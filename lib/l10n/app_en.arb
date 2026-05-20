@@ -1,0 +1,529 @@
+{
+  "@@locale": "en",
+  "appTitle": "Bimobond App",
+  "helloWorld": "Hello World!",
+  "loginTitle": "Login",
+  "signInSubtitle": "Sign in to continue",
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "loginButton": "Login",
+  "dontHaveAccount": "Don't have an account? ",
+  "signUp": "Sign Up",
+  "orDivider": "OR",
+  "continueAsGuest": "Continue as Guest",
+  "continueWith": "Continue with",
+  "signUpTitle": "Create Account",
+  "signUpSubtitle": "Enter your details to create a new account",
+  "fullNameLabel": "Full Name",
+  "usernameLabel": "Username",
+  "countryLabel": "Country",
+  "nationalityLabel": "Nationality",
+  "ageLabel": "Age",
+  "addressLabel": "Address",
+  "phoneLabel": "Phone",
+  "mobileNumberLabel": "Mobile Number",
+  "confirmPasswordLabel": "Confirm Password",
+  "createAccountBtn": "Create Account",
+  "alreadyHaveAccount": "Already have an account? ",
+  "phoneLoginTitle": "Phone Login",
+  "phoneLoginSubtitle": "Enter your phone number to receive a verification code",
+  "phoneHint": "+20 123 456 7890",
+  "termsAndConditionsPart1": "By continuing, you agree to our ",
+  "termsAndConditionsPart2": "Terms & Conditions",
+  "verifyPhoneTitle": "Verify Phone",
+  "emailVerificationTitle": "Verify Your Email",
+  "emailVerificationSent": "We sent a verification link to {email}.",
+  "@emailVerificationSent": {
+    "description": "Displayed after sending verification email",
+    "placeholders": {
+      "email": {}
+    }
+  },
+  "emailVerificationContinue": "Open your email and verify your account before continuing.",
+  "emailVerificationButton": "I have verified my email",
+  "emailVerificationResendError": "Unable to resend verification email. Please sign in again.",
+  "emailVerificationResendSuccess": "Verification email resent. Check your inbox and spam folder.",
+  "emailVerificationResendFailed": "Failed to resend verification email. Please try again.",
+  "emailVerificationStatusError": "Unable to verify email status. Please sign in again.",
+  "emailVerificationNotVerified": "Email not verified yet. Please open your email and verify your account.",
+  "emailVerificationCheckFailed": "Could not check verification status. Please try again.",
+  "emailVerificationResendButton": "Resend verification email",
+  "emailVerificationResending": "Resending...",
+  "enterCodeSentTo": "Enter the 6-digit code sent to",
+  "verificationCodeLabel": "Verification Code",
+  "verifyAndLoginBtn": "Verify & Login",
+  "didNotReceiveCode": "Didn't receive a code? ",
+  "resendCode": "Resend",
+  "back": "Back",
+  "continueAction": "Continue",
+  "emailRequired": "Email is required",
+  "invalidEmail": "Enter a valid email",
+  "passwordRequired": "Password is required",
+  "passwordTooShort": "Password must be at least 6 characters",
+  "loginFailed": "Login failed. Please try again.",
+  "verificationFailed": "Verification failed",
+  "invalidOtpCode": "Invalid OTP code",
+  "facebookLoginFailed": "Facebook login failed",
+  "googleLoginFailed": "Google login failed",
+  "updateProfileFailed": "Failed to update profile",
+  "signupFailed": "Signup failed. Please try again.",
+  "profileUpdatedSuccessfully": "Profile updated successfully!",
+  "enterSixDigitCode": "Please enter a 6-digit code",
+  "postAdded": "Post added!",
+  "addPost": "Add Post",
+  "postButton": "Post",
+  "loginSuccess": "Login successful!",
+  "signupSuccess": "Signup successful! Please check your email to verify your account.",
+  "signUpWithEmailPassword": "Sign up with Email and Password",
+  "following": "Following",
+  "followers": "Followers",
+  "likes": "Likes",
+  "profilePostsTab": "Posts",
+  "profilePostAuction": "Auction",
+  "profileLikesTab": "Likes",
+  "noPostsYet": "No posts yet",
+  "noLikedPosts": "No liked posts",
+  "noSavedPosts": "No saved posts",
+  "editProfile": "Edit profile",
+  "noBio": "No bio yet.",
+  "story": "Story",
+  "personalInfo": "Personal Info",
+  "genderLabel": "Gender",
+  "male": "Male",
+  "female": "Female",
+  "selectCountry": "Select Country",
+  "changeProfilePhoto": "Change profile photo",
+  "takePhoto": "Take a photo",
+  "selectFromGallery": "Select from gallery",
+  "removeCurrentPhoto": "Remove current photo",
+  "changePhoto": "Change photo",
+  "enterYourName": "Enter your name",
+  "enterUsername": "Enter username",
+  "addBioToProfile": "Add a bio to your profile",
+  "selectGender": "Select gender",
+  "instagramProfileUrl": "Instagram profile URL",
+  "youtubeChannelUrl": "YouTube channel URL",
+  "egypt": "Egypt",
+  "saudiArabia": "Saudi Arabia",
+  "uae": "UAE",
+  "usa": "USA",
+  "uk": "UK",
+  "kuwait": "Kuwait",
+  "qatar": "Qatar",
+  "bioLabel": "Bio",
+  "instagramLabel": "Instagram",
+  "youtubeLabel": "YouTube",
+  "fieldIsRequired": "{field} is required",
+  "@fieldIsRequired": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "edit": "Edit",
+  "feedFollowingTab": "Following",
+  "feedForYou": "For You",
+  "feedLive": "Live",
+  "noPostsFound": "No posts found",
+  "navHome": "Home",
+  "navFriends": "Friends",
+  "navAuctions": "Auctions",
+  "auctionsSearchHint": "Search by category or description...",
+  "popularCategories": "Popular categories",
+  "viewAll": "View all",
+  "auctionCategoryWatches": "Luxury watches",
+  "auctionCategoryCars": "Sports cars",
+  "auctionCategoryArt": "Rare art",
+  "auctionCategoryJewelry": "Jewelry",
+  "auctionCategoryAll": "All",
+  "activeAuctionsNow": "Active auctions now",
+  "liveBadge": "Live",
+  "auctionActiveBadge": "Active",
+  "auctionFinishedBadge": "Finished",
+  "auctionTimeLeft": "Time left",
+  "auctionStartsIn": "Starts in",
+  "auctionAddedBy": "Added by {username}",
+  "@auctionAddedBy": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "auctionCountdownDayCount": "{days} day",
+  "@auctionCountdownDayCount": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "auctionTimerHour": "h",
+  "auctionTimerMinute": "m",
+  "auctionTimerSecond": "s",
+  "auctionCountdownWithDays": "{days} day {time}",
+  "@auctionCountdownWithDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "auctionTargetReachedMessage": "Target price reached. Auction ended.",
+  "auctionBiddingClosed": "Bidding closed",
+  "auctionTargetPrice": "Target {amount} {currency}",
+  "@auctionTargetPrice": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveStreamsTitle": "Live Streams",
+  "searchLiveStreamsHint": "Search live streams...",
+  "liveFilterAll": "All",
+  "liveFilterRealEstate": "Real Estate",
+  "liveFilterAuctions": "Auctions",
+  "liveFilterTrending": "Trending",
+  "liveFilterInvestments": "Investments",
+  "liveStreamTitle1": "Live Real Estate Q&A",
+  "liveStreamTitle2": "Luxury Auction Showcase",
+  "liveStreamTitle3": "Investment Tips Live",
+  "liveHostName": "Host {number}",
+  "@liveHostName": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "liveViewersCount": "{count}",
+  "@liveViewersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "joinLiveStream": "Join live",
+  "liveDetailsTitle": "Live stream",
+  "liveFollow": "Follow",
+  "liveFollowing": "Following",
+  "liveViewersShort": "{count} viewers",
+  "@liveViewersShort": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTopBid": "Highest price",
+  "currencyUsd": "USD",
+  "currencySar": "SAR",
+  "liveHighestBidAmount": "{amount} {currency}",
+  "@liveHighestBidAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveAddCommentOrBid": "Add comment or bid...",
+  "liveBidAmount": "Bid {amount} SAR",
+  "@liveBidAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "liveCommentSample": "This property looks amazing!",
+  "liveChatYou": "You",
+  "liveSendGift": "Send Gift",
+  "liveSelectGift": "Select a Gift",
+  "liveSendToHost": "Send to Host",
+  "liveGiftSent": "Sent {name} {icon}",
+  "@liveGiftSent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "icon": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftCommentGeneric": "Sent a gift",
+  "liveGiftRose": "Rose",
+  "liveGiftCoffee": "Coffee",
+  "liveGiftDonut": "Donut",
+  "liveGiftHeart": "Heart",
+  "liveGiftParty": "Party",
+  "liveGiftCrown": "Crown",
+  "liveGiftRocket": "Rocket",
+  "liveGiftDiamond": "Diamond",
+  "liveVipBadge": "VIP",
+  "liveCoinsBalance": "{count}",
+  "@liveCoinsBalance": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGiftPriceLabel": "PRICE",
+  "liveGiftPriceAmount": "{amount} {currency}",
+  "@liveGiftPriceAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftBuy": "Buy — {price}",
+  "@liveGiftBuy": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftBuyMore": "Buy more",
+  "liveGiftBuying": "Buying…",
+  "liveGiftSending": "Sending…",
+  "liveGiftPurchaseSuccess": "Purchased {name}",
+  "@liveGiftPurchaseSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftLoginRequired": "Sign in to buy or send gifts",
+  "liveGiftNoRecipient": "Open a live or auction post to send a gift",
+  "liveGiftCannotSendToSelf": "You cannot send a gift to your own auction",
+  "liveGiftCatalogEmpty": "No gifts available",
+  "liveGiftRetry": "Retry",
+  "liveGiftOwned": "×{count}",
+  "@liveGiftOwned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "auctionGiftsTitle": "Auction gifts",
+  "auctionGiftsEmpty": "No gifts sent on this auction yet",
+  "auctionGiftsSummary": "{current} / {target} {currency}",
+  "@auctionGiftsSummary": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "auctionGiftsContribution": "+{amount} {currency}",
+  "@auctionGiftsContribution": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveQuickBid": "+{amount}",
+  "@liveQuickBid": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "highestCurrentBid": "Highest current bid",
+  "bidsLabel": "Bids",
+  "auctionGiftsLabel": "Gifts",
+  "bidNow": "Bid now",
+  "navAdd": "Add",
+  "navChat": "Chat",
+  "navProfile": "Profile",
+  "describePostHint": "Describe your post...",
+  "hashtagsLabel": "Hashtags",
+  "mentionsLabel": "Mentions",
+  "whoCanWatchLabel": "Who can watch this post",
+  "allowCommentsLabel": "Allow comments",
+  "allowDuetLabel": "Allow Duet",
+  "allowStitchLabel": "Allow Stitch",
+  "addLocationLabel": "Add location",
+  "everyoneLabel": "Everyone",
+  "friendsLabel": "Friends",
+  "onlyMeLabel": "Only me",
+  "videoLabel": "Video",
+  "recordVideo": "Record video",
+  "imagesLabel": "Images",
+  "imageFromLibrary": "Images from library",
+  "videoFromLibrary": "Videos from library",
+  "tapToSelectMedia": "Tap to select media",
+  "pleaseSelectMediaFirst": "Please select media first",
+  "loginRequired": "Login Required",
+  "loginRequiredMessage": "Please login to like, comment or save posts",
+  "cancel": "Cancel",
+  "login": "Login",
+  "commentsTitle": "Comments",
+  "commentsCount": "{count} comments",
+  "@commentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noCommentsYet": "No comments yet. Be the first!",
+  "addCommentHint": "Add comment...",
+  "justNow": "Just now",
+  "replyAction": "Reply",
+  "replyingTo": "Replying to {username}",
+  "@replyingTo": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "viewReplies": "View {count} replies",
+  "@viewReplies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hideReplies": "Hide replies",
+  "loadMoreReplies": "Load more replies",
+  "deleteCommentTitle": "Delete comment?",
+  "deleteCommentMessage": "This comment will be permanently removed.",
+  "deleteAction": "Delete",
+  "editPost": "Edit post",
+  "deletePost": "Delete post",
+  "deletePostTitle": "Delete post?",
+  "deletePostMessage": "This post will be permanently removed. Only you can delete your own posts.",
+  "postUpdatedSuccessfully": "Post updated successfully",
+  "postDeletedSuccessfully": "Post deleted successfully",
+  "saveButton": "Save",
+  "categoryLabel": "Category",
+  "selectCategoryHint": "Choose a category",
+  "hashtagsHint": "Separate with commas (e.g. travel, food)",
+  "mentionsHint": "Separate with commas (e.g. john, jane)",
+  "mediaLabel": "Media",
+  "settingsAndPrivacy": "Settings and privacy",
+  "settingsSectionAccount": "Account",
+  "settingsSecurity": "Security",
+  "settingsPrivacy": "Privacy",
+  "settingsSectionContent": "Content & display",
+  "settingsLanguage": "Language",
+  "settingsNotifications": "Notifications",
+  "settingsDarkMode": "Dark mode",
+  "settingsSectionSupport": "Support",
+  "settingsHelpCenter": "Help center",
+  "settingsAbout": "About",
+  "settingsLogout": "Log out",
+  "settingsSelectLanguage": "Select language",
+  "settingsAppearance": "Appearance",
+  "settingsLightMode": "Light mode",
+  "settingsDarkModeOption": "Dark mode",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageArabic": "Arabic",
+  "settingsOn": "On",
+  "settingsOff": "Off",
+  "settingsLogoutTitle": "Log out?",
+  "settingsLogoutMessage": "You will need to sign in again to use your account.",
+  "settingsComingSoon": "Coming soon",
+  "messagesTitle": "Messages",
+  "messagesInboxTitle": "Inbox",
+  "messagesSwitchAccount": "Switch Account",
+  "messagesNewConversation": "New conversation",
+  "messagesSearchHint": "Search messages or people",
+  "messagesYourStory": "Your Story",
+  "messagesPeopleYouMayKnow": "People you may know",
+  "messagesSeeAll": "See all",
+  "messagesFollow": "Follow",
+  "messagesFollowing": "Following",
+  "messagesRecentMentions": "Recent Mentions",
+  "messagesActivityFollowers": "Followers",
+  "messagesActivityActivities": "Activities",
+  "messagesActivityComments": "Comments",
+  "messagesActivityMentions": "Mentions",
+  "messagesRecentMessages": "Recent Messages",
+  "messagesAll": "All",
+  "messagesNoResults": "No results found",
+  "messagesInboxNoMessagesYet": "No messages yet",
+  "messagesInboxYouPrefix": "You",
+  "messagesInboxLastPhoto": "Photo",
+  "messagesInboxLastVideo": "Video",
+  "messagesInboxLastGift": "Gift",
+  "messagesInboxLastShare": "Shared a post",
+  "messagesInboxMessageDeleted": "Message deleted",
+  "messagesInboxGroupFallback": "Group",
+  "messagesInboxUserFallback": "User",
+  "messagesPreviewProperty": "Hi, is the property still available?",
+  "messagesPreviewOffer": "New offer has been sent",
+  "messagesPreviewThanks": "Thank you for your interest",
+  "messagesPreviewCar": "When can I check the car?",
+  "messagesMentionVilla": "Great post describing the villa! @myself",
+  "messagesMentionCheck": "Check this out @myself",
+  "messagesSuggestionBioDesigner": "Interior Designer | Arch",
+  "messagesSuggestionBioJeddah": "Top listings in Jeddah",
+  "messagesSuggestionBioLuxury": "Worldwide luxury estates",
+  "chatActiveNow": "Active now",
+  "chatAddComment": "Add comment...",
+  "chatRecording": "Recording...",
+  "chatSlideUpToCancel": "Slide up to cancel",
+  "chatSeedGreeting": "Hi! How can I help you?",
+  "chatSeedInterested": "I am interested in the property shown",
+  "chatSeedFinalPrice": "Can I know the final price?",
+  "chatSeedAutoReply": "Thanks for reaching out! We will get back to you soon with more details.",
+  "chatUserBio": "Interested in real estate and design.",
+  "chatMoreGallery": "Gallery",
+  "chatMoreCamera": "Camera",
+  "chatMoreVideo": "Video",
+  "chatMoreLocation": "Location",
+  "chatMoreContact": "Contact",
+  "chatMoreFile": "File",
+  "chatMoreGift": "Gift",
+  "chatMorePoll": "Poll",
+  "chatLastMessage1": "Can I know the final price?",
+  "chatLastMessage2": "Thanks for the update!",
+  "chatLastMessage3": "Is the property still available?",
+  "chatLastMessage4": "Sent a photo",
+  "chatLastMessage5": "See you tomorrow 👋",
+  "addPostAsAuction": "List as auction",
+  "auctionItemName": "Item name",
+  "auctionItemNameHint": "e.g. Antique Pocket Watch",
+  "auctionStartingPrice": "Starting price (USD)",
+  "auctionTargetPriceLabel": "Target price (USD)",
+  "auctionStartDate": "Auction starts",
+  "auctionEndDate": "Auction ends",
+  "auctionEndBeforeStart": "End date must be after start date",
+  "auctionTargetBelowStart": "Target price must be greater than starting price",
+  "auctionInvalidPrice": "Enter a valid price"
+}

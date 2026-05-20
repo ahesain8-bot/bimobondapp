@@ -1,0 +1,122 @@
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/core/utils/api_constants.dart';
+
+class MediaUtils {
+  MediaUtils._();
+
+  /// Turns API-relative paths (e.g. `/uploads/foo.jpg`) into absolute URLs.
+  static String resolveAbsoluteUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) {
+      return '${ApiConstants.baseUrl}$trimmed';
+    }
+    return trimmed;
+  }
+
+  static const List<String> videoExtensions = [
+    '.mp4',
+    '.mov',
+    '.avi',
+    '.wmv',
+    '.flv',
+    '.mkv',
+    '.webm',
+    '.m4v',
+    '.3gp',
+    '.mpg',
+    '.mpeg',
+  ];
+
+  static const List<String> imageExtensions = [
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+    '.bmp',
+    '.heic',
+    '.heif',
+  ];
+
+  /// True only for URLs that look like real image files (not video / unknown).
+  static bool isLikelyImageUrl(String url) {
+    if (url.isEmpty || isVideo(url)) return false;
+    final cleanUrl = url.toLowerCase().split('?').first;
+    return imageExtensions.any((ext) => cleanUrl.endsWith(ext));
+  }
+
+  /// Poster image for a video post (API thumbnail or first image in media).
+  static String? resolveVideoPosterUrl(PostEntity post) {
+    final videoUrl = post.videoUrl != null && post.videoUrl!.isNotEmpty
+        ? resolveAbsoluteUrl(post.videoUrl!)
+        : null;
+
+    final thumb = post.thumbnailUrl;
+    if (thumb != null && thumb.isNotEmpty) {
+      final resolved = resolveAbsoluteUrl(thumb);
+      if (isLikelyImageUrl(resolved) && resolved != videoUrl) {
+        return resolved;
+      }
+    }
+
+    for (final item in post.media) {
+      if (item.mediaType.toUpperCase() == 'IMAGE' && item.url.isNotEmpty) {
+        final resolved = resolveAbsoluteUrl(item.url);
+        if (isLikelyImageUrl(resolved)) return resolved;
+      }
+    }
+
+    return null;
+  }
+
+  /// Checks if a URL points to a video based on extension or metadata
+  static bool isVideo(String url, {String? mediaType}) {
+    if (url.isEmpty) return false;
+
+    // 1. Check explicit metadata if provided
+    if (mediaType?.toUpperCase() == 'VIDEO') return true;
+
+    // 2. Check URL content
+    final lowerUrl = url.toLowerCase();
+
+    // Handle Firebase/Cloud storage URLs with query params
+    final cleanUrl = lowerUrl.split('?').first;
+
+    // Check extensions
+    if (videoExtensions.any((ext) => cleanUrl.endsWith(ext))) return true;
+
+    // Fallback: check if URL contains common video identifiers (less reliable but useful for streams)
+    if (lowerUrl.contains('video') || lowerUrl.contains('mp4')) return true;
+
+    return false;
+  }
+
+  /// Checks if a URL points to an image
+  static bool isImage(String url, {String? mediaType}) {
+    if (url.isEmpty) return false;
+
+    if (mediaType?.toUpperCase() == 'VIDEO') return false;
+
+    // 1. Check explicit metadata if provided
+    if (mediaType?.toUpperCase() == 'IMAGE') return true;
+
+    // 2. Check URL content
+    final lowerUrl = url.toLowerCase();
+    final cleanUrl = lowerUrl.split('?').first;
+
+    // Check extensions
+    if (imageExtensions.any((ext) => cleanUrl.endsWith(ext))) return true;
+
+    // If it's not a video and has some common image keywords or is a typical media URL
+    if (!isVideo(url, mediaType: mediaType)) {
+      // If we can't tell, we often assume image for fallback if it's not obviously a video
+      return true;
+    }
+
+    return false;
+  }
+}

@@ -1,0 +1,74 @@
+import 'package:bimobondapp/app/posts/data/datasources/posts_remote_data_source.dart';
+import 'package:bimobondapp/app/posts/data/repositories/posts_repository_impl.dart';
+import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/add_comment_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/create_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/delete_comment_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_comments_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_replies_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_comment_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/delete_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/toggle_save_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
+import 'package:bimobondapp/app/posts/presentation/bloc/comments_bloc.dart';
+import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
+import 'package:get_it/get_it.dart';
+
+final sl = GetIt.instance;
+
+Future<void> initPosts() async {
+  // Data sources
+  sl.registerLazySingleton<PostsRemoteDataSource>(
+    () => PostsRemoteDataSourceImpl(apiClient: sl()),
+  );
+
+  // Repository
+  sl.registerLazySingleton<PostsRepository>(
+    () => PostsRepositoryImpl(
+      remoteDataSource: sl(),
+      likesLocalDataSource: sl(),
+    ),
+  );
+
+  // Use cases
+  sl.registerLazySingleton(() => CreatePostUseCase(sl()));
+  sl.registerLazySingleton(() => UploadMediaUseCase(sl()));
+  sl.registerLazySingleton(() => GetFeedUseCase(sl()));
+  sl.registerLazySingleton(() => ToggleLikePostUsecase(sl()));
+  sl.registerLazySingleton(() => ToggleSavePostUsecase(sl()));
+  sl.registerLazySingleton(() => UpdatePostUsecase(sl()));
+  sl.registerLazySingleton(() => DeletePostUsecase(sl()));
+
+  // Comments Use Cases
+  sl.registerLazySingleton(() => GetCommentsUsecase(sl()));
+  sl.registerLazySingleton(() => AddCommentUsecase(sl()));
+  sl.registerLazySingleton(() => GetRepliesUsecase(sl()));
+  sl.registerLazySingleton(() => DeleteCommentUsecase(sl()));
+  sl.registerLazySingleton(() => ToggleLikeCommentUsecase(sl()));
+
+  // Bloc
+  sl.registerFactory(
+    () => PostsBloc(
+      createPostUseCase: sl(),
+      uploadMediaUseCase: sl(),
+      getFeedUseCase: sl(),
+      toggleLikePostUsecase: sl(),
+      toggleSavePostUsecase: sl(),
+      updatePostUsecase: sl(),
+      deletePostUsecase: sl(),
+    ),
+  );
+
+  sl.registerFactory(
+    () => CommentsBloc(
+      getCommentsUsecase: sl(),
+      addCommentUsecase: sl(),
+      getRepliesUsecase: sl(),
+      deleteCommentUsecase: sl(),
+      toggleLikeCommentUsecase: sl(),
+    ),
+  );
+}

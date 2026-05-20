@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bimo Bond</string>
+    <string name="facebook_app_id">972315768828668</string>
+    <string name="fb_login_protocol_scheme">fb972315768828668</string>
+    <string name="facebook_client_token">c63780c784abbee2ec7ff75c346efb9c</string>
+</resources>

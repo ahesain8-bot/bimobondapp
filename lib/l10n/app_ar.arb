@@ -1,0 +1,529 @@
+{
+  "@@locale": "ar",
+  "appTitle": "تطبيق بيموبوند",
+  "helloWorld": "مرحبا بالعالم!",
+  "loginTitle": "تسجيل الدخول",
+  "signInSubtitle": "تسجيل الدخول للمتابعة",
+  "emailLabel": "البريد الإلكتروني",
+  "passwordLabel": "كلمة المرور",
+  "loginButton": "تسجيل الدخول",
+  "dontHaveAccount": "ليس لديك حساب؟ ",
+  "signUp": "إنشاء حساب",
+  "orDivider": "أو",
+  "continueAsGuest": "الدخول كضيف",
+  "continueWith": "المتابعة باستخدام",
+  "signUpTitle": "إنشاء حساب",
+  "signUpSubtitle": "أدخل بياناتك لإنشاء حساب جديد",
+  "fullNameLabel": "الاسم الكامل",
+  "usernameLabel": "اسم المستخدم",
+  "countryLabel": "الدولة",
+  "nationalityLabel": "الجنسية",
+  "ageLabel": "العمر",
+  "addressLabel": "العنوان",
+  "phoneLabel": "رقم الجوال",
+  "mobileNumberLabel": "رقم الجوال",
+  "confirmPasswordLabel": "تأكيد كلمة المرور",
+  "createAccountBtn": "إنشاء الحساب",
+  "alreadyHaveAccount": "لديك حساب؟ ",
+  "phoneLoginTitle": "الدخول برقم الجوال",
+  "phoneLoginSubtitle": "أدخل رقم جوالك لتلقي رمز التحقق",
+  "phoneHint": "+20 123 456 7890",
+  "termsAndConditionsPart1": "بالاستمرار، أنت توافق على ",
+  "termsAndConditionsPart2": "الشروط والأحكام",
+  "verifyPhoneTitle": "التحقق من الجوال",
+  "emailVerificationTitle": "تحقق من بريدك الإلكتروني",
+  "emailVerificationSent": "أرسلنا رابط التحقق إلى {email}.",
+  "@emailVerificationSent": {
+    "description": "Displayed after sending verification email",
+    "placeholders": {
+      "email": {}
+    }
+  },
+  "emailVerificationContinue": "افتح بريدك الإلكتروني وتحقق من حسابك قبل المتابعة.",
+  "emailVerificationButton": "لقد قمت بالتحقق من بريدي الإلكتروني",
+  "emailVerificationResendError": "يتعذر إعادة إرسال بريد التحقق. يرجى تسجيل الدخول مرة أخرى.",
+  "emailVerificationResendSuccess": "تمت إعادة إرسال بريد التحقق. تحقق من صندوق الوارد ومجلد البريد العشوائي.",
+  "emailVerificationResendFailed": "فشل إعادة إرسال بريد التحقق. يرجى المحاولة مرة أخرى.",
+  "emailVerificationStatusError": "يتعذر التحقق من حالة البريد الإلكتروني. يرجى تسجيل الدخول مرة أخرى.",
+  "emailVerificationNotVerified": "لم يتم التحقق من البريد الإلكتروني بعد. يرجى فتح بريدك الإلكتروني والتحقق من حسابك.",
+  "emailVerificationCheckFailed": "تعذّر التحقق من حالة البريد الإلكتروني. يرجى المحاولة مرة أخرى.",
+  "emailVerificationResendButton": "إعادة إرسال بريد التحقق",
+  "emailVerificationResending": "جارٍ إعادة الإرسال...",
+  "enterCodeSentTo": "أدخل الرمز المكون من 6 أرقام المرسل إلى",
+  "verificationCodeLabel": "رمز التحقق",
+  "verifyAndLoginBtn": "التحقق والدخول",
+  "didNotReceiveCode": "لم يصلك الرمز؟ ",
+  "resendCode": "إعادة إرسال",
+  "back": "رجوع",
+  "continueAction": "متابعة",
+  "emailRequired": "البريد الإلكتروني مطلوب",
+  "invalidEmail": "أدخل بريد إلكتروني صحيح",
+  "passwordRequired": "كلمة المرور مطلوبة",
+  "passwordTooShort": "يجب أن تكون كلمة المرور 6 أحرف على الأقل",
+  "loginFailed": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+  "verificationFailed": "فشل التحقق",
+  "invalidOtpCode": "رمز OTP غير صحيح",
+  "facebookLoginFailed": "فشل تسجيل الدخول عبر فيسبوك",
+  "googleLoginFailed": "فشل تسجيل الدخول عبر جوجل",
+  "updateProfileFailed": "فشل تحديث الملف الشخصي",
+  "signupFailed": "فشل إنشاء الحساب. يرجى المحاولة مرة أخرى.",
+  "profileUpdatedSuccessfully": "تم تحديث الملف الشخصي بنجاح!",
+  "enterSixDigitCode": "يرجى إدخال رمز مكون من 6 أرقام",
+  "postAdded": "تم إضافة المنشور!",
+  "addPost": "إضافة منشور",
+  "postButton": "نشر",
+  "loginSuccess": "تم تسجيل الدخول بنجاح!",
+  "signupSuccess": "تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتفعيل حسابك.",
+  "signUpWithEmailPassword": "إنشاء حساب بالبريد الإلكتروني وكلمة المرور",
+  "following": "متابعة",
+  "followers": "متابعون",
+  "likes": "إعجابات",
+  "profilePostsTab": "المنشورات",
+  "profilePostAuction": "مزاد",
+  "profileLikesTab": "الإعجابات",
+  "noPostsYet": "لا توجد منشورات بعد",
+  "noLikedPosts": "لا توجد منشورات معجب بها",
+  "noSavedPosts": "لا توجد منشورات محفوظة",
+  "editProfile": "تعديل الملف الشخصي",
+  "noBio": "لا يوجد نبذة شخصية بعد.",
+  "story": "قصة",
+  "personalInfo": "المعلومات الشخصية",
+  "genderLabel": "الجنس",
+  "male": "ذكر",
+  "female": "أنثى",
+  "selectCountry": "اختر الدولة",
+  "changeProfilePhoto": "تغيير صورة الملف الشخصي",
+  "takePhoto": "التقاط صورة",
+  "selectFromGallery": "اختيار من المعرض",
+  "removeCurrentPhoto": "إزالة الصورة الحالية",
+  "changePhoto": "تغيير الصورة",
+  "enterYourName": "أدخل اسمك",
+  "enterUsername": "أدخل اسم المستخدم",
+  "addBioToProfile": "أضف نبذة شخصية لملفك",
+  "selectGender": "اختر الجنس",
+  "instagramProfileUrl": "رابط حساب إنستجرام",
+  "youtubeChannelUrl": "رابط قناة يوتيوب",
+  "egypt": "مصر",
+  "saudiArabia": "السعودية",
+  "uae": "الإمارات",
+  "usa": "أمريكا",
+  "uk": "بريطانيا",
+  "kuwait": "الكويت",
+  "qatar": "قطر",
+  "bioLabel": "نبذة شخصية",
+  "instagramLabel": "إنستجرام",
+  "youtubeLabel": "يوتيوب",
+  "fieldIsRequired": "{field} مطلوب",
+  "@fieldIsRequired": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "edit": "تعديل",
+  "feedFollowingTab": "المتابَعون",
+  "feedForYou": "لك",
+  "feedLive": "مباشر",
+  "noPostsFound": "لا توجد منشورات",
+  "navHome": "الرئيسية",
+  "navFriends": "الأصدقاء",
+  "navAuctions": "مزادات",
+  "auctionsSearchHint": "ابحث بالفئة أو الوصف...",
+  "popularCategories": "الفئات الرائجة",
+  "viewAll": "عرض الكل",
+  "auctionCategoryWatches": "ساعات فاخرة",
+  "auctionCategoryCars": "سيارات رياضية",
+  "auctionCategoryArt": "فنون نادرة",
+  "auctionCategoryJewelry": "مجوهرات",
+  "auctionCategoryAll": "الكل",
+  "activeAuctionsNow": "مزادات نشطة الآن",
+  "liveBadge": "مباشر",
+  "auctionActiveBadge": "نشط",
+  "auctionFinishedBadge": "انتهى",
+  "auctionTimeLeft": "الوقت المتبقي",
+  "auctionStartsIn": "يبدأ خلال",
+  "auctionAddedBy": "أضافه {username}",
+  "@auctionAddedBy": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "auctionCountdownDayCount": "{days} يوم",
+  "@auctionCountdownDayCount": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "auctionTimerHour": "س",
+  "auctionTimerMinute": "د",
+  "auctionTimerSecond": "ث",
+  "auctionCountdownWithDays": "{days} يوم {time}",
+  "@auctionCountdownWithDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "auctionTargetReachedMessage": "تم الوصول للسعر المستهدف. انتهى المزاد.",
+  "auctionBiddingClosed": "المزايدة مغلقة",
+  "auctionTargetPrice": "الهدف {amount} {currency}",
+  "@auctionTargetPrice": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveStreamsTitle": "بث مباشر",
+  "searchLiveStreamsHint": "ابحث عن بث...",
+  "liveFilterAll": "الكل",
+  "liveFilterRealEstate": "عقارات",
+  "liveFilterAuctions": "مزادات",
+  "liveFilterTrending": "رائج",
+  "liveFilterInvestments": "استثمارات",
+  "liveStreamTitle1": "استثمار عقاري مباشر",
+  "liveStreamTitle2": "عرض مزادات فاخرة",
+  "liveStreamTitle3": "نصائح استثمارية مباشرة",
+  "liveHostName": "مضيف {number}",
+  "@liveHostName": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "liveViewersCount": "{count}",
+  "@liveViewersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "joinLiveStream": "انضم للبث",
+  "liveDetailsTitle": "بث مباشر",
+  "liveFollow": "متابعة",
+  "liveFollowing": "متابع",
+  "liveViewersShort": "{count} مشاهد",
+  "@liveViewersShort": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "liveTopBid": "أعلى سعر",
+  "currencyUsd": "دولار",
+  "currencySar": "ر.س",
+  "liveHighestBidAmount": "{amount} {currency}",
+  "@liveHighestBidAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveAddCommentOrBid": "أضف تعليق أو سعر...",
+  "liveBidAmount": "زايد بـ {amount} ر.س",
+  "@liveBidAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "liveCommentSample": "هذا العقار ممتاز جداً!",
+  "liveChatYou": "أنت",
+  "liveSendGift": "إرسال هدية",
+  "liveSelectGift": "اختر هدية",
+  "liveSendToHost": "إرسال للمضيف",
+  "liveGiftSent": "أرسل {name} {icon}",
+  "@liveGiftSent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "icon": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftCommentGeneric": "أرسل هدية",
+  "liveGiftRose": "وردة",
+  "liveGiftCoffee": "قهوة",
+  "liveGiftDonut": "دونات",
+  "liveGiftHeart": "قلب",
+  "liveGiftParty": "احتفال",
+  "liveGiftCrown": "تاج",
+  "liveGiftRocket": "صاروخ",
+  "liveGiftDiamond": "ماسة",
+  "liveVipBadge": "VIP",
+  "liveCoinsBalance": "{count}",
+  "@liveCoinsBalance": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGiftPriceLabel": "السعر",
+  "liveGiftPriceAmount": "{amount} {currency}",
+  "@liveGiftPriceAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftBuy": "شراء — {price}",
+  "@liveGiftBuy": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftBuyMore": "شراء المزيد",
+  "liveGiftBuying": "جاري الشراء…",
+  "liveGiftSending": "جاري الإرسال…",
+  "liveGiftPurchaseSuccess": "تم شراء {name}",
+  "@liveGiftPurchaseSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGiftLoginRequired": "سجّل الدخول لشراء أو إرسال الهدايا",
+  "liveGiftNoRecipient": "افتح بثاً أو مزاداً لإرسال هدية",
+  "liveGiftCannotSendToSelf": "لا يمكنك إرسال هدية إلى مزادك الخاص",
+  "liveGiftCatalogEmpty": "لا توجد هدايا متاحة",
+  "liveGiftRetry": "إعادة المحاولة",
+  "liveGiftOwned": "×{count}",
+  "@liveGiftOwned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "auctionGiftsTitle": "هدايا المزاد",
+  "auctionGiftsEmpty": "لم تُرسل هدايا على هذا المزاد بعد",
+  "auctionGiftsSummary": "{current} / {target} {currency}",
+  "@auctionGiftsSummary": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "auctionGiftsContribution": "+{amount} {currency}",
+  "@auctionGiftsContribution": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "liveQuickBid": "+{amount}",
+  "@liveQuickBid": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "highestCurrentBid": "أعلى مزايدة حالية",
+  "bidsLabel": "المزايدات",
+  "auctionGiftsLabel": "الهدايا",
+  "bidNow": "زايد الآن",
+  "navAdd": "إضافة",
+  "navChat": "الدردشة",
+  "navProfile": "حسابي",
+  "describePostHint": "صف منشورك...",
+  "hashtagsLabel": "هاشتاجات",
+  "mentionsLabel": "منشن",
+  "whoCanWatchLabel": "من يمكنه مشاهدة هذا المنشور",
+  "allowCommentsLabel": "السماح بالتعليقات",
+  "allowDuetLabel": "السماح بـ Duet",
+  "allowStitchLabel": "السماح بـ Stitch",
+  "addLocationLabel": "إضافة موقع",
+  "everyoneLabel": "الجميع",
+  "friendsLabel": "الأصدقاء",
+  "onlyMeLabel": "أنا فقط",
+  "videoLabel": "فيديو",
+  "recordVideo": "تسجيل فيديو",
+  "imagesLabel": "صور",
+  "imageFromLibrary": "صور من المعرض",
+  "videoFromLibrary": "فيديوهات من المعرض",
+  "tapToSelectMedia": "اضغط لاختيار الوسائط",
+  "pleaseSelectMediaFirst": "يرجى اختيار الوسائط أولاً",
+  "loginRequired": "تسجيل الدخول مطلوب",
+  "loginRequiredMessage": "يرجى تسجيل الدخول للإعجاب أو التعليق أو حفظ المنشورات",
+  "cancel": "إلغاء",
+  "login": "تسجيل الدخول",
+  "commentsTitle": "التعليقات",
+  "commentsCount": "{count} تعليقات",
+  "@commentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noCommentsYet": "لا توجد تعليقات بعد. كن أول من يعلق!",
+  "addCommentHint": "أضف تعليقًا...",
+  "justNow": "الآن",
+  "replyAction": "رد",
+  "replyingTo": "الرد على {username}",
+  "@replyingTo": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "viewReplies": "عرض {count} ردود",
+  "@viewReplies": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hideReplies": "إخفاء الردود",
+  "loadMoreReplies": "تحميل المزيد من الردود",
+  "deleteCommentTitle": "حذف التعليق؟",
+  "deleteCommentMessage": "سيتم حذف هذا التعليق نهائيًا.",
+  "deleteAction": "حذف",
+  "editPost": "تعديل المنشور",
+  "deletePost": "حذف المنشور",
+  "deletePostTitle": "حذف المنشور؟",
+  "deletePostMessage": "سيتم حذف هذا المنشور نهائيًا. يمكنك حذف منشوراتك فقط.",
+  "postUpdatedSuccessfully": "تم تحديث المنشور بنجاح",
+  "postDeletedSuccessfully": "تم حذف المنشور بنجاح",
+  "saveButton": "حفظ",
+  "categoryLabel": "الفئة",
+  "selectCategoryHint": "اختر فئة",
+  "hashtagsHint": "افصل بفواصل (مثال: سفر، طعام)",
+  "mentionsHint": "افصل بفواصل (مثال: john, jane)",
+  "mediaLabel": "الوسائط",
+  "settingsAndPrivacy": "الإعدادات والخصوصية",
+  "settingsSectionAccount": "الحساب",
+  "settingsSecurity": "الأمان",
+  "settingsPrivacy": "الخصوصية",
+  "settingsSectionContent": "المحتوى والعرض",
+  "settingsLanguage": "اللغة",
+  "settingsNotifications": "الإشعارات",
+  "settingsDarkMode": "الوضع المظلم",
+  "settingsSectionSupport": "الدعم",
+  "settingsHelpCenter": "مركز المساعدة",
+  "settingsAbout": "حول التطبيق",
+  "settingsLogout": "تسجيل الخروج",
+  "settingsSelectLanguage": "اختر اللغة",
+  "settingsAppearance": "المظهر",
+  "settingsLightMode": "وضع النهار",
+  "settingsDarkModeOption": "الوضع المظلم",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageArabic": "العربية",
+  "settingsOn": "مفعل",
+  "settingsOff": "معطل",
+  "settingsLogoutTitle": "تسجيل الخروج؟",
+  "settingsLogoutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى لاستخدام حسابك.",
+  "settingsComingSoon": "قريباً",
+  "messagesTitle": "الرسائل",
+  "messagesInboxTitle": "البريد الوارد",
+  "messagesSwitchAccount": "تغيير الحساب",
+  "messagesNewConversation": "بدء محادثة جديدة",
+  "messagesSearchHint": "بحث عن محادثات أو أشخاص",
+  "messagesYourStory": "قصتك",
+  "messagesPeopleYouMayKnow": "أشخاص قد تعرفهم",
+  "messagesSeeAll": "عرض الكل",
+  "messagesFollow": "متابعة",
+  "messagesFollowing": "متابَع",
+  "messagesRecentMentions": "الإشارات الأخيرة",
+  "messagesActivityFollowers": "متابعون",
+  "messagesActivityActivities": "أنشطة",
+  "messagesActivityComments": "تعليقات",
+  "messagesActivityMentions": "إشارات",
+  "messagesRecentMessages": "الرسائل الأخيرة",
+  "messagesAll": "الكل",
+  "messagesNoResults": "لا توجد نتائج",
+  "messagesInboxNoMessagesYet": "لا توجد رسائل بعد",
+  "messagesInboxYouPrefix": "أنت",
+  "messagesInboxLastPhoto": "صورة",
+  "messagesInboxLastVideo": "فيديو",
+  "messagesInboxLastGift": "هدية",
+  "messagesInboxLastShare": "شارك منشوراً",
+  "messagesInboxMessageDeleted": "تم حذف الرسالة",
+  "messagesInboxGroupFallback": "مجموعة",
+  "messagesInboxUserFallback": "مستخدم",
+  "messagesPreviewProperty": "أهلاً، هل العقار لا يزال متاحاً؟",
+  "messagesPreviewOffer": "تم إرسال العرض الجديد",
+  "messagesPreviewThanks": "شكراً لاهتمامك بخدماتنا",
+  "messagesPreviewCar": "متى يمكنني معاينة السيارة؟",
+  "messagesMentionVilla": "منشور رائع يصف الفيلا! @myself",
+  "messagesMentionCheck": "ألقِ نظرة على هذا @myself",
+  "messagesSuggestionBioDesigner": "مصمم داخلي | معماري",
+  "messagesSuggestionBioJeddah": "أفضل العروض في جدة",
+  "messagesSuggestionBioLuxury": "عقارات فاخرة عالمية",
+  "chatActiveNow": "نشط الآن",
+  "chatAddComment": "إضافة تعليق...",
+  "chatRecording": "جاري التسجيل...",
+  "chatSlideUpToCancel": "اسحب للأعلى للإلغاء",
+  "chatSeedGreeting": "مرحباً! كيف يمكنني مساعدتك؟",
+  "chatSeedInterested": "أنا مهتم بالعقار المعروض",
+  "chatSeedFinalPrice": "هل يمكنني معرفة السعر النهائي؟",
+  "chatSeedAutoReply": "شكراً لتواصلك معنا، سنرد عليك في أقرب وقت بمزيد من التفاصيل.",
+  "chatUserBio": "مهتم بالعقارات والتصميم.",
+  "chatMoreGallery": "المعرض",
+  "chatMoreCamera": "الكاميرا",
+  "chatMoreVideo": "فيديو",
+  "chatMoreLocation": "الموقع",
+  "chatMoreContact": "جهة اتصال",
+  "chatMoreFile": "ملف",
+  "chatMoreGift": "هدية",
+  "chatMorePoll": "تصويت",
+  "chatLastMessage1": "هل يمكنني معرفة السعر النهائي؟",
+  "chatLastMessage2": "شكراً على التحديث!",
+  "chatLastMessage3": "هل العقار ما زال متاحاً؟",
+  "chatLastMessage4": "أرسل صورة",
+  "chatLastMessage5": "أراك غداً 👋",
+  "addPostAsAuction": "عرض كمزاد",
+  "auctionItemName": "اسم المنتج",
+  "auctionItemNameHint": "مثال: ساعة جيب عتيقة",
+  "auctionStartingPrice": "السعر الابتدائي (دولار)",
+  "auctionTargetPriceLabel": "السعر المستهدف (دولار)",
+  "auctionStartDate": "بداية المزاد",
+  "auctionEndDate": "نهاية المزاد",
+  "auctionEndBeforeStart": "يجب أن يكون تاريخ النهاية بعد تاريخ البداية",
+  "auctionTargetBelowStart": "يجب أن يكون السعر المستهدف أعلى من السعر الابتدائي",
+  "auctionInvalidPrice": "أدخل سعراً صالحاً"
+}

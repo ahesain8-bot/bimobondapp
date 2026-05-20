@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "550929645796",
+    "project_id": "bomibondapp",
+    "storage_bucket": "bomibondapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:550929645796:android:a57bb9271ed4cb807becf1",
+        "android_client_info": {
+          "package_name": "com.bimobond.dashboard"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "550929645796-udp63i7fbdcmbteuufet7apoa8tg99ti.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bimobond.dashboard",
+            "certificate_hash": "1beb14704afb8f28e5f1486f07631ed0e452e960"
+          }
+        },
+        {
+          "client_id": "550929645796-e5atapv0604h08epsila05th6ssqouk2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJq4Q5MlourHSGanK88FpJcOGnd6jkgXs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "550929645796-e5atapv0604h08epsila05th6ssqouk2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "550929645796-0bc32pdscquvs4kcl3fv3rfcnlocb7bb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bimobond.dashboard"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:550929645796:android:75d1e81ca442d3207becf1",
+        "android_client_info": {
+          "package_name": "com.dubai.bimobondapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "550929645796-e5atapv0604h08epsila05th6ssqouk2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJq4Q5MlourHSGanK88FpJcOGnd6jkgXs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "550929645796-e5atapv0604h08epsila05th6ssqouk2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "550929645796-0bc32pdscquvs4kcl3fv3rfcnlocb7bb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.bimobond.dashboard"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

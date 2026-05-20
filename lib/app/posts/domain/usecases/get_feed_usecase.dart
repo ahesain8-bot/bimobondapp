@@ -1,0 +1,68 @@
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
+import 'package:bimobondapp/core/error/failures.dart';
+import 'package:bimobondapp/core/usecases/usecase.dart';
+import 'package:dartz/dartz.dart';
+import 'package:equatable/equatable.dart';
+
+class GetFeedUseCase implements UseCase<List<PostEntity>, GetFeedParams> {
+  final PostsRepository repository;
+
+  GetFeedUseCase(this.repository);
+
+  @override
+  Future<Either<Failure, List<PostEntity>>> call(GetFeedParams params) async {
+    return await repository.getFeed(
+      page: params.page,
+      limit: params.limit,
+      category: params.category,
+      type: params.type,
+      hashtag: params.hashtag,
+      search: params.search,
+      sort: params.sort,
+      userId: params.userId,
+      isLiked: params.isLiked,
+      isSaved: params.isSaved,
+    );
+  }
+}
+
+class GetFeedParams extends Equatable {
+  final int page;
+  final int limit;
+  final String? category;
+  final String? type;
+  final String? hashtag;
+  final String? search;
+  final String? sort;
+  final String? userId;
+  final bool? isLiked;
+  final bool? isSaved;
+
+  const GetFeedParams({
+    this.page = 1,
+    this.limit = 10,
+    this.category,
+    this.type,
+    this.hashtag,
+    this.search,
+    this.sort,
+    this.userId,
+    this.isLiked,
+    this.isSaved,
+  });
+
+  @override
+  List<Object?> get props => [
+    page,
+    limit,
+    category,
+    type,
+    hashtag,
+    search,
+    sort,
+    userId,
+    isLiked,
+    isSaved,
+  ];
+}
