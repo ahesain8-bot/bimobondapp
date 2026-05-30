@@ -13,11 +13,13 @@ class ChatScreen extends StatelessWidget {
     required this.chatId,
     required this.username,
     required this.imageUrl,
+    this.peerUserId,
   });
 
   final String chatId;
   final String username;
   final String imageUrl;
+  final String? peerUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +35,7 @@ class ChatScreen extends StatelessWidget {
         username: username,
         imageUrl: imageUrl,
         currentUserId: currentUserId,
+        peerUserId: peerUserId,
       ),
     );
   }

@@ -18,6 +18,7 @@ class ChatView extends StatefulWidget {
     required this.username,
     required this.imageUrl,
     required this.currentUserId,
+    this.peerUserId,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class ChatView extends StatefulWidget {
   final String username;
   final String imageUrl;
   final String currentUserId;
+  final String? peerUserId;
 
   @override
   State<ChatView> createState() => _ChatViewState();
@@ -83,6 +85,7 @@ class _ChatViewState extends State<ChatView> {
       context: context,
       username: widget.username,
       imageUrl: widget.imageUrl,
+      userId: widget.peerUserId,
     );
   }
 

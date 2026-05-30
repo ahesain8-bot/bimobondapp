@@ -344,6 +344,7 @@ class AuctionCard extends StatelessWidget {
                         auction.ownerUsername!.isNotEmpty) ...[
                       const SizedBox(height: AppSizes.p12),
                       AuctionCardFooterRow(
+                        userId: auction.ownerUserId ?? '',
                         username: auction.ownerUsername!,
                         avatarUrl: auction.ownerAvatarUrl,
                         categoryLabel: auction.categoryLabel,

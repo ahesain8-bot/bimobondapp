@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -14,7 +15,18 @@ class ChatSheets {
     required BuildContext context,
     required String username,
     required String imageUrl,
+    String? userId,
   }) {
+    if (userId != null && userId.isNotEmpty) {
+      openUserProfile(
+        context,
+        userId: userId,
+        username: username,
+        avatarUrl: imageUrl,
+      );
+      return;
+    }
+
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     showModalBottomSheet<void>(

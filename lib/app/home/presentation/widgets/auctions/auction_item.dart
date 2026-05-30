@@ -11,6 +11,7 @@ class AuctionItem {
     required this.giftCount,
     this.ownerUsername,
     this.ownerAvatarUrl,
+    this.ownerUserId,
     this.categorySlug,
     this.categoryLabel,
     this.isLive = false,
@@ -26,6 +27,7 @@ class AuctionItem {
   final int giftCount;
   final String? ownerUsername;
   final String? ownerAvatarUrl;
+  final String? ownerUserId;
   final String? categorySlug;
   final String? categoryLabel;
   final bool isLive;
@@ -55,6 +57,7 @@ class AuctionItem {
       giftCount: auction.giftCount,
       ownerUsername: hasOwnerHandle ? ownerHandle : null,
       ownerAvatarUrl: owner?.avatarUrl,
+      ownerUserId: owner?.id ?? post.userId,
       categorySlug: post.category,
       categoryLabel: categoryLabel,
       isLive: isLive,

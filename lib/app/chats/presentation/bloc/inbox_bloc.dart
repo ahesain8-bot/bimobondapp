@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_participant_entity.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/get_chats_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/get_friends_usecase.dart';
+import 'package:bimobondapp/app/social/domain/entities/social_list_query.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_event.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_state.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
@@ -52,7 +53,9 @@ class InboxBloc extends Bloc<InboxEvent, InboxState> {
     InboxFriendsLoadRequested event,
     Emitter<InboxState> emit,
   ) async {
-    final result = await getFriendsUseCase(NoParams());
+    final result = await getFriendsUseCase(
+      const SocialListQuery(page: 1, limit: 50),
+    );
     result.fold(
       (_) {},
       (friends) {

@@ -30,6 +30,7 @@ abstract class AuthRemoteDataSource {
   Future<String> uploadAvatar(File file);
   Future<UserModel> updateProfile(Map<String, dynamic> data);
   Future<UserModel> getProfile();
+  Future<UserModel> getUserById(String userId);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -266,7 +267,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel> getProfile() => _execute(() async {
     final response = await apiClient.dio.get(
-      ApiConstants.updateProfile,
+      ApiConstants.authMe,
       options: Options(headers: await _profileAuthHeaders()),
     );
 
@@ -274,6 +275,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return UserModel.fromJson(_parseUserPayload(response.data));
     } else {
       throw ServerException(message: 'Fetch profile failed');
+    }
+  });
+
+  @override
+  Future<UserModel> getUserById(String userId) => _execute(() async {
+    final response = await apiClient.dio.get(
+      ApiConstants.userById(userId),
+      options: Options(headers: await _profileAuthHeaders()),
+    );
+
+    if (response.statusCode == 200) {
+      return UserModel.fromJson(_parseUserPayload(response.data));
+    } else {
+      throw ServerException(message: 'Fetch user failed');
     }
   });
 }

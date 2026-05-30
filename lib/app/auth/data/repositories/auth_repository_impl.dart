@@ -218,6 +218,18 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, UserEntity>> getUserById(String userId) async {
+    try {
+      final userModel = await remoteDataSource.getUserById(userId);
+      return Right(userModel);
+    } on AppException catch (e) {
+      return Left(_mapExceptionToFailure(e));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, UserEntity?>> getCachedUser() async {
     try {
       final user = await localDataSource.getUser();

@@ -1,6 +1,5 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_entity.dart';
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
-import 'package:bimobondapp/app/chats/domain/entities/chat_participant_entity.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -36,6 +35,4 @@ abstract class ChatsRepository {
   });
 
   Future<Either<Failure, void>> deleteMessage(String messageId);
-
-  Future<Either<Failure, List<ChatParticipantEntity>>> getFriends();
 }

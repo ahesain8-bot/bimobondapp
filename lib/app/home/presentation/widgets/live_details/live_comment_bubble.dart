@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -13,6 +14,7 @@ class LiveCommentBubble extends StatelessWidget {
     required this.body,
     required this.isGift,
     required this.theme,
+    this.onProfileTap,
   });
 
   final bool isRtl;
@@ -21,6 +23,7 @@ class LiveCommentBubble extends StatelessWidget {
   final String body;
   final bool isGift;
   final ThemeData theme;
+  final VoidCallback? onProfileTap;
 
   Color get _giftNameColor => LiveDetailsLayoutConstants.giftCommentGold
       .withValues(alpha: LiveDetailsLayoutConstants.giftCommentContentOpacity);
@@ -30,6 +33,10 @@ class LiveCommentBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final nameRecognizer = onProfileTap != null
+        ? (TapGestureRecognizer()..onTap = onProfileTap)
+        : null;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
@@ -108,43 +115,47 @@ class LiveCommentBubble extends StatelessWidget {
                       end: isRtl ? 0 : AppSizes.p8,
                       start: isRtl ? AppSizes.p8 : 0,
                     ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isGift 
-                            ? _giftNameColor.withValues(alpha: 0.8) 
-                            : Colors.white.withValues(alpha: 0.2),
-                          width: 1.5,
+                    child: GestureDetector(
+                      onTap: onProfileTap,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isGift 
+                              ? _giftNameColor.withValues(alpha: 0.8) 
+                              : Colors.white.withValues(alpha: 0.2),
+                            width: 1.5,
+                          ),
                         ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: isGift
-                            ? LiveDetailsLayoutConstants.giftCommentGoldDeep
-                                  .withValues(alpha: 0.5)
-                            : Colors.white.withValues(alpha: 0.1),
-                        backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
-                            ? NetworkImage(MediaUtils.resolveAbsoluteUrl(avatarUrl!))
-                            : null,
-                        child: avatarUrl == null || avatarUrl!.isEmpty
-                            ? Text(
-                                displayName.isNotEmpty
-                                    ? displayName[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isGift ? _giftBodyColor : Colors.white70,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: isGift
+                              ? LiveDetailsLayoutConstants.giftCommentGoldDeep
+                                    .withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.1),
+                          backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
+                              ? NetworkImage(MediaUtils.resolveAbsoluteUrl(avatarUrl!))
+                              : null,
+                          child: avatarUrl == null || avatarUrl!.isEmpty
+                              ? Text(
+                                  displayName.isNotEmpty
+                                      ? displayName[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isGift ? _giftBodyColor : Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
                       ),
                     ),
                   ),
                 ),
                 TextSpan(
                   text: '$displayName  ',
+                  recognizer: nameRecognizer,
                   style: TextStyle(
                     color: isGift
                         ? _giftNameColor

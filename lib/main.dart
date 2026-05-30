@@ -14,6 +14,8 @@ import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
 import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
     as chats_di;
+import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
+    as social_di;
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
@@ -24,6 +26,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await auth_di.initAuth();
+  await social_di.initSocial();
   await posts_di.initPosts();
   await categories_di.initCategories();
   await gifts_di.initGifts();

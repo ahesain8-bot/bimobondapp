@@ -18,6 +18,10 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/app/social/domain/entities/follow_status.dart';
+import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
+import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
+    as social_di;
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
@@ -33,6 +37,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_medi
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_mock_chat_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_post_comments_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_page_indicator.dart';
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -69,6 +74,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   double? _giftTotalUsdOverride;
   bool _isAuctionFinished = false;
   bool _isFollowing = false;
+  bool _isFollowLoading = false;
   bool _isUIHidden = false;
   Timer? _countdownTimer;
 
@@ -236,6 +242,37 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     };
     final postOwnerIds = {post.userId, if (post.user != null) post.user!.id};
     return ownerIds.any(postOwnerIds.contains);
+  }
+
+  String? get _hostUserId {
+    final post = widget.post;
+    if (post == null) return null;
+    if (post.user?.id.isNotEmpty == true) return post.user!.id;
+    if (post.userId.isNotEmpty) return post.userId;
+    return null;
+  }
+
+  Future<void> _toggleFollow() async {
+    if (!_checkAuth() || _isPostOwner() || _isFollowLoading) return;
+
+    final userId = _hostUserId;
+    if (userId == null || userId.isEmpty) return;
+
+    setState(() => _isFollowLoading = true);
+    final result = await social_di.sl<ToggleFollowUseCase>()(
+      ToggleFollowParams(userId),
+    );
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        PopupDialogs.showErrorDialog(context, failure.message);
+      },
+      (status) {
+        setState(() => _isFollowing = status == FollowStatus.followed);
+      },
+    );
+    setState(() => _isFollowLoading = false);
   }
 
   void _showOwnerOptions() {
@@ -469,6 +506,21 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     );
   }
 
+  Future<void> _openHostProfile() async {
+    final userId = _hostUserId;
+    if (userId == null || userId.isEmpty) return;
+
+    final isFollowing = await openUserProfile(
+      context,
+      userId: userId,
+      username: widget.post?.user?.username,
+      avatarUrl: _avatarUrl(),
+      isFollowing: _isFollowing,
+    );
+    if (!mounted || isFollowing == null) return;
+    setState(() => _isFollowing = isFollowing);
+  }
+
   String _hostName(AppLocalizations l10n) {
     final username = widget.post?.user?.username;
     if (username != null && username.isNotEmpty) return username;
@@ -642,10 +694,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                         showAuctionGifts: _isAuctionPost,
                         onAuctionGifts: _showAuctionGiftsSheet,
                         showOwnerMenu: isPostOwner,
+                        showFollowButton: !isPostOwner && _hostUserId != null,
+                        onProfileTap: _hostUserId != null ? _openHostProfile : null,
                         onOwnerMenu: _showOwnerOptions,
                         onClose: () => context.pop(),
-                        onFollowTap: () =>
-                            setState(() => _isFollowing = !_isFollowing),
+                        onFollowTap: _isFollowLoading ? () {} : _toggleFollow,
                         countdownBelowProfile: widget.post?.auction != null
                             ? AuctionCountdownBar(
                                 parts: _auctionCountdownParts(),

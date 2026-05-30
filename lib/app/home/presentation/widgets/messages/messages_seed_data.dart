@@ -35,6 +35,7 @@ List<Map<String, dynamic>> messagesSeedChats() => [
 
 List<Map<String, dynamic>> messagesSeedMentions() => [
   {
+    'userId': 'mention-user-1',
     'user': 'Omar Design',
     'contentKey': 'villa',
     'time': '10m',
@@ -42,6 +43,7 @@ List<Map<String, dynamic>> messagesSeedMentions() => [
     'postPreview': 'https://picsum.photos/100/100?random=1',
   },
   {
+    'userId': 'mention-user-2',
     'user': 'Realty Expert',
     'contentKey': 'check',
     'time': '2h',
@@ -52,18 +54,21 @@ List<Map<String, dynamic>> messagesSeedMentions() => [
 
 List<Map<String, dynamic>> messagesSeedSuggestions() => [
   {
+    'userId': 'suggestion-user-1',
     'name': 'Ahmed Modern',
     'bioKey': 'designer',
     'image': 'https://i.pravatar.cc/150?u=ahmedmod',
     'isFollowing': false,
   },
   {
+    'userId': 'suggestion-user-2',
     'name': 'Jeddah Homes',
     'bioKey': 'jeddah',
     'image': 'https://i.pravatar.cc/150?u=jeddahhomes',
     'isFollowing': false,
   },
   {
+    'userId': 'suggestion-user-3',
     'name': 'Luxury Living',
     'bioKey': 'luxury',
     'image': 'https://i.pravatar.cc/150?u=luxury',

@@ -125,18 +125,45 @@ class PostUserModel extends PostUserEntity {
     required super.id,
     required super.username,
     super.avatarUrl,
+    super.isFollowing,
   });
+
+  static bool? _parseOptionalBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      switch (value.toLowerCase()) {
+        case 'true':
+        case '1':
+        case 'followed':
+        case 'following':
+          return true;
+        case 'false':
+        case '0':
+        case 'unfollowed':
+          return false;
+      }
+    }
+    return null;
+  }
 
   factory PostUserModel.fromJson(Map<String, dynamic> json) {
     return PostUserModel(
       id: json['id'] ?? '',
       username: json['username'] ?? '',
       avatarUrl: PostModel._normalizeUrl(json['avatarUrl']),
+      isFollowing: _parseOptionalBool(json['isFollowing']) ??
+          _parseOptionalBool(json['isFollowed']),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'username': username, 'avatarUrl': avatarUrl};
+    return {
+      'id': id,
+      'username': username,
+      'avatarUrl': avatarUrl,
+      if (isFollowing != null) 'isFollowing': isFollowing,
+    };
   }
 }
 

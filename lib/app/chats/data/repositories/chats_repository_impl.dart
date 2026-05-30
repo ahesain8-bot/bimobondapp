@@ -1,7 +1,6 @@
 import 'package:bimobondapp/app/chats/data/datasources/chats_remote_data_source.dart';
 import 'package:bimobondapp/app/chats/domain/entities/chat_entity.dart';
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
-import 'package:bimobondapp/app/chats/domain/entities/chat_participant_entity.dart';
 import 'package:bimobondapp/app/chats/domain/repositories/chats_repository.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/error/failures.dart';
@@ -125,16 +124,6 @@ class ChatsRepositoryImpl implements ChatsRepository {
     try {
       await remoteDataSource.deleteMessage(messageId);
       return const Right(null);
-    } catch (e) {
-      return Left(_mapException(e));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<ChatParticipantEntity>>> getFriends() async {
-    try {
-      final friends = await remoteDataSource.getFriends();
-      return Right(friends);
     } catch (e) {
       return Left(_mapException(e));
     }

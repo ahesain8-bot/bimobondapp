@@ -125,6 +125,11 @@ class _MainScreenState extends State<MainScreen> {
         return MultiBlocListener(
           listeners: [
             BlocListener<AuthBloc, AuthState>(
+              listenWhen: (previous, current) {
+                if (current is AuthInitial) return true;
+                // Only reset tab on fresh login, not profile refresh (AuthSuccess → AuthSuccess).
+                return current is AuthSuccess && previous is! AuthSuccess;
+              },
               listener: (context, authState) {
                 if (authState is AuthSuccess) {
                   setState(() => _currentIndex = 0);

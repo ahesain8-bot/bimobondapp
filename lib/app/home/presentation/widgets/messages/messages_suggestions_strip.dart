@@ -1,6 +1,6 @@
-import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_text.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -10,11 +10,13 @@ class MessagesSuggestionsStrip extends StatelessWidget {
   const MessagesSuggestionsStrip({
     required this.suggestions,
     required this.onFollowToggle,
+    this.loadingIndexes = const {},
     super.key,
   });
 
   final List<Map<String, dynamic>> suggestions;
-  final void Function(int index) onFollowToggle;
+  final Future<void> Function(int index) onFollowToggle;
+  final Set<int> loadingIndexes;
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +65,25 @@ class MessagesSuggestionsStrip extends StatelessWidget {
             itemBuilder: (context, index) {
               final user = suggestions[index];
               final isFollowing = user['isFollowing'] as bool? ?? false;
+              final isLoading = loadingIndexes.contains(index);
+              final userId = user['userId'] as String? ?? '';
               final name = user['name'] as String;
               final image = user['image'] as String;
               final bio = messagesSuggestionBio(
                 user['bioKey'] as String?,
                 l10n,
               );
+
+              void openProfile() {
+                if (userId.isEmpty) return;
+                openUserProfile(
+                  context,
+                  userId: userId,
+                  username: name,
+                  avatarUrl: image,
+                  isFollowing: isFollowing,
+                );
+              }
 
               return Container(
                 width: MessagesLayoutConstants.suggestionCardWidth,
@@ -91,29 +106,27 @@ class MessagesSuggestionsStrip extends StatelessWidget {
                     ),
                   ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    MessagesLayoutConstants.suggestionCardRadius,
-                  ),
-                  child: Stack(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSizes.p16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      PositionedDirectional(
-                        top: 10,
-                        end: 10,
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: theme.textTheme.bodyMedium?.color?.withValues(
-                            alpha: 0.2,
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          PositionedDirectional(
+                            top: -6,
+                            end: -6,
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: theme.textTheme.bodyMedium?.color
+                                  ?.withValues(alpha: 0.2),
+                            ),
                           ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(AppSizes.p16),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
+                          GestureDetector(
+                            onTap: openProfile,
+                            child: Container(
                               padding: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
@@ -126,56 +139,78 @@ class MessagesSuggestionsStrip extends StatelessWidget {
                               ),
                               child: SafeNetworkAvatar(
                                 imageUrl: image,
-                                radius:
-                                    MessagesLayoutConstants.suggestionAvatarRadius,
+                                radius: MessagesLayoutConstants
+                                    .suggestionAvatarRadius,
                                 fallbackText: name,
                               ),
                             ),
-                            const SizedBox(height: AppSizes.p12),
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: AppSizes.p4),
-                            Text(
-                              bio,
-                              style: TextStyle(
-                                color: theme.textTheme.bodyMedium?.color
-                                    ?.withValues(alpha: 0.5),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 14),
-                            SizedBox(
-                              width: double.infinity,
-                              height: MessagesLayoutConstants
-                                  .suggestionFollowButtonHeight,
-                              child: ElevatedButton(
-                                onPressed: () => onFollowToggle(index),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isFollowing
-                                      ? theme.dividerColor.withValues(
-                                          alpha: 0.05,
-                                        )
-                                      : theme.colorScheme.primary,
-                                  foregroundColor: isFollowing
-                                      ? theme.textTheme.bodyLarge?.color
-                                      : Colors.white,
-                                  elevation: 0,
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.p12),
+                      GestureDetector(
+                        onTap: openProfile,
+                        child: Text(
+                          name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.p4),
+                      Text(
+                        bio,
+                        style: TextStyle(
+                          color: theme.textTheme.bodyMedium?.color
+                              ?.withValues(alpha: 0.5),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: MessagesLayoutConstants
+                            .suggestionFollowButtonHeight,
+                        child: ElevatedButton(
+                          onPressed: isLoading
+                              ? null
+                              : () => onFollowToggle(index),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isFollowing
+                                ? theme.dividerColor.withValues(alpha: 0.05)
+                                : theme.colorScheme.primary,
+                            foregroundColor: isFollowing
+                                ? theme.textTheme.bodyLarge?.color
+                                : Colors.white,
+                            disabledBackgroundColor: isFollowing
+                                ? theme.dividerColor.withValues(alpha: 0.05)
+                                : theme.colorScheme.primary.withValues(
+                                    alpha: 0.5,
                                   ),
-                                ),
-                                child: Text(
+                            elevation: 0,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isLoading
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: isFollowing
+                                        ? theme.textTheme.bodyLarge?.color
+                                        : Colors.white,
+                                  ),
+                                )
+                              : Text(
                                   isFollowing
                                       ? l10n.messagesFollowing
                                       : l10n.messagesFollow,
@@ -184,19 +219,6 @@ class MessagesSuggestionsStrip extends StatelessWidget {
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => ChatSheets.showUserInfo(
-                            context: context,
-                            username: name,
-                            imageUrl: image,
-                          ),
                         ),
                       ),
                     ],

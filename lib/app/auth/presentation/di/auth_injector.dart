@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/auth/domain/usecases/get_profile_usecase.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -10,7 +11,7 @@ import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_facebook_useca
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_google_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/upload_avatar_usecase.dart';
-import 'package:bimobondapp/app/auth/domain/usecases/get_profile_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/get_user_by_id_usecase.dart';
 
 import 'package:bimobondapp/app/auth/data/repositories/auth_repository_impl.dart';
 import 'package:bimobondapp/app/auth/data/datasources/auth_remote_data_source.dart';
@@ -59,6 +60,7 @@ Future<void> initAuth() async {
   sl.registerLazySingleton(() => UpdateProfileUseCase(sl()));
   sl.registerLazySingleton(() => UploadAvatarUseCase(sl()));
   sl.registerLazySingleton(() => GetProfileUseCase(sl()));
+  sl.registerLazySingleton(() => GetUserByIdUseCase(sl()));
 
   // Bloc
   sl.registerFactory(

@@ -521,6 +521,42 @@ abstract class AppLocalizations {
   /// **'Followers'**
   String get followers;
 
+  /// No description provided for @connectionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connections'**
+  String get connectionsTitle;
+
+  /// No description provided for @connectionsEmptyFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'No followers yet'**
+  String get connectionsEmptyFollowers;
+
+  /// No description provided for @connectionsEmptyFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Not following anyone yet'**
+  String get connectionsEmptyFollowing;
+
+  /// No description provided for @connectionsEmptyFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'No friends yet'**
+  String get connectionsEmptyFriends;
+
+  /// No description provided for @connectionsFollowBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow back'**
+  String get connectionsFollowBack;
+
+  /// No description provided for @profileMessageButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get profileMessageButton;
+
   /// No description provided for @likes.
   ///
   /// In en, this message translates to:

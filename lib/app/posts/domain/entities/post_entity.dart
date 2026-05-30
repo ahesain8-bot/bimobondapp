@@ -116,15 +116,17 @@ class PostUserEntity extends Equatable {
   final String id;
   final String username;
   final String? avatarUrl;
+  final bool? isFollowing;
 
   const PostUserEntity({
     required this.id,
     required this.username,
     this.avatarUrl,
+    this.isFollowing,
   });
 
   @override
-  List<Object?> get props => [id, username, avatarUrl];
+  List<Object?> get props => [id, username, avatarUrl, isFollowing];
 }
 
 class PostMediaEntity extends Equatable {

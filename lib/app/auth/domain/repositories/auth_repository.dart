@@ -34,6 +34,7 @@ abstract class AuthRepository {
   Future<Either<Failure, String>> uploadAvatar(File file);
   Future<Either<Failure, UserEntity>> updateProfile(Map<String, dynamic> data);
   Future<Either<Failure, UserEntity>> getProfile();
+  Future<Either<Failure, UserEntity>> getUserById(String userId);
 
   Future<Either<Failure, UserEntity?>> getCachedUser();
 

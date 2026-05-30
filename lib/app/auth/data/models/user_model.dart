@@ -31,6 +31,8 @@ class UserModel extends UserEntity {
     super.followingCount,
     super.postCount,
     super.totalLikes,
+    super.deviceCount,
+    super.isFollowing,
     super.isBanned,
     super.banReason,
     super.bannedUntil,
@@ -45,9 +47,74 @@ class UserModel extends UserEntity {
   static String? _normalizeUrl(String? url) {
     if (url == null || url.isEmpty) return url;
     if (url.startsWith('/')) {
-      return '$url';
+      return url;
     }
     return url;
+  }
+
+  static int _parseInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  static int _readCount(
+    Map<String, dynamic> json,
+    String countKey,
+    List<String> fallbackKeys, {
+    int fallback = 0,
+  }) {
+    final counts = json['_count'] ?? json['count'];
+    if (counts is Map && counts[countKey] != null) {
+      return _parseInt(counts[countKey], fallback: fallback);
+    }
+
+    for (final key in fallbackKeys) {
+      if (json[key] != null) {
+        return _parseInt(json[key], fallback: fallback);
+      }
+    }
+
+    return fallback;
+  }
+
+  static int? _readOptionalCount(
+    Map<String, dynamic> json,
+    String countKey,
+    List<String> fallbackKeys,
+  ) {
+    final counts = json['_count'] ?? json['count'];
+    if (counts is Map && counts[countKey] != null) {
+      return _parseInt(counts[countKey]);
+    }
+
+    for (final key in fallbackKeys) {
+      if (json[key] != null) {
+        return _parseInt(json[key]);
+      }
+    }
+
+    return null;
+  }
+
+  static bool? _parseOptionalBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      switch (value.toLowerCase()) {
+        case 'true':
+        case '1':
+        case 'followed':
+        case 'following':
+          return true;
+        case 'false':
+        case '0':
+        case 'unfollowed':
+          return false;
+      }
+    }
+    return null;
   }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -77,10 +144,15 @@ class UserModel extends UserEntity {
       country: json['country'],
       region: json['region'],
       city: json['city'],
-      followerCount: json['followerCount'] ?? 0,
-      followingCount: json['followingCount'] ?? 0,
-      postCount: json['postCount'] ?? 0,
-      totalLikes: json['totalLikes'] ?? 0,
+      followerCount: _readCount(json, 'followers', ['followerCount']),
+      followingCount: _readCount(json, 'following', ['followingCount']),
+      postCount: _readCount(json, 'posts', ['postCount']),
+      totalLikes: _readCount(json, 'postLikes', ['totalLikes', 'postLikes']),
+      deviceCount: _readOptionalCount(json, 'devices', ['deviceCount']),
+      isFollowing: _parseOptionalBool(json['isFollowing']) ??
+          _parseOptionalBool(json['isFollowed']) ??
+          _parseOptionalBool(json['viewerIsFollowing']) ??
+          _parseOptionalBool(json['following']),
       isBanned: json['isBanned'] ?? false,
       banReason: json['banReason'],
       bannedUntil: json['bannedUntil'],

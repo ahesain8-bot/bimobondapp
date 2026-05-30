@@ -4,6 +4,7 @@ class ApiConstants {
       'YOUR_API_KEY'; // Replace with your ReqRes API Key
   static const String login = '/login';
   static const String backendLogin = '/auth/login';
+  static const String authMe = '/auth/me';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
   static const String register = '/register';
@@ -46,4 +47,7 @@ class ApiConstants {
   // Friends (mutual follows)
   static const String myFriends = '/users/me/friends';
   static String followUser(String userId) => '/users/$userId/follow';
+  static String userFollowers(String userId) => '/users/$userId/followers';
+  static String userFollowing(String userId) => '/users/$userId/following';
+  static String userById(String userId) => '/users/$userId';
 }

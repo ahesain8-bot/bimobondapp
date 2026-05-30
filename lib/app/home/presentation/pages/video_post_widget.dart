@@ -7,6 +7,10 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
+import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
+import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
+import 'package:bimobondapp/app/social/presentation/di/social_injector.dart' as social_di;
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -47,6 +51,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   late int _likeCount;
   late bool _isSaved;
   late int _saveCount;
+  bool _isFollowing = false;
+  bool _isFollowLoading = false;
+  bool _followStatusResolved = false;
 
   @override
   void initState() {
@@ -55,6 +62,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     _likeCount = widget.post.likeCount;
     _isSaved = widget.post.isSaved;
     _saveCount = widget.post.saveCount;
+    _isFollowing = widget.post.user?.isFollowing ?? false;
+    _followStatusResolved = widget.post.user?.isFollowing != null;
 
     _musicController = AnimationController(
       duration: const Duration(seconds: 8),
@@ -72,6 +81,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         ]).animate(
           CurvedAnimation(parent: _likeAnimController, curve: Curves.easeInOut),
         );
+
+    if (widget.isActive) {
+      _resolveFollowStatusIfNeeded();
+    }
   }
 
   @override
@@ -82,7 +95,74 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       _likeCount = widget.post.likeCount;
       _isSaved = widget.post.isSaved;
       _saveCount = widget.post.saveCount;
+      _isFollowing = widget.post.user?.isFollowing ?? false;
+      _followStatusResolved = widget.post.user?.isFollowing != null;
+      _isFollowLoading = false;
     }
+
+    if (widget.isActive && !oldWidget.isActive) {
+      _resolveFollowStatusIfNeeded();
+    }
+  }
+
+  Future<void> _resolveFollowStatusIfNeeded() async {
+    if (_followStatusResolved || _isPostOwner() || !mounted) return;
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthSuccess) return;
+
+    final authorId = _postAuthorUserId();
+    if (authorId == null || authorId.isEmpty) return;
+
+    final result = await social_di.sl<CheckIsFollowingUseCase>()(
+      CheckIsFollowingParams(
+        currentUserId: authState.user.id,
+        targetUserId: authorId,
+      ),
+    );
+    if (!mounted) return;
+
+    result.fold((_) {}, (isFollowing) {
+      setState(() {
+        _isFollowing = isFollowing;
+        _followStatusResolved = true;
+      });
+    });
+  }
+
+  Future<void> _handleFollow() async {
+    if (_isPostOwner() || _isFollowing || _isFollowLoading) return;
+    if (!_checkAuth()) return;
+
+    final userId = _postAuthorUserId();
+    if (userId == null || userId.isEmpty) return;
+
+    setState(() {
+      _isFollowLoading = true;
+      _isFollowing = true;
+    });
+
+    final result = await social_di.sl<ToggleFollowUseCase>()(
+      ToggleFollowParams(userId),
+    );
+    if (!mounted) return;
+
+    result.fold(
+      (failure) {
+        setState(() {
+          _isFollowing = false;
+          _isFollowLoading = false;
+        });
+        PopupDialogs.showErrorDialog(context, failure.message);
+      },
+      (_) {
+        setState(() {
+          _isFollowing = true;
+          _isFollowLoading = false;
+          _followStatusResolved = true;
+        });
+      },
+    );
   }
 
   void _handleLike() {
@@ -131,6 +211,32 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       if (widget.post.user != null) widget.post.user!.id,
     };
     return ownerIds.any(postOwnerIds.contains);
+  }
+
+  String? _postAuthorUserId() {
+    final user = widget.post.user;
+    if (user != null && user.id.isNotEmpty) return user.id;
+    if (widget.post.userId.isNotEmpty) return widget.post.userId;
+    return null;
+  }
+
+  Future<void> _openAuthorProfile() async {
+    final userId = _postAuthorUserId();
+    if (userId == null) return;
+
+    final isFollowing = await openUserProfile(
+      context,
+      userId: userId,
+      username: widget.post.user?.username,
+      avatarUrl: widget.post.user?.avatarUrl,
+      isFollowing: _isFollowing,
+    );
+    if (!mounted || isFollowing == null) return;
+
+    setState(() {
+      _isFollowing = isFollowing;
+      _followStatusResolved = true;
+    });
   }
 
   void _showPostOptions() {
@@ -464,20 +570,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                       // Username
                       Row(
                         children: [
-                          Text(
-                            '@${post.user?.username ?? 'user'}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              letterSpacing: 0.2,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black54,
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
+                          GestureDetector(
+                            onTap: _openAuthorProfile,
+                            child: Text(
+                              '@${post.user?.username ?? 'user'}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                letterSpacing: 0.2,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black54,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -643,60 +752,90 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   Widget _buildProfileAvatar(String? avatarUrl, ThemeData theme) {
+    final showFollowBadge = !_isPostOwner();
+
     return Stack(
       alignment: Alignment.bottomCenter,
       clipBehavior: Clip.none,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                blurRadius: 12,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.all(2.5),
-          child: SafeNetworkAvatar(
-            imageUrl: avatarUrl,
-            radius: 24,
-            fallbackText: widget.post.user?.username,
-            backgroundColor: Colors.white24,
-          ),
-        ),
-        Positioned(
-          bottom: -10,
+        GestureDetector(
+          onTap: _openAuthorProfile,
           child: Container(
-            width: 22,
-            height: 22,
             decoration: BoxDecoration(
+              shape: BoxShape.circle,
               gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.secondary,
-                ],
+                colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.black, width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                  blurRadius: 6,
+                  blurRadius: 12,
+                  spreadRadius: 2,
                 ),
               ],
             ),
-            child: const Icon(Icons.add, color: Colors.white, size: 15),
+            padding: const EdgeInsets.all(2.5),
+            child: SafeNetworkAvatar(
+              imageUrl: avatarUrl,
+              radius: 24,
+              fallbackText: widget.post.user?.username,
+              backgroundColor: Colors.white24,
+            ),
           ),
         ),
+        if (showFollowBadge)
+          Positioned(
+            bottom: -10,
+            child: GestureDetector(
+              onTap: _isFollowing ? null : _handleFollow,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  gradient: _isFollowing
+                      ? null
+                      : LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.secondary,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                  color: _isFollowing ? Colors.white : null,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isFollowing ? Colors.white : Colors.black,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: _isFollowLoading
+                    ? Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.primary,
+                        ),
+                      )
+                    : Icon(
+                        _isFollowing ? Icons.check : Icons.add,
+                        color: _isFollowing
+                            ? theme.colorScheme.primary
+                            : Colors.white,
+                        size: 15,
+                      ),
+              ),
+            ),
+          ),
       ],
     );
   }

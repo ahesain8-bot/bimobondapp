@@ -17,6 +17,8 @@ import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/edit_post_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/user_profile_screen.dart';
+import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'dart:io';
 
 class AppRouter {
@@ -117,6 +119,7 @@ class AppRouter {
             username: extra?['username'] as String? ?? 'User',
             imageUrl: extra?['imageUrl'] as String? ??
                 'https://i.pravatar.cc/150?u=default',
+            peerUserId: extra?['peerUserId'] as String?,
           );
         },
       ),
@@ -147,6 +150,31 @@ class AppRouter {
         builder: (context, state) {
           final post = state.extra as PostEntity;
           return EditPostScreen(post: post);
+        },
+      ),
+      GoRoute(
+        path: '/user-profile',
+        name: 'user_profile',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return UserProfileScreen(
+            userId: extra['userId'] as String? ?? '',
+            initialUsername: extra['username'] as String?,
+            initialFullName: extra['fullName'] as String?,
+            initialAvatarUrl: extra['avatarUrl'] as String?,
+            initialIsFollowing: extra['isFollowing'] as bool?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/user-connections',
+        name: 'user_connections',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          return UserConnectionsScreen(
+            userId: extra['userId'] as String,
+            type: extra['type'] as UserConnectionType,
+          );
         },
       ),
     ],

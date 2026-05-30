@@ -224,6 +224,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get followers => 'Followers';
 
   @override
+  String get connectionsTitle => 'Connections';
+
+  @override
+  String get connectionsEmptyFollowers => 'No followers yet';
+
+  @override
+  String get connectionsEmptyFollowing => 'Not following anyone yet';
+
+  @override
+  String get connectionsEmptyFriends => 'No friends yet';
+
+  @override
+  String get connectionsFollowBack => 'Follow back';
+
+  @override
+  String get profileMessageButton => 'Message';
+
+  @override
   String get likes => 'Likes';
 
   @override

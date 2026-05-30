@@ -75,6 +75,7 @@ class MessagesConversationList extends StatelessWidget {
                   'chatId': chat.chatId,
                   'username': chat.name,
                   'imageUrl': chat.imageUrl,
+                  if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
                 },
               );
               if (context.mounted) {

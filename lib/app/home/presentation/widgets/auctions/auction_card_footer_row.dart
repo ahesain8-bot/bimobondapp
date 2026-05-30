@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_post_category_badge.dart';
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 
 class AuctionCardFooterRow extends StatelessWidget {
   const AuctionCardFooterRow({
+    required this.userId,
     required this.username,
     required this.avatarUrl,
     this.categoryLabel,
@@ -13,6 +15,7 @@ class AuctionCardFooterRow extends StatelessWidget {
     super.key,
   });
 
+  final String userId;
   final String username;
   final String? avatarUrl;
   final String? categoryLabel;
@@ -20,6 +23,16 @@ class AuctionCardFooterRow extends StatelessWidget {
 
   bool get _hasCategory =>
       categoryLabel != null && categoryLabel!.trim().isNotEmpty;
+
+  void _openProfile(BuildContext context) {
+    if (userId.isEmpty) return;
+    openUserProfile(
+      context,
+      userId: userId,
+      username: username,
+      avatarUrl: avatarUrl,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,20 +42,33 @@ class AuctionCardFooterRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SafeNetworkAvatar(
-          imageUrl: avatarUrl,
-          radius: 14,
-          fallbackText: username,
+        InkWell(
+          onTap: () => _openProfile(context),
+          borderRadius: BorderRadius.circular(999),
+          child: SafeNetworkAvatar(
+            imageUrl: avatarUrl,
+            radius: 14,
+            fallbackText: username,
+          ),
         ),
         const SizedBox(width: AppSizes.p8),
         Expanded(
-          child: Text(
-            l10n.auctionAddedBy('@$username'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-              fontSize: 13,
+          child: InkWell(
+            onTap: () => _openProfile(context),
+            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSizes.p4),
+              child: Text(
+                l10n.auctionAddedBy('@$username'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.textTheme.bodySmall?.color?.withValues(
+                    alpha: 0.7,
+                  ),
+                  fontSize: 13,
+                ),
+              ),
             ),
           ),
         ),

@@ -5,6 +5,10 @@ import 'package:bimobondapp/app/chats/presentation/bloc/inbox_event.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_state.dart';
 import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
     as chats_di;
+import 'package:bimobondapp/app/social/domain/entities/follow_status.dart';
+import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
+import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
+    as social_di;
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_active_users_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_activity_section.dart';
@@ -16,12 +20,14 @@ import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_seed
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_suggestions_strip.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 class MessagesScreen extends StatefulWidget {
   final bool isTabActive;
@@ -86,6 +92,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
   final _mentions = messagesSeedMentions();
   final _suggestions = messagesSeedSuggestions();
   List<InboxChatItem> _cachedInboxItems = [];
+  final Set<int> _followLoadingIndexes = {};
 
   @override
   void dispose() {
@@ -127,6 +134,46 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
+    );
+  }
+
+  bool _ensureLoggedIn() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthSuccess) return true;
+
+    final l10n = AppLocalizations.of(context)!;
+    PopupDialogs.showConfirmDialog(
+      context,
+      title: l10n.loginRequired,
+      message: l10n.loginRequiredMessage,
+      cancelLabel: l10n.cancel,
+      confirmLabel: l10n.login,
+      onConfirm: () => context.pushNamed('login'),
+    );
+    return false;
+  }
+
+  Future<void> _toggleSuggestionFollow(int index) async {
+    if (!_ensureLoggedIn() || _followLoadingIndexes.contains(index)) return;
+
+    final userId = _suggestions[index]['userId'] as String?;
+    if (userId == null || userId.isEmpty) return;
+
+    setState(() => _followLoadingIndexes.add(index));
+    final result = await social_di.sl<ToggleFollowUseCase>()(
+      ToggleFollowParams(userId),
+    );
+    if (!mounted) return;
+
+    setState(() => _followLoadingIndexes.remove(index));
+    result.fold(
+      (failure) => _showSnackBar(failure.message),
+      (status) {
+        setState(() {
+          _suggestions[index]['isFollowing'] =
+              status == FollowStatus.followed;
+        });
+      },
     );
   }
 
@@ -243,12 +290,8 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                       ),
                       MessagesSuggestionsStrip(
                         suggestions: _suggestions,
-                        onFollowToggle: (index) {
-                          setState(() {
-                            _suggestions[index]['isFollowing'] =
-                                !(_suggestions[index]['isFollowing'] as bool);
-                          });
-                        },
+                        loadingIndexes: _followLoadingIndexes,
+                        onFollowToggle: _toggleSuggestionFollow,
                       ),
                       const SizedBox(height: 8),
                       MessagesMentionsStrip(mentions: _mentions),

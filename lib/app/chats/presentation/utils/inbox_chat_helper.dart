@@ -11,6 +11,7 @@ class InboxChatItem {
     required this.preview,
     required this.time,
     required this.unread,
+    this.peerUserId,
     this.active = false,
   });
 
@@ -20,6 +21,7 @@ class InboxChatItem {
   final String preview;
   final String time;
   final bool unread;
+  final String? peerUserId;
   final bool active;
 }
 
@@ -90,6 +92,7 @@ InboxChatItem inboxChatItemFromEntity(
     preview: preview,
     time: formatInboxTime(last?.createdAt ?? chat.updatedAt),
     unread: chat.unreadCount > 0,
+    peerUserId: chat.isGroup ? null : other?.id,
     active: other?.isActive ?? false,
   );
 }

@@ -224,6 +224,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get followers => 'متابعون';
 
   @override
+  String get connectionsTitle => 'العلاقات';
+
+  @override
+  String get connectionsEmptyFollowers => 'لا يوجد متابعون بعد';
+
+  @override
+  String get connectionsEmptyFollowing => 'لا تتابع أحداً بعد';
+
+  @override
+  String get connectionsEmptyFriends => 'لا يوجد أصدقاء بعد';
+
+  @override
+  String get connectionsFollowBack => 'رد المتابعة';
+
+  @override
+  String get profileMessageButton => 'رسالة';
+
+  @override
   String get likes => 'إعجابات';
 
   @override

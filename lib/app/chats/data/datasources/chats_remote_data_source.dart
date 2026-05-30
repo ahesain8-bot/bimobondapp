@@ -1,6 +1,5 @@
 import 'package:bimobondapp/app/chats/data/models/chat_message_model.dart';
 import 'package:bimobondapp/app/chats/data/models/chat_model.dart';
-import 'package:bimobondapp/app/chats/data/models/chat_participant_model.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -36,8 +35,6 @@ abstract class ChatsRemoteDataSource {
   });
 
   Future<void> deleteMessage(String messageId);
-
-  Future<List<ChatParticipantModel>> getFriends();
 }
 
 class ChatsRemoteDataSourceImpl implements ChatsRemoteDataSource {
@@ -243,32 +240,6 @@ class ChatsRemoteDataSourceImpl implements ChatsRemoteDataSource {
               _extractErrorMessage(response.data) ?? 'Failed to delete message',
         );
       }
-    } on DioException catch (e) {
-      throw DioHandler.handle(e);
-    }
-  }
-
-  @override
-  Future<List<ChatParticipantModel>> getFriends() async {
-    try {
-      final response = await apiClient.dio.get(
-        ApiConstants.myFriends,
-        options: Options(headers: await _authHeaders()),
-      );
-      if (response.statusCode == 200) {
-        return _extractList(response.data)
-            .whereType<Map>()
-            .map(
-              (e) => ChatParticipantModel.fromJson(
-                Map<String, dynamic>.from(e),
-              ),
-            )
-            .where((u) => u.id.isNotEmpty)
-            .toList();
-      }
-      throw ServerException(
-        message: _extractErrorMessage(response.data) ?? 'Failed to load friends',
-      );
     } on DioException catch (e) {
       throw DioHandler.handle(e);
     }

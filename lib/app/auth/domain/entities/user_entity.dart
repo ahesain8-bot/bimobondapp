@@ -28,6 +28,8 @@ class UserEntity extends Equatable {
   final int? followingCount;
   final int? postCount;
   final int? totalLikes;
+  final int? deviceCount;
+  final bool? isFollowing;
   final bool? isBanned;
   final String? banReason;
   final String? bannedUntil;
@@ -66,6 +68,8 @@ class UserEntity extends Equatable {
     this.followingCount,
     this.postCount,
     this.totalLikes,
+    this.deviceCount,
+    this.isFollowing,
     this.isBanned,
     this.banReason,
     this.bannedUntil,
@@ -106,6 +110,8 @@ class UserEntity extends Equatable {
     followingCount,
     postCount,
     totalLikes,
+    deviceCount,
+    isFollowing,
     isBanned,
     banReason,
     bannedUntil,

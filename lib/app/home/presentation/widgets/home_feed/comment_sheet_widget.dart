@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/comments_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_state.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/gift_comment_l10n.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -726,25 +727,43 @@ class _CommentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final userId = comment.user.id;
+
+    void openProfile() {
+      if (userId.isEmpty) return;
+      openUserProfile(
+        context,
+        userId: userId,
+        username: comment.user.username,
+        fullName: comment.user.fullName,
+        avatarUrl: comment.user.avatarUrl,
+      );
+    }
 
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SafeNetworkAvatar(
-          imageUrl: comment.user.avatarUrl,
-          radius: isReply ? 14 : 16,
-          fallbackText: comment.user.username,
+        GestureDetector(
+          onTap: openProfile,
+          child: SafeNetworkAvatar(
+            imageUrl: comment.user.avatarUrl,
+            radius: isReply ? 14 : 16,
+            fallbackText: comment.user.username,
+          ),
         ),
         const SizedBox(width: AppSizes.p8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CustomText(
-                comment.user.username ?? 'user',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              GestureDetector(
+                onTap: openProfile,
+                child: CustomText(
+                  comment.user.username ?? 'user',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                ),
               ),
               const SizedBox(height: 4),
               CustomText(

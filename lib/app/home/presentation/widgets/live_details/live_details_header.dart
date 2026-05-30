@@ -25,6 +25,8 @@ class LiveDetailsHeader extends StatelessWidget {
     this.onAuctionGifts,
     this.showOwnerMenu = false,
     this.onOwnerMenu,
+    this.showFollowButton = true,
+    this.onProfileTap,
     this.countdownBelowProfile,
     required this.onClose,
     required this.onFollowTap,
@@ -46,6 +48,8 @@ class LiveDetailsHeader extends StatelessWidget {
   final VoidCallback? onAuctionGifts;
   final bool showOwnerMenu;
   final VoidCallback? onOwnerMenu;
+  final bool showFollowButton;
+  final VoidCallback? onProfileTap;
   final Widget? countdownBelowProfile;
   final VoidCallback onClose;
   final VoidCallback onFollowTap;
@@ -75,50 +79,62 @@ class LiveDetailsHeader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ProfileAvatar(avatarUrl: avatarUrl),
-              const SizedBox(width: AppSizes.p10),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              GestureDetector(
+                onTap: onProfileTap,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      hostName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        letterSpacing: 0.3,
+                    _ProfileAvatar(avatarUrl: avatarUrl),
+                    const SizedBox(width: AppSizes.p10),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            hostName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              letterSpacing: 0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            subtitle != null && subtitle!.isNotEmpty
+                                ? subtitle!
+                                : viewersLabel,
+                            style: TextStyle(
+                              color: subtitle != null && subtitle!.isNotEmpty
+                                  ? Colors.amberAccent
+                                  : Colors.white.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight: subtitle != null &&
+                                      subtitle!.isNotEmpty
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      subtitle != null && subtitle!.isNotEmpty
-                          ? subtitle!
-                          : viewersLabel,
-                      style: TextStyle(
-                        color: subtitle != null && subtitle!.isNotEmpty
-                            ? Colors.amberAccent
-                            : Colors.white.withValues(alpha: 0.8),
-                        fontSize: 10,
-                        fontWeight: subtitle != null && subtitle!.isNotEmpty
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSizes.p12),
-              _AnimatedFollowButton(
-                isFollowing: isFollowing,
-                followLabel: followLabel,
-                followingLabel: followingLabel,
-                onTap: onFollowTap,
-              ),
+              if (showFollowButton) ...[
+                const SizedBox(width: AppSizes.p12),
+                _AnimatedFollowButton(
+                  isFollowing: isFollowing,
+                  followLabel: followLabel,
+                  followingLabel: followingLabel,
+                  onTap: onFollowTap,
+                ),
+              ],
             ],
           ),
         ),
