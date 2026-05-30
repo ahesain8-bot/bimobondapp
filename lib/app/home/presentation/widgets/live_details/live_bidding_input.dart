@@ -66,17 +66,21 @@ class LiveBiddingInput extends StatelessWidget {
                 GestureDetector(
                   onTap: onGift,
                   child: Container(
-                    height: LiveDetailsLayoutConstants.actionButtonSize,
-                    width: LiveDetailsLayoutConstants.actionButtonSize,
+                    height: 48,
+                    width: 48,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Colors.pinkAccent, Colors.orangeAccent],
+                        colors: [Color(0xFFFF3366), Color(0xFFFF9933)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.pinkAccent.withValues(alpha: 0.4),
-                          blurRadius: 8,
+                          color: const Color(0xFFFF3366).withValues(alpha: 0.5),
+                          blurRadius: 12,
+                          spreadRadius: 2,
                           offset: const Offset(0, 4),
                         ),
                       ],
@@ -91,63 +95,71 @@ class LiveBiddingInput extends StatelessWidget {
                 const SizedBox(width: AppSizes.p12),
               ],
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    LiveDetailsLayoutConstants.inputRadius,
-                  ),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(
-                      height: LiveDetailsLayoutConstants.inputHeight,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(
-                          LiveDetailsLayoutConstants.inputRadius,
-                        ),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                        ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
                       ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            onPressed: () {},
-                            icon: Icon(
-                              LucideIcons.smile,
-                              color: Colors.white.withValues(alpha: 0.7),
-                              size: 22,
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.15),
                           ),
-                          Expanded(
-                            child: TextField(
-                              controller: controller,
-                              enabled: enabled,
-                              readOnly: !enabled,
-                              style: TextStyle(
-                                color: enabled
-                                    ? Colors.white
-                                    : Colors.white.withValues(alpha: 0.4),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: () {},
+                              icon: Icon(
+                                LucideIcons.smile,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 22,
                               ),
-                              decoration: InputDecoration(
-                                hintText: hintText,
-                                hintStyle: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                  fontSize: 13,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.only(
-                                  bottom: AppSizes.p4,
-                                ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 44,
+                                minHeight: 44,
                               ),
-                              onSubmitted: (_) => onSend(),
                             ),
-                          ),
-                        ],
+                            Expanded(
+                              child: TextField(
+                                controller: controller,
+                                enabled: enabled,
+                                readOnly: !enabled,
+                                style: TextStyle(
+                                  color: enabled
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.4),
+                                  fontSize: 14,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: hintText,
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 13,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.only(
+                                    bottom: AppSizes.p4,
+                                  ),
+                                ),
+                                onSubmitted: (_) => onSend(),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -159,22 +171,26 @@ class LiveBiddingInput extends StatelessWidget {
                 child: Opacity(
                   opacity: enabled ? 1 : 0.45,
                   child: Container(
-                    height: LiveDetailsLayoutConstants.actionButtonSize,
-                    width: LiveDetailsLayoutConstants.actionButtonSize,
+                    height: 48,
+                    width: 48,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
                           theme.colorScheme.primary,
                           theme.colorScheme.secondary,
                         ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                       boxShadow: [
                         BoxShadow(
                           color: theme.colorScheme.primary.withValues(
-                            alpha: 0.4,
+                            alpha: 0.5,
                           ),
-                          blurRadius: 8,
+                          blurRadius: 12,
+                          spreadRadius: 2,
                           offset: const Offset(0, 4),
                         ),
                       ],

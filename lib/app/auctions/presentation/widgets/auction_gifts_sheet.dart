@@ -92,25 +92,24 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
         top: Radius.circular(LiveDetailsLayoutConstants.giftSheetRadius),
       ),
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: LiveDetailsLayoutConstants.giftSheetBlur,
-          sigmaY: LiveDetailsLayoutConstants.giftSheetBlur,
-        ),
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
         child: Container(
-          height: MediaQuery.of(context).size.height * 0.55,
+          height: MediaQuery.of(context).size.height * 0.6,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.white.withValues(alpha: 0.15),
-                Colors.black.withValues(alpha: 0.85),
+                Colors.black.withValues(alpha: 0.5),
+                Colors.black.withValues(alpha: 0.8),
                 Colors.black,
               ],
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
+                  alpha: 0.4,
+                ),
                 width: 1.5,
               ),
             ),
@@ -122,8 +121,20 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
                 width: 48,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  gradient: const LinearGradient(
+                    colors: [
+                      LiveDetailsLayoutConstants.giftCommentGoldDeep,
+                      LiveDetailsLayoutConstants.giftCommentGold,
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: LiveDetailsLayoutConstants.giftCommentGold
+                          .withValues(alpha: 0.4),
+                      blurRadius: 8,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSizes.p16),
@@ -266,23 +277,36 @@ class _AuctionGiftsSummaryBar extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.p12,
-        vertical: AppSizes.p10,
+        horizontal: AppSizes.p16,
+        vertical: AppSizes.p16,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
             LiveDetailsLayoutConstants.giftCommentGoldDeep
-                .withValues(alpha: 0.35),
-            LiveDetailsLayoutConstants.giftCommentGold.withValues(alpha: 0.15),
+                .withValues(alpha: 0.5),
+            LiveDetailsLayoutConstants.giftCommentGold.withValues(alpha: 0.2),
           ],
         ),
-        borderRadius: BorderRadius.circular(AppSizes.p12),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
-            alpha: 0.5,
+            alpha: 0.6,
           ),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: LiveDetailsLayoutConstants.giftCommentGoldDeep.withValues(
+              alpha: 0.25,
+            ),
+            blurRadius: 20,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,20 +362,18 @@ class _AuctionGiftTransactionTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSizes.p12),
       decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
         gradient: LinearGradient(
           colors: [
-            LiveDetailsLayoutConstants.giftCommentGoldDeep
-                .withValues(alpha: 0.4),
-            LiveDetailsLayoutConstants.giftCommentGold.withValues(alpha: 0.12),
+            Colors.white.withValues(alpha: 0.1),
+            Colors.white.withValues(alpha: 0.02),
           ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(AppSizes.p16),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
-            alpha: 0.65,
-          ),
+          color: Colors.white.withValues(alpha: 0.15),
         ),
       ),
       child: Row(

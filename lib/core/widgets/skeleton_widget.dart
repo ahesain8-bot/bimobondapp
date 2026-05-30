@@ -220,8 +220,8 @@ class AuctionCardSkeleton extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
+              AppSizes.p16,
               AppSizes.p12,
-              AppSizes.p8,
               AppSizes.p16,
               AppSizes.p16,
             ),
@@ -240,14 +240,12 @@ class AuctionCardSkeleton extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSizes.p12),
-                const Row(
-                  children: [
-                    Expanded(child: SkeletonWidget(height: 32, width: 72)),
-                    SizedBox(width: AppSizes.p16),
-                    Expanded(child: SkeletonWidget(height: 32, width: 72)),
-                  ],
+                // Match the new segmented stats container block
+                const SkeletonWidget(
+                  height: 48,
+                  borderRadius: AppSizes.radiusMd,
                 ),
-                const SizedBox(height: AppSizes.p16),
+                const SizedBox(height: AppSizes.p12),
                 const SkeletonWidget(
                   height: 46,
                   borderRadius: AppSizes.radiusMd,
@@ -260,6 +258,7 @@ class AuctionCardSkeleton extends StatelessWidget {
     );
   }
 }
+
 
 /// Horizontal category chips placeholder for [AuctionsScreen].
 class AuctionsCategoryStripSkeleton extends StatelessWidget {

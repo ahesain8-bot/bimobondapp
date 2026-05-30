@@ -1,11 +1,7 @@
 import 'dart:ui';
 
-import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_digits.dart';
@@ -24,70 +20,60 @@ class AuctionCountdownBar extends StatelessWidget {
             ? Colors.amberAccent
             : LiveDetailsLayoutConstants.auctionActiveBadgeColor;
 
-    final radius = LiveDetailsLayoutConstants.countdownBarRadius;
-
     return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
+      borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: LiveDetailsLayoutConstants.countdownBarBlur,
-          sigmaY: LiveDetailsLayoutConstants.countdownBarBlur,
-        ),
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
         child: Container(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.p8,
+            horizontal: AppSizes.p12,
             vertical: AppSizes.p6,
           ),
           decoration: BoxDecoration(
-            color: LiveDetailsLayoutConstants.countdownBarOverlay,
-            borderRadius: BorderRadius.circular(radius),
+            gradient: LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.6),
+                Colors.black.withValues(alpha: 0.4),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: LiveDetailsLayoutConstants.countdownBarBorder,
+              color: Colors.white.withValues(alpha: 0.1),
             ),
-          ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: LiveDetailsLayoutConstants.countdownBarFill,
-              borderRadius: BorderRadius.circular(radius),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.p6,
-                vertical: AppSizes.p4,
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.1),
+                blurRadius: 10,
+                spreadRadius: 1,
               ),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        LucideIcons.clock,
-                        size: 13,
-                        color: Colors.white.withValues(alpha: 0.7),
-                      ),
-                      const SizedBox(width: AppSizes.p6),
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(
-                            alpha: parts.isFinished ? 0.5 : 0.9,
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: AppSizes.p8),
-                      AuctionCountdownDigits(
-                        parts: parts,
-                        compact: true,
-                      ),
-                    ],
+            ],
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSizes.p4),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    LucideIcons.clock,
+                    size: 14,
+                    color: accentColor,
                   ),
                 ),
-              ),
+                const SizedBox(width: AppSizes.p8),
+                AuctionCountdownDigits(
+                  parts: parts,
+                  compact: true,
+                ),
+              ],
             ),
           ),
         ),

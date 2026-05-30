@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -29,126 +30,141 @@ class LiveCommentBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.p12,
-        vertical: AppSizes.p6,
-      ),
-      decoration: BoxDecoration(
-        gradient: isGift
-            ? LinearGradient(
-                colors: [
-                  LiveDetailsLayoutConstants.giftCommentGoldDeep.withValues(
-                    alpha:
-                        LiveDetailsLayoutConstants.giftCommentFillOpacityDeep,
-                  ),
-                  LiveDetailsLayoutConstants.giftCommentGold.withValues(
-                    alpha:
-                        LiveDetailsLayoutConstants.giftCommentFillOpacityLight,
-                  ),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        color: isGift ? null : Colors.black.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(
-          LiveDetailsLayoutConstants.chatBubbleRadius,
-        ),
-        border: Border.all(
-          color: isGift
-              ? LiveDetailsLayoutConstants.giftCommentGold.withValues(
-                  alpha: LiveDetailsLayoutConstants.giftCommentBorderOpacity,
-                )
-              : Colors.white.withValues(alpha: 0.08),
-          width: isGift ? 1.2 : 1,
-        ),
-        boxShadow: isGift
-            ? [
-                BoxShadow(
-                  color: LiveDetailsLayoutConstants.giftCommentGoldDeep
-                      .withValues(
-                        alpha:
-                            LiveDetailsLayoutConstants.giftCommentGlowOpacity,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.p12,
+            vertical: AppSizes.p8,
+          ),
+          decoration: BoxDecoration(
+            gradient: isGift
+                ? LinearGradient(
+                    colors: [
+                      LiveDetailsLayoutConstants.giftCommentGoldDeep.withValues(
+                        alpha: 0.35,
                       ),
-                  blurRadius: 10,
-                  spreadRadius: 0.5,
-                ),
-              ]
-            : null,
-      ),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            if (isGift)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: EdgeInsetsDirectional.only(
-                    end: isRtl ? 0 : AppSizes.p6,
-                    start: isRtl ? AppSizes.p6 : 0,
+                      LiveDetailsLayoutConstants.giftCommentGold.withValues(
+                        alpha: 0.15,
+                      ),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : LinearGradient(
+                    colors: [
+                      Colors.black.withValues(alpha: 0.5),
+                      Colors.black.withValues(alpha: 0.3),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
-                  child: Icon(
-                    LucideIcons.gift,
-                    size: 14,
-                    color: _giftNameColor,
-                  ),
-                ),
-              ),
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: Padding(
-                padding: EdgeInsetsDirectional.only(
-                  end: isRtl ? 0 : AppSizes.p6,
-                  start: isRtl ? AppSizes.p6 : 0,
-                ),
-                child: CircleAvatar(
-                  radius: LiveDetailsLayoutConstants.chatAvatarRadius,
-                  backgroundColor: isGift
-                      ? LiveDetailsLayoutConstants.giftCommentGoldDeep
-                            .withValues(
-                              alpha: LiveDetailsLayoutConstants
-                                  .giftCommentAvatarFillOpacity,
-                            )
-                      : null,
-                  backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
-                      ? NetworkImage(MediaUtils.resolveAbsoluteUrl(avatarUrl!))
-                      : null,
-                  child: avatarUrl == null || avatarUrl!.isEmpty
-                      ? Text(
-                          displayName.isNotEmpty
-                              ? displayName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isGift ? _giftBodyColor : null,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isGift
+                  ? LiveDetailsLayoutConstants.giftCommentGold.withValues(
+                      alpha: 0.8,
+                    )
+                  : Colors.white.withValues(alpha: 0.1),
+              width: isGift ? 1.5 : 1,
+            ),
+            boxShadow: isGift
+                ? [
+                    BoxShadow(
+                      color: LiveDetailsLayoutConstants.giftCommentGoldDeep
+                          .withValues(
+                            alpha: 0.4,
                           ),
-                        )
-                      : null,
+                      blurRadius: 15,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: RichText(
+            text: TextSpan(
+              children: [
+                if (isGift)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.only(
+                        end: isRtl ? 0 : AppSizes.p6,
+                        start: isRtl ? AppSizes.p6 : 0,
+                      ),
+                      child: Icon(
+                        LucideIcons.gift,
+                        size: 16,
+                        color: _giftNameColor,
+                      ),
+                    ),
+                  ),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.only(
+                      end: isRtl ? 0 : AppSizes.p8,
+                      start: isRtl ? AppSizes.p8 : 0,
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isGift 
+                            ? _giftNameColor.withValues(alpha: 0.8) 
+                            : Colors.white.withValues(alpha: 0.2),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 12,
+                        backgroundColor: isGift
+                            ? LiveDetailsLayoutConstants.giftCommentGoldDeep
+                                  .withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.1),
+                        backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
+                            ? NetworkImage(MediaUtils.resolveAbsoluteUrl(avatarUrl!))
+                            : null,
+                        child: avatarUrl == null || avatarUrl!.isEmpty
+                            ? Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isGift ? _giftBodyColor : Colors.white70,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                TextSpan(
+                  text: '$displayName  ',
+                  style: TextStyle(
+                    color: isGift
+                        ? _giftNameColor
+                        : theme.colorScheme.primary.withValues(alpha: 0.95),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+                TextSpan(
+                  text: body,
+                  style: TextStyle(
+                    color: isGift ? _giftBodyColor : Colors.white.withValues(alpha: 0.95),
+                    fontSize: 13,
+                    height: 1.4,
+                    fontWeight: isGift ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-
-            TextSpan(
-              text: '$displayName  ',
-              style: TextStyle(
-                color: isGift
-                    ? _giftNameColor
-                    : theme.colorScheme.primary.withValues(alpha: 0.9),
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-            TextSpan(
-              text: body,
-              style: TextStyle(
-                color: isGift ? _giftBodyColor : Colors.white,
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: isGift ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

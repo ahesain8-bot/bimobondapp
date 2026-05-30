@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
 import 'package:bimobondapp/app/categories/domain/usecases/get_categories_usecase.dart';
@@ -7,6 +8,7 @@ import 'package:bimobondapp/app/categories/presentation/di/categories_injector.d
 import 'package:bimobondapp/app/home/presentation/utils/post_owner_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_card.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_item.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_status_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_active_header.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_category_strip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
@@ -18,10 +20,12 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AuctionsScreen extends StatefulWidget {
   final bool isTabActive;
@@ -249,12 +253,25 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     }
   }
 
+  AuctionItem? _getSpotlightItem() {
+    if (_postAuctionItems.isEmpty) return null;
+    final liveAuctions = _postAuctionItems
+        .where((item) => item.isLive)
+        .toList();
+    if (liveAuctions.isNotEmpty) {
+      liveAuctions.sort((a, b) => b.giftTotalUsd.compareTo(a.giftTotalUsd));
+      return liveAuctions.first;
+    }
+    return _postAuctionItems.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final locale = Localizations.localeOf(context);
 
     final surfaceElevated = isDark
         ? const Color(0xFF1E1E1E)
@@ -265,6 +282,19 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     final chipInactiveBorder = isDark
         ? Colors.white24
         : theme.dividerColor.withValues(alpha: 0.35);
+
+    final showSpotlight =
+        !_isLoadingPostAuctions &&
+        _searchQuery.isEmpty &&
+        _selectedCategorySlug == null &&
+        _postAuctionItems.isNotEmpty;
+    final spotlightItem = showSpotlight ? _getSpotlightItem() : null;
+
+    final filteredListItems = spotlightItem != null
+        ? _postAuctionItems
+              .where((item) => item.id != spotlightItem.id)
+              .toList()
+        : _postAuctionItems;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -280,105 +310,362 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
               parent: BouncingScrollPhysics(),
             ),
             slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
-                child: AuctionsSearchBar(
-                  controller: _searchController,
-                  fillColor: surfaceElevated,
-                  onSubmitted: _submitSearch,
-                  onClear: _clearSearch,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
+                  child: AuctionsSearchBar(
+                    controller: _searchController,
+                    fillColor: surfaceElevated,
+                    onSubmitted: _submitSearch,
+                    onClear: _clearSearch,
+                  ),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSizes.p16,
+                    AppSizes.p20,
+                    AppSizes.p16,
+                    AppSizes.p12,
+                  ),
+                  child: CustomText(
+                    l10n.popularCategories,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (_isLoadingCategories && _categories.isEmpty)
+                const SliverToBoxAdapter(child: AuctionsCategoryStripSkeleton())
+              else if (_categories.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: AuctionsCategoryStrip(
+                    categories: _categories,
+                    selectedCategorySlug: _selectedCategorySlug,
+                    chipInactiveBg: chipInactiveBg,
+                    inactiveBorder: chipInactiveBorder,
+                    selectedColor: theme.primaryColor,
+                    onCategorySelected: _onCategorySelected,
+                  ),
+                ),
+              if (showSpotlight && spotlightItem != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: AppSizes.p20),
+                    child: _FeaturedSpotlight(
+                      item: spotlightItem,
+                      onTap: () => _openAuction(spotlightItem),
+                    ),
+                  ),
+                ),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSizes.p16,
+                    AppSizes.p24,
+                    AppSizes.p16,
+                    AppSizes.p12,
+                  ),
+                  child: AuctionsActiveHeader(),
+                ),
+              ),
+              SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
                   AppSizes.p16,
-                  AppSizes.p20,
+                  0,
                   AppSizes.p16,
-                  AppSizes.p12,
-                ),
-                child: CustomText(
-                  l10n.popularCategories,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            if (_isLoadingCategories && _categories.isEmpty)
-              const SliverToBoxAdapter(
-                child: AuctionsCategoryStripSkeleton(),
-              )
-            else if (_categories.isNotEmpty)
-              SliverToBoxAdapter(
-                child: AuctionsCategoryStrip(
-                  categories: _categories,
-                  selectedCategorySlug: _selectedCategorySlug,
-                  chipInactiveBg: chipInactiveBg,
-                  inactiveBorder: chipInactiveBorder,
-                  selectedColor: theme.primaryColor,
-                  onCategorySelected: _onCategorySelected,
-                ),
-              ),
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
                   AppSizes.p16,
-                  AppSizes.p24,
-                  AppSizes.p16,
-                  AppSizes.p12,
                 ),
-                child: AuctionsActiveHeader(),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSizes.p16,
-                0,
-                AppSizes.p16,
-                AppSizes.p16,
-              ),
-              sliver: _isLoadingPostAuctions
-                  ? const SliverToBoxAdapter(
-                      child: AuctionListSkeleton(itemCount: 3),
-                    )
-                  : _postAuctionItems.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSizes.p48,
-                          horizontal: AppSizes.p16,
+                sliver: _isLoadingPostAuctions
+                    ? const SliverToBoxAdapter(
+                        child: AuctionListSkeleton(itemCount: 3),
+                      )
+                    : filteredListItems.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSizes.p48,
+                            horizontal: AppSizes.p16,
+                          ),
+                          child: Center(
+                            child: CustomText(
+                              l10n.noPostsFound,
+                              variant: TextVariant.secondary,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         ),
-                        child: Center(
-                          child: CustomText(
-                            l10n.noPostsFound,
-                            variant: TextVariant.secondary,
-                            textAlign: TextAlign.center,
+                      )
+                    : SliverList.separated(
+                        itemCount: filteredListItems.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSizes.p16),
+                        itemBuilder: (context, index) {
+                          final auction = filteredListItems[index];
+                          final post = auction.post;
+                          final showBidButton =
+                              post == null ||
+                              !isCurrentUserPostOwner(context, post);
+
+                          return AuctionCard(
+                            auction: auction,
+                            surfaceColor: surfaceElevated,
+                            showBidButton: showBidButton,
+                            onOpen: () => _openAuction(auction),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeaturedSpotlight extends StatelessWidget {
+  const _FeaturedSpotlight({required this.item, required this.onTap});
+
+  final AuctionItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context);
+
+    final total = item.giftTotalUsd;
+    final text = total == total.roundToDouble()
+        ? total.round().toString()
+        : total.toStringAsFixed(2);
+    final localizedAmount = LocaleFormatUtils.localizeDigits(text, locale);
+    final bidText = l10n.liveHighestBidAmount(
+      localizedAmount,
+      l10n.currencyUsd,
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        boxShadow: [
+          if (!isDark)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            )
+          else
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        child: AspectRatio(
+          aspectRatio: 1.85,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                item.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => ColoredBox(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  child: Icon(
+                    LucideIcons.image,
+                    color: theme.disabledColor,
+                    size: 48,
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.1),
+                        Colors.black.withValues(alpha: 0.75),
+                      ],
+                      stops: const [0.35, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: AppSizes.p12,
+                right: AppSizes.p12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.p8,
+                    vertical: AppSizes.p4,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [theme.primaryColor, const Color(0xFFFF5E97)],
+                    ),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.primaryColor.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        LucideIcons.sparkles,
+                        size: 11,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        l10n.viewAll.toUpperCase() == "VIEW ALL"
+                            ? "SPOTLIGHT"
+                            : "مميز",
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: AppSizes.p12,
+                left: AppSizes.p12,
+                child: AuctionStatusBadge(auction: item),
+              ),
+              Positioned(
+                bottom: AppSizes.p16,
+                left: AppSizes.p16,
+                right: AppSizes.p16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black45,
+                            blurRadius: 4,
+                            offset: Offset(0, 1.5),
+                          ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                    ),
+                    const SizedBox(height: AppSizes.p8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSizes.p12,
+                            vertical: AppSizes.p8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusMd,
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.liveTopBid,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.75,
+                                      ),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    bidText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              ElevatedButton(
+                                onPressed: onTap,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.primaryColor,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSizes.p16,
+                                    vertical: 0,
+                                  ),
+                                  minimumSize: const Size(0, 32),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppSizes.radiusSm,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      LucideIcons.gavel,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      l10n.bidNow,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    )
-                  : SliverList.separated(
-                      itemCount: _postAuctionItems.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSizes.p16),
-                      itemBuilder: (context, index) {
-                        final auction = _postAuctionItems[index];
-                        final post = auction.post;
-                        final showBidButton =
-                            post == null ||
-                            !isCurrentUserPostOwner(context, post);
-
-                        return AuctionCard(
-                          auction: auction,
-                          surfaceColor: surfaceElevated,
-                          showBidButton: showBidButton,
-                          onOpen: () => _openAuction(auction),
-                        );
-                      },
                     ),
-            ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

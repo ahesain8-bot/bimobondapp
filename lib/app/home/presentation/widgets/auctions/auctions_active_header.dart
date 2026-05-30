@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/pulsing_dot.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -25,14 +26,7 @@ class AuctionsActiveHeader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: AppTheme.successAccent,
-                  shape: BoxShape.circle,
-                ),
-              ),
+              const PulsingDot(color: AppTheme.successAccent, size: 6),
               const SizedBox(width: AppSizes.p6),
               CustomText(
                 l10n.liveBadge,

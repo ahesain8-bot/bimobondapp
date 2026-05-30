@@ -1,11 +1,7 @@
 import 'dart:ui';
 
-import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -32,104 +28,147 @@ class CompactHighestBid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = isFinished
+        ? LiveDetailsLayoutConstants.auctionFinishedBadgeColor
+        : theme.colorScheme.primary;
+
+    final darkAccent = isFinished
+        ? LiveDetailsLayoutConstants.auctionFinishedBadgeDark
+        : theme.colorScheme.secondary;
+
     return ScaleTransition(
       scale: popAnimation,
       child: Container(
         margin: LiveDetailsLayoutConstants.screenHorizontalPadding,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(
-            LiveDetailsLayoutConstants.topBidRadius,
-          ),
+          borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSizes.p16,
-                vertical: AppSizes.p8,
-              ),
+              padding: const EdgeInsets.all(AppSizes.p6),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isFinished
-                      ? [
-                          LiveDetailsLayoutConstants.auctionFinishedBadgeColor
-                              .withValues(alpha: 0.9),
-                          LiveDetailsLayoutConstants.auctionFinishedBadgeDark
-                              .withValues(alpha: 0.9),
-                        ]
-                      : [
-                          theme.colorScheme.primary.withValues(alpha: 0.85),
-                          theme.colorScheme.secondary.withValues(alpha: 0.85),
-                        ],
-                ),
-                borderRadius: BorderRadius.circular(
-                  LiveDetailsLayoutConstants.topBidRadius,
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
+                color: Colors.black.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 boxShadow: [
                   BoxShadow(
-                    color: (isFinished
-                            ? LiveDetailsLayoutConstants
-                                .auctionFinishedBadgeDark
-                            : theme.colorScheme.primary)
-                        .withValues(alpha: 0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: accentColor.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    spreadRadius: -5,
                   ),
                 ],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    isFinished
-                        ? LucideIcons.badgeCheck
-                        : showGiftIcon
-                            ? LucideIcons.gift
-                            : LucideIcons.gavel,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: AppSizes.p8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        topBidLabel,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  // Main Bid Segment
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.p16,
+                      vertical: AppSizes.p10,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          accentColor.withValues(alpha: 0.85),
+                          darkAccent.withValues(alpha: 0.85),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      Text(
-                        bidAmountText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      if (targetPriceLabel != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          targetPriceLabel!,
-                          style: TextStyle(
-                            color: isFinished
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.75),
-                            fontSize: 10,
-                            fontWeight: isFinished
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                          ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: darkAccent.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
                         ),
                       ],
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isFinished
+                              ? LucideIcons.badgeCheck
+                              : showGiftIcon
+                                  ? LucideIcons.gift
+                                  : LucideIcons.gavel,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: AppSizes.p10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              topBidLabel.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              bidAmountText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                  
+                  // Target Price Segment
+                  if (targetPriceLabel != null) ...[
+                    const SizedBox(width: AppSizes.p8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.p12,
+                        vertical: AppSizes.p10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'TARGET',
+                            style: TextStyle(
+                              color: isFinished ? accentColor : Colors.white54,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            targetPriceLabel!,
+                            style: TextStyle(
+                              color: isFinished
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                              fontWeight: isFinished
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

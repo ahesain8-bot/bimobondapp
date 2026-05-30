@@ -11,11 +11,13 @@ class AuctionCardCountdownStat extends StatefulWidget {
   const AuctionCardCountdownStat({
     required this.startedAt,
     required this.endedAt,
+    this.isMinimal = false,
     super.key,
   });
 
   final DateTime startedAt;
   final DateTime endedAt;
+  final bool isMinimal;
 
   @override
   State<AuctionCardCountdownStat> createState() =>
@@ -77,6 +79,17 @@ class _AuctionCardCountdownStatState extends State<AuctionCardCountdownStat> {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context);
 
+    if (widget.isMinimal) {
+      return Text(
+        formatAuctionCountdownDisplay(l10n, locale, _parts),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+      );
+    }
+
     return AuctionBidStatColumn(
       label: auctionCountdownLabel(l10n, _parts),
       value: formatAuctionCountdownDisplay(l10n, locale, _parts),
@@ -85,3 +98,4 @@ class _AuctionCardCountdownStatState extends State<AuctionCardCountdownStat> {
     );
   }
 }
+

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -11,7 +13,6 @@ import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
-import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -34,9 +35,11 @@ class VideoPostWidget extends StatefulWidget {
 }
 
 class _VideoPostWidgetState extends State<VideoPostWidget>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   int _currentPage = 0;
   late AnimationController _musicController;
+  late AnimationController _likeAnimController;
+  late Animation<double> _likeScaleAnim;
   final CarouselSliderController _carouselCtrl = CarouselSliderController();
 
   // Local state for optimistic UI
@@ -52,10 +55,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     _likeCount = widget.post.likeCount;
     _isSaved = widget.post.isSaved;
     _saveCount = widget.post.saveCount;
+
     _musicController = AnimationController(
-      duration: const Duration(seconds: 5),
+      duration: const Duration(seconds: 8),
       vsync: this,
     )..repeat();
+
+    _likeAnimController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _likeScaleAnim =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4), weight: 50),
+          TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0), weight: 50),
+        ]).animate(
+          CurvedAnimation(parent: _likeAnimController, curve: Curves.easeInOut),
+        );
   }
 
   @override
@@ -75,7 +91,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       _isLiked = !_isLiked;
       _isLiked ? _likeCount++ : _likeCount--;
     });
-
+    _likeAnimController.forward(from: 0);
     context.read<PostsBloc>().add(
       ToggleLikePostRequestedEvent(widget.post.id, liked: _isLiked),
     );
@@ -87,7 +103,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       _isSaved = !_isSaved;
       _isSaved ? _saveCount++ : _saveCount--;
     });
-
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
   }
 
@@ -126,34 +141,97 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(LucideIcons.pencil, color: theme.iconTheme.color),
-              title: Text(l10n.editPost),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _openEditPost();
-              },
-            ),
-            ListTile(
-              leading: const Icon(LucideIcons.trash2, color: Colors.red),
-              title: Text(
-                l10n.deletePost,
-                style: const TextStyle(color: Colors.red),
+      builder: (sheetContext) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.15),
+                  Colors.black.withValues(alpha: 0.85),
+                ],
               ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _confirmDeletePost();
-              },
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              ),
             ),
-          ],
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        LucideIcons.pencil,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    title: Text(
+                      l10n.editPost,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _openEditPost();
+                    },
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        LucideIcons.trash2,
+                        color: Colors.red,
+                        size: 18,
+                      ),
+                    ),
+                    title: Text(
+                      l10n.deletePost,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _confirmDeletePost();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -161,15 +239,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   Future<void> _openEditPost() async {
     if (!_checkAuth() || !_isPostOwner()) return;
-
     await context.pushNamed<PostEntity>('edit_post', extra: widget.post);
   }
 
   void _confirmDeletePost() {
     if (!_checkAuth() || !_isPostOwner()) return;
-
     final l10n = AppLocalizations.of(context)!;
-
     PopupDialogs.showConfirmDialog(
       context,
       title: l10n.deletePostTitle,
@@ -194,10 +269,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   bool _checkAuth() {
     final authState = context.read<AuthBloc>().state;
-    if (authState is AuthSuccess) {
-      return true;
-    }
-
+    if (authState is AuthSuccess) return true;
     final l10n = AppLocalizations.of(context)!;
     PopupDialogs.showConfirmDialog(
       context,
@@ -242,6 +314,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   @override
   void dispose() {
     _musicController.dispose();
+    _likeAnimController.dispose();
     super.dispose();
   }
 
@@ -251,6 +324,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final bottom = widget.bottomPadding ?? 30.0;
     final post = widget.post;
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
     return BlocListener<PostsBloc, PostsState>(
       listenWhen: (previous, current) =>
@@ -260,23 +334,26 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(l10n.postDeletedSuccessfully)));
-          if (context.canPop()) {
-            context.pop();
-          }
+          if (context.canPop()) context.pop();
         }
       },
-      child: _buildPostContent(size, bottom, post),
+      child: _buildPostContent(size, bottom, post, theme),
     );
   }
 
-  Widget _buildPostContent(Size size, double bottom, PostEntity post) {
+  Widget _buildPostContent(
+    Size size,
+    double bottom,
+    PostEntity post,
+    ThemeData theme,
+  ) {
     return Container(
       height: size.height,
       width: size.width,
       color: Colors.black,
       child: Stack(
         children: [
-          // Post Content (Video/Image) - Carousel
+          // ── Media Carousel ───────────────────────────────────────────────
           CarouselSlider.builder(
             carouselController: _carouselCtrl,
             itemCount: _displayMedia.length,
@@ -296,7 +373,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                 _buildMediaItem(_displayMedia[index], index),
           ),
 
-          // Subtle Gradients for readability (must not block swipe gestures)
+          // ── Gradient Overlay ─────────────────────────────────────────────
           Positioned.fill(
             child: IgnorePointer(
               child: DecoratedBox(
@@ -305,71 +382,66 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.3),
+                      Colors.black.withValues(alpha: 0.4),
                       Colors.transparent,
                       Colors.transparent,
-                      Colors.black.withOpacity(0.5),
+                      Colors.black.withValues(alpha: 0.75),
                     ],
-                    stops: const [0.0, 0.2, 0.7, 1.0],
+                    stops: const [0.0, 0.15, 0.6, 1.0],
                   ),
                 ),
               ),
             ),
           ),
 
-          // Media count at top center (e.g. 1/3)
+          // ── Media Count Badge ─────────────────────────────────────────────
           if (_displayMedia.length > 1)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 12,
+              top: MediaQuery.of(context).padding.top + 16,
               left: 0,
               right: 0,
               child: Center(child: _buildMediaCountBadge(_displayMedia.length)),
             ),
 
-          // Right Side Actions
+          // ── Right Side Actions ────────────────────────────────────────────
           Positioned(
-            right: 8,
+            right: 10,
             bottom: bottom + 20,
             child: Column(
               children: [
-                _buildProfilePicture(post.user?.avatarUrl),
+                _buildProfileAvatar(post.user?.avatarUrl, theme),
+                const SizedBox(height: 24),
+                _buildLikeButton(theme),
                 const SizedBox(height: 20),
-                _buildActionItem(
-                  _isLiked ? Icons.favorite : LucideIcons.heart,
-                  _formatCount(_likeCount),
-                  _isLiked ? Colors.red : Colors.white,
-                  onTap: _handleLike,
-                ),
-                const SizedBox(height: 16),
-                _buildActionItem(
-                  LucideIcons.messageCircle,
-                  '',
-                  Colors.white,
+                _buildActionButton(
+                  icon: LucideIcons.messageCircle,
+                  label: '',
+                  color: Colors.white,
                   onTap: _showComments,
                 ),
-                const SizedBox(height: 16),
-                _buildActionItem(
-                  _isSaved ? Icons.bookmark : LucideIcons.bookmark,
-                  _formatCount(_saveCount),
-                  _isSaved ? Colors.yellow : Colors.white,
+                const SizedBox(height: 20),
+                _buildActionButton(
+                  icon: _isSaved ? Icons.bookmark : LucideIcons.bookmark,
+                  label: _formatCount(_saveCount),
+                  color: _isSaved ? Colors.amberAccent : Colors.white,
                   onTap: _handleSave,
                 ),
                 if (_isPostOwner()) ...[
-                  const SizedBox(height: 16),
-                  _buildActionItem(
-                    LucideIcons.ellipsis,
-                    '',
-                    Colors.white,
+                  const SizedBox(height: 20),
+                  _buildActionButton(
+                    icon: LucideIcons.ellipsis,
+                    label: '',
+                    color: Colors.white,
                     onTap: _showPostOptions,
                   ),
                 ],
-                const SizedBox(height: 25),
-                _buildMusicDisc(),
+                const SizedBox(height: 28),
+                _buildMusicDisc(theme),
               ],
             ),
           ),
 
-          // Bottom info: centered dots above user caption
+          // ── Bottom Info ───────────────────────────────────────────────────
           Positioned(
             left: 0,
             right: 0,
@@ -381,75 +453,135 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   IgnorePointer(
                     child: _buildMediaPageDots(_displayMedia.length),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                 ],
                 Padding(
-                  padding: const EdgeInsets.only(left: 12, right: 80),
+                  padding: const EdgeInsets.only(left: 16, right: 88),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CustomText(
-                        '@${post.user?.username ?? 'user'}',
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                      ),
-                      const SizedBox(height: 6),
-                      CustomText(
-                        post.description ?? '',
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 15,
-                      ),
-                      const SizedBox(height: 10),
-                      if (post.category != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                LucideIcons.tag,
-                                color: Colors.white,
-                                size: 12,
-                              ),
-                              const SizedBox(width: 4),
-                              CustomText(
-                                post.category!,
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 10),
+                      // Username
                       Row(
                         children: [
-                          const Icon(
-                            LucideIcons.music,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SizedBox(
-                              height: 20,
-                              child: CustomText(
-                                'Original Sound - @${post.user?.username ?? 'user'}',
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
+                          Text(
+                            '@${post.user?.username ?? 'user'}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              letterSpacing: 0.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black54,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Description
+                      if ((post.description ?? '').isNotEmpty)
+                        Text(
+                          post.description!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 14,
+                            height: 1.4,
+                            shadows: const [
+                              Shadow(color: Colors.black54, blurRadius: 6),
+                            ],
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      const SizedBox(height: 10),
+
+                      // Category Chip
+                      if (post.category != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    LucideIcons.tag,
+                                    color: Colors.white,
+                                    size: 11,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    post.category!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+
+                      // Music row
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  LucideIcons.music,
+                                  color: Colors.white70,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Original Sound · @${post.user?.username ?? 'user'}',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 12,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -463,17 +595,27 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   Widget _buildMediaCountBadge(int total) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: CustomText(
-        '${_currentPage + 1}/$total',
-        color: Colors.white,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          child: Text(
+            '${_currentPage + 1}/$total',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -485,22 +627,22 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       children: List.generate(
         total,
         (index) => AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 250),
           margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: _currentPage == index ? 8 : 6,
-          height: _currentPage == index ? 8 : 6,
+          width: _currentPage == index ? 20 : 7,
+          height: 7,
           decoration: BoxDecoration(
             color: _currentPage == index
                 ? Colors.white
-                : Colors.white.withValues(alpha: 0.4),
-            shape: BoxShape.circle,
+                : Colors.white.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(4),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildProfilePicture(String? avatarUrl) {
+  Widget _buildProfileAvatar(String? avatarUrl, ThemeData theme) {
     return Stack(
       alignment: Alignment.bottomCenter,
       clipBehavior: Clip.none,
@@ -508,8 +650,20 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 1.5),
+            gradient: LinearGradient(
+              colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
+            ],
           ),
+          padding: const EdgeInsets.all(2.5),
           child: SafeNetworkAvatar(
             imageUrl: avatarUrl,
             radius: 24,
@@ -522,18 +676,121 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           child: Container(
             width: 22,
             height: 22,
-            decoration: const BoxDecoration(
-              color: Colors.red,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.secondary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               shape: BoxShape.circle,
+              border: Border.all(color: Colors.black, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                  blurRadius: 6,
+                ),
+              ],
             ),
-            child: const Icon(Icons.add, color: Colors.white, size: 16),
+            child: const Icon(Icons.add, color: Colors.white, size: 15),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMusicDisc() {
+  Widget _buildLikeButton(ThemeData theme) {
+    return GestureDetector(
+      onTap: _handleLike,
+      child: Column(
+        children: [
+          ScaleTransition(
+            scale: _likeScaleAnim,
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isLiked
+                    ? Colors.red.withValues(alpha: 0.25)
+                    : Colors.white.withValues(alpha: 0.1),
+                border: Border.all(
+                  color: _isLiked
+                      ? Colors.red.withValues(alpha: 0.6)
+                      : Colors.white.withValues(alpha: 0.2),
+                ),
+                boxShadow: _isLiked
+                    ? [
+                        BoxShadow(
+                          color: Colors.red.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                _isLiked ? Icons.favorite : LucideIcons.heart,
+                color: _isLiked ? Colors.red : Colors.white,
+                size: 26,
+              ),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            _formatCount(_likeCount),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.1),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          if (label.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMusicDisc(ThemeData theme) {
     return AnimatedBuilder(
       animation: _musicController,
       builder: (context, child) {
@@ -543,46 +800,34 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         );
       },
       child: Container(
-        width: 45,
-        height: 45,
-        padding: const EdgeInsets.all(10),
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: const SweepGradient(
-            colors: [Colors.black87, Colors.grey, Colors.black87],
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primary.withValues(alpha: 0.8),
+              theme.colorScheme.secondary.withValues(alpha: 0.8),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          border: Border.all(color: Colors.black54, width: 8),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.primary.withValues(alpha: 0.4),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
         ),
         child: Container(
+          margin: const EdgeInsets.all(10),
           decoration: const BoxDecoration(
             color: Colors.black,
             shape: BoxShape.circle,
           ),
           child: const Icon(LucideIcons.music, color: Colors.white54, size: 12),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionItem(
-    IconData icon,
-    String label,
-    Color color, {
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 35),
-          const SizedBox(height: 4),
-          CustomText(
-            label,
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ],
       ),
     );
   }

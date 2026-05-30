@@ -55,25 +55,28 @@ class LiveDetailsHeader extends StatelessWidget {
     final theme = Theme.of(context);
 
     final profileCard = ClipRRect(
-      borderRadius: BorderRadius.circular(
-        LiveDetailsLayoutConstants.headerGlassRadius,
-      ),
+      borderRadius: BorderRadius.circular(50),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+          padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
           decoration: BoxDecoration(
-            color: LiveDetailsLayoutConstants.glassFill,
-            borderRadius: BorderRadius.circular(
-              LiveDetailsLayoutConstants.headerGlassRadius,
-            ),
-            border: Border.all(color: LiveDetailsLayoutConstants.glassBorder),
+            color: Colors.black.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(50),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               _ProfileAvatar(avatarUrl: avatarUrl),
-              const SizedBox(width: AppSizes.p8),
+              const SizedBox(width: AppSizes.p10),
               Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,8 +86,9 @@ class LiveDetailsHeader extends StatelessWidget {
                       hostName,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w800,
                         fontSize: 13,
+                        letterSpacing: 0.3,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -96,11 +100,11 @@ class LiveDetailsHeader extends StatelessWidget {
                       style: TextStyle(
                         color: subtitle != null && subtitle!.isNotEmpty
                             ? Colors.amberAccent
-                            : Colors.white70,
+                            : Colors.white.withValues(alpha: 0.8),
                         fontSize: 10,
                         fontWeight: subtitle != null && subtitle!.isNotEmpty
-                            ? FontWeight.w600
-                            : FontWeight.normal,
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -108,30 +112,12 @@ class LiveDetailsHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: AppSizes.p8),
-              GestureDetector(
+              const SizedBox(width: AppSizes.p12),
+              _AnimatedFollowButton(
+                isFollowing: isFollowing,
+                followLabel: followLabel,
+                followingLabel: followingLabel,
                 onTap: onFollowTap,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.p10,
-                    vertical: AppSizes.p6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isFollowing
-                        ? Colors.white.withValues(alpha: 0.2)
-                        : theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isFollowing ? followingLabel : followLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -218,7 +204,8 @@ class _ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = LiveDetailsLayoutConstants.headerAvatarRadius;
+    // Slighly smaller radius for the new pill shape
+    const radius = 16.0;
     final url = avatarUrl?.trim();
     final hasImage =
         url != null && url.isNotEmpty && MediaUtils.isImage(url);
@@ -226,29 +213,160 @@ class _ProfileAvatar extends StatelessWidget {
     if (!hasImage) {
       return CircleAvatar(
         radius: radius,
-        backgroundColor: Colors.white.withValues(alpha: 0.12),
+        backgroundColor: Colors.white.withValues(alpha: 0.15),
         child: Icon(
           LucideIcons.user,
           size: radius,
-          color: Colors.white70,
+          color: Colors.white,
         ),
       );
     }
 
     final size = radius * 2;
-    return ClipOval(
-      child: SizedBox(
-        width: size,
-        height: size,
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipOval(
         child: Image.network(
           MediaUtils.resolveAbsoluteUrl(url),
           fit: BoxFit.cover,
           errorBuilder: (_, _, _) => ColoredBox(
-            color: Colors.white.withValues(alpha: 0.12),
+            color: Colors.white.withValues(alpha: 0.15),
             child: Icon(
               LucideIcons.user,
               size: radius,
-              color: Colors.white70,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedFollowButton extends StatefulWidget {
+  const _AnimatedFollowButton({
+    required this.isFollowing,
+    required this.followLabel,
+    required this.followingLabel,
+    required this.onTap,
+  });
+
+  final bool isFollowing;
+  final String followLabel;
+  final String followingLabel;
+  final VoidCallback onTap;
+
+  @override
+  State<_AnimatedFollowButton> createState() => _AnimatedFollowButtonState();
+}
+
+class _AnimatedFollowButtonState extends State<_AnimatedFollowButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails details) {
+    _controller.forward();
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    _controller.reverse();
+    widget.onTap();
+  }
+
+  void _handleTapCancel() {
+    _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return GestureDetector(
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.p12,
+            vertical: AppSizes.p6,
+          ),
+          decoration: BoxDecoration(
+            gradient: widget.isFollowing
+                ? LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.2),
+                      Colors.white.withValues(alpha: 0.1),
+                    ],
+                  )
+                : LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.secondary,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: widget.isFollowing 
+                  ? Colors.white.withValues(alpha: 0.3)
+                  : Colors.transparent,
+            ),
+            boxShadow: widget.isFollowing 
+                ? []
+                : [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(
+              widget.isFollowing ? widget.followingLabel : widget.followLabel,
+              key: ValueKey(widget.isFollowing),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ),
