@@ -43,6 +43,39 @@ class ChatMessageSendRequested extends ChatEvent {
   List<Object?> get props => [content, replyToId];
 }
 
+class ChatAttachmentSendRequested extends ChatEvent {
+  const ChatAttachmentSendRequested({
+    required this.messageType,
+    required this.content,
+    this.localFilePath,
+    this.replyToId,
+  });
+
+  final String messageType;
+  final String content;
+  final String? localFilePath;
+  final String? replyToId;
+
+  @override
+  List<Object?> get props =>
+      [messageType, content, localFilePath, replyToId];
+}
+
+class ChatVoiceMessageSendRequested extends ChatEvent {
+  const ChatVoiceMessageSendRequested({
+    required this.filePath,
+    required this.durationSeconds,
+    this.replyToId,
+  });
+
+  final String filePath;
+  final int durationSeconds;
+  final String? replyToId;
+
+  @override
+  List<Object?> get props => [filePath, durationSeconds, replyToId];
+}
+
 class ChatMessageReactRequested extends ChatEvent {
   const ChatMessageReactRequested({
     required this.messageId,
@@ -54,6 +87,15 @@ class ChatMessageReactRequested extends ChatEvent {
 
   @override
   List<Object?> get props => [messageId, emoji];
+}
+
+class ChatMessageDeleteRequested extends ChatEvent {
+  const ChatMessageDeleteRequested({required this.messageId});
+
+  final String messageId;
+
+  @override
+  List<Object?> get props => [messageId];
 }
 
 class ChatTypingChanged extends ChatEvent {
@@ -89,4 +131,31 @@ class ChatSocketUserTyping extends ChatEvent {
 
   @override
   List<Object?> get props => [userId, isTyping];
+}
+
+class ChatSocketMessageRead extends ChatEvent {
+  const ChatSocketMessageRead(this.payload);
+
+  final Map<String, dynamic> payload;
+
+  @override
+  List<Object?> get props => [payload];
+}
+
+class ChatSocketMessageReacted extends ChatEvent {
+  const ChatSocketMessageReacted(this.payload);
+
+  final Map<String, dynamic> payload;
+
+  @override
+  List<Object?> get props => [payload];
+}
+
+class ChatSocketMessageDeleted extends ChatEvent {
+  const ChatSocketMessageDeleted(this.payload);
+
+  final Map<String, dynamic> payload;
+
+  @override
+  List<Object?> get props => [payload];
 }

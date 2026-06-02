@@ -1,4 +1,7 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
+import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
+import 'package:bimobondapp/app/home/presentation/utils/chat_voice_duration_formatter.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 String formatChatMessageTime(DateTime? dateTime) {
@@ -14,13 +17,15 @@ String formatChatMessageTime(DateTime? dateTime) {
   return DateFormat('MMM d').format(local);
 }
 
-String formatInboxTime(DateTime? dateTime) {
+String formatInboxTime(DateTime? dateTime, AppLocalizations l10n) {
   if (dateTime == null) return '';
-  final diff = DateTime.now().difference(dateTime);
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-  if (diff.inHours < 24) return '${diff.inHours}h';
-  if (diff.inDays < 7) return '${diff.inDays}d';
-  return DateFormat('MMM d').format(dateTime);
+  final local = dateTime.toLocal();
+  final diff = DateTime.now().difference(local);
+  if (diff.inMinutes < 1) return l10n.justNow;
+  if (diff.inMinutes < 60) return l10n.inboxTimeMinutes(diff.inMinutes);
+  if (diff.inHours < 24) return l10n.inboxTimeHours(diff.inHours);
+  if (diff.inDays < 7) return l10n.inboxTimeDays(diff.inDays);
+  return DateFormat.MMMd(l10n.localeName).format(local);
 }
 
 String _typeToUi(ChatMessageType type) {
@@ -31,6 +36,14 @@ String _typeToUi(ChatMessageType type) {
       return 'image';
     case ChatMessageType.video:
       return 'video';
+    case ChatMessageType.audio:
+      return 'voice';
+    case ChatMessageType.location:
+      return 'location';
+    case ChatMessageType.file:
+      return 'file';
+    case ChatMessageType.contact:
+      return 'contact';
     default:
       return 'text';
   }
@@ -42,21 +55,63 @@ Map<String, dynamic> chatMessageToUiMap(
 ) {
   final isMe = message.senderId == currentUserId;
   final readByMe = message.isReadBy(currentUserId);
-  final reactions = message.reactions.map((r) => r.emoji).toList();
+  final reactions = <String>[];
+  final seenEmojis = <String>{};
+  for (final reaction in message.reactions) {
+    final emoji = reaction.emoji.trim();
+    if (emoji.isNotEmpty && seenEmojis.add(emoji)) {
+      reactions.add(emoji);
+    }
+  }
 
   Map<String, dynamic>? replyTo;
   if (message.replyPreview != null) {
     replyTo = chatMessageToUiMap(message.replyPreview!, currentUserId);
   }
 
+  final location = ChatLocationPayload.tryParse(message.content);
+  final contact = ChatContactPayload.tryParse(message.content);
+
   return {
     'id': message.id,
     'createdAtMs': message.createdAt?.millisecondsSinceEpoch ?? 0,
     'type': message.isDeleted ? 'text' : _typeToUi(message.type),
-    'text': message.isDeleted
-        ? 'This message was deleted'
-        : (message.content ?? ''),
-    if (message.mediaUrl != null) 'imageUrl': message.mediaUrl,
+    'text': message.isDeleted ? '' : (message.content ?? ''),
+    if (message.isDeleted) 'textKey': 'deleted',
+    'isDeleted': message.isDeleted,
+    if (message.type == ChatMessageType.image &&
+        message.mediaUrl != null &&
+        !message.isDeleted)
+      'imageUrl': message.mediaUrl,
+    if (message.type == ChatMessageType.video &&
+        message.mediaUrl != null &&
+        !message.isDeleted)
+      'videoUrl': message.mediaUrl,
+    if (message.type == ChatMessageType.audio && !message.isDeleted) ...{
+      'duration': formatVoiceDurationFromContent(message.content),
+      if (message.mediaUrl != null) ...{
+        'audioUrl': message.mediaUrl,
+        'mediaUrl': message.mediaUrl,
+      },
+    },
+    if (message.type == ChatMessageType.file && !message.isDeleted) ...{
+      'fileName': message.content ?? '',
+      if (message.mediaUrl != null) 'fileUrl': message.mediaUrl,
+    },
+    if (message.type == ChatMessageType.location &&
+        location != null &&
+        !message.isDeleted) ...{
+      'locationLabel': location.displayLabel,
+      'mapsUrl': location.mapsUrl,
+      'latitude': location.latitude,
+      'longitude': location.longitude,
+    },
+    if (message.type == ChatMessageType.contact &&
+        contact != null &&
+        !message.isDeleted) ...{
+      'contactName': contact.name,
+      'contactPhone': contact.phone,
+    },
     'isMe': isMe,
     'time': formatChatMessageTime(message.createdAt),
     'reactions': reactions,

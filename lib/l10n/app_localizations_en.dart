@@ -762,6 +762,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get justNow => 'Just now';
 
   @override
+  String inboxTimeMinutes(int count) {
+    return '${count}m';
+  }
+
+  @override
+  String inboxTimeHours(int count) {
+    return '${count}h';
+  }
+
+  @override
+  String inboxTimeDays(int count) {
+    return '${count}d';
+  }
+
+  @override
   String get replyAction => 'Reply';
 
   @override
@@ -895,6 +910,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsComingSoon => 'Coming soon';
 
   @override
+  String get settingsChatWallpaper => 'Chat wallpaper';
+
+  @override
+  String get chatWallpaperTitle => 'Chat wallpaper';
+
+  @override
+  String get chatWallpaperSubtitle => 'Choose a background pattern for your chats. Colors follow your app theme.';
+
+  @override
+  String get chatWallpaperPlus => 'Plus';
+
+  @override
+  String get chatWallpaperSquares => 'Squares';
+
+  @override
+  String get chatWallpaperMaze => 'Maze';
+
+  @override
   String get messagesTitle => 'Messages';
 
   @override
@@ -943,6 +976,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesRecentMessages => 'Recent Messages';
 
   @override
+  String get messagesAllChats => 'All Chats';
+
+  @override
   String get messagesAll => 'All';
 
   @override
@@ -959,6 +995,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messagesInboxLastVideo => 'Video';
+
+  @override
+  String get messagesInboxLastVoice => 'Voice message';
 
   @override
   String get messagesInboxLastGift => 'Gift';
@@ -1003,6 +1042,88 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesSuggestionBioLuxury => 'Worldwide luxury estates';
 
   @override
+  String get messagesSuggestionFriendsOfFriends => 'Suggested for you';
+
+  @override
+  String get messagesSuggestionPopular => 'Popular creator';
+
+  @override
+  String messagesSuggestionMutualFriends(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count mutual friends',
+      one: '1 mutual friend',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messagesSuggestionsEmpty => 'No suggestions right now';
+
+  @override
+  String get userCommentsTitle => 'My Comments';
+
+  @override
+  String get userCommentsEmpty => 'You haven\'t commented on any posts yet';
+
+  @override
+  String get userCommentReplyLabel => 'Reply';
+
+  @override
+  String get userCommentAction => 'commented';
+
+  @override
+  String userCommentOnPost(String author) {
+    return 'On post by $author';
+  }
+
+  @override
+  String get userLikesTitle => 'Likes';
+
+  @override
+  String get userLikesEmpty => 'No one has liked your posts yet';
+
+  @override
+  String get userLikeReceivedAction => 'liked your post';
+
+  @override
+  String get userMentionsTitle => 'My Mentions';
+
+  @override
+  String get userMentionsEmpty => 'No one has mentioned you yet';
+
+  @override
+  String get userMentionAction => 'mentioned you';
+
+  @override
+  String get userMentionInComment => 'in a comment';
+
+  @override
+  String get userFollowersTitle => 'Followers';
+
+  @override
+  String get userFollowerAction => 'started following you';
+
+  @override
+  String get chatMessageDeleted => 'This message was deleted';
+
+  @override
+  String get chatActionReply => 'Reply';
+
+  @override
+  String get chatActionReact => 'React';
+
+  @override
+  String get chatActionDelete => 'Delete';
+
+  @override
+  String get chatDeleteMessageTitle => 'Delete message?';
+
+  @override
+  String get chatDeleteMessageMessage => 'This message will be hidden for everyone in the chat.';
+
+  @override
   String get chatActiveNow => 'Active now';
 
   @override
@@ -1013,6 +1134,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatSlideUpToCancel => 'Slide up to cancel';
+
+  @override
+  String get chatRecordingPermissionDenied => 'Allow microphone access to record voice messages.';
+
+  @override
+  String get chatRecordingPermissionTitle => 'Microphone access';
+
+  @override
+  String get chatRecordingPermissionSettingsMessage => 'Voice messages need the microphone. Open Settings, tap Permissions, and allow Microphone for Bimo Bond.';
+
+  @override
+  String get chatRecordingOpenSettings => 'Open Settings';
+
+  @override
+  String get chatRecordingAllowMicrophone => 'Allow';
+
+  @override
+  String get chatRecordingPluginUnavailable => 'Voice recording is not ready. Stop the app completely, then run it again (not hot reload).';
+
+  @override
+  String get chatVoiceTooShort => 'Hold longer to record a voice message.';
+
+  @override
+  String get chatVoicePlaybackFailed => 'Could not play this voice message.';
+
+  @override
+  String get chatAttachmentSendFailed => 'Could not send attachment. Please try again.';
+
+  @override
+  String get chatLocationPermissionDenied => 'Location permission is required to share your position.';
+
+  @override
+  String get chatContactsPermissionDenied => 'Contacts permission is required to share a contact.';
+
+  @override
+  String get chatFeatureComingSoon => 'Coming soon.';
+
+  @override
+  String get chatMessageLocation => 'Location';
+
+  @override
+  String get messagesInboxLastLocation => 'Location';
+
+  @override
+  String get messagesInboxLastFile => 'File';
+
+  @override
+  String get messagesInboxLastContact => 'Contact';
 
   @override
   String get chatSeedGreeting => 'Hi! How can I help you?';

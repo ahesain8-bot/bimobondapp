@@ -11,6 +11,8 @@ class ChatMessageList extends StatelessWidget {
     required this.messages,
     required this.isTyping,
     required this.username,
+    required this.peerImageUrl,
+    this.peerUserId,
     required this.isRtl,
     required this.onReactionPicker,
     required this.onReplyTo,
@@ -21,6 +23,8 @@ class ChatMessageList extends StatelessWidget {
   final List<Map<String, dynamic>> messages;
   final bool isTyping;
   final String username;
+  final String peerImageUrl;
+  final String? peerUserId;
   final bool isRtl;
   final void Function(Map<String, dynamic> msg) onReactionPicker;
   final void Function(Map<String, dynamic> msg) onReplyTo;
@@ -40,7 +44,10 @@ class ChatMessageList extends StatelessWidget {
       itemCount: messages.length + (isTyping ? 1 : 0),
       itemBuilder: (context, index) {
         if (isTyping && index == messages.length) {
-          return const ChatTypingIndicator();
+          return ChatTypingIndicator(
+            peerImageUrl: peerImageUrl,
+            username: username,
+          );
         }
 
         final msg = messages[index];
@@ -51,6 +58,8 @@ class ChatMessageList extends StatelessWidget {
         return ChatMessageItem(
           msg: msg,
           username: username,
+          peerImageUrl: peerImageUrl,
+          peerUserId: peerUserId,
           isFirstInGroup: isFirstInGroup,
           isFirstInList: index == 0,
           messageText: chatMessageText(msg, l10n),

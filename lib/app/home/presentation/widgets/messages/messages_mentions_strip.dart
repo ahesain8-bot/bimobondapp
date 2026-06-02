@@ -1,14 +1,38 @@
-import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_text.dart';
+import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart';
+import 'package:bimobondapp/app/social/presentation/utils/mention_post_navigation.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class MessagesMentionsStrip extends StatelessWidget {
-  const MessagesMentionsStrip({required this.mentions, super.key});
+  const MessagesMentionsStrip({
+    required this.mentions,
+    this.onSeeAll,
+    super.key,
+  });
 
-  final List<Map<String, dynamic>> mentions;
+  final List<UserMentionEntity> mentions;
+  final VoidCallback? onSeeAll;
+
+  String? _resolveThumbnailUrl(UserMentionEntity mention) {
+    final post = mention.post;
+    if (post == null) return null;
+
+    if (post.thumbnailUrl != null &&
+        MediaUtils.isImage(post.thumbnailUrl!)) {
+      return post.thumbnailUrl;
+    }
+    if (post.media.isNotEmpty) {
+      final first = post.media.first;
+      if (MediaUtils.isImage(first.url, mediaType: first.mediaType)) {
+        return first.url;
+      }
+    }
+    return post.thumbnailUrl;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,155 +45,197 @@ class MessagesMentionsStrip extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: MessagesLayoutConstants.horizontalPadding,
-            vertical: 4,
+          padding: const EdgeInsets.fromLTRB(
+            MessagesLayoutConstants.sectionHorizontalPadding,
+            8,
+            MessagesLayoutConstants.sectionHorizontalPadding,
+            12,
           ),
-          child: Text(
-            l10n.messagesRecentMentions,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.messagesRecentMentions,
+                style: TextStyle(
+                  color: theme.textTheme.bodyLarge?.color,
+                  fontSize: MessagesLayoutConstants.sectionHeaderFontSize,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              if (onSeeAll != null)
+                InkWell(
+                  onTap: onSeeAll,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    child: Text(
+                      l10n.messagesSeeAll,
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontSize: MessagesLayoutConstants.sectionLinkFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         SizedBox(
           height: MessagesLayoutConstants.mentionsStripHeight,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: mentions.length,
             itemBuilder: (context, index) {
               final mention = mentions[index];
-              final userId = mention['userId'] as String? ?? '';
-              final user = mention['user'] as String;
-              final image = mention['image'] as String;
-              final content = messagesMentionText(
-                mention['contentKey'] as String?,
-                l10n,
-              );
-              final preview = mention['postPreview'] as String;
+              final author = mention.user;
+              final authorName =
+                  author?.displayName ?? l10n.messagesInboxUserFallback;
+              final content = mention.content.trim();
+              final preview = _resolveThumbnailUrl(mention);
 
               void openProfile() {
-                if (userId.isEmpty) return;
+                if (author == null || author.id.isEmpty) return;
                 openUserProfile(
                   context,
-                  userId: userId,
-                  username: user,
-                  avatarUrl: image,
+                  userId: author.id,
+                  username: author.username,
+                  fullName: author.fullName,
+                  avatarUrl: author.avatarUrl,
+                  isFollowing: author.isFollowing,
                 );
               }
 
-              return Container(
-                width: MessagesLayoutConstants.mentionCardWidth,
-                margin: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 4,
+              return InkWell(
+                onTap: () => openMentionPost(context, mention),
+                borderRadius: BorderRadius.circular(
+                  MessagesLayoutConstants.mentionCardRadius,
                 ),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(
-                    MessagesLayoutConstants.mentionCardRadius,
+                child: Container(
+                  width: MessagesLayoutConstants.mentionCardWidth,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
                   ),
-                  border: Border.all(
-                    color: theme.dividerColor.withValues(alpha: 0.08),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(
+                      MessagesLayoutConstants.mentionCardRadius,
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: openProfile,
-                      child: Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(1.5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: theme.colorScheme.primary.withValues(
-                                  alpha: 0.2,
-                                ),
-                              ),
-                            ),
-                            child: SafeNetworkAvatar(
-                              imageUrl: image,
-                              radius:
-                                  MessagesLayoutConstants.mentionAvatarRadius,
-                              fallbackText: user,
-                            ),
-                          ),
-                          PositionedDirectional(
-                            end: -1,
-                            bottom: -1,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
+                    border: Border.all(
+                      color: theme.dividerColor.withValues(alpha: 0.08),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: openProfile,
+                        child: Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(1.5),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: theme.cardColor,
-                                  width: 1.5,
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.alternate_email_rounded,
-                                size: 10,
-                                color: Colors.white,
+                              child: SafeNetworkAvatar(
+                                imageUrl: author?.avatarUrl,
+                                radius: MessagesLayoutConstants
+                                    .mentionAvatarRadius,
+                                fallbackText: authorName,
                               ),
                             ),
-                          ),
-                        ],
+                            PositionedDirectional(
+                              end: -1,
+                              bottom: -1,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: theme.cardColor,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.alternate_email_rounded,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: openProfile,
-                            child: Text(
-                              user,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: openProfile,
+                              child: Text(
+                                authorName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              content.isNotEmpty
+                                  ? content
+                                  : l10n.userMentionAction,
+                              style: TextStyle(
+                                color: theme.textTheme.bodyMedium?.color
+                                    ?.withValues(alpha: 0.6),
+                                fontSize: 10,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            content,
-                            style: TextStyle(
-                              color: theme.textTheme.bodyMedium?.color
-                                  ?.withValues(alpha: 0.6),
-                              fontSize: 10,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SafeNetworkImage(
-                        imageUrl: preview,
-                        width: MessagesLayoutConstants.mentionPreviewSize,
-                        height: MessagesLayoutConstants.mentionPreviewSize,
-                        fit: BoxFit.cover,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ],
+                      if (preview != null && preview.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SafeNetworkImage(
+                            imageUrl: preview,
+                            width: MessagesLayoutConstants.mentionPreviewSize,
+                            height: MessagesLayoutConstants.mentionPreviewSize,
+                            fit: BoxFit.cover,
+                            borderRadius: BorderRadius.circular(8),
+                            errorIcon: Icons.image_outlined,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               );
             },

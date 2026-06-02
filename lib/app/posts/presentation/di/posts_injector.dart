@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/create_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_comment_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_comments_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_replies_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_comment_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_post_usecase.dart';
@@ -37,6 +38,7 @@ Future<void> initPosts() async {
   sl.registerLazySingleton(() => CreatePostUseCase(sl()));
   sl.registerLazySingleton(() => UploadMediaUseCase(sl()));
   sl.registerLazySingleton(() => GetFeedUseCase(sl()));
+  sl.registerLazySingleton(() => GetPostByIdUseCase(sl()));
   sl.registerLazySingleton(() => ToggleLikePostUsecase(sl()));
   sl.registerLazySingleton(() => ToggleSavePostUsecase(sl()));
   sl.registerLazySingleton(() => UpdatePostUsecase(sl()));

@@ -25,6 +25,7 @@ class SafeNetworkImage extends StatefulWidget {
     this.borderRadius,
     this.errorIcon = Icons.broken_image_outlined,
     this.blankOnError = false,
+    this.onLoadFailed,
     super.key,
   });
 
@@ -37,6 +38,7 @@ class SafeNetworkImage extends StatefulWidget {
 
   /// When true, loading/error states are solid black with no icon (e.g. video posters).
   final bool blankOnError;
+  final VoidCallback? onLoadFailed;
 
   @override
   State<SafeNetworkImage> createState() => _SafeNetworkImageState();
@@ -96,6 +98,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       },
       onError: (exception, stackTrace) {
         debugPrint('SafeNetworkImage failed for $url: $exception');
+        widget.onLoadFailed?.call();
         if (!mounted) return;
         setState(() {
           _failed = true;
@@ -188,7 +191,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   }
 }
 
-class SafeNetworkAvatar extends StatelessWidget {
+class SafeNetworkAvatar extends StatefulWidget {
   const SafeNetworkAvatar({
     required this.imageUrl,
     required this.radius,
@@ -203,39 +206,67 @@ class SafeNetworkAvatar extends StatelessWidget {
   final Color? backgroundColor;
 
   @override
+  State<SafeNetworkAvatar> createState() => _SafeNetworkAvatarState();
+}
+
+class _SafeNetworkAvatarState extends State<SafeNetworkAvatar> {
+  bool _loadFailed = false;
+
+  @override
+  void didUpdateWidget(SafeNetworkAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _loadFailed = false;
+    }
+  }
+
+  String? get _resolvedUrl {
+    final raw = widget.imageUrl?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    return MediaUtils.resolveAbsoluteUrl(raw);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final resolved = imageUrl != null && imageUrl!.trim().isNotEmpty
-        ? MediaUtils.resolveAbsoluteUrl(imageUrl!.trim())
-        : null;
+    final resolved = _resolvedUrl;
 
-    if (!isValidNetworkImageUrl(resolved)) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundColor:
-            backgroundColor ?? theme.colorScheme.primary.withValues(alpha: 0.12),
-        child: Text(
-          _initials(fallbackText),
-          style: TextStyle(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w700,
-            fontSize: radius * 0.55,
-          ),
-        ),
-      );
+    if (!isValidNetworkImageUrl(resolved) || _loadFailed) {
+      return _initialsAvatar(theme);
     }
 
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundColor:
-          backgroundColor ?? theme.colorScheme.surfaceContainerHighest,
+          widget.backgroundColor ??
+          theme.colorScheme.surfaceContainerHighest,
       child: ClipOval(
         child: SafeNetworkImage(
           imageUrl: resolved,
-          width: radius * 2,
-          height: radius * 2,
+          width: widget.radius * 2,
+          height: widget.radius * 2,
           fit: BoxFit.cover,
           errorIcon: Icons.person_outline,
+          onLoadFailed: () {
+            if (mounted) setState(() => _loadFailed = true);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _initialsAvatar(ThemeData theme) {
+    return CircleAvatar(
+      radius: widget.radius,
+      backgroundColor:
+          widget.backgroundColor ??
+          theme.colorScheme.primary.withValues(alpha: 0.12),
+      child: Text(
+        _initials(widget.fallbackText),
+        style: TextStyle(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: widget.radius * 0.55,
         ),
       ),
     );
@@ -244,6 +275,10 @@ class SafeNetworkAvatar extends StatelessWidget {
   String _initials(String? text) {
     final value = text?.trim() ?? '';
     if (value.isEmpty) return '?';
+    if (value.startsWith('@')) {
+      final handle = value.substring(1).trim();
+      if (handle.isNotEmpty) return handle[0].toUpperCase();
+    }
     final parts = value.split(RegExp(r'\s+'));
     if (parts.length >= 2) {
       return '${parts.first[0]}${parts[1][0]}'.toUpperCase();

@@ -9,6 +9,9 @@ class ChatLayoutConstants {
   static const double appBarBlurSigma = 12;
   static const double appBarBackgroundAlpha = 0.8;
   static const double headerAvatarRadius = 18;
+  static const double receivedMessageAvatarRadius = 16;
+  static const double receivedMessageAvatarGap = 8;
+  static const double receivedMessageAvatarRowWidth = 40;
   static const double headerTitleFontSize = 15;
   static const double headerStatusFontSize = 10;
   static const double appBarLeadingIconSize = 20;
@@ -30,7 +33,8 @@ class ChatLayoutConstants {
   static const double bubbleShadowAlpha = 0.04;
   static const double bubbleShadowBlur = 10;
   static const Offset bubbleShadowOffset = Offset(0, 4);
-  static const double sentGradientEndAlpha = 0.85;
+  static const double sentBubbleOpacity = 0.75;
+  static const double deletedMessageOpacity = 0.65;
 
   // Message content
   static const double imageMessageWidth = 200;
@@ -113,12 +117,21 @@ class ChatLayoutConstants {
   static const double recordingShadowBlur = 20;
   static const double recordingTitleFontSize = 18;
   static const double recordingSubtitleFontSize = 14;
+  static const double recordingTimerFontSize = 36;
+  static const double recordingTimerDotSize = 10;
   static const int recordingWaveBarCount = 20;
   static const double recordingWaveBarWidth = 3;
   static const double recordingWaveBarMinHeight = 10;
   static const int recordingWaveBarMaxExtra = 30;
   static const double recordingWaveBarSpacing = 2;
   static const double recordingWaveBarRadius = 2;
+
+  // Attachment messages
+  static const double locationMessageWidth = 220;
+  static const double fileMessageWidth = 220;
+  static const double contactMessageWidth = 220;
+  static const double chatVideoMessageWidth = 220;
+  static const double chatVideoMessageHeight = 160;
 
   // Voice message
   static const double voiceMessageWidth = 200;
@@ -130,7 +143,13 @@ class ChatLayoutConstants {
   static const double voiceWaveBarRadius = 1;
   static const double voiceDurationFontSize = 9;
   static const double voiceWavePrimaryAlpha = 0.3;
+  static const double voiceWavePrimaryActiveAlpha = 0.55;
   static const double voiceWaveSentAlpha = 0.54;
+  static const double voiceWaveSentActiveAlpha = 0.85;
+  static const double voicePlayDisabledAlpha = 0.4;
+  static const int voiceWaveAnimationMs = 520;
+  static const double voiceProgressBarHeight = 2;
+  static const double voicePlayingPulseSize = 6;
 
   // Typing indicator
   static const double typingIndicatorTopPadding = AppSizes.p8;
@@ -141,6 +160,8 @@ class ChatLayoutConstants {
   // Screen
   static const double errorBannerPadding = AppSizes.p8;
   static const double patternOpacityLight = 0.02;
+  // Lower alpha makes the primary-colored wallpaper pattern lighter/subtler.
+  static const double chatPatternFillOpacity = 0.07;
 
   static const int chatMessageSkeletonCount = 6;
   static const double chatMessageSkeletonBubbleHeight = 44;

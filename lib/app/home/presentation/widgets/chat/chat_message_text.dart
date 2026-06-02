@@ -10,15 +10,15 @@ String chatTextFromKey(String? key, AppLocalizations l10n) {
       return l10n.chatSeedFinalPrice;
     case 'autoReply':
       return l10n.chatSeedAutoReply;
+    case 'deleted':
+      return l10n.chatMessageDeleted;
     default:
       return '';
   }
 }
 
-String chatMessageText(
-  Map<String, dynamic> msg,
-  AppLocalizations l10n,
-) {
+String chatMessageText(Map<String, dynamic> msg, AppLocalizations l10n) {
+  if (msg['isDeleted'] == true) return l10n.chatMessageDeleted;
   final direct = msg['text'] as String?;
   if (direct != null && direct.isNotEmpty) return direct;
   return chatTextFromKey(msg['textKey'] as String?, l10n);
@@ -65,8 +65,7 @@ List<Map<String, dynamic>> chatSeedMessages() => [
 
 String chatFormatCurrentTime() {
   final now = DateTime.now();
-  final hour =
-      now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+  final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
   final ampm = now.hour >= 12 ? 'PM' : 'AM';
   return '${hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} $ampm';
 }

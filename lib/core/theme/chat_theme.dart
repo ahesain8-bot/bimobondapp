@@ -18,6 +18,9 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
   final Color bubbleShadow;
   final Color pendingReceipt;
   final Color backgroundGradientEnd;
+  final Color chatBackgroundColor;
+  final Color sentBubbleGradientStart;
+  final Color sentBubbleGradientEnd;
   final List<Color> moreMenuIconColors;
 
   const ChatTheme({
@@ -34,6 +37,9 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     required this.bubbleShadow,
     required this.pendingReceipt,
     required this.backgroundGradientEnd,
+    required this.chatBackgroundColor,
+    required this.sentBubbleGradientStart,
+    required this.sentBubbleGradientEnd,
     required this.moreMenuIconColors,
   });
 
@@ -44,8 +50,8 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       activeStatus: AppTheme.successAccent,
       readReceipt: scheme.secondary,
       replyAccent: scheme.primary,
-      onSentBubble: scheme.onPrimary,
-      onSentBubbleMuted: scheme.onPrimary.withValues(alpha: 0.7),
+      onSentBubble: Colors.white,
+      onSentBubbleMuted: Colors.white.withValues(alpha: 0.7),
       inputFill: isDark
           ? Colors.white.withValues(alpha: ChatLayoutConstants.inputFillAlpha)
           : Colors.black.withValues(alpha: ChatLayoutConstants.inputFillAlpha),
@@ -64,6 +70,15 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
           : scheme.primary.withValues(
               alpha: ChatLayoutConstants.patternOpacityLight,
             ),
+      chatBackgroundColor: isDark
+          ? const Color(0xFF1E1619)
+          : const Color(0xFFFBEBF1),
+      sentBubbleGradientStart: scheme.primary.withValues(
+        alpha: ChatLayoutConstants.sentBubbleOpacity,
+      ),
+      sentBubbleGradientEnd: scheme.primary.withValues(
+        alpha: ChatLayoutConstants.sentBubbleOpacity,
+      ),
       moreMenuIconColors: const [
         Color(0xFF2196F3),
         Color(0xFFFF9800),
@@ -96,6 +111,9 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     Color? bubbleShadow,
     Color? pendingReceipt,
     Color? backgroundGradientEnd,
+    Color? chatBackgroundColor,
+    Color? sentBubbleGradientStart,
+    Color? sentBubbleGradientEnd,
     List<Color>? moreMenuIconColors,
   }) {
     return ChatTheme(
@@ -114,6 +132,11 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       pendingReceipt: pendingReceipt ?? this.pendingReceipt,
       backgroundGradientEnd:
           backgroundGradientEnd ?? this.backgroundGradientEnd,
+      chatBackgroundColor: chatBackgroundColor ?? this.chatBackgroundColor,
+      sentBubbleGradientStart:
+          sentBubbleGradientStart ?? this.sentBubbleGradientStart,
+      sentBubbleGradientEnd:
+          sentBubbleGradientEnd ?? this.sentBubbleGradientEnd,
       moreMenuIconColors: moreMenuIconColors ?? this.moreMenuIconColors,
     );
   }
@@ -126,24 +149,48 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       readReceipt: Color.lerp(readReceipt, other.readReceipt, t)!,
       replyAccent: Color.lerp(replyAccent, other.replyAccent, t)!,
       onSentBubble: Color.lerp(onSentBubble, other.onSentBubble, t)!,
-      onSentBubbleMuted:
-          Color.lerp(onSentBubbleMuted, other.onSentBubbleMuted, t)!,
+      onSentBubbleMuted: Color.lerp(
+        onSentBubbleMuted,
+        other.onSentBubbleMuted,
+        t,
+      )!,
       inputFill: Color.lerp(inputFill, other.inputFill, t)!,
       recordingScrim: Color.lerp(recordingScrim, other.recordingScrim, t)!,
-      recordingForeground:
-          Color.lerp(recordingForeground, other.recordingForeground, t)!,
+      recordingForeground: Color.lerp(
+        recordingForeground,
+        other.recordingForeground,
+        t,
+      )!,
       recordingForegroundMuted: Color.lerp(
         recordingForegroundMuted,
         other.recordingForegroundMuted,
         t,
       )!,
-      waveformOnOverlay:
-          Color.lerp(waveformOnOverlay, other.waveformOnOverlay, t)!,
+      waveformOnOverlay: Color.lerp(
+        waveformOnOverlay,
+        other.waveformOnOverlay,
+        t,
+      )!,
       bubbleShadow: Color.lerp(bubbleShadow, other.bubbleShadow, t)!,
       pendingReceipt: Color.lerp(pendingReceipt, other.pendingReceipt, t)!,
       backgroundGradientEnd: Color.lerp(
         backgroundGradientEnd,
         other.backgroundGradientEnd,
+        t,
+      )!,
+      chatBackgroundColor: Color.lerp(
+        chatBackgroundColor,
+        other.chatBackgroundColor,
+        t,
+      )!,
+      sentBubbleGradientStart: Color.lerp(
+        sentBubbleGradientStart,
+        other.sentBubbleGradientStart,
+        t,
+      )!,
+      sentBubbleGradientEnd: Color.lerp(
+        sentBubbleGradientEnd,
+        other.sentBubbleGradientEnd,
         t,
       )!,
       moreMenuIconColors: other.moreMenuIconColors,

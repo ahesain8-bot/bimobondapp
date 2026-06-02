@@ -1,6 +1,8 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_entity.dart';
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_seed_data.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 
 class InboxChatItem {
@@ -17,7 +19,7 @@ class InboxChatItem {
 
   final String chatId;
   final String name;
-  final String imageUrl;
+  final String? imageUrl;
   final String preview;
   final String time;
   final bool unread;
@@ -48,6 +50,18 @@ String inboxLastMessagePreview(
       break;
     case ChatMessageType.video:
       body = l10n.messagesInboxLastVideo;
+      break;
+    case ChatMessageType.audio:
+      body = l10n.messagesInboxLastVoice;
+      break;
+    case ChatMessageType.location:
+      body = l10n.messagesInboxLastLocation;
+      break;
+    case ChatMessageType.file:
+      body = l10n.messagesInboxLastFile;
+      break;
+    case ChatMessageType.contact:
+      body = l10n.messagesInboxLastContact;
       break;
     case ChatMessageType.gift:
       body = l10n.messagesInboxLastGift;
@@ -88,9 +102,9 @@ InboxChatItem inboxChatItemFromEntity(
     name: chat.isGroup
         ? (chat.name ?? l10n.messagesInboxGroupFallback)
         : (other?.displayName ?? l10n.messagesInboxUserFallback),
-    imageUrl: other?.avatarUrl ?? 'https://i.pravatar.cc/150?u=chat',
+    imageUrl: other?.avatarUrl,
     preview: preview,
-    time: formatInboxTime(last?.createdAt ?? chat.updatedAt),
+    time: formatInboxTime(last?.createdAt ?? chat.updatedAt, l10n),
     unread: chat.unreadCount > 0,
     peerUserId: chat.isGroup ? null : other?.id,
     active: other?.isActive ?? false,
@@ -121,4 +135,23 @@ List<InboxChatItem> filterInboxChats(
             c.preview.toLowerCase().contains(q),
       )
       .toList();
+}
+
+List<InboxChatItem> messagesMockInboxItems(AppLocalizations l10n) {
+  return messagesSeedChats().asMap().entries.map((entry) {
+    final index = entry.key;
+    final chat = entry.value;
+    final name = chat['name'] as String;
+
+    return InboxChatItem(
+      chatId: 'mock-chat-$index',
+      name: name,
+      imageUrl: null,
+      preview: messagesPreviewText(chat['messageKey'] as String?, l10n),
+      time: chat['time'] as String,
+      unread: chat['unread'] as bool? ?? false,
+      peerUserId: 'mock-user-$index',
+      active: chat['active'] as bool? ?? false,
+    );
+  }).toList();
 }

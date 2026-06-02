@@ -1,8 +1,16 @@
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
 
 class ChatTypingIndicator extends StatelessWidget {
-  const ChatTypingIndicator({super.key});
+  const ChatTypingIndicator({
+    required this.peerImageUrl,
+    required this.username,
+    super.key,
+  });
+
+  final String peerImageUrl;
+  final String username;
 
   @override
   Widget build(BuildContext context) {
@@ -11,26 +19,36 @@ class ChatTypingIndicator extends StatelessWidget {
       padding: const EdgeInsets.only(
         top: ChatLayoutConstants.typingIndicatorTopPadding,
       ),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ChatLayoutConstants.typingIndicatorHorizontalPadding,
-            vertical: ChatLayoutConstants.typingIndicatorVerticalPadding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SafeNetworkAvatar(
+            imageUrl: peerImageUrl,
+            radius: ChatLayoutConstants.receivedMessageAvatarRadius,
+            fallbackText: username,
           ),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(
-              ChatLayoutConstants.typingIndicatorRadius,
+          const SizedBox(
+            width: ChatLayoutConstants.receivedMessageAvatarGap,
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ChatLayoutConstants.typingIndicatorHorizontalPadding,
+              vertical: ChatLayoutConstants.typingIndicatorVerticalPadding,
+            ),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(
+                ChatLayoutConstants.typingIndicatorRadius,
+              ),
+            ),
+            child: Text(
+              '...',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          child: Text(
-            '...',
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }

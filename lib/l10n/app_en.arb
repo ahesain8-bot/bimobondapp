@@ -407,6 +407,30 @@
   "noCommentsYet": "No comments yet. Be the first!",
   "addCommentHint": "Add comment...",
   "justNow": "Just now",
+  "inboxTimeMinutes": "{count}m",
+  "@inboxTimeMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inboxTimeHours": "{count}h",
+  "@inboxTimeHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inboxTimeDays": "{count}d",
+  "@inboxTimeDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "replyAction": "Reply",
   "replyingTo": "Replying to {username}",
   "@replyingTo": {
@@ -464,6 +488,12 @@
   "settingsLogoutTitle": "Log out?",
   "settingsLogoutMessage": "You will need to sign in again to use your account.",
   "settingsComingSoon": "Coming soon",
+  "settingsChatWallpaper": "Chat wallpaper",
+  "chatWallpaperTitle": "Chat wallpaper",
+  "chatWallpaperSubtitle": "Choose a background pattern for your chats. Colors follow your app theme.",
+  "chatWallpaperPlus": "Plus",
+  "chatWallpaperSquares": "Squares",
+  "chatWallpaperMaze": "Maze",
   "messagesTitle": "Messages",
   "messagesInboxTitle": "Inbox",
   "messagesSwitchAccount": "Switch Account",
@@ -480,12 +510,14 @@
   "messagesActivityComments": "Comments",
   "messagesActivityMentions": "Mentions",
   "messagesRecentMessages": "Recent Messages",
+  "messagesAllChats": "All Chats",
   "messagesAll": "All",
   "messagesNoResults": "No results found",
   "messagesInboxNoMessagesYet": "No messages yet",
   "messagesInboxYouPrefix": "You",
   "messagesInboxLastPhoto": "Photo",
   "messagesInboxLastVideo": "Video",
+  "messagesInboxLastVoice": "Voice message",
   "messagesInboxLastGift": "Gift",
   "messagesInboxLastShare": "Shared a post",
   "messagesInboxMessageDeleted": "Message deleted",
@@ -500,10 +532,57 @@
   "messagesSuggestionBioDesigner": "Interior Designer | Arch",
   "messagesSuggestionBioJeddah": "Top listings in Jeddah",
   "messagesSuggestionBioLuxury": "Worldwide luxury estates",
+  "messagesSuggestionFriendsOfFriends": "Suggested for you",
+  "messagesSuggestionPopular": "Popular creator",
+  "messagesSuggestionMutualFriends": "{count, plural, =1{1 mutual friend} other{{count} mutual friends}}",
+  "messagesSuggestionsEmpty": "No suggestions right now",
+  "userCommentsTitle": "My Comments",
+  "userCommentsEmpty": "You haven't commented on any posts yet",
+  "userCommentReplyLabel": "Reply",
+  "userCommentAction": "commented",
+  "userCommentOnPost": "On post by {author}",
+  "@userCommentOnPost": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "userLikesTitle": "Likes",
+  "userLikesEmpty": "No one has liked your posts yet",
+  "userLikeReceivedAction": "liked your post",
+  "userMentionsTitle": "My Mentions",
+  "userMentionsEmpty": "No one has mentioned you yet",
+  "userMentionAction": "mentioned you",
+  "userMentionInComment": "in a comment",
+  "userFollowersTitle": "Followers",
+  "userFollowerAction": "started following you",
+  "chatMessageDeleted": "This message was deleted",
+  "chatActionReply": "Reply",
+  "chatActionReact": "React",
+  "chatActionDelete": "Delete",
+  "chatDeleteMessageTitle": "Delete message?",
+  "chatDeleteMessageMessage": "This message will be hidden for everyone in the chat.",
   "chatActiveNow": "Active now",
   "chatAddComment": "Add comment...",
   "chatRecording": "Recording...",
   "chatSlideUpToCancel": "Slide up to cancel",
+  "chatRecordingPermissionDenied": "Allow microphone access to record voice messages.",
+  "chatRecordingPermissionTitle": "Microphone access",
+  "chatRecordingPermissionSettingsMessage": "Voice messages need the microphone. Open Settings, tap Permissions, and allow Microphone for Bimo Bond.",
+  "chatRecordingOpenSettings": "Open Settings",
+  "chatRecordingAllowMicrophone": "Allow",
+  "chatRecordingPluginUnavailable": "Voice recording is not ready. Stop the app completely, then run it again (not hot reload).",
+  "chatVoiceTooShort": "Hold longer to record a voice message.",
+  "chatVoicePlaybackFailed": "Could not play this voice message.",
+  "chatAttachmentSendFailed": "Could not send attachment. Please try again.",
+  "chatLocationPermissionDenied": "Location permission is required to share your position.",
+  "chatContactsPermissionDenied": "Contacts permission is required to share a contact.",
+  "chatFeatureComingSoon": "Coming soon.",
+  "chatMessageLocation": "Location",
+  "messagesInboxLastLocation": "Location",
+  "messagesInboxLastFile": "File",
+  "messagesInboxLastContact": "Contact",
   "chatSeedGreeting": "Hi! How can I help you?",
   "chatSeedInterested": "I am interested in the property shown",
   "chatSeedFinalPrice": "Can I know the final price?",

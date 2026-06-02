@@ -16,6 +16,11 @@ class InboxLoadRequested extends InboxEvent {
   List<Object?> get props => [refresh];
 }
 
-class InboxFriendsLoadRequested extends InboxEvent {
-  const InboxFriendsLoadRequested();
+class InboxSuggestionsLoadRequested extends InboxEvent {
+  const InboxSuggestionsLoadRequested({this.limit = 20});
+
+  final int limit;
+
+  @override
+  List<Object?> get props => [limit];
 }

@@ -762,6 +762,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get justNow => 'الآن';
 
   @override
+  String inboxTimeMinutes(int count) {
+    return '$count د';
+  }
+
+  @override
+  String inboxTimeHours(int count) {
+    return '$count س';
+  }
+
+  @override
+  String inboxTimeDays(int count) {
+    return '$count ي';
+  }
+
+  @override
   String get replyAction => 'رد';
 
   @override
@@ -895,6 +910,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsComingSoon => 'قريباً';
 
   @override
+  String get settingsChatWallpaper => 'خلفية المحادثة';
+
+  @override
+  String get chatWallpaperTitle => 'خلفية المحادثة';
+
+  @override
+  String get chatWallpaperSubtitle => 'اختر نمط الخلفية للمحادثات. الألوان تتبع سمة التطبيق.';
+
+  @override
+  String get chatWallpaperPlus => 'علامات زائد';
+
+  @override
+  String get chatWallpaperSquares => 'مربعات';
+
+  @override
+  String get chatWallpaperMaze => 'متاهة';
+
+  @override
   String get messagesTitle => 'الرسائل';
 
   @override
@@ -943,6 +976,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesRecentMessages => 'الرسائل الأخيرة';
 
   @override
+  String get messagesAllChats => 'جميع المحادثات';
+
+  @override
   String get messagesAll => 'الكل';
 
   @override
@@ -959,6 +995,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get messagesInboxLastVideo => 'فيديو';
+
+  @override
+  String get messagesInboxLastVoice => 'رسالة صوتية';
 
   @override
   String get messagesInboxLastGift => 'هدية';
@@ -1003,6 +1042,88 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesSuggestionBioLuxury => 'عقارات فاخرة عالمية';
 
   @override
+  String get messagesSuggestionFriendsOfFriends => 'مقترح لك';
+
+  @override
+  String get messagesSuggestionPopular => 'منشئ محتوى شائع';
+
+  @override
+  String messagesSuggestionMutualFriends(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count أصدقاء مشتركين',
+      one: 'صديق مشترك واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messagesSuggestionsEmpty => 'لا توجد اقتراحات حالياً';
+
+  @override
+  String get userCommentsTitle => 'تعليقاتي';
+
+  @override
+  String get userCommentsEmpty => 'لم تعلق على أي منشور بعد';
+
+  @override
+  String get userCommentReplyLabel => 'رد';
+
+  @override
+  String get userCommentAction => 'علّق';
+
+  @override
+  String userCommentOnPost(String author) {
+    return 'على منشور $author';
+  }
+
+  @override
+  String get userLikesTitle => 'الإعجابات';
+
+  @override
+  String get userLikesEmpty => 'لم يعجب أحد بمنشوراتك بعد';
+
+  @override
+  String get userLikeReceivedAction => 'أعجب بمنشورك';
+
+  @override
+  String get userMentionsTitle => 'إشاراتي';
+
+  @override
+  String get userMentionsEmpty => 'لم يذكرك أحد بعد';
+
+  @override
+  String get userMentionAction => 'ذكرك';
+
+  @override
+  String get userMentionInComment => 'في تعليق';
+
+  @override
+  String get userFollowersTitle => 'المتابعون';
+
+  @override
+  String get userFollowerAction => 'بدأ بمتابعتك';
+
+  @override
+  String get chatMessageDeleted => 'تم حذف هذه الرسالة';
+
+  @override
+  String get chatActionReply => 'رد';
+
+  @override
+  String get chatActionReact => 'تفاعل';
+
+  @override
+  String get chatActionDelete => 'حذف';
+
+  @override
+  String get chatDeleteMessageTitle => 'حذف الرسالة؟';
+
+  @override
+  String get chatDeleteMessageMessage => 'سيتم إخفاء هذه الرسالة عن الجميع في المحادثة.';
+
+  @override
   String get chatActiveNow => 'نشط الآن';
 
   @override
@@ -1013,6 +1134,54 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chatSlideUpToCancel => 'اسحب للأعلى للإلغاء';
+
+  @override
+  String get chatRecordingPermissionDenied => 'اسمح بالوصول إلى الميكروفون لتسجيل الرسائل الصوتية.';
+
+  @override
+  String get chatRecordingPermissionTitle => 'الوصول إلى الميكروفون';
+
+  @override
+  String get chatRecordingPermissionSettingsMessage => 'الرسائل الصوتية تحتاج الميكروفون. افتح الإعدادات، ثم الأذونات، واسمح بالميكروفون لتطبيق Bimo Bond.';
+
+  @override
+  String get chatRecordingOpenSettings => 'فتح الإعدادات';
+
+  @override
+  String get chatRecordingAllowMicrophone => 'سماح';
+
+  @override
+  String get chatRecordingPluginUnavailable => 'التسجيل الصوتي غير جاهز. أغلق التطبيق بالكامل ثم شغّله من جديد (وليس إعادة التحميل السريع).';
+
+  @override
+  String get chatVoiceTooShort => 'اضغط مطولاً لتسجيل رسالة صوتية.';
+
+  @override
+  String get chatVoicePlaybackFailed => 'تعذّر تشغيل الرسالة الصوتية.';
+
+  @override
+  String get chatAttachmentSendFailed => 'تعذّر إرسال المرفق. حاول مرة أخرى.';
+
+  @override
+  String get chatLocationPermissionDenied => 'يلزم إذن الموقع لمشاركة موقعك.';
+
+  @override
+  String get chatContactsPermissionDenied => 'يلزم إذن جهات الاتصال لمشاركة جهة اتصال.';
+
+  @override
+  String get chatFeatureComingSoon => 'قريباً.';
+
+  @override
+  String get chatMessageLocation => 'الموقع';
+
+  @override
+  String get messagesInboxLastLocation => 'موقع';
+
+  @override
+  String get messagesInboxLastFile => 'ملف';
+
+  @override
+  String get messagesInboxLastContact => 'جهة اتصال';
 
   @override
   String get chatSeedGreeting => 'مرحباً! كيف يمكنني مساعدتك؟';

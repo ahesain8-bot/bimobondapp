@@ -4,13 +4,20 @@ import 'package:bimobondapp/app/chats/presentation/bloc/chat_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_input_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_message_list.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_pattern_background.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_recording_overlay.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_playback.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_recorder.dart';
+import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ChatView extends StatefulWidget {
   const ChatView({
@@ -38,6 +45,7 @@ class _ChatViewState extends State<ChatView> {
 
   bool _isRecording = false;
   Map<String, dynamic>? _replyTo;
+  final ChatVoiceRecorder _voiceRecorder = ChatVoiceRecorder();
 
   @override
   void initState() {
@@ -47,6 +55,8 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   void dispose() {
+    ChatVoicePlayback.instance.stop();
+    _voiceRecorder.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -89,6 +99,17 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
+  void _showMessageActions(Map<String, dynamic> msg) {
+    if (msg['isDeleted'] == true) return;
+
+    ChatSheets.showMessageActions(
+      context: context,
+      onReply: () => setState(() => _replyTo = msg),
+      onReact: () => _showReactionPicker(msg),
+      onDelete: msg['isMe'] == true ? () => _confirmDeleteMessage(msg) : null,
+    );
+  }
+
   void _showReactionPicker(Map<String, dynamic> msg) {
     final messageId = msg['id']?.toString();
     if (messageId == null) return;
@@ -104,8 +125,240 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
+  Future<void> _confirmDeleteMessage(Map<String, dynamic> msg) async {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final messageId = msg['id']?.toString();
+    if (messageId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.chatDeleteMessageTitle),
+        content: Text(l10n.chatDeleteMessageMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              l10n.chatActionDelete,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    context.read<ChatBloc>().add(
+      ChatMessageDeleteRequested(messageId: messageId),
+    );
+  }
+
   void _onTypingChanged(bool isTyping) {
     context.read<ChatBloc>().add(ChatTypingChanged(isTyping: isTyping));
+  }
+
+  Future<void> _onRecordingStart() async {
+    final result = await _voiceRecorder.start();
+    if (!mounted) return;
+
+    if (result == true) {
+      setState(() => _isRecording = true);
+      return;
+    }
+
+    if (result == ChatVoiceRecorderStartFailure.permissionPermanentlyDenied) {
+      await _showMicrophonePermissionDialog();
+      return;
+    }
+
+    final l10n = AppLocalizations.of(context)!;
+    final message = result == ChatVoiceRecorderStartFailure.pluginUnavailable
+        ? l10n.chatRecordingPluginUnavailable
+        : l10n.chatRecordingPermissionDenied;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: result == ChatVoiceRecorderStartFailure.permissionDenied
+            ? SnackBarAction(
+                label: l10n.chatRecordingAllowMicrophone,
+                onPressed: _onRecordingStart,
+              )
+            : null,
+      ),
+    );
+  }
+
+  Future<void> _showMicrophonePermissionDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.chatRecordingPermissionTitle),
+        content: Text(l10n.chatRecordingPermissionSettingsMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              openAppSettings();
+            },
+            child: Text(
+              l10n.chatRecordingOpenSettings,
+              style: TextStyle(color: theme.colorScheme.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onRecordingEnd() async {
+    if (!_isRecording) return;
+
+    final result = await _voiceRecorder.stop();
+    if (!mounted) return;
+
+    setState(() => _isRecording = false);
+
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.chatVoiceTooShort),
+        ),
+      );
+      return;
+    }
+
+    final durationSeconds = result.duration.inSeconds.clamp(1, 3600);
+    context.read<ChatBloc>().add(
+      ChatVoiceMessageSendRequested(
+        filePath: result.file.path,
+        durationSeconds: durationSeconds,
+        replyToId: _replyTo?['id']?.toString(),
+      ),
+    );
+
+    setState(() => _replyTo = null);
+    _scrollToBottom();
+  }
+
+  Future<void> _onRecordingCancel() async {
+    await _voiceRecorder.cancel();
+    if (mounted) {
+      setState(() => _isRecording = false);
+    }
+  }
+
+  Future<void> _sendAttachment(
+    Future<ChatAttachmentDraft?> Function() pick,
+  ) async {
+    final draft = await pick();
+    if (!mounted || draft == null) return;
+
+    context.read<ChatBloc>().add(
+      ChatAttachmentSendRequested(
+        messageType: draft.type,
+        content: draft.content,
+        localFilePath: draft.filePath,
+        replyToId: _replyTo?['id']?.toString(),
+      ),
+    );
+    setState(() => _replyTo = null);
+    _scrollToBottom();
+  }
+
+  void _showComingSoon() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.chatFeatureComingSoon),
+      ),
+    );
+  }
+
+  void _showAttachmentFailed() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.chatAttachmentSendFailed),
+      ),
+    );
+  }
+
+  Future<void> _pickAndSend(
+    Future<ChatAttachmentDraft?> Function() pick,
+  ) async {
+    try {
+      await _sendAttachment(pick);
+    } catch (_) {
+      _showAttachmentFailed();
+    }
+  }
+
+  Future<void> _sendLocationAttachment() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final bloc = context.read<ChatBloc>();
+    final replyToId = _replyTo?['id']?.toString();
+
+    final draft = await ChatAttachmentPicker.pickCurrentLocation();
+    if (!mounted) return;
+
+    if (draft == null) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.chatLocationPermissionDenied)),
+      );
+      return;
+    }
+
+    bloc.add(
+      ChatAttachmentSendRequested(
+        messageType: draft.type,
+        content: draft.content,
+        replyToId: replyToId,
+      ),
+    );
+    setState(() => _replyTo = null);
+    _scrollToBottom();
+  }
+
+  Future<void> _sendContactAttachment() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final bloc = context.read<ChatBloc>();
+    final replyToId = _replyTo?['id']?.toString();
+
+    final draft = await ChatAttachmentPicker.pickContact();
+    if (!mounted) return;
+
+    if (draft == null) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.chatContactsPermissionDenied)),
+      );
+      return;
+    }
+
+    bloc.add(
+      ChatAttachmentSendRequested(
+        messageType: draft.type,
+        content: draft.content,
+        replyToId: replyToId,
+      ),
+    );
+    setState(() => _replyTo = null);
+    _scrollToBottom();
   }
 
   bool get _isRtl => Directionality.of(context) == TextDirection.rtl;
@@ -113,6 +366,7 @@ class _ChatViewState extends State<ChatView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final chatTheme = ChatTheme.of(context);
     final hasText = _messageController.text.isNotEmpty;
 
     return BlocConsumer<ChatBloc, ChatState>(
@@ -135,13 +389,21 @@ class _ChatViewState extends State<ChatView> {
             : false;
         final isLoading = state is ChatLoading;
 
+        final l10n = AppLocalizations.of(context)!;
         String? replyPreviewText;
         if (_replyTo != null) {
-          replyPreviewText = _replyTo!['text']?.toString() ?? '';
+          if (_replyTo!['type'] == 'voice') {
+            final duration = _replyTo!['duration']?.toString();
+            replyPreviewText = duration != null && duration.isNotEmpty
+                ? '${l10n.messagesInboxLastVoice} · $duration'
+                : l10n.messagesInboxLastVoice;
+          } else {
+            replyPreviewText = _replyTo!['text']?.toString() ?? '';
+          }
         }
 
         return Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
+          backgroundColor: chatTheme.chatBackgroundColor,
           appBar: ChatAppBar(
             username: widget.username,
             imageUrl: widget.imageUrl,
@@ -149,7 +411,8 @@ class _ChatViewState extends State<ChatView> {
           ),
           body: Stack(
             children: [
-              ChatBackground(
+              ChatPatternBackground(
+                backgroundColor: chatTheme.chatBackgroundColor,
                 child: Column(
                   children: [
                     Expanded(
@@ -160,8 +423,10 @@ class _ChatViewState extends State<ChatView> {
                               messages: messages,
                               isTyping: isTypingRemote,
                               username: widget.username,
+                              peerImageUrl: widget.imageUrl,
+                              peerUserId: widget.peerUserId,
                               isRtl: _isRtl,
-                              onReactionPicker: _showReactionPicker,
+                              onReactionPicker: _showMessageActions,
                               onReplyTo: (msg) =>
                                   setState(() => _replyTo = msg),
                             ),
@@ -184,17 +449,33 @@ class _ChatViewState extends State<ChatView> {
                       hasText: hasText,
                       replyPreviewText: replyPreviewText,
                       onSend: _sendMessage,
-                      onMoreMenu: () =>
-                          ChatSheets.showMoreMenu(context: context),
+                      onMoreMenu: () => ChatSheets.showMoreMenu(
+                        context: context,
+                        onGallery: () => _pickAndSend(
+                          ChatAttachmentPicker.pickFromGallery,
+                        ),
+                        onCamera: () => _pickAndSend(
+                          ChatAttachmentPicker.pickFromCamera,
+                        ),
+                        onVideo: () => _pickAndSend(
+                          ChatAttachmentPicker.pickVideo,
+                        ),
+                        onLocation: _sendLocationAttachment,
+                        onContact: _sendContactAttachment,
+                        onFile: () => _pickAndSend(
+                          ChatAttachmentPicker.pickFile,
+                        ),
+                        onGift: _showComingSoon,
+                        onPoll: _showComingSoon,
+                      ),
                       onEmojiPicker: () => ChatSheets.showEmojiPicker(
                         context: context,
                         messageController: _messageController,
                         onEmojiInserted: () => setState(() {}),
                       ),
-                      onRecordingStart: () =>
-                          setState(() => _isRecording = true),
-                      onRecordingEnd: () =>
-                          setState(() => _isRecording = false),
+                      onRecordingStart: _onRecordingStart,
+                      onRecordingEnd: _onRecordingEnd,
+                      onRecordingCancel: _onRecordingCancel,
                       onReplyClose: () => setState(() => _replyTo = null),
                       onTextChanged: (typing) => _onTypingChanged(typing),
                     ),
@@ -210,28 +491,3 @@ class _ChatViewState extends State<ChatView> {
   }
 }
 
-class ChatBackground extends StatelessWidget {
-  const ChatBackground({required this.child, super.key});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final chatTheme = ChatTheme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            theme.scaffoldBackgroundColor,
-            chatTheme.backgroundGradientEnd,
-          ],
-        ),
-      ),
-      child: child,
-    );
-  }
-}

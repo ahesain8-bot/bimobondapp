@@ -48,6 +48,8 @@ abstract class PostsRepository {
     bool? isSaved,
   });
 
+  Future<Either<Failure, PostEntity>> getPostById(String postId);
+
   Future<Either<Failure, bool>> toggleLike(
     String postId, {
     required bool liked,

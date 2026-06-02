@@ -16,6 +16,7 @@ class ChatInputBar extends StatelessWidget {
     required this.onEmojiPicker,
     required this.onRecordingStart,
     required this.onRecordingEnd,
+    this.onRecordingCancel,
     required this.onReplyClose,
     this.onTextChanged,
     super.key,
@@ -29,6 +30,7 @@ class ChatInputBar extends StatelessWidget {
   final VoidCallback onEmojiPicker;
   final VoidCallback onRecordingStart;
   final VoidCallback onRecordingEnd;
+  final VoidCallback? onRecordingCancel;
   final VoidCallback onReplyClose;
   final ValueChanged<bool>? onTextChanged;
 
@@ -130,6 +132,8 @@ class ChatInputBar extends StatelessWidget {
               GestureDetector(
                 onLongPressStart: hasText ? null : (_) => onRecordingStart(),
                 onLongPressEnd: hasText ? null : (_) => onRecordingEnd(),
+                onLongPressCancel:
+                    hasText ? null : () => onRecordingCancel?.call(),
                 onTap: hasText ? onSend : null,
                 child: Container(
                   width: ChatLayoutConstants.inputActionSize,

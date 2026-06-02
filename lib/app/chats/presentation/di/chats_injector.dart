@@ -5,7 +5,8 @@ import 'package:bimobondapp/app/chats/domain/repositories/chats_repository.dart'
 import 'package:bimobondapp/app/chats/domain/usecases/create_or_get_chat_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/get_chat_messages_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/get_chats_usecase.dart';
-import 'package:bimobondapp/app/chats/domain/usecases/get_friends_usecase.dart';
+import 'package:bimobondapp/app/social/domain/usecases/get_suggestions_usecase.dart';
+import 'package:bimobondapp/app/chats/domain/usecases/delete_message_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/mark_message_read_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/react_to_message_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/send_message_usecase.dart';
@@ -32,12 +33,12 @@ Future<void> initChats() async {
   sl.registerLazySingleton(() => SendMessageUseCase(sl()));
   sl.registerLazySingleton(() => MarkMessageReadUseCase(sl()));
   sl.registerLazySingleton(() => ReactToMessageUseCase(sl()));
-  sl.registerLazySingleton(() => GetFriendsUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteMessageUseCase(sl()));
 
   sl.registerFactory(
     () => InboxBloc(
       getChatsUseCase: sl(),
-      getFriendsUseCase: sl(),
+      getSuggestionsUseCase: sl(),
     ),
   );
 
@@ -45,8 +46,10 @@ Future<void> initChats() async {
     () => ChatBloc(
       getChatMessagesUseCase: sl(),
       sendMessageUseCase: sl(),
+      uploadMediaUseCase: sl(),
       reactToMessageUseCase: sl(),
       markMessageReadUseCase: sl(),
+      deleteMessageUseCase: sl(),
       socketService: sl(),
     ),
   );

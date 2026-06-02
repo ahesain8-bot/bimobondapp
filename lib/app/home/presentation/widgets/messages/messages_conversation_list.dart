@@ -11,10 +11,12 @@ import 'package:go_router/go_router.dart';
 class MessagesConversationList extends StatelessWidget {
   const MessagesConversationList({
     required this.items,
+    this.scrollable = false,
     super.key,
   });
 
   final List<InboxChatItem> items;
+  final bool scrollable;
 
   @override
   Widget build(BuildContext context) {
@@ -48,156 +50,162 @@ class MessagesConversationList extends StatelessWidget {
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: !scrollable,
+      physics: scrollable
+          ? const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics())
+          : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       itemCount: items.length,
-      itemBuilder: (context, index) {
-        final chat = items[index];
+      itemBuilder: (context, index) => _ConversationTile(chat: items[index]),
+    );
+  }
+}
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: chat.unread
-                ? theme.colorScheme.primary.withValues(
-                    alpha: MessagesLayoutConstants.conversationUnreadAlpha,
-                  )
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(
-              MessagesLayoutConstants.conversationTileRadius,
-            ),
-          ),
-          child: ListTile(
-            onTap: () async {
-              await context.pushNamed(
-                'chat',
-                extra: {
-                  'chatId': chat.chatId,
-                  'username': chat.name,
-                  'imageUrl': chat.imageUrl,
-                  if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
-                },
-              );
-              if (context.mounted) {
-                context.read<InboxBloc>().add(
-                  const InboxLoadRequested(refresh: true),
-                );
-              }
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({required this.chat});
+
+  final InboxChatItem chat;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      // margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: chat.unread
+            ? theme.colorScheme.primary.withValues(
+                alpha: MessagesLayoutConstants.conversationUnreadAlpha,
+              )
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(
+          MessagesLayoutConstants.conversationTileRadius,
+        ),
+      ),
+      child: ListTile(
+        onTap: () async {
+          await context.pushNamed(
+            'chat',
+            extra: {
+              'chatId': chat.chatId,
+              'username': chat.name,
+              if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
+                'imageUrl': chat.imageUrl,
+              if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
             },
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(
-                MessagesLayoutConstants.conversationTileRadius,
+          );
+          if (context.mounted) {
+            context.read<InboxBloc>().add(
+              const InboxLoadRequested(refresh: true),
+            );
+          }
+        },
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            MessagesLayoutConstants.conversationTileRadius,
+          ),
+        ),
+        leading: Stack(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: chat.unread
+                      ? theme.colorScheme.primary
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+              child: SafeNetworkAvatar(
+                imageUrl: chat.imageUrl,
+                radius: MessagesLayoutConstants.conversationAvatarRadius,
+                fallbackText: chat.name,
               ),
             ),
-            leading: Stack(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(2),
+            if (chat.active)
+              PositionedDirectional(
+                end: 4,
+                bottom: 4,
+                child: Container(
+                  width: 12,
+                  height: 12,
                   decoration: BoxDecoration(
+                    color: MessagesLayoutConstants.activeDotColor,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: chat.unread
-                          ? theme.colorScheme.primary
-                          : Colors.transparent,
+                      color: theme.scaffoldBackgroundColor,
                       width: 2,
                     ),
                   ),
-                  child: SafeNetworkAvatar(
-                    imageUrl: chat.imageUrl,
-                    radius: MessagesLayoutConstants.conversationAvatarRadius,
-                    fallbackText: chat.name,
-                  ),
                 ),
-                if (chat.active)
-                  PositionedDirectional(
-                    end: 4,
-                    bottom: 4,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: MessagesLayoutConstants.activeDotColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: theme.scaffoldBackgroundColor,
-                          width: 2,
+              ),
+          ],
+        ),
+        title: Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  chat.name,
+                  style: TextStyle(
+                    fontWeight: chat.unread ? FontWeight.w900 : FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                chat.time,
+                style: TextStyle(
+                  color: chat.unread
+                      ? theme.colorScheme.primary
+                      : theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.4,
                         ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            title: Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      chat.name,
-                      style: TextStyle(
-                        fontWeight:
-                            chat.unread ? FontWeight.w900 : FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    chat.time,
-                    style: TextStyle(
-                      color: chat.unread
-                          ? theme.colorScheme.primary
-                          : theme.textTheme.bodyMedium?.color?.withValues(
-                              alpha: 0.4,
-                            ),
-                      fontSize: 12,
-                      fontWeight:
-                          chat.unread ? FontWeight.w800 : FontWeight.w500,
-                    ),
-                  ),
-                ],
+                  fontSize: 12,
+                  fontWeight: chat.unread ? FontWeight.w800 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            Expanded(
+              child: Text(
+                chat.preview,
+                style: TextStyle(
+                  color: chat.unread
+                      ? theme.textTheme.bodyLarge?.color
+                      : theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.5,
+                        ),
+                  fontWeight: chat.unread ? FontWeight.w600 : FontWeight.w400,
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            subtitle: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    chat.preview,
-                    style: TextStyle(
-                      color: chat.unread
-                          ? theme.textTheme.bodyLarge?.color
-                          : theme.textTheme.bodyMedium?.color?.withValues(
-                              alpha: 0.5,
-                            ),
-                      fontWeight:
-                          chat.unread ? FontWeight.w600 : FontWeight.w400,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            if (chat.unread) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: MessagesLayoutConstants.conversationUnreadDotSize,
+                height: MessagesLayoutConstants.conversationUnreadDotSize,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
                 ),
-                if (chat.unread) ...[
-                  const SizedBox(width:  8),
-                  Container(
-                    width: MessagesLayoutConstants.conversationUnreadDotSize,
-                    height: MessagesLayoutConstants.conversationUnreadDotSize,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

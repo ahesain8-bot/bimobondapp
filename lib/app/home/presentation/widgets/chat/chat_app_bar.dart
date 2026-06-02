@@ -97,7 +97,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             color: theme.colorScheme.primary,
             size: ChatLayoutConstants.appBarActionIconSize,
           ),
-          onPressed: onProfileTap,
+          tooltip: l10n.settingsChatWallpaper,
+          onPressed: () => context.pushNamed('chat_wallpaper_settings'),
         ),
       ],
     );

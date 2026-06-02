@@ -328,6 +328,445 @@ class ListSkeleton extends StatelessWidget {
   }
 }
 
+/// Notification-style placeholders for the user comments screen.
+class UserCommentsListSkeleton extends StatelessWidget {
+  const UserCommentsListSkeleton({
+    super.key,
+    this.itemCount = 8,
+  });
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      itemCount: itemCount,
+      separatorBuilder: (context, _) => Divider(
+        height: 1,
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+      ),
+      itemBuilder: (context, _) => const _UserCommentTileSkeleton(),
+    );
+  }
+}
+
+class _UserCommentTileSkeleton extends StatelessWidget {
+  const _UserCommentTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p16,
+        vertical: AppSizes.p12,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SkeletonWidget.circular(size: 44),
+          const SizedBox(width: AppSizes.p12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: SkeletonWidget(height: 14, width: double.infinity),
+                    ),
+                    const SizedBox(width: AppSizes.p8),
+                    SkeletonWidget(
+                      height: 12,
+                      width: 36,
+                      borderRadius: 6,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const SkeletonWidget(height: 16, width: double.infinity),
+                const SizedBox(height: 6),
+                SkeletonWidget(
+                  height: 16,
+                  width: MediaQuery.sizeOf(context).width * 0.55,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Notification-style placeholders for the user likes screen.
+class UserLikesListSkeleton extends StatelessWidget {
+  const UserLikesListSkeleton({
+    super.key,
+    this.itemCount = 8,
+  });
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      itemCount: itemCount,
+      separatorBuilder: (context, _) => Divider(
+        height: 1,
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+      ),
+      itemBuilder: (context, _) => const _UserLikeTileSkeleton(),
+    );
+  }
+}
+
+class _UserLikeTileSkeleton extends StatelessWidget {
+  const _UserLikeTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p16,
+        vertical: AppSizes.p12,
+      ),
+      child: Row(
+        children: [
+          const SkeletonWidget.circular(size: 44),
+          const SizedBox(width: AppSizes.p12),
+          Expanded(
+            child: Row(
+              children: [
+                const Expanded(
+                  child: SkeletonWidget(height: 14, width: double.infinity),
+                ),
+                const SizedBox(width: AppSizes.p8),
+                SkeletonWidget(
+                  height: 12,
+                  width: 36,
+                  borderRadius: 6,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Notification-style placeholders for the user mentions screen.
+class UserMentionsListSkeleton extends StatelessWidget {
+  const UserMentionsListSkeleton({
+    super.key,
+    this.itemCount = 8,
+  });
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      itemCount: itemCount,
+      separatorBuilder: (context, _) => Divider(
+        height: 1,
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+      ),
+      itemBuilder: (context, _) => const _UserLikeTileSkeleton(),
+    );
+  }
+}
+
+/// Notification-style placeholders for the my followers screen.
+class UserFollowersListSkeleton extends StatelessWidget {
+  const UserFollowersListSkeleton({
+    super.key,
+    this.itemCount = 8,
+  });
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      itemCount: itemCount,
+      separatorBuilder: (context, _) => Divider(
+        height: 1,
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+      ),
+      itemBuilder: (context, _) => const _UserFollowerTileSkeleton(),
+    );
+  }
+}
+
+class _UserFollowerTileSkeleton extends StatelessWidget {
+  const _UserFollowerTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p16,
+        vertical: AppSizes.p12,
+      ),
+      child: Row(
+        children: [
+          const SkeletonWidget.circular(size: 44),
+          const SizedBox(width: AppSizes.p12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SkeletonWidget(height: 14, width: double.infinity),
+                const SizedBox(height: 6),
+                SkeletonWidget(
+                  height: 12,
+                  width: MediaQuery.sizeOf(context).width * 0.28,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSizes.p8),
+          SkeletonWidget(
+            height: 32,
+            width: 88,
+            borderRadius: AppSizes.radiusMd,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Horizontal card placeholders for recent mentions on the messages tab.
+class MessagesMentionsStripSkeleton extends StatelessWidget {
+  const MessagesMentionsStripSkeleton({super.key, this.cardCount = 3});
+
+  final int cardCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            MessagesLayoutConstants.sectionHorizontalPadding,
+            8,
+            MessagesLayoutConstants.sectionHorizontalPadding,
+            12,
+          ),
+          child: SkeletonWidget(
+            height: 18,
+            width: 160,
+            borderRadius: MessagesLayoutConstants.inboxChipRadius,
+          ),
+        ),
+        SizedBox(
+          height: MessagesLayoutConstants.mentionsStripHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: cardCount,
+            itemBuilder: (context, _) => Container(
+              width: MessagesLayoutConstants.mentionCardWidth,
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(
+                  MessagesLayoutConstants.mentionCardRadius,
+                ),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(
+                    alpha: MessagesLayoutConstants.dividerAlpha,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const SkeletonWidget.circular(size: 42),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonWidget(height: 12, width: 72),
+                        SizedBox(height: 6),
+                        SkeletonWidget(height: 10, width: 110),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SkeletonWidget(
+                    height: MessagesLayoutConstants.mentionPreviewSize,
+                    width: MessagesLayoutConstants.mentionPreviewSize,
+                    borderRadius: 8,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Vertical list placeholders on the follow suggestions screen.
+class FollowSuggestionsListSkeleton extends StatelessWidget {
+  const FollowSuggestionsListSkeleton({
+    super.key,
+    this.itemCount = 8,
+    this.scrollable = true,
+  });
+
+  final int itemCount;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: scrollable
+          ? const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics())
+          : const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: itemCount,
+      separatorBuilder: (context, _) => Divider(
+        height: 1,
+        indent: 72,
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.08),
+      ),
+      itemBuilder: (context, _) => const _FollowSuggestionTileSkeleton(),
+    );
+  }
+}
+
+class _FollowSuggestionTileSkeleton extends StatelessWidget {
+  const _FollowSuggestionTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p16,
+        vertical: AppSizes.p4,
+      ),
+      leading: const SkeletonWidget.circular(size: 48),
+      title: const SkeletonWidget(height: 16, width: 140),
+      subtitle: const Padding(
+        padding: EdgeInsets.only(top: 6),
+        child: SkeletonWidget(height: 12, width: 100),
+      ),
+      trailing: const SkeletonWidget(
+        height: 34,
+        width: 96,
+        borderRadius: 12,
+      ),
+    );
+  }
+}
+
+/// Horizontal card placeholders for people-you-may-know on the messages tab.
+class MessagesSuggestionsStripSkeleton extends StatelessWidget {
+  const MessagesSuggestionsStripSkeleton({super.key, this.cardCount = 4});
+
+  final int cardCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            MessagesLayoutConstants.sectionHorizontalPadding,
+            24,
+            MessagesLayoutConstants.sectionHorizontalPadding,
+            12,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SkeletonWidget(
+                height: 15,
+                width: 160,
+                borderRadius: MessagesLayoutConstants.inboxChipRadius,
+              ),
+              SkeletonWidget(
+                height: 13,
+                width: 52,
+                borderRadius: MessagesLayoutConstants.inboxChipRadius,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: MessagesLayoutConstants.suggestionsStripHeight,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            itemCount: cardCount,
+            itemBuilder: (context, _) => Container(
+              width: MessagesLayoutConstants.suggestionCardWidth,
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              padding: const EdgeInsets.all(AppSizes.p16),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(
+                  MessagesLayoutConstants.suggestionCardRadius,
+                ),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(
+                    alpha: MessagesLayoutConstants.dividerAlpha,
+                  ),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SkeletonWidget.circular(
+                    size: MessagesLayoutConstants.suggestionAvatarRadius * 2,
+                  ),
+                  const SizedBox(height: AppSizes.p12),
+                  const SkeletonWidget(height: 13, width: 90),
+                  const SizedBox(height: AppSizes.p4),
+                  const SkeletonWidget(height: 10, width: 72),
+                  const SizedBox(height: 14),
+                  SkeletonWidget(
+                    height: MessagesLayoutConstants.suggestionFollowButtonHeight,
+                    width: double.infinity,
+                    borderRadius: 12,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Inbox chat row placeholders on the messages (الدردشة) tab.
 class MessagesChatListSkeleton extends StatelessWidget {
   const MessagesChatListSkeleton({

@@ -23,7 +23,8 @@ enum FollowStatus {
       return fromApi(status);
     }
 
-    final isFollowing = data['isFollowing'] ?? data['isFollowed'] ?? data['following'];
+    final isFollowing =
+        data['isFollowing'] ?? data['isFollowed'] ?? data['following'];
     if (isFollowing is bool) {
       return isFollowing ? FollowStatus.followed : FollowStatus.unfollowed;
     }

@@ -104,6 +104,19 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
+  Future<Either<Failure, PostEntity>> getPostById(String postId) async {
+    try {
+      final post = await remoteDataSource.getPostById(postId);
+      final posts = _applyPostLikes([post]);
+      return Right(posts.first);
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, PostEntity>> createPost({
     String? type,
     String? videoUrl,

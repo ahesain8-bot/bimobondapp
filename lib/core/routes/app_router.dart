@@ -9,11 +9,18 @@ import 'package:bimobondapp/app/auth/presentation/pages/email_verification_scree
 import 'package:bimobondapp/app/auth/presentation/pages/splash_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/personal_info_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/chat_wallpaper_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/change_avatar_screen.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/post_detail_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
+import 'package:bimobondapp/app/social/presentation/pages/follow_suggestions_screen.dart';
+import 'package:bimobondapp/app/social/presentation/pages/user_comments_screen.dart';
+import 'package:bimobondapp/app/social/presentation/pages/my_followers_screen.dart';
+import 'package:bimobondapp/app/social/presentation/pages/user_likes_screen.dart';
+import 'package:bimobondapp/app/social/presentation/pages/user_mentions_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/edit_post_screen.dart';
@@ -89,6 +96,11 @@ class AppRouter {
         builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
+        path: '/settings/chat-wallpaper',
+        name: 'chat_wallpaper_settings',
+        builder: (context, state) => const ChatWallpaperSettingsScreen(),
+      ),
+      GoRoute(
         path: '/change-avatar',
         name: 'change_avatar',
         builder: (context, state) => const ChangeAvatarScreen(),
@@ -117,11 +129,49 @@ class AppRouter {
           return ChatScreen(
             chatId: extra?['chatId'] as String? ?? '',
             username: extra?['username'] as String? ?? 'User',
-            imageUrl: extra?['imageUrl'] as String? ??
-                'https://i.pravatar.cc/150?u=default',
+            imageUrl: extra?['imageUrl'] as String? ?? '',
             peerUserId: extra?['peerUserId'] as String?,
           );
         },
+      ),
+      GoRoute(
+        path: '/all-chats',
+        name: 'all_chats',
+        builder: (context, state) => const AllChatsScreen(),
+      ),
+      GoRoute(
+        path: '/follow-suggestions',
+        name: 'follow_suggestions',
+        builder: (context, state) => const FollowSuggestionsScreen(),
+      ),
+      GoRoute(
+        path: '/user-comments',
+        name: 'user_comments',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return UserCommentsScreen(
+            userId: extra['userId'] as String?,
+            title: extra['title'] as String?,
+            authorName: extra['authorName'] as String?,
+            authorUsername: extra['authorUsername'] as String?,
+            authorAvatarUrl: extra['authorAvatarUrl'] as String?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/my-followers',
+        name: 'my_followers',
+        builder: (context, state) => const MyFollowersScreen(),
+      ),
+      GoRoute(
+        path: '/user-likes',
+        name: 'user_likes',
+        builder: (context, state) => const UserLikesScreen(),
+      ),
+      GoRoute(
+        path: '/user-mentions',
+        name: 'user_mentions',
+        builder: (context, state) => const UserMentionsScreen(),
       ),
       GoRoute(
         path: '/live-details',

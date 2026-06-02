@@ -1,5 +1,12 @@
 import 'package:bimobondapp/app/social/data/models/social_user_model.dart';
 import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_comment_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_comments_page_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_like_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_likes_page_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_mention_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_mentions_page_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_suggestion_model.dart';
 import 'package:bimobondapp/app/social/domain/entities/follow_status.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_list_query.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
@@ -17,6 +24,24 @@ abstract class SocialRemoteDataSource {
   Future<SocialUserPageModel> getFollowing(SocialListQuery query);
 
   Future<SocialUserPageModel> getMyFriends(SocialListQuery query);
+
+  Future<List<UserSuggestionModel>> getSuggestions({int limit = 20});
+
+  Future<UserCommentsPageModel> getUserComments({
+    String? userId,
+    required int page,
+    required int limit,
+  });
+
+  Future<UserLikesPageModel> getMyLikes({
+    required int page,
+    required int limit,
+  });
+
+  Future<UserMentionsPageModel> getMyMentions({
+    required int page,
+    required int limit,
+  });
 }
 
 class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
@@ -51,6 +76,10 @@ class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
         'friends',
         'followers',
         'following',
+        'suggestions',
+        'comments',
+        'likes',
+        'mentions',
       ]) {
         final nested = body[key];
         if (nested is List) return nested;
@@ -178,6 +207,160 @@ class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
       }
       throw ServerException(
         message: _extractErrorMessage(response.data) ?? 'Failed to load friends',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<List<UserSuggestionModel>> getSuggestions({int limit = 20}) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.mySuggestions,
+        queryParameters: {'limit': limit},
+        options: Options(headers: await _authHeaders()),
+      );
+      if (response.statusCode == 200) {
+        return _extractList(response.data)
+            .whereType<Map>()
+            .map(
+              (e) => UserSuggestionModel.fromJson(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .where((s) => s.id.isNotEmpty)
+            .toList();
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ??
+            'Failed to load suggestions',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<UserCommentsPageModel> getUserComments({
+    String? userId,
+    required int page,
+    required int limit,
+  }) async {
+    try {
+      final path = userId == null || userId.isEmpty
+          ? ApiConstants.myComments
+          : ApiConstants.userComments(userId);
+
+      final response = await apiClient.dio.get(
+        path,
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _authHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final comments = _extractList(response.data)
+            .whereType<Map>()
+            .map(
+              (e) => UserCommentModel.fromJson(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .where((comment) => comment.id.isNotEmpty)
+            .toList();
+
+        return UserCommentsPageModel.fromResponse(
+          response.data,
+          comments,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load comments',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<UserLikesPageModel> getMyLikes({
+    required int page,
+    required int limit,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.myLikes,
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _authHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final likes = _extractList(response.data)
+            .whereType<Map>()
+            .map(
+              (e) => UserLikeModel.fromJson(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .where((like) => like.postId.isNotEmpty)
+            .toList();
+
+        return UserLikesPageModel.fromResponse(
+          response.data,
+          likes,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load likes',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<UserMentionsPageModel> getMyMentions({
+    required int page,
+    required int limit,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.myMentions,
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _authHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final mentions = _extractList(response.data)
+            .whereType<Map>()
+            .map(
+              (e) => UserMentionModel.fromJson(
+                Map<String, dynamic>.from(e),
+              ),
+            )
+            .where((mention) => mention.postId.isNotEmpty)
+            .toList();
+
+        return UserMentionsPageModel.fromResponse(
+          response.data,
+          mentions,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load mentions',
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);

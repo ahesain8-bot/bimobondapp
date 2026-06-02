@@ -20,6 +20,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
+import 'package:bimobondapp/core/theme/cubit/chat_wallpaper_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:firebase_core/firebase_core.dart';
 void main() async {
@@ -46,6 +47,9 @@ class MyApp extends StatelessWidget {
         BlocProvider<PostsBloc>(create: (_) => posts_di.sl<PostsBloc>()),
         BlocProvider<ThemeCubit>(create: (_) => ThemeCubit(auth_di.sl())),
         BlocProvider<LocaleCubit>(create: (_) => LocaleCubit(auth_di.sl())),
+        BlocProvider<ChatWallpaperCubit>(
+          create: (_) => ChatWallpaperCubit(auth_di.sl()),
+        ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {

@@ -26,6 +26,25 @@ String messagesMentionText(String? key, AppLocalizations l10n) {
   }
 }
 
+String messagesSuggestionReason({
+  required String? reason,
+  required int mutualCount,
+  required AppLocalizations l10n,
+}) {
+  if (mutualCount > 0) {
+    return l10n.messagesSuggestionMutualFriends(mutualCount);
+  }
+
+  switch (reason) {
+    case 'friends_of_friends':
+      return l10n.messagesSuggestionFriendsOfFriends;
+    case 'popular':
+      return l10n.messagesSuggestionPopular;
+    default:
+      return reason?.replaceAll('_', ' ') ?? '';
+  }
+}
+
 String messagesSuggestionBio(String? key, AppLocalizations l10n) {
   switch (key) {
     case 'designer':

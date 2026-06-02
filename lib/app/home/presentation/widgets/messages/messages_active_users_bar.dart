@@ -31,7 +31,7 @@ class MessagesActiveUsersBar extends StatelessWidget {
 
           final chat = chats[index - 1];
           final name = chat['name'] as String;
-          final image = chat['image'] as String;
+          final image = chat['image'] as String?;
           final active = chat['active'] as bool? ?? false;
 
           return Padding(

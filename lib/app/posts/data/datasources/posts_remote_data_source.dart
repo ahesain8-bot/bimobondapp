@@ -14,6 +14,7 @@ abstract class PostsRemoteDataSource {
   Future<PostModel> createPost(Map<String, dynamic> postData);
   Future<String> uploadMedia(File file);
   Future<List<PostModel>> getFeed(Map<String, dynamic> queryParams);
+  Future<PostModel> getPostById(String postId);
   Future<bool> toggleLike(String postId);
   Future<bool> toggleSave(String postId);
   Future<PostModel> updatePost(String postId, Map<String, dynamic> data);
@@ -94,6 +95,26 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       } else {
         throw ServerException(message: 'Failed to fetch feed');
       }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<PostModel> getPostById(String postId) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.postById(postId),
+        options: Options(headers: await _optionalAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        return _parsePostModel(response.data);
+      }
+
+      throw ServerException(
+        message: _extractErrorMessage(response.data) ?? 'Failed to fetch post',
+      );
     } catch (e) {
       throw DioHandler.handle(e);
     }

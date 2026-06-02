@@ -1,38 +1,53 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:bimobondapp/app/chats/data/datasources/chat_socket_service.dart';
+import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
 import 'package:bimobondapp/app/chats/data/models/chat_message_model.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/get_chat_messages_usecase.dart';
+import 'package:bimobondapp/app/chats/domain/usecases/delete_message_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/mark_message_read_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/react_to_message_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/send_message_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_event.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_state.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
+import 'package:bimobondapp/app/chats/presentation/utils/chat_send_content.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ChatBloc({
     required this.getChatMessagesUseCase,
     required this.sendMessageUseCase,
+    required this.uploadMediaUseCase,
     required this.reactToMessageUseCase,
     required this.markMessageReadUseCase,
+    required this.deleteMessageUseCase,
     required this.socketService,
   }) : super(const ChatInitial()) {
     on<ChatStarted>(_onStarted);
     on<ChatMessagesLoadRequested>(_onMessagesLoadRequested);
     on<ChatMessageSendRequested>(_onMessageSendRequested);
+    on<ChatVoiceMessageSendRequested>(_onVoiceMessageSendRequested);
+    on<ChatAttachmentSendRequested>(_onAttachmentSendRequested);
     on<ChatMessageReactRequested>(_onMessageReactRequested);
+    on<ChatMessageDeleteRequested>(_onMessageDeleteRequested);
     on<ChatTypingChanged>(_onTypingChanged);
     on<ChatStopped>(_onStopped);
     on<ChatSocketMessageReceived>(_onSocketMessage);
     on<ChatSocketUserTyping>(_onSocketUserTyping);
+    on<ChatSocketMessageRead>(_onSocketMessageRead);
+    on<ChatSocketMessageReacted>(_onSocketMessageReacted);
+    on<ChatSocketMessageDeleted>(_onSocketMessageDeleted);
   }
 
   final GetChatMessagesUseCase getChatMessagesUseCase;
   final SendMessageUseCase sendMessageUseCase;
+  final UploadMediaUseCase uploadMediaUseCase;
   final ReactToMessageUseCase reactToMessageUseCase;
   final MarkMessageReadUseCase markMessageReadUseCase;
+  final DeleteMessageUseCase deleteMessageUseCase;
   final ChatSocketService socketService;
 
   String? _chatId;
@@ -73,15 +88,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     });
 
     _readSub = socketService.onMessageRead.listen((payload) {
-      _applyReadReceipt(payload, emit);
+      add(ChatSocketMessageRead(Map<String, dynamic>.from(payload)));
     });
 
     _reactedSub = socketService.onMessageReacted.listen((payload) {
-      _applyReaction(payload, emit);
+      add(ChatSocketMessageReacted(Map<String, dynamic>.from(payload)));
     });
 
     _deletedSub = socketService.onMessageDeleted.listen((payload) {
-      _applyDeleted(payload, emit);
+      add(ChatSocketMessageDeleted(Map<String, dynamic>.from(payload)));
     });
 
     add(const ChatMessagesLoadRequested(refresh: true));
@@ -129,8 +144,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         }
 
         for (final msg in messages) {
-          if (msg.senderId != userId && !msg.isReadBy(userId)) {
-            markMessageReadUseCase(MarkMessageReadParams(messageId: msg.id));
+          if (!msg.isDeleted &&
+              msg.senderId != userId &&
+              !msg.isReadBy(userId)) {
+            unawaited(
+              markMessageReadUseCase(
+                MarkMessageReadParams(messageId: msg.id),
+              ),
+            );
           }
         }
       },
@@ -176,15 +197,193 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     );
   }
 
+  Future<void> _onVoiceMessageSendRequested(
+    ChatVoiceMessageSendRequested event,
+    Emitter<ChatState> emit,
+  ) async {
+    final chatId = _chatId;
+    final userId = _currentUserId;
+    if (chatId == null || userId == null) return;
+    if (state is! ChatLoadSuccess) return;
+
+    final current = state as ChatLoadSuccess;
+    emit(current.copyWith(isSending: true));
+
+    final file = File(event.filePath);
+    final uploadResult = await uploadMediaUseCase(file);
+    if (await file.exists()) {
+      await file.delete();
+    }
+
+    await uploadResult.fold(
+      (failure) async {
+        emit(ChatFailure(failure.message));
+      },
+      (mediaUrl) async {
+        final sendResult = await sendMessageUseCase(
+          SendMessageParams(
+            chatId: chatId,
+            content: event.durationSeconds.toString(),
+            type: 'AUDIO',
+            mediaUrl: mediaUrl,
+            replyToId: event.replyToId,
+          ),
+        );
+
+        sendResult.fold(
+          (failure) => emit(ChatFailure(failure.message)),
+          (message) {
+            final ui = chatMessageToUiMap(message, userId);
+            final ids = current.messages.map((m) => m['id']).toSet();
+            if (ids.contains(ui['id'])) {
+              emit(current.copyWith(isSending: false));
+              return;
+            }
+            emit(
+              current.copyWith(
+                messages: sortChatMessagesOldestFirst([
+                  ...current.messages,
+                  ui,
+                ]),
+                isSending: false,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _onAttachmentSendRequested(
+    ChatAttachmentSendRequested event,
+    Emitter<ChatState> emit,
+  ) async {
+    final chatId = _chatId;
+    final userId = _currentUserId;
+    if (chatId == null || userId == null) return;
+    if (state is! ChatLoadSuccess) return;
+
+    final current = state as ChatLoadSuccess;
+    emit(current.copyWith(isSending: true));
+
+    Future<void> sendWithMediaUrl(String? mediaUrl) async {
+      final content = buildChatMessageContent(
+        messageType: event.messageType,
+        draftContent: event.content,
+        mediaUrl: mediaUrl,
+      );
+
+      final sendResult = await sendMessageUseCase(
+        SendMessageParams(
+          chatId: chatId,
+          content: content,
+          type: event.messageType,
+          mediaUrl: mediaUrl,
+          replyToId: event.replyToId,
+        ),
+      );
+
+      sendResult.fold(
+        (failure) => emit(ChatFailure(failure.message)),
+        (message) => _emitSentMessage(emit, current, message, userId),
+      );
+    }
+
+    final filePath = event.localFilePath;
+    final needsUpload = chatMessageTypeRequiresUpload(event.messageType);
+
+    if (!needsUpload || filePath == null || filePath.isEmpty) {
+      await sendWithMediaUrl(null);
+      return;
+    }
+
+    final uploadResult = await uploadMediaUseCase(File(filePath));
+    await uploadResult.fold(
+      (failure) async {
+        emit(ChatFailure(failure.message));
+      },
+      (mediaUrl) async {
+        if (mediaUrl.trim().isEmpty) {
+          emit(ChatFailure('Upload did not return a media URL.'));
+          return;
+        }
+        await sendWithMediaUrl(mediaUrl);
+      },
+    );
+  }
+
+  void _emitSentMessage(
+    Emitter<ChatState> emit,
+    ChatLoadSuccess current,
+    ChatMessageEntity message,
+    String userId,
+  ) {
+    final ui = chatMessageToUiMap(message, userId);
+    final ids = current.messages.map((m) => m['id']).toSet();
+    if (ids.contains(ui['id'])) {
+      emit(current.copyWith(isSending: false));
+      return;
+    }
+    emit(
+      current.copyWith(
+        messages: sortChatMessagesOldestFirst([...current.messages, ui]),
+        isSending: false,
+      ),
+    );
+  }
+
   Future<void> _onMessageReactRequested(
     ChatMessageReactRequested event,
     Emitter<ChatState> emit,
   ) async {
-    await reactToMessageUseCase(
+    if (state is! ChatLoadSuccess) return;
+    final current = state as ChatLoadSuccess;
+
+    emit(
+      current.copyWith(
+        messages: _messagesWithReaction(
+          current.messages,
+          event.messageId,
+          event.emoji,
+        ),
+      ),
+    );
+
+    final result = await reactToMessageUseCase(
       ReactToMessageParams(
         messageId: event.messageId,
         emoji: event.emoji,
       ),
+    );
+
+    result.fold(
+      (failure) {
+        if (!emit.isDone) emit(ChatFailure(failure.message));
+      },
+      (_) {},
+    );
+  }
+
+  Future<void> _onMessageDeleteRequested(
+    ChatMessageDeleteRequested event,
+    Emitter<ChatState> emit,
+  ) async {
+    if (state is! ChatLoadSuccess) return;
+    final current = state as ChatLoadSuccess;
+
+    emit(
+      current.copyWith(
+        messages: _messagesMarkedDeleted(current.messages, event.messageId),
+      ),
+    );
+
+    final result = await deleteMessageUseCase(
+      DeleteMessageParams(messageId: event.messageId),
+    );
+
+    result.fold(
+      (failure) => emit(ChatFailure(failure.message)),
+      (_) {},
     );
   }
 
@@ -213,8 +412,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final senderId = event.raw['senderId']?.toString();
     if (senderId != null &&
         senderId != _currentUserId &&
-        id != null) {
-      markMessageReadUseCase(MarkMessageReadParams(messageId: id.toString()));
+        id != null &&
+        event.raw['isDeleted'] != true) {
+      unawaited(
+        markMessageReadUseCase(
+          MarkMessageReadParams(messageId: id.toString()),
+        ),
+      );
     }
   }
 
@@ -225,9 +429,47 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     emit(current.copyWith(isTypingRemote: event.isTyping));
   }
 
-  void _applyReadReceipt(Map<String, dynamic> payload, Emitter<ChatState> emit) {
+  String? _messageIdFromPayload(Map<String, dynamic> payload) {
+    return payload['messageId']?.toString() ?? payload['id']?.toString();
+  }
+
+  List<Map<String, dynamic>> _messagesWithReaction(
+    List<Map<String, dynamic>> messages,
+    String messageId,
+    String emoji,
+  ) {
+    return messages.map((m) {
+      if (m['id'] == messageId) {
+        return {...m, 'reactions': [emoji]};
+      }
+      return m;
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _messagesMarkedDeleted(
+    List<Map<String, dynamic>> messages,
+    String messageId,
+  ) {
+    return messages.map((m) {
+      if (m['id'] == messageId) {
+        return {
+          ...m,
+          'isDeleted': true,
+          'type': 'text',
+          'text': '',
+          'textKey': 'deleted',
+        };
+      }
+      return m;
+    }).toList();
+  }
+
+  void _onSocketMessageRead(
+    ChatSocketMessageRead event,
+    Emitter<ChatState> emit,
+  ) {
     if (state is! ChatLoadSuccess) return;
-    final messageId = payload['messageId']?.toString();
+    final messageId = _messageIdFromPayload(event.payload);
     if (messageId == null) return;
 
     final current = state as ChatLoadSuccess;
@@ -240,39 +482,37 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     emit(current.copyWith(messages: updated));
   }
 
-  void _applyReaction(Map<String, dynamic> payload, Emitter<ChatState> emit) {
+  void _onSocketMessageReacted(
+    ChatSocketMessageReacted event,
+    Emitter<ChatState> emit,
+  ) {
     if (state is! ChatLoadSuccess) return;
-    final messageId = payload['messageId']?.toString();
-    final emoji = payload['emoji']?.toString();
+    final messageId = _messageIdFromPayload(event.payload);
+    final emoji = event.payload['emoji']?.toString();
     if (messageId == null || emoji == null) return;
 
     final current = state as ChatLoadSuccess;
-    final updated = current.messages.map((m) {
-      if (m['id'] == messageId) {
-        return {...m, 'reactions': [emoji]};
-      }
-      return m;
-    }).toList();
-    emit(current.copyWith(messages: updated));
+    emit(
+      current.copyWith(
+        messages: _messagesWithReaction(current.messages, messageId, emoji),
+      ),
+    );
   }
 
-  void _applyDeleted(Map<String, dynamic> payload, Emitter<ChatState> emit) {
+  void _onSocketMessageDeleted(
+    ChatSocketMessageDeleted event,
+    Emitter<ChatState> emit,
+  ) {
     if (state is! ChatLoadSuccess) return;
-    final messageId = payload['messageId']?.toString();
+    final messageId = _messageIdFromPayload(event.payload);
     if (messageId == null) return;
 
     final current = state as ChatLoadSuccess;
-    final updated = current.messages.map((m) {
-      if (m['id'] == messageId) {
-        return {
-          ...m,
-          'text': 'This message was deleted',
-          'type': 'text',
-        };
-      }
-      return m;
-    }).toList();
-    emit(current.copyWith(messages: updated));
+    emit(
+      current.copyWith(
+        messages: _messagesMarkedDeleted(current.messages, messageId),
+      ),
+    );
   }
 
   Future<void> _onStopped(ChatStopped event, Emitter<ChatState> emit) async {

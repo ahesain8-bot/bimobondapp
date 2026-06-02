@@ -46,6 +46,11 @@ class ApiConstants {
 
   // Friends (mutual follows)
   static const String myFriends = '/users/me/friends';
+  static const String mySuggestions = '/users/me/suggestions';
+  static const String myComments = '/users/me/comments';
+  static const String myLikes = '/users/me/likes';
+  static const String myMentions = '/users/me/mentions';
+  static String userComments(String userId) => '/users/$userId/comments';
   static String followUser(String userId) => '/users/$userId/follow';
   static String userFollowers(String userId) => '/users/$userId/followers';
   static String userFollowing(String userId) => '/users/$userId/following';

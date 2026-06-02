@@ -318,9 +318,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         final displayName = user?.fullName?.trim().isNotEmpty == true
             ? user!.fullName!.trim()
             : user?.username ?? widget.initialUsername ?? 'User';
-        final avatarUrl = user?.avatarUrl ??
-            widget.initialAvatarUrl ??
-            'https://i.pravatar.cc/150?u=${widget.userId}';
+        final avatarUrl = user?.avatarUrl ?? widget.initialAvatarUrl;
 
         await _refreshProfileAfterNavigation(
           context.pushNamed(
@@ -328,7 +326,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             extra: {
               'chatId': chat.id,
               'username': displayName,
-              'imageUrl': avatarUrl,
+              if (avatarUrl != null && avatarUrl.isNotEmpty)
+                'imageUrl': avatarUrl,
               'peerUserId': widget.userId,
             },
           ),

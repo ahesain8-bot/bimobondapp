@@ -63,7 +63,13 @@ class ChatsRemoteDataSourceImpl implements ChatsRemoteDataSource {
     if (body is Map) {
       final data = body['data'];
       if (data is List) return data;
-      for (final key in ['items', 'chats', 'messages', 'friends']) {
+      for (final key in [
+        'items',
+        'chats',
+        'messages',
+        'friends',
+        'data',
+      ]) {
         final nested = body[key];
         if (nested is List) return nested;
       }

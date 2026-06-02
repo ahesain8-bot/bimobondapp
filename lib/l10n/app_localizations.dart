@@ -1517,6 +1517,24 @@ abstract class AppLocalizations {
   /// **'Just now'**
   String get justNow;
 
+  /// No description provided for @inboxTimeMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}m'**
+  String inboxTimeMinutes(int count);
+
+  /// No description provided for @inboxTimeHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}h'**
+  String inboxTimeHours(int count);
+
+  /// No description provided for @inboxTimeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}d'**
+  String inboxTimeDays(int count);
+
   /// No description provided for @replyAction.
   ///
   /// In en, this message translates to:
@@ -1775,6 +1793,42 @@ abstract class AppLocalizations {
   /// **'Coming soon'**
   String get settingsComingSoon;
 
+  /// No description provided for @settingsChatWallpaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat wallpaper'**
+  String get settingsChatWallpaper;
+
+  /// No description provided for @chatWallpaperTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat wallpaper'**
+  String get chatWallpaperTitle;
+
+  /// No description provided for @chatWallpaperSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a background pattern for your chats. Colors follow your app theme.'**
+  String get chatWallpaperSubtitle;
+
+  /// No description provided for @chatWallpaperPlus.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus'**
+  String get chatWallpaperPlus;
+
+  /// No description provided for @chatWallpaperSquares.
+  ///
+  /// In en, this message translates to:
+  /// **'Squares'**
+  String get chatWallpaperSquares;
+
+  /// No description provided for @chatWallpaperMaze.
+  ///
+  /// In en, this message translates to:
+  /// **'Maze'**
+  String get chatWallpaperMaze;
+
   /// No description provided for @messagesTitle.
   ///
   /// In en, this message translates to:
@@ -1871,6 +1925,12 @@ abstract class AppLocalizations {
   /// **'Recent Messages'**
   String get messagesRecentMessages;
 
+  /// No description provided for @messagesAllChats.
+  ///
+  /// In en, this message translates to:
+  /// **'All Chats'**
+  String get messagesAllChats;
+
   /// No description provided for @messagesAll.
   ///
   /// In en, this message translates to:
@@ -1906,6 +1966,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Video'**
   String get messagesInboxLastVideo;
+
+  /// No description provided for @messagesInboxLastVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice message'**
+  String get messagesInboxLastVoice;
 
   /// No description provided for @messagesInboxLastGift.
   ///
@@ -1991,6 +2057,150 @@ abstract class AppLocalizations {
   /// **'Worldwide luxury estates'**
   String get messagesSuggestionBioLuxury;
 
+  /// No description provided for @messagesSuggestionFriendsOfFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested for you'**
+  String get messagesSuggestionFriendsOfFriends;
+
+  /// No description provided for @messagesSuggestionPopular.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular creator'**
+  String get messagesSuggestionPopular;
+
+  /// No description provided for @messagesSuggestionMutualFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 mutual friend} other{{count} mutual friends}}'**
+  String messagesSuggestionMutualFriends(num count);
+
+  /// No description provided for @messagesSuggestionsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No suggestions right now'**
+  String get messagesSuggestionsEmpty;
+
+  /// No description provided for @userCommentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Comments'**
+  String get userCommentsTitle;
+
+  /// No description provided for @userCommentsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t commented on any posts yet'**
+  String get userCommentsEmpty;
+
+  /// No description provided for @userCommentReplyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get userCommentReplyLabel;
+
+  /// No description provided for @userCommentAction.
+  ///
+  /// In en, this message translates to:
+  /// **'commented'**
+  String get userCommentAction;
+
+  /// No description provided for @userCommentOnPost.
+  ///
+  /// In en, this message translates to:
+  /// **'On post by {author}'**
+  String userCommentOnPost(String author);
+
+  /// No description provided for @userLikesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Likes'**
+  String get userLikesTitle;
+
+  /// No description provided for @userLikesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No one has liked your posts yet'**
+  String get userLikesEmpty;
+
+  /// No description provided for @userLikeReceivedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'liked your post'**
+  String get userLikeReceivedAction;
+
+  /// No description provided for @userMentionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Mentions'**
+  String get userMentionsTitle;
+
+  /// No description provided for @userMentionsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No one has mentioned you yet'**
+  String get userMentionsEmpty;
+
+  /// No description provided for @userMentionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'mentioned you'**
+  String get userMentionAction;
+
+  /// No description provided for @userMentionInComment.
+  ///
+  /// In en, this message translates to:
+  /// **'in a comment'**
+  String get userMentionInComment;
+
+  /// No description provided for @userFollowersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Followers'**
+  String get userFollowersTitle;
+
+  /// No description provided for @userFollowerAction.
+  ///
+  /// In en, this message translates to:
+  /// **'started following you'**
+  String get userFollowerAction;
+
+  /// No description provided for @chatMessageDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'This message was deleted'**
+  String get chatMessageDeleted;
+
+  /// No description provided for @chatActionReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get chatActionReply;
+
+  /// No description provided for @chatActionReact.
+  ///
+  /// In en, this message translates to:
+  /// **'React'**
+  String get chatActionReact;
+
+  /// No description provided for @chatActionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatActionDelete;
+
+  /// No description provided for @chatDeleteMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message?'**
+  String get chatDeleteMessageTitle;
+
+  /// No description provided for @chatDeleteMessageMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This message will be hidden for everyone in the chat.'**
+  String get chatDeleteMessageMessage;
+
   /// No description provided for @chatActiveNow.
   ///
   /// In en, this message translates to:
@@ -2014,6 +2224,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Slide up to cancel'**
   String get chatSlideUpToCancel;
+
+  /// No description provided for @chatRecordingPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow microphone access to record voice messages.'**
+  String get chatRecordingPermissionDenied;
+
+  /// No description provided for @chatRecordingPermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access'**
+  String get chatRecordingPermissionTitle;
+
+  /// No description provided for @chatRecordingPermissionSettingsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice messages need the microphone. Open Settings, tap Permissions, and allow Microphone for Bimo Bond.'**
+  String get chatRecordingPermissionSettingsMessage;
+
+  /// No description provided for @chatRecordingOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings'**
+  String get chatRecordingOpenSettings;
+
+  /// No description provided for @chatRecordingAllowMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get chatRecordingAllowMicrophone;
+
+  /// No description provided for @chatRecordingPluginUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice recording is not ready. Stop the app completely, then run it again (not hot reload).'**
+  String get chatRecordingPluginUnavailable;
+
+  /// No description provided for @chatVoiceTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold longer to record a voice message.'**
+  String get chatVoiceTooShort;
+
+  /// No description provided for @chatVoicePlaybackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not play this voice message.'**
+  String get chatVoicePlaybackFailed;
+
+  /// No description provided for @chatAttachmentSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send attachment. Please try again.'**
+  String get chatAttachmentSendFailed;
+
+  /// No description provided for @chatLocationPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is required to share your position.'**
+  String get chatLocationPermissionDenied;
+
+  /// No description provided for @chatContactsPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Contacts permission is required to share a contact.'**
+  String get chatContactsPermissionDenied;
+
+  /// No description provided for @chatFeatureComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon.'**
+  String get chatFeatureComingSoon;
+
+  /// No description provided for @chatMessageLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get chatMessageLocation;
+
+  /// No description provided for @messagesInboxLastLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get messagesInboxLastLocation;
+
+  /// No description provided for @messagesInboxLastFile.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get messagesInboxLastFile;
+
+  /// No description provided for @messagesInboxLastContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact'**
+  String get messagesInboxLastContact;
 
   /// No description provided for @chatSeedGreeting.
   ///

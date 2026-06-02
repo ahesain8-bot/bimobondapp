@@ -1,6 +1,17 @@
 import 'package:equatable/equatable.dart';
 
-enum ChatMessageType { text, image, video, gift, share, unknown }
+enum ChatMessageType {
+  text,
+  image,
+  video,
+  audio,
+  location,
+  file,
+  contact,
+  gift,
+  share,
+  unknown,
+}
 
 class ChatMessageReactionEntity extends Equatable {
   const ChatMessageReactionEntity({

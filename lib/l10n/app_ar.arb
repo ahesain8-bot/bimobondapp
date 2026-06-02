@@ -407,6 +407,30 @@
   "noCommentsYet": "لا توجد تعليقات بعد. كن أول من يعلق!",
   "addCommentHint": "أضف تعليقًا...",
   "justNow": "الآن",
+  "inboxTimeMinutes": "{count} د",
+  "@inboxTimeMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inboxTimeHours": "{count} س",
+  "@inboxTimeHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "inboxTimeDays": "{count} ي",
+  "@inboxTimeDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "replyAction": "رد",
   "replyingTo": "الرد على {username}",
   "@replyingTo": {
@@ -464,6 +488,12 @@
   "settingsLogoutTitle": "تسجيل الخروج؟",
   "settingsLogoutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى لاستخدام حسابك.",
   "settingsComingSoon": "قريباً",
+  "settingsChatWallpaper": "خلفية المحادثة",
+  "chatWallpaperTitle": "خلفية المحادثة",
+  "chatWallpaperSubtitle": "اختر نمط الخلفية للمحادثات. الألوان تتبع سمة التطبيق.",
+  "chatWallpaperPlus": "علامات زائد",
+  "chatWallpaperSquares": "مربعات",
+  "chatWallpaperMaze": "متاهة",
   "messagesTitle": "الرسائل",
   "messagesInboxTitle": "البريد الوارد",
   "messagesSwitchAccount": "تغيير الحساب",
@@ -480,12 +510,14 @@
   "messagesActivityComments": "تعليقات",
   "messagesActivityMentions": "إشارات",
   "messagesRecentMessages": "الرسائل الأخيرة",
+  "messagesAllChats": "جميع المحادثات",
   "messagesAll": "الكل",
   "messagesNoResults": "لا توجد نتائج",
   "messagesInboxNoMessagesYet": "لا توجد رسائل بعد",
   "messagesInboxYouPrefix": "أنت",
   "messagesInboxLastPhoto": "صورة",
   "messagesInboxLastVideo": "فيديو",
+  "messagesInboxLastVoice": "رسالة صوتية",
   "messagesInboxLastGift": "هدية",
   "messagesInboxLastShare": "شارك منشوراً",
   "messagesInboxMessageDeleted": "تم حذف الرسالة",
@@ -500,10 +532,57 @@
   "messagesSuggestionBioDesigner": "مصمم داخلي | معماري",
   "messagesSuggestionBioJeddah": "أفضل العروض في جدة",
   "messagesSuggestionBioLuxury": "عقارات فاخرة عالمية",
+  "messagesSuggestionFriendsOfFriends": "مقترح لك",
+  "messagesSuggestionPopular": "منشئ محتوى شائع",
+  "messagesSuggestionMutualFriends": "{count, plural, =1{صديق مشترك واحد} other{{count} أصدقاء مشتركين}}",
+  "messagesSuggestionsEmpty": "لا توجد اقتراحات حالياً",
+  "userCommentsTitle": "تعليقاتي",
+  "userCommentsEmpty": "لم تعلق على أي منشور بعد",
+  "userCommentReplyLabel": "رد",
+  "userCommentAction": "علّق",
+  "userCommentOnPost": "على منشور {author}",
+  "@userCommentOnPost": {
+    "placeholders": {
+      "author": {
+        "type": "String"
+      }
+    }
+  },
+  "userLikesTitle": "الإعجابات",
+  "userLikesEmpty": "لم يعجب أحد بمنشوراتك بعد",
+  "userLikeReceivedAction": "أعجب بمنشورك",
+  "userMentionsTitle": "إشاراتي",
+  "userMentionsEmpty": "لم يذكرك أحد بعد",
+  "userMentionAction": "ذكرك",
+  "userMentionInComment": "في تعليق",
+  "userFollowersTitle": "المتابعون",
+  "userFollowerAction": "بدأ بمتابعتك",
+  "chatMessageDeleted": "تم حذف هذه الرسالة",
+  "chatActionReply": "رد",
+  "chatActionReact": "تفاعل",
+  "chatActionDelete": "حذف",
+  "chatDeleteMessageTitle": "حذف الرسالة؟",
+  "chatDeleteMessageMessage": "سيتم إخفاء هذه الرسالة عن الجميع في المحادثة.",
   "chatActiveNow": "نشط الآن",
   "chatAddComment": "إضافة تعليق...",
   "chatRecording": "جاري التسجيل...",
   "chatSlideUpToCancel": "اسحب للأعلى للإلغاء",
+  "chatRecordingPermissionDenied": "اسمح بالوصول إلى الميكروفون لتسجيل الرسائل الصوتية.",
+  "chatRecordingPermissionTitle": "الوصول إلى الميكروفون",
+  "chatRecordingPermissionSettingsMessage": "الرسائل الصوتية تحتاج الميكروفون. افتح الإعدادات، ثم الأذونات، واسمح بالميكروفون لتطبيق Bimo Bond.",
+  "chatRecordingOpenSettings": "فتح الإعدادات",
+  "chatRecordingAllowMicrophone": "سماح",
+  "chatRecordingPluginUnavailable": "التسجيل الصوتي غير جاهز. أغلق التطبيق بالكامل ثم شغّله من جديد (وليس إعادة التحميل السريع).",
+  "chatVoiceTooShort": "اضغط مطولاً لتسجيل رسالة صوتية.",
+  "chatVoicePlaybackFailed": "تعذّر تشغيل الرسالة الصوتية.",
+  "chatAttachmentSendFailed": "تعذّر إرسال المرفق. حاول مرة أخرى.",
+  "chatLocationPermissionDenied": "يلزم إذن الموقع لمشاركة موقعك.",
+  "chatContactsPermissionDenied": "يلزم إذن جهات الاتصال لمشاركة جهة اتصال.",
+  "chatFeatureComingSoon": "قريباً.",
+  "chatMessageLocation": "الموقع",
+  "messagesInboxLastLocation": "موقع",
+  "messagesInboxLastFile": "ملف",
+  "messagesInboxLastContact": "جهة اتصال",
   "chatSeedGreeting": "مرحباً! كيف يمكنني مساعدتك؟",
   "chatSeedInterested": "أنا مهتم بالعقار المعروض",
   "chatSeedFinalPrice": "هل يمكنني معرفة السعر النهائي؟",

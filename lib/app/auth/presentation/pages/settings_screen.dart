@@ -83,6 +83,11 @@ class SettingsScreen extends StatelessWidget {
                 trailingText: isDark ? l10n.settingsOn : l10n.settingsOff,
                 onTap: () => _showThemeSheet(context, l10n, themeMode),
               ),
+              _SettingsTile(
+                icon: LucideIcons.messageCircle,
+                title: l10n.settingsChatWallpaper,
+                onTap: () => context.pushNamed('chat_wallpaper_settings'),
+              ),
             ],
           ),
           const SizedBox(height: SettingsLayoutConstants.groupSpacing),

@@ -58,6 +58,8 @@ class MessagesLayoutConstants {
   static const double conversationUnreadAlpha = 0.03;
   static const double conversationUnreadDotSize = 8;
   static const double emptyStateHeight = 230;
+  static const int recentMessagesPreviewCount = 2;
+  static const int recentMentionsPreviewCount = 5;
   static const int chatListSkeletonItemCount = 6;
   static const double chatListSkeletonTileHeight = 72;
 

@@ -32,7 +32,8 @@ class SocialUserModel extends SocialUserEntity {
   }
 
   factory SocialUserModel.fromJson(Map<String, dynamic> json) {
-    final avatar = json['avatarUrl'] ??
+    final avatar =
+        json['avatarUrl'] ??
         json['avatar'] ??
         json['image'] ??
         json['profileImage'];
