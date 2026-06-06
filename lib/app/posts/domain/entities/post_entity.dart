@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:equatable/equatable.dart';
 
@@ -6,9 +7,10 @@ class PostEntity extends Equatable {
   final String userId;
   final String type;
   final String? videoUrl;
+  final String? hlsUrl;
   final String? thumbnailUrl;
   final String? description;
-  final String? category;
+  final String? categoryId;
   final String privacyStatus;
   final int viewCount;
   final int likeCount;
@@ -21,8 +23,9 @@ class PostEntity extends Equatable {
   final PostUserEntity? user;
   final List<PostMediaEntity> media;
   final List<String> hashtags;
-  final List<String> mentions;
+  final List<MentionRefEntity> mentions;
   final bool isAuctionable;
+  final bool isStory;
   final PostAuctionEntity? auction;
 
   const PostEntity({
@@ -30,9 +33,10 @@ class PostEntity extends Equatable {
     required this.userId,
     required this.type,
     this.videoUrl,
+    this.hlsUrl,
     this.thumbnailUrl,
     this.description,
-    this.category,
+    this.categoryId,
     required this.privacyStatus,
     required this.viewCount,
     required this.likeCount,
@@ -47,6 +51,7 @@ class PostEntity extends Equatable {
     required this.hashtags,
     required this.mentions,
     this.isAuctionable = false,
+    this.isStory = false,
     this.auction,
   });
 
@@ -64,9 +69,10 @@ class PostEntity extends Equatable {
       userId: userId,
       type: type,
       videoUrl: videoUrl,
+      hlsUrl: hlsUrl,
       thumbnailUrl: thumbnailUrl,
       description: description ?? this.description,
-      category: category,
+      categoryId: categoryId,
       privacyStatus: privacyStatus ?? this.privacyStatus,
       viewCount: viewCount,
       likeCount: likeCount ?? this.likeCount,
@@ -81,6 +87,7 @@ class PostEntity extends Equatable {
       hashtags: hashtags,
       mentions: mentions,
       isAuctionable: isAuctionable,
+      isStory: isStory,
       auction: auction,
     );
   }
@@ -91,9 +98,10 @@ class PostEntity extends Equatable {
     userId,
     type,
     videoUrl,
+    hlsUrl,
     thumbnailUrl,
     description,
-    category,
+    categoryId,
     privacyStatus,
     viewCount,
     likeCount,
@@ -108,6 +116,7 @@ class PostEntity extends Equatable {
     hashtags,
     mentions,
     isAuctionable,
+    isStory,
     auction,
   ];
 }

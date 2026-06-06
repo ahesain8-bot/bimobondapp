@@ -37,6 +37,19 @@ class FeedLoadSuccess extends PostsState {
   List<Object?> get props => [posts, hasReachedMax];
 }
 
+class StoriesLoadSuccess extends PostsState {
+  final List<PostEntity> stories;
+  final bool hasReachedMax;
+
+  const StoriesLoadSuccess({
+    required this.stories,
+    this.hasReachedMax = false,
+  });
+
+  @override
+  List<Object?> get props => [stories, hasReachedMax];
+}
+
 class ProfilePostsLoadSuccess extends PostsState {
   final List<PostEntity> posts;
   final bool hasReachedMax;

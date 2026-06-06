@@ -33,6 +33,7 @@ class UserModel extends UserEntity {
     super.totalLikes,
     super.deviceCount,
     super.isFollowing,
+    super.isFollowedBy,
     super.isBanned,
     super.banReason,
     super.bannedUntil,
@@ -149,10 +150,15 @@ class UserModel extends UserEntity {
       postCount: _readCount(json, 'posts', ['postCount']),
       totalLikes: _readCount(json, 'postLikes', ['totalLikes', 'postLikes']),
       deviceCount: _readOptionalCount(json, 'devices', ['deviceCount']),
-      isFollowing: _parseOptionalBool(json['isFollowing']) ??
+      isFollowing:
+          _parseOptionalBool(json['isFollowing']) ??
           _parseOptionalBool(json['isFollowed']) ??
           _parseOptionalBool(json['viewerIsFollowing']) ??
           _parseOptionalBool(json['following']),
+      isFollowedBy:
+          _parseOptionalBool(json['isFollowedBy']) ??
+          _parseOptionalBool(json['followsYou']) ??
+          _parseOptionalBool(json['isFollower']),
       isBanned: json['isBanned'] ?? false,
       banReason: json['banReason'],
       bannedUntil: json['bannedUntil'],

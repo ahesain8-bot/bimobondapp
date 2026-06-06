@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
 import 'package:bimobondapp/core/error/failures.dart';
@@ -15,7 +16,7 @@ class GetFeedUseCase implements UseCase<List<PostEntity>, GetFeedParams> {
     return await repository.getFeed(
       page: params.page,
       limit: params.limit,
-      category: params.category,
+      categoryId: params.categoryId,
       type: params.type,
       hashtag: params.hashtag,
       search: params.search,
@@ -23,6 +24,8 @@ class GetFeedUseCase implements UseCase<List<PostEntity>, GetFeedParams> {
       userId: params.userId,
       isLiked: params.isLiked,
       isSaved: params.isSaved,
+      isStory: params.isStory,
+      auctionQuery: params.auctionQuery,
     );
   }
 }
@@ -30,7 +33,7 @@ class GetFeedUseCase implements UseCase<List<PostEntity>, GetFeedParams> {
 class GetFeedParams extends Equatable {
   final int page;
   final int limit;
-  final String? category;
+  final String? categoryId;
   final String? type;
   final String? hashtag;
   final String? search;
@@ -38,11 +41,14 @@ class GetFeedParams extends Equatable {
   final String? userId;
   final bool? isLiked;
   final bool? isSaved;
+  /// `false` for posts feed/profile; `true` for stories.
+  final bool isStory;
+  final FeedAuctionQuery? auctionQuery;
 
   const GetFeedParams({
     this.page = 1,
     this.limit = 10,
-    this.category,
+    this.categoryId,
     this.type,
     this.hashtag,
     this.search,
@@ -50,13 +56,15 @@ class GetFeedParams extends Equatable {
     this.userId,
     this.isLiked,
     this.isSaved,
+    this.isStory = false,
+    this.auctionQuery,
   });
 
   @override
   List<Object?> get props => [
     page,
     limit,
-    category,
+    categoryId,
     type,
     hashtag,
     search,
@@ -64,5 +72,7 @@ class GetFeedParams extends Equatable {
     userId,
     isLiked,
     isSaved,
+    isStory,
+    auctionQuery,
   ];
 }

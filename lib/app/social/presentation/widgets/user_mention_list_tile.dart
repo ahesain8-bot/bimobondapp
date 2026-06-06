@@ -1,6 +1,9 @@
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/mention_list_card.dart';
 import 'package:bimobondapp/app/social/presentation/utils/mention_post_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -48,8 +51,20 @@ class UserMentionListTile extends StatelessWidget {
     final thumbnailUrl = _resolveThumbnailUrl();
     final content = mention.content.trim();
 
-    return InkWell(
-      onTap: () => openMentionPost(context, mention),
+    void openAuthorProfile() {
+      if (author == null || author.id.isEmpty) return;
+      openUserStoryOrProfile(
+        context,
+        userId: author.id,
+        username: author.username,
+        fullName: author.fullName,
+        avatarUrl: author.avatarUrl,
+        isFollowing: author.isFollowing,
+      );
+    }
+
+    return MentionListCard(
+      mention: mention,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.p16,
@@ -58,10 +73,15 @@ class UserMentionListTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SafeNetworkAvatar(
+            StoryProfileAvatar(
+              userId: author?.id,
               imageUrl: author?.avatarUrl,
               radius: 22,
               fallbackText: authorName,
+              username: author?.username,
+              fullName: author?.fullName,
+              isFollowing: author?.isFollowing,
+              onTap: openAuthorProfile,
             ),
             const SizedBox(width: AppSizes.p12),
             Expanded(
@@ -79,10 +99,17 @@ class UserMentionListTile extends StatelessWidget {
                               height: 1.3,
                             ),
                             children: [
-                              TextSpan(
-                                text: authorName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: GestureDetector(
+                                  onTap: openAuthorProfile,
+                                  child: Text(
+                                    authorName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
                               ),
                               TextSpan(
@@ -130,14 +157,17 @@ class UserMentionListTile extends StatelessWidget {
             ),
             if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) ...[
               const SizedBox(width: AppSizes.p12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                child: SafeNetworkImage(
-                  imageUrl: thumbnailUrl,
-                  width: 52,
-                  height: 52,
-                  fit: BoxFit.cover,
-                  errorIcon: Icons.image_outlined,
+              GestureDetector(
+                onTap: () => openMentionPost(context, mention),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                  child: SafeNetworkImage(
+                    imageUrl: thumbnailUrl,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    errorIcon: Icons.image_outlined,
+                  ),
                 ),
               ),
             ],

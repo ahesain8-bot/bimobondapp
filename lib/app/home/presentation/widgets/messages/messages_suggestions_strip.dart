@@ -2,8 +2,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_text
 import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -91,7 +91,7 @@ class MessagesSuggestionsStrip extends StatelessWidget {
               );
 
               Future<void> openProfile() async {
-                final profileIsFollowing = await openUserProfile(
+                final profileIsFollowing = await openUserStoryOrProfile(
                   context,
                   userId: suggestion.id,
                   username: suggestion.username,
@@ -130,26 +130,15 @@ class MessagesSuggestionsStrip extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      GestureDetector(
+                      StoryProfileAvatar(
+                        userId: suggestion.id,
+                        imageUrl: suggestion.avatarUrl,
+                        radius: MessagesLayoutConstants.suggestionAvatarRadius,
+                        fallbackText: suggestion.displayName,
+                        username: suggestion.username,
+                        fullName: suggestion.fullName,
+                        isFollowing: isFollowing,
                         onTap: openProfile,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: 0.1,
-                              ),
-                              width: 2,
-                            ),
-                          ),
-                          child: SafeNetworkAvatar(
-                            imageUrl: suggestion.avatarUrl,
-                            radius:
-                                MessagesLayoutConstants.suggestionAvatarRadius,
-                            fallbackText: suggestion.displayName,
-                          ),
-                        ),
                       ),
                       const SizedBox(height: AppSizes.p12),
                       GestureDetector(
@@ -180,10 +169,12 @@ class MessagesSuggestionsStrip extends StatelessWidget {
                       const SizedBox(height: 14),
                       ProfileFollowButton(
                         isFollowing: isFollowing,
+                        isFollowedBy: suggestion.isFollowedBy,
                         isLoading: isLoading,
+                        width: ProfileFollowButtonSizes.listWidth,
                         height: MessagesLayoutConstants
                             .suggestionFollowButtonHeight,
-                        fontSize: 11,
+                        fontSize: ProfileFollowButtonSizes.listFontSize,
                         onPressed: () => onFollowToggle(index),
                       ),
                     ],

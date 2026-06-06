@@ -71,21 +71,26 @@ class ProfileHeaderSection extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.p16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              ProfileStatItem(
-                number: formatProfileCount(user.postCount ?? 0),
-                label: l10n.profilePostsTab,
+              Expanded(
+                child: ProfileStatItem(
+                  number: formatProfileCount(user.postCount ?? 0),
+                  label: l10n.profilePostsTab,
+                ),
               ),
-              ProfileStatItem(
-                number: formatProfileCount(user.followerCount ?? 0),
-                label: l10n.followers,
-                onTap: onFollowersTap,
+              Expanded(
+                child: ProfileStatItem(
+                  number: formatProfileCount(user.followerCount ?? 0),
+                  label: l10n.followers,
+                  onTap: onFollowersTap,
+                ),
               ),
-              ProfileStatItem(
-                number: formatProfileCount(user.followingCount ?? 0),
-                label: l10n.following,
-                onTap: onFollowingTap,
+              Expanded(
+                child: ProfileStatItem(
+                  number: formatProfileCount(user.followingCount ?? 0),
+                  label: l10n.following,
+                  onTap: onFollowingTap,
+                ),
               ),
             ],
           ),

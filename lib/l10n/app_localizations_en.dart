@@ -269,7 +269,84 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noBio => 'No bio yet.';
 
   @override
+  String get profileAvatarViewPhoto => 'Profile photo';
+
+  @override
+  String get profileAvatarViewStory => 'View story';
+
+  @override
+  String get profileAvatarNoPhoto => 'No profile photo';
+
+  @override
   String get story => 'Story';
+
+  @override
+  String get addStoryTitle => 'Add story';
+
+  @override
+  String get shareStoryButton => 'Share story';
+
+  @override
+  String get storyCaptionHint => 'Add a caption (optional)';
+
+  @override
+  String storyPickMediaError(String error) {
+    return 'Could not pick media: $error';
+  }
+
+  @override
+  String get storyExpired => 'Story expired';
+
+  @override
+  String storyTimeMinutesAgo(int count) {
+    return '${count}m ago';
+  }
+
+  @override
+  String storyTimeHoursAgo(int count) {
+    return '${count}h ago';
+  }
+
+  @override
+  String get storyAddCommentHint => 'Add comment...';
+
+  @override
+  String get storySendMessageHint => 'Write a message...';
+
+  @override
+  String get storySendMessageTitle => 'Reply with a message';
+
+  @override
+  String get storyViewersTitle => 'Viewers';
+
+  @override
+  String get storyViewerUnknown => 'Viewer';
+
+  @override
+  String get storyMessagesTitle => 'Messages on this story';
+
+  @override
+  String get storyMessagesEmpty => 'No messages on this story yet';
+
+  @override
+  String get storyMessageSendFailed => 'Could not send message. Try again.';
+
+  @override
+  String storyMessageSent(String name) {
+    return 'Message sent to $name';
+  }
+
+  @override
+  String get storyPreviewLabel => 'Story';
+
+  @override
+  String get postPreviewLabel => 'Post';
+
+  @override
+  String get storyMessageOnStory => 'Replied to your story';
+
+  @override
+  String get storyMessageOnPost => 'Replied to your post';
 
   @override
   String get personalInfo => 'Personal Info';
@@ -379,7 +456,58 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navAuctions => 'Auctions';
 
   @override
-  String get auctionsSearchHint => 'Search by category or description...';
+  String get auctionsSearchHint => 'Search auctions...';
+
+  @override
+  String get postsSearchTitle => 'Search posts';
+
+  @override
+  String get postsSearchHint => 'Search posts...';
+
+  @override
+  String get auctionsFiltersTitle => 'Filters';
+
+  @override
+  String get auctionsFiltersApply => 'Apply filters';
+
+  @override
+  String get auctionsFiltersReset => 'Reset';
+
+  @override
+  String get auctionsFiltersCategories => 'Categories';
+
+  @override
+  String get auctionsFiltersPriceRange => 'Price range (USD)';
+
+  @override
+  String get auctionsFiltersMinPrice => 'Min price';
+
+  @override
+  String get auctionsFiltersMaxPrice => 'Max price';
+
+  @override
+  String get auctionsFiltersTimeRemaining => 'Time remaining';
+
+  @override
+  String get auctionsFiltersInvalidPriceRange => 'Min price cannot be greater than max price';
+
+  @override
+  String get auctionsTimeRemainingAny => 'Any time';
+
+  @override
+  String get auctionsTimeRemaining1Hour => 'Ending within 1 hour';
+
+  @override
+  String get auctionsTimeRemaining6Hours => 'Ending within 6 hours';
+
+  @override
+  String get auctionsTimeRemaining24Hours => 'Ending within 24 hours';
+
+  @override
+  String get auctionsTimeRemaining7Days => 'Ending within 7 days';
+
+  @override
+  String get auctionsTimeRemaining30Days => 'Ending within 30 days';
 
   @override
   String get popularCategories => 'Popular categories';
@@ -679,7 +807,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navProfile => 'Profile';
 
   @override
-  String get describePostHint => 'Describe your post...';
+  String get describePostHint => 'Describe your post… use @username and #tag in the text';
 
   @override
   String get hashtagsLabel => 'Hashtags';
@@ -753,10 +881,33 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get postLikesEmpty => 'No likes yet';
+
+  @override
+  String get postViewsEmpty => 'No views yet';
+
+  @override
+  String postViewWatchedDuration(int seconds) {
+    return '${seconds}s watched';
+  }
+
+  @override
+  String get viewsLabel => 'Views';
+
+  @override
+  String get commentsSortNewest => 'Newest';
+
+  @override
+  String get commentsSortOldest => 'Oldest';
+
+  @override
+  String get commentsSortTop => 'Top';
+
+  @override
   String get noCommentsYet => 'No comments yet. Be the first!';
 
   @override
-  String get addCommentHint => 'Add comment...';
+  String get addCommentHint => 'Add comment… @username to mention';
 
   @override
   String get justNow => 'Just now';
@@ -832,10 +983,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectCategoryHint => 'Choose a category';
 
   @override
-  String get hashtagsHint => 'Separate with commas (e.g. travel, food)';
+  String get hashtagsHint => 'Type #tag in your caption (e.g. #travel #food)';
 
   @override
-  String get mentionsHint => 'Separate with commas (e.g. john, jane)';
+  String get mentionsHint => 'Type @username in your caption (e.g. @jane_doe)';
 
   @override
   String get mediaLabel => 'Media';
@@ -911,6 +1062,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsChatWallpaper => 'Chat wallpaper';
+
+  @override
+  String get settingsSectionAdmin => 'Admin';
+
+  @override
+  String get settingsAdminActivity => 'User activity';
+
+  @override
+  String get adminActivityTitle => 'Activity';
+
+  @override
+  String get adminActivityEmpty => 'No activity yet';
+
+  @override
+  String get adminActivityJustNow => 'Just now';
+
+  @override
+  String get adminActivityNoDetails => 'No details';
+
+  @override
+  String adminActivityOnPost(String post) {
+    return 'On post: $post';
+  }
+
+  @override
+  String get adminActivityTypeCreatePost => 'Created a post';
+
+  @override
+  String get adminActivityTypeComment => 'Commented';
+
+  @override
+  String get adminActivityTypeLikePost => 'Liked a post';
+
+  @override
+  String get adminActivityTypeSendGift => 'Sent a gift';
 
   @override
   String get chatWallpaperTitle => 'Chat wallpaper';

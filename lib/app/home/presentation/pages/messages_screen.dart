@@ -1,5 +1,8 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/core/data/viewed_stories_store.dart';
+import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_bloc.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_event.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_state.dart';
@@ -12,7 +15,15 @@ import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
 import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.dart';
 import 'package:bimobondapp/app/social/presentation/utils/suggestion_follow_toggle.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
+import 'package:bimobondapp/app/home/presentation/utils/story_flow.dart';
+import 'package:bimobondapp/app/home/presentation/utils/story_grouping.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_active_users_bar.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
+import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
+import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_activity_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_conversation_list.dart';
@@ -90,8 +101,6 @@ class _MessagesScreenBody extends StatefulWidget {
 }
 
 class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   List<UserMentionEntity> _mentions = [];
   List<UserSuggestionEntity> _suggestions = [];
   List<InboxChatItem> _cachedInboxItems = [];
@@ -99,13 +108,28 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
   bool _isLoadingMentions = false;
   bool _mentionsLoaded = false;
   final Set<String> _followLoadingIds = {};
+  List<StoryUserGroup> _storyGroups = [];
+  StoryUserGroup? _myStoryGroup;
+  late final ViewedStoriesStore _viewedStoriesStore;
 
   @override
   void initState() {
     super.initState();
+    _viewedStoriesStore = auth_di.sl<ViewedStoriesStore>();
+    _viewedStoriesStore.addListener(_onViewedStoriesChanged);
+    _bindViewedStoriesUser();
     if (widget.isTabActive) {
       _loadRecentMentions();
+      _loadStories();
     }
+  }
+
+  void _onViewedStoriesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _bindViewedStoriesUser() {
+    _viewedStoriesStore.bindUser(_currentUserId);
   }
 
   @override
@@ -113,12 +137,66 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     super.didUpdateWidget(oldWidget);
     if (widget.isTabActive && !oldWidget.isTabActive) {
       _loadRecentMentions();
+      _loadStories();
     }
+  }
+
+  void _loadStories() {
+    context.read<PostsBloc>().add(const FetchStoriesRequestedEvent(isRefresh: true));
+  }
+
+  void _applyStoriesFromPosts(List<PostEntity> stories) {
+    final me = _currentUserId;
+    final groups = groupStoriesByUser(stories);
+    StoryUserGroup? mine;
+    final others = <StoryUserGroup>[];
+
+    for (final group in groups) {
+      if (me != null && group.userId == me) {
+        mine = group;
+      } else {
+        others.add(group);
+      }
+    }
+
+    auth_di.sl<ActiveStoriesRegistry>().updateFromStories(stories);
+
+    setState(() {
+      _myStoryGroup = mine;
+      _storyGroups = others;
+    });
+  }
+
+  void _openStoryGroup(StoryUserGroup group) {
+    final active = onlyStoryPosts(group.stories);
+    if (active.isEmpty) {
+      _loadStories();
+      return;
+    }
+
+    final me = _currentUserId;
+    if (me != null && group.userId == me) {
+      context.pushNamed(
+        'stories_viewer',
+        extra: {
+          'stories': active,
+          'initialIndex': 0,
+        },
+      );
+      return;
+    }
+
+    openUserStoryOrProfile(
+      context,
+      userId: group.userId,
+      username: group.displayName,
+      avatarUrl: group.avatarUrl,
+    );
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _viewedStoriesStore.removeListener(_onViewedStoriesChanged);
     super.dispose();
   }
 
@@ -138,6 +216,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     bloc.add(const InboxLoadRequested(refresh: true));
     bloc.add(const InboxSuggestionsLoadRequested());
     unawaited(_loadRecentMentions(refresh: true));
+    _loadStories();
     try {
       await bloc.stream
           .firstWhere(
@@ -255,10 +334,29 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
       appBar: HomeTabAppBar(title: l10n.navChat),
       body: SafeArea(
         top: false,
-        child: BlocListener<InboxBloc, InboxState>(
-          listenWhen: (previous, current) =>
-              current is InboxLoadSuccess || current is InboxFailure,
-          listener: (context, state) {
+        child: MultiBlocListener(
+          listeners: [
+            BlocListener<AuthBloc, AuthState>(
+              listener: (context, state) => _bindViewedStoriesUser(),
+            ),
+            BlocListener<PostsBloc, PostsState>(
+              listenWhen: (_, current) =>
+                  current is StoriesLoadSuccess ||
+                  current is DeletePostSuccess ||
+                  (current is CreatePostSuccess && current.post.isStory),
+              listener: (context, state) {
+                if (state is StoriesLoadSuccess) {
+                  _applyStoriesFromPosts(state.stories);
+                } else if (state is DeletePostSuccess ||
+                    (state is CreatePostSuccess && state.post.isStory)) {
+                  _loadStories();
+                }
+              },
+            ),
+            BlocListener<InboxBloc, InboxState>(
+              listenWhen: (previous, current) =>
+                  current is InboxLoadSuccess || current is InboxFailure,
+              listener: (context, state) {
             setState(() => _inboxLoadFinished = true);
             if (state is InboxLoadSuccess) {
               setState(() {
@@ -270,7 +368,9 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                     .toList(growable: true);
               });
             }
-          },
+              },
+            ),
+          ],
           child: BlocBuilder<InboxBloc, InboxState>(
             builder: (context, state) {
               final inboxItems = _cachedInboxItems.isNotEmpty
@@ -278,8 +378,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                   : (_inboxLoadFinished
                         ? messagesMockInboxItems(l10n)
                         : <InboxChatItem>[]);
-              final filtered = filterInboxChats(inboxItems, _searchQuery);
-              final recentPreview = filtered
+              final recentPreview = inboxItems
                   .take(MessagesLayoutConstants.recentMessagesPreviewCount)
                   .toList();
               final isLoadingChats =
@@ -288,16 +387,6 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
               final isLoadingSuggestions = state is InboxLoadSuccess
                   ? !state.suggestionsLoaded
                   : !_inboxLoadFinished;
-              final activeBarData = inboxItems
-                  .map(
-                    (e) => {
-                      'name': e.name,
-                      'image': e.imageUrl,
-                      'active': e.active,
-                    },
-                  )
-                  .toList();
-
               return RefreshIndicator(
                 onRefresh: _onRefresh,
                 edgeOffset: MessagesLayoutConstants.refreshEdgeOffset,
@@ -307,15 +396,8 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                     parent: BouncingScrollPhysics(),
                   ),
                   children: [
-                    MessagesSearchBar(
-                      controller: _searchController,
-                      searchQuery: _searchQuery,
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      onClear: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
+                    MessagesSearchBar.launcher(
+                      onTap: () => context.pushNamed('chat_search'),
                     ),
                     if (state is InboxFailure)
                       Padding(
@@ -326,9 +408,18 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+                    if (!isLoadingChats)
+                      MessagesActiveUsersBar(
+                        storyGroups: _storyGroups,
+                        myStoryGroup: _myStoryGroup,
+                        onAddStory: () => StoryFlow.start(context),
+                        onOpenStoryGroup: _openStoryGroup,
+                        isStoryGroupViewed: (group) =>
+                            _viewedStoriesStore.isGroupFullyViewed(
+                          group.stories,
+                        ),
+                      ),
                     if (!isLoadingChats) ...[
-                      if (activeBarData.isNotEmpty)
-                        MessagesActiveUsersBar(chats: activeBarData),
                       MessagesActivitySection(
                         onActivityTap: (type) {
                           switch (type) {

@@ -92,7 +92,58 @@
   "noSavedPosts": "لا توجد منشورات محفوظة",
   "editProfile": "تعديل الملف الشخصي",
   "noBio": "لا يوجد نبذة شخصية بعد.",
+  "profileAvatarViewPhoto": "صورة الملف الشخصي",
+  "profileAvatarViewStory": "عرض القصة",
+  "profileAvatarNoPhoto": "لا توجد صورة للملف الشخصي",
   "story": "قصة",
+  "addStoryTitle": "إضافة قصة",
+  "shareStoryButton": "نشر القصة",
+  "storyCaptionHint": "أضف تعليقاً (اختياري)",
+  "storyPickMediaError": "تعذر اختيار الوسائط: {error}",
+  "storyExpired": "انتهت القصة",
+  "storyTimeMinutesAgo": "منذ {count} د",
+  "@storyTimeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storyTimeHoursAgo": "منذ {count} س",
+  "@storyTimeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storyAddCommentHint": "أضف تعليقاً...",
+  "storySendMessageHint": "اكتب رسالة...",
+  "storySendMessageTitle": "الرد برسالة",
+  "storyViewersTitle": "المشاهدون",
+  "storyViewerUnknown": "مشاهد",
+  "storyMessagesTitle": "رسائل على هذه القصة",
+  "storyMessagesEmpty": "لا رسائل على هذه القصة بعد",
+  "storyMessageSendFailed": "تعذر إرسال الرسالة. حاول مرة أخرى.",
+  "storyMessageSent": "تم إرسال الرسالة إلى {name}",
+  "@storyMessageSent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "storyPreviewLabel": "قصة",
+  "postPreviewLabel": "منشور",
+  "storyMessageOnStory": "رد على قصتك",
+  "storyMessageOnPost": "رد على منشورك",
+  "@storyPickMediaError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "personalInfo": "المعلومات الشخصية",
   "genderLabel": "الجنس",
   "male": "ذكر",
@@ -135,7 +186,24 @@
   "navHome": "الرئيسية",
   "navFriends": "الأصدقاء",
   "navAuctions": "مزادات",
-  "auctionsSearchHint": "ابحث بالفئة أو الوصف...",
+  "auctionsSearchHint": "ابحث في المزادات...",
+  "postsSearchTitle": "بحث المنشورات",
+  "postsSearchHint": "ابحث في المنشورات...",
+  "auctionsFiltersTitle": "تصفية",
+  "auctionsFiltersApply": "تطبيق التصفية",
+  "auctionsFiltersReset": "إعادة تعيين",
+  "auctionsFiltersCategories": "الفئات",
+  "auctionsFiltersPriceRange": "نطاق السعر (دولار)",
+  "auctionsFiltersMinPrice": "أقل سعر",
+  "auctionsFiltersMaxPrice": "أعلى سعر",
+  "auctionsFiltersTimeRemaining": "الوقت المتبقي",
+  "auctionsFiltersInvalidPriceRange": "لا يمكن أن يكون أقل سعر أكبر من أعلى سعر",
+  "auctionsTimeRemainingAny": "أي وقت",
+  "auctionsTimeRemaining1Hour": "ينتهي خلال ساعة",
+  "auctionsTimeRemaining6Hours": "ينتهي خلال 6 ساعات",
+  "auctionsTimeRemaining24Hours": "ينتهي خلال 24 ساعة",
+  "auctionsTimeRemaining7Days": "ينتهي خلال 7 أيام",
+  "auctionsTimeRemaining30Days": "ينتهي خلال 30 يوماً",
   "popularCategories": "الفئات الرائجة",
   "viewAll": "عرض الكل",
   "auctionCategoryWatches": "ساعات فاخرة",
@@ -373,7 +441,7 @@
   "navAdd": "إضافة",
   "navChat": "الدردشة",
   "navProfile": "حسابي",
-  "describePostHint": "صف منشورك...",
+  "describePostHint": "صف منشورك… استخدم @اسم_المستخدم و #وسم في النص",
   "hashtagsLabel": "هاشتاجات",
   "mentionsLabel": "منشن",
   "whoCanWatchLabel": "من يمكنه مشاهدة هذا المنشور",
@@ -404,8 +472,22 @@
       }
     }
   },
+  "postLikesEmpty": "لا إعجابات بعد",
+  "postViewsEmpty": "لا مشاهدات بعد",
+  "postViewWatchedDuration": "شاهد {seconds} ث",
+  "@postViewWatchedDuration": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "viewsLabel": "المشاهدات",
+  "commentsSortNewest": "الأحدث",
+  "commentsSortOldest": "الأقدم",
+  "commentsSortTop": "الأكثر إعجاباً",
   "noCommentsYet": "لا توجد تعليقات بعد. كن أول من يعلق!",
-  "addCommentHint": "أضف تعليقًا...",
+  "addCommentHint": "أضف تعليقًا… @اسم_المستخدم للإشارة",
   "justNow": "الآن",
   "inboxTimeMinutes": "{count} د",
   "@inboxTimeMinutes": {
@@ -462,8 +544,8 @@
   "saveButton": "حفظ",
   "categoryLabel": "الفئة",
   "selectCategoryHint": "اختر فئة",
-  "hashtagsHint": "افصل بفواصل (مثال: سفر، طعام)",
-  "mentionsHint": "افصل بفواصل (مثال: john, jane)",
+  "hashtagsHint": "اكتب #وسم في الوصف (مثال: #سفر #طعام)",
+  "mentionsHint": "اكتب @اسم_المستخدم في الوصف (مثال: @jane_doe)",
   "mediaLabel": "الوسائط",
   "settingsAndPrivacy": "الإعدادات والخصوصية",
   "settingsSectionAccount": "الحساب",
@@ -489,6 +571,24 @@
   "settingsLogoutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى لاستخدام حسابك.",
   "settingsComingSoon": "قريباً",
   "settingsChatWallpaper": "خلفية المحادثة",
+  "settingsSectionAdmin": "المسؤول",
+  "settingsAdminActivity": "نشاط المستخدم",
+  "adminActivityTitle": "النشاط",
+  "adminActivityEmpty": "لا يوجد نشاط بعد",
+  "adminActivityJustNow": "الآن",
+  "adminActivityNoDetails": "لا توجد تفاصيل",
+  "adminActivityOnPost": "على المنشور: {post}",
+  "@adminActivityOnPost": {
+    "placeholders": {
+      "post": {
+        "type": "String"
+      }
+    }
+  },
+  "adminActivityTypeCreatePost": "أنشأ منشوراً",
+  "adminActivityTypeComment": "علّق",
+  "adminActivityTypeLikePost": "أعجب بمنشور",
+  "adminActivityTypeSendGift": "أرسل هدية",
   "chatWallpaperTitle": "خلفية المحادثة",
   "chatWallpaperSubtitle": "اختر نمط الخلفية للمحادثات. الألوان تتبع سمة التطبيق.",
   "chatWallpaperPlus": "علامات زائد",

@@ -29,6 +29,7 @@ class MediaUtils {
     '.3gp',
     '.mpg',
     '.mpeg',
+    '.m3u8',
   ];
 
   static const List<String> imageExtensions = [
@@ -49,24 +50,59 @@ class MediaUtils {
     return imageExtensions.any((ext) => cleanUrl.endsWith(ext));
   }
 
+  /// Primary playable video URL for a post (HLS preferred when available).
+  static String? resolveVideoUrl(PostEntity post) {
+    final candidates = <String>[];
+
+    final hls = post.hlsUrl;
+    if (hls != null && hls.isNotEmpty) {
+      candidates.add(resolveAbsoluteUrl(hls));
+    }
+
+    final direct = post.videoUrl;
+    if (direct != null && direct.isNotEmpty) {
+      candidates.add(resolveAbsoluteUrl(direct));
+    }
+
+    for (final item in post.media) {
+      if (item.url.isEmpty) continue;
+      if (item.mediaType.toUpperCase() == 'VIDEO' ||
+          isVideo(item.url, mediaType: item.mediaType)) {
+        candidates.add(resolveAbsoluteUrl(item.url));
+      }
+    }
+
+    for (final url in candidates) {
+      if (url.isNotEmpty && (isVideo(url) || post.type.toUpperCase() == 'VIDEO')) {
+        return url;
+      }
+    }
+
+    if (post.type.toUpperCase() == 'VIDEO') {
+      for (final url in candidates) {
+        if (url.isNotEmpty) return url;
+      }
+    }
+
+    return null;
+  }
+
   /// Poster image for a video post (API thumbnail or first image in media).
   static String? resolveVideoPosterUrl(PostEntity post) {
-    final videoUrl = post.videoUrl != null && post.videoUrl!.isNotEmpty
-        ? resolveAbsoluteUrl(post.videoUrl!)
-        : null;
+    final videoUrl = resolveVideoUrl(post);
 
     final thumb = post.thumbnailUrl;
     if (thumb != null && thumb.isNotEmpty) {
       final resolved = resolveAbsoluteUrl(thumb);
-      if (isLikelyImageUrl(resolved) && resolved != videoUrl) {
-        return resolved;
+      if (videoUrl == null || resolved != videoUrl) {
+        if (!isVideo(resolved)) return resolved;
       }
     }
 
     for (final item in post.media) {
       if (item.mediaType.toUpperCase() == 'IMAGE' && item.url.isNotEmpty) {
         final resolved = resolveAbsoluteUrl(item.url);
-        if (isLikelyImageUrl(resolved)) return resolved;
+        if (!isVideo(resolved)) return resolved;
       }
     }
 
@@ -88,6 +124,9 @@ class MediaUtils {
 
     // Check extensions
     if (videoExtensions.any((ext) => cleanUrl.endsWith(ext))) return true;
+
+    // HLS manifests and stream paths
+    if (lowerUrl.contains('.m3u8')) return true;
 
     // Fallback: check if URL contains common video identifiers (less reliable but useful for streams)
     if (lowerUrl.contains('video') || lowerUrl.contains('mp4')) return true;

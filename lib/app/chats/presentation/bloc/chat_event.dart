@@ -34,13 +34,15 @@ class ChatMessageSendRequested extends ChatEvent {
   const ChatMessageSendRequested({
     required this.content,
     this.replyToId,
+    this.sharedPostId,
   });
 
   final String content;
   final String? replyToId;
+  final String? sharedPostId;
 
   @override
-  List<Object?> get props => [content, replyToId];
+  List<Object?> get props => [content, replyToId, sharedPostId];
 }
 
 class ChatAttachmentSendRequested extends ChatEvent {

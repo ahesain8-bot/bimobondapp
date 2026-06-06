@@ -2,10 +2,11 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
-import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
-import 'package:bimobondapp/app/social/presentation/widgets/user_follower_list_tile.dart';
+import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -74,6 +75,25 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
 
   SocialUserEntity _normalizeFollower(SocialUserEntity user) {
     return user.copyWith(isFollowedBy: true);
+  }
+
+  List<SocialUserEntity> _mergeFollowers(
+    List<SocialUserEntity> incoming, {
+    required bool refresh,
+  }) {
+    if (!refresh || _followers.isEmpty) return incoming;
+
+    final followingById = {
+      for (final user in _followers)
+        if (user.isFollowing) user.id: true,
+    };
+
+    return incoming.map((user) {
+      if (followingById[user.id] == true && !user.isFollowing) {
+        return user.copyWith(isFollowing: true);
+      }
+      return user;
+    }).toList();
   }
 
   bool _isSelfUser(SocialUserEntity user) {
@@ -145,7 +165,10 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
         _errorMessage = null;
         _hasReachedMax = page.hasReachedMax;
 
-        final normalized = page.users.map(_normalizeFollower).toList();
+        final normalized = _mergeFollowers(
+          page.users.map(_normalizeFollower).toList(),
+          refresh: refresh,
+        );
 
         if (refresh) {
           _followers
@@ -172,28 +195,36 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
       _followers[index] = user.copyWith(isFollowing: !previousFollowing);
     });
 
-    final result = await social_di.sl<ToggleFollowUseCase>()(
-      ToggleFollowParams(user.id),
+    final result = await toggleSocialUserFollow(
+      userId: user.id,
+      wasFollowing: previousFollowing,
     );
     if (!mounted) return;
 
-    result.fold(
-      (failure) {
-        setState(() {
-          _followers[index] = user.copyWith(isFollowing: previousFollowing);
-          _followLoadingIds.remove(user.id);
-        });
-        PopupDialogs.showErrorDialog(context, failure.message);
-      },
-      (_) {
-        setState(() => _followLoadingIds.remove(user.id));
-      },
-    );
+    if (result.failure != null) {
+      setState(() {
+        _followers[index] = _followers[index].copyWith(
+          isFollowing: previousFollowing,
+        );
+        _followLoadingIds.remove(user.id);
+      });
+      PopupDialogs.showErrorDialog(context, result.failure!.message);
+      return;
+    }
+
+    setState(() {
+      _followers[index] = _followers[index].copyWith(
+        isFollowing: result.isFollowing!,
+      );
+      _followLoadingIds.remove(user.id);
+    });
   }
 
   void _onProfileFollowStateChanged(int index, bool isFollowing) {
     setState(() {
-      _followers[index] = _followers[index].copyWith(isFollowing: isFollowing);
+      _followers[index] = _followers[index].copyWith(
+        isFollowing: isFollowing,
+      );
     });
   }
 
@@ -263,19 +294,34 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
+      padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
       itemCount: _followers.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (context, _) =>
-          Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.08)),
+      separatorBuilder: (context, index) {
+        if (index >= _followers.length - 1) {
+          return const SizedBox.shrink();
+        }
+        return Divider(
+          height: 1,
+          indent: 72,
+          color: theme.dividerColor.withValues(alpha: 0.08),
+        );
+      },
       itemBuilder: (context, index) {
         if (index >= _followers.length) {
           return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            padding: EdgeInsets.symmetric(vertical: AppSizes.p16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           );
         }
 
         final user = _followers[index];
-        return UserFollowerListTile(
+        return SocialUserListTile(
           user: user,
           isSelf: _isSelfUser(user),
           isFollowLoading: _followLoadingIds.contains(user.id),

@@ -1,7 +1,7 @@
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_post_category_badge.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -26,7 +26,7 @@ class AuctionCardFooterRow extends StatelessWidget {
 
   void _openProfile(BuildContext context) {
     if (userId.isEmpty) return;
-    openUserProfile(
+    openUserStoryOrProfile(
       context,
       userId: userId,
       username: username,
@@ -42,14 +42,13 @@ class AuctionCardFooterRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        InkWell(
+        StoryProfileAvatar(
+          userId: userId,
+          imageUrl: avatarUrl,
+          radius: 14,
+          fallbackText: username,
+          username: username,
           onTap: () => _openProfile(context),
-          borderRadius: BorderRadius.circular(999),
-          child: SafeNetworkAvatar(
-            imageUrl: avatarUrl,
-            radius: 14,
-            fallbackText: username,
-          ),
         ),
         const SizedBox(width: AppSizes.p8),
         Expanded(

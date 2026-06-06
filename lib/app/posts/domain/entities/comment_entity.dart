@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:equatable/equatable.dart';
 
 class CommentEntity extends Equatable {
@@ -15,6 +16,7 @@ class CommentEntity extends Equatable {
   final String? giftIcon;
   final String createdAt;
   final String updatedAt;
+  final List<MentionRefEntity> mentions;
 
   const CommentEntity({
     required this.id,
@@ -30,6 +32,7 @@ class CommentEntity extends Equatable {
     this.giftIcon,
     required this.createdAt,
     required this.updatedAt,
+    this.mentions = const [],
   });
 
   CommentEntity copyWith({
@@ -54,6 +57,7 @@ class CommentEntity extends Equatable {
       giftIcon: giftIcon ?? this.giftIcon,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      mentions: mentions,
     );
   }
 
@@ -72,5 +76,6 @@ class CommentEntity extends Equatable {
         giftIcon,
         createdAt,
         updatedAt,
+        mentions,
       ];
 }

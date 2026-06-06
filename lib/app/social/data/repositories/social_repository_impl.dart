@@ -255,9 +255,10 @@ class SocialRepositoryImpl implements SocialRepository {
       userId: post.userId,
       type: post.type,
       videoUrl: post.videoUrl,
+      hlsUrl: post.hlsUrl,
       thumbnailUrl: post.thumbnailUrl,
       description: post.description,
-      category: post.category,
+      categoryId: post.categoryId,
       privacyStatus: post.privacyStatus,
       viewCount: post.viewCount,
       likeCount: post.likeCount,
@@ -279,6 +280,7 @@ class SocialRepositoryImpl implements SocialRepository {
       hashtags: post.hashtags,
       mentions: post.mentions,
       isAuctionable: post.isAuctionable,
+      isStory: post.isStory,
       auction: post.auction,
     );
   }

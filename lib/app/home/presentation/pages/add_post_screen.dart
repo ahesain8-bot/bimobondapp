@@ -16,8 +16,11 @@ import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/mention_composer_field.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/mention_picker_sheet.dart';
 import 'package:bimobondapp/core/constants/add_post_layout_constants.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
+import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_button.dart';
@@ -31,10 +34,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AddPostScreen extends StatefulWidget {
-  const AddPostScreen({super.key, this.initialFiles, this.initialType});
+  const AddPostScreen({
+    super.key,
+    this.initialFiles,
+    this.initialType,
+    this.isStory = false,
+  });
 
   final List<File>? initialFiles;
   final String? initialType;
+  final bool isStory;
 
   @override
   State<AddPostScreen> createState() => _AddPostScreenState();
@@ -129,11 +138,12 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
   Future<void> _pickMedia(ImageSource source, {required bool isVideo}) async {
     final l10n = AppLocalizations.of(context)!;
+    final maxFiles = _maxFilesLimit;
     try {
-      if (_selectedFiles.length >= _maxFiles) {
+      if (_selectedFiles.length >= maxFiles) {
         PopupDialogs.showErrorDialog(
           context,
-          l10n.fieldIsRequired('Maximum $_maxFiles files allowed'),
+          l10n.fieldIsRequired('Maximum $maxFiles files allowed'),
         );
         return;
       }
@@ -142,19 +152,27 @@ class _AddPostScreenState extends State<AddPostScreen> {
         if (!mounted) return;
         if (video != null) {
           setState(() {
-            _selectedFiles = [..._selectedFiles, File(video.path)];
+            if (widget.isStory) {
+              _selectedFiles = [File(video.path)];
+            } else {
+              _selectedFiles = [..._selectedFiles, File(video.path)];
+            }
             _updateType();
           });
         }
       } else {
-        if (source == ImageSource.camera) {
+        if (source == ImageSource.camera || widget.isStory) {
           final XFile? photo = await _picker.pickImage(
-            source: ImageSource.camera,
+            source: source,
           );
           if (!mounted) return;
           if (photo != null) {
             setState(() {
-              _selectedFiles = [..._selectedFiles, File(photo.path)];
+              if (widget.isStory) {
+                _selectedFiles = [File(photo.path)];
+              } else {
+                _selectedFiles = [..._selectedFiles, File(photo.path)];
+              }
               _updateType();
             });
           }
@@ -162,7 +180,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
           final List<XFile> picked = await _picker.pickMultiImage();
           if (!mounted) return;
           if (picked.isNotEmpty) {
-            final remaining = _maxFiles - _selectedFiles.length;
+            final remaining = maxFiles - _selectedFiles.length;
             final toAdd = picked
                 .take(remaining)
                 .map((e) => File(e.path))
@@ -170,7 +188,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
             if (toAdd.length < picked.length) {
               PopupDialogs.showErrorDialog(
                 context,
-                l10n.fieldIsRequired('Maximum $_maxFiles files allowed'),
+                l10n.fieldIsRequired('Maximum $maxFiles files allowed'),
               );
             }
             setState(() {
@@ -228,6 +246,8 @@ class _AddPostScreenState extends State<AddPostScreen> {
     );
   }
 
+  int get _maxFilesLimit => widget.isStory ? 1 : _maxFiles;
+
   void _onCreatePost() {
     final l10n = AppLocalizations.of(context)!;
     if (_selectedFiles.isEmpty) {
@@ -235,29 +255,35 @@ class _AddPostScreenState extends State<AddPostScreen> {
       return;
     }
 
-    final auction = _buildAuctionInput(l10n);
-    if (_isAuction && auction == null) return;
+    PostAuctionInput? auction;
+    if (!widget.isStory) {
+      auction = _buildAuctionInput(l10n);
+      if (_isAuction && auction == null) return;
 
-    if (_selectedCategory == null) {
-      PopupDialogs.showErrorDialog(
-        context,
-        l10n.fieldIsRequired(l10n.categoryLabel),
-      );
-      return;
+      if (_selectedCategory == null) {
+        PopupDialogs.showErrorDialog(
+          context,
+          l10n.fieldIsRequired(l10n.categoryLabel),
+        );
+        return;
+      }
     }
 
     context.read<PostsBloc>().add(
       CreatePostWithMediaRequestedEvent(
         type: _type,
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory!.slug,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        categoryId: widget.isStory ? null : _selectedCategory!.id,
         privacyStatus: _privacyStatus,
         allowComments: _allowComments,
-        allowDuets: _allowDuets,
-        allowStitch: _allowStitch,
+        allowDuets: widget.isStory ? false : _allowDuets,
+        allowStitch: widget.isStory ? false : _allowStitch,
         status: 'PUBLISHED',
-        isAuctionable: _isAuction,
-        auction: auction,
+        isStory: widget.isStory,
+        isAuctionable: widget.isStory ? false : _isAuction,
+        auction: widget.isStory ? null : auction,
         files: _selectedFiles,
       ),
     );
@@ -327,13 +353,24 @@ class _AddPostScreenState extends State<AddPostScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: CustomAppBar(title: l10n.addPost, showBackButton: true),
+      appBar: CustomAppBar(
+        title: widget.isStory ? l10n.addStoryTitle : l10n.addPost,
+        showBackButton: true,
+      ),
       body: BlocConsumer<PostsBloc, PostsState>(
         listener: (context, state) {
           if (state is PostsFailure) {
             PopupDialogs.showErrorDialog(context, state.message);
           } else if (state is CreatePostSuccess) {
-            context.goNamed('home');
+            if (widget.isStory) {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.goNamed('home');
+              }
+            } else {
+              context.goNamed('home');
+            }
           }
         },
         builder: (context, state) {
@@ -345,11 +382,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(
+                      MentionComposerField(
                         controller: _descriptionController,
-                        maxLines: 5,
+                        maxLines: widget.isStory ? 3 : 5,
                         decoration: InputDecoration(
-                          hintText: l10n.describePostHint,
+                          hintText: widget.isStory
+                              ? l10n.storyCaptionHint
+                              : l10n.describePostHint,
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.zero,
                         ),
@@ -357,106 +396,135 @@ class _AddPostScreenState extends State<AddPostScreen> {
                       const SizedBox(height: AppSizes.p12),
                       AddPostMediaStrip(
                         files: _selectedFiles,
-                        maxFiles: _maxFiles,
+                        maxFiles: _maxFilesLimit,
                         onAddTap: _showMediaPickerOptions,
                         onRemoveAt: _removeFile,
                       ),
-                      const SizedBox(height: AppSizes.p12),
-                      Row(
-                        children: [
-                          AddPostTagButton(
-                            icon: LucideIcons.hash,
-                            label: l10n.hashtagsLabel,
-                            onTap: () {},
+                      if (!widget.isStory) ...[
+                        const SizedBox(height: AppSizes.p12),
+                        Row(
+                          children: [
+                            AddPostTagButton(
+                              icon: LucideIcons.hash,
+                              label: l10n.hashtagsLabel,
+                              onTap: () => TagTextEditing.insertToken(
+                                _descriptionController,
+                                '#',
+                              ),
+                            ),
+                            const SizedBox(width: AppSizes.p12),
+                            AddPostTagButton(
+                              icon: LucideIcons.atSign,
+                              label: l10n.mentionsLabel,
+                              onTap: () => MentionPickerSheet.show(
+                                context,
+                                controller: _descriptionController,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSizes.p24),
+                        Divider(color: theme.colorScheme.outlineVariant),
+                        AddPostSettingItem(
+                          icon: LucideIcons.gavel,
+                          title: l10n.addPostAsAuction,
+                          trailing: Switch.adaptive(
+                            value: _isAuction,
+                            activeTrackColor: theme.colorScheme.primary,
+                            onChanged: (value) =>
+                                setState(() => _isAuction = value),
                           ),
-                          const SizedBox(width: AppSizes.p12),
-                          AddPostTagButton(
-                            icon: LucideIcons.atSign,
-                            label: l10n.mentionsLabel,
-                            onTap: () {},
+                        ),
+                        if (_isAuction) ...[
+                          const SizedBox(height: AppSizes.p8),
+                          AddPostAuctionFields(
+                            itemNameController: _auctionItemNameController,
+                            startingPriceController: _startingPriceController,
+                            targetPriceController: _targetPriceController,
+                            startDate: _auctionStartDate,
+                            endDate: _auctionEndDate,
+                            onPickStartDate: () =>
+                                _pickAuctionDate(isStart: true),
+                            onPickEndDate: () =>
+                                _pickAuctionDate(isStart: false),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: AppSizes.p24),
-                      Divider(color: theme.colorScheme.outlineVariant),
-                      AddPostSettingItem(
-                        icon: LucideIcons.gavel,
-                        title: l10n.addPostAsAuction,
-                        trailing: Switch.adaptive(
-                          value: _isAuction,
-                          activeTrackColor: theme.colorScheme.primary,
-                          onChanged: (value) =>
-                              setState(() => _isAuction = value),
-                        ),
-                      ),
-                      if (_isAuction) ...[
-                        const SizedBox(height: AppSizes.p8),
-                        AddPostAuctionFields(
-                          itemNameController: _auctionItemNameController,
-                          startingPriceController: _startingPriceController,
-                          targetPriceController: _targetPriceController,
-                          startDate: _auctionStartDate,
-                          endDate: _auctionEndDate,
-                          onPickStartDate: () =>
-                              _pickAuctionDate(isStart: true),
-                          onPickEndDate: () =>
-                              _pickAuctionDate(isStart: false),
-                        ),
-                      ],
-                      AddPostSettingItem(
-                        icon: LucideIcons.layoutGrid,
-                        title: l10n.categoryLabel,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_isLoadingCategories)
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.colorScheme.primary,
+                        AddPostSettingItem(
+                          icon: LucideIcons.layoutGrid,
+                          title: l10n.categoryLabel,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_isLoadingCategories)
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                )
+                              else
+                                CustomText(
+                                  _selectedCategory?.name ??
+                                      l10n.selectCategoryHint,
+                                  variant: TextVariant.secondary,
+                                  fontSize: 14,
                                 ),
-                              )
-                            else
+                              const AddPostChevronIcon(),
+                            ],
+                          ),
+                          onTap: _categories.isEmpty && !_isLoadingCategories
+                              ? null
+                              : _showCategoryPicker,
+                        ),
+                        AddPostSettingItem(
+                          icon: LucideIcons.lock,
+                          title: l10n.whoCanWatchLabel,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               CustomText(
-                                _selectedCategory?.name ??
-                                    l10n.selectCategoryHint,
+                                localizedAddPostPrivacyStatus(
+                                  _privacyStatus,
+                                  l10n,
+                                ),
                                 variant: TextVariant.secondary,
                                 fontSize: 14,
                               ),
-                            const AddPostChevronIcon(),
-                          ],
+                              const AddPostChevronIcon(),
+                            ],
+                          ),
+                          onTap: _showPrivacyPicker,
                         ),
-                        onTap: _categories.isEmpty && !_isLoadingCategories
-                            ? null
-                            : _showCategoryPicker,
-                      ),
-                      AddPostSettingItem(
-                        icon: LucideIcons.lock,
-                        title: l10n.whoCanWatchLabel,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CustomText(
-                              localizedAddPostPrivacyStatus(
-                                _privacyStatus,
-                                l10n,
+                        AddPostSettingItem(
+                          icon: LucideIcons.mapPin,
+                          title: l10n.addLocationLabel,
+                          trailing: const AddPostChevronIcon(),
+                          onTap: () {},
+                        ),
+                      ] else ...[
+                        const SizedBox(height: AppSizes.p16),
+                        AddPostSettingItem(
+                          icon: LucideIcons.lock,
+                          title: l10n.whoCanWatchLabel,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CustomText(
+                                localizedAddPostPrivacyStatus(
+                                  _privacyStatus,
+                                  l10n,
+                                ),
+                                variant: TextVariant.secondary,
+                                fontSize: 14,
                               ),
-                              variant: TextVariant.secondary,
-                              fontSize: 14,
-                            ),
-                            const AddPostChevronIcon(),
-                          ],
+                              const AddPostChevronIcon(),
+                            ],
+                          ),
+                          onTap: _showPrivacyPicker,
                         ),
-                        onTap: _showPrivacyPicker,
-                      ),
-                      AddPostSettingItem(
-                        icon: LucideIcons.mapPin,
-                        title: l10n.addLocationLabel,
-                        trailing: const AddPostChevronIcon(),
-                        onTap: () {},
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -470,7 +538,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 ),
                 child: CustomButton(
                   onPressed: _onCreatePost,
-                  text: l10n.postButton,
+                  text: widget.isStory ? l10n.shareStoryButton : l10n.postButton,
                   isLoading: state is PostsLoading,
                 ),
               ),

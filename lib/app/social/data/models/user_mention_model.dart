@@ -15,39 +15,50 @@ class UserMentionModel extends UserMentionEntity {
   });
 
   factory UserMentionModel.fromJson(Map<String, dynamic> json) {
-    final commentRaw = json['comment'];
-    final postRaw = json['post'] ?? (commentRaw is Map ? commentRaw['post'] : null);
+    final root = json['mention'] is Map
+        ? Map<String, dynamic>.from(json['mention'] as Map)
+        : json;
+
+    final commentRaw = root['comment'];
+    final postRaw = root['post'] ??
+        (commentRaw is Map ? commentRaw['post'] : null) ??
+        json['post'];
 
     PostModel? post;
     if (postRaw is Map) {
       post = PostModel.fromJson(Map<String, dynamic>.from(postRaw));
-    } else if (_looksLikePost(json)) {
-      post = PostModel.fromJson(json);
+    } else if (_looksLikePost(root)) {
+      post = PostModel.fromJson(root);
     }
 
     final commentMap = commentRaw is Map
         ? Map<String, dynamic>.from(commentRaw)
         : null;
 
-    final sourceType = _parseSourceType(json, commentMap: commentMap);
-    final commentId = json['commentId']?.toString() ??
+    final sourceType = _parseSourceType(root, commentMap: commentMap);
+    final commentId = root['commentId']?.toString() ??
         commentMap?['id']?.toString();
 
     final content = _firstNonEmpty([
-      json['content']?.toString(),
-      json['text']?.toString(),
+      root['content']?.toString(),
+      root['text']?.toString(),
       commentMap?['content']?.toString(),
       post?.description,
     ]);
 
     final postId = _firstNonEmpty([
-      json['postId']?.toString(),
+      root['postId']?.toString(),
+      root['post_id']?.toString(),
       commentMap?['postId']?.toString(),
+      commentMap?['post_id']?.toString(),
+      (commentMap?['post'] is Map)
+          ? (commentMap!['post'] as Map)['id']?.toString()
+          : null,
       post?.id,
     ])!;
 
     SocialUserModel? user;
-    final userRaw = json['user'] ?? commentMap?['user'];
+    final userRaw = root['user'] ?? commentMap?['user'];
     if (userRaw is Map) {
       user = SocialUserModel.fromJson(Map<String, dynamic>.from(userRaw));
     } else if (post?.user != null) {
@@ -61,7 +72,7 @@ class UserMentionModel extends UserMentionEntity {
     }
 
     return UserMentionModel(
-      id: json['id']?.toString() ??
+      id: root['id']?.toString() ??
           commentId ??
           postId,
       sourceType: sourceType,
@@ -69,7 +80,7 @@ class UserMentionModel extends UserMentionEntity {
       commentId: commentId,
       content: content ?? '',
       createdAt: _firstNonEmpty([
-        json['createdAt']?.toString(),
+        root['createdAt']?.toString(),
         commentMap?['createdAt']?.toString(),
         post?.createdAt.toIso8601String(),
       ])!,

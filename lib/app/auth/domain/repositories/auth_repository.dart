@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'dart:io';
 
 import 'package:bimobondapp/core/error/failures.dart';
+import 'package:bimobondapp/app/auth/domain/entities/user_activity_page_entity.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -35,6 +36,12 @@ abstract class AuthRepository {
   Future<Either<Failure, UserEntity>> updateProfile(Map<String, dynamic> data);
   Future<Either<Failure, UserEntity>> getProfile();
   Future<Either<Failure, UserEntity>> getUserById(String userId);
+
+  Future<Either<Failure, UserActivityPageEntity>> getAdminUserActivity(
+    String userId, {
+    int page = 1,
+    int limit = 10,
+  });
 
   Future<Either<Failure, UserEntity?>> getCachedUser();
 

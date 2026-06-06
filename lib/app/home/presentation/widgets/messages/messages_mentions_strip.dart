@@ -1,7 +1,9 @@
 import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart';
 import 'package:bimobondapp/app/social/presentation/utils/mention_post_navigation.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/mention_list_card.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -102,7 +104,7 @@ class MessagesMentionsStrip extends StatelessWidget {
 
               void openProfile() {
                 if (author == null || author.id.isEmpty) return;
-                openUserProfile(
+                openUserStoryOrProfile(
                   context,
                   userId: author.id,
                   username: author.username,
@@ -112,11 +114,8 @@ class MessagesMentionsStrip extends StatelessWidget {
                 );
               }
 
-              return InkWell(
-                onTap: () => openMentionPost(context, mention),
-                borderRadius: BorderRadius.circular(
-                  MessagesLayoutConstants.mentionCardRadius,
-                ),
+              return MentionListCard(
+                mention: mention,
                 child: Container(
                   width: MessagesLayoutConstants.mentionCardWidth,
                   margin: const EdgeInsets.symmetric(
@@ -142,26 +141,19 @@ class MessagesMentionsStrip extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: openProfile,
-                        child: Stack(
+                      Stack(
+                          clipBehavior: Clip.none,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(1.5),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: theme.colorScheme.primary.withValues(
-                                    alpha: 0.2,
-                                  ),
-                                ),
-                              ),
-                              child: SafeNetworkAvatar(
-                                imageUrl: author?.avatarUrl,
-                                radius: MessagesLayoutConstants
-                                    .mentionAvatarRadius,
-                                fallbackText: authorName,
-                              ),
+                            StoryProfileAvatar(
+                              userId: author?.id,
+                              imageUrl: author?.avatarUrl,
+                              radius: MessagesLayoutConstants
+                                  .mentionAvatarRadius,
+                              fallbackText: authorName,
+                              username: author?.username,
+                              fullName: author?.fullName,
+                              isFollowing: author?.isFollowing,
+                              onTap: openProfile,
                             ),
                             PositionedDirectional(
                               end: -1,
@@ -184,7 +176,6 @@ class MessagesMentionsStrip extends StatelessWidget {
                               ),
                             ),
                           ],
-                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -205,32 +196,47 @@ class MessagesMentionsStrip extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 1),
-                            Text(
-                              content.isNotEmpty
-                                  ? content
-                                  : l10n.userMentionAction,
-                              style: TextStyle(
-                                color: theme.textTheme.bodyMedium?.color
-                                    ?.withValues(alpha: 0.6),
-                                fontSize: 10,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            content.isNotEmpty
+                                ? Text(
+                                    content,
+                                    style: TextStyle(
+                                      color: theme
+                                          .textTheme.bodyMedium?.color
+                                          ?.withValues(alpha: 0.6),
+                                      fontSize: 10,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : Text(
+                                    l10n.userMentionAction,
+                                    style: TextStyle(
+                                      color: theme.textTheme.bodyMedium?.color
+                                          ?.withValues(alpha: 0.6),
+                                      fontSize: 10,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                           ],
                         ),
                       ),
                       if (preview != null && preview.isNotEmpty) ...[
                         const SizedBox(width: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SafeNetworkImage(
-                            imageUrl: preview,
-                            width: MessagesLayoutConstants.mentionPreviewSize,
-                            height: MessagesLayoutConstants.mentionPreviewSize,
-                            fit: BoxFit.cover,
+                        GestureDetector(
+                          onTap: () => openMentionPost(context, mention),
+                          child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            errorIcon: Icons.image_outlined,
+                            child: SafeNetworkImage(
+                              imageUrl: preview,
+                              width:
+                                  MessagesLayoutConstants.mentionPreviewSize,
+                              height:
+                                  MessagesLayoutConstants.mentionPreviewSize,
+                              fit: BoxFit.cover,
+                              borderRadius: BorderRadius.circular(8),
+                              errorIcon: Icons.image_outlined,
+                            ),
                           ),
                         ),
                       ],

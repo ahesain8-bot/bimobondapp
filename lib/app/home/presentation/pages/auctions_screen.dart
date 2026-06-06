@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
+import 'package:bimobondapp/app/categories/presentation/utils/category_lookup.dart';
 import 'package:bimobondapp/app/categories/domain/usecases/get_categories_usecase.dart';
 import 'package:bimobondapp/app/categories/presentation/di/categories_injector.dart'
     as categories_di;
@@ -12,6 +13,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_statu
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_active_header.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_category_strip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_filter_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_search_bar.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
@@ -42,7 +45,7 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   String _searchQuery = '';
-  String? _selectedCategorySlug;
+  AuctionSearchFilters _filters = AuctionSearchFilters.empty;
   final List<CategoryEntity> _categories = [];
   final List<AuctionItem> _postAuctionItems = [];
   bool _isLoadingCategories = false;
@@ -125,63 +128,40 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     });
   }
 
-  CategoryEntity? _selectedCategory() {
-    final slug = _selectedCategorySlug;
-    if (slug == null) return null;
-    for (final category in _categories) {
-      if (category.slug == slug) return category;
-    }
-    return null;
+  String? _categoryLabelFor(String? categoryId) {
+    return CategoryLookup.labelForId(categoryId, _categories);
   }
 
-  String? _categoryLabelFor(String? categoryRef) {
-    if (categoryRef == null || categoryRef.trim().isEmpty) return null;
-    final lower = categoryRef.trim().toLowerCase();
-    for (final category in _categories) {
-      if (category.slug.toLowerCase() == lower ||
-          category.id.toLowerCase() == lower ||
-          category.name.toLowerCase() == lower) {
-        return category.name;
-      }
-    }
-    return categoryRef;
+  Future<void> _openFilters() async {
+    final result = await AuctionsFilterSheet.show(
+      context,
+      initialFilters: _filters,
+      categories: _categories,
+    );
+    if (!mounted || result == null) return;
+    setState(() => _filters = result);
+    _loadPostAuctions();
   }
 
-  bool _matchesSelectedCategory(PostEntity post) {
-    final slug = _selectedCategorySlug;
-    if (slug == null) return true;
-
-    final postCategory = post.category?.trim().toLowerCase();
-    if (postCategory == null || postCategory.isEmpty) return false;
-
-    final selected = _selectedCategory();
-    if (postCategory == slug.toLowerCase()) return true;
-    if (selected != null) {
-      if (postCategory == selected.id.toLowerCase()) return true;
-      if (postCategory == selected.name.toLowerCase()) return true;
+  void _toggleCategoryFilter(String categoryId) {
+    final nextIds = Set<String>.from(_filters.categoryIds);
+    if (nextIds.contains(categoryId)) {
+      nextIds.remove(categoryId);
+    } else {
+      nextIds.add(categoryId);
     }
-    return false;
+    setState(() {
+      _filters = _filters.copyWith(categoryIds: nextIds);
+    });
+    _loadPostAuctions();
   }
 
-  bool _matchesSearchQuery(PostEntity post) {
-    final query = _searchQuery.trim();
-    if (query.isEmpty) return true;
-
-    final q = query.toLowerCase();
-
-    final description = post.description?.trim().toLowerCase() ?? '';
-    if (description.contains(q)) return true;
-
-    final categoryRef = post.category?.trim().toLowerCase() ?? '';
-    if (categoryRef.isNotEmpty && categoryRef.contains(q)) return true;
-
-    final categoryLabel = _categoryLabelFor(post.category)?.toLowerCase() ?? '';
-    if (categoryLabel.contains(q)) return true;
-
-    final itemName = post.auction?.itemName.trim().toLowerCase() ?? '';
-    if (itemName.contains(q)) return true;
-
-    return false;
+  void _clearCategoryFilters() {
+    if (_filters.categoryIds.isEmpty) return;
+    setState(() {
+      _filters = _filters.copyWith(categoryIds: {});
+    });
+    _loadPostAuctions();
   }
 
   Future<void> _loadPostAuctions() async {
@@ -198,22 +178,18 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     while (hasMore && page <= 10) {
       final search = _searchQuery.trim();
       final result = await useCase(
-        GetFeedParams(
+        _filters.toFeedParams(
           page: page,
           limit: 30,
-          category: _selectedCategorySlug,
           search: search.isEmpty ? null : search,
         ),
       );
       var shouldContinue = false;
       result.fold((_) => hasMore = false, (posts) {
         for (final post in posts) {
-          if (post.isAuctionable &&
-              post.auction != null &&
-              _matchesSelectedCategory(post) &&
-              _matchesSearchQuery(post)) {
-            postsById[post.id] = post;
-          }
+          if (!post.isAuctionable || post.auction == null) continue;
+          if (!_filters.matchesClientCategory(post)) continue;
+          postsById[post.id] = post;
         }
         shouldContinue = posts.length >= 30;
       });
@@ -232,18 +208,16 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
           postsById.values.map(
             (post) => AuctionItem.fromPost(
               post,
-              categoryLabel: _categoryLabelFor(post.category),
+              categoryLabel: _categoryLabelFor(post.categoryId),
+              categorySlug: CategoryLookup.slugForId(
+                post.categoryId,
+                _categories,
+              ),
             ),
           ),
         );
       _isLoadingPostAuctions = false;
     });
-  }
-
-  void _onCategorySelected(String? slug) {
-    if (_selectedCategorySlug == slug) return;
-    setState(() => _selectedCategorySlug = slug);
-    _loadPostAuctions();
   }
 
   void _openAuction(AuctionItem item) {
@@ -286,7 +260,7 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     final showSpotlight =
         !_isLoadingPostAuctions &&
         _searchQuery.isEmpty &&
-        _selectedCategorySlug == null &&
+        !_filters.hasActiveFilters &&
         _postAuctionItems.isNotEmpty;
     final spotlightItem = showSpotlight ? _getSpotlightItem() : null;
 
@@ -318,6 +292,8 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
                     fillColor: surfaceElevated,
                     onSubmitted: _submitSearch,
                     onClear: _clearSearch,
+                    onFilterTap: _openFilters,
+                    activeFilterCount: _filters.activeFilterCount,
                   ),
                 ),
               ),
@@ -342,11 +318,12 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
                 SliverToBoxAdapter(
                   child: AuctionsCategoryStrip(
                     categories: _categories,
-                    selectedCategorySlug: _selectedCategorySlug,
+                    selectedCategoryIds: _filters.categoryIds,
                     chipInactiveBg: chipInactiveBg,
                     inactiveBorder: chipInactiveBorder,
                     selectedColor: theme.primaryColor,
-                    onCategorySelected: _onCategorySelected,
+                    onCategoryToggled: _toggleCategoryFilter,
+                    onClearCategories: _clearCategoryFilters,
                   ),
                 ),
               if (showSpotlight && spotlightItem != null)

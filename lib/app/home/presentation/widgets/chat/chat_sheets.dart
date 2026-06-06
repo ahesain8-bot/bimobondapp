@@ -1,9 +1,9 @@
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/attachment_grid_menu_item.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -18,7 +18,7 @@ class ChatSheets {
     String? userId,
   }) {
     if (userId != null && userId.isNotEmpty) {
-      openUserProfile(
+      openUserStoryOrProfile(
         context,
         userId: userId,
         username: username,
@@ -43,10 +43,12 @@ class ChatSheets {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SafeNetworkAvatar(
+              StoryProfileAvatar(
+                userId: userId,
                 imageUrl: imageUrl,
                 radius: ChatLayoutConstants.userInfoAvatarRadius,
                 fallbackText: username,
+                username: username,
               ),
               const SizedBox(height: AppSizes.p12),
               Text(

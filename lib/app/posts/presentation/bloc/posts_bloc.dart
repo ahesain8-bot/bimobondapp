@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/create_post_usecase.dart';
@@ -11,6 +13,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PostsBloc extends Bloc<PostsEvent, PostsState> {
@@ -35,6 +38,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<CreatePostRequestedEvent>(_onCreatePostRequested);
     on<CreatePostWithMediaRequestedEvent>(_onCreatePostWithMediaRequested);
     on<FetchFeedRequestedEvent>(_onFetchFeedRequested);
+    on<FetchStoriesRequestedEvent>(_onFetchStoriesRequested);
     on<ToggleLikePostRequestedEvent>(_onToggleLikePostRequested);
     on<ToggleSavePostRequestedEvent>(_onToggleSavePostRequested);
     on<UpdatePostRequestedEvent>(_onUpdatePostRequested);
@@ -49,7 +53,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       UpdatePostParams(
         postId: event.postId,
         description: event.description,
-        category: event.category,
+        categoryId: event.categoryId,
         privacyStatus: event.privacyStatus,
       ),
     );
@@ -94,6 +98,25 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     );
   }
 
+  Future<String> _uploadMediaFile(File file) async {
+    final result = await uploadMediaUseCase(file);
+    return result.fold(
+      (failure) => throw Exception(failure.message),
+      (url) => url,
+    );
+  }
+
+  Future<String?> _uploadVideoThumbnail(File videoFile) async {
+    final thumbFile = await VideoThumbnailUtils.generateThumbnailFile(videoFile);
+    if (thumbFile == null) return null;
+
+    try {
+      return await _uploadMediaFile(thumbFile);
+    } finally {
+      await VideoThumbnailUtils.deleteIfExists(thumbFile);
+    }
+  }
+
   Future<void> _onCreatePostWithMediaRequested(
     CreatePostWithMediaRequestedEvent event,
     Emitter<PostsState> emit,
@@ -106,20 +129,19 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       String? thumbnailUrl;
 
       for (int i = 0; i < event.files.length; i++) {
-        final result = await uploadMediaUseCase(event.files[i]);
-        final url = result.fold(
-          (failure) => throw Exception(failure.message),
-          (url) => url,
-        );
+        final file = event.files[i];
+        final isVideo = VideoThumbnailUtils.isVideoFile(file);
 
-        if (event.type == 'VIDEO') {
-          videoUrl = url;
-          // In a real app, you'd generate a thumbnail too
-          thumbnailUrl = url;
+        if (isVideo) {
+          thumbnailUrl ??= await _uploadVideoThumbnail(file);
+
+          final url = await _uploadMediaFile(file);
+          videoUrl ??= url;
           mediaEntities.add(
             PostMediaEntity(url: url, mediaType: 'VIDEO', order: i),
           );
         } else {
+          final url = await _uploadMediaFile(file);
           mediaEntities.add(
             PostMediaEntity(url: url, mediaType: 'IMAGE', order: i),
           );
@@ -140,12 +162,13 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           videoUrl: videoUrl,
           thumbnailUrl: thumbnailUrl,
           description: event.description,
-          category: event.category,
+          categoryId: event.categoryId,
           status: event.status,
           privacyStatus: event.privacyStatus,
           allowComments: event.allowComments,
           allowDuets: event.allowDuets,
           allowStitch: event.allowStitch,
+          isStory: event.isStory ? true : null,
           isAuctionable: event.isAuctionable,
           auction: event.isAuctionable ? auction : null,
           media: mediaEntities,
@@ -173,7 +196,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       GetFeedParams(
         page: event.page,
         limit: event.limit,
-        category: event.category,
+        categoryId: event.categoryId,
         type: event.type,
         hashtag: event.hashtag,
         search: event.search,
@@ -181,6 +204,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         userId: event.userId,
         isLiked: event.isLiked,
         isSaved: event.isSaved,
+        isStory: event.isStory,
       ),
     );
 
@@ -190,18 +214,41 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       ),
       (posts) {
         final hasReachedMax = posts.length < event.limit;
-        if (event.userId != null) {
+        if (event.profileLoadKey != null) {
           emit(
             ProfilePostsLoadSuccess(
               posts: posts,
               hasReachedMax: hasReachedMax,
-              profileLoadKey: event.profileLoadKey ?? 0,
+              profileLoadKey: event.profileLoadKey!,
             ),
           );
         } else {
           emit(FeedLoadSuccess(posts: posts, hasReachedMax: hasReachedMax));
         }
       },
+    );
+  }
+
+  Future<void> _onFetchStoriesRequested(
+    FetchStoriesRequestedEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    final result = await getFeedUseCase(
+      GetFeedParams(
+        page: event.page,
+        limit: event.limit,
+        isStory: true,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(PostsFailure(failure.message)),
+      (stories) => emit(
+        StoriesLoadSuccess(
+          stories: stories,
+          hasReachedMax: stories.length < event.limit,
+        ),
+      ),
     );
   }
 
@@ -230,7 +277,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         thumbnailUrl: event.thumbnailUrl,
         animatedCoverUrl: event.animatedCoverUrl,
         description: event.description,
-        category: event.category,
+        categoryId: event.categoryId,
         status: event.status,
         duration: event.duration,
         videoWidth: event.videoWidth,

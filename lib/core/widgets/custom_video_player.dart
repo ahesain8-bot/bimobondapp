@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/foundation.dart';
@@ -9,8 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
-
 class CustomVideoPlayer extends StatefulWidget {
   const CustomVideoPlayer({
     super.key,
@@ -127,9 +126,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (url.isEmpty || !MediaUtils.isVideo(url)) return;
 
     try {
-      final bytes = await VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
+      final bytes = await VideoThumbnailUtils.generateThumbnailBytes(
+        url,
         timeMs: 0,
         quality: 70,
         maxHeight: 720,

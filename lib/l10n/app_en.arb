@@ -92,7 +92,58 @@
   "noSavedPosts": "No saved posts",
   "editProfile": "Edit profile",
   "noBio": "No bio yet.",
+  "profileAvatarViewPhoto": "Profile photo",
+  "profileAvatarViewStory": "View story",
+  "profileAvatarNoPhoto": "No profile photo",
   "story": "Story",
+  "addStoryTitle": "Add story",
+  "shareStoryButton": "Share story",
+  "storyCaptionHint": "Add a caption (optional)",
+  "storyPickMediaError": "Could not pick media: {error}",
+  "storyExpired": "Story expired",
+  "storyTimeMinutesAgo": "{count}m ago",
+  "@storyTimeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storyTimeHoursAgo": "{count}h ago",
+  "@storyTimeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storyAddCommentHint": "Add comment...",
+  "storySendMessageHint": "Write a message...",
+  "storySendMessageTitle": "Reply with a message",
+  "storyViewersTitle": "Viewers",
+  "storyViewerUnknown": "Viewer",
+  "storyMessagesTitle": "Messages on this story",
+  "storyMessagesEmpty": "No messages on this story yet",
+  "storyMessageSendFailed": "Could not send message. Try again.",
+  "storyMessageSent": "Message sent to {name}",
+  "@storyMessageSent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "storyPreviewLabel": "Story",
+  "postPreviewLabel": "Post",
+  "storyMessageOnStory": "Replied to your story",
+  "storyMessageOnPost": "Replied to your post",
+  "@storyPickMediaError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "personalInfo": "Personal Info",
   "genderLabel": "Gender",
   "male": "Male",
@@ -135,7 +186,24 @@
   "navHome": "Home",
   "navFriends": "Friends",
   "navAuctions": "Auctions",
-  "auctionsSearchHint": "Search by category or description...",
+  "auctionsSearchHint": "Search auctions...",
+  "postsSearchTitle": "Search posts",
+  "postsSearchHint": "Search posts...",
+  "auctionsFiltersTitle": "Filters",
+  "auctionsFiltersApply": "Apply filters",
+  "auctionsFiltersReset": "Reset",
+  "auctionsFiltersCategories": "Categories",
+  "auctionsFiltersPriceRange": "Price range (USD)",
+  "auctionsFiltersMinPrice": "Min price",
+  "auctionsFiltersMaxPrice": "Max price",
+  "auctionsFiltersTimeRemaining": "Time remaining",
+  "auctionsFiltersInvalidPriceRange": "Min price cannot be greater than max price",
+  "auctionsTimeRemainingAny": "Any time",
+  "auctionsTimeRemaining1Hour": "Ending within 1 hour",
+  "auctionsTimeRemaining6Hours": "Ending within 6 hours",
+  "auctionsTimeRemaining24Hours": "Ending within 24 hours",
+  "auctionsTimeRemaining7Days": "Ending within 7 days",
+  "auctionsTimeRemaining30Days": "Ending within 30 days",
   "popularCategories": "Popular categories",
   "viewAll": "View all",
   "auctionCategoryWatches": "Luxury watches",
@@ -373,7 +441,7 @@
   "navAdd": "Add",
   "navChat": "Chat",
   "navProfile": "Profile",
-  "describePostHint": "Describe your post...",
+  "describePostHint": "Describe your post… use @username and #tag in the text",
   "hashtagsLabel": "Hashtags",
   "mentionsLabel": "Mentions",
   "whoCanWatchLabel": "Who can watch this post",
@@ -404,8 +472,22 @@
       }
     }
   },
+  "postLikesEmpty": "No likes yet",
+  "postViewsEmpty": "No views yet",
+  "postViewWatchedDuration": "{seconds}s watched",
+  "@postViewWatchedDuration": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "viewsLabel": "Views",
+  "commentsSortNewest": "Newest",
+  "commentsSortOldest": "Oldest",
+  "commentsSortTop": "Top",
   "noCommentsYet": "No comments yet. Be the first!",
-  "addCommentHint": "Add comment...",
+  "addCommentHint": "Add comment… @username to mention",
   "justNow": "Just now",
   "inboxTimeMinutes": "{count}m",
   "@inboxTimeMinutes": {
@@ -462,8 +544,8 @@
   "saveButton": "Save",
   "categoryLabel": "Category",
   "selectCategoryHint": "Choose a category",
-  "hashtagsHint": "Separate with commas (e.g. travel, food)",
-  "mentionsHint": "Separate with commas (e.g. john, jane)",
+  "hashtagsHint": "Type #tag in your caption (e.g. #travel #food)",
+  "mentionsHint": "Type @username in your caption (e.g. @jane_doe)",
   "mediaLabel": "Media",
   "settingsAndPrivacy": "Settings and privacy",
   "settingsSectionAccount": "Account",
@@ -489,6 +571,24 @@
   "settingsLogoutMessage": "You will need to sign in again to use your account.",
   "settingsComingSoon": "Coming soon",
   "settingsChatWallpaper": "Chat wallpaper",
+  "settingsSectionAdmin": "Admin",
+  "settingsAdminActivity": "User activity",
+  "adminActivityTitle": "Activity",
+  "adminActivityEmpty": "No activity yet",
+  "adminActivityJustNow": "Just now",
+  "adminActivityNoDetails": "No details",
+  "adminActivityOnPost": "On post: {post}",
+  "@adminActivityOnPost": {
+    "placeholders": {
+      "post": {
+        "type": "String"
+      }
+    }
+  },
+  "adminActivityTypeCreatePost": "Created a post",
+  "adminActivityTypeComment": "Commented",
+  "adminActivityTypeLikePost": "Liked a post",
+  "adminActivityTypeSendGift": "Sent a gift",
   "chatWallpaperTitle": "Chat wallpaper",
   "chatWallpaperSubtitle": "Choose a background pattern for your chats. Colors follow your app theme.",
   "chatWallpaperPlus": "Plus",

@@ -15,7 +15,7 @@ class UpdatePostUsecase implements UseCase<PostEntity, UpdatePostParams> {
     return repository.updatePost(
       params.postId,
       description: params.description,
-      category: params.category,
+      categoryId: params.categoryId,
       privacyStatus: params.privacyStatus,
     );
   }

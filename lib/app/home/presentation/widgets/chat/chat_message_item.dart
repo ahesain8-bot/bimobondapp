@@ -1,7 +1,11 @@
 import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_messages.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_image_preview.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_message.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_shared_preview.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -115,12 +119,24 @@ class ChatMessageItem extends StatelessWidget {
               bottom: AppSizes.p4,
             ),
             child: InkWell(
-              onTap: () => ChatSheets.showUserInfo(
-                context: context,
-                username: username,
-                imageUrl: peerImageUrl,
-                userId: peerUserId,
-              ),
+              onTap: () {
+                final id = peerUserId?.trim() ?? '';
+                if (id.isNotEmpty) {
+                  openUserStoryOrProfile(
+                    context,
+                    userId: id,
+                    username: username,
+                    avatarUrl: peerImageUrl,
+                  );
+                  return;
+                }
+                ChatSheets.showUserInfo(
+                  context: context,
+                  username: username,
+                  imageUrl: peerImageUrl,
+                  userId: peerUserId,
+                );
+              },
               borderRadius: BorderRadius.circular(10),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
@@ -149,6 +165,7 @@ class ChatMessageItem extends StatelessWidget {
               _ReceivedMessageAvatarSlot(
                 imageUrl: peerImageUrl,
                 username: username,
+                peerUserId: peerUserId,
                 showAvatar: isFirstInGroup,
               ),
               const SizedBox(
@@ -187,11 +204,13 @@ class _ReceivedMessageAvatarSlot extends StatelessWidget {
   const _ReceivedMessageAvatarSlot({
     required this.imageUrl,
     required this.username,
+    this.peerUserId,
     required this.showAvatar,
   });
 
   final String imageUrl;
   final String username;
+  final String? peerUserId;
   final bool showAvatar;
 
   @override
@@ -200,10 +219,12 @@ class _ReceivedMessageAvatarSlot extends StatelessWidget {
     const size = radius * 2;
 
     if (showAvatar) {
-      return SafeNetworkAvatar(
+      return StoryProfileAvatar(
+        userId: peerUserId,
         imageUrl: imageUrl,
         radius: radius,
         fallbackText: username,
+        username: username,
       );
     }
 
@@ -260,11 +281,20 @@ class ChatMessageBubble extends StatelessWidget {
           )
         : EdgeInsets.zero;
 
+    final sharedPostId = msg['sharedPostId']?.toString();
+    final sharedStory = msg['sharedStory'];
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (replyText != null && replyText!.isNotEmpty)
           ChatBubbleReplyPreview(text: replyText!, isMe: isMe),
+        if (sharedPostId != null && sharedPostId.isNotEmpty)
+          ChatStoryReplyPreview(
+            sharedPostId: sharedPostId,
+            sharedStory:
+                sharedStory is Map<String, dynamic> ? sharedStory : null,
+            isMe: isMe,
+          ),
         ChatMessageContent(
           msg: msg,
           messageText: messageText,
@@ -394,13 +424,22 @@ class ChatMessageContent extends StatelessWidget {
           ),
         );
       case 'image':
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(ChatLayoutConstants.bubbleRadius),
-          child: SafeNetworkImage(
-            imageUrl: msg['imageUrl']?.toString(),
-            width: ChatLayoutConstants.imageMessageWidth,
-            height: ChatLayoutConstants.imageMessageHeight,
-            fit: BoxFit.cover,
+        final imageUrl = msg['imageUrl']?.toString() ?? '';
+        final canPreview = !isDeleted && imageUrl.trim().isNotEmpty;
+        return GestureDetector(
+          onTap: canPreview
+              ? () => showChatImagePreview(context, imageUrl: imageUrl)
+              : null,
+          behavior: HitTestBehavior.opaque,
+          child: ClipRRect(
+            borderRadius:
+                BorderRadius.circular(ChatLayoutConstants.bubbleRadius),
+            child: SafeNetworkImage(
+              imageUrl: imageUrl,
+              width: ChatLayoutConstants.imageMessageWidth,
+              height: ChatLayoutConstants.imageMessageHeight,
+              fit: BoxFit.cover,
+            ),
           ),
         );
       case 'video':

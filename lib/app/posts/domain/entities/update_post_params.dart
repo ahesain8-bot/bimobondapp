@@ -3,16 +3,16 @@ import 'package:equatable/equatable.dart';
 class UpdatePostParams extends Equatable {
   final String postId;
   final String? description;
-  final String? category;
+  final String? categoryId;
   final String? privacyStatus;
 
   const UpdatePostParams({
     required this.postId,
     this.description,
-    this.category,
+    this.categoryId,
     this.privacyStatus,
   });
 
   @override
-  List<Object?> get props => [postId, description, category, privacyStatus];
+  List<Object?> get props => [postId, description, categoryId, privacyStatus];
 }

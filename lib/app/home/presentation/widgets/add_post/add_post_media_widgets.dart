@@ -1,16 +1,13 @@
 import 'dart:io';
 
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/video_post_preview_placeholder.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-bool addPostIsVideoFile(File file) {
-  final ext = file.path.toLowerCase().split('?').first;
-  return MediaUtils.videoExtensions.any((e) => ext.endsWith(e));
-}
+bool addPostIsVideoFile(File file) => VideoThumbnailUtils.isVideoFile(file);
 
 class AddPostMediaCountChip extends StatelessWidget {
   const AddPostMediaCountChip({required this.label, super.key});

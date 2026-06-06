@@ -26,7 +26,7 @@ class CreatePostRequestedEvent extends PostsEvent {
   final String? thumbnailUrl;
   final String? animatedCoverUrl;
   final String? description;
-  final String? category;
+  final String? categoryId;
   final String? status;
   final int? duration;
   final int? videoWidth;
@@ -52,7 +52,7 @@ class CreatePostRequestedEvent extends PostsEvent {
     this.thumbnailUrl,
     this.animatedCoverUrl,
     this.description,
-    this.category,
+    this.categoryId,
     this.status,
     this.duration,
     this.videoWidth,
@@ -80,7 +80,7 @@ class CreatePostRequestedEvent extends PostsEvent {
     thumbnailUrl,
     animatedCoverUrl,
     description,
-    category,
+    categoryId,
     status,
     duration,
     videoWidth,
@@ -104,26 +104,28 @@ class CreatePostRequestedEvent extends PostsEvent {
 class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final String? type;
   final String? description;
-  final String? category;
+  final String? categoryId;
   final String? status;
   final String? privacyStatus;
   final bool? allowComments;
   final bool? allowDuets;
   final bool? allowStitch;
   final bool isAuctionable;
+  final bool isStory;
   final PostAuctionInput? auction;
   final List<File> files;
 
   const CreatePostWithMediaRequestedEvent({
     this.type,
     this.description,
-    this.category,
+    this.categoryId,
     this.status,
     this.privacyStatus,
     this.allowComments,
     this.allowDuets,
     this.allowStitch,
     this.isAuctionable = false,
+    this.isStory = false,
     this.auction,
     required this.files,
   });
@@ -132,13 +134,14 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   List<Object?> get props => [
     type,
     description,
-    category,
+    categoryId,
     privacyStatus,
     allowComments,
     allowDuets,
     allowStitch,
     status,
     isAuctionable,
+    isStory,
     auction,
     files,
   ];
@@ -165,18 +168,18 @@ class ToggleSavePostRequestedEvent extends PostsEvent {
 class UpdatePostRequestedEvent extends PostsEvent {
   final String postId;
   final String? description;
-  final String? category;
+  final String? categoryId;
   final String? privacyStatus;
 
   const UpdatePostRequestedEvent({
     required this.postId,
     this.description,
-    this.category,
+    this.categoryId,
     this.privacyStatus,
   });
 
   @override
-  List<Object?> get props => [postId, description, category, privacyStatus];
+  List<Object?> get props => [postId, description, categoryId, privacyStatus];
 }
 
 class DeletePostRequestedEvent extends PostsEvent {
@@ -191,7 +194,7 @@ class DeletePostRequestedEvent extends PostsEvent {
 class FetchFeedRequestedEvent extends PostsEvent {
   final int page;
   final int limit;
-  final String? category;
+  final String? categoryId;
   final String? type;
   final String? hashtag;
   final String? search;
@@ -199,13 +202,15 @@ class FetchFeedRequestedEvent extends PostsEvent {
   final String? userId;
   final bool? isLiked;
   final bool? isSaved;
+  /// `false` for posts feed/profile; must stay false for non-story lists.
+  final bool isStory;
   final bool isRefresh;
   final int? profileLoadKey;
 
   const FetchFeedRequestedEvent({
     this.page = 1,
     this.limit = 10,
-    this.category,
+    this.categoryId,
     this.type,
     this.hashtag,
     this.search,
@@ -213,6 +218,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
     this.userId,
     this.isLiked,
     this.isSaved,
+    this.isStory = false,
     this.isRefresh = false,
     this.profileLoadKey,
   });
@@ -221,7 +227,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
   List<Object?> get props => [
     page,
     limit,
-    category,
+    categoryId,
     type,
     hashtag,
     search,
@@ -229,7 +235,23 @@ class FetchFeedRequestedEvent extends PostsEvent {
     userId,
     isLiked,
     isSaved,
+    isStory,
     isRefresh,
     profileLoadKey,
   ];
+}
+
+class FetchStoriesRequestedEvent extends PostsEvent {
+  final int page;
+  final int limit;
+  final bool isRefresh;
+
+  const FetchStoriesRequestedEvent({
+    this.page = 1,
+    this.limit = 30,
+    this.isRefresh = false,
+  });
+
+  @override
+  List<Object?> get props => [page, limit, isRefresh];
 }

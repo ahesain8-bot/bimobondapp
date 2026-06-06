@@ -79,6 +79,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         page: _feedPage,
         limit: HomeLayoutConstants.feedPageSize,
         isRefresh: refresh,
+        isStory: false,
       ),
     );
   }
@@ -177,7 +178,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         _prefetchNextPageIfNeeded();
       }
     } else if (state is CreatePostSuccess) {
-      _fetchFeed(refresh: true);
+      if (!state.post.isStory) {
+        _fetchFeed(refresh: true);
+      }
     } else if (state is UpdatePostSuccess) {
       _fetchFeed(refresh: true);
     } else if (state is DeletePostSuccess) {
@@ -280,6 +283,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   isTabActive: widget.isTabActive,
                   onPageChanged: _onFeedPageChanged,
                   onLiveTap: () => context.pushNamed('lives'),
+                  onSearchTap: () => context.pushNamed('posts_search'),
                 ),
               ),
             );

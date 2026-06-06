@@ -9,20 +9,22 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 class AuctionsCategoryStrip extends StatelessWidget {
   const AuctionsCategoryStrip({
     required this.categories,
-    required this.selectedCategorySlug,
+    required this.selectedCategoryIds,
     required this.chipInactiveBg,
     required this.inactiveBorder,
     required this.selectedColor,
-    required this.onCategorySelected,
+    required this.onCategoryToggled,
+    required this.onClearCategories,
     super.key,
   });
 
   final List<CategoryEntity> categories;
-  final String? selectedCategorySlug;
+  final Set<String> selectedCategoryIds;
   final Color chipInactiveBg;
   final Color inactiveBorder;
   final Color selectedColor;
-  final ValueChanged<String?> onCategorySelected;
+  final ValueChanged<String> onCategoryToggled;
+  final VoidCallback onClearCategories;
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +42,11 @@ class AuctionsCategoryStrip extends StatelessWidget {
             return AuctionCategoryChip(
               label: l10n.auctionCategoryAll,
               icon: LucideIcons.layoutGrid,
-              isSelected: selectedCategorySlug == null,
+              isSelected: selectedCategoryIds.isEmpty,
               selectedColor: selectedColor,
               inactiveBackground: chipInactiveBg,
               inactiveBorder: inactiveBorder,
-              onTap: () => onCategorySelected(null),
+              onTap: onClearCategories,
             );
           }
 
@@ -52,11 +54,11 @@ class AuctionsCategoryStrip extends StatelessWidget {
           return AuctionCategoryChip(
             label: category.name,
             icon: categoryIconForSlug(category.slug),
-            isSelected: selectedCategorySlug == category.slug,
+            isSelected: selectedCategoryIds.contains(category.id),
             selectedColor: selectedColor,
             inactiveBackground: chipInactiveBg,
             inactiveBorder: inactiveBorder,
-            onTap: () => onCategorySelected(category.slug),
+            onTap: () => onCategoryToggled(category.id),
           );
         },
       ),

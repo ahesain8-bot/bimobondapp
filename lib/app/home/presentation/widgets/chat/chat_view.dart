@@ -407,6 +407,7 @@ class _ChatViewState extends State<ChatView> {
           appBar: ChatAppBar(
             username: widget.username,
             imageUrl: widget.imageUrl,
+            userId: widget.peerUserId,
             onProfileTap: _showUserInfo,
           ),
           body: Stack(
@@ -451,20 +452,16 @@ class _ChatViewState extends State<ChatView> {
                       onSend: _sendMessage,
                       onMoreMenu: () => ChatSheets.showMoreMenu(
                         context: context,
-                        onGallery: () => _pickAndSend(
-                          ChatAttachmentPicker.pickFromGallery,
-                        ),
-                        onCamera: () => _pickAndSend(
-                          ChatAttachmentPicker.pickFromCamera,
-                        ),
-                        onVideo: () => _pickAndSend(
-                          ChatAttachmentPicker.pickVideo,
-                        ),
+                        onGallery: () =>
+                            _pickAndSend(ChatAttachmentPicker.pickFromGallery),
+                        onCamera: () =>
+                            _pickAndSend(ChatAttachmentPicker.pickFromCamera),
+                        onVideo: () =>
+                            _pickAndSend(ChatAttachmentPicker.pickVideo),
                         onLocation: _sendLocationAttachment,
                         onContact: _sendContactAttachment,
-                        onFile: () => _pickAndSend(
-                          ChatAttachmentPicker.pickFile,
-                        ),
+                        onFile: () =>
+                            _pickAndSend(ChatAttachmentPicker.pickFile),
                         onGift: _showComingSoon,
                         onPoll: _showComingSoon,
                       ),
@@ -490,4 +487,3 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 }
-

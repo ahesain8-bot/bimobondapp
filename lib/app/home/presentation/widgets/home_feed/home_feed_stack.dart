@@ -13,6 +13,7 @@ class HomeFeedStack extends StatelessWidget {
     required this.isTabActive,
     required this.onPageChanged,
     required this.onLiveTap,
+    required this.onSearchTap,
     super.key,
   });
 
@@ -22,6 +23,7 @@ class HomeFeedStack extends StatelessWidget {
   final bool isTabActive;
   final ValueChanged<int> onPageChanged;
   final VoidCallback onLiveTap;
+  final VoidCallback onSearchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,11 @@ class HomeFeedStack extends StatelessWidget {
           isTabActive: isTabActive,
           onPageChanged: onPageChanged,
         ),
-        if (!isAuctionPost) FeedOverlayControls(onLiveTap: onLiveTap),
+        if (!isAuctionPost)
+          FeedOverlayControls(
+            onLiveTap: onLiveTap,
+            onSearchTap: onSearchTap,
+          ),
         if (showVideoProgress)
           Positioned(
             key: ValueKey(posts[currentPostIndex].id),

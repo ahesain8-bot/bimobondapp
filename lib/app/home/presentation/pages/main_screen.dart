@@ -10,7 +10,10 @@ import 'package:bimobondapp/app/home/presentation/pages/auctions_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/home_feed_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/messages_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_picker_sheet.dart';
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
+import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
@@ -33,6 +36,21 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadActiveStories());
+  }
+
+  void _loadActiveStories() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthSuccess) {
+      context.read<PostsBloc>().add(
+        const FetchStoriesRequestedEvent(isRefresh: true),
+      );
+    }
+  }
 
   Future<void> _showAddPostOptions() {
     return AddPostMediaPickerSheet.show(
@@ -141,8 +159,17 @@ class _MainScreenState extends State<MainScreen> {
             ),
             BlocListener<PostsBloc, PostsState>(
               listener: (context, state) {
-                if (state is CreatePostSuccess) {
+                if (state is StoriesLoadSuccess) {
+                  auth_di.sl<ActiveStoriesRegistry>().updateFromStories(
+                    state.stories,
+                  );
+                } else if (state is CreatePostSuccess) {
                   setState(() => _currentIndex = 0);
+                  if (state.post.isStory) {
+                    _loadActiveStories();
+                  }
+                } else if (state is DeletePostSuccess) {
+                  _loadActiveStories();
                 }
               },
             ),
@@ -220,7 +247,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
           _buildAddButton(context),
           _buildNavItem(
-            icon: LucideIcons.messageCircle,
+            icon: LucideIcons.messageSquare,
             label: l10n.navChat,
             index: 3,
             selectedColor: selectedColor,

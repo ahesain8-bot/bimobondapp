@@ -7,6 +7,9 @@ import 'package:bimobondapp/app/posts/domain/usecases/delete_comment_usecase.dar
 import 'package:bimobondapp/app/posts/domain/usecases/get_comments_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_post_likes_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_post_views_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/record_post_view_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_replies_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_comment_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_post_usecase.dart';
@@ -40,6 +43,9 @@ Future<void> initPosts() async {
   sl.registerLazySingleton(() => GetFeedUseCase(sl()));
   sl.registerLazySingleton(() => GetPostByIdUseCase(sl()));
   sl.registerLazySingleton(() => ToggleLikePostUsecase(sl()));
+  sl.registerLazySingleton(() => GetPostLikesUseCase(sl()));
+  sl.registerLazySingleton(() => GetPostViewsUseCase(sl()));
+  sl.registerLazySingleton(() => RecordPostViewUseCase(sl()));
   sl.registerLazySingleton(() => ToggleSavePostUsecase(sl()));
   sl.registerLazySingleton(() => UpdatePostUsecase(sl()));
   sl.registerLazySingleton(() => DeletePostUsecase(sl()));

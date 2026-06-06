@@ -19,7 +19,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AllChatsScreen extends StatefulWidget {
-  const AllChatsScreen({super.key});
+  const AllChatsScreen({super.key, this.autofocusSearch = false});
+
+  /// When true, opens as a search-focused screen with the keyboard ready.
+  final bool autofocusSearch;
 
   @override
   State<AllChatsScreen> createState() => _AllChatsScreenState();
@@ -45,13 +48,15 @@ class _AllChatsScreenState extends State<AllChatsScreen> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _inboxBloc,
-      child: const _AllChatsBody(),
+      child: _AllChatsBody(autofocusSearch: widget.autofocusSearch),
     );
   }
 }
 
 class _AllChatsBody extends StatefulWidget {
-  const _AllChatsBody();
+  const _AllChatsBody({required this.autofocusSearch});
+
+  final bool autofocusSearch;
 
   @override
   State<_AllChatsBody> createState() => _AllChatsBodyState();
@@ -59,13 +64,25 @@ class _AllChatsBody extends StatefulWidget {
 
 class _AllChatsBodyState extends State<_AllChatsBody> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   List<InboxChatItem> _cachedInboxItems = [];
   bool _inboxLoadFinished = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.autofocusSearch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchFocusNode.requestFocus();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -102,7 +119,11 @@ class _AllChatsBodyState extends State<_AllChatsBody> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: l10n.messagesAllChats),
+      appBar: CustomAppBar(
+        title: widget.autofocusSearch
+            ? l10n.messagesSearchHint
+            : l10n.messagesAllChats,
+      ),
       body: BlocListener<InboxBloc, InboxState>(
         listenWhen: (previous, current) =>
             current is InboxLoadSuccess || current is InboxFailure,
@@ -132,6 +153,8 @@ class _AllChatsBodyState extends State<_AllChatsBody> {
               children: [
                 MessagesSearchBar(
                   controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  autofocus: widget.autofocusSearch,
                   searchQuery: _searchQuery,
                   onChanged: (value) => setState(() => _searchQuery = value),
                   onClear: () {

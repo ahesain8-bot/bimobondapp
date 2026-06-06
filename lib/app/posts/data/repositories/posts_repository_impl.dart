@@ -4,9 +4,19 @@ import 'package:bimobondapp/app/posts/data/datasources/posts_remote_data_source.
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
+import 'package:bimobondapp/app/posts/data/models/post_view_model.dart';
+import 'package:bimobondapp/app/posts/data/models/post_views_page_model.dart';
+import 'package:bimobondapp/core/utils/comment_sort.dart';
+import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
+import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
+import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
+import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.dart';
 import 'package:bimobondapp/core/data/likes_local_data_source.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
@@ -71,7 +81,7 @@ class PostsRepositoryImpl implements PostsRepository {
   Future<Either<Failure, List<PostEntity>>> getFeed({
     int page = 1,
     int limit = 10,
-    String? category,
+    String? categoryId,
     String? type,
     String? hashtag,
     String? search,
@@ -79,12 +89,15 @@ class PostsRepositoryImpl implements PostsRepository {
     String? userId,
     bool? isLiked,
     bool? isSaved,
+    bool isStory = false,
+    FeedAuctionQuery? auctionQuery,
   }) async {
     try {
       final queryParams = {
         'page': page,
         'limit': limit,
-        if (category != null) 'category': category,
+        'isStory': isStory,
+        if (categoryId != null) 'categoryId': categoryId,
         if (type != null) 'type': type,
         if (hashtag != null) 'hashtag': hashtag,
         if (search != null) 'search': search,
@@ -92,10 +105,15 @@ class PostsRepositoryImpl implements PostsRepository {
         if (userId != null) 'userId': userId,
         if (isLiked != null) 'isLiked': isLiked,
         if (isSaved != null) 'isSaved': isSaved,
+        ...?auctionQuery?.toQueryParams(),
       };
 
       final posts = await remoteDataSource.getFeed(queryParams);
-      return Right(_applyPostLikes(posts));
+      final withLikes = _applyPostLikes(posts);
+      final filtered = isStory
+          ? onlyStoryPosts(withLikes)
+          : excludeStoryPosts(withLikes);
+      return Right(filtered);
     } on AppException catch (e) {
       return Left(ServerFailure(e.message!));
     } catch (e) {
@@ -124,7 +142,7 @@ class PostsRepositoryImpl implements PostsRepository {
     String? thumbnailUrl,
     String? animatedCoverUrl,
     String? description,
-    String? category,
+    String? categoryId,
     String? status,
     int? duration,
     int? videoWidth,
@@ -151,7 +169,7 @@ class PostsRepositoryImpl implements PostsRepository {
         if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
         if (animatedCoverUrl != null) 'animatedCoverUrl': animatedCoverUrl,
         if (description != null) 'description': description,
-        if (category != null) 'category': category,
+        if (categoryId != null) 'categoryId': categoryId,
         if (status != null) 'status': status,
         if (duration != null) 'duration': duration,
         if (videoWidth != null) 'videoWidth': videoWidth,
@@ -203,6 +221,127 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
+  Future<Either<Failure, SocialUserPageEntity>> getPostLikes(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final pageModel = await remoteDataSource.getPostLikes(
+        postId,
+        page: page,
+        limit: limit,
+      );
+      return Right(_mapSocialUserPage(pageModel));
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PostViewsPageEntity>> getPostViews(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final pageModel = await remoteDataSource.getPostViews(
+        postId,
+        page: page,
+        limit: limit,
+      );
+      return Right(_mapPostViewsPage(pageModel));
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  PostViewsPageEntity _mapPostViewsPage(PostViewsPageModel pageModel) {
+    return PostViewsPageEntity(
+      views: pageModel.views
+          .whereType<PostViewModel>()
+          .map(_mapPostView)
+          .toList(),
+      page: pageModel.page,
+      lastPage: pageModel.lastPage,
+      total: pageModel.total,
+    );
+  }
+
+  PostViewEntity _mapPostView(PostViewModel view) {
+    return PostViewEntity(
+      id: view.id,
+      userId: view.userId,
+      postId: view.postId,
+      watchedDuration: view.watchedDuration,
+      createdAt: view.createdAt,
+      user: _mapViewUser(view),
+    );
+  }
+
+  SocialUserEntity? _mapViewUser(PostViewModel view) {
+    final user = view.user;
+    if (user != null) {
+      return SocialUserEntity(
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive,
+        isFollowing: user.isFollowing,
+        isFollowedBy: user.isFollowedBy,
+      );
+    }
+    if (view.userId.isNotEmpty) {
+      return SocialUserEntity(id: view.userId);
+    }
+    return null;
+  }
+
+  @override
+  Future<Either<Failure, int>> recordPostView(
+    String postId, {
+    int? watchedDuration,
+  }) async {
+    try {
+      final count = await remoteDataSource.recordPostView(
+        postId,
+        watchedDuration: watchedDuration,
+      );
+      return Right(count);
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  SocialUserPageEntity _mapSocialUserPage(SocialUserPageModel pageModel) {
+    return SocialUserPageEntity(
+      users: pageModel.users
+          .map(
+            (u) => SocialUserEntity(
+              id: u.id,
+              username: u.username,
+              fullName: u.fullName,
+              avatarUrl: u.avatarUrl,
+              isActive: u.isActive,
+              isFollowing: u.isFollowing,
+              isFollowedBy: u.isFollowedBy,
+            ),
+          )
+          .toList(growable: false),
+      page: pageModel.page,
+      lastPage: pageModel.lastPage,
+      total: pageModel.total,
+    );
+  }
+
+  @override
   Future<Either<Failure, bool>> toggleSave(String postId) async {
     try {
       final result = await remoteDataSource.toggleSave(postId);
@@ -239,13 +378,13 @@ class PostsRepositoryImpl implements PostsRepository {
   Future<Either<Failure, PostEntity>> updatePost(
     String postId, {
     String? description,
-    String? category,
+    String? categoryId,
     String? privacyStatus,
   }) async {
     try {
       final data = <String, dynamic>{
         if (description != null) 'description': description,
-        if (category != null) 'category': category,
+        if (categoryId != null) 'categoryId': categoryId,
         if (privacyStatus != null) 'privacyStatus': privacyStatus,
       };
       final post = await remoteDataSource.updatePost(postId, data);
@@ -274,13 +413,16 @@ class PostsRepositoryImpl implements PostsRepository {
     String postId, {
     int page = 1,
     int limit = 20,
+    String sort = 'newest',
   }) async {
     try {
       final result = await remoteDataSource.getComments(postId, {
         'page': page,
         'limit': limit,
+        'sort': sort,
       });
-      return Right(_applyCommentLikes(result));
+      final withLikes = _applyCommentLikes(result);
+      return Right(sortCommentsByKey(withLikes, sort));
     } on AppException catch (e) {
       return Left(ServerFailure(e.message!));
     } catch (e) {

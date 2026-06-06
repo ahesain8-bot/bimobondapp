@@ -2,6 +2,11 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
+import 'package:bimobondapp/app/posts/data/models/post_view_model.dart';
+import 'package:bimobondapp/app/posts/data/models/post_views_page_model.dart';
+import 'package:bimobondapp/app/social/data/models/social_user_model.dart';
+import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
+import 'package:bimobondapp/app/social/data/models/user_like_model.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -16,6 +21,17 @@ abstract class PostsRemoteDataSource {
   Future<List<PostModel>> getFeed(Map<String, dynamic> queryParams);
   Future<PostModel> getPostById(String postId);
   Future<bool> toggleLike(String postId);
+  Future<SocialUserPageModel> getPostLikes(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  });
+  Future<PostViewsPageModel> getPostViews(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  });
+  Future<int> recordPostView(String postId, {int? watchedDuration});
   Future<bool> toggleSave(String postId);
   Future<PostModel> updatePost(String postId, Map<String, dynamic> data);
   Future<bool> deletePost(String postId);
@@ -49,11 +65,124 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
     return {};
   }
 
+  Future<Map<String, dynamic>> _requiredAuthHeaders() async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw ServerException(message: 'User not authenticated');
+    }
+    final idToken = await firebaseUser.getIdToken();
+    return {'Authorization': 'Bearer $idToken'};
+  }
+
   String? _extractErrorMessage(dynamic data) {
     if (data is Map) {
       return data['message']?.toString() ?? data['error']?.toString();
     }
     return null;
+  }
+
+  List<dynamic> _extractList(dynamic body) {
+    if (body is List) return body;
+    if (body is Map) {
+      final map = Map<String, dynamic>.from(body);
+      final data = map['data'];
+      if (data is List) return data;
+      if (data is Map) {
+        final nestedData = Map<String, dynamic>.from(data);
+        for (final key in [
+          'items',
+          'users',
+          'likes',
+          'likers',
+          'views',
+          'viewers',
+        ]) {
+          final nested = nestedData[key];
+          if (nested is List) return nested;
+        }
+      }
+      for (final key in ['items', 'users', 'likes', 'likers', 'views', 'viewers']) {
+        final nested = map[key];
+        if (nested is List) return nested;
+      }
+    }
+    return const [];
+  }
+
+  Map<String, dynamic> _postViewsEnvelope(dynamic body) {
+    if (body is! Map) return {};
+    final root = Map<String, dynamic>.from(body);
+    final data = root['data'];
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return root;
+  }
+
+  List<dynamic> _extractViewsList(dynamic body) {
+    final envelope = _postViewsEnvelope(body);
+    final nested = envelope['views'] ?? envelope['viewers'];
+    if (nested is List) return nested;
+    return _extractList(body);
+  }
+
+  List<SocialUserModel> _parsePostLikers(dynamic body) {
+    final users = <SocialUserModel>[];
+    final seen = <String>{};
+
+    void addUser(SocialUserModel user) {
+      if (user.id.isEmpty || seen.contains(user.id)) return;
+      seen.add(user.id);
+      users.add(user);
+    }
+
+    for (final entry in _extractList(body)) {
+      if (entry is! Map) continue;
+      final map = Map<String, dynamic>.from(entry);
+      if (map['user'] is Map ||
+          map['liker'] is Map ||
+          map['likedBy'] is Map) {
+        final like = UserLikeModel.fromJson(map);
+        if (like.user != null) {
+          final u = like.user!;
+          addUser(
+            SocialUserModel(
+              id: u.id,
+              username: u.username,
+              fullName: u.fullName,
+              avatarUrl: u.avatarUrl,
+              isActive: u.isActive,
+              isFollowing: u.isFollowing,
+              isFollowedBy: u.isFollowedBy,
+            ),
+          );
+          continue;
+        }
+      }
+      addUser(SocialUserModel.fromJson(map));
+    }
+
+    return users;
+  }
+
+  List<PostViewModel> _parsePostViews(dynamic body) {
+    final views = <PostViewModel>[];
+    final seen = <String>{};
+
+    for (final entry in _extractViewsList(body)) {
+      if (entry is! Map) continue;
+      final view = PostViewModel.fromJson(Map<String, dynamic>.from(entry));
+      final dedupeKey = view.id.isNotEmpty
+          ? view.id
+          : view.userId.isNotEmpty
+              ? '${view.userId}_${view.createdAt?.toIso8601String() ?? ''}'
+              : '';
+      if (dedupeKey.isEmpty || seen.contains(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      views.add(view);
+    }
+
+    return views;
   }
 
   PostModel _parsePostModel(dynamic data) {
@@ -195,6 +324,108 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       } else {
         throw ServerException(message: 'Failed to create post');
       }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<SocialUserPageModel> getPostLikes(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.postLikes(postId),
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _optionalAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final users = _parsePostLikers(response.data);
+        return SocialUserPageModel.fromResponse(
+          response.data,
+          users,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load likes',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<PostViewsPageModel> getPostViews(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.postViews(postId),
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _requiredAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final views = _parsePostViews(response.data);
+        return PostViewsPageModel.fromResponse(
+          response.data,
+          views,
+          requestedPage: page,
+          requestedLimit: limit,
+          envelope: _postViewsEnvelope(response.data),
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load views',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<int> recordPostView(String postId, {int? watchedDuration}) async {
+    try {
+      final body = <String, dynamic>{};
+      if (watchedDuration != null) {
+        body['watchedDuration'] = watchedDuration;
+      }
+
+      final response = await apiClient.dio.post(
+        ApiConstants.recordPostView(postId),
+        data: body.isEmpty ? null : body,
+        options: Options(headers: await _optionalAuthHeaders()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          final count = data['viewCount'] ?? data['viewsCount'];
+          if (count is num) return count.toInt();
+          final nested = data['data'];
+          if (nested is Map<String, dynamic>) {
+            final nestedCount = nested['viewCount'] ?? nested['viewsCount'];
+            if (nestedCount is num) return nestedCount.toInt();
+          }
+        }
+        return 0;
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to record view',
+      );
     } catch (e) {
       throw DioHandler.handle(e);
     }

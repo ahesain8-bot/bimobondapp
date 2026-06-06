@@ -12,6 +12,22 @@ class SettingsLayoutConstants {
   static const double sectionTitleFontSize = 13;
   static const double sectionTitleLetterSpacing = 0.5;
   static const double sectionTitleColorAlpha = 0.5;
+
+  /// Light gray borders for settings groups (light / dark).
+  static const Color groupBorderLight = Color(0xFFE5E5E5);
+  static const Color groupBorderDark = Color(0xFF3D3D3D);
+  static const Color groupDividerLight = Color(0xFFEBEBEB);
+  static const Color groupDividerDark = Color(0xFF383838);
+
+  static Color groupBorderColor(ThemeData theme) =>
+      theme.brightness == Brightness.dark
+          ? groupBorderDark
+          : groupBorderLight;
+
+  static Color groupDividerColor(ThemeData theme) =>
+      theme.brightness == Brightness.dark
+          ? groupDividerDark
+          : groupDividerLight;
   static const double groupSpacing = AppSizes.p12;
   static const double groupRadius = AppSizes.p16;
   static const double dividerIndent = 56;

@@ -7,9 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
-import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart';
-import 'package:bimobondapp/app/auth/domain/usecases/upload_avatar_usecase.dart';
-import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
+import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -153,8 +152,8 @@ class _ChangeAvatarScreenState extends State<ChangeAvatarScreen> {
       _isUploading = true;
     });
 
-    final result = await sl<UploadAvatarUseCase>().call(file);
-    result.fold(
+    final uploadResult = await sl<UploadMediaUseCase>().call(file);
+    uploadResult.fold(
       (failure) {
         setState(() {
           _isUploading = false;
@@ -162,9 +161,8 @@ class _ChangeAvatarScreenState extends State<ChangeAvatarScreen> {
         PopupDialogs.showErrorDialog(context, 'Failed to upload avatar');
       },
       (uploadedUrl) {
-        final normalizedUrl = _normalizeAvatarUrl(uploadedUrl);
         context.read<AuthBloc>().add(
-          UpdateProfileRequestedEvent({'avatarUrl': normalizedUrl}),
+          UpdateProfileRequestedEvent({'avatarUrl': uploadedUrl}),
         );
       },
     );
@@ -179,13 +177,6 @@ class _ChangeAvatarScreenState extends State<ChangeAvatarScreen> {
     context.read<AuthBloc>().add(
       UpdateProfileRequestedEvent({'avatarUrl': null}),
     );
-  }
-
-  String _normalizeAvatarUrl(String url) {
-    if (url.toLowerCase().startsWith('http')) {
-      return url;
-    }
-    return '${ApiConstants.baseUrl}$url';
   }
 
   Widget _buildOption(

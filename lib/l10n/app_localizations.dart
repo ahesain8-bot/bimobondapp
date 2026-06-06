@@ -611,11 +611,149 @@ abstract class AppLocalizations {
   /// **'No bio yet.'**
   String get noBio;
 
+  /// No description provided for @profileAvatarViewPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile photo'**
+  String get profileAvatarViewPhoto;
+
+  /// No description provided for @profileAvatarViewStory.
+  ///
+  /// In en, this message translates to:
+  /// **'View story'**
+  String get profileAvatarViewStory;
+
+  /// No description provided for @profileAvatarNoPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'No profile photo'**
+  String get profileAvatarNoPhoto;
+
   /// No description provided for @story.
   ///
   /// In en, this message translates to:
   /// **'Story'**
   String get story;
+
+  /// No description provided for @addStoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add story'**
+  String get addStoryTitle;
+
+  /// No description provided for @shareStoryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Share story'**
+  String get shareStoryButton;
+
+  /// No description provided for @storyCaptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a caption (optional)'**
+  String get storyCaptionHint;
+
+  /// No description provided for @storyPickMediaError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not pick media: {error}'**
+  String storyPickMediaError(String error);
+
+  /// No description provided for @storyExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Story expired'**
+  String get storyExpired;
+
+  /// No description provided for @storyTimeMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}m ago'**
+  String storyTimeMinutesAgo(int count);
+
+  /// No description provided for @storyTimeHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}h ago'**
+  String storyTimeHoursAgo(int count);
+
+  /// No description provided for @storyAddCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add comment...'**
+  String get storyAddCommentHint;
+
+  /// No description provided for @storySendMessageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a message...'**
+  String get storySendMessageHint;
+
+  /// No description provided for @storySendMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply with a message'**
+  String get storySendMessageTitle;
+
+  /// No description provided for @storyViewersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewers'**
+  String get storyViewersTitle;
+
+  /// No description provided for @storyViewerUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get storyViewerUnknown;
+
+  /// No description provided for @storyMessagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages on this story'**
+  String get storyMessagesTitle;
+
+  /// No description provided for @storyMessagesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages on this story yet'**
+  String get storyMessagesEmpty;
+
+  /// No description provided for @storyMessageSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send message. Try again.'**
+  String get storyMessageSendFailed;
+
+  /// No description provided for @storyMessageSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Message sent to {name}'**
+  String storyMessageSent(String name);
+
+  /// No description provided for @storyPreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Story'**
+  String get storyPreviewLabel;
+
+  /// No description provided for @postPreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Post'**
+  String get postPreviewLabel;
+
+  /// No description provided for @storyMessageOnStory.
+  ///
+  /// In en, this message translates to:
+  /// **'Replied to your story'**
+  String get storyMessageOnStory;
+
+  /// No description provided for @storyMessageOnPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Replied to your post'**
+  String get storyMessageOnPost;
 
   /// No description provided for @personalInfo.
   ///
@@ -830,8 +968,110 @@ abstract class AppLocalizations {
   /// No description provided for @auctionsSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search by category or description...'**
+  /// **'Search auctions...'**
   String get auctionsSearchHint;
+
+  /// No description provided for @postsSearchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search posts'**
+  String get postsSearchTitle;
+
+  /// No description provided for @postsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search posts...'**
+  String get postsSearchHint;
+
+  /// No description provided for @auctionsFiltersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get auctionsFiltersTitle;
+
+  /// No description provided for @auctionsFiltersApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply filters'**
+  String get auctionsFiltersApply;
+
+  /// No description provided for @auctionsFiltersReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get auctionsFiltersReset;
+
+  /// No description provided for @auctionsFiltersCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get auctionsFiltersCategories;
+
+  /// No description provided for @auctionsFiltersPriceRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Price range (USD)'**
+  String get auctionsFiltersPriceRange;
+
+  /// No description provided for @auctionsFiltersMinPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Min price'**
+  String get auctionsFiltersMinPrice;
+
+  /// No description provided for @auctionsFiltersMaxPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Max price'**
+  String get auctionsFiltersMaxPrice;
+
+  /// No description provided for @auctionsFiltersTimeRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Time remaining'**
+  String get auctionsFiltersTimeRemaining;
+
+  /// No description provided for @auctionsFiltersInvalidPriceRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Min price cannot be greater than max price'**
+  String get auctionsFiltersInvalidPriceRange;
+
+  /// No description provided for @auctionsTimeRemainingAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Any time'**
+  String get auctionsTimeRemainingAny;
+
+  /// No description provided for @auctionsTimeRemaining1Hour.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending within 1 hour'**
+  String get auctionsTimeRemaining1Hour;
+
+  /// No description provided for @auctionsTimeRemaining6Hours.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending within 6 hours'**
+  String get auctionsTimeRemaining6Hours;
+
+  /// No description provided for @auctionsTimeRemaining24Hours.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending within 24 hours'**
+  String get auctionsTimeRemaining24Hours;
+
+  /// No description provided for @auctionsTimeRemaining7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending within 7 days'**
+  String get auctionsTimeRemaining7Days;
+
+  /// No description provided for @auctionsTimeRemaining30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending within 30 days'**
+  String get auctionsTimeRemaining30Days;
 
   /// No description provided for @popularCategories.
   ///
@@ -1358,7 +1598,7 @@ abstract class AppLocalizations {
   /// No description provided for @describePostHint.
   ///
   /// In en, this message translates to:
-  /// **'Describe your post...'**
+  /// **'Describe your post… use @username and #tag in the text'**
   String get describePostHint;
 
   /// No description provided for @hashtagsLabel.
@@ -1499,6 +1739,48 @@ abstract class AppLocalizations {
   /// **'{count} comments'**
   String commentsCount(int count);
 
+  /// No description provided for @postLikesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No likes yet'**
+  String get postLikesEmpty;
+
+  /// No description provided for @postViewsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No views yet'**
+  String get postViewsEmpty;
+
+  /// No description provided for @postViewWatchedDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s watched'**
+  String postViewWatchedDuration(int seconds);
+
+  /// No description provided for @viewsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Views'**
+  String get viewsLabel;
+
+  /// No description provided for @commentsSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get commentsSortNewest;
+
+  /// No description provided for @commentsSortOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest'**
+  String get commentsSortOldest;
+
+  /// No description provided for @commentsSortTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get commentsSortTop;
+
   /// No description provided for @noCommentsYet.
   ///
   /// In en, this message translates to:
@@ -1508,7 +1790,7 @@ abstract class AppLocalizations {
   /// No description provided for @addCommentHint.
   ///
   /// In en, this message translates to:
-  /// **'Add comment...'**
+  /// **'Add comment… @username to mention'**
   String get addCommentHint;
 
   /// No description provided for @justNow.
@@ -1640,13 +1922,13 @@ abstract class AppLocalizations {
   /// No description provided for @hashtagsHint.
   ///
   /// In en, this message translates to:
-  /// **'Separate with commas (e.g. travel, food)'**
+  /// **'Type #tag in your caption (e.g. #travel #food)'**
   String get hashtagsHint;
 
   /// No description provided for @mentionsHint.
   ///
   /// In en, this message translates to:
-  /// **'Separate with commas (e.g. john, jane)'**
+  /// **'Type @username in your caption (e.g. @jane_doe)'**
   String get mentionsHint;
 
   /// No description provided for @mediaLabel.
@@ -1798,6 +2080,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Chat wallpaper'**
   String get settingsChatWallpaper;
+
+  /// No description provided for @settingsSectionAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get settingsSectionAdmin;
+
+  /// No description provided for @settingsAdminActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'User activity'**
+  String get settingsAdminActivity;
+
+  /// No description provided for @adminActivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get adminActivityTitle;
+
+  /// No description provided for @adminActivityEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity yet'**
+  String get adminActivityEmpty;
+
+  /// No description provided for @adminActivityJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get adminActivityJustNow;
+
+  /// No description provided for @adminActivityNoDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'No details'**
+  String get adminActivityNoDetails;
+
+  /// No description provided for @adminActivityOnPost.
+  ///
+  /// In en, this message translates to:
+  /// **'On post: {post}'**
+  String adminActivityOnPost(String post);
+
+  /// No description provided for @adminActivityTypeCreatePost.
+  ///
+  /// In en, this message translates to:
+  /// **'Created a post'**
+  String get adminActivityTypeCreatePost;
+
+  /// No description provided for @adminActivityTypeComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Commented'**
+  String get adminActivityTypeComment;
+
+  /// No description provided for @adminActivityTypeLikePost.
+  ///
+  /// In en, this message translates to:
+  /// **'Liked a post'**
+  String get adminActivityTypeLikePost;
+
+  /// No description provided for @adminActivityTypeSendGift.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent a gift'**
+  String get adminActivityTypeSendGift;
 
   /// No description provided for @chatWallpaperTitle.
   ///

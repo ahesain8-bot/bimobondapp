@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
+import 'package:bimobondapp/app/chats/domain/entities/shared_post_snapshot.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 
 class ChatMessageModel extends ChatMessageEntity {
@@ -11,6 +12,7 @@ class ChatMessageModel extends ChatMessageEntity {
     super.mediaUrl,
     super.replyToId,
     super.sharedPostId,
+    super.sharedPost,
     super.createdAt,
     super.readByUserIds,
     super.reactions,
@@ -226,6 +228,18 @@ class ChatMessageModel extends ChatMessageEntity {
       );
     }
 
+    SharedPostSnapshot? sharedPost;
+    final sharedRaw = json['sharedPost'] ?? json['shared_post'];
+    if (sharedRaw is Map) {
+      sharedPost = SharedPostSnapshot.fromJson(
+        Map<String, dynamic>.from(sharedRaw),
+      );
+    }
+
+    final sharedPostId =
+        (json['sharedPostId'] ?? json['shared_post_id'])?.toString() ??
+        sharedPost?.postId;
+
     return ChatMessageModel(
       id: (json['id'] ?? '').toString(),
       chatId: (json['chatId'] ?? json['chat_id'] ?? '').toString(),
@@ -235,7 +249,8 @@ class ChatMessageModel extends ChatMessageEntity {
       content: (json['content'] ?? json['text'] ?? json['message'])?.toString(),
       mediaUrl: _resolveMediaUrl(json, type),
       replyToId: (json['replyToId'] ?? json['reply_to_id'])?.toString(),
-      sharedPostId: (json['sharedPostId'] ?? json['shared_post_id'])?.toString(),
+      sharedPostId: sharedPostId,
+      sharedPost: sharedPost,
       createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
       readByUserIds: _parseReadBy(json['readBy'] ?? json['read_by']),
       reactions: _parseReactions(json),

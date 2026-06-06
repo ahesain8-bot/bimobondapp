@@ -9,8 +9,15 @@ import 'package:go_router/go_router.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostEntity post;
+  final bool openCommentsOnLoad;
+  final String? highlightCommentId;
 
-  const PostDetailScreen({super.key, required this.post});
+  const PostDetailScreen({
+    super.key,
+    required this.post,
+    this.openCommentsOnLoad = false,
+    this.highlightCommentId,
+  });
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -54,6 +61,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           key: ValueKey('${_post.id}_${_post.description}'),
           post: _post,
           bottomPadding: MediaQuery.of(context).padding.bottom + 16,
+          openCommentsOnLoad: widget.openCommentsOnLoad,
+          highlightCommentId: widget.highlightCommentId,
         ),
       ),
     );

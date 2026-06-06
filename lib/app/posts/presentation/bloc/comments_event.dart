@@ -11,15 +11,17 @@ class FetchCommentsRequested extends CommentsEvent {
   final String postId;
   final int page;
   final bool isRefresh;
+  final String sort;
 
   const FetchCommentsRequested({
     required this.postId,
     this.page = 1,
     this.isRefresh = false,
+    this.sort = 'newest',
   });
 
   @override
-  List<Object?> get props => [postId, page, isRefresh];
+  List<Object?> get props => [postId, page, isRefresh, sort];
 }
 
 class AddCommentRequested extends CommentsEvent {
@@ -27,14 +29,18 @@ class AddCommentRequested extends CommentsEvent {
   final String content;
   final String? parentId;
 
+  /// Top-level comment id for grouping nested replies in the UI thread.
+  final String? threadRootId;
+
   const AddCommentRequested({
     required this.postId,
     required this.content,
     this.parentId,
+    this.threadRootId,
   });
 
   @override
-  List<Object?> get props => [postId, content, parentId];
+  List<Object?> get props => [postId, content, parentId, threadRootId];
 }
 
 class FetchRepliesRequested extends CommentsEvent {

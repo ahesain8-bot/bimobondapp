@@ -7,11 +7,11 @@ import 'package:bimobondapp/app/social/presentation/utils/suggestion_follow_togg
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -199,7 +199,7 @@ class _FollowSuggestionsScreenState extends State<FollowSuggestionsScreen> {
         );
 
         Future<void> openProfile() async {
-          final isFollowing = await openUserProfile(
+          final isFollowing = await openUserStoryOrProfile(
             context,
             userId: suggestion.id,
             username: suggestion.username,
@@ -222,10 +222,15 @@ class _FollowSuggestionsScreenState extends State<FollowSuggestionsScreen> {
             horizontal: AppSizes.p16,
             vertical: AppSizes.p4,
           ),
-          leading: SafeNetworkAvatar(
+          leading: StoryProfileAvatar(
+            userId: suggestion.id,
             imageUrl: suggestion.avatarUrl,
             radius: 24,
             fallbackText: suggestion.displayName,
+            username: suggestion.username,
+            fullName: suggestion.fullName,
+            isFollowing: suggestion.isFollowing,
+            onTap: openProfile,
           ),
           title: Row(
             children: [
@@ -262,12 +267,10 @@ class _FollowSuggestionsScreenState extends State<FollowSuggestionsScreen> {
                   ),
                 )
               : null,
-          trailing: ProfileFollowButton(
+          trailing: ProfileFollowButton.listTile(
             isFollowing: suggestion.isFollowing,
+            isFollowedBy: suggestion.isFollowedBy,
             isLoading: isLoading,
-            width: 96,
-            height: 34,
-            fontSize: 11,
             onPressed: () => _toggleFollow(index),
           ),
         );

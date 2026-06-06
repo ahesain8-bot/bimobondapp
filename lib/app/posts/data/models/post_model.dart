@@ -1,6 +1,9 @@
+import 'package:bimobondapp/app/posts/data/models/mention_ref_model.dart';
+import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/post_story_filter.dart';
 
 class PostModel extends PostEntity {
   const PostModel({
@@ -8,9 +11,10 @@ class PostModel extends PostEntity {
     required super.userId,
     required super.type,
     super.videoUrl,
+    super.hlsUrl,
     super.thumbnailUrl,
     super.description,
-    super.category,
+    super.categoryId,
     required super.privacyStatus,
     required super.viewCount,
     required super.likeCount,
@@ -25,12 +29,37 @@ class PostModel extends PostEntity {
     required super.hashtags,
     required super.mentions,
     super.isAuctionable = false,
+    super.isStory = false,
     super.auction,
   });
+
+  static List<String> _parseHashtagNames(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) {
+          if (e is String) return e;
+          if (e is Map) return e['name']?.toString() ?? '';
+          return e.toString();
+        })
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
 
   static String? _normalizeUrl(String? url) {
     if (url == null || url.isEmpty) return url;
     return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  static String? _parseCategoryId(Map<String, dynamic> json) {
+    final direct = json['categoryId']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final nested = json['category'];
+    if (nested is Map) {
+      final nestedId = nested['id']?.toString();
+      if (nestedId != null && nestedId.isNotEmpty) return nestedId;
+    }
+    return null;
   }
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -39,9 +68,10 @@ class PostModel extends PostEntity {
       userId: json['userId'] ?? '',
       type: json['type'] ?? 'VIDEO',
       videoUrl: _normalizeUrl(json['videoUrl']),
+      hlsUrl: _normalizeUrl(json['hlsUrl']),
       thumbnailUrl: _normalizeUrl(json['thumbnailUrl']),
       description: json['description'],
-      category: json['category'],
+      categoryId: _parseCategoryId(json),
       privacyStatus: json['privacyStatus'] ?? 'PUBLIC',
       viewCount: json['viewCount'] ?? 0,
       likeCount: json['likeCount'] ?? 0,
@@ -63,17 +93,10 @@ class PostModel extends PostEntity {
               ?.map((e) => PostMediaModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      hashtags:
-          (json['hashtags'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
-      mentions:
-          (json['mentions'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      hashtags: _parseHashtagNames(json['hashtags']),
+      mentions: MentionRefModel.listFromJson(json['mentions']),
       isAuctionable: json['isAuctionable'] == true,
+      isStory: parsePostIsStory(json['isStory']),
       auction: json['auction'] is Map<String, dynamic>
           ? PostAuctionEntity.fromJson(json['auction'] as Map<String, dynamic>)
           : null,
@@ -86,9 +109,10 @@ class PostModel extends PostEntity {
       'userId': userId,
       'type': type,
       'videoUrl': videoUrl,
+      'hlsUrl': hlsUrl,
       'thumbnailUrl': thumbnailUrl,
       'description': description,
-      'category': category,
+      'categoryId': categoryId,
       'privacyStatus': privacyStatus,
       'viewCount': viewCount,
       'likeCount': likeCount,
@@ -101,7 +125,14 @@ class PostModel extends PostEntity {
       'user': (user as PostUserModel?)?.toJson(),
       'media': media.map((e) => (e as PostMediaModel).toJson()).toList(),
       'hashtags': hashtags,
-      'mentions': mentions,
+      'mentions': mentions
+          .map(
+            (e) => e is MentionRefModel
+                ? e.toJson()
+                : MentionRefModel(userId: e.userId, username: e.username)
+                    .toJson(),
+          )
+          .toList(),
       'isAuctionable': isAuctionable,
       if (auction != null) 'auction': _auctionToJson(auction!),
     };

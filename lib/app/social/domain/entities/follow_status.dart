@@ -31,4 +31,15 @@ enum FollowStatus {
 
     return FollowStatus.unfollowed;
   }
+
+  /// Maps a toggle API result to the next follow state.
+  /// When the API omits follow status, keeps the optimistic toggle result.
+  static bool resolveIsFollowing({
+    required bool wasFollowing,
+    required FollowStatus status,
+  }) {
+    if (status == FollowStatus.followed) return true;
+    if (status == FollowStatus.unfollowed && wasFollowing) return false;
+    return !wasFollowing;
+  }
 }

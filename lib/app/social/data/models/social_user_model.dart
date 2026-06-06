@@ -31,35 +31,50 @@ class SocialUserModel extends SocialUserEntity {
     return false;
   }
 
+  static Map<String, dynamic> unwrapForParsing(Map<String, dynamic> json) {
+    for (final key in ['user', 'friend', 'followedUser', 'follower', 'profile']) {
+      final nested = json[key];
+      if (nested is Map) {
+        final user = Map<String, dynamic>.from(nested);
+        user.putIfAbsent('id', () => json['userId'] ?? json['friendId']);
+        return user;
+      }
+    }
+    return json;
+  }
+
   factory SocialUserModel.fromJson(Map<String, dynamic> json) {
+    final data = unwrapForParsing(json);
     final avatar =
-        json['avatarUrl'] ??
-        json['avatar'] ??
-        json['image'] ??
-        json['profileImage'];
+        data['avatarUrl'] ??
+        data['avatar'] ??
+        data['image'] ??
+        data['profileImage'];
 
     final isFollowing = _parseBool(
-      json['isFollowing'] ??
-          json['isFollowed'] ??
-          json['viewerIsFollowing'] ??
-          json['youFollow'],
+      data['isFollowing'] ??
+          data['isFollowed'] ??
+          data['viewerIsFollowing'] ??
+          data['youFollow'] ??
+          json['isFollowing'],
     );
 
     final isFollowedBy = _parseBool(
-      json['isFollowedBy'] ??
-          json['followsYou'] ??
-          json['isFollower'] ??
-          json['followsViewer'],
+      data['isFollowedBy'] ??
+          data['followsYou'] ??
+          data['isFollower'] ??
+          data['followsViewer'] ??
+          json['isFollowedBy'],
     );
 
     return SocialUserModel(
-      id: (json['id'] ?? json['userId'] ?? '').toString(),
-      username: json['username']?.toString(),
-      fullName: json['fullName']?.toString() ?? json['name']?.toString(),
+      id: (data['id'] ?? data['userId'] ?? json['userId'] ?? '').toString(),
+      username: data['username']?.toString(),
+      fullName: data['fullName']?.toString() ?? data['name']?.toString(),
       avatarUrl: avatar != null
           ? MediaUtils.resolveAbsoluteUrl(avatar.toString())
           : null,
-      isActive: json['isActive'] as bool? ?? json['active'] as bool?,
+      isActive: data['isActive'] as bool? ?? data['active'] as bool?,
       isFollowing: isFollowing,
       isFollowedBy: isFollowedBy,
     );

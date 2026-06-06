@@ -16,6 +16,9 @@ class ApiConstants {
   static const String getFeed = '/posts/feed';
   static const String publicFeed = '/posts/public/feed';
   static String toggleLike(String postId) => '/posts/$postId/like';
+  static String postLikes(String postId) => '/posts/$postId/likes';
+  static String postViews(String postId) => '/posts/$postId/views';
+  static String recordPostView(String postId) => '/posts/$postId/view';
   static String toggleSave(String postId) => '/posts/$postId/save';
   
   // Comments
@@ -55,4 +58,6 @@ class ApiConstants {
   static String userFollowers(String userId) => '/users/$userId/followers';
   static String userFollowing(String userId) => '/users/$userId/following';
   static String userById(String userId) => '/users/$userId';
+  static String adminUserActivity(String userId) =>
+      '/users/admin/$userId/activity';
 }

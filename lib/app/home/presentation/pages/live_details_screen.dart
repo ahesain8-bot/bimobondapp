@@ -13,6 +13,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as di;
+import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -37,7 +38,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_medi
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_mock_chat_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_post_comments_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_page_indicator.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -166,6 +167,16 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     }
 
     _syncAuctionFinishedFromGiftTotal();
+    _recordPostViewIfNeeded();
+  }
+
+  void _recordPostViewIfNeeded() {
+    final post = widget.post;
+    if (post == null || post.isStory) return;
+    PostViewRecorder.recordIfNeeded(
+      postId: post.id,
+      isOwner: _isPostOwner(),
+    );
   }
 
   @override
@@ -454,6 +465,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         page: 1,
         limit: HomeLayoutConstants.feedPageSize,
         isRefresh: true,
+        isStory: false,
       ),
     );
 
@@ -510,7 +522,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final userId = _hostUserId;
     if (userId == null || userId.isEmpty) return;
 
-    final isFollowing = await openUserProfile(
+    final isFollowing = await openUserStoryOrProfile(
       context,
       userId: userId,
       username: widget.post?.user?.username,
@@ -679,6 +691,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                         subtitle: widget.post?.auction?.itemName,
                         viewersLabel: _viewersLabel(l10n),
                         avatarUrl: _avatarUrl(),
+                        hostUserId: _hostUserId,
                         isFollowing: _isFollowing,
                         followLabel: l10n.liveFollow,
                         followingLabel: l10n.liveFollowing,

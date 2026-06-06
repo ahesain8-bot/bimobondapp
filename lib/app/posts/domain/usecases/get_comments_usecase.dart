@@ -11,7 +11,12 @@ class GetCommentsUsecase implements UseCase<List<CommentEntity>, GetCommentsPara
 
   @override
   Future<Either<Failure, List<CommentEntity>>> call(GetCommentsParams params) async {
-    return await repository.getComments(params.postId, page: params.page, limit: params.limit);
+    return await repository.getComments(
+      params.postId,
+      page: params.page,
+      limit: params.limit,
+      sort: params.sort,
+    );
   }
 }
 
@@ -19,6 +24,12 @@ class GetCommentsParams {
   final String postId;
   final int page;
   final int limit;
+  final String sort;
 
-  GetCommentsParams({required this.postId, this.page = 1, this.limit = 20});
+  GetCommentsParams({
+    required this.postId,
+    this.page = 1,
+    this.limit = 20,
+    this.sort = 'newest',
+  });
 }

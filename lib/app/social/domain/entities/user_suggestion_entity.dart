@@ -11,6 +11,7 @@ class UserSuggestionEntity extends Equatable {
     this.mutualCount = 0,
     this.reason,
     this.isFollowing = false,
+    this.isFollowedBy = false,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class UserSuggestionEntity extends Equatable {
   final int mutualCount;
   final String? reason;
   final bool isFollowing;
+  final bool isFollowedBy;
 
   String get displayName =>
       (fullName?.trim().isNotEmpty == true ? fullName : username) ?? 'User';
@@ -37,6 +39,7 @@ class UserSuggestionEntity extends Equatable {
       mutualCount: other.mutualCount,
       reason: other.reason,
       isFollowing: other.isFollowing,
+      isFollowedBy: other.isFollowedBy,
     );
   }
 
@@ -50,6 +53,7 @@ class UserSuggestionEntity extends Equatable {
     int? mutualCount,
     String? reason,
     bool? isFollowing,
+    bool? isFollowedBy,
   }) {
     return UserSuggestionEntity(
       id: id ?? this.id,
@@ -61,6 +65,7 @@ class UserSuggestionEntity extends Equatable {
       mutualCount: mutualCount ?? this.mutualCount,
       reason: reason ?? this.reason,
       isFollowing: isFollowing ?? this.isFollowing,
+      isFollowedBy: isFollowedBy ?? this.isFollowedBy,
     );
   }
 
@@ -75,5 +80,6 @@ class UserSuggestionEntity extends Equatable {
         mutualCount,
         reason,
         isFollowing,
+        isFollowedBy,
       ];
 }

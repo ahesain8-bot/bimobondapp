@@ -3,10 +3,28 @@ import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
+/// Shared sizing so Follow / Follow back / Following look identical on user cards.
+class ProfileFollowButtonSizes {
+  static const double listHeight = 34;
+  static const double listWidth = 92;
+  static const double listFontSize = 12;
+}
+
+String profileFollowButtonLabel(
+  AppLocalizations l10n, {
+  required bool isFollowing,
+  bool isFollowedBy = false,
+}) {
+  if (isFollowing) return l10n.messagesFollowing;
+  if (isFollowedBy) return l10n.connectionsFollowBack;
+  return l10n.messagesFollow;
+}
+
 class ProfileFollowButton extends StatelessWidget {
   const ProfileFollowButton({
     required this.isFollowing,
     required this.isLoading,
+    this.isFollowedBy = false,
     this.onPressed,
     this.width,
     this.height = 40,
@@ -14,7 +32,18 @@ class ProfileFollowButton extends StatelessWidget {
     super.key,
   });
 
+  const ProfileFollowButton.listTile({
+    required this.isFollowing,
+    required this.isLoading,
+    this.isFollowedBy = false,
+    this.onPressed,
+    super.key,
+  })  : width = ProfileFollowButtonSizes.listWidth,
+        height = ProfileFollowButtonSizes.listHeight,
+        fontSize = ProfileFollowButtonSizes.listFontSize;
+
   final bool isFollowing;
+  final bool isFollowedBy;
   final bool isLoading;
   final VoidCallback? onPressed;
   final double? width;
@@ -25,6 +54,11 @@ class ProfileFollowButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final label = profileFollowButtonLabel(
+      l10n,
+      isFollowing: isFollowing,
+      isFollowedBy: isFollowedBy,
+    );
     final foregroundColor = isFollowing
         ? theme.colorScheme.onSurface
         : Colors.white;
@@ -43,7 +77,7 @@ class ProfileFollowButton extends StatelessWidget {
               ? theme.dividerColor.withValues(alpha: 0.2)
               : theme.colorScheme.primary.withValues(alpha: 0.5),
           elevation: 0,
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(horizontal: AppSizes.p8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
           ),
@@ -57,11 +91,14 @@ class ProfileFollowButton extends StatelessWidget {
                   color: foregroundColor,
                 ),
               )
-            : CustomText(
-                isFollowing ? l10n.messagesFollowing : l10n.messagesFollow,
-                fontWeight: FontWeight.bold,
-                fontSize: fontSize,
-                color: foregroundColor,
+            : FittedBox(
+                fit: BoxFit.scaleDown,
+                child: CustomText(
+                  label,
+                  fontWeight: FontWeight.bold,
+                  fontSize: fontSize,
+                  color: foregroundColor,
+                ),
               ),
       ),
     );

@@ -269,7 +269,84 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noBio => 'لا يوجد نبذة شخصية بعد.';
 
   @override
+  String get profileAvatarViewPhoto => 'صورة الملف الشخصي';
+
+  @override
+  String get profileAvatarViewStory => 'عرض القصة';
+
+  @override
+  String get profileAvatarNoPhoto => 'لا توجد صورة للملف الشخصي';
+
+  @override
   String get story => 'قصة';
+
+  @override
+  String get addStoryTitle => 'إضافة قصة';
+
+  @override
+  String get shareStoryButton => 'نشر القصة';
+
+  @override
+  String get storyCaptionHint => 'أضف تعليقاً (اختياري)';
+
+  @override
+  String storyPickMediaError(String error) {
+    return 'تعذر اختيار الوسائط: $error';
+  }
+
+  @override
+  String get storyExpired => 'انتهت القصة';
+
+  @override
+  String storyTimeMinutesAgo(int count) {
+    return 'منذ $count د';
+  }
+
+  @override
+  String storyTimeHoursAgo(int count) {
+    return 'منذ $count س';
+  }
+
+  @override
+  String get storyAddCommentHint => 'أضف تعليقاً...';
+
+  @override
+  String get storySendMessageHint => 'اكتب رسالة...';
+
+  @override
+  String get storySendMessageTitle => 'الرد برسالة';
+
+  @override
+  String get storyViewersTitle => 'المشاهدون';
+
+  @override
+  String get storyViewerUnknown => 'مشاهد';
+
+  @override
+  String get storyMessagesTitle => 'رسائل على هذه القصة';
+
+  @override
+  String get storyMessagesEmpty => 'لا رسائل على هذه القصة بعد';
+
+  @override
+  String get storyMessageSendFailed => 'تعذر إرسال الرسالة. حاول مرة أخرى.';
+
+  @override
+  String storyMessageSent(String name) {
+    return 'تم إرسال الرسالة إلى $name';
+  }
+
+  @override
+  String get storyPreviewLabel => 'قصة';
+
+  @override
+  String get postPreviewLabel => 'منشور';
+
+  @override
+  String get storyMessageOnStory => 'رد على قصتك';
+
+  @override
+  String get storyMessageOnPost => 'رد على منشورك';
 
   @override
   String get personalInfo => 'المعلومات الشخصية';
@@ -379,7 +456,58 @@ class AppLocalizationsAr extends AppLocalizations {
   String get navAuctions => 'مزادات';
 
   @override
-  String get auctionsSearchHint => 'ابحث بالفئة أو الوصف...';
+  String get auctionsSearchHint => 'ابحث في المزادات...';
+
+  @override
+  String get postsSearchTitle => 'بحث المنشورات';
+
+  @override
+  String get postsSearchHint => 'ابحث في المنشورات...';
+
+  @override
+  String get auctionsFiltersTitle => 'تصفية';
+
+  @override
+  String get auctionsFiltersApply => 'تطبيق التصفية';
+
+  @override
+  String get auctionsFiltersReset => 'إعادة تعيين';
+
+  @override
+  String get auctionsFiltersCategories => 'الفئات';
+
+  @override
+  String get auctionsFiltersPriceRange => 'نطاق السعر (دولار)';
+
+  @override
+  String get auctionsFiltersMinPrice => 'أقل سعر';
+
+  @override
+  String get auctionsFiltersMaxPrice => 'أعلى سعر';
+
+  @override
+  String get auctionsFiltersTimeRemaining => 'الوقت المتبقي';
+
+  @override
+  String get auctionsFiltersInvalidPriceRange => 'لا يمكن أن يكون أقل سعر أكبر من أعلى سعر';
+
+  @override
+  String get auctionsTimeRemainingAny => 'أي وقت';
+
+  @override
+  String get auctionsTimeRemaining1Hour => 'ينتهي خلال ساعة';
+
+  @override
+  String get auctionsTimeRemaining6Hours => 'ينتهي خلال 6 ساعات';
+
+  @override
+  String get auctionsTimeRemaining24Hours => 'ينتهي خلال 24 ساعة';
+
+  @override
+  String get auctionsTimeRemaining7Days => 'ينتهي خلال 7 أيام';
+
+  @override
+  String get auctionsTimeRemaining30Days => 'ينتهي خلال 30 يوماً';
 
   @override
   String get popularCategories => 'الفئات الرائجة';
@@ -679,7 +807,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get navProfile => 'حسابي';
 
   @override
-  String get describePostHint => 'صف منشورك...';
+  String get describePostHint => 'صف منشورك… استخدم @اسم_المستخدم و #وسم في النص';
 
   @override
   String get hashtagsLabel => 'هاشتاجات';
@@ -753,10 +881,33 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get postLikesEmpty => 'لا إعجابات بعد';
+
+  @override
+  String get postViewsEmpty => 'لا مشاهدات بعد';
+
+  @override
+  String postViewWatchedDuration(int seconds) {
+    return 'شاهد $seconds ث';
+  }
+
+  @override
+  String get viewsLabel => 'المشاهدات';
+
+  @override
+  String get commentsSortNewest => 'الأحدث';
+
+  @override
+  String get commentsSortOldest => 'الأقدم';
+
+  @override
+  String get commentsSortTop => 'الأكثر إعجاباً';
+
+  @override
   String get noCommentsYet => 'لا توجد تعليقات بعد. كن أول من يعلق!';
 
   @override
-  String get addCommentHint => 'أضف تعليقًا...';
+  String get addCommentHint => 'أضف تعليقًا… @اسم_المستخدم للإشارة';
 
   @override
   String get justNow => 'الآن';
@@ -832,10 +983,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get selectCategoryHint => 'اختر فئة';
 
   @override
-  String get hashtagsHint => 'افصل بفواصل (مثال: سفر، طعام)';
+  String get hashtagsHint => 'اكتب #وسم في الوصف (مثال: #سفر #طعام)';
 
   @override
-  String get mentionsHint => 'افصل بفواصل (مثال: john, jane)';
+  String get mentionsHint => 'اكتب @اسم_المستخدم في الوصف (مثال: @jane_doe)';
 
   @override
   String get mediaLabel => 'الوسائط';
@@ -911,6 +1062,41 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsChatWallpaper => 'خلفية المحادثة';
+
+  @override
+  String get settingsSectionAdmin => 'المسؤول';
+
+  @override
+  String get settingsAdminActivity => 'نشاط المستخدم';
+
+  @override
+  String get adminActivityTitle => 'النشاط';
+
+  @override
+  String get adminActivityEmpty => 'لا يوجد نشاط بعد';
+
+  @override
+  String get adminActivityJustNow => 'الآن';
+
+  @override
+  String get adminActivityNoDetails => 'لا توجد تفاصيل';
+
+  @override
+  String adminActivityOnPost(String post) {
+    return 'على المنشور: $post';
+  }
+
+  @override
+  String get adminActivityTypeCreatePost => 'أنشأ منشوراً';
+
+  @override
+  String get adminActivityTypeComment => 'علّق';
+
+  @override
+  String get adminActivityTypeLikePost => 'أعجب بمنشور';
+
+  @override
+  String get adminActivityTypeSendGift => 'أرسل هدية';
 
   @override
   String get chatWallpaperTitle => 'خلفية المحادثة';

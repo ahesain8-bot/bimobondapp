@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/add_comment_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_comment_usecase.dart';
@@ -7,6 +8,7 @@ import 'package:bimobondapp/app/posts/domain/entities/toggle_like_params.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_comment_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_state.dart';
+import 'package:bimobondapp/app/posts/presentation/utils/comment_thread_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class CommentsBloc extends Bloc<CommentsEvent, CommentsState> {
@@ -42,7 +44,12 @@ class CommentsBloc extends Bloc<CommentsEvent, CommentsState> {
     }
 
     final result = await getCommentsUsecase(
-      GetCommentsParams(postId: event.postId, page: event.page, limit: limit),
+      GetCommentsParams(
+        postId: event.postId,
+        page: event.page,
+        limit: limit,
+        sort: event.sort,
+      ),
     );
     result.fold(
       (failure) => emit(CommentsFailure(failure.message)),
@@ -103,19 +110,19 @@ class CommentsBloc extends Bloc<CommentsEvent, CommentsState> {
       ),
     );
     result.fold((failure) => emit(CommentsFailure(failure.message)), (comment) {
-      final parentId = event.parentId ?? comment.parentId;
-      if (currentState is CommentsLoadSuccess && parentId != null) {
+      final threadKey =
+          event.threadRootId ?? event.parentId ?? comment.parentId;
+      if (currentState is CommentsLoadSuccess && threadKey != null) {
         final updatedReplies = Map<String, List<CommentEntity>>.from(
           currentState.repliesByParentId,
         );
-        final existingReplies = List<CommentEntity>.from(
-          updatedReplies[parentId] ?? const [],
+        updatedReplies[threadKey] = mergeThreadReplies(
+          updatedReplies[threadKey] ?? const [],
+          [comment],
         );
-        existingReplies.insert(0, comment);
-        updatedReplies[parentId] = existingReplies;
 
         final updatedComments = currentState.comments.map((c) {
-          if (c.id == parentId) {
+          if (c.id == threadKey) {
             return c.copyWith(replyCount: c.replyCount + 1);
           }
           return c;
@@ -150,32 +157,69 @@ class CommentsBloc extends Bloc<CommentsEvent, CommentsState> {
         limit: event.limit,
       ),
     );
-    result.fold((failure) => emit(CommentsFailure(failure.message)), (replies) {
-      final updatedReplies = Map<String, List<CommentEntity>>.from(
-        currentState.repliesByParentId,
-      );
-      final existing = event.page > 1
-          ? List<CommentEntity>.from(
-              updatedReplies[event.commentId] ?? const [],
-            )
-          : <CommentEntity>[];
-      existing.addAll(replies);
-      updatedReplies[event.commentId] = existing;
 
-      final updatedHasReachedMax = Map<String, bool>.from(
-        currentState.repliesHasReachedMaxByParentId,
-      );
-      updatedHasReachedMax[event.commentId] = replies.length < event.limit;
+    Failure? failure;
+    List<CommentEntity>? directReplies;
+    result.fold(
+      (left) => failure = left,
+      (right) => directReplies = right,
+    );
+    if (failure != null) {
+      emit(CommentsFailure(failure!.message));
+      return;
+    }
 
-      emit(
-        CommentsLoadSuccess(
-          comments: currentState.comments,
-          hasReachedMax: currentState.hasReachedMax,
-          repliesByParentId: updatedReplies,
-          repliesHasReachedMaxByParentId: updatedHasReachedMax,
-        ),
+    final flattened = await _flattenReplyThread(directReplies ?? const []);
+    final updatedReplies = Map<String, List<CommentEntity>>.from(
+      currentState.repliesByParentId,
+    );
+    final existing = event.page > 1
+        ? List<CommentEntity>.from(
+            updatedReplies[event.commentId] ?? const [],
+          )
+        : <CommentEntity>[];
+    updatedReplies[event.commentId] = mergeThreadReplies(
+      existing,
+      flattened,
+    );
+
+    final updatedHasReachedMax = Map<String, bool>.from(
+      currentState.repliesHasReachedMaxByParentId,
+    );
+    updatedHasReachedMax[event.commentId] =
+        (directReplies?.length ?? 0) < event.limit;
+
+    emit(
+      CommentsLoadSuccess(
+        comments: currentState.comments,
+        hasReachedMax: currentState.hasReachedMax,
+        repliesByParentId: updatedReplies,
+        repliesHasReachedMaxByParentId: updatedHasReachedMax,
+      ),
+    );
+  }
+
+  Future<List<CommentEntity>> _flattenReplyThread(
+    List<CommentEntity> directReplies,
+  ) async {
+    final byId = <String, CommentEntity>{
+      for (final reply in directReplies) reply.id: reply,
+    };
+
+    for (final reply in directReplies) {
+      if (reply.replyCount <= 0) continue;
+
+      final nestedResult = await getRepliesUsecase(
+        GetRepliesParams(commentId: reply.id, page: 1, limit: 100),
       );
-    });
+      nestedResult.fold((_) {}, (nested) {
+        for (final child in nested) {
+          byId[child.id] = child;
+        }
+      });
+    }
+
+    return sortCommentsOldestFirst(byId.values.toList());
   }
 
   Future<void> _onDeleteCommentRequested(

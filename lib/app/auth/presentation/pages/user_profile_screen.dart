@@ -15,11 +15,14 @@ import 'package:bimobondapp/app/chats/domain/usecases/create_or_get_chat_usecase
 import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
     as chats_di;
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
-import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
+import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -73,6 +76,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   String? _errorMessage;
   bool _isLoadingUser = true;
   bool _isFollowing = false;
+  bool _isFollowedBy = false;
   bool _isFollowLoading = false;
   bool _isMessageLoading = false;
   int _profileLoadKey = 0;
@@ -167,6 +171,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           if (user.isFollowing != null) {
             _isFollowing = user.isFollowing!;
           }
+          if (user.isFollowedBy != null) {
+            _isFollowedBy = user.isFollowedBy!;
+          }
         });
         if (!_isSelf && user.isFollowing == null) {
           unawaited(_resolveFollowStatus());
@@ -202,6 +209,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         limit: _UserProfilePostsState.pageSize,
         userId: widget.userId,
         isRefresh: refresh || _postsState.page == 1,
+        isStory: false,
         profileLoadKey: loadKey,
       ),
     );
@@ -272,27 +280,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       _isFollowing = !previousFollowing;
     });
 
-    final result = await social_di.sl<ToggleFollowUseCase>()(
-      ToggleFollowParams(widget.userId),
+    final result = await toggleSocialUserFollow(
+      userId: widget.userId,
+      wasFollowing: previousFollowing,
     );
     if (!mounted) return;
 
-    result.fold(
-      (failure) {
-        setState(() {
-          _isFollowing = previousFollowing;
-          _isFollowLoading = false;
-        });
-        PopupDialogs.showErrorDialog(context, failure.message);
-      },
-      (_) {
-        setState(() {
-          _isFollowing = !previousFollowing;
-          _isFollowLoading = false;
-        });
-        unawaited(_loadUser(showLoadingShell: false));
-      },
-    );
+    if (result.failure != null) {
+      setState(() {
+        _isFollowing = previousFollowing;
+        _isFollowLoading = false;
+      });
+      PopupDialogs.showErrorDialog(context, result.failure!.message);
+      return;
+    }
+
+    setState(() {
+      _isFollowing = result.isFollowing!;
+      _isFollowLoading = false;
+    });
+    unawaited(_loadUser(showLoadingShell: false));
   }
 
   Future<void> _openMessage() async {
@@ -454,12 +461,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             if (_isLoadingUser && user == null)
                               const SkeletonWidget.circular(size: 96)
                             else
-                              SafeNetworkAvatar(
+                              StoryProfileAvatar(
+                                userId: widget.userId,
                                 imageUrl: user?.avatarUrl,
                                 radius: ProfileLayoutConstants.avatarRadius,
                                 fallbackText: user?.username ?? username,
                                 backgroundColor: theme.dividerColor.withValues(
                                   alpha: 0.08,
+                                ),
+                                username: user?.username ?? username,
+                                fullName: user?.fullName,
+                                isFollowing: _isFollowing,
+                                onTap: () => handleProfileScreenAvatarTap(
+                                  context,
+                                  userId: widget.userId,
+                                  avatarUrl: user?.avatarUrl,
                                 ),
                               ),
                             const SizedBox(height: AppSizes.p12),
@@ -488,51 +504,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  SizedBox(
+                                  ProfileFollowButton(
                                     width: 140,
-                                    height: 40,
-                                    child: ElevatedButton(
-                                      onPressed: _isFollowLoading
-                                          ? null
-                                          : _toggleFollow,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _isFollowing
-                                            ? theme.dividerColor.withValues(
-                                                alpha: 0.2,
-                                              )
-                                            : theme.colorScheme.primary,
-                                        foregroundColor: _isFollowing
-                                            ? theme.colorScheme.onSurface
-                                            : Colors.white,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            AppSizes.radiusMd,
-                                          ),
-                                        ),
-                                      ),
-                                      child: _isFollowLoading
-                                          ? SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: _isFollowing
-                                                    ? theme.colorScheme
-                                                        .onSurface
-                                                    : Colors.white,
-                                              ),
-                                            )
-                                          : CustomText(
-                                              _isFollowing
-                                                  ? l10n.messagesFollowing
-                                                  : l10n.messagesFollow,
-                                              fontWeight: FontWeight.bold,
-                                              color: _isFollowing
-                                                  ? theme.colorScheme.onSurface
-                                                  : Colors.white,
-                                            ),
-                                    ),
+                                    isFollowing: _isFollowing,
+                                    isFollowedBy: _isFollowedBy,
+                                    isLoading: _isFollowLoading,
+                                    onPressed: _toggleFollow,
                                   ),
                                   const SizedBox(width: AppSizes.p12),
                                   SizedBox(
@@ -576,39 +553,44 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             ],
                             const SizedBox(height: AppSizes.p16),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _UserProfileStatItem(
-                                  number: _formatCount(user?.postCount ?? 0),
-                                  label: l10n.profilePostsTab,
-                                ),
-                                _UserProfileStatItem(
-                                  number: _formatCount(
-                                    user?.followerCount ?? 0,
+                                Expanded(
+                                  child: _UserProfileStatItem(
+                                    number: _formatCount(user?.postCount ?? 0),
+                                    label: l10n.profilePostsTab,
                                   ),
-                                  label: l10n.followers,
-                                  onTap: () => _refreshProfileAfterNavigation(
-                                    context.pushNamed(
-                                      'user_connections',
-                                      extra: {
-                                        'userId': widget.userId,
-                                        'type': UserConnectionType.followers,
-                                      },
+                                ),
+                                Expanded(
+                                  child: _UserProfileStatItem(
+                                    number: _formatCount(
+                                      user?.followerCount ?? 0,
+                                    ),
+                                    label: l10n.followers,
+                                    onTap: () => _refreshProfileAfterNavigation(
+                                      context.pushNamed(
+                                        'user_connections',
+                                        extra: {
+                                          'userId': widget.userId,
+                                          'type': UserConnectionType.followers,
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                                _UserProfileStatItem(
-                                  number: _formatCount(
-                                    user?.followingCount ?? 0,
-                                  ),
-                                  label: l10n.following,
-                                  onTap: () => _refreshProfileAfterNavigation(
-                                    context.pushNamed(
-                                      'user_connections',
-                                      extra: {
-                                        'userId': widget.userId,
-                                        'type': UserConnectionType.following,
-                                      },
+                                Expanded(
+                                  child: _UserProfileStatItem(
+                                    number: _formatCount(
+                                      user?.followingCount ?? 0,
+                                    ),
+                                    label: l10n.following,
+                                    onTap: () => _refreshProfileAfterNavigation(
+                                      context.pushNamed(
+                                        'user_connections',
+                                        extra: {
+                                          'userId': widget.userId,
+                                          'type': UserConnectionType.following,
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -662,6 +644,7 @@ class _UserProfileStatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         CustomText(number, fontSize: 18, fontWeight: FontWeight.bold),
         const SizedBox(height: AppSizes.p4),
@@ -669,18 +652,20 @@ class _UserProfileStatItem extends StatelessWidget {
       ],
     );
 
-    if (onTap == null) return content;
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p12,
+        vertical: AppSizes.p4,
+      ),
+      child: Center(child: content),
+    );
+
+    if (onTap == null) return child;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p12,
-          vertical: AppSizes.p4,
-        ),
-        child: content,
-      ),
+      child: child,
     );
   }
 }

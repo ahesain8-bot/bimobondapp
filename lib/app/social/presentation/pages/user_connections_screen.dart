@@ -4,9 +4,9 @@ import 'package:bimobondapp/app/social/domain/entities/social_list_query.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
-import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
+import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/error/failures.dart';
@@ -142,6 +142,26 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
     }
   }
 
+  List<SocialUserEntity> _mergeUsers(
+    List<SocialUserEntity> incoming,
+    _ConnectionsTabState tab, {
+    required bool refresh,
+  }) {
+    if (!refresh || tab.users.isEmpty) return incoming;
+
+    final followingById = {
+      for (final user in tab.users)
+        if (user.isFollowing) user.id: true,
+    };
+
+    return incoming.map((user) {
+      if (followingById[user.id] == true && !user.isFollowing) {
+        return user.copyWith(isFollowing: true);
+      }
+      return user;
+    }).toList();
+  }
+
   bool _isSelfUser(SocialUserEntity user) {
     final currentUserId = _currentUserId;
     if (currentUserId == null) return false;
@@ -176,23 +196,29 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
       tab.users[index] = user.copyWith(isFollowing: !previousFollowing);
     });
 
-    final result = await social_di.sl<ToggleFollowUseCase>()(
-      ToggleFollowParams(user.id),
+    final result = await toggleSocialUserFollow(
+      userId: user.id,
+      wasFollowing: previousFollowing,
     );
     if (!mounted) return;
 
-    result.fold(
-      (failure) {
-        setState(() {
-          tab.users[index] = user.copyWith(isFollowing: previousFollowing);
-          _followLoadingIds.remove(user.id);
-        });
-        PopupDialogs.showErrorDialog(context, failure.message);
-      },
-      (_) {
-        setState(() => _followLoadingIds.remove(user.id));
-      },
-    );
+    if (result.failure != null) {
+      setState(() {
+        tab.users[index] = tab.users[index].copyWith(
+          isFollowing: previousFollowing,
+        );
+        _followLoadingIds.remove(user.id);
+      });
+      PopupDialogs.showErrorDialog(context, result.failure!.message);
+      return;
+    }
+
+    setState(() {
+      tab.users[index] = tab.users[index].copyWith(
+        isFollowing: result.isFollowing!,
+      );
+      _followLoadingIds.remove(user.id);
+    });
   }
 
   void _onScroll() {
@@ -249,8 +275,11 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
         });
       },
       (pageResult) {
-        final normalizedUsers =
-            pageResult.users.map(_normalizeUser).toList(growable: false);
+        final normalizedUsers = _mergeUsers(
+          pageResult.users.map(_normalizeUser).toList(growable: false),
+          tab,
+          refresh: tab.page == 1,
+        );
 
         setState(() {
           if (tab.page == 1) {
@@ -445,7 +474,9 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
           onFollowTap: () => _toggleFollow(index),
           onProfileFollowStateChanged: (isFollowing) {
             setState(() {
-              tab.users[index] = user.copyWith(isFollowing: isFollowing);
+              tab.users[index] = tab.users[index].copyWith(
+                isFollowing: isFollowing,
+              );
             });
           },
         );

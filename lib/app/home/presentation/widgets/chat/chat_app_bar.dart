@@ -2,7 +2,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -13,12 +13,14 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.username,
     required this.imageUrl,
     required this.onProfileTap,
+    this.userId,
     super.key,
   });
 
   final String username;
   final String imageUrl;
   final VoidCallback onProfileTap;
+  final String? userId;
 
   @override
   Size get preferredSize =>
@@ -46,10 +48,13 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SafeNetworkAvatar(
+            StoryProfileAvatar(
+              userId: userId,
               imageUrl: imageUrl,
               radius: ChatLayoutConstants.headerAvatarRadius,
               fallbackText: username,
+              username: username,
+              onTap: onProfileTap,
             ),
             const SizedBox(width: AppSizes.p12),
             Flexible(

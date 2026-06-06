@@ -144,15 +144,17 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     final bool? isLiked = _selectedTabIndex == 1 ? true : null;
     final bool? isSaved = _selectedTabIndex == 2 ? true : null;
+    final bool isEngagementTab = isLiked == true || isSaved == true;
 
     context.read<PostsBloc>().add(
       FetchFeedRequestedEvent(
         page: tab.page,
         limit: ProfileTabPostsState.pageSize,
-        userId: authState.user.id,
+        userId: isEngagementTab ? null : authState.user.id,
         isRefresh: refresh || tab.page == 1,
         isLiked: isLiked,
         isSaved: isSaved,
+        isStory: false,
         profileLoadKey: loadKey,
       ),
     );
@@ -266,6 +268,15 @@ class _ProfileScreenState extends State<ProfileScreen>
             tab.hasReachedMax = false;
             tab.isInitialLoading = tab.posts.isEmpty;
             _fetchUserPosts(refresh: true);
+          } else if (state is SavePostSuccess) {
+            final savedTab = _tabPosts[2];
+            savedTab.posts.clear();
+            savedTab.page = 1;
+            savedTab.hasReachedMax = false;
+            if (_selectedTabIndex == 2) {
+              savedTab.isInitialLoading = true;
+              _fetchUserPosts(refresh: true);
+            }
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(

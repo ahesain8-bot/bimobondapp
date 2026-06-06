@@ -1,6 +1,7 @@
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:bimobondapp/app/auth/data/models/user_activity_page_model.dart';
 import 'package:bimobondapp/app/auth/data/models/user_model.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -31,6 +32,11 @@ abstract class AuthRemoteDataSource {
   Future<UserModel> updateProfile(Map<String, dynamic> data);
   Future<UserModel> getProfile();
   Future<UserModel> getUserById(String userId);
+  Future<UserActivityPageModel> getAdminUserActivity(
+    String userId, {
+    int page = 1,
+    int limit = 10,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -212,7 +218,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final response = await apiClient.dio.post(
       ApiConstants.uploadAvatar,
       data: formData,
-      options: Options(headers: {'Content-Type': 'multipart/form-data'}),
+      options: Options(
+        headers: {
+          ...await _profileAuthHeaders(),
+          'Content-Type': 'multipart/form-data',
+        },
+      ),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -233,6 +244,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         final response = await apiClient.dio.patch(
           ApiConstants.updateProfile,
           data: data,
+          options: Options(headers: await _profileAuthHeaders()),
         );
 
         if (response.statusCode == 200 || response.statusCode == 201) {
@@ -290,5 +302,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } else {
       throw ServerException(message: 'Fetch user failed');
     }
+  });
+
+  @override
+  Future<UserActivityPageModel> getAdminUserActivity(
+    String userId, {
+    int page = 1,
+    int limit = 10,
+  }) => _execute(() async {
+    final response = await apiClient.dio.get(
+      ApiConstants.adminUserActivity(userId),
+      queryParameters: {'page': page, 'limit': limit},
+      options: Options(headers: await _profileAuthHeaders()),
+    );
+
+    if (response.statusCode == 200) {
+      return UserActivityPageModel.fromResponse(
+        response.data,
+        requestedPage: page,
+        requestedLimit: limit,
+      );
+    }
+    throw ServerException(message: 'Fetch user activity failed');
   });
 }

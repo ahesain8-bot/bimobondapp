@@ -8,18 +8,68 @@ class MessagesSearchBar extends StatelessWidget {
     required this.searchQuery,
     required this.onChanged,
     required this.onClear,
+    this.autofocus = false,
+    this.focusNode,
     super.key,
-  });
+  })  : readOnly = false,
+        onTap = null;
 
-  final TextEditingController controller;
+  const MessagesSearchBar.launcher({
+    required this.onTap,
+    super.key,
+  })  : controller = null,
+        searchQuery = '',
+        onChanged = null,
+        onClear = null,
+        autofocus = false,
+        focusNode = null,
+        readOnly = true;
+
+  final TextEditingController? controller;
   final String searchQuery;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onClear;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final bool autofocus;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+
+    final field = TextField(
+      controller: controller,
+      focusNode: focusNode,
+      autofocus: autofocus,
+      readOnly: readOnly,
+      onTap: readOnly ? onTap : null,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      decoration: InputDecoration(
+        hintText: l10n.messagesSearchHint,
+        hintStyle: TextStyle(
+          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
+          fontSize: 15,
+        ),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          color: theme.colorScheme.primary.withValues(
+            alpha: MessagesLayoutConstants.searchIconAlpha,
+          ),
+          size: 22,
+        ),
+        suffixIcon: !readOnly && searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.cancel_rounded, size: 18),
+                onPressed: onClear,
+              )
+            : null,
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -50,33 +100,13 @@ class MessagesSearchBar extends StatelessWidget {
             ),
           ),
         ),
-        child: TextField(
-          controller: controller,
-          onChanged: onChanged,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-          decoration: InputDecoration(
-            hintText: l10n.messagesSearchHint,
-            hintStyle: TextStyle(
-              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
-              fontSize: 15,
-            ),
-            prefixIcon: Icon(
-              Icons.search_rounded,
-              color: theme.colorScheme.primary.withValues(
-                alpha: MessagesLayoutConstants.searchIconAlpha,
-              ),
-              size: 22,
-            ),
-            suffixIcon: searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.cancel_rounded, size: 18),
-                    onPressed: onClear,
-                  )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          ),
-        ),
+        child: readOnly
+            ? GestureDetector(
+                onTap: onTap,
+                behavior: HitTestBehavior.opaque,
+                child: AbsorbPointer(child: field),
+              )
+            : field,
       ),
     );
   }

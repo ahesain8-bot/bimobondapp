@@ -175,6 +175,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         chatId: chatId,
         content: event.content,
         replyToId: event.replyToId,
+        sharedPostId: event.sharedPostId,
       ),
     );
 

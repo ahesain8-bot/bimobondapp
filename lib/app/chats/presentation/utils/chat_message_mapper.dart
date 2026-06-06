@@ -1,4 +1,6 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
+import 'package:bimobondapp/app/chats/domain/entities/shared_post_snapshot.dart';
+import 'package:bimobondapp/app/home/presentation/utils/chat_shared_post_cache.dart';
 import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
 import 'package:bimobondapp/app/home/presentation/utils/chat_voice_duration_formatter.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -26,6 +28,19 @@ String formatInboxTime(DateTime? dateTime, AppLocalizations l10n) {
   if (diff.inHours < 24) return l10n.inboxTimeHours(diff.inHours);
   if (diff.inDays < 7) return l10n.inboxTimeDays(diff.inDays);
   return DateFormat.MMMd(l10n.localeName).format(local);
+}
+
+Map<String, dynamic>? _sharedStoryUiMap(ChatMessageEntity message) {
+  if (message.sharedPost != null) {
+    return message.sharedPost!.toUiMap();
+  }
+  final id = message.sharedPostId?.trim();
+  if (id == null || id.isEmpty) return null;
+  final cached = ChatSharedPostCache.get(id);
+  if (cached != null) {
+    return SharedPostSnapshot.fromPost(cached).toUiMap();
+  }
+  return null;
 }
 
 String _typeToUi(ChatMessageType type) {
@@ -117,6 +132,9 @@ Map<String, dynamic> chatMessageToUiMap(
     'reactions': reactions,
     'status': isMe ? (readByMe ? 'read' : 'sent') : 'read',
     if (replyTo != null) 'replyTo': replyTo,
+    if (message.sharedPostId != null && message.sharedPostId!.isNotEmpty)
+      'sharedPostId': message.sharedPostId,
+    if (_sharedStoryUiMap(message) case final map?) 'sharedStory': map,
     'senderId': message.senderId,
   };
 }

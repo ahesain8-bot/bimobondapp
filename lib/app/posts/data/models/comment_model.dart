@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/auth/data/models/user_model.dart';
+import 'package:bimobondapp/app/posts/data/models/mention_ref_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 
 class CommentModel extends CommentEntity {
@@ -16,6 +17,7 @@ class CommentModel extends CommentEntity {
     super.giftIcon,
     required super.createdAt,
     required super.updatedAt,
+    super.mentions = const [],
   });
 
   static String? _giftField(Map<String, dynamic> json, String key) {
@@ -62,6 +64,7 @@ class CommentModel extends CommentEntity {
       giftIcon: _giftField(json, 'icon'),
       createdAt: json['createdAt']?.toString() ?? '',
       updatedAt: json['updatedAt']?.toString() ?? '',
+      mentions: MentionRefModel.listFromJson(json['mentions']),
     );
   }
 

@@ -17,6 +17,7 @@ class ProfileStatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         CustomText(number, fontSize: 18, fontWeight: FontWeight.bold),
         const SizedBox(height: AppSizes.p4),
@@ -24,20 +25,20 @@ class ProfileStatItem extends StatelessWidget {
       ],
     );
 
-    if (onTap == null) {
-      return content;
-    }
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p12,
+        vertical: AppSizes.p4,
+      ),
+      child: Center(child: content),
+    );
+
+    if (onTap == null) return child;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p12,
-          vertical: AppSizes.p4,
-        ),
-        child: content,
-      ),
+      child: child,
     );
   }
 }

@@ -10,7 +10,7 @@ import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_phone_usecase.
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_facebook_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_google_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
-import 'package:bimobondapp/app/auth/domain/usecases/upload_avatar_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/get_admin_user_activity_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/get_user_by_id_usecase.dart';
 
 import 'package:bimobondapp/app/auth/data/repositories/auth_repository_impl.dart';
@@ -18,6 +18,8 @@ import 'package:bimobondapp/app/auth/data/datasources/auth_remote_data_source.da
 import 'package:bimobondapp/app/auth/data/datasources/auth_local_data_source.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/core/data/likes_local_data_source.dart';
+import 'package:bimobondapp/core/data/viewed_stories_store.dart';
+import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 
 final sl = GetIt.instance;
 
@@ -28,6 +30,14 @@ Future<void> initAuth() async {
 
   sl.registerLazySingleton<LikesLocalDataSource>(
     () => LikesLocalDataSourceImpl(sharedPreferences: sl()),
+  );
+
+  sl.registerLazySingleton<ViewedStoriesStore>(
+    () => ViewedStoriesStore(sl()),
+  );
+
+  sl.registerLazySingleton<ActiveStoriesRegistry>(
+    () => ActiveStoriesRegistry(),
   );
 
   // Core
@@ -58,9 +68,9 @@ Future<void> initAuth() async {
   sl.registerLazySingleton(() => SignInWithFacebookUseCase(sl()));
   sl.registerLazySingleton(() => SignInWithGoogleUseCase(sl()));
   sl.registerLazySingleton(() => UpdateProfileUseCase(sl()));
-  sl.registerLazySingleton(() => UploadAvatarUseCase(sl()));
   sl.registerLazySingleton(() => GetProfileUseCase(sl()));
   sl.registerLazySingleton(() => GetUserByIdUseCase(sl()));
+  sl.registerLazySingleton(() => GetAdminUserActivityUseCase(sl()));
 
   // Bloc
   sl.registerFactory(

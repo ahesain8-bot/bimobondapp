@@ -1,7 +1,7 @@
 import 'dart:ui';
 
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/gift_comment_l10n.dart';
@@ -71,7 +71,7 @@ class LivePostCommentsArea extends StatelessWidget {
                   isGift: comment.isGift,
                   theme: theme,
                   onProfileTap: comment.user.id.isNotEmpty
-                      ? () => openUserProfile(
+                      ? () => openUserStoryOrProfile(
                             context,
                             userId: comment.user.id,
                             username: comment.user.username,
@@ -79,6 +79,7 @@ class LivePostCommentsArea extends StatelessWidget {
                             avatarUrl: comment.user.avatarUrl,
                           )
                       : null,
+                  userId: comment.user.id,
                 ),
               ),
             );

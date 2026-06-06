@@ -6,7 +6,7 @@ import 'package:bimobondapp/app/social/domain/entities/user_comment_entity.dart'
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -74,10 +74,14 @@ class UserCommentListTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SafeNetworkAvatar(
+            StoryProfileAvatar(
+              userId: author?.id,
               imageUrl: author?.avatarUrl,
               radius: 22,
               fallbackText: authorName,
+              username: author?.username,
+              fullName: author?.fullName,
+              isFollowing: author?.isFollowing,
             ),
             const SizedBox(width: AppSizes.p12),
             Expanded(

@@ -2,7 +2,7 @@ import 'package:bimobondapp/app/chats/presentation/bloc/inbox_bloc.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_event.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -119,10 +119,12 @@ class _ConversationTile extends StatelessWidget {
                   width: 2,
                 ),
               ),
-              child: SafeNetworkAvatar(
+              child: StoryProfileAvatar(
+                userId: chat.peerUserId,
                 imageUrl: chat.imageUrl,
                 radius: MessagesLayoutConstants.conversationAvatarRadius,
                 fallbackText: chat.name,
+                username: chat.name,
               ),
             ),
             if (chat.active)

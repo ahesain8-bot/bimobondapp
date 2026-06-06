@@ -34,7 +34,11 @@ class AuctionItem {
   final String? countdown;
   final PostEntity? post;
 
-  factory AuctionItem.fromPost(PostEntity post, {String? categoryLabel}) {
+  factory AuctionItem.fromPost(
+    PostEntity post, {
+    String? categoryLabel,
+    String? categorySlug,
+  }) {
     final auction = post.auction!;
     final now = DateTime.now().toUtc();
     final startedAt = auction.startedAt.toUtc();
@@ -58,7 +62,7 @@ class AuctionItem {
       ownerUsername: hasOwnerHandle ? ownerHandle : null,
       ownerAvatarUrl: owner?.avatarUrl,
       ownerUserId: owner?.id ?? post.userId,
-      categorySlug: post.category,
+      categorySlug: categorySlug,
       categoryLabel: categoryLabel,
       isLive: isLive,
       countdown: countdown,

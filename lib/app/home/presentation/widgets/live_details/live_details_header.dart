@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_status_badge.dart';
@@ -13,6 +13,7 @@ class LiveDetailsHeader extends StatelessWidget {
     this.subtitle,
     required this.viewersLabel,
     this.avatarUrl,
+    this.hostUserId,
     required this.isFollowing,
     required this.followLabel,
     required this.followingLabel,
@@ -36,6 +37,7 @@ class LiveDetailsHeader extends StatelessWidget {
   final String? subtitle;
   final String viewersLabel;
   final String? avatarUrl;
+  final String? hostUserId;
   final bool isFollowing;
   final String followLabel;
   final String followingLabel;
@@ -67,7 +69,10 @@ class LiveDetailsHeader extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(50),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1.2),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.15),
+              width: 1.2,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
@@ -77,57 +82,64 @@ class LiveDetailsHeader extends StatelessWidget {
             ],
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              GestureDetector(
-                onTap: onProfileTap,
-                behavior: HitTestBehavior.opaque,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ProfileAvatar(avatarUrl: avatarUrl),
-                    const SizedBox(width: AppSizes.p10),
-                    Flexible(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            hostName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                              letterSpacing: 0.3,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            subtitle != null && subtitle!.isNotEmpty
-                                ? subtitle!
-                                : viewersLabel,
-                            style: TextStyle(
-                              color: subtitle != null && subtitle!.isNotEmpty
-                                  ? Colors.amberAccent
-                                  : Colors.white.withValues(alpha: 0.8),
-                              fontSize: 10,
-                              fontWeight: subtitle != null &&
-                                      subtitle!.isNotEmpty
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+              Expanded(
+                child: GestureDetector(
+                  onTap: onProfileTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      StoryProfileAvatar(
+                        userId: hostUserId,
+                        imageUrl: avatarUrl,
+                        radius: 16,
+                        fallbackText: hostName,
+                        username: hostName,
+                        onTap: onProfileTap,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: AppSizes.p10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              hostName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                letterSpacing: 0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              subtitle != null && subtitle!.isNotEmpty
+                                  ? subtitle!
+                                  : viewersLabel,
+                              style: TextStyle(
+                                color: subtitle != null && subtitle!.isNotEmpty
+                                    ? Colors.amberAccent
+                                    : Colors.white.withValues(alpha: 0.8),
+                                fontSize: 10,
+                                fontWeight:
+                                    subtitle != null && subtitle!.isNotEmpty
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (showFollowButton) ...[
-                const SizedBox(width: AppSizes.p12),
+                const SizedBox(width: AppSizes.p8),
                 _AnimatedFollowButton(
                   isFollowing: isFollowing,
                   followLabel: followLabel,
@@ -149,10 +161,9 @@ class LiveDetailsHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Flexible(
-            fit: FlexFit.loose,
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 profileCard,
@@ -163,7 +174,7 @@ class LiveDetailsHeader extends StatelessWidget {
               ],
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: AppSizes.p8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -213,64 +224,6 @@ class LiveDetailsHeader extends StatelessWidget {
   }
 }
 
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({this.avatarUrl});
-
-  final String? avatarUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    // Slighly smaller radius for the new pill shape
-    const radius = 16.0;
-    final url = avatarUrl?.trim();
-    final hasImage =
-        url != null && url.isNotEmpty && MediaUtils.isImage(url);
-
-    if (!hasImage) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundColor: Colors.white.withValues(alpha: 0.15),
-        child: Icon(
-          LucideIcons.user,
-          size: radius,
-          color: Colors.white,
-        ),
-      );
-    }
-
-    final size = radius * 2;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: Image.network(
-          MediaUtils.resolveAbsoluteUrl(url),
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => ColoredBox(
-            color: Colors.white.withValues(alpha: 0.15),
-            child: Icon(
-              LucideIcons.user,
-              size: radius,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _AnimatedFollowButton extends StatefulWidget {
   const _AnimatedFollowButton({
     required this.isFollowing,
@@ -300,9 +253,10 @@ class _AnimatedFollowButtonState extends State<_AnimatedFollowButton>
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.9,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -327,7 +281,7 @@ class _AnimatedFollowButtonState extends State<_AnimatedFollowButton>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTapDown: _handleTapDown,
       onTapUp: _handleTapUp,
@@ -358,11 +312,11 @@ class _AnimatedFollowButtonState extends State<_AnimatedFollowButton>
                   ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: widget.isFollowing 
+              color: widget.isFollowing
                   ? Colors.white.withValues(alpha: 0.3)
                   : Colors.transparent,
             ),
-            boxShadow: widget.isFollowing 
+            boxShadow: widget.isFollowing
                 ? []
                 : [
                     BoxShadow(
@@ -377,6 +331,8 @@ class _AnimatedFollowButtonState extends State<_AnimatedFollowButton>
             child: Text(
               widget.isFollowing ? widget.followingLabel : widget.followLabel,
               key: ValueKey(widget.isFollowing),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 11,

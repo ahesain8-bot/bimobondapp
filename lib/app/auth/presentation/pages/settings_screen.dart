@@ -1,5 +1,7 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/core/utils/user_roles.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_placeholder_screen.dart';
 import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
@@ -91,6 +93,38 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SettingsLayoutConstants.groupSpacing),
+          BlocBuilder<AuthBloc, AuthState>(
+            buildWhen: (previous, current) =>
+                previous.runtimeType != current.runtimeType ||
+                (current is AuthSuccess &&
+                    previous is AuthSuccess &&
+                    previous.user.roles != current.user.roles),
+            builder: (context, authState) {
+              if (authState is! AuthSuccess ||
+                  !userHasAdminRole(authState.user.roles)) {
+                return const SizedBox.shrink();
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SettingsSectionTitle(title: l10n.settingsSectionAdmin),
+                  _SettingsGroup(
+                    children: [
+                      _SettingsTile(
+                        icon: LucideIcons.activity,
+                        title: l10n.settingsAdminActivity,
+                        onTap: () => context.pushNamed('admin_user_activity'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(
+                    height: SettingsLayoutConstants.groupSpacing,
+                  ),
+                ],
+              );
+            },
+          ),
           _SettingsSectionTitle(title: l10n.settingsSectionSupport),
           _SettingsGroup(
             children: [
@@ -341,9 +375,7 @@ class _SettingsGroup extends StatelessWidget {
           SettingsLayoutConstants.groupRadius,
         ),
         border: Border.all(
-          color: theme.dividerColor.withValues(
-            alpha: SettingsLayoutConstants.sectionTitleColorAlpha,
-          ),
+          color: SettingsLayoutConstants.groupBorderColor(theme),
         ),
       ),
       child: Column(
@@ -354,7 +386,7 @@ class _SettingsGroup extends StatelessWidget {
                 height: SettingsLayoutConstants.appBarDividerHeight,
                 indent: SettingsLayoutConstants.dividerIndent,
                 endIndent: SettingsLayoutConstants.dividerEndIndent,
-                color: theme.dividerColor,
+                color: SettingsLayoutConstants.groupDividerColor(theme),
               ),
             children[i],
           ],

@@ -1,9 +1,9 @@
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 class SocialUserListTile extends StatelessWidget {
@@ -14,29 +14,34 @@ class SocialUserListTile extends StatelessWidget {
     this.onFollowTap,
     this.onTap,
     this.onProfileFollowStateChanged,
+    this.subtitleOverride,
+    this.hideFollowButton = false,
     super.key,
   });
 
   final SocialUserEntity user;
   final bool isSelf;
+  final bool hideFollowButton;
   final bool isFollowLoading;
   final VoidCallback? onFollowTap;
   final VoidCallback? onTap;
   final ValueChanged<bool>? onProfileFollowStateChanged;
 
+  /// Extra line under @username (e.g. watch duration for post views).
+  final String? subtitleOverride;
+
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final handle = user.username?.trim();
-    final buttonMode = user.followButtonMode(isSelf: isSelf);
+    final showFollowButton = !hideFollowButton && !isSelf;
 
     Future<void> openProfile() async {
       if (onTap != null) {
         onTap!();
         return;
       }
-      final isFollowing = await openUserProfile(
+      final isFollowing = await openUserStoryOrProfile(
         context,
         userId: user.id,
         username: user.username,
@@ -55,10 +60,14 @@ class SocialUserListTile extends StatelessWidget {
         horizontal: AppSizes.p16,
         vertical: AppSizes.p4,
       ),
-      leading: SafeNetworkAvatar(
+      leading: StoryProfileAvatar(
+        userId: user.id,
         imageUrl: user.avatarUrl,
-        radius: 24,
         fallbackText: user.displayName,
+        radius: 24,
+        username: user.username,
+        fullName: user.fullName,
+        isFollowing: user.isFollowing,
       ),
       title: Text(
         user.fullName ?? user.username ?? user.displayName,
@@ -68,100 +77,36 @@ class SocialUserListTile extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
-      subtitle: handle != null && handle.isNotEmpty
-          ? CustomText('@$handle', fontSize: 13, variant: TextVariant.secondary)
-          : null,
-      trailing: buttonMode == SocialFollowButtonMode.hidden
-          ? null
-          : _SocialFollowButton(
-              mode: buttonMode,
+      subtitle: _buildSubtitle(handle, subtitleOverride),
+      trailing: showFollowButton
+          ? ProfileFollowButton.listTile(
+              isFollowing: user.isFollowing,
+              isFollowedBy: user.isFollowedBy,
               isLoading: isFollowLoading,
               onPressed: onFollowTap,
-              followLabel: l10n.messagesFollow,
-              followBackLabel: l10n.connectionsFollowBack,
-              followingLabel: l10n.messagesFollowing,
-            ),
+            )
+          : null,
     );
   }
-}
 
-class _SocialFollowButton extends StatelessWidget {
-  const _SocialFollowButton({
-    required this.mode,
-    required this.isLoading,
-    required this.onPressed,
-    required this.followLabel,
-    required this.followBackLabel,
-    required this.followingLabel,
-  });
+  Widget? _buildSubtitle(String? handle, String? extra) {
+    final hasHandle = handle != null && handle.isNotEmpty;
+    final hasExtra = extra != null && extra.isNotEmpty;
+    if (!hasHandle && !hasExtra) return null;
 
-  final SocialFollowButtonMode mode;
-  final bool isLoading;
-  final VoidCallback? onPressed;
-  final String followLabel;
-  final String followBackLabel;
-  final String followingLabel;
-
-  bool get _isFollowing => mode == SocialFollowButtonMode.following;
-
-  String get _label {
-    switch (mode) {
-      case SocialFollowButtonMode.followBack:
-        return followBackLabel;
-      case SocialFollowButtonMode.following:
-        return followingLabel;
-      case SocialFollowButtonMode.follow:
-      case SocialFollowButtonMode.hidden:
-        return followLabel;
+    if (hasHandle && hasExtra) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CustomText('@$handle', fontSize: 13, variant: TextVariant.secondary),
+          const SizedBox(height: 2),
+          CustomText(extra, fontSize: 12, variant: TextVariant.secondary),
+        ],
+      );
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SizedBox(
-      height: 34,
-      child: TextButton(
-        onPressed: isLoading ? null : onPressed,
-        style: TextButton.styleFrom(
-          backgroundColor: _isFollowing
-              ? theme.dividerColor.withValues(alpha: 0.15)
-              : theme.colorScheme.primary,
-          foregroundColor: _isFollowing
-              ? theme.colorScheme.onSurface
-              : Colors.white,
-          disabledBackgroundColor: _isFollowing
-              ? theme.dividerColor.withValues(alpha: 0.15)
-              : theme.colorScheme.primary.withValues(alpha: 0.5),
-          padding: const EdgeInsets.symmetric(horizontal: AppSizes.p12),
-          minimumSize: const Size(88, 34),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          ),
-        ),
-        child: isLoading
-            ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: _isFollowing
-                      ? theme.colorScheme.onSurface
-                      : Colors.white,
-                ),
-              )
-            : Text(
-                _label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-      ),
-    );
+    if (hasHandle) {
+      return CustomText('@$handle', fontSize: 13, variant: TextVariant.secondary);
+    }
+    return CustomText(extra!, fontSize: 12, variant: TextVariant.secondary);
   }
 }

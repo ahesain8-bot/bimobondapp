@@ -2,9 +2,9 @@ import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dar
 import 'package:bimobondapp/app/social/domain/entities/user_like_entity.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -35,7 +35,7 @@ class UserLikeListTile extends StatelessWidget {
 
     Future<void> openLikerProfile() async {
       if (liker == null || liker.id.isEmpty) return;
-      await openUserProfile(
+      await openUserStoryOrProfile(
         context,
         userId: liker.id,
         username: liker.username,
@@ -55,16 +55,19 @@ class UserLikeListTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GestureDetector(
-              onTap: openLikerProfile,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  SafeNetworkAvatar(
-                    imageUrl: liker?.avatarUrl,
-                    radius: 22,
-                    fallbackText: likerName,
-                  ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                StoryProfileAvatar(
+                  userId: liker?.id,
+                  imageUrl: liker?.avatarUrl,
+                  radius: 22,
+                  fallbackText: likerName,
+                  username: liker?.username,
+                  fullName: liker?.fullName,
+                  isFollowing: liker?.isFollowing,
+                  onTap: openLikerProfile,
+                ),
                   PositionedDirectional(
                     end: -1,
                     bottom: -1,
@@ -86,7 +89,6 @@ class UserLikeListTile extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
             ),
             const SizedBox(width: AppSizes.p12),
             Expanded(

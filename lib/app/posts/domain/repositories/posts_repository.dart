@@ -1,8 +1,11 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
+import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -15,7 +18,7 @@ abstract class PostsRepository {
     String? thumbnailUrl,
     String? animatedCoverUrl,
     String? description,
-    String? category,
+    String? categoryId,
     String? status,
     int? duration,
     int? videoWidth,
@@ -38,7 +41,7 @@ abstract class PostsRepository {
   Future<Either<Failure, List<PostEntity>>> getFeed({
     int page = 1,
     int limit = 10,
-    String? category,
+    String? categoryId,
     String? type,
     String? hashtag,
     String? search,
@@ -46,6 +49,8 @@ abstract class PostsRepository {
     String? userId,
     bool? isLiked,
     bool? isSaved,
+    bool isStory = false,
+    FeedAuctionQuery? auctionQuery,
   });
 
   Future<Either<Failure, PostEntity>> getPostById(String postId);
@@ -54,11 +59,25 @@ abstract class PostsRepository {
     String postId, {
     required bool liked,
   });
+  Future<Either<Failure, SocialUserPageEntity>> getPostLikes(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  });
+  Future<Either<Failure, PostViewsPageEntity>> getPostViews(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  });
+  Future<Either<Failure, int>> recordPostView(
+    String postId, {
+    int? watchedDuration,
+  });
   Future<Either<Failure, bool>> toggleSave(String postId);
   Future<Either<Failure, PostEntity>> updatePost(
     String postId, {
     String? description,
-    String? category,
+    String? categoryId,
     String? privacyStatus,
   });
   Future<Either<Failure, bool>> deletePost(String postId);
@@ -68,6 +87,7 @@ abstract class PostsRepository {
     String postId, {
     int page = 1,
     int limit = 20,
+    String sort = 'newest',
   });
   Future<Either<Failure, CommentEntity>> addComment(
     String postId, {

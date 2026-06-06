@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bimobondapp/app/home/presentation/pages/main_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/login_screen.dart';
@@ -8,12 +9,15 @@ import 'package:bimobondapp/app/auth/presentation/pages/email_otp_verification_s
 import 'package:bimobondapp/app/auth/presentation/pages/email_verification_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/splash_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/personal_info_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/admin_user_activity_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_wallpaper_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/change_avatar_screen.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/post_detail_screen.dart';
+import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/follow_suggestions_screen.dart';
@@ -23,6 +27,7 @@ import 'package:bimobondapp/app/social/presentation/pages/user_likes_screen.dart
 import 'package:bimobondapp/app/social/presentation/pages/user_mentions_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/posts_search_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/edit_post_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/user_profile_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
@@ -101,6 +106,14 @@ class AppRouter {
         builder: (context, state) => const ChatWallpaperSettingsScreen(),
       ),
       GoRoute(
+        path: '/settings/admin-activity',
+        name: 'admin_user_activity',
+        builder: (context, state) {
+          final userId = state.uri.queryParameters['userId'];
+          return AdminUserActivityScreen(userId: userId);
+        },
+      ),
+      GoRoute(
         path: '/change-avatar',
         name: 'change_avatar',
         builder: (context, state) => const ChangeAvatarScreen(),
@@ -109,17 +122,31 @@ class AppRouter {
         path: '/post-detail',
         name: 'post_detail',
         builder: (context, state) {
-          final post = state.extra as PostEntity;
-          if (post.isAuctionable) {
-            return LiveDetailsScreen(post: post);
+          final args = postOpenArgsFromExtra(state.extra);
+          if (args == null) {
+            return const Scaffold(
+              body: Center(child: Text('Post not found')),
+            );
           }
-          return PostDetailScreen(post: post);
+          if (args.post.isAuctionable) {
+            return LiveDetailsScreen(post: args.post);
+          }
+          return PostDetailScreen(
+            post: args.post,
+            openCommentsOnLoad: args.openComments,
+            highlightCommentId: args.highlightCommentId,
+          );
         },
       ),
       GoRoute(
         path: '/lives',
         name: 'lives',
         builder: (context, state) => const LivesScreen(),
+      ),
+      GoRoute(
+        path: '/posts-search',
+        name: 'posts_search',
+        builder: (context, state) => const PostsSearchScreen(),
       ),
       GoRoute(
         path: '/chat',
@@ -138,6 +165,12 @@ class AppRouter {
         path: '/all-chats',
         name: 'all_chats',
         builder: (context, state) => const AllChatsScreen(),
+      ),
+      GoRoute(
+        path: '/chat-search',
+        name: 'chat_search',
+        builder: (context, state) =>
+            const AllChatsScreen(autofocusSearch: true),
       ),
       GoRoute(
         path: '/follow-suggestions',
@@ -184,6 +217,24 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/stories-viewer',
+        name: 'stories_viewer',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            final stories = extra['stories'];
+            final initialIndex = extra['initialIndex'] as int? ?? 0;
+            if (stories is List<PostEntity>) {
+              return StoriesViewerScreen(
+                stories: stories,
+                initialIndex: initialIndex,
+              );
+            }
+          }
+          return const StoriesViewerScreen(stories: []);
+        },
+      ),
+      GoRoute(
         path: '/add-post',
         name: 'add_post',
         builder: (context, state) {
@@ -191,6 +242,7 @@ class AppRouter {
           return AddPostScreen(
             initialFiles: extra?['files'] as List<File>?,
             initialType: extra?['type'] as String?,
+            isStory: extra?['isStory'] as bool? ?? false,
           );
         },
       ),

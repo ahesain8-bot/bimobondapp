@@ -20,7 +20,7 @@ class CreatePostUseCase implements UseCase<PostEntity, CreatePostParams> {
       thumbnailUrl: params.thumbnailUrl,
       animatedCoverUrl: params.animatedCoverUrl,
       description: params.description,
-      category: params.category,
+      categoryId: params.categoryId,
       status: params.status,
       duration: params.duration,
       videoWidth: params.videoWidth,
@@ -49,7 +49,7 @@ class CreatePostParams extends Equatable {
   final String? thumbnailUrl;
   final String? animatedCoverUrl;
   final String? description;
-  final String? category;
+  final String? categoryId;
   final String? status;
   final int? duration;
   final int? videoWidth;
@@ -75,7 +75,7 @@ class CreatePostParams extends Equatable {
     this.thumbnailUrl,
     this.animatedCoverUrl,
     this.description,
-    this.category,
+    this.categoryId,
     this.status,
     this.duration,
     this.videoWidth,
@@ -103,7 +103,7 @@ class CreatePostParams extends Equatable {
         thumbnailUrl,
         animatedCoverUrl,
         description,
-        category,
+        categoryId,
         status,
         duration,
         videoWidth,

@@ -47,6 +47,7 @@ class ChatMessageList extends StatelessWidget {
           return ChatTypingIndicator(
             peerImageUrl: peerImageUrl,
             username: username,
+            peerUserId: peerUserId,
           );
         }
 

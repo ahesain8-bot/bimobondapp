@@ -4,16 +4,22 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
-import 'package:bimobondapp/app/social/presentation/di/social_injector.dart' as social_di;
-import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
+import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
+    as social_di;
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/core/utils/tag_parser.dart';
+import 'package:bimobondapp/core/widgets/tagged_text.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
@@ -26,12 +32,16 @@ class VideoPostWidget extends StatefulWidget {
   final PostEntity post;
   final double? bottomPadding;
   final bool isActive;
+  final bool openCommentsOnLoad;
+  final String? highlightCommentId;
 
   const VideoPostWidget({
     super.key,
     required this.post,
     this.bottomPadding,
     this.isActive = true,
+    this.openCommentsOnLoad = false,
+    this.highlightCommentId,
   });
 
   @override
@@ -84,6 +94,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
     if (widget.isActive) {
       _resolveFollowStatusIfNeeded();
+      _recordViewIfNeeded();
+    }
+
+    if (widget.openCommentsOnLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showComments();
+      });
     }
   }
 
@@ -102,7 +119,16 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
     if (widget.isActive && !oldWidget.isActive) {
       _resolveFollowStatusIfNeeded();
+      _recordViewIfNeeded();
     }
+  }
+
+  void _recordViewIfNeeded() {
+    if (!widget.isActive || widget.post.isStory) return;
+    PostViewRecorder.recordIfNeeded(
+      postId: widget.post.id,
+      isOwner: _isPostOwner(),
+    );
   }
 
   Future<void> _resolveFollowStatusIfNeeded() async {
@@ -186,15 +212,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
   }
 
-  void _showComments() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => CommentSheetWidget(
-        postId: widget.post.id,
-        postOwnerId: widget.post.userId,
-      ),
+  void _showComments({int initialTabIndex = 1}) {
+    final isOwner = _isPostOwner();
+    CommentSheetWidget.show(
+      context,
+      postId: widget.post.id,
+      postOwnerId: widget.post.userId,
+      likeCount: _likeCount,
+      commentCount: widget.post.commentCount,
+      viewCount: widget.post.viewCount,
+      isPostOwner: isOwner,
+      initialTabIndex: isOwner ? initialTabIndex : 0,
     );
   }
 
@@ -224,10 +252,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final userId = _postAuthorUserId();
     if (userId == null) return;
 
-    final isFollowing = await openUserProfile(
+    final isFollowing = await openUserStoryOrProfile(
       context,
       userId: userId,
       username: widget.post.user?.username,
+      fullName: widget.post.user?.username,
       avatarUrl: widget.post.user?.avatarUrl,
       isFollowing: _isFollowing,
     );
@@ -595,8 +624,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
                       // Description
                       if ((post.description ?? '').isNotEmpty)
-                        Text(
-                          post.description!,
+                        TaggedText(
+                          text: post.description!,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 14,
@@ -605,52 +634,33 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                               Shadow(color: Colors.black54, blurRadius: 6),
                             ],
                           ),
+                          mentionStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            shadows: const [
+                              Shadow(color: Colors.black54, blurRadius: 6),
+                            ],
+                          ),
+                          hashtagStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            shadows: const [
+                              Shadow(color: Colors.black54, blurRadius: 6),
+                            ],
+                          ),
+                          post: post,
+                          mentionUserIds: MentionRefUtils.usernameToUserIdMap(
+                            post.description!,
+                            post.mentions,
+                            post: post,
+                          ),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
                       const SizedBox(height: 10),
 
-                      // Category Chip
-                      if (post.category != null)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    LucideIcons.tag,
-                                    color: Colors.white,
-                                    size: 11,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    post.category!,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
                       const SizedBox(height: 10),
 
                       // Music row
@@ -753,37 +763,22 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   Widget _buildProfileAvatar(String? avatarUrl, ThemeData theme) {
     final showFollowBadge = !_isPostOwner();
+    final authorId = _postAuthorUserId();
 
     return Stack(
       alignment: Alignment.bottomCenter,
       clipBehavior: Clip.none,
       children: [
-        GestureDetector(
+        StoryProfileAvatar(
+          userId: authorId,
+          imageUrl: avatarUrl,
+          fallbackText: widget.post.user?.username ?? 'User',
+          radius: 24,
+          backgroundColor: Colors.white24,
+          username: widget.post.user?.username,
+          fullName: widget.post.user?.username,
+          isFollowing: _isFollowing,
           onTap: _openAuthorProfile,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                  blurRadius: 12,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.all(2.5),
-            child: SafeNetworkAvatar(
-              imageUrl: avatarUrl,
-              radius: 24,
-              fallbackText: widget.post.user?.username,
-              backgroundColor: Colors.white24,
-            ),
-          ),
         ),
         if (showFollowBadge)
           Positioned(
@@ -971,12 +966,5 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     );
   }
 
-  String _formatCount(int count) {
-    if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}M';
-    } else if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}K';
-    }
-    return count.toString();
-  }
+  String _formatCount(int count) => formatCompactCount(count);
 }

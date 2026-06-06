@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/auth/data/models/user_model.dart';
 import 'package:dartz/dartz.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/app/auth/domain/entities/user_activity_page_entity.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/auth/domain/repositories/auth_repository.dart';
 import 'package:bimobondapp/app/auth/data/datasources/auth_remote_data_source.dart';
@@ -222,6 +223,26 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final userModel = await remoteDataSource.getUserById(userId);
       return Right(userModel);
+    } on AppException catch (e) {
+      return Left(_mapExceptionToFailure(e));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserActivityPageEntity>> getAdminUserActivity(
+    String userId, {
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final pageModel = await remoteDataSource.getAdminUserActivity(
+        userId,
+        page: page,
+        limit: limit,
+      );
+      return Right(pageModel);
     } on AppException catch (e) {
       return Left(_mapExceptionToFailure(e));
     } catch (e) {
