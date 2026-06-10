@@ -11,6 +11,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_card.
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_status_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_active_header.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_ended_header.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_category_strip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
@@ -28,6 +29,7 @@ import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AuctionsScreen extends StatefulWidget {
@@ -41,6 +43,7 @@ class AuctionsScreen extends StatefulWidget {
 
 class _AuctionsScreenState extends State<AuctionsScreen> {
   static const _searchDebounceDuration = Duration(milliseconds: 400);
+  static const _endedPreviewLimit = 3;
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -48,8 +51,10 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   AuctionSearchFilters _filters = AuctionSearchFilters.empty;
   final List<CategoryEntity> _categories = [];
   final List<AuctionItem> _postAuctionItems = [];
+  final List<AuctionItem> _endedPreviewItems = [];
   bool _isLoadingCategories = false;
   bool _isLoadingPostAuctions = false;
+  bool _isLoadingEndedPreview = false;
 
   @override
   void initState() {
@@ -71,11 +76,18 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   void _loadTabData() {
     unawaited(_loadCategories());
     unawaited(_loadPostAuctions());
+    unawaited(_loadEndedPreview());
   }
 
   Future<void> _onPullToRefresh() async {
-    await Future.wait([_loadCategories(), _loadPostAuctions()]);
+    await Future.wait([
+      _loadCategories(),
+      _loadPostAuctions(),
+      _loadEndedPreview(),
+    ]);
   }
+
+  void _openEndedAuctions() => context.pushNamed('ended_auctions');
 
   @override
   void dispose() {
@@ -140,7 +152,8 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     );
     if (!mounted || result == null) return;
     setState(() => _filters = result);
-    _loadPostAuctions();
+    unawaited(_loadPostAuctions());
+    unawaited(_loadEndedPreview());
   }
 
   void _toggleCategoryFilter(String categoryId) {
@@ -153,7 +166,8 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     setState(() {
       _filters = _filters.copyWith(categoryIds: nextIds);
     });
-    _loadPostAuctions();
+    unawaited(_loadPostAuctions());
+    unawaited(_loadEndedPreview());
   }
 
   void _clearCategoryFilters() {
@@ -161,7 +175,73 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     setState(() {
       _filters = _filters.copyWith(categoryIds: {});
     });
-    _loadPostAuctions();
+    unawaited(_loadPostAuctions());
+    unawaited(_loadEndedPreview());
+  }
+
+  Future<void> _loadEndedPreview() async {
+    if (_searchQuery.isNotEmpty || _filters.hasActiveFilters) {
+      if (!mounted) return;
+      setState(() {
+        _endedPreviewItems.clear();
+        _isLoadingEndedPreview = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingEndedPreview = true;
+      _endedPreviewItems.clear();
+    });
+
+    const endedFilters = AuctionSearchFilters(
+      liveStatus: AuctionLiveStatusFilter.ended,
+    );
+    final useCase = posts_di.sl<GetFeedUseCase>();
+    final postsById = <String, PostEntity>{};
+    var page = 1;
+    var hasMore = true;
+
+    while (hasMore && page <= 5 && postsById.length < _endedPreviewLimit) {
+      final result = await useCase(
+        endedFilters.toFeedParams(page: page, limit: 30),
+      );
+      var shouldContinue = false;
+      result.fold((_) => hasMore = false, (items) {
+        for (final item in items) {
+          final post = item.post;
+          if (!post.isAuctionable || post.auction == null) continue;
+          if (!_isEndedPost(post)) continue;
+          postsById[post.id] = post;
+          if (postsById.length >= _endedPreviewLimit) break;
+        }
+        shouldContinue = items.length >= 30;
+      });
+      if (!shouldContinue || postsById.length >= _endedPreviewLimit) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _endedPreviewItems
+        ..clear()
+        ..addAll(
+          postsById.values.take(_endedPreviewLimit).map(
+            (post) => AuctionItem.fromPost(
+              post,
+              categoryLabel: _categoryLabelFor(post.categoryId),
+              categorySlug: CategoryLookup.slugForId(
+                post.categoryId,
+                _categories,
+              ),
+            ),
+          ),
+        );
+      _isLoadingEndedPreview = false;
+    });
   }
 
   Future<void> _loadPostAuctions() async {
@@ -185,13 +265,16 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
         ),
       );
       var shouldContinue = false;
-      result.fold((_) => hasMore = false, (posts) {
-        for (final post in posts) {
+      result.fold((_) => hasMore = false, (items) {
+        for (final item in items) {
+          final post = item.post;
           if (!post.isAuctionable || post.auction == null) continue;
+          if (_isEndedPost(post)) continue;
           if (!_filters.matchesClientCategory(post)) continue;
+          if (!_filters.matchesClientLiveStatus(post)) continue;
           postsById[post.id] = post;
         }
-        shouldContinue = posts.length >= 30;
+        shouldContinue = items.length >= 30;
       });
       if (!shouldContinue) {
         hasMore = false;
@@ -227,16 +310,193 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     }
   }
 
-  AuctionItem? _getSpotlightItem() {
-    if (_postAuctionItems.isEmpty) return null;
-    final liveAuctions = _postAuctionItems
-        .where((item) => item.isLive)
-        .toList();
+  bool _isEndedPost(PostEntity post) => AuctionSearchFilters.isPostEnded(post);
+
+  List<AuctionItem> get _activeAuctionItems => _postAuctionItems;
+
+  AuctionItem? _getSpotlightItem(List<AuctionItem> source) {
+    if (source.isEmpty) return null;
+    final liveAuctions = source.where((item) => item.isLive).toList();
     if (liveAuctions.isNotEmpty) {
       liveAuctions.sort((a, b) => b.giftTotalUsd.compareTo(a.giftTotalUsd));
       return liveAuctions.first;
     }
-    return _postAuctionItems.first;
+    return source.first;
+  }
+
+  List<Widget> _buildAuctionSections({
+    required BuildContext context,
+    required ThemeData theme,
+    required Color surfaceElevated,
+    required AppLocalizations l10n,
+  }) {
+    final showSpotlightBase =
+        !_isLoadingPostAuctions &&
+        _searchQuery.isEmpty &&
+        !_filters.hasActiveFilters;
+
+    final activeItems = _activeAuctionItems;
+    final spotlightItem =
+        showSpotlightBase ? _getSpotlightItem(activeItems) : null;
+    final listItems = spotlightItem != null
+        ? activeItems.where((item) => item.id != spotlightItem.id).toList()
+        : activeItems;
+
+    return _buildActiveAuctionSection(
+      context: context,
+      theme: theme,
+      surfaceElevated: surfaceElevated,
+      l10n: l10n,
+      items: listItems,
+      showSpotlight: showSpotlightBase,
+      spotlightItem: spotlightItem,
+    );
+  }
+
+  List<Widget> _buildActiveAuctionSection({
+    required BuildContext context,
+    required ThemeData theme,
+    required Color surfaceElevated,
+    required AppLocalizations l10n,
+    required List<AuctionItem> items,
+    required bool showSpotlight,
+    AuctionItem? spotlightItem,
+  }) {
+    return [
+      if (showSpotlight && spotlightItem != null)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: AppSizes.p20),
+            child: _FeaturedSpotlight(
+              item: spotlightItem,
+              onTap: () => _openAuction(spotlightItem),
+            ),
+          ),
+        ),
+      if (items.isNotEmpty) ...[
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSizes.p16,
+              AppSizes.p24,
+              AppSizes.p16,
+              AppSizes.p12,
+            ),
+            child: AuctionsActiveHeader(),
+          ),
+        ),
+        ..._buildAuctionListSlivers(
+          context: context,
+          theme: theme,
+          surfaceElevated: surfaceElevated,
+          items: items,
+        ),
+      ],
+      if (items.isEmpty && (spotlightItem == null || !showSpotlight))
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppSizes.p48,
+              horizontal: AppSizes.p16,
+            ),
+            child: Center(
+              child: CustomText(
+                l10n.noPostsFound,
+                variant: TextVariant.secondary,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ..._buildEndedPreviewSection(
+        context: context,
+        theme: theme,
+        surfaceElevated: surfaceElevated,
+      ),
+    ];
+  }
+
+  List<Widget> _buildEndedPreviewSection({
+    required BuildContext context,
+    required ThemeData theme,
+    required Color surfaceElevated,
+  }) {
+    if (_searchQuery.isNotEmpty || _filters.hasActiveFilters) {
+      return const [];
+    }
+
+    if (_isLoadingEndedPreview) {
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(top: AppSizes.p24),
+            child: AuctionListSkeleton(itemCount: 1),
+          ),
+        ),
+      ];
+    }
+
+    if (_endedPreviewItems.isEmpty) return const [];
+
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.p16,
+            AppSizes.p24,
+            AppSizes.p16,
+            AppSizes.p12,
+          ),
+          child: AuctionsEndedHeader(
+            onTap: _openEndedAuctions,
+            showViewAll: true,
+          ),
+        ),
+      ),
+      ..._buildAuctionListSlivers(
+        context: context,
+        theme: theme,
+        surfaceElevated: surfaceElevated,
+        items: _endedPreviewItems,
+        showBidButton: false,
+      ),
+    ];
+  }
+
+  List<Widget> _buildAuctionListSlivers({
+    required BuildContext context,
+    required ThemeData theme,
+    required Color surfaceElevated,
+    required List<AuctionItem> items,
+    bool showBidButton = true,
+  }) {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSizes.p16,
+          0,
+          AppSizes.p16,
+          AppSizes.p16,
+        ),
+        sliver: SliverList.separated(
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: AppSizes.p16),
+          itemBuilder: (context, index) {
+            final auction = items[index];
+            final post = auction.post;
+            final canBid = showBidButton &&
+                (post == null || !isCurrentUserPostOwner(context, post));
+
+            return AuctionCard(
+              auction: auction,
+              surfaceColor: surfaceElevated,
+              showBidButton: canBid,
+              onOpen: () => _openAuction(auction),
+            );
+          },
+        ),
+      ),
+    ];
   }
 
   @override
@@ -245,7 +505,6 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final locale = Localizations.localeOf(context);
 
     final surfaceElevated = isDark
         ? const Color(0xFF1E1E1E)
@@ -257,22 +516,17 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
         ? Colors.white24
         : theme.dividerColor.withValues(alpha: 0.35);
 
-    final showSpotlight =
-        !_isLoadingPostAuctions &&
-        _searchQuery.isEmpty &&
-        !_filters.hasActiveFilters &&
-        _postAuctionItems.isNotEmpty;
-    final spotlightItem = showSpotlight ? _getSpotlightItem() : null;
-
-    final filteredListItems = spotlightItem != null
-        ? _postAuctionItems
-              .where((item) => item.id != spotlightItem.id)
-              .toList()
-        : _postAuctionItems;
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: HomeTabAppBar(title: l10n.navAuctions),
+      appBar: HomeTabAppBar(
+        title: l10n.navAuctions,
+        actions: [
+          HomeTabGlassIconButton(
+            icon: LucideIcons.history,
+            onTap: _openEndedAuctions,
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         bottom: false,
@@ -326,74 +580,17 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
                     onClearCategories: _clearCategoryFilters,
                   ),
                 ),
-              if (showSpotlight && spotlightItem != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: AppSizes.p20),
-                    child: _FeaturedSpotlight(
-                      item: spotlightItem,
-                      onTap: () => _openAuction(spotlightItem),
-                    ),
-                  ),
+              if (_isLoadingPostAuctions)
+                const SliverToBoxAdapter(
+                  child: AuctionListSkeleton(itemCount: 3),
+                )
+              else
+                ..._buildAuctionSections(
+                  context: context,
+                  theme: theme,
+                  surfaceElevated: surfaceElevated,
+                  l10n: l10n,
                 ),
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSizes.p16,
-                    AppSizes.p24,
-                    AppSizes.p16,
-                    AppSizes.p12,
-                  ),
-                  child: AuctionsActiveHeader(),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.p16,
-                  0,
-                  AppSizes.p16,
-                  AppSizes.p16,
-                ),
-                sliver: _isLoadingPostAuctions
-                    ? const SliverToBoxAdapter(
-                        child: AuctionListSkeleton(itemCount: 3),
-                      )
-                    : filteredListItems.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: AppSizes.p48,
-                            horizontal: AppSizes.p16,
-                          ),
-                          child: Center(
-                            child: CustomText(
-                              l10n.noPostsFound,
-                              variant: TextVariant.secondary,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      )
-                    : SliverList.separated(
-                        itemCount: filteredListItems.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: AppSizes.p16),
-                        itemBuilder: (context, index) {
-                          final auction = filteredListItems[index];
-                          final post = auction.post;
-                          final showBidButton =
-                              post == null ||
-                              !isCurrentUserPostOwner(context, post);
-
-                          return AuctionCard(
-                            auction: auction,
-                            surfaceColor: surfaceElevated,
-                            showBidButton: showBidButton,
-                            onOpen: () => _openAuction(auction),
-                          );
-                        },
-                      ),
-              ),
             ],
           ),
         ),

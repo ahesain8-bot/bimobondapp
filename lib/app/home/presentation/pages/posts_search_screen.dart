@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -86,6 +87,10 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
   void _submitSearch() {
     _searchDebounce?.cancel();
     final next = _searchController.text.trim();
+    if (next.startsWith('#') && next.length > 1) {
+      openHashtagFeed(context, next);
+      return;
+    }
     if (next == _searchQuery) return;
     setState(() => _searchQuery = next);
     unawaited(_loadPosts(refresh: true));
@@ -125,7 +130,8 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
           _isLoadingMore = false;
         });
       },
-      (posts) {
+      (items) {
+        final posts = items.map((item) => item.post).toList();
         setState(() {
           if (refresh) {
             _posts

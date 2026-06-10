@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:equatable/equatable.dart';
 
@@ -29,12 +30,13 @@ class CreatePostSuccess extends PostsState {
 }
 
 class FeedLoadSuccess extends PostsState {
-  final List<PostEntity> posts;
+  final List<FeedItemEntity> items;
   final bool hasReachedMax;
-  const FeedLoadSuccess({required this.posts, this.hasReachedMax = false});
+
+  const FeedLoadSuccess({required this.items, this.hasReachedMax = false});
 
   @override
-  List<Object?> get props => [posts, hasReachedMax];
+  List<Object?> get props => [items, hasReachedMax];
 }
 
 class StoriesLoadSuccess extends PostsState {
@@ -89,6 +91,34 @@ class SavePostSuccess extends PostsState {
 
   @override
   List<Object?> get props => [postId];
+}
+
+class RepostPostSuccess extends PostsState {
+  final String postId;
+  final bool isReposted;
+
+  const RepostPostSuccess({
+    required this.postId,
+    required this.isReposted,
+  });
+
+  @override
+  List<Object?> get props => [postId, isReposted];
+}
+
+class MyRepostsLoadSuccess extends PostsState {
+  final List<PostEntity> posts;
+  final bool hasReachedMax;
+  final int profileLoadKey;
+
+  const MyRepostsLoadSuccess({
+    required this.posts,
+    required this.profileLoadKey,
+    this.hasReachedMax = false,
+  });
+
+  @override
+  List<Object?> get props => [posts, hasReachedMax, profileLoadKey];
 }
 
 class UpdatePostSuccess extends PostsState {

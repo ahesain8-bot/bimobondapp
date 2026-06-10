@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:equatable/equatable.dart';
 
 class PostEntity extends Equatable {
@@ -17,8 +18,11 @@ class PostEntity extends Equatable {
   final int commentCount;
   final int saveCount;
   final int shareCount;
+  final int repostCount;
   final bool isLiked;
   final bool isSaved;
+  final bool isReposted;
+  final List<RepostUserEntity> recentReposters;
   final DateTime createdAt;
   final PostUserEntity? user;
   final List<PostMediaEntity> media;
@@ -43,8 +47,11 @@ class PostEntity extends Equatable {
     required this.commentCount,
     required this.saveCount,
     required this.shareCount,
+    required this.repostCount,
     required this.isLiked,
     required this.isSaved,
+    required this.isReposted,
+    this.recentReposters = const [],
     required this.createdAt,
     this.user,
     required this.media,
@@ -59,8 +66,11 @@ class PostEntity extends Equatable {
     int? commentCount,
     int? likeCount,
     int? saveCount,
+    int? repostCount,
     bool? isLiked,
     bool? isSaved,
+    bool? isReposted,
+    List<RepostUserEntity>? recentReposters,
     String? description,
     String? privacyStatus,
   }) {
@@ -79,8 +89,11 @@ class PostEntity extends Equatable {
       commentCount: commentCount ?? this.commentCount,
       saveCount: saveCount ?? this.saveCount,
       shareCount: shareCount,
+      repostCount: repostCount ?? this.repostCount,
       isLiked: isLiked ?? this.isLiked,
       isSaved: isSaved ?? this.isSaved,
+      isReposted: isReposted ?? this.isReposted,
+      recentReposters: recentReposters ?? this.recentReposters,
       createdAt: createdAt,
       user: user,
       media: media,
@@ -108,8 +121,11 @@ class PostEntity extends Equatable {
     commentCount,
     saveCount,
     shareCount,
+    repostCount,
     isLiked,
     isSaved,
+    isReposted,
+    recentReposters,
     createdAt,
     user,
     media,

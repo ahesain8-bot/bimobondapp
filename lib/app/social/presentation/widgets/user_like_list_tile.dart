@@ -4,7 +4,9 @@ import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/widgets/activity_feed_card.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -21,17 +23,27 @@ class UserLikeListTile extends StatelessWidget {
     return DateTime.tryParse(like.createdAt);
   }
 
-  void _openLikedPost(BuildContext context) {
-    openPostById(context, like.postId);
+  String? _resolveThumbnailUrl() {
+    final post = like.post;
+    if (post == null) return null;
+    final thumb = post.thumbnailUrl;
+    if (thumb != null && MediaUtils.isImage(thumb)) return thumb;
+    if (post.media.isNotEmpty) {
+      final first = post.media.first;
+      if (MediaUtils.isImage(first.url, mediaType: first.mediaType)) {
+        return first.url;
+      }
+    }
+    return thumb;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final liker = like.user;
     final likerName = liker?.displayName ?? l10n.messagesInboxUserFallback;
     final time = formatInboxTime(_likedAt, l10n);
+    final thumbnailUrl = _resolveThumbnailUrl();
 
     Future<void> openLikerProfile() async {
       if (liker == null || liker.id.isEmpty) return;
@@ -45,96 +57,39 @@ class UserLikeListTile extends StatelessWidget {
       );
     }
 
-    return InkWell(
-      onTap: () => _openLikedPost(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p16,
-          vertical: AppSizes.p12,
+    Widget? trailing;
+    if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+      trailing = ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SafeNetworkImage(
+          imageUrl: thumbnailUrl,
+          width: 52,
+          height: 52,
+          fit: BoxFit.cover,
+          errorIcon: Icons.image_outlined,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                StoryProfileAvatar(
-                  userId: liker?.id,
-                  imageUrl: liker?.avatarUrl,
-                  radius: 22,
-                  fallbackText: likerName,
-                  username: liker?.username,
-                  fullName: liker?.fullName,
-                  isFollowing: liker?.isFollowing,
-                  onTap: openLikerProfile,
-                ),
-                  PositionedDirectional(
-                    end: -1,
-                    bottom: -1,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: MessagesLayoutConstants.activityLikesColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: theme.scaffoldBackgroundColor,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.favorite_rounded,
-                        size: 10,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-            ),
-            const SizedBox(width: AppSizes.p12),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.3,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: likerName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextSpan(
-                            text: ' ${l10n.userLikeReceivedAction}',
-                            style: TextStyle(
-                              color: theme.textTheme.bodyMedium?.color
-                                  ?.withValues(alpha: 0.75),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (time.isNotEmpty) ...[
-                    const SizedBox(width: AppSizes.p8),
-                    Text(
-                      time,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color
-                            ?.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
+      );
+    }
+
+    return ActivityFeedCard(
+      badgeColor: MessagesLayoutConstants.activityLikesColor,
+      badgeIcon: Icons.favorite_rounded,
+      onTap: () => openPostById(context, like.postId),
+      avatar: StoryProfileAvatar(
+        userId: liker?.id,
+        imageUrl: liker?.avatarUrl,
+        radius: 24,
+        fallbackText: likerName,
+        username: liker?.username,
+        fullName: liker?.fullName,
+        isFollowing: liker?.isFollowing,
+        onTap: openLikerProfile,
+      ),
+      trailing: trailing,
+      content: ActivityFeedActionText(
+        actorName: likerName,
+        action: l10n.userLikeReceivedAction,
+        time: time,
       ),
     );
   }

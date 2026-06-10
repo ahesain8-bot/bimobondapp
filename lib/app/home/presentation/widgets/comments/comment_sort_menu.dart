@@ -1,4 +1,6 @@
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_dropdown.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -27,50 +29,79 @@ class CommentSortMenu extends StatelessWidget {
     }
   }
 
+  Future<void> _openDropdown(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+
+    final anchor = box.localToGlobal(Offset.zero) & box.size;
+    final selected = await LiquidGlassDropdownMenu.show<String>(
+      context: context,
+      anchor: anchor,
+      alignTrailing: true,
+      items: [
+        for (final key in sortKeys)
+          LiquidGlassDropdownItem(
+            value: key,
+            label: labelFor(key, l10n),
+            isSelected: key == sort,
+          ),
+      ],
+    );
+
+    if (selected != null && selected != sort) {
+      onSortChanged(selected);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isDefaultSort = sort == 'newest';
 
-    return PopupMenuButton<String>(
-      initialValue: sort,
-      tooltip: labelFor(sort, l10n),
-      offset: const Offset(0, 40),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSizes.p12),
-      ),
-      onSelected: onSortChanged,
-      icon: Icon(
-        LucideIcons.slidersHorizontal,
-        size: 20,
-        color: isDefaultSort
-            ? theme.colorScheme.onSurface.withValues(alpha: 0.65)
-            : theme.colorScheme.primary,
-      ),
-      itemBuilder: (context) => sortKeys
-          .map(
-            (key) => PopupMenuItem<String>(
-              value: key,
-              child: Row(
-                children: [
-                  if (key == sort)
-                    Icon(
-                      Icons.check_rounded,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    )
-                  else
-                    const SizedBox(width: 18),
-                  const SizedBox(width: AppSizes.p8),
-                  Text(labelFor(key, l10n)),
-                ],
-              ),
+    return Builder(
+      builder: (triggerContext) {
+        return GestureDetector(
+          onTap: () => _openDropdown(triggerContext),
+          behavior: HitTestBehavior.opaque,
+          child: LiquidGlassSurface(
+            borderRadius: BorderRadius.circular(20),
+            blurSigma: 16,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.p10,
+              vertical: AppSizes.p6,
             ),
-          )
-          .toList(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  LucideIcons.slidersHorizontal,
+                  size: 16,
+                  color: isDefaultSort
+                      ? Colors.white.withValues(alpha: 0.65)
+                      : Colors.white,
+                ),
+                const SizedBox(width: AppSizes.p6),
+                Text(
+                  labelFor(sort, l10n),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight:
+                        isDefaultSort ? FontWeight.w500 : FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: AppSizes.p4),
+                Icon(
+                  LucideIcons.chevronDown,
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.75),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

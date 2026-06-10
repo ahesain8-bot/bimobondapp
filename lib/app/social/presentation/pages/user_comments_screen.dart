@@ -194,7 +194,9 @@ class _UserCommentsScreenState extends State<UserCommentsScreen> {
         : l10n.userCommentsTitle;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.brightness == Brightness.light
+          ? Colors.white
+          : theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(title: title),
       body: RefreshIndicator(
         onRefresh: () => _loadComments(refresh: true),
@@ -249,16 +251,13 @@ class _UserCommentsScreenState extends State<UserCommentsScreen> {
       );
     }
 
-    return ListView.separated(
+    return ListView.builder(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: _comments.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (context, _) => Divider(
-        height: 1,
-        color: theme.dividerColor.withValues(alpha: 0.08),
-      ),
       itemBuilder: (context, index) {
         if (index >= _comments.length) {
           return const Padding(

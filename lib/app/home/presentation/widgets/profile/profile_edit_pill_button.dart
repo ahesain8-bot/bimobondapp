@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ProfileEditPillButton extends StatelessWidget {
-  const ProfileEditPillButton({
-    required this.onPressed,
-    super.key,
-  });
+  const ProfileEditPillButton({required this.onPressed, super.key});
 
   final VoidCallback onPressed;
 

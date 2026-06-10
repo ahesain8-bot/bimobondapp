@@ -1,19 +1,19 @@
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
-import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 
-class GetFeedUseCase implements UseCase<List<PostEntity>, GetFeedParams> {
-  final PostsRepository repository;
-
+class GetFeedUseCase implements UseCase<List<FeedItemEntity>, GetFeedParams> {
   GetFeedUseCase(this.repository);
 
+  final PostsRepository repository;
+
   @override
-  Future<Either<Failure, List<PostEntity>>> call(GetFeedParams params) async {
-    return await repository.getFeed(
+  Future<Either<Failure, List<FeedItemEntity>>> call(GetFeedParams params) {
+    return repository.getFeed(
       page: params.page,
       limit: params.limit,
       categoryId: params.categoryId,
@@ -25,26 +25,14 @@ class GetFeedUseCase implements UseCase<List<PostEntity>, GetFeedParams> {
       isLiked: params.isLiked,
       isSaved: params.isSaved,
       isStory: params.isStory,
+      contentType: params.contentType,
       auctionQuery: params.auctionQuery,
+      privacyStatus: params.privacyStatus,
     );
   }
 }
 
 class GetFeedParams extends Equatable {
-  final int page;
-  final int limit;
-  final String? categoryId;
-  final String? type;
-  final String? hashtag;
-  final String? search;
-  final String? sort;
-  final String? userId;
-  final bool? isLiked;
-  final bool? isSaved;
-  /// `false` for posts feed/profile; `true` for stories.
-  final bool isStory;
-  final FeedAuctionQuery? auctionQuery;
-
   const GetFeedParams({
     this.page = 1,
     this.limit = 10,
@@ -57,8 +45,25 @@ class GetFeedParams extends Equatable {
     this.isLiked,
     this.isSaved,
     this.isStory = false,
+    this.contentType,
     this.auctionQuery,
+    this.privacyStatus,
   });
+
+  final int page;
+  final int limit;
+  final String? categoryId;
+  final String? type;
+  final String? hashtag;
+  final String? search;
+  final String? sort;
+  final String? userId;
+  final bool? isLiked;
+  final bool? isSaved;
+  final bool isStory;
+  final FeedContentType? contentType;
+  final FeedAuctionQuery? auctionQuery;
+  final String? privacyStatus;
 
   @override
   List<Object?> get props => [
@@ -73,6 +78,8 @@ class GetFeedParams extends Equatable {
     isLiked,
     isSaved,
     isStory,
+    contentType,
     auctionQuery,
+    privacyStatus,
   ];
 }

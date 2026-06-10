@@ -263,13 +263,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noSavedPosts => 'No saved posts';
 
   @override
+  String get noRepostedPosts => 'No reposts yet';
+
+  @override
+  String get noOnlyMePosts => 'No only me posts yet';
+
+  @override
+  String get repostTitle => 'Repost';
+
+  @override
+  String get repostSubtitle => 'Share this post to your profile';
+
+  @override
+  String get repostAction => 'Repost';
+
+  @override
+  String get repostUndo => 'Undo repost';
+
+  @override
+  String get savePost => 'Save post';
+
+  @override
+  String get unsavePost => 'Remove from saved';
+
+  @override
+  String get repostQuoteHint => 'Add a comment (optional)';
+
+  @override
+  String get repostSuccess => 'Reposted';
+
+  @override
+  String get repostRemoved => 'Repost removed';
+
+  @override
+  String get cannotRepostOwnPost => 'You can\'t repost your own post';
+
+  @override
+  String repostCountLabel(int count) {
+    return '$count reposts';
+  }
+
+  @override
+  String repostedByUser(Object name) {
+    return '$name reposted';
+  }
+
+  @override
+  String postRepostersTitle(int count) {
+    return 'Reposts · $count';
+  }
+
+  @override
+  String get postRepostersEmpty => 'No reposts yet';
+
+  @override
+  String get profileRepostsTab => 'Reposts';
+
+  @override
   String get editProfile => 'Edit profile';
 
   @override
   String get noBio => 'No bio yet.';
 
   @override
-  String get profileAvatarViewPhoto => 'Profile photo';
+  String get profileAvatarViewPhoto => 'Open profile photo';
 
   @override
   String get profileAvatarViewStory => 'View story';
@@ -305,6 +362,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String storyTimeHoursAgo(int count) {
     return '${count}h ago';
+  }
+
+  @override
+  String storyTimeDaysAgo(int count) {
+    return '${count}d ago';
   }
 
   @override
@@ -484,6 +546,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get auctionsFiltersMaxPrice => 'Max price';
+
+  @override
+  String get auctionsFiltersLiveStatus => 'Auction status';
+
+  @override
+  String get auctionsFilterLive => 'Live';
+
+  @override
+  String get auctionsFilterEnded => 'Ended';
+
+  @override
+  String get endedAuctionsNow => 'Ended auctions';
 
   @override
   String get auctionsFiltersTimeRemaining => 'Time remaining';
@@ -1159,6 +1233,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesActivityMentions => 'Mentions';
 
   @override
+  String get messagesActivityNotifications => 'Notifications';
+
+  @override
   String get messagesRecentMessages => 'Recent Messages';
 
   @override
@@ -1452,4 +1529,179 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get auctionInvalidPrice => 'Enter a valid price';
+
+  @override
+  String get hashtagFeedSubtitle => 'Posts with this hashtag';
+
+  @override
+  String get noHashtagPosts => 'No posts for this hashtag yet';
+
+  @override
+  String get trendingHashtags => 'Trending hashtags';
+
+  @override
+  String get searchHashtagsHint => 'Search hashtags';
+
+  @override
+  String get noHashtagsFound => 'No hashtags found';
+
+  @override
+  String hashtagPostCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count posts',
+      one: '1 post',
+      zero: 'No posts',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsEmpty => 'No notifications yet';
+
+  @override
+  String get notificationsEmptySubtitle => 'When someone interacts with you, you\'ll see it here.';
+
+  @override
+  String get notificationsEmptyUnread => 'You\'re all caught up — no unread notifications.';
+
+  @override
+  String get notificationsEmptyRead => 'No read notifications yet.';
+
+  @override
+  String notificationsFilterUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsRetry => 'Try again';
+
+  @override
+  String get notificationsOk => 'OK';
+
+  @override
+  String get notificationsLoadError => 'Couldn\'t load notifications';
+
+  @override
+  String get notificationsMarkAllRead => 'Mark all read';
+
+  @override
+  String get notificationsClearRead => 'Clear read';
+
+  @override
+  String get notificationsFilterAll => 'All';
+
+  @override
+  String get notificationsFilterUnread => 'Unread';
+
+  @override
+  String get notificationsFilterRead => 'Read';
+
+  @override
+  String get notificationSomeone => 'Someone';
+
+  @override
+  String get notificationTitleDefault => 'Notification';
+
+  @override
+  String get notificationTitleNewFollower => 'New follower';
+
+  @override
+  String get notificationTitleFollowRequest => 'Follow request';
+
+  @override
+  String get notificationTitleFollowAccepted => 'Follow request accepted';
+
+  @override
+  String get notificationTitlePostLike => 'New like';
+
+  @override
+  String get notificationTitlePostComment => 'New comment';
+
+  @override
+  String get notificationTitleCommentReply => 'New reply';
+
+  @override
+  String get notificationTitleCommentLike => 'Comment liked';
+
+  @override
+  String get notificationTitleMention => 'Mention';
+
+  @override
+  String get notificationTitleRepost => 'Repost';
+
+  @override
+  String get notificationTitleGift => 'Gift received';
+
+  @override
+  String get notificationTitleAuctionUpdate => 'Auction update';
+
+  @override
+  String get notificationTitleAuctionWon => 'Auction won';
+
+  @override
+  String get notificationBodyDefault => 'You have a new notification';
+
+  @override
+  String notificationBodyNewFollower(String name) {
+    return '$name started following you';
+  }
+
+  @override
+  String notificationBodyFollowRequest(String name) {
+    return '$name requested to follow you';
+  }
+
+  @override
+  String notificationBodyFollowAccepted(String name) {
+    return '$name accepted your follow request';
+  }
+
+  @override
+  String notificationBodyPostLike(String name) {
+    return '$name liked your post';
+  }
+
+  @override
+  String notificationBodyPostComment(String name) {
+    return '$name commented on your post';
+  }
+
+  @override
+  String notificationBodyCommentReply(String name) {
+    return '$name replied to your comment';
+  }
+
+  @override
+  String notificationBodyCommentLike(String name) {
+    return '$name liked your comment';
+  }
+
+  @override
+  String notificationBodyMention(String name) {
+    return '$name mentioned you';
+  }
+
+  @override
+  String notificationBodyRepost(String name) {
+    return '$name reposted your post';
+  }
+
+  @override
+  String notificationBodyGift(String name) {
+    return '$name sent you a gift';
+  }
+
+  @override
+  String get notificationBodyAuctionUpdate => 'An auction you follow was updated';
+
+  @override
+  String get notificationBodyAuctionWon => 'You won an auction';
 }

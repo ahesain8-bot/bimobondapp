@@ -2,10 +2,11 @@ import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth
 import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_image_preview.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 enum _ProfileAvatarChoice { photo, story }
 
@@ -26,38 +27,7 @@ Future<void> handleProfileScreenAvatarTap(
       photoUrl.isNotEmpty && MediaUtils.isImage(photoUrl);
 
   if (hasStories && hasPhoto) {
-    final choice = await showModalBottomSheet<_ProfileAvatarChoice>(
-      context: context,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(
-                  Icons.person_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-                title: Text(l10n.profileAvatarViewPhoto),
-                onTap: () =>
-                    Navigator.pop(ctx, _ProfileAvatarChoice.photo),
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.auto_stories_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-                title: Text(l10n.profileAvatarViewStory),
-                onTap: () =>
-                    Navigator.pop(ctx, _ProfileAvatarChoice.story),
-              ),
-              const SizedBox(height: AppSizes.p8),
-            ],
-          ),
-        );
-      },
-    );
+    final choice = await _showProfileAvatarChoiceSheet(context, l10n);
 
     if (!context.mounted || choice == null) return;
     switch (choice) {
@@ -84,4 +54,25 @@ Future<void> handleProfileScreenAvatarTap(
       SnackBar(content: Text(l10n.profileAvatarNoPhoto)),
     );
   }
+}
+
+Future<_ProfileAvatarChoice?> _showProfileAvatarChoiceSheet(
+  BuildContext context,
+  AppLocalizations l10n,
+) {
+  return GlassBottomSheetShell.show<_ProfileAvatarChoice>(
+    context,
+    children: [
+      GlassBottomSheetActionTile(
+        icon: LucideIcons.userRound,
+        label: l10n.profileAvatarViewPhoto,
+        onTap: () => Navigator.pop(context, _ProfileAvatarChoice.photo),
+      ),
+      GlassBottomSheetActionTile(
+        icon: LucideIcons.circlePlay,
+        label: l10n.profileAvatarViewStory,
+        onTap: () => Navigator.pop(context, _ProfileAvatarChoice.story),
+      ),
+    ],
+  );
 }

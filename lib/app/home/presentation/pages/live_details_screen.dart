@@ -40,6 +40,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_post
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_page_indicator.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -290,32 +291,20 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (!_checkAuth() || !_isPostOwner()) return;
 
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(LucideIcons.trash2, color: Colors.red),
-              title: Text(
-                l10n.deletePost,
-                style: const TextStyle(color: Colors.red),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _confirmDeletePost();
-              },
-            ),
-          ],
+    GlassBottomSheet.showActions<void>(
+      context,
+      children: [
+        GlassBottomSheetListTile(
+          label: l10n.deletePost,
+          destructive: true,
+          icon: LucideIcons.trash2,
+          onTap: () {
+            Navigator.pop(context);
+            _confirmDeletePost();
+          },
         ),
-      ),
+      ],
     );
   }
 

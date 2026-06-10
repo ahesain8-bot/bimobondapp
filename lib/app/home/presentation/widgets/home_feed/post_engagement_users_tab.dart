@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/utils/story_l10n_format.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_likes_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_views_usecase.dart';
@@ -7,7 +8,6 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as po
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
-import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
@@ -270,8 +270,13 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
   String? _viewTimeSubtitle(PostViewEntity view, AppLocalizations l10n) {
     final at = view.createdAt;
     if (at == null) return null;
-    final label = formatInboxTime(at, l10n);
-    return label.isEmpty ? null : label;
+    return formatTimeAgo(at, l10n);
+  }
+
+  String? _likeTimeSubtitle(SocialUserEntity user, AppLocalizations l10n) {
+    final at = user.likedAt;
+    if (at == null) return null;
+    return formatTimeAgo(at, l10n);
   }
 
   Widget _buildUserTile({
@@ -420,7 +425,11 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
           );
         }
 
-        return _buildUserTile(user: _likedUsers[index], index: index);
+        return _buildUserTile(
+          user: _likedUsers[index],
+          index: index,
+          subtitle: _likeTimeSubtitle(_likedUsers[index], l10n),
+        );
       },
     );
   }

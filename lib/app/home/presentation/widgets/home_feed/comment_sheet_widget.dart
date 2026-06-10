@@ -18,6 +18,7 @@ import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -66,25 +67,20 @@ class CommentSheetWidget extends StatefulWidget {
     int initialTabIndex = 1,
   }) {
     final maxIndex = isPostOwner ? 2 : 0;
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: 0.72,
-        minChildSize: 0.45,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (context, scrollController) => CommentSheetWidget(
-          postId: postId,
-          postOwnerId: postOwnerId,
-          postLikeCount: likeCount,
-          postCommentCount: commentCount,
-          postViewCount: viewCount,
-          isPostOwner: isPostOwner,
-          initialTabIndex: initialTabIndex.clamp(0, maxIndex),
-        ),
+    return GlassBottomSheet.showDraggable<void>(
+      context,
+      initialChildSize: 0.72,
+      minChildSize: 0.45,
+      maxChildSize: 0.92,
+      adaptTheme: true,
+      builder: (context, scrollController) => CommentSheetWidget(
+        postId: postId,
+        postOwnerId: postOwnerId,
+        postLikeCount: likeCount,
+        postCommentCount: commentCount,
+        postViewCount: viewCount,
+        isPostOwner: isPostOwner,
+        initialTabIndex: initialTabIndex.clamp(0, maxIndex),
       ),
     );
   }
@@ -335,16 +331,13 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
-    final sheetColor = theme.colorScheme.surface;
 
     return BlocProvider.value(
       value: _commentsBloc,
       child: Material(
-        color: sheetColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        color: Colors.transparent,
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [

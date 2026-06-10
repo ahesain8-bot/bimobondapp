@@ -42,6 +42,25 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
           overflow: TextOverflow.ellipsis,
         );
 
+    final trailingActions = [
+      ...actions,
+      const SizedBox(width: AppSizes.p4),
+    ];
+
+    // Balance trailing actions so a centered title stays visually centered.
+    final Widget? balancedLeading = leading ??
+        (centerTitle && actions.isNotEmpty
+            ? Opacity(
+                opacity: 0,
+                child: IgnorePointer(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: trailingActions,
+                  ),
+                ),
+              )
+            : null);
+
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(
@@ -57,14 +76,10 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
           toolbarHeight: MessagesLayoutConstants.appBarHeight,
           titleSpacing: 0,
           automaticallyImplyLeading: false,
-          leading: leading,
-          leadingWidth: leading != null ? 56 : null,
+          leading: balancedLeading,
           centerTitle: centerTitle,
           title: centerTitle ? Center(child: titleContent) : titleContent,
-          actions: [
-            ...actions,
-            const SizedBox(width: AppSizes.p4),
-          ],
+          actions: trailingActions,
         ),
       ),
     );

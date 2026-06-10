@@ -90,9 +90,45 @@
   "noPostsYet": "No posts yet",
   "noLikedPosts": "No liked posts",
   "noSavedPosts": "No saved posts",
+  "noRepostedPosts": "No reposts yet",
+  "noOnlyMePosts": "No only me posts yet",
+  "repostTitle": "Repost",
+  "repostSubtitle": "Share this post to your profile",
+  "repostAction": "Repost",
+  "repostUndo": "Undo repost",
+  "savePost": "Save post",
+  "unsavePost": "Remove from saved",
+  "repostQuoteHint": "Add a comment (optional)",
+  "repostSuccess": "Reposted",
+  "repostRemoved": "Repost removed",
+  "cannotRepostOwnPost": "You can't repost your own post",
+  "repostCountLabel": "{count} reposts",
+  "@repostCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "repostedByUser": "{name} reposted",
+  "@repostedByUser": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "postRepostersTitle": "Reposts · {count}",
+  "@postRepostersTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postRepostersEmpty": "No reposts yet",
+  "profileRepostsTab": "Reposts",
   "editProfile": "Edit profile",
   "noBio": "No bio yet.",
-  "profileAvatarViewPhoto": "Profile photo",
+  "profileAvatarViewPhoto": "Open profile photo",
   "profileAvatarViewStory": "View story",
   "profileAvatarNoPhoto": "No profile photo",
   "story": "Story",
@@ -111,6 +147,14 @@
   },
   "storyTimeHoursAgo": "{count}h ago",
   "@storyTimeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storyTimeDaysAgo": "{count}d ago",
+  "@storyTimeDaysAgo": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -196,6 +240,10 @@
   "auctionsFiltersPriceRange": "Price range (USD)",
   "auctionsFiltersMinPrice": "Min price",
   "auctionsFiltersMaxPrice": "Max price",
+  "auctionsFiltersLiveStatus": "Auction status",
+  "auctionsFilterLive": "Live",
+  "auctionsFilterEnded": "Ended",
+  "endedAuctionsNow": "Ended auctions",
   "auctionsFiltersTimeRemaining": "Time remaining",
   "auctionsFiltersInvalidPriceRange": "Min price cannot be greater than max price",
   "auctionsTimeRemainingAny": "Any time",
@@ -609,6 +657,7 @@
   "messagesActivityActivities": "Activities",
   "messagesActivityComments": "Comments",
   "messagesActivityMentions": "Mentions",
+  "messagesActivityNotifications": "Notifications",
   "messagesRecentMessages": "Recent Messages",
   "messagesAllChats": "All Chats",
   "messagesAll": "All",
@@ -710,5 +759,73 @@
   "auctionEndDate": "Auction ends",
   "auctionEndBeforeStart": "End date must be after start date",
   "auctionTargetBelowStart": "Target price must be greater than starting price",
-  "auctionInvalidPrice": "Enter a valid price"
+  "auctionInvalidPrice": "Enter a valid price",
+  "hashtagFeedSubtitle": "Posts with this hashtag",
+  "noHashtagPosts": "No posts for this hashtag yet",
+  "trendingHashtags": "Trending hashtags",
+  "searchHashtagsHint": "Search hashtags",
+  "noHashtagsFound": "No hashtags found",
+  "hashtagPostCount": "{count, plural, =0{No posts} =1{1 post} other{{count} posts}}",
+  "@hashtagPostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsEmpty": "No notifications yet",
+  "notificationsEmptySubtitle": "When someone interacts with you, you'll see it here.",
+  "notificationsEmptyUnread": "You're all caught up — no unread notifications.",
+  "notificationsEmptyRead": "No read notifications yet.",
+  "notificationsFilterUnreadCount": "{count, plural, =1{1 unread notification} other{{count} unread notifications}}",
+  "@notificationsFilterUnreadCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "notificationsRetry": "Try again",
+  "notificationsOk": "OK",
+  "notificationsLoadError": "Couldn't load notifications",
+  "notificationsMarkAllRead": "Mark all read",
+  "notificationsClearRead": "Clear read",
+  "notificationsFilterAll": "All",
+  "notificationsFilterUnread": "Unread",
+  "notificationsFilterRead": "Read",
+  "notificationSomeone": "Someone",
+  "notificationTitleDefault": "Notification",
+  "notificationTitleNewFollower": "New follower",
+  "notificationTitleFollowRequest": "Follow request",
+  "notificationTitleFollowAccepted": "Follow request accepted",
+  "notificationTitlePostLike": "New like",
+  "notificationTitlePostComment": "New comment",
+  "notificationTitleCommentReply": "New reply",
+  "notificationTitleCommentLike": "Comment liked",
+  "notificationTitleMention": "Mention",
+  "notificationTitleRepost": "Repost",
+  "notificationTitleGift": "Gift received",
+  "notificationTitleAuctionUpdate": "Auction update",
+  "notificationTitleAuctionWon": "Auction won",
+  "notificationBodyDefault": "You have a new notification",
+  "notificationBodyNewFollower": "{name} started following you",
+  "@notificationBodyNewFollower": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyFollowRequest": "{name} requested to follow you",
+  "@notificationBodyFollowRequest": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyFollowAccepted": "{name} accepted your follow request",
+  "@notificationBodyFollowAccepted": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyPostLike": "{name} liked your post",
+  "@notificationBodyPostLike": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyPostComment": "{name} commented on your post",
+  "@notificationBodyPostComment": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyCommentReply": "{name} replied to your comment",
+  "@notificationBodyCommentReply": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyCommentLike": "{name} liked your comment",
+  "@notificationBodyCommentLike": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyMention": "{name} mentioned you",
+  "@notificationBodyMention": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyRepost": "{name} reposted your post",
+  "@notificationBodyRepost": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyGift": "{name} sent you a gift",
+  "@notificationBodyGift": { "placeholders": { "name": { "type": "String" } } },
+  "notificationBodyAuctionUpdate": "An auction you follow was updated",
+  "notificationBodyAuctionWon": "You won an auction"
 }

@@ -2,7 +2,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_po
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
-import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/post_cover_card.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -16,12 +16,14 @@ class ProfilePostsGridSliver extends StatelessWidget {
     required this.tab,
     required this.tabIndex,
     required this.emptyMessage,
+    this.userId,
     super.key,
   });
 
   final ProfileTabPostsState tab;
   final int tabIndex;
   final String emptyMessage;
+  final String? userId;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +81,15 @@ class ProfilePostsGridSliver extends StatelessWidget {
           post: post,
           tabIndex: tabIndex,
           theme: theme,
-          onTap: () => openPost(context, post),
+          onTap: () => openProfilePosts(
+            context,
+            posts: tab.posts,
+            initialIndex: index,
+            source: profilePostsSourceForTab(tabIndex),
+            page: tab.page,
+            hasReachedMax: tab.hasReachedMax,
+            userId: userId,
+          ),
         );
       }, childCount: itemCount),
     );

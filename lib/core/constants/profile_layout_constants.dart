@@ -27,10 +27,18 @@ class ProfileLayoutConstants {
   static const double gridItemRadius = 8;
   static const double gridPlaceholderIconSize = 34;
 
-  static const int postsPageSize = 18;
+  static const int postsPageSize = 10;
+  /// Feed API sort: newest posts first (`LATEST`).
+  static const String postsSortNewestFirst = 'LATEST';
   static const double scrollLoadMoreThreshold = 200;
 
-  static const int tabCount = 3;
+  static const int tabCount = 5;
+  static const int postsTabIndex = 0;
+  static const int repostsTabIndex = 1;
+  static const int onlyMeTabIndex = 2;
+  static const int likedTabIndex = 3;
+  static const int savedTabIndex = 4;
+  static const String onlyMePrivacyStatus = 'PRIVATE';
   static const double iconTabBarHeight = 48;
   static const double iconTabSize = 22;
   static const double iconTabIndicatorHeight = 2;

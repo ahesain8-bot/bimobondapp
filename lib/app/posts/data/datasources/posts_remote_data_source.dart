@@ -3,6 +3,10 @@ import 'dart:io';
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_view_model.dart';
+import 'package:bimobondapp/app/posts/data/models/feed_item_model.dart';
+import 'package:bimobondapp/app/posts/data/models/hashtag_model.dart';
+import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
+import 'package:bimobondapp/app/posts/data/models/repost_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_views_page_model.dart';
 import 'package:bimobondapp/app/social/data/models/social_user_model.dart';
 import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
@@ -18,7 +22,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 abstract class PostsRemoteDataSource {
   Future<PostModel> createPost(Map<String, dynamic> postData);
   Future<String> uploadMedia(File file);
-  Future<List<PostModel>> getFeed(Map<String, dynamic> queryParams);
+  Future<List<FeedItemModel>> getFeed(Map<String, dynamic> queryParams);
+  Future<HashtagsPageModel> getHashtags({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    HashtagSort sort = HashtagSort.name,
+  });
   Future<PostModel> getPostById(String postId);
   Future<bool> toggleLike(String postId);
   Future<SocialUserPageModel> getPostLikes(
@@ -33,6 +43,16 @@ abstract class PostsRemoteDataSource {
   });
   Future<int> recordPostView(String postId, {int? watchedDuration});
   Future<bool> toggleSave(String postId);
+  Future<bool> toggleRepost(String postId, {String? quote});
+  Future<RepostsPageModel> getPostReposts(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  });
+  Future<UserRepostsPageModel> getMyReposts({
+    int page = 1,
+    int limit = 10,
+  });
   Future<PostModel> updatePost(String postId, Map<String, dynamic> data);
   Future<bool> deletePost(String postId);
 
@@ -130,10 +150,23 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
     final users = <SocialUserModel>[];
     final seen = <String>{};
 
-    void addUser(SocialUserModel user) {
+    void addUser(SocialUserModel user, {DateTime? likedAt}) {
       if (user.id.isEmpty || seen.contains(user.id)) return;
       seen.add(user.id);
-      users.add(user);
+      users.add(
+        likedAt == null
+            ? user
+            : SocialUserModel(
+                id: user.id,
+                username: user.username,
+                fullName: user.fullName,
+                avatarUrl: user.avatarUrl,
+                isActive: user.isActive,
+                isFollowing: user.isFollowing,
+                isFollowedBy: user.isFollowedBy,
+                likedAt: likedAt,
+              ),
+      );
     }
 
     for (final entry in _extractList(body)) {
@@ -145,6 +178,7 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
         final like = UserLikeModel.fromJson(map);
         if (like.user != null) {
           final u = like.user!;
+          final likedAt = DateTime.tryParse(like.createdAt);
           addUser(
             SocialUserModel(
               id: u.id,
@@ -155,11 +189,17 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
               isFollowing: u.isFollowing,
               isFollowedBy: u.isFollowedBy,
             ),
+            likedAt: likedAt,
           );
           continue;
         }
       }
-      addUser(SocialUserModel.fromJson(map));
+      addUser(
+        SocialUserModel.fromJson(map),
+        likedAt: DateTime.tryParse(
+          map['createdAt']?.toString() ?? map['likedAt']?.toString() ?? '',
+        ),
+      );
     }
 
     return users;
@@ -188,8 +228,11 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
   PostModel _parsePostModel(dynamic data) {
     if (data is Map<String, dynamic>) {
       if (data['data'] is Map) {
+        return _parsePostModel(data['data']);
+      }
+      if (data['post'] is Map) {
         return PostModel.fromJson(
-          Map<String, dynamic>.from(data['data'] as Map),
+          Map<String, dynamic>.from(data['post'] as Map),
         );
       }
       return PostModel.fromJson(data);
@@ -198,7 +241,7 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
   }
 
   @override
-  Future<List<PostModel>> getFeed(Map<String, dynamic> queryParams) async {
+  Future<List<FeedItemModel>> getFeed(Map<String, dynamic> queryParams) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       final Map<String, dynamic> headers = {};
@@ -217,13 +260,50 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data['data'];
-        return data
-            .map((e) => PostModel.fromJson(e as Map<String, dynamic>))
+        final raw = response.data['data'];
+        if (raw is! List) return const [];
+        return raw
+            .whereType<Map>()
+            .map((e) => FeedItemModel.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       } else {
         throw ServerException(message: 'Failed to fetch feed');
       }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<HashtagsPageModel> getHashtags({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    HashtagSort sort = HashtagSort.name,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.postsHashtags,
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          'sort': sort.apiValue,
+          if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return HashtagsPageModel.fromResponse(
+          response.data,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load hashtags',
+      );
     } catch (e) {
       throw DioHandler.handle(e);
     }
@@ -518,6 +598,107 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       } else {
         throw ServerException(message: 'Failed to toggle save');
       }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<bool> toggleRepost(String postId, {String? quote}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw ServerException(message: 'User not authenticated');
+      }
+
+      final idToken = await user.getIdToken();
+      final trimmedQuote = quote?.trim();
+      final data = trimmedQuote != null && trimmedQuote.isNotEmpty
+          ? {'quote': trimmedQuote}
+          : null;
+
+      final response = await apiClient.dio.post(
+        ApiConstants.toggleRepost(postId),
+        data: data,
+        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final body = response.data;
+        if (body is Map && body['isReposted'] is bool) {
+          return body['isReposted'] as bool;
+        }
+        return true;
+      }
+
+      throw ServerException(
+        message: _extractErrorMessage(response.data) ?? 'Failed to toggle repost',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<RepostsPageModel> getPostReposts(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.postReposts(postId),
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _optionalAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        return RepostsPageModel.fromResponse(
+          response.data,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load reposts',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<UserRepostsPageModel> getMyReposts({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw ServerException(message: 'User not authenticated');
+      }
+
+      final idToken = await user.getIdToken();
+      final response = await apiClient.dio.get(
+        ApiConstants.myReposts,
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+      );
+
+      if (response.statusCode == 200) {
+        return UserRepostsPageModel.fromResponse(
+          response.data,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load my reposts',
+      );
     } catch (e) {
       throw DioHandler.handle(e);
     }

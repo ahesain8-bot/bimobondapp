@@ -122,7 +122,7 @@ class ChatMessageItem extends StatelessWidget {
               onTap: () {
                 final id = peerUserId?.trim() ?? '';
                 if (id.isNotEmpty) {
-                  openUserStoryOrProfile(
+                  openUserActiveStoriesOrProfile(
                     context,
                     userId: id,
                     username: username,

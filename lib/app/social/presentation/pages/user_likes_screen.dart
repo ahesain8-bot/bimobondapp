@@ -146,7 +146,9 @@ class _UserLikesScreenState extends State<UserLikesScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.brightness == Brightness.light
+          ? Colors.white
+          : theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(title: l10n.userLikesTitle),
       body: RefreshIndicator(
         onRefresh: () => _loadLikes(refresh: true),
@@ -201,16 +203,13 @@ class _UserLikesScreenState extends State<UserLikesScreen> {
       );
     }
 
-    return ListView.separated(
+    return ListView.builder(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: _likes.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (context, _) => Divider(
-        height: 1,
-        color: theme.dividerColor.withValues(alpha: 0.08),
-      ),
       itemBuilder: (context, index) {
         if (index >= _likes.length) {
           return const Padding(

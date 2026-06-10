@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:equatable/equatable.dart';
@@ -165,6 +166,33 @@ class ToggleSavePostRequestedEvent extends PostsEvent {
   List<Object?> get props => [postId];
 }
 
+class ToggleRepostPostRequestedEvent extends PostsEvent {
+  final String postId;
+  final String? quote;
+
+  const ToggleRepostPostRequestedEvent(this.postId, {this.quote});
+
+  @override
+  List<Object?> get props => [postId, quote];
+}
+
+class FetchMyRepostsRequestedEvent extends PostsEvent {
+  final int page;
+  final int limit;
+  final bool isRefresh;
+  final int? profileLoadKey;
+
+  const FetchMyRepostsRequestedEvent({
+    this.page = 1,
+    this.limit = 10,
+    this.isRefresh = false,
+    this.profileLoadKey,
+  });
+
+  @override
+  List<Object?> get props => [page, limit, isRefresh, profileLoadKey];
+}
+
 class UpdatePostRequestedEvent extends PostsEvent {
   final String postId;
   final String? description;
@@ -204,8 +232,10 @@ class FetchFeedRequestedEvent extends PostsEvent {
   final bool? isSaved;
   /// `false` for posts feed/profile; must stay false for non-story lists.
   final bool isStory;
+  final FeedContentType? contentType;
   final bool isRefresh;
   final int? profileLoadKey;
+  final String? privacyStatus;
 
   const FetchFeedRequestedEvent({
     this.page = 1,
@@ -219,8 +249,10 @@ class FetchFeedRequestedEvent extends PostsEvent {
     this.isLiked,
     this.isSaved,
     this.isStory = false,
+    this.contentType,
     this.isRefresh = false,
     this.profileLoadKey,
+    this.privacyStatus,
   });
 
   @override
@@ -236,8 +268,10 @@ class FetchFeedRequestedEvent extends PostsEvent {
     isLiked,
     isSaved,
     isStory,
+    contentType,
     isRefresh,
     profileLoadKey,
+    privacyStatus,
   ];
 }
 

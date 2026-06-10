@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:bimobondapp/app/auctions/domain/entities/auction_details_entity.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
@@ -8,6 +6,7 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -20,9 +19,8 @@ class AuctionGiftsSheet {
     BuildContext context, {
     required String auctionId,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
+    return GlassBottomSheet.open<void>(
+      context,
       isScrollControlled: true,
       builder: (_) => _AuctionGiftsSheetBody(auctionId: auctionId),
     );
@@ -87,58 +85,14 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
     final locale = Localizations.localeOf(context);
     final details = _details;
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(LiveDetailsLayoutConstants.giftSheetRadius),
-      ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.5),
-                Colors.black.withValues(alpha: 0.8),
-                Colors.black,
-              ],
-            ),
-            border: Border(
-              top: BorderSide(
-                color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
-                  alpha: 0.4,
-                ),
-                width: 1.5,
-              ),
-            ),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: AppSizes.p12),
-              Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      LiveDetailsLayoutConstants.giftCommentGoldDeep,
-                      LiveDetailsLayoutConstants.giftCommentGold,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: LiveDetailsLayoutConstants.giftCommentGold
-                          .withValues(alpha: 0.4),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSizes.p16),
-              Padding(
+    return GlassBottomSheetFrame(
+      showHandle: true,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: Column(
+          children: [
+            const SizedBox(height: AppSizes.p4),
+            Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSizes.p24),
                 child: Row(
                   children: [
@@ -185,7 +139,6 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
             ],
           ),
         ),
-      ),
     );
   }
 

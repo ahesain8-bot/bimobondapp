@@ -14,8 +14,11 @@ import 'package:bimobondapp/app/auth/presentation/pages/settings_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_wallpaper_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/change_avatar_screen.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/notifications/presentation/pages/notifications_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/post_detail_screen.dart';
+import 'package:bimobondapp/app/posts/presentation/pages/profile_posts_viewer_screen.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
@@ -27,14 +30,20 @@ import 'package:bimobondapp/app/social/presentation/pages/user_likes_screen.dart
 import 'package:bimobondapp/app/social/presentation/pages/user_mentions_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/posts_search_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/ended_auctions_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/edit_post_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/user_profile_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'dart:io';
 
 class AppRouter {
+  static final GlobalKey<NavigatorState> rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     routes: [
       GoRoute(
@@ -119,6 +128,11 @@ class AppRouter {
         builder: (context, state) => const ChangeAvatarScreen(),
       ),
       GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
         path: '/post-detail',
         name: 'post_detail',
         builder: (context, state) {
@@ -139,6 +153,19 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/profile-posts',
+        name: 'profile_posts_viewer',
+        builder: (context, state) {
+          final args = profilePostsOpenArgsFromExtra(state.extra);
+          if (args == null) {
+            return const Scaffold(
+              body: Center(child: Text('Post not found')),
+            );
+          }
+          return ProfilePostsViewerScreen(args: args);
+        },
+      ),
+      GoRoute(
         path: '/lives',
         name: 'lives',
         builder: (context, state) => const LivesScreen(),
@@ -147,6 +174,19 @@ class AppRouter {
         path: '/posts-search',
         name: 'posts_search',
         builder: (context, state) => const PostsSearchScreen(),
+      ),
+      GoRoute(
+        path: '/hashtag',
+        name: 'hashtag_feed',
+        builder: (context, state) {
+          final name = state.uri.queryParameters['name'] ?? '';
+          return HashtagFeedScreen(hashtagName: name);
+        },
+      ),
+      GoRoute(
+        path: '/ended-auctions',
+        name: 'ended_auctions',
+        builder: (context, state) => const EndedAuctionsScreen(),
       ),
       GoRoute(
         path: '/chat',

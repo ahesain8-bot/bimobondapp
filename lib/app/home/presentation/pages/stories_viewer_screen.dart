@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -287,10 +288,33 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     });
   }
 
-  void _confirmDelete(PostEntity post) {
+  void _showStoryOptions(PostEntity post) {
     _pauseProgress();
     final l10n = AppLocalizations.of(context)!;
-    PopupDialogs.showConfirmDialog(
+    var openedConfirm = false;
+
+    GlassBottomSheet.showActions<void>(
+      context,
+      children: [
+        GlassBottomSheetListTile(
+          label: l10n.deletePost,
+          destructive: true,
+          icon: LucideIcons.trash2,
+          onTap: () {
+            openedConfirm = true;
+            Navigator.pop(context);
+            _confirmDelete(post);
+          },
+        ),
+      ],
+    ).whenComplete(() {
+      if (mounted && !openedConfirm) _resumeProgress();
+    });
+  }
+
+  void _confirmDelete(PostEntity post) {
+    final l10n = AppLocalizations.of(context)!;
+    GlassBottomSheet.showConfirm(
       context,
       title: l10n.deletePostTitle,
       message: l10n.deletePostMessage,
@@ -472,42 +496,18 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                 ),
               ),
               if (_isOwner(post))
-                PopupMenuButton<String>(
+                IconButton(
                   icon: const Icon(
                     Icons.more_horiz_rounded,
                     color: Colors.white,
                     size: 26,
                   ),
+                  onPressed: () => _showStoryOptions(post),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
                     minWidth: 40,
                     minHeight: 40,
                   ),
-                  color: Theme.of(context).colorScheme.surface,
-                  onSelected: (value) {
-                    if (value == 'delete') _confirmDelete(post);
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            LucideIcons.trash2,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(width: AppSizes.p12),
-                          Text(
-                            l10n.deletePost,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, color: Colors.white),

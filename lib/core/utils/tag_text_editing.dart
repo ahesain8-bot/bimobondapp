@@ -18,6 +18,26 @@ class TagTextEditing {
     );
   }
 
+  static void insertHashtag(TextEditingController controller, String name) {
+    var normalized = name.trim();
+    if (normalized.startsWith('#')) {
+      normalized = normalized.substring(1);
+    }
+    if (normalized.isEmpty) return;
+
+    final hashtag = '#$normalized ';
+    final text = controller.text;
+    final selection = controller.selection;
+    final offset = selection.isValid ? selection.baseOffset : text.length;
+    final safeOffset = offset.clamp(0, text.length);
+
+    final newText = text.replaceRange(safeOffset, safeOffset, hashtag);
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: safeOffset + hashtag.length),
+    );
+  }
+
   static void insertMention(
     TextEditingController controller,
     String username,
@@ -46,6 +66,29 @@ class TagTextEditing {
     final mention = '@$username ';
     final newText = text.replaceRange(mentionStart, mentionEnd, mention);
     final newOffset = mentionStart + mention.length;
+    controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newOffset),
+    );
+  }
+
+  /// Replaces `#partial` at [hashtagStart]..[hashtagEnd] with `#name `.
+  static void completeHashtag(
+    TextEditingController controller, {
+    required int hashtagStart,
+    required int hashtagEnd,
+    required String name,
+  }) {
+    var normalized = name.trim();
+    if (normalized.startsWith('#')) {
+      normalized = normalized.substring(1);
+    }
+    if (normalized.isEmpty) return;
+
+    final text = controller.text;
+    final hashtag = '#$normalized ';
+    final newText = text.replaceRange(hashtagStart, hashtagEnd, hashtag);
+    final newOffset = hashtagStart + hashtag.length;
     controller.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: newOffset),

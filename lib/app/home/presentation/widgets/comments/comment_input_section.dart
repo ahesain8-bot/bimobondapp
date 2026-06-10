@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/comments/quick_comment
 import 'package:bimobondapp/app/social/presentation/widgets/mention_composer_field.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -32,8 +33,9 @@ class CommentInputSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    const hintColor = Color(0x73FFFFFF);
+    const textColor = Colors.white;
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -43,10 +45,9 @@ class CommentInputSection extends StatelessWidget {
         bottomPadding + AppSizes.p20,
       ),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: theme.dividerColor.withValues(alpha: 0.25),
+            color: Colors.white.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
@@ -72,7 +73,7 @@ class CommentInputSection extends StatelessWidget {
                     child: Icon(
                       LucideIcons.x,
                       size: 18,
-                      color: theme.iconTheme.color?.withValues(alpha: 0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -85,13 +86,13 @@ class CommentInputSection extends StatelessWidget {
             focusNode: commentFocusNode,
             maxLines: 5,
             minLines: 1,
-            style: const TextStyle(fontSize: 15),
+            style: const TextStyle(fontSize: 15, color: textColor),
             decoration: InputDecoration(
               hintText: replyingToUsername != null
                   ? l10n.replyingTo(replyingToUsername!)
                   : l10n.addCommentHint,
               border: InputBorder.none,
-              hintStyle: const TextStyle(fontSize: 15),
+              hintStyle: const TextStyle(fontSize: 15, color: hintColor),
               contentPadding: const EdgeInsets.symmetric(
                 vertical: AppSizes.p10,
               ),
@@ -116,13 +117,8 @@ class CommentInputSection extends StatelessWidget {
                         child: inputAvatar,
                       ),
                       Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: theme.brightness == Brightness.dark
-                                ? Colors.white.withValues(alpha: 0.1)
-                                : const Color(0xFFEDEDED),
-                            borderRadius: BorderRadius.circular(AppSizes.p24),
-                          ),
+                        child: LiquidGlassSurface(
+                          borderRadius: BorderRadius.circular(AppSizes.p24),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
@@ -130,10 +126,10 @@ class CommentInputSection extends StatelessWidget {
                               Expanded(child: textField),
                               if (showPostButton)
                                 IconButton(
-                                  icon: Icon(
+                                  icon: const Icon(
                                     LucideIcons.send,
                                     size: 20,
-                                    color: theme.primaryColor,
+                                    color: Colors.white,
                                   ),
                                   onPressed: onSendComment,
                                 )

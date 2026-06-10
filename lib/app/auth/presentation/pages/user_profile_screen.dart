@@ -20,10 +20,12 @@ import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
 import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_format_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
-import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -185,18 +187,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void _fetchPosts({bool refresh = false, bool loadMore = false}) {
     if (loadMore) {
       if (_postsState.hasReachedMax || _postsState.isLoadingMore) return;
-      _postsState.isLoadingMore = true;
-      _postsState.page++;
+      setState(() {
+        _postsState.isLoadingMore = true;
+        _postsState.page++;
+      });
     } else if (refresh) {
-      _postsState.page = 1;
-      _postsState.hasReachedMax = false;
-      _postsState.isInitialLoading = _postsState.posts.isEmpty;
+      setState(() {
+        _postsState.page = 1;
+        _postsState.hasReachedMax = false;
+        _postsState.isInitialLoading = _postsState.posts.isEmpty;
+      });
     } else if (_postsState.posts.isNotEmpty) {
       return;
     } else {
-      _postsState.page = 1;
-      _postsState.hasReachedMax = false;
-      _postsState.isInitialLoading = true;
+      setState(() {
+        _postsState.page = 1;
+        _postsState.hasReachedMax = false;
+        _postsState.isInitialLoading = true;
+      });
     }
 
     final loadKey = ++_profileLoadKey;
@@ -208,6 +216,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         page: _postsState.page,
         limit: _UserProfilePostsState.pageSize,
         userId: widget.userId,
+        sort: ProfileLayoutConstants.postsSortNewestFirst,
         isRefresh: refresh || _postsState.page == 1,
         isStory: false,
         profileLoadKey: loadKey,
@@ -374,6 +383,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final theme = Theme.of(context);
     final user = _displayUser;
     final username = user?.username ?? widget.initialUsername ?? 'user';
+    final displayPostCount = resolveProfilePostsCount(
+      apiPostCount: user?.postCount,
+      loadedPostsCount: _postsState.posts.length,
+      hasLoadedAllPosts:
+          _postsState.hasReachedMax && !_postsState.isInitialLoading,
+    );
 
     return BlocListener<PostsBloc, PostsState>(
       listener: (context, state) {
@@ -391,6 +406,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 state.posts.where((p) => !existingIds.contains(p.id)),
               );
             }
+            sortProfilePostsNewestFirst(_postsState.posts);
             _postsState.hasReachedMax = state.hasReachedMax;
             _postsState.isLoadingMore = false;
             _postsState.isInitialLoading = false;
@@ -556,7 +572,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               children: [
                                 Expanded(
                                   child: _UserProfileStatItem(
-                                    number: _formatCount(user?.postCount ?? 0),
+                                    number: _formatCount(displayPostCount),
                                     label: l10n.profilePostsTab,
                                   ),
                                 ),
@@ -620,6 +636,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     _UserProfilePostsGrid(
                       state: _postsState,
                       emptyMessage: l10n.noPostsYet,
+                      userId: widget.userId,
                     ),
                   ],
                 ),
@@ -674,10 +691,12 @@ class _UserProfilePostsGrid extends StatelessWidget {
   const _UserProfilePostsGrid({
     required this.state,
     required this.emptyMessage,
+    required this.userId,
   });
 
   final _UserProfilePostsState state;
   final String emptyMessage;
+  final String userId;
 
   @override
   Widget build(BuildContext context) {
@@ -731,7 +750,15 @@ class _UserProfilePostsGrid extends StatelessWidget {
         final post = state.posts[index];
         return _UserProfileGridTile(
           post: post,
-          onTap: () => openPost(context, post),
+          onTap: () => openProfilePosts(
+            context,
+            posts: state.posts,
+            initialIndex: index,
+            source: ProfilePostsViewerSource.userPosts,
+            page: state.page,
+            hasReachedMax: state.hasReachedMax,
+            userId: userId,
+          ),
         );
       }, childCount: itemCount),
     );

@@ -17,7 +17,6 @@ import 'package:bimobondapp/app/social/presentation/utils/suggestion_follow_togg
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_grouping.dart';
-import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_active_users_bar.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
@@ -30,6 +29,9 @@ import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_conv
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_mentions_strip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_search_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_suggestions_strip.dart';
+import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
+    as notifications_di;
+import 'package:bimobondapp/app/notifications/presentation/services/notification_unread_badge.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -138,6 +140,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     if (widget.isTabActive && !oldWidget.isTabActive) {
       _loadRecentMentions();
       _loadStories();
+      notifications_di.sl<NotificationUnreadBadge>().refresh();
     }
   }
 
@@ -186,11 +189,12 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
       return;
     }
 
-    openUserStoryOrProfile(
-      context,
-      userId: group.userId,
-      username: group.displayName,
-      avatarUrl: group.avatarUrl,
+    context.pushNamed(
+      'stories_viewer',
+      extra: {
+        'stories': active,
+        'initialIndex': 0,
+      },
     );
   }
 
@@ -420,18 +424,32 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                         ),
                       ),
                     if (!isLoadingChats) ...[
-                      MessagesActivitySection(
-                        onActivityTap: (type) {
-                          switch (type) {
-                            case MessagesActivityType.followers:
-                              context.pushNamed('my_followers');
-                            case MessagesActivityType.comments:
-                              context.pushNamed('user_comments');
-                            case MessagesActivityType.activities:
-                              context.pushNamed('user_likes');
-                            case MessagesActivityType.mentions:
-                              context.pushNamed('user_mentions');
-                          }
+                      ListenableBuilder(
+                        listenable: notifications_di.sl<NotificationUnreadBadge>(),
+                        builder: (context, _) {
+                          return MessagesActivitySection(
+                            hasUnreadNotifications: notifications_di
+                                .sl<NotificationUnreadBadge>()
+                                .hasUnread,
+                            onActivityTap: (type) {
+                              switch (type) {
+                                case MessagesActivityType.followers:
+                                  context.pushNamed('my_followers');
+                                case MessagesActivityType.comments:
+                                  context.pushNamed('user_comments');
+                                case MessagesActivityType.activities:
+                                  context.pushNamed('user_likes');
+                                case MessagesActivityType.mentions:
+                                  context.pushNamed('user_mentions');
+                                case MessagesActivityType.notifications:
+                                  context
+                                      .pushNamed('notifications')
+                                      .then((_) => notifications_di
+                                          .sl<NotificationUnreadBadge>()
+                                          .refresh());
+                              }
+                            },
+                          );
                         },
                       ),
                     ],

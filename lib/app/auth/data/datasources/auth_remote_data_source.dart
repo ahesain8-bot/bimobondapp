@@ -37,6 +37,7 @@ abstract class AuthRemoteDataSource {
     int page = 1,
     int limit = 10,
   });
+  Future<void> syncDeviceRegistration();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -324,5 +325,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     }
     throw ServerException(message: 'Fetch user activity failed');
+  });
+
+  @override
+  Future<void> syncDeviceRegistration() => _execute(() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw UnauthorizedException(message: 'User not authenticated');
+    }
+
+    final idToken = await user.getIdToken(true);
+    final deviceInfo = await DeviceUtility.getDeviceInfo();
+
+    await apiClient.dio.post(
+      ApiConstants.backendLogin,
+      data: deviceInfo,
+      options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+    );
   });
 }

@@ -15,6 +15,7 @@ class AuctionItem {
     this.categorySlug,
     this.categoryLabel,
     this.isLive = false,
+    this.isEnded = false,
     this.countdown,
     this.post,
   });
@@ -31,6 +32,7 @@ class AuctionItem {
   final String? categorySlug;
   final String? categoryLabel;
   final bool isLive;
+  final bool isEnded;
   final String? countdown;
   final PostEntity? post;
 
@@ -44,6 +46,7 @@ class AuctionItem {
     final startedAt = auction.startedAt.toUtc();
     final endedAt = auction.endedAt.toUtc();
     final isLive = !startedAt.isAfter(now) && endedAt.isAfter(now);
+    final isEnded = !endedAt.isAfter(now);
     final countdown = formatAuctionCountdown(now, startedAt, endedAt);
     final owner = post.user;
     final ownerHandle = owner?.username.trim();
@@ -65,6 +68,7 @@ class AuctionItem {
       categorySlug: categorySlug,
       categoryLabel: categoryLabel,
       isLive: isLive,
+      isEnded: isEnded,
       countdown: countdown,
       post: post,
     );

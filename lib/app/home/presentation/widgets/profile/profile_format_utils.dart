@@ -7,3 +7,14 @@ String formatProfileCount(int count) {
   }
   return count.toString();
 }
+
+/// API [apiPostCount] often includes stories; the profile grid shows non-story
+/// posts only. Once all pages are loaded, use the grid length so the stat matches.
+int resolveProfilePostsCount({
+  required int? apiPostCount,
+  required int loadedPostsCount,
+  required bool hasLoadedAllPosts,
+}) {
+  if (hasLoadedAllPosts) return loadedPostsCount;
+  return apiPostCount ?? loadedPostsCount;
+}

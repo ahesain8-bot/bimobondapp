@@ -6,7 +6,7 @@ import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
 
-/// Profile avatar with optional story ring; tap opens unseen stories or profile.
+/// Profile avatar with optional story ring; tap opens active stories or profile.
 class StoryProfileAvatar extends StatelessWidget {
   const StoryProfileAvatar({
     required this.userId,
@@ -65,7 +65,7 @@ class StoryProfileAvatar extends StatelessWidget {
             (id.isEmpty
                 ? null
                 : () {
-                    openUserStoryOrProfile(
+                    openUserActiveStoriesOrProfile(
                       context,
                       userId: id,
                       username: username,

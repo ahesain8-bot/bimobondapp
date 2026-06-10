@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:flutter/material.dart';
@@ -391,31 +392,27 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   void _showGenderPicker(BuildContext context, AppLocalizations l10n) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            title: CustomText(l10n.male),
-            onTap: () {
-              setState(() => _selectedGender = 'male');
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: CustomText(l10n.female),
-            onTap: () {
-              setState(() => _selectedGender = 'female');
-              Navigator.pop(context);
-            },
-          ),
-          const SizedBox(height: AppSizes.p16),
-        ],
-      ),
+    GlassBottomSheet.showActions<void>(
+      context,
+      title: l10n.selectGender,
+      children: [
+        GlassBottomSheetListTile(
+          label: l10n.male,
+          isSelected: _selectedGender == 'male',
+          onTap: () {
+            setState(() => _selectedGender = 'male');
+            Navigator.pop(context);
+          },
+        ),
+        GlassBottomSheetListTile(
+          label: l10n.female,
+          isSelected: _selectedGender == 'female',
+          onTap: () {
+            setState(() => _selectedGender = 'female');
+            Navigator.pop(context);
+          },
+        ),
+      ],
     );
   }
 
@@ -427,41 +424,21 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       {'code': 'USA', 'name': l10n.usa},
       {'code': 'UK', 'name': l10n.uk},
     ];
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Container(
-        height: 400,
-        padding: const EdgeInsets.symmetric(vertical: AppSizes.p16),
-        child: Column(
-          children: [
-            CustomText(
-              l10n.selectCountry,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-            const Divider(),
-            Expanded(
-              child: ListView.builder(
-                itemCount: countries.length,
-                itemBuilder: (context, index) => ListTile(
-                  title: CustomText(countries[index]['name'] as String),
-                  onTap: () {
-                    setState(
-                      () =>
-                          _selectedCountry = countries[index]['code'] as String,
-                    );
-                    Navigator.pop(context);
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    GlassBottomSheet.showActions<void>(
+      context,
+      title: l10n.selectCountry,
+      scrollable: true,
+      children: [
+        for (final country in countries)
+          GlassBottomSheetListTile(
+            label: country['name']!,
+            isSelected: _selectedCountry == country['code'],
+            onTap: () {
+              setState(() => _selectedCountry = country['code'] as String);
+              Navigator.pop(context);
+            },
+          ),
+      ],
     );
   }
 

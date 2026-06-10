@@ -16,6 +16,7 @@ class ProfileHeaderSection extends StatelessWidget {
     required this.onEditProfile,
     required this.onFollowersTap,
     required this.onFollowingTap,
+    this.postsCount,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class ProfileHeaderSection extends StatelessWidget {
   final VoidCallback onEditProfile;
   final VoidCallback onFollowersTap;
   final VoidCallback onFollowingTap;
+  final int? postsCount;
 
   @override
   Widget build(BuildContext context) {
@@ -73,10 +75,12 @@ class ProfileHeaderSection extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: ProfileStatItem(
-                  number: formatProfileCount(user.postCount ?? 0),
-                  label: l10n.profilePostsTab,
-                ),
+                        child: ProfileStatItem(
+                          number: formatProfileCount(
+                            postsCount ?? user.postCount ?? 0,
+                          ),
+                          label: l10n.profilePostsTab,
+                        ),
               ),
               Expanded(
                 child: ProfileStatItem(

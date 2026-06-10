@@ -12,6 +12,7 @@ import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -90,12 +91,23 @@ class _ChatViewState extends State<ChatView> {
     _scrollToBottom();
   }
 
-  void _showUserInfo() {
-    ChatSheets.showUserInfo(
-      context: context,
+  Future<void> _onPeerHeaderTap() async {
+    final id = widget.peerUserId?.trim() ?? '';
+    if (id.isEmpty) {
+      ChatSheets.showUserInfo(
+        context: context,
+        username: widget.username,
+        imageUrl: widget.imageUrl,
+        userId: widget.peerUserId,
+      );
+      return;
+    }
+
+    await openUserActiveStoriesOrProfile(
+      context,
+      userId: id,
       username: widget.username,
-      imageUrl: widget.imageUrl,
-      userId: widget.peerUserId,
+      avatarUrl: widget.imageUrl,
     );
   }
 
@@ -408,7 +420,7 @@ class _ChatViewState extends State<ChatView> {
             username: widget.username,
             imageUrl: widget.imageUrl,
             userId: widget.peerUserId,
-            onProfileTap: _showUserInfo,
+            onProfileTap: _onPeerHeaderTap,
           ),
           body: Stack(
             children: [

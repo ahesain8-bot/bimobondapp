@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase.dart';
@@ -11,6 +9,7 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -37,11 +36,10 @@ class LiveGiftSheet {
     bool canSendToHost = true,
     OnGiftSentCallback? onGiftSent,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
+    return GlassBottomSheet.open<void>(
+      context,
       isScrollControlled: true,
-      builder: (sheetContext) => _LiveGiftSheetBody(
+      builder: (_) => _LiveGiftSheetBody(
         postId: postId,
         receiverId: receiverId,
         auctionId: auctionId,
@@ -307,48 +305,15 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final selected = _selectedGift;
     final owned = selected == null ? 0 : _ownedQuantity(selected.id);
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(LiveDetailsLayoutConstants.giftSheetRadius),
-      ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: LiveDetailsLayoutConstants.giftSheetBlur,
-          sigmaY: LiveDetailsLayoutConstants.giftSheetBlur,
-        ),
-        child: Container(
-          height: MediaQuery.of(context).size.height *
-              LiveDetailsLayoutConstants.giftSheetHeightFactor,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white.withValues(alpha: 0.15),
-                Colors.black.withValues(alpha: 0.8),
-                Colors.black,
-              ],
-            ),
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-            ),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: AppSizes.p12),
-              Container(
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-              const SizedBox(height: AppSizes.p16),
-              Padding(
+    return GlassBottomSheetFrame(
+      showHandle: true,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height *
+            LiveDetailsLayoutConstants.giftSheetHeightFactor,
+        child: Column(
+          children: [
+            const SizedBox(height: AppSizes.p4),
+            Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSizes.p24),
                 child: Stack(
                   alignment: Alignment.center,
@@ -385,7 +350,6 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
             ],
           ),
         ),
-      ),
     );
   }
 

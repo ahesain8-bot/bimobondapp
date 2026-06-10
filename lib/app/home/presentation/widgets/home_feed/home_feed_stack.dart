@@ -2,13 +2,13 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_p
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_overlay_controls.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_page_view.dart';
-import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:flutter/material.dart';
 
 class HomeFeedStack extends StatelessWidget {
   const HomeFeedStack({
     required this.pageController,
-    required this.posts,
+    required this.feedItems,
     required this.currentPostIndex,
     required this.isTabActive,
     required this.onPageChanged,
@@ -18,7 +18,7 @@ class HomeFeedStack extends StatelessWidget {
   });
 
   final PageController pageController;
-  final List<PostEntity> posts;
+  final List<FeedItemEntity> feedItems;
   final int currentPostIndex;
   final bool isTabActive;
   final ValueChanged<int> onPageChanged;
@@ -27,7 +27,8 @@ class HomeFeedStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentPost = posts[currentPostIndex.clamp(0, posts.length - 1)];
+    final currentItem = feedItems[currentPostIndex.clamp(0, feedItems.length - 1)];
+    final currentPost = currentItem.post;
     final isAuctionPost = currentPost.isAuctionable;
     final showVideoProgress = !isAuctionPost && feedPostHasVideo(currentPost);
 
@@ -36,7 +37,7 @@ class HomeFeedStack extends StatelessWidget {
       children: [
         HomeFeedPageView(
           controller: pageController,
-          posts: posts,
+          feedItems: feedItems,
           currentPostIndex: currentPostIndex,
           isTabActive: isTabActive,
           onPageChanged: onPageChanged,
@@ -48,7 +49,7 @@ class HomeFeedStack extends StatelessWidget {
           ),
         if (showVideoProgress)
           Positioned(
-            key: ValueKey(posts[currentPostIndex].id),
+            key: ValueKey(feedItems[currentPostIndex].id),
             left: 0,
             right: 0,
             bottom: MediaQuery.paddingOf(context).bottom,

@@ -7,15 +7,18 @@ enum MessagesActivityType {
   activities,
   comments,
   mentions,
+  notifications,
 }
 
 class MessagesActivitySection extends StatelessWidget {
   const MessagesActivitySection({
     required this.onActivityTap,
+    this.hasUnreadNotifications = false,
     super.key,
   });
 
   final ValueChanged<MessagesActivityType> onActivityTap;
+  final bool hasUnreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +50,12 @@ class MessagesActivitySection extends StatelessWidget {
         icon: Icons.alternate_email_rounded,
         color: MessagesLayoutConstants.activityMentionsColor,
       ),
+      (
+        type: MessagesActivityType.notifications,
+        title: l10n.messagesActivityNotifications,
+        icon: Icons.notifications_rounded,
+        color: MessagesLayoutConstants.activityNotificationsColor,
+      ),
     ];
 
     return SizedBox(
@@ -69,27 +78,50 @@ class MessagesActivitySection extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Container(
-                    width: MessagesLayoutConstants.activityIconSize,
-                    height: MessagesLayoutConstants.activityIconSize,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          activity.color.withValues(alpha: 0.15),
-                          activity.color.withValues(alpha: 0.05),
-                        ],
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: MessagesLayoutConstants.activityIconSize,
+                        height: MessagesLayoutConstants.activityIconSize,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              activity.color.withValues(alpha: 0.15),
+                              activity.color.withValues(alpha: 0.05),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(
+                            MessagesLayoutConstants.activityIconRadius,
+                          ),
+                        ),
+                        child: Icon(
+                          activity.icon,
+                          color: activity.color,
+                          size: 26,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(
-                        MessagesLayoutConstants.activityIconRadius,
-                      ),
-                    ),
-                    child: Icon(
-                      activity.icon,
-                      color: activity.color,
-                      size: 26,
-                    ),
+                      if (activity.type == MessagesActivityType.notifications &&
+                          hasUnreadNotifications)
+                        PositionedDirectional(
+                          end: 2,
+                          top: 2,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: MessagesLayoutConstants.activityBadgeColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: theme.scaffoldBackgroundColor,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(

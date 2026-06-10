@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/posts/data/models/mention_ref_model.dart';
+import 'package:bimobondapp/app/posts/data/models/repost_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
@@ -21,8 +22,11 @@ class PostModel extends PostEntity {
     required super.commentCount,
     required super.saveCount,
     required super.shareCount,
+    required super.repostCount,
     required super.isLiked,
     required super.isSaved,
+    required super.isReposted,
+    super.recentReposters = const [],
     required super.createdAt,
     PostUserModel? super.user,
     required List<PostMediaModel> super.media,
@@ -62,6 +66,34 @@ class PostModel extends PostEntity {
     return null;
   }
 
+  static int _parseRepostCount(Map<String, dynamic> json) {
+    final direct = json['repostCount'];
+    if (direct is int) return direct;
+    if (direct is num) return direct.toInt();
+    final count = json['_count'];
+    if (count is Map) {
+      final nested = count['reposts'];
+      if (nested is int) return nested;
+      if (nested is num) return nested.toInt();
+    }
+    return 0;
+  }
+
+  static bool _parseBoolField(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) return value.toLowerCase() == 'true';
+    return false;
+  }
+
+  static List<RepostUserModel> _parseRecentReposters(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => RepostUserModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
   factory PostModel.fromJson(Map<String, dynamic> json) {
     return PostModel(
       id: json['id'] ?? '',
@@ -78,10 +110,15 @@ class PostModel extends PostEntity {
       commentCount: json['commentCount'] ?? 0,
       saveCount: json['saveCount'] ?? 0,
       shareCount: json['shareCount'] ?? 0,
+      repostCount: _parseRepostCount(json),
       isLiked: json['isLiked'] is bool
           ? json['isLiked'] as bool
           : json['isLiked']?.toString().toLowerCase() == 'true',
-      isSaved: json['isSaved'] ?? false,
+      isSaved: _parseBoolField(json['isSaved']),
+      isReposted: _parseBoolField(json['isReposted']),
+      recentReposters: _parseRecentReposters(
+        json['recentReposters'] ?? json['recentReposts'],
+      ),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
@@ -119,8 +156,10 @@ class PostModel extends PostEntity {
       'commentCount': commentCount,
       'saveCount': saveCount,
       'shareCount': shareCount,
+      'repostCount': repostCount,
       'isLiked': isLiked,
       'isSaved': isSaved,
+      'isReposted': isReposted,
       'createdAt': createdAt.toIso8601String(),
       'user': (user as PostUserModel?)?.toJson(),
       'media': media.map((e) => (e as PostMediaModel).toJson()).toList(),

@@ -9,6 +9,9 @@ import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_post_usecase.d
 import 'package:bimobondapp/app/posts/domain/entities/update_post_params.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_save_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/toggle_repost_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/entities/toggle_repost_params.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_my_reposts_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -22,6 +25,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   final GetFeedUseCase getFeedUseCase;
   final ToggleLikePostUsecase toggleLikePostUsecase;
   final ToggleSavePostUsecase toggleSavePostUsecase;
+  final ToggleRepostPostUsecase toggleRepostPostUsecase;
+  final GetMyRepostsUseCase getMyRepostsUseCase;
   final UpdatePostUsecase updatePostUsecase;
   final DeletePostUsecase deletePostUsecase;
 
@@ -31,6 +36,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     required this.getFeedUseCase,
     required this.toggleLikePostUsecase,
     required this.toggleSavePostUsecase,
+    required this.toggleRepostPostUsecase,
+    required this.getMyRepostsUseCase,
     required this.updatePostUsecase,
     required this.deletePostUsecase,
   }) : super(PostsInitial()) {
@@ -41,6 +48,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<FetchStoriesRequestedEvent>(_onFetchStoriesRequested);
     on<ToggleLikePostRequestedEvent>(_onToggleLikePostRequested);
     on<ToggleSavePostRequestedEvent>(_onToggleSavePostRequested);
+    on<ToggleRepostPostRequestedEvent>(_onToggleRepostPostRequested);
+    on<FetchMyRepostsRequestedEvent>(_onFetchMyRepostsRequested);
     on<UpdatePostRequestedEvent>(_onUpdatePostRequested);
     on<DeletePostRequestedEvent>(_onDeletePostRequested);
   }
@@ -82,6 +91,47 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     result.fold(
       (failure) => emit(PostsFailure(failure.message)),
       (_) => emit(SavePostSuccess(event.postId)),
+    );
+  }
+
+  Future<void> _onToggleRepostPostRequested(
+    ToggleRepostPostRequestedEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    final result = await toggleRepostPostUsecase(
+      ToggleRepostParams(postId: event.postId, quote: event.quote),
+    );
+    result.fold(
+      (failure) => emit(PostsFailure(failure.message)),
+      (isReposted) => emit(
+        RepostPostSuccess(postId: event.postId, isReposted: isReposted),
+      ),
+    );
+  }
+
+  Future<void> _onFetchMyRepostsRequested(
+    FetchMyRepostsRequestedEvent event,
+    Emitter<PostsState> emit,
+  ) async {
+    final result = await getMyRepostsUseCase(
+      GetMyRepostsParams(page: event.page, limit: event.limit),
+    );
+    result.fold(
+      (failure) => emit(
+        PostsFailure(failure.message, profileLoadKey: event.profileLoadKey),
+      ),
+      (page) {
+        final reposts = List.of(page.reposts)
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final posts = reposts.map((item) => item.post).toList();
+        emit(
+          MyRepostsLoadSuccess(
+            posts: posts,
+            hasReachedMax: page.hasReachedMax,
+            profileLoadKey: event.profileLoadKey ?? 0,
+          ),
+        );
+      },
     );
   }
 
@@ -205,6 +255,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         isLiked: event.isLiked,
         isSaved: event.isSaved,
         isStory: event.isStory,
+        contentType: event.contentType,
+        privacyStatus: event.privacyStatus,
       ),
     );
 
@@ -212,18 +264,18 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       (failure) => emit(
         PostsFailure(failure.message, profileLoadKey: event.profileLoadKey),
       ),
-      (posts) {
-        final hasReachedMax = posts.length < event.limit;
+      (items) {
+        final hasReachedMax = items.length < event.limit;
         if (event.profileLoadKey != null) {
           emit(
             ProfilePostsLoadSuccess(
-              posts: posts,
+              posts: items.map((item) => item.post).toList(),
               hasReachedMax: hasReachedMax,
               profileLoadKey: event.profileLoadKey!,
             ),
           );
         } else {
-          emit(FeedLoadSuccess(posts: posts, hasReachedMax: hasReachedMax));
+          emit(FeedLoadSuccess(items: items, hasReachedMax: hasReachedMax));
         }
       },
     );
@@ -243,10 +295,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
 
     result.fold(
       (failure) => emit(PostsFailure(failure.message)),
-      (stories) => emit(
+      (items) => emit(
         StoriesLoadSuccess(
-          stories: stories,
-          hasReachedMax: stories.length < event.limit,
+          stories: items.map((item) => item.post).toList(),
+          hasReachedMax: items.length < event.limit,
         ),
       ),
     );

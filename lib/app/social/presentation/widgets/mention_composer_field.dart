@@ -1,6 +1,12 @@
+import 'dart:async';
+
+import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
+import 'package:bimobondapp/app/posts/presentation/services/hashtag_suggestions_source.dart';
+import 'package:bimobondapp/app/posts/presentation/widgets/hashtag_suggestions_ui.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/presentation/services/mention_friends_source.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/hashtag_compose.dart';
 import 'package:bimobondapp/core/utils/mention_compose.dart';
 import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -15,7 +21,9 @@ typedef MentionComposerLayoutBuilder = Widget Function(
   Widget textField,
 );
 
-/// Text field that shows a friends list while typing `@` + letters.
+enum _ComposeSuggestionMode { mention, hashtag }
+
+/// Text field with inline `@` people and `#` hashtag suggestions.
 class MentionComposerField extends StatefulWidget {
   const MentionComposerField({
     super.key,
@@ -47,10 +55,18 @@ class MentionComposerField extends StatefulWidget {
 }
 
 class _MentionComposerFieldState extends State<MentionComposerField> {
-  ActiveMentionQuery? _activeQuery;
-  List<SocialUserEntity> _suggestions = const [];
+  static const _hashtagDebounce = Duration(milliseconds: 280);
+
+  _ComposeSuggestionMode? _mode;
+  ActiveMentionQuery? _mentionQuery;
+  ActiveHashtagQuery? _hashtagQuery;
+  List<SocialUserEntity> _mentionSuggestions = const [];
+  List<HashtagEntity> _hashtagSuggestions = const [];
   bool _loadingFriends = false;
+  bool _loadingHashtags = false;
   List<SocialUserEntity> _friends = const [];
+  Timer? _hashtagDebounceTimer;
+  int _hashtagRequestId = 0;
 
   @override
   void initState() {
@@ -70,6 +86,7 @@ class _MentionComposerFieldState extends State<MentionComposerField> {
 
   @override
   void dispose() {
+    _hashtagDebounceTimer?.cancel();
     widget.controller.removeListener(_onTextChanged);
     super.dispose();
   }
@@ -78,10 +95,33 @@ class _MentionComposerFieldState extends State<MentionComposerField> {
     final people = await MentionFriendsSource.ensureLoaded();
     if (!mounted) return;
     setState(() => _friends = people);
-    final active = _activeQuery;
-    if (active != null) {
-      _applyFilter(active);
+    final active = _mentionQuery;
+    if (_mode == _ComposeSuggestionMode.mention && active != null) {
+      _applyMentionFilter(active);
     }
+  }
+
+  void _clearSuggestions() {
+    _hashtagDebounceTimer?.cancel();
+    setState(() {
+      _mode = null;
+      _mentionQuery = null;
+      _hashtagQuery = null;
+      _mentionSuggestions = const [];
+      _hashtagSuggestions = const [];
+    });
+  }
+
+  _ComposeSuggestionMode? _resolveMode(
+    ActiveMentionQuery? mention,
+    ActiveHashtagQuery? hashtag,
+  ) {
+    if (mention == null && hashtag == null) return null;
+    if (mention == null) return _ComposeSuggestionMode.hashtag;
+    if (hashtag == null) return _ComposeSuggestionMode.mention;
+    return mention.start >= hashtag.start
+        ? _ComposeSuggestionMode.mention
+        : _ComposeSuggestionMode.hashtag;
   }
 
   void _onTextChanged() {
@@ -90,40 +130,64 @@ class _MentionComposerFieldState extends State<MentionComposerField> {
     var cursor = selection.isValid ? selection.baseOffset : text.length;
     if (cursor < 0) cursor = 0;
 
-    final active = MentionCompose.activeAt(text, cursor);
+    final mention = MentionCompose.activeAt(text, cursor);
+    final hashtag = HashtagCompose.activeAt(text, cursor);
+    final mode = _resolveMode(mention, hashtag);
 
-    if (active == null) {
-      if (_activeQuery != null) {
-        setState(() {
-          _activeQuery = null;
-          _suggestions = const [];
-        });
+    if (mode == null) {
+      if (_mode != null) _clearSuggestions();
+      return;
+    }
+
+    if (mode == _ComposeSuggestionMode.mention && mention != null) {
+      _hashtagDebounceTimer?.cancel();
+      final queryChanged = _mentionQuery?.query != mention.query ||
+          _mentionQuery?.start != mention.start ||
+          _mode != mode;
+      setState(() {
+        _mode = mode;
+        _mentionQuery = mention;
+        _hashtagQuery = null;
+        _hashtagSuggestions = const [];
+      });
+
+      if (_friends.isNotEmpty) {
+        _applyMentionFilter(mention);
+        return;
+      }
+
+      if (queryChanged || _mentionSuggestions.isEmpty) {
+        _refreshMentionSuggestions(mention);
       }
       return;
     }
 
-    final queryChanged = _activeQuery?.query != active.query ||
-        _activeQuery?.start != active.start;
-    setState(() => _activeQuery = active);
+    if (mode == _ComposeSuggestionMode.hashtag && hashtag != null) {
+      final queryChanged = _hashtagQuery?.query != hashtag.query ||
+          _hashtagQuery?.start != hashtag.start ||
+          _mode != mode;
+      setState(() {
+        _mode = mode;
+        _hashtagQuery = hashtag;
+        _mentionQuery = null;
+        _mentionSuggestions = const [];
+      });
 
-    if (_friends.isNotEmpty) {
-      _applyFilter(active);
-      return;
-    }
-
-    if (queryChanged || _suggestions.isEmpty) {
-      _refreshSuggestions(active);
+      if (queryChanged || _hashtagSuggestions.isEmpty) {
+        _scheduleHashtagRefresh(hashtag);
+      }
     }
   }
 
-  void _applyFilter(ActiveMentionQuery active) {
+  void _applyMentionFilter(ActiveMentionQuery active) {
     if (!mounted) return;
     setState(
-      () => _suggestions = MentionFriendsSource.filter(_friends, active.query),
+      () => _mentionSuggestions =
+          MentionFriendsSource.filter(_friends, active.query),
     );
   }
 
-  Future<void> _refreshSuggestions(ActiveMentionQuery active) async {
+  Future<void> _refreshMentionSuggestions(ActiveMentionQuery active) async {
     if (!_loadingFriends) {
       setState(() => _loadingFriends = true);
       _friends = await MentionFriendsSource.ensureLoaded();
@@ -131,14 +195,41 @@ class _MentionComposerFieldState extends State<MentionComposerField> {
       setState(() => _loadingFriends = false);
     }
 
-    if (_activeQuery?.start != active.start || _activeQuery?.query != active.query) {
+    if (_mentionQuery?.start != active.start ||
+        _mentionQuery?.query != active.query) {
       return;
     }
-    _applyFilter(active);
+    _applyMentionFilter(active);
+  }
+
+  void _scheduleHashtagRefresh(ActiveHashtagQuery active) {
+    _hashtagDebounceTimer?.cancel();
+    _hashtagDebounceTimer = Timer(_hashtagDebounce, () {
+      unawaited(_refreshHashtagSuggestions(active));
+    });
+  }
+
+  Future<void> _refreshHashtagSuggestions(ActiveHashtagQuery active) async {
+    final requestId = ++_hashtagRequestId;
+    setState(() => _loadingHashtags = true);
+
+    final tags = await HashtagSuggestionsSource.search(active.query);
+
+    if (!mounted || requestId != _hashtagRequestId) return;
+    if (_hashtagQuery?.start != active.start ||
+        _hashtagQuery?.query != active.query) {
+      setState(() => _loadingHashtags = false);
+      return;
+    }
+
+    setState(() {
+      _hashtagSuggestions = tags;
+      _loadingHashtags = false;
+    });
   }
 
   void _pickUser(SocialUserEntity user) {
-    final active = _activeQuery;
+    final active = _mentionQuery;
     final username = user.username?.trim();
     if (active == null || username == null || username.isEmpty) return;
 
@@ -148,29 +239,48 @@ class _MentionComposerFieldState extends State<MentionComposerField> {
       mentionEnd: active.end,
       username: username,
     );
-    setState(() {
-      _activeQuery = null;
-      _suggestions = const [];
-    });
+    _clearSuggestions();
+  }
+
+  void _pickHashtag(HashtagEntity tag) {
+    final active = _hashtagQuery;
+    if (active == null) return;
+
+    TagTextEditing.completeHashtag(
+      widget.controller,
+      hashtagStart: active.start,
+      hashtagEnd: active.end,
+      name: tag.name,
+    );
+    _clearSuggestions();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final showList = _activeQuery != null;
-
-    final suggestions = showList
-        ? _MentionSuggestionsList(
-            loading: _loadingFriends && _suggestions.isEmpty,
-            suggestions: _suggestions,
-            emptyLabel: _friends.isEmpty && !_loadingFriends
-                ? l10n.connectionsEmptyFriends
-                : l10n.messagesNoResults,
-            theme: theme,
-            onPick: _pickUser,
-          )
-        : null;
+    final Widget? suggestions;
+    if (_mode == _ComposeSuggestionMode.mention) {
+      suggestions = _MentionSuggestionsList(
+        loading: _loadingFriends && _mentionSuggestions.isEmpty,
+        suggestions: _mentionSuggestions,
+        emptyLabel: _friends.isEmpty && !_loadingFriends
+            ? l10n.connectionsEmptyFriends
+            : l10n.messagesNoResults,
+        theme: theme,
+        onPick: _pickUser,
+      );
+    } else if (_mode == _ComposeSuggestionMode.hashtag) {
+      suggestions = _HashtagSuggestionsList(
+        loading: _loadingHashtags && _hashtagSuggestions.isEmpty,
+        suggestions: _hashtagSuggestions,
+        emptyLabel: l10n.noHashtagsFound,
+        l10n: l10n,
+        onPick: _pickHashtag,
+      );
+    } else {
+      suggestions = null;
+    }
 
     final textField = TextField(
       controller: widget.controller,
@@ -196,6 +306,47 @@ class _MentionComposerFieldState extends State<MentionComposerField> {
         if (suggestions != null) suggestions,
         textField,
       ],
+    );
+  }
+}
+
+class _HashtagSuggestionsList extends StatelessWidget {
+  const _HashtagSuggestionsList({
+    required this.loading,
+    required this.suggestions,
+    required this.emptyLabel,
+    required this.l10n,
+    required this.onPick,
+  });
+
+  final bool loading;
+  final List<HashtagEntity> suggestions;
+  final String emptyLabel;
+  final AppLocalizations l10n;
+  final void Function(HashtagEntity tag) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return HashtagSuggestionsCard(
+      margin: const EdgeInsets.only(bottom: AppSizes.p6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          HashtagSuggestionsHeader(
+            title: l10n.trendingHashtags,
+            compact: true,
+          ),
+          Divider(height: 1, color: Colors.grey.shade200),
+          HashtagSuggestionsBody(
+            loading: loading,
+            tags: suggestions,
+            emptyLabel: emptyLabel,
+            l10n: l10n,
+            onSelect: onPick,
+          ),
+        ],
+      ),
     );
   }
 }

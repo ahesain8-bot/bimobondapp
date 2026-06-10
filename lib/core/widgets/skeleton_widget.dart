@@ -294,19 +294,27 @@ class AuctionsCategoryStripSkeleton extends StatelessWidget {
 
 /// Vertical list of [AuctionCardSkeleton] items for category filtering.
 class AuctionListSkeleton extends StatelessWidget {
-  const AuctionListSkeleton({super.key, this.itemCount = 3});
+  const AuctionListSkeleton({
+    super.key,
+    this.itemCount = 3,
+    this.padding = const EdgeInsets.symmetric(horizontal: AppSizes.p16),
+  });
 
   final int itemCount;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < itemCount; i++) ...[
-          if (i > 0) const SizedBox(height: AppSizes.p16),
-          const AuctionCardSkeleton(),
+    return Padding(
+      padding: padding,
+      child: Column(
+        children: [
+          for (var i = 0; i < itemCount; i++) ...[
+            if (i > 0) const SizedBox(height: AppSizes.p16),
+            const AuctionCardSkeleton(),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

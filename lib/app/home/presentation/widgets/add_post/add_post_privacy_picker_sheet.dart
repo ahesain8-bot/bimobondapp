@@ -1,7 +1,6 @@
-import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 String localizedAddPostPrivacyStatus(String status, AppLocalizations l10n) {
   switch (status) {
@@ -25,38 +24,30 @@ class AddPostPrivacyPickerSheet {
     required ValueChanged<String> onSelected,
   }) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
 
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.p16)),
-      ),
-      builder: (sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _PrivacyOption(
-            value: 'PUBLIC',
-            label: l10n.everyoneLabel,
-            selectedStatus: selectedStatus,
-            onSelected: onSelected,
-          ),
-          _PrivacyOption(
-            value: 'FRIENDS',
-            label: l10n.friendsLabel,
-            selectedStatus: selectedStatus,
-            onSelected: onSelected,
-          ),
-          _PrivacyOption(
-            value: 'PRIVATE',
-            label: l10n.onlyMeLabel,
-            selectedStatus: selectedStatus,
-            onSelected: onSelected,
-          ),
-          const SizedBox(height: AppSizes.p20),
-        ],
-      ),
+    return GlassBottomSheetShell.show<void>(
+      context,
+      title: l10n.whoCanWatchLabel,
+      children: [
+        _PrivacyOption(
+          value: 'PUBLIC',
+          label: l10n.everyoneLabel,
+          selectedStatus: selectedStatus,
+          onSelected: onSelected,
+        ),
+        _PrivacyOption(
+          value: 'FRIENDS',
+          label: l10n.friendsLabel,
+          selectedStatus: selectedStatus,
+          onSelected: onSelected,
+        ),
+        _PrivacyOption(
+          value: 'PRIVATE',
+          label: l10n.onlyMeLabel,
+          selectedStatus: selectedStatus,
+          onSelected: onSelected,
+        ),
+      ],
     );
   }
 }
@@ -76,12 +67,11 @@ class _PrivacyOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListTile(
-      title: Text(label),
-      trailing: selectedStatus == value
-          ? Icon(LucideIcons.check, color: theme.colorScheme.primary)
-          : null,
+    return GlassBottomSheetActionTile(
+      icon: privacyIconForStatus(value),
+      label: label,
+      isSelected: selectedStatus == value,
+      showChevron: false,
       onTap: () {
         onSelected(value);
         Navigator.pop(context);

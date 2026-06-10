@@ -9,6 +9,7 @@ class AttachmentGridMenuItem extends StatelessWidget {
     required this.label,
     required this.color,
     this.onTap,
+    this.glassStyle = false,
     super.key,
   });
 
@@ -16,10 +17,22 @@ class AttachmentGridMenuItem extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback? onTap;
+  final bool glassStyle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final labelColor = glassStyle
+        ? Colors.white.withValues(alpha: 0.9)
+        : theme.textTheme.labelSmall?.color;
+    final iconBackgroundAlpha = glassStyle
+        ? 0.18
+        : ChatLayoutConstants.moreMenuIconBackgroundAlpha;
+    final iconColor = glassStyle ? Colors.white : color;
+    final tileColor = glassStyle
+        ? Colors.white.withValues(alpha: iconBackgroundAlpha)
+        : color.withValues(alpha: iconBackgroundAlpha);
+
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -27,16 +40,17 @@ class AttachmentGridMenuItem extends StatelessWidget {
           width: ChatLayoutConstants.moreMenuIconSize,
           height: ChatLayoutConstants.moreMenuIconSize,
           decoration: BoxDecoration(
-            color: color.withValues(
-              alpha: ChatLayoutConstants.moreMenuIconBackgroundAlpha,
-            ),
+            color: tileColor,
             borderRadius: BorderRadius.circular(
               ChatLayoutConstants.moreMenuIconRadius,
             ),
+            border: glassStyle
+                ? Border.all(color: Colors.white.withValues(alpha: 0.16))
+                : null,
           ),
           child: Icon(
             icon,
-            color: color,
+            color: iconColor,
             size: ChatLayoutConstants.moreMenuItemIconSize,
           ),
         ),
@@ -49,6 +63,7 @@ class AttachmentGridMenuItem extends StatelessWidget {
           style: theme.textTheme.labelSmall?.copyWith(
             fontSize: ChatLayoutConstants.moreMenuLabelFontSize,
             fontWeight: FontWeight.w600,
+            color: labelColor,
           ),
         ),
       ],

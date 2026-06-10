@@ -2,13 +2,18 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/posts/data/datasources/posts_remote_data_source.dart';
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
+import 'package:bimobondapp/app/posts/data/models/feed_item_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/user_repost_entity.dart';
 import 'package:bimobondapp/app/posts/data/models/post_view_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_views_page_model.dart';
 import 'package:bimobondapp/core/utils/comment_sort.dart';
@@ -77,8 +82,63 @@ class PostsRepositoryImpl implements PostsRepository {
     }
   }
 
+  List<FeedItemEntity> _applyFeedItemLikes(List<FeedItemModel> items) {
+    final userId = _userId;
+    if (userId == null) return items;
+
+    return items
+        .map((item) {
+          final post = item.post;
+          if (post is! PostModel) return item;
+          final liked = likesLocalDataSource.resolvePostLiked(
+            userId,
+            post.id,
+            post.isLiked,
+          );
+          return FeedItemModel(
+            id: item.id,
+            feedType: item.feedType,
+            sortAt: item.sortAt,
+            post: post.copyWith(isLiked: liked),
+            repostId: item.repostId,
+            repostedAt: item.repostedAt,
+            quote: item.quote,
+            repostedBy: item.repostedBy,
+          );
+        })
+        .toList();
+  }
+
+  List<FeedItemEntity> _excludeStoryFeedItems(List<FeedItemEntity> items) =>
+      items.where((item) => !item.post.isStory).toList();
+
+  List<FeedItemEntity> _onlyStoryFeedItems(List<FeedItemEntity> items) =>
+      items.where((item) => item.post.isStory && isStoryStillActive(item.post)).toList();
+
   @override
-  Future<Either<Failure, List<PostEntity>>> getFeed({
+  Future<Either<Failure, HashtagsPageEntity>> getHashtags({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    HashtagSort sort = HashtagSort.name,
+  }) async {
+    try {
+      final result = await remoteDataSource.getHashtags(
+        page: page,
+        limit: limit,
+        search: search,
+        sort: sort,
+      );
+      return Right(result);
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<FeedItemEntity>>> getFeed({
     int page = 1,
     int limit = 10,
     String? categoryId,
@@ -90,7 +150,9 @@ class PostsRepositoryImpl implements PostsRepository {
     bool? isLiked,
     bool? isSaved,
     bool isStory = false,
+    FeedContentType? contentType,
     FeedAuctionQuery? auctionQuery,
+    String? privacyStatus,
   }) async {
     try {
       final queryParams = {
@@ -105,14 +167,17 @@ class PostsRepositoryImpl implements PostsRepository {
         if (userId != null) 'userId': userId,
         if (isLiked != null) 'isLiked': isLiked,
         if (isSaved != null) 'isSaved': isSaved,
+        if (privacyStatus != null) 'privacyStatus': privacyStatus,
+        if (contentType != null && contentType != FeedContentType.all)
+          'contentType': contentType.apiValue,
         ...?auctionQuery?.toQueryParams(),
       };
 
-      final posts = await remoteDataSource.getFeed(queryParams);
-      final withLikes = _applyPostLikes(posts);
+      final items = await remoteDataSource.getFeed(queryParams);
+      final withLikes = _applyFeedItemLikes(items);
       final filtered = isStory
-          ? onlyStoryPosts(withLikes)
-          : excludeStoryPosts(withLikes);
+          ? _onlyStoryFeedItems(withLikes)
+          : _excludeStoryFeedItems(withLikes);
       return Right(filtered);
     } on AppException catch (e) {
       return Left(ServerFailure(e.message!));
@@ -332,6 +397,7 @@ class PostsRepositoryImpl implements PostsRepository {
               isActive: u.isActive,
               isFollowing: u.isFollowing,
               isFollowedBy: u.isFollowedBy,
+              likedAt: u.likedAt,
             ),
           )
           .toList(growable: false),
@@ -345,6 +411,59 @@ class PostsRepositoryImpl implements PostsRepository {
   Future<Either<Failure, bool>> toggleSave(String postId) async {
     try {
       final result = await remoteDataSource.toggleSave(postId);
+      return Right(result);
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> toggleRepost(
+    String postId, {
+    String? quote,
+  }) async {
+    try {
+      final result = await remoteDataSource.toggleRepost(postId, quote: quote);
+      return Right(result);
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, RepostsPageEntity>> getPostReposts(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final result = await remoteDataSource.getPostReposts(
+        postId,
+        page: page,
+        limit: limit,
+      );
+      return Right(result);
+    } on AppException catch (e) {
+      return Left(ServerFailure(e.message!));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, UserRepostsPageEntity>> getMyReposts({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final result = await remoteDataSource.getMyReposts(
+        page: page,
+        limit: limit,
+      );
       return Right(result);
     } on AppException catch (e) {
       return Left(ServerFailure(e.message!));

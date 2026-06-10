@@ -10,6 +10,7 @@ class SocialUserModel extends SocialUserEntity {
     super.isActive,
     super.isFollowing = false,
     super.isFollowedBy = false,
+    super.likedAt,
   });
 
   static bool _parseBool(dynamic value) {

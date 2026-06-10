@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_privacy_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -179,16 +180,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
   }
 
   String _privacyLabel(String status, AppLocalizations l10n) {
-    switch (status) {
-      case 'PUBLIC':
-        return l10n.everyoneLabel;
-      case 'FRIENDS':
-        return l10n.friendsLabel;
-      case 'PRIVATE':
-        return l10n.onlyMeLabel;
-      default:
-        return status;
-    }
+    return localizedAddPostPrivacyStatus(status, l10n);
   }
 
   Widget _buildReadOnlyMediaTile(PostMediaEntity media) {
@@ -254,37 +246,10 @@ class _EditPostScreenState extends State<EditPostScreen> {
   }
 
   void _showPrivacyPicker() {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.p16)),
-      ),
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildPrivacyOption('PUBLIC', l10n.everyoneLabel),
-          _buildPrivacyOption('FRIENDS', l10n.friendsLabel),
-          _buildPrivacyOption('PRIVATE', l10n.onlyMeLabel),
-          const SizedBox(height: AppSizes.p20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrivacyOption(String value, String label) {
-    final theme = Theme.of(context);
-    return ListTile(
-      title: Text(label),
-      trailing: _privacyStatus == value
-          ? Icon(LucideIcons.check, color: theme.primaryColor)
-          : null,
-      onTap: () {
-        setState(() => _privacyStatus = value);
-        Navigator.pop(context);
-      },
+    AddPostPrivacyPickerSheet.show(
+      context,
+      selectedStatus: _privacyStatus,
+      onSelected: (status) => setState(() => _privacyStatus = status),
     );
   }
 }

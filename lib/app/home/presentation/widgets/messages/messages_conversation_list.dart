@@ -49,13 +49,20 @@ class MessagesConversationList extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !scrollable,
       physics: scrollable
           ? const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics())
           : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       itemCount: items.length,
+      separatorBuilder: (context, index) => Divider(
+        height: 1,
+        thickness: 1,
+        color: theme.brightness == Brightness.light
+            ? const Color(0xFFE4E7EC)
+            : theme.dividerColor.withValues(alpha: 0.12),
+      ),
       itemBuilder: (context, index) => _ConversationTile(chat: items[index]),
     );
   }

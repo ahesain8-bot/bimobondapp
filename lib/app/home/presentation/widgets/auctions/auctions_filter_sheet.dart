@@ -4,6 +4,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_categ
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,27 +15,31 @@ class AuctionsFilterSheet extends StatefulWidget {
   const AuctionsFilterSheet({
     required this.initialFilters,
     required this.categories,
+    required this.scrollController,
     super.key,
   });
 
   final AuctionSearchFilters initialFilters;
   final List<CategoryEntity> categories;
+  final ScrollController scrollController;
 
   static Future<AuctionSearchFilters?> show(
     BuildContext context, {
     required AuctionSearchFilters initialFilters,
     required List<CategoryEntity> categories,
   }) {
-    return showModalBottomSheet<AuctionSearchFilters>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.radiusLg)),
-      ),
-      builder: (context) => AuctionsFilterSheet(
+    final l10n = AppLocalizations.of(context)!;
+    return GlassBottomSheet.showDraggable<AuctionSearchFilters>(
+      context,
+      title: l10n.auctionsFiltersTitle,
+      initialChildSize: 0.88,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      adaptTheme: true,
+      builder: (context, scrollController) => AuctionsFilterSheet(
         initialFilters: initialFilters,
         categories: categories,
+        scrollController: scrollController,
       ),
     );
   }
@@ -117,6 +123,7 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
         minPriceUsd: minPrice,
         maxPriceUsd: maxPrice,
         timeRemaining: _timeRemaining,
+        liveStatus: widget.initialFilters.liveStatus,
       ),
     );
   }
@@ -141,185 +148,198 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final chipInactiveBg = isDark ? const Color(0xFF252525) : const Color(0xFFF3F4F6);
-    final chipInactiveBorder = isDark
-        ? Colors.white24
-        : theme.dividerColor.withValues(alpha: 0.35);
+    const chipInactiveBg = Color(0x1FFFFFFF);
+    const chipInactiveBorder = Color(0x33FFFFFF);
+    const labelColor = Colors.white;
+    const mutedColor = Color(0xA3FFFFFF);
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.88,
-      minChildSize: 0.45,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Column(
-          children: [
-            const SizedBox(height: AppSizes.p8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.dividerColor.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
+    InputDecoration priceDecoration(String label) {
+      return InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: mutedColor),
+        prefixIcon: Icon(
+          LucideIcons.dollarSign,
+          size: 18,
+          color: Colors.white.withValues(alpha: 0.65),
+        ),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.p12,
+          vertical: AppSizes.p12,
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.p16,
+            0,
+            AppSizes.p8,
+            AppSizes.p8,
+          ),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton(
+              onPressed: _reset,
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              child: Text(l10n.auctionsFiltersReset),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSizes.p16,
-                AppSizes.p16,
-                AppSizes.p8,
-                AppSizes.p8,
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            controller: widget.scrollController,
+            padding: const EdgeInsets.fromLTRB(
+              AppSizes.p16,
+              0,
+              AppSizes.p16,
+              AppSizes.p16,
+            ),
+            children: [
+              CustomText(
+                l10n.auctionsFiltersCategories,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: labelColor,
               ),
-              child: Row(
+              const SizedBox(height: AppSizes.p12),
+              Wrap(
+                spacing: AppSizes.p8,
+                runSpacing: AppSizes.p8,
+                children: [
+                  for (final category in widget.categories)
+                    AuctionCategoryChip(
+                      label: category.name,
+                      icon: categoryIconForSlug(category.slug),
+                      isSelected: _selectedCategoryIds.contains(category.id),
+                      selectedColor: const Color(0xFF2ECC71),
+                      inactiveBackground: chipInactiveBg,
+                      inactiveBorder: chipInactiveBorder,
+                      onTap: () => _toggleCategory(category.id),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSizes.p24),
+              CustomText(
+                l10n.auctionsFiltersPriceRange,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: labelColor,
+              ),
+              const SizedBox(height: AppSizes.p12),
+              Row(
                 children: [
                   Expanded(
-                    child: CustomText(
-                      l10n.auctionsFiltersTitle,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    child: LiquidGlassSurface(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                      child: TextField(
+                        controller: _minPriceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                        ],
+                        style: const TextStyle(color: labelColor),
+                        cursorColor: Colors.white,
+                        decoration: priceDecoration(l10n.auctionsFiltersMinPrice),
+                      ),
                     ),
                   ),
-                  TextButton(
-                    onPressed: _reset,
-                    child: Text(l10n.auctionsFiltersReset),
+                  const SizedBox(width: AppSizes.p12),
+                  Expanded(
+                    child: LiquidGlassSurface(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                      child: TextField(
+                        controller: _maxPriceController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                        ],
+                        style: const TextStyle(color: labelColor),
+                        cursorColor: Colors.white,
+                        decoration: priceDecoration(l10n.auctionsFiltersMaxPrice),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.p16,
-                  0,
-                  AppSizes.p16,
-                  AppSizes.p16,
-                ),
-                children: [
-                  CustomText(
-                    l10n.auctionsFiltersCategories,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  const SizedBox(height: AppSizes.p12),
-                  Wrap(
-                    spacing: AppSizes.p8,
-                    runSpacing: AppSizes.p8,
-                    children: [
-                      for (final category in widget.categories)
-                        AuctionCategoryChip(
-                          label: category.name,
-                          icon: categoryIconForSlug(category.slug),
-                          isSelected: _selectedCategoryIds.contains(category.id),
-                          selectedColor: theme.primaryColor,
-                          inactiveBackground: chipInactiveBg,
-                          inactiveBorder: chipInactiveBorder,
-                          onTap: () => _toggleCategory(category.id),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSizes.p24),
-                  CustomText(
-                    l10n.auctionsFiltersPriceRange,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  const SizedBox(height: AppSizes.p12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _minPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ],
-                          decoration: InputDecoration(
-                            labelText: l10n.auctionsFiltersMinPrice,
-                            prefixIcon: const Icon(LucideIcons.dollarSign, size: 18),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                            ),
-                          ),
-                        ),
+              const SizedBox(height: AppSizes.p24),
+              CustomText(
+                l10n.auctionsFiltersTimeRemaining,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: labelColor,
+              ),
+              const SizedBox(height: AppSizes.p12),
+              Wrap(
+                spacing: AppSizes.p8,
+                runSpacing: AppSizes.p8,
+                children: AuctionTimeRemainingFilter.values.map((filter) {
+                  final isSelected = _timeRemaining == filter;
+                  return GestureDetector(
+                    onTap: () => setState(() => _timeRemaining = filter),
+                    child: LiquidGlassSurface(
+                      borderRadius: BorderRadius.circular(20),
+                      backgroundColor: isSelected
+                          ? Colors.white.withValues(alpha: 0.22)
+                          : chipInactiveBg,
+                      borderColor: isSelected
+                          ? Colors.white.withValues(alpha: 0.55)
+                          : chipInactiveBorder,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.p12,
+                        vertical: AppSizes.p10,
                       ),
-                      const SizedBox(width: AppSizes.p12),
-                      Expanded(
-                        child: TextField(
-                          controller: _maxPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ],
-                          decoration: InputDecoration(
-                            labelText: l10n.auctionsFiltersMaxPrice,
-                            prefixIcon: const Icon(LucideIcons.dollarSign, size: 18),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSizes.p24),
-                  CustomText(
-                    l10n.auctionsFiltersTimeRemaining,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  const SizedBox(height: AppSizes.p12),
-                  Wrap(
-                    spacing: AppSizes.p8,
-                    runSpacing: AppSizes.p8,
-                    children: AuctionTimeRemainingFilter.values.map((filter) {
-                      final isSelected = _timeRemaining == filter;
-                      return FilterChip(
-                        label: Text(_timeRemainingLabel(l10n, filter)),
-                        selected: isSelected,
-                        onSelected: (_) => setState(() => _timeRemaining = filter),
-                        selectedColor: theme.primaryColor.withValues(alpha: 0.15),
-                        checkmarkColor: theme.primaryColor,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? theme.primaryColor
-                              : theme.colorScheme.onSurface,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      child: Text(
+                        _timeRemainingLabel(l10n, filter),
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : mutedColor,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
                           fontSize: 13,
                         ),
-                      );
-                    }).toList(),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSizes.p16,
+              AppSizes.p8,
+              AppSizes.p16,
+              AppSizes.p16,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _apply,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
+                ),
+                child: Text(l10n.auctionsFiltersApply),
               ),
             ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.p16,
-                  AppSizes.p8,
-                  AppSizes.p16,
-                  AppSizes.p16,
-                ),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _apply,
-                    child: Text(l10n.auctionsFiltersApply),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }

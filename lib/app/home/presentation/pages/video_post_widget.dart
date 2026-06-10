@@ -1,6 +1,9 @@
 import 'dart:ui';
 
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -8,11 +11,13 @@ import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/repost_sheet.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/tag_parser.dart';
 import 'package:bimobondapp/core/widgets/tagged_text.dart';
@@ -23,6 +28,7 @@ import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +36,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class VideoPostWidget extends StatefulWidget {
   final PostEntity post;
+  final FeedItemEntity? feedItem;
   final double? bottomPadding;
   final bool isActive;
   final bool openCommentsOnLoad;
@@ -38,6 +45,7 @@ class VideoPostWidget extends StatefulWidget {
   const VideoPostWidget({
     super.key,
     required this.post,
+    this.feedItem,
     this.bottomPadding,
     this.isActive = true,
     this.openCommentsOnLoad = false,
@@ -50,6 +58,18 @@ class VideoPostWidget extends StatefulWidget {
 
 class _VideoPostWidgetState extends State<VideoPostWidget>
     with TickerProviderStateMixin {
+  static const double _actionButtonSize = 40;
+  static const double _actionIconSize = 21;
+  static const double _actionLabelSize = 11;
+  static const double _actionSpacing = 14;
+  static const double _actionColumnInset = 10;
+  static const double _contentActionGap = 16;
+  static const double _contentActionSidePadding =
+      _actionColumnInset + _actionButtonSize + _contentActionGap;
+  static const double _contentEdgeInset = 16;
+  static const double _profileAvatarRadius = 20;
+  static const double _musicDiscSize = 38;
+
   int _currentPage = 0;
   late AnimationController _musicController;
   late AnimationController _likeAnimController;
@@ -61,6 +81,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   late int _likeCount;
   late bool _isSaved;
   late int _saveCount;
+  late bool _isReposted;
+  late int _repostCount;
+  late List<RepostUserEntity> _recentReposters;
+  String? _repostQuote;
+  bool _pendingRepostToggle = false;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
   bool _followStatusResolved = false;
@@ -72,6 +97,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     _likeCount = widget.post.likeCount;
     _isSaved = widget.post.isSaved;
     _saveCount = widget.post.saveCount;
+    _isReposted = widget.post.isReposted;
+    _repostCount = widget.post.repostCount;
+    _recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
+    _repostQuote = _initialRepostQuote();
     _isFollowing = widget.post.user?.isFollowing ?? false;
     _followStatusResolved = widget.post.user?.isFollowing != null;
 
@@ -107,11 +136,19 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   @override
   void didUpdateWidget(VideoPostWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.post.id != oldWidget.post.id || widget.post != oldWidget.post) {
+    if (widget.post.id != oldWidget.post.id ||
+        widget.post != oldWidget.post ||
+        widget.feedItem != oldWidget.feedItem) {
       _isLiked = widget.post.isLiked;
       _likeCount = widget.post.likeCount;
       _isSaved = widget.post.isSaved;
       _saveCount = widget.post.saveCount;
+      _isReposted = widget.post.isReposted;
+      _repostCount = widget.post.repostCount;
+      _recentReposters = List<RepostUserEntity>.from(
+        widget.post.recentReposters,
+      );
+      _repostQuote = _initialRepostQuote();
       _isFollowing = widget.post.user?.isFollowing ?? false;
       _followStatusResolved = widget.post.user?.isFollowing != null;
       _isFollowLoading = false;
@@ -212,6 +249,117 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
   }
 
+  void _handleRepostTap() {
+    if (!_checkAuth()) return;
+    if (_isPostOwner()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.cannotRepostOwnPost),
+        ),
+      );
+      return;
+    }
+
+    if (_isReposted) {
+      _toggleRepost();
+      return;
+    }
+
+    RepostSheet.show(
+      context: context,
+      onRepost: (quote) => _toggleRepost(quote: quote),
+    );
+  }
+
+  String? _initialRepostQuote() {
+    final fromFeed = widget.feedItem?.quote?.trim();
+    if (fromFeed != null && fromFeed.isNotEmpty) return fromFeed;
+
+    if (widget.post.isReposted) {
+      for (final r in widget.post.recentReposters) {
+        final q = r.quote?.trim();
+        if (q != null && q.isNotEmpty) return q;
+      }
+    }
+    return null;
+  }
+
+  RepostUserEntity? _currentUserAsReposter() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthSuccess) return null;
+    final user = authState.user;
+    return RepostUserEntity(
+      id: user.id,
+      username: user.username ?? 'user',
+      fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
+      isVerified: user.isVerified ?? false,
+      repostedAt: DateTime.now(),
+    );
+  }
+
+  void _syncRecentRepostersWithState() {
+    final me = _currentUserAsReposter();
+    if (me == null) return;
+    _recentReposters.removeWhere((r) => r.id == me.id);
+    if (_isReposted) {
+      _recentReposters.insert(
+        0,
+        RepostUserEntity(
+          id: me.id,
+          username: me.username,
+          fullName: me.fullName,
+          avatarUrl: me.avatarUrl,
+          isVerified: me.isVerified,
+          repostedAt: me.repostedAt,
+          quote: _repostQuote,
+        ),
+      );
+    }
+  }
+
+  void _toggleRepost({String? quote}) {
+    final wasReposted = _isReposted;
+    final trimmedQuote = quote?.trim();
+    setState(() {
+      _pendingRepostToggle = true;
+      _isReposted = !wasReposted;
+      wasReposted ? _repostCount-- : _repostCount++;
+      if (!wasReposted) {
+        _repostQuote = trimmedQuote != null && trimmedQuote.isNotEmpty
+            ? trimmedQuote
+            : null;
+      } else {
+        _repostQuote = null;
+      }
+      _syncRecentRepostersWithState();
+    });
+    context.read<PostsBloc>().add(
+      ToggleRepostPostRequestedEvent(widget.post.id, quote: quote),
+    );
+  }
+
+  void _rollbackRepostToggle() {
+    if (!_pendingRepostToggle) return;
+    setState(() {
+      _isReposted = !_isReposted;
+      _isReposted ? _repostCount++ : _repostCount--;
+      if (!_isReposted) {
+        _repostQuote = _initialRepostQuote();
+      }
+      _syncRecentRepostersWithState();
+      _pendingRepostToggle = false;
+    });
+  }
+
+  PostEntity _postWithLocalRepostState(PostEntity post) {
+    return post.copyWith(
+      repostCount: _repostCount,
+      isReposted: _isReposted,
+      recentReposters: _recentReposters,
+    );
+  }
+
   void _showComments({int initialTabIndex = 1}) {
     final isOwner = _isPostOwner();
     CommentSheetWidget.show(
@@ -268,107 +416,33 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     });
   }
 
-  void _showPostOptions() {
+  void _showMoreOptions() {
     if (!_checkAuth() || !_isPostOwner()) return;
 
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withValues(alpha: 0.15),
-                  Colors.black.withValues(alpha: 0.85),
-                ],
-              ),
-              border: Border(
-                top: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        LucideIcons.pencil,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    title: Text(
-                      l10n.editPost,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      _openEditPost();
-                    },
-                  ),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        LucideIcons.trash2,
-                        color: Colors.red,
-                        size: 18,
-                      ),
-                    ),
-                    title: Text(
-                      l10n.deletePost,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      _confirmDeletePost();
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
+    GlassBottomSheet.showActions<void>(
+      context,
+      children: [
+        GlassBottomSheetActionTile(
+          icon: LucideIcons.pencil,
+          label: l10n.editPost,
+          showChevron: false,
+          onTap: () {
+            Navigator.pop(context);
+            _openEditPost();
+          },
         ),
-      ),
+        GlassBottomSheetListTile(
+          label: l10n.deletePost,
+          destructive: true,
+          icon: LucideIcons.trash2,
+          onTap: () {
+            Navigator.pop(context);
+            _confirmDeletePost();
+          },
+        ),
+      ],
     );
   }
 
@@ -462,14 +536,46 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final theme = Theme.of(context);
 
     return BlocListener<PostsBloc, PostsState>(
-      listenWhen: (previous, current) =>
-          current is DeletePostSuccess && current.postId == post.id,
+      listenWhen: (previous, current) {
+        if (current is DeletePostSuccess && current.postId == post.id) {
+          return true;
+        }
+        if (current is RepostPostSuccess && current.postId == post.id) {
+          return true;
+        }
+        if (current is PostsFailure && _pendingRepostToggle) {
+          return true;
+        }
+        return false;
+      },
       listener: (context, state) {
         if (state is DeletePostSuccess && state.postId == post.id) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(l10n.postDeletedSuccessfully)));
           if (context.canPop()) context.pop();
+          return;
+        }
+
+        if (state is RepostPostSuccess && state.postId == post.id) {
+          setState(() {
+            _isReposted = state.isReposted;
+            _pendingRepostToggle = false;
+            _syncRecentRepostersWithState();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                state.isReposted ? l10n.repostSuccess : l10n.repostRemoved,
+              ),
+            ),
+          );
+          return;
+        }
+
+        if (state is PostsFailure && _pendingRepostToggle) {
+          _rollbackRepostToggle();
+          PopupDialogs.showErrorDialog(context, state.message);
         }
       },
       child: _buildPostContent(size, bottom, post, theme),
@@ -482,6 +588,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     PostEntity post,
     ThemeData theme,
   ) {
+    final actionsOnRight = Localizations.localeOf(context).languageCode == 'ar';
+
     return Container(
       height: size.height,
       width: size.width,
@@ -538,40 +646,67 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
               child: Center(child: _buildMediaCountBadge(_displayMedia.length)),
             ),
 
-          // ── Right Side Actions ────────────────────────────────────────────
+          // ── Side action column (right in Arabic, left in English) ────────
           Positioned(
-            right: 10,
+            right: actionsOnRight ? _actionColumnInset : null,
+            left: actionsOnRight ? null : _actionColumnInset,
             bottom: bottom + 20,
             child: Column(
+              crossAxisAlignment: actionsOnRight
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 _buildProfileAvatar(post.user?.avatarUrl, theme),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 _buildLikeButton(theme),
-                const SizedBox(height: 20),
+                const SizedBox(height: _actionSpacing),
                 _buildActionButton(
                   icon: LucideIcons.messageCircle,
                   label: '',
                   color: Colors.white,
                   onTap: _showComments,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: _actionSpacing),
+
+                if (!_isPostOwner()) ...[
+                  const SizedBox(height: _actionSpacing),
+                  _buildActionButton(
+                    icon: LucideIcons.repeat2,
+                    label: _formatCount(_repostCount),
+                    color: _isReposted ? const Color(0xFF2ECC71) : Colors.white,
+                    activeBackgroundColor: _isReposted
+                        ? const Color(0xFF2ECC71).withValues(alpha: 0.22)
+                        : null,
+                    activeBorderColor: _isReposted
+                        ? const Color(0xFF2ECC71).withValues(alpha: 0.65)
+                        : null,
+                    onTap: _handleRepostTap,
+                  ),
+                ],
+                const SizedBox(height: _actionSpacing),
                 _buildActionButton(
                   icon: _isSaved ? Icons.bookmark : LucideIcons.bookmark,
                   label: _formatCount(_saveCount),
                   color: _isSaved ? Colors.amberAccent : Colors.white,
+                  activeBackgroundColor: _isSaved
+                      ? Colors.amberAccent.withValues(alpha: 0.22)
+                      : null,
+                  activeBorderColor: _isSaved
+                      ? Colors.amberAccent.withValues(alpha: 0.65)
+                      : null,
                   onTap: _handleSave,
                 ),
+                const SizedBox(height: _actionSpacing),
+                _buildMusicDisc(theme),
                 if (_isPostOwner()) ...[
-                  const SizedBox(height: 20),
+                  const SizedBox(height: _actionSpacing),
                   _buildActionButton(
                     icon: LucideIcons.ellipsis,
                     label: '',
                     color: Colors.white,
-                    onTap: _showPostOptions,
+                    onTap: _showMoreOptions,
                   ),
                 ],
-                const SizedBox(height: 28),
-                _buildMusicDisc(theme),
               ],
             ),
           ),
@@ -591,11 +726,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   const SizedBox(height: 16),
                 ],
                 Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 88),
+                  padding: EdgeInsets.only(
+                    left: actionsOnRight
+                        ? _contentEdgeInset
+                        : _contentActionSidePadding,
+                    right: actionsOnRight
+                        ? _contentActionSidePadding
+                        : _contentEdgeInset,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      FeedRepostBanner(
+                        post: _postWithLocalRepostState(post),
+                        feedItem: widget.feedItem,
+                        repostQuote: _repostQuote,
+                      ),
                       // Username
                       Row(
                         children: [
@@ -622,86 +769,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                       ),
                       const SizedBox(height: 6),
 
-                      // Description
+                      // Description + hashtags
                       if ((post.description ?? '').isNotEmpty)
-                        TaggedText(
-                          text: post.description!,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontSize: 14,
-                            height: 1.4,
-                            shadows: const [
-                              Shadow(color: Colors.black54, blurRadius: 6),
-                            ],
-                          ),
-                          mentionStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.95),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            shadows: const [
-                              Shadow(color: Colors.black54, blurRadius: 6),
-                            ],
-                          ),
-                          hashtagStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            shadows: const [
-                              Shadow(color: Colors.black54, blurRadius: 6),
-                            ],
-                          ),
-                          post: post,
-                          mentionUserIds: MentionRefUtils.usernameToUserIdMap(
-                            post.description!,
-                            post.mentions,
-                            post: post,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        _PostCaptionTags(post: post, maxLines: 3)
+                      else if (post.hashtags.isNotEmpty)
+                        _PostHashtagChips(tags: post.hashtags),
                       const SizedBox(height: 10),
-
-                      const SizedBox(height: 10),
-
-                      // Music row
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.12),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  LucideIcons.music,
-                                  color: Colors.white70,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Original Sound · @${post.user?.username ?? 'user'}',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.85),
-                                    fontSize: 12,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildMusicSoundLabel(post),
                     ],
                   ),
                 ),
@@ -773,7 +847,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           userId: authorId,
           imageUrl: avatarUrl,
           fallbackText: widget.post.user?.username ?? 'User',
-          radius: 24,
+          radius: _profileAvatarRadius,
           backgroundColor: Colors.white24,
           username: widget.post.user?.username,
           fullName: widget.post.user?.username,
@@ -782,13 +856,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         ),
         if (showFollowBadge)
           Positioned(
-            bottom: -10,
+            bottom: -8,
             child: GestureDetector(
               onTap: _isFollowing ? null : _handleFollow,
               behavior: HitTestBehavior.opaque,
               child: Container(
-                width: 22,
-                height: 22,
+                width: 18,
+                height: 18,
                 decoration: BoxDecoration(
                   gradient: _isFollowing
                       ? null
@@ -826,7 +900,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                         color: _isFollowing
                             ? theme.colorScheme.primary
                             : Colors.white,
-                        size: 15,
+                        size: 12,
                       ),
               ),
             ),
@@ -843,8 +917,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           ScaleTransition(
             scale: _likeScaleAnim,
             child: Container(
-              width: 50,
-              height: 50,
+              width: _actionButtonSize,
+              height: _actionButtonSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _isLiked
@@ -859,8 +933,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                     ? [
                         BoxShadow(
                           color: Colors.red.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          spreadRadius: 2,
+                          blurRadius: 8,
+                          spreadRadius: 1,
                         ),
                       ]
                     : null,
@@ -868,16 +942,16 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
               child: Icon(
                 _isLiked ? Icons.favorite : LucideIcons.heart,
                 color: _isLiked ? Colors.red : Colors.white,
-                size: 26,
+                size: _actionIconSize,
               ),
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Text(
             _formatCount(_likeCount),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 13,
+              fontSize: _actionLabelSize,
               fontWeight: FontWeight.w700,
               shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
             ),
@@ -892,33 +966,72 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     required String label,
     required Color color,
     VoidCallback? onTap,
+    Color? activeBackgroundColor,
+    Color? activeBorderColor,
   }) {
+    final isActive = activeBackgroundColor != null;
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: _actionButtonSize,
+            height: _actionButtonSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.1),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              color: isActive
+                  ? activeBackgroundColor
+                  : Colors.white.withValues(alpha: 0.1),
+              border: Border.all(
+                color: isActive
+                    ? (activeBorderColor ?? Colors.white.withValues(alpha: 0.2))
+                    : Colors.white.withValues(alpha: 0.2),
+              ),
             ),
-            child: Icon(icon, color: color, size: 26),
+            child: Icon(icon, color: color, size: _actionIconSize),
           ),
           if (label.isNotEmpty) ...[
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: _actionLabelSize,
                 fontWeight: FontWeight.w700,
                 shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMusicSoundLabel(PostEntity post) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(right: 10, left: 10, bottom: 24),
+      // decoration: BoxDecoration(
+      //   color: Colors.black.withValues(alpha: 0.3),
+      //   borderRadius: BorderRadius.circular(20),
+      //   border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      // ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(LucideIcons.music, color: Colors.white70, size: 12),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Original Sound · @${post.user?.username ?? 'user'}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -934,8 +1047,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         );
       },
       child: Container(
-        width: 48,
-        height: 48,
+        width: _musicDiscSize,
+        height: _musicDiscSize,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
@@ -955,7 +1068,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           ],
         ),
         child: Container(
-          margin: const EdgeInsets.all(10),
+          margin: const EdgeInsets.all(8),
           decoration: const BoxDecoration(
             color: Colors.black,
             shape: BoxShape.circle,
@@ -967,4 +1080,102 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   String _formatCount(int count) => formatCompactCount(count);
+}
+
+const _captionHashtagColor = Color(0xFF7FDBFF);
+
+class _PostCaptionTags extends StatelessWidget {
+  const _PostCaptionTags({required this.post, this.maxLines});
+
+  final PostEntity post;
+  final int? maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final description = post.description!;
+    final captionStyle = TextStyle(
+      color: Colors.white.withValues(alpha: 0.9),
+      fontSize: 14,
+      height: 1.4,
+      shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+    );
+
+    final inTextTags = TagParser.extractHashtagNames(
+      description,
+    ).map((tag) => tag.toLowerCase()).toSet();
+    final extraTags = post.hashtags
+        .where((tag) => !inTextTags.contains(tag.toLowerCase()))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: TaggedText(
+            text: description,
+            style: captionStyle,
+            mentionStyle: TextStyle(
+              color: Colors.white.withValues(alpha: 0.95),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+            hashtagStyle: TextStyle(
+              color: _captionHashtagColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+            post: post,
+            mentionUserIds: MentionRefUtils.usernameToUserIdMap(
+              description,
+              post.mentions,
+              post: post,
+            ),
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            onHashtagTap: (name) => openHashtagFeed(context, name),
+          ),
+        ),
+        if (extraTags.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          _PostHashtagChips(tags: extraTags),
+        ],
+      ],
+    );
+  }
+}
+
+class _PostHashtagChips extends StatelessWidget {
+  const _PostHashtagChips({required this.tags});
+
+  final List<String> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (final tag in tags)
+          GestureDetector(
+            onTap: () => openHashtagFeed(context, tag),
+            behavior: HitTestBehavior.opaque,
+            child: Text(
+              '#$tag',
+              style: const TextStyle(
+                color: _captionHashtagColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+                decorationColor: _captionHashtagColor,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

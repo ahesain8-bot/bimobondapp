@@ -234,7 +234,9 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.brightness == Brightness.light
+          ? Colors.white
+          : theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(title: l10n.userFollowersTitle),
       body: RefreshIndicator(
         onRefresh: () => _loadFollowers(refresh: true),
@@ -289,23 +291,13 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
       );
     }
 
-    return ListView.separated(
+    return ListView.builder(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: _followers.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (context, index) {
-        if (index >= _followers.length - 1) {
-          return const SizedBox.shrink();
-        }
-        return Divider(
-          height: 1,
-          indent: 72,
-          color: theme.dividerColor.withValues(alpha: 0.08),
-        );
-      },
       itemBuilder: (context, index) {
         if (index >= _followers.length) {
           return const Padding(
@@ -325,6 +317,7 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
           user: user,
           isSelf: _isSelfUser(user),
           isFollowLoading: _followLoadingIds.contains(user.id),
+          useActivityCard: true,
           onFollowTap: () => _toggleFollow(index),
           onProfileFollowStateChanged: (isFollowing) =>
               _onProfileFollowStateChanged(index, isFollowing),

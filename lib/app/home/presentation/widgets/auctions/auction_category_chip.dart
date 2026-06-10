@@ -60,7 +60,10 @@ class _AuctionCategoryChipState extends State<AuctionCategoryChip>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSelected = widget.isSelected;
-    final foreground = isSelected ? Colors.white : theme.colorScheme.onSurface;
+    final foreground = isSelected
+        ? Colors.white
+        : theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7) ??
+            theme.colorScheme.onSurface;
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -68,26 +71,25 @@ class _AuctionCategoryChipState extends State<AuctionCategoryChip>
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         decoration: BoxDecoration(
-          color: isSelected ? widget.selectedColor : widget.inactiveBackground,
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    widget.selectedColor,
+                    widget.selectedColor.withValues(alpha: 0.72),
+                  ],
+                )
+              : null,
+          color: isSelected ? null : widget.inactiveBackground,
+          borderRadius: BorderRadius.circular(AppSizes.p20),
           border: Border.all(
-            color: isSelected ? widget.selectedColor : widget.inactiveBorder,
-            width: isSelected ? 1.2 : 1.0,
+            color: isSelected ? Colors.transparent : widget.inactiveBorder,
           ),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: widget.selectedColor.withOpacity(0.24),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-          ],
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: _handleTap,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            borderRadius: BorderRadius.circular(AppSizes.p20),
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSizes.p16,
@@ -101,7 +103,7 @@ class _AuctionCategoryChipState extends State<AuctionCategoryChip>
                   CustomText(
                     widget.label,
                     fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                     color: foreground,
                   ),
                 ],

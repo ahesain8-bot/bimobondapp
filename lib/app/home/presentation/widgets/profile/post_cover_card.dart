@@ -168,10 +168,16 @@ class PostCoverCard extends StatelessWidget {
     final IconData icon;
     final Color color;
 
-    if (tabIndex == 1) {
+    if (tabIndex == ProfileLayoutConstants.repostsTabIndex) {
+      icon = LucideIcons.repeat2;
+      color = const Color(0xFF2ECC71).withValues(alpha: 0.45);
+    } else if (tabIndex == ProfileLayoutConstants.onlyMeTabIndex) {
+      icon = LucideIcons.lock;
+      color = theme.colorScheme.onSurface.withValues(alpha: 0.35);
+    } else if (tabIndex == ProfileLayoutConstants.likedTabIndex) {
       icon = LucideIcons.heart;
       color = theme.colorScheme.primary.withValues(alpha: 0.35);
-    } else if (tabIndex == 2) {
+    } else if (tabIndex == ProfileLayoutConstants.savedTabIndex) {
       icon = LucideIcons.bookmark;
       color = theme.colorScheme.secondary.withValues(alpha: 0.35);
     } else if (isAuction) {

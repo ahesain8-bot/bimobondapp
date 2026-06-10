@@ -263,13 +263,70 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noSavedPosts => 'لا توجد منشورات محفوظة';
 
   @override
+  String get noRepostedPosts => 'لا توجد إعادات نشر بعد';
+
+  @override
+  String get noOnlyMePosts => 'لا توجد منشورات خاصة بك فقط';
+
+  @override
+  String get repostTitle => 'إعادة النشر';
+
+  @override
+  String get repostSubtitle => 'شارك هذا المنشور على ملفك الشخصي';
+
+  @override
+  String get repostAction => 'إعادة النشر';
+
+  @override
+  String get repostUndo => 'تراجع عن إعادة النشر';
+
+  @override
+  String get savePost => 'حفظ المنشور';
+
+  @override
+  String get unsavePost => 'إزالة من المحفوظات';
+
+  @override
+  String get repostQuoteHint => 'أضف تعليقاً (اختياري)';
+
+  @override
+  String get repostSuccess => 'تمت إعادة النشر';
+
+  @override
+  String get repostRemoved => 'تم إلغاء إعادة النشر';
+
+  @override
+  String get cannotRepostOwnPost => 'لا يمكنك إعادة نشر منشورك';
+
+  @override
+  String repostCountLabel(int count) {
+    return '$count إعادة نشر';
+  }
+
+  @override
+  String repostedByUser(Object name) {
+    return 'أعاد $name النشر';
+  }
+
+  @override
+  String postRepostersTitle(int count) {
+    return 'إعادات النشر · $count';
+  }
+
+  @override
+  String get postRepostersEmpty => 'لا توجد إعادات نشر بعد';
+
+  @override
+  String get profileRepostsTab => 'إعادات النشر';
+
+  @override
   String get editProfile => 'تعديل الملف الشخصي';
 
   @override
   String get noBio => 'لا يوجد نبذة شخصية بعد.';
 
   @override
-  String get profileAvatarViewPhoto => 'صورة الملف الشخصي';
+  String get profileAvatarViewPhoto => 'فتح صورة الملف الشخصي';
 
   @override
   String get profileAvatarViewStory => 'عرض القصة';
@@ -305,6 +362,11 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String storyTimeHoursAgo(int count) {
     return 'منذ $count س';
+  }
+
+  @override
+  String storyTimeDaysAgo(int count) {
+    return 'منذ $count ي';
   }
 
   @override
@@ -484,6 +546,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get auctionsFiltersMaxPrice => 'أعلى سعر';
+
+  @override
+  String get auctionsFiltersLiveStatus => 'حالة المزاد';
+
+  @override
+  String get auctionsFilterLive => 'مباشر';
+
+  @override
+  String get auctionsFilterEnded => 'منتهي';
+
+  @override
+  String get endedAuctionsNow => 'مزادات منتهية';
 
   @override
   String get auctionsFiltersTimeRemaining => 'الوقت المتبقي';
@@ -1159,6 +1233,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesActivityMentions => 'إشارات';
 
   @override
+  String get messagesActivityNotifications => 'إشعارات';
+
+  @override
   String get messagesRecentMessages => 'الرسائل الأخيرة';
 
   @override
@@ -1452,4 +1529,179 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get auctionInvalidPrice => 'أدخل سعراً صالحاً';
+
+  @override
+  String get hashtagFeedSubtitle => 'منشورات بهذا الوسم';
+
+  @override
+  String get noHashtagPosts => 'لا توجد منشورات لهذا الوسم بعد';
+
+  @override
+  String get trendingHashtags => 'الوسوم الرائجة';
+
+  @override
+  String get searchHashtagsHint => 'ابحث عن وسوم';
+
+  @override
+  String get noHashtagsFound => 'لم يتم العثور على وسوم';
+
+  @override
+  String hashtagPostCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count منشورات',
+      one: 'منشور واحد',
+      zero: 'لا منشورات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsEmpty => 'لا توجد إشعارات بعد';
+
+  @override
+  String get notificationsEmptySubtitle => 'عندما يتفاعل شخص معك، ستظهر الإشعارات هنا.';
+
+  @override
+  String get notificationsEmptyUnread => 'لا توجد إشعارات غير مقروءة.';
+
+  @override
+  String get notificationsEmptyRead => 'لا توجد إشعارات مقروءة بعد.';
+
+  @override
+  String notificationsFilterUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count إشعارات غير مقروءة',
+      one: 'إشعار واحد غير مقروء',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsRetry => 'حاول مجدداً';
+
+  @override
+  String get notificationsOk => 'حسناً';
+
+  @override
+  String get notificationsLoadError => 'تعذّر تحميل الإشعارات';
+
+  @override
+  String get notificationsMarkAllRead => 'تحديد الكل كمقروء';
+
+  @override
+  String get notificationsClearRead => 'مسح المقروء';
+
+  @override
+  String get notificationsFilterAll => 'الكل';
+
+  @override
+  String get notificationsFilterUnread => 'غير مقروء';
+
+  @override
+  String get notificationsFilterRead => 'مقروء';
+
+  @override
+  String get notificationSomeone => 'شخص ما';
+
+  @override
+  String get notificationTitleDefault => 'إشعار';
+
+  @override
+  String get notificationTitleNewFollower => 'متابع جديد';
+
+  @override
+  String get notificationTitleFollowRequest => 'طلب متابعة';
+
+  @override
+  String get notificationTitleFollowAccepted => 'تم قبول طلب المتابعة';
+
+  @override
+  String get notificationTitlePostLike => 'إعجاب جديد';
+
+  @override
+  String get notificationTitlePostComment => 'تعليق جديد';
+
+  @override
+  String get notificationTitleCommentReply => 'رد جديد';
+
+  @override
+  String get notificationTitleCommentLike => 'إعجاب على تعليق';
+
+  @override
+  String get notificationTitleMention => 'إشارة';
+
+  @override
+  String get notificationTitleRepost => 'إعادة نشر';
+
+  @override
+  String get notificationTitleGift => 'هدية مستلمة';
+
+  @override
+  String get notificationTitleAuctionUpdate => 'تحديث مزاد';
+
+  @override
+  String get notificationTitleAuctionWon => 'فوز في مزاد';
+
+  @override
+  String get notificationBodyDefault => 'لديك إشعار جديد';
+
+  @override
+  String notificationBodyNewFollower(String name) {
+    return 'بدأ $name بمتابعتك';
+  }
+
+  @override
+  String notificationBodyFollowRequest(String name) {
+    return 'طلب $name متابعتك';
+  }
+
+  @override
+  String notificationBodyFollowAccepted(String name) {
+    return 'قبل $name طلب متابعتك';
+  }
+
+  @override
+  String notificationBodyPostLike(String name) {
+    return 'أعجب $name بمنشورك';
+  }
+
+  @override
+  String notificationBodyPostComment(String name) {
+    return 'علّق $name على منشورك';
+  }
+
+  @override
+  String notificationBodyCommentReply(String name) {
+    return 'رد $name على تعليقك';
+  }
+
+  @override
+  String notificationBodyCommentLike(String name) {
+    return 'أعجب $name بتعليقك';
+  }
+
+  @override
+  String notificationBodyMention(String name) {
+    return 'أشار إليك $name';
+  }
+
+  @override
+  String notificationBodyRepost(String name) {
+    return 'أعاد $name نشر منشورك';
+  }
+
+  @override
+  String notificationBodyGift(String name) {
+    return 'أرسل لك $name هدية';
+  }
+
+  @override
+  String get notificationBodyAuctionUpdate => 'تم تحديث مزاد تتابعه';
+
+  @override
+  String get notificationBodyAuctionWon => 'لقد فزت بمزاد';
 }

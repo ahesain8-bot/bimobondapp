@@ -20,6 +20,40 @@ bool userHasUnseenActiveStories(String userId) {
   return !auth_di.sl<ViewedStoriesStore>().isGroupFullyViewed(group.stories);
 }
 
+/// Opens active stories when present; otherwise the user's profile.
+Future<bool?> openUserActiveStoriesOrProfile(
+  BuildContext context, {
+  required String userId,
+  String? username,
+  String? fullName,
+  String? avatarUrl,
+  bool? isFollowing,
+}) async {
+  if (userId.trim().isEmpty) return null;
+
+  final stories =
+      auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(userId);
+  if (stories.isNotEmpty) {
+    await context.pushNamed(
+      'stories_viewer',
+      extra: {
+        'stories': stories,
+        'initialIndex': 0,
+      },
+    );
+    return null;
+  }
+
+  return openUserProfile(
+    context,
+    userId: userId,
+    username: username,
+    fullName: fullName,
+    avatarUrl: avatarUrl,
+    isFollowing: isFollowing,
+  );
+}
+
 /// Opens unseen active stories; otherwise the user's profile.
 Future<bool?> openUserStoryOrProfile(
   BuildContext context, {

@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/auth/presentation/pages/settings_placeholder_scr
 import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -76,8 +77,7 @@ class SettingsScreen extends StatelessWidget {
               _SettingsTile(
                 icon: LucideIcons.bell,
                 title: l10n.settingsNotifications,
-                onTap: () =>
-                    _openPlaceholder(context, l10n.settingsNotifications),
+                onTap: () => context.pushNamed('notifications'),
               ),
               _SettingsTile(
                 icon: LucideIcons.moon,
@@ -224,53 +224,27 @@ class SettingsScreen extends StatelessWidget {
     AppLocalizations l10n,
     Locale locale,
   ) {
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(SettingsLayoutConstants.sheetRadius),
+    GlassBottomSheet.showActions<void>(
+      context,
+      title: l10n.settingsSelectLanguage,
+      children: [
+        GlassBottomSheetListTile(
+          label: l10n.settingsLanguageEnglish,
+          isSelected: locale.languageCode == 'en',
+          onTap: () {
+            context.read<LocaleCubit>().changeLanguage('en');
+            Navigator.pop(context);
+          },
         ),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: SettingsLayoutConstants.sheetVerticalPadding,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomText(
-                  l10n.settingsSelectLanguage,
-                  fontSize: SettingsLayoutConstants.sheetTitleFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
-                const SizedBox(
-                  height: SettingsLayoutConstants.sheetItemSpacing,
-                ),
-                _SelectionTile(
-                  title: l10n.settingsLanguageEnglish,
-                  isSelected: locale.languageCode == 'en',
-                  onTap: () {
-                    context.read<LocaleCubit>().changeLanguage('en');
-                    Navigator.pop(sheetContext);
-                  },
-                ),
-                _SelectionTile(
-                  title: l10n.settingsLanguageArabic,
-                  isSelected: locale.languageCode == 'ar',
-                  onTap: () {
-                    context.read<LocaleCubit>().changeLanguage('ar');
-                    Navigator.pop(sheetContext);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+        GlassBottomSheetListTile(
+          label: l10n.settingsLanguageArabic,
+          isSelected: locale.languageCode == 'ar',
+          onTap: () {
+            context.read<LocaleCubit>().changeLanguage('ar');
+            Navigator.pop(context);
+          },
+        ),
+      ],
     );
   }
 
@@ -279,53 +253,27 @@ class SettingsScreen extends StatelessWidget {
     AppLocalizations l10n,
     ThemeMode themeMode,
   ) {
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(SettingsLayoutConstants.sheetRadius),
+    GlassBottomSheet.showActions<void>(
+      context,
+      title: l10n.settingsAppearance,
+      children: [
+        GlassBottomSheetListTile(
+          label: l10n.settingsLightMode,
+          isSelected: themeMode == ThemeMode.light,
+          onTap: () {
+            context.read<ThemeCubit>().setThemeMode(ThemeMode.light);
+            Navigator.pop(context);
+          },
         ),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: SettingsLayoutConstants.sheetVerticalPadding,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomText(
-                  l10n.settingsAppearance,
-                  fontSize: SettingsLayoutConstants.sheetTitleFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
-                const SizedBox(
-                  height: SettingsLayoutConstants.sheetItemSpacing,
-                ),
-                _SelectionTile(
-                  title: l10n.settingsLightMode,
-                  isSelected: themeMode == ThemeMode.light,
-                  onTap: () {
-                    context.read<ThemeCubit>().setThemeMode(ThemeMode.light);
-                    Navigator.pop(sheetContext);
-                  },
-                ),
-                _SelectionTile(
-                  title: l10n.settingsDarkModeOption,
-                  isSelected: themeMode == ThemeMode.dark,
-                  onTap: () {
-                    context.read<ThemeCubit>().setThemeMode(ThemeMode.dark);
-                    Navigator.pop(sheetContext);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+        GlassBottomSheetListTile(
+          label: l10n.settingsDarkModeOption,
+          isSelected: themeMode == ThemeMode.dark,
+          onTap: () {
+            context.read<ThemeCubit>().setThemeMode(ThemeMode.dark);
+            Navigator.pop(context);
+          },
+        ),
+      ],
     );
   }
 }
@@ -466,34 +414,6 @@ class _SettingsTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SelectionTile extends StatelessWidget {
-  const _SelectionTile({
-    required this.title,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String title;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ListTile(
-      onTap: onTap,
-      title: CustomText(
-        title,
-        fontSize: SettingsLayoutConstants.itemTitleFontSize,
-      ),
-      trailing: isSelected
-          ? Icon(LucideIcons.circleCheck, color: colorScheme.primary)
-          : null,
     );
   }
 }

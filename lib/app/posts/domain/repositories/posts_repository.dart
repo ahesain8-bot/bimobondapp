@@ -1,10 +1,14 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/user_repost_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
@@ -38,7 +42,14 @@ abstract class PostsRepository {
     List<PostMediaEntity>? media,
   });
 
-  Future<Either<Failure, List<PostEntity>>> getFeed({
+  Future<Either<Failure, HashtagsPageEntity>> getHashtags({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    HashtagSort sort = HashtagSort.name,
+  });
+
+  Future<Either<Failure, List<FeedItemEntity>>> getFeed({
     int page = 1,
     int limit = 10,
     String? categoryId,
@@ -50,7 +61,9 @@ abstract class PostsRepository {
     bool? isLiked,
     bool? isSaved,
     bool isStory = false,
+    FeedContentType? contentType,
     FeedAuctionQuery? auctionQuery,
+    String? privacyStatus,
   });
 
   Future<Either<Failure, PostEntity>> getPostById(String postId);
@@ -74,6 +87,19 @@ abstract class PostsRepository {
     int? watchedDuration,
   });
   Future<Either<Failure, bool>> toggleSave(String postId);
+  Future<Either<Failure, bool>> toggleRepost(
+    String postId, {
+    String? quote,
+  });
+  Future<Either<Failure, RepostsPageEntity>> getPostReposts(
+    String postId, {
+    int page = 1,
+    int limit = 20,
+  });
+  Future<Either<Failure, UserRepostsPageEntity>> getMyReposts({
+    int page = 1,
+    int limit = 10,
+  });
   Future<Either<Failure, PostEntity>> updatePost(
     String postId, {
     String? description,

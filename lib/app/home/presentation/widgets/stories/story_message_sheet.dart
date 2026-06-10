@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_message_flow.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_shared_preview.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -17,15 +18,12 @@ class StoryMessageSheet extends StatefulWidget {
   final PostEntity story;
 
   static Future<void> show(BuildContext context, {required PostEntity story}) {
-    return showModalBottomSheet<void>(
-      context: context,
+    return GlassBottomSheet.showContent<void>(
+      context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: StoryMessageSheet(story: story),
-      ),
+      adaptTheme: true,
+      title: AppLocalizations.of(context)!.storySendMessageTitle,
+      child: StoryMessageSheet(story: story),
     );
   }
 
@@ -91,45 +89,19 @@ class _StoryMessageSheetState extends State<StoryMessageSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
 
-    return Material(
-      color: theme.colorScheme.surface,
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(AppSizes.p16),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.p16,
+        0,
+        AppSizes.p16,
+        AppSizes.p16,
       ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSizes.p16,
-            AppSizes.p10,
-            AppSizes.p16,
-            AppSizes.p16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSizes.p12),
-              Text(
-                l10n.storySendMessageTitle,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSizes.p12),
-              StorySharedPreview(post: widget.story),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          StorySharedPreview(post: widget.story),
               const SizedBox(height: AppSizes.p12),
               TextField(
                 controller: _controller,
@@ -140,8 +112,10 @@ class _StoryMessageSheetState extends State<StoryMessageSheet> {
                 decoration: InputDecoration(
                   hintText: l10n.storySendMessageHint,
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.5),
+                  fillColor: Colors.white.withValues(alpha: 0.1),
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.45),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSizes.radiusMd),
                     borderSide: BorderSide.none,
@@ -151,6 +125,10 @@ class _StoryMessageSheetState extends State<StoryMessageSheet> {
               const SizedBox(height: AppSizes.p12),
               FilledButton.icon(
                 onPressed: _sending ? null : _send,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.16),
+                  foregroundColor: Colors.white,
+                ),
                 icon: _sending
                     ? const SizedBox(
                         width: 18,
@@ -162,8 +140,6 @@ class _StoryMessageSheetState extends State<StoryMessageSheet> {
               ),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 }

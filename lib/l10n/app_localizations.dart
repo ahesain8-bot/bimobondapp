@@ -599,6 +599,108 @@ abstract class AppLocalizations {
   /// **'No saved posts'**
   String get noSavedPosts;
 
+  /// No description provided for @noRepostedPosts.
+  ///
+  /// In en, this message translates to:
+  /// **'No reposts yet'**
+  String get noRepostedPosts;
+
+  /// No description provided for @noOnlyMePosts.
+  ///
+  /// In en, this message translates to:
+  /// **'No only me posts yet'**
+  String get noOnlyMePosts;
+
+  /// No description provided for @repostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Repost'**
+  String get repostTitle;
+
+  /// No description provided for @repostSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share this post to your profile'**
+  String get repostSubtitle;
+
+  /// No description provided for @repostAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Repost'**
+  String get repostAction;
+
+  /// No description provided for @repostUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo repost'**
+  String get repostUndo;
+
+  /// No description provided for @savePost.
+  ///
+  /// In en, this message translates to:
+  /// **'Save post'**
+  String get savePost;
+
+  /// No description provided for @unsavePost.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from saved'**
+  String get unsavePost;
+
+  /// No description provided for @repostQuoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a comment (optional)'**
+  String get repostQuoteHint;
+
+  /// No description provided for @repostSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Reposted'**
+  String get repostSuccess;
+
+  /// No description provided for @repostRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Repost removed'**
+  String get repostRemoved;
+
+  /// No description provided for @cannotRepostOwnPost.
+  ///
+  /// In en, this message translates to:
+  /// **'You can\'t repost your own post'**
+  String get cannotRepostOwnPost;
+
+  /// No description provided for @repostCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} reposts'**
+  String repostCountLabel(int count);
+
+  /// No description provided for @repostedByUser.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} reposted'**
+  String repostedByUser(Object name);
+
+  /// No description provided for @postRepostersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reposts · {count}'**
+  String postRepostersTitle(int count);
+
+  /// No description provided for @postRepostersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reposts yet'**
+  String get postRepostersEmpty;
+
+  /// No description provided for @profileRepostsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Reposts'**
+  String get profileRepostsTab;
+
   /// No description provided for @editProfile.
   ///
   /// In en, this message translates to:
@@ -614,7 +716,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileAvatarViewPhoto.
   ///
   /// In en, this message translates to:
-  /// **'Profile photo'**
+  /// **'Open profile photo'**
   String get profileAvatarViewPhoto;
 
   /// No description provided for @profileAvatarViewStory.
@@ -676,6 +778,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count}h ago'**
   String storyTimeHoursAgo(int count);
+
+  /// No description provided for @storyTimeDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}d ago'**
+  String storyTimeDaysAgo(int count);
 
   /// No description provided for @storyAddCommentHint.
   ///
@@ -1024,6 +1132,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Max price'**
   String get auctionsFiltersMaxPrice;
+
+  /// No description provided for @auctionsFiltersLiveStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction status'**
+  String get auctionsFiltersLiveStatus;
+
+  /// No description provided for @auctionsFilterLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get auctionsFilterLive;
+
+  /// No description provided for @auctionsFilterEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get auctionsFilterEnded;
+
+  /// No description provided for @endedAuctionsNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended auctions'**
+  String get endedAuctionsNow;
 
   /// No description provided for @auctionsFiltersTimeRemaining.
   ///
@@ -2267,6 +2399,12 @@ abstract class AppLocalizations {
   /// **'Mentions'**
   String get messagesActivityMentions;
 
+  /// No description provided for @messagesActivityNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get messagesActivityNotifications;
+
   /// No description provided for @messagesRecentMessages.
   ///
   /// In en, this message translates to:
@@ -2836,6 +2974,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a valid price'**
   String get auctionInvalidPrice;
+
+  /// No description provided for @hashtagFeedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Posts with this hashtag'**
+  String get hashtagFeedSubtitle;
+
+  /// No description provided for @noHashtagPosts.
+  ///
+  /// In en, this message translates to:
+  /// **'No posts for this hashtag yet'**
+  String get noHashtagPosts;
+
+  /// No description provided for @trendingHashtags.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending hashtags'**
+  String get trendingHashtags;
+
+  /// No description provided for @searchHashtagsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search hashtags'**
+  String get searchHashtagsHint;
+
+  /// No description provided for @noHashtagsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No hashtags found'**
+  String get noHashtagsFound;
+
+  /// No description provided for @hashtagPostCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No posts} =1{1 post} other{{count} posts}}'**
+  String hashtagPostCount(int count);
+
+  /// No description provided for @notificationsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet'**
+  String get notificationsEmpty;
+
+  /// No description provided for @notificationsEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When someone interacts with you, you\'ll see it here.'**
+  String get notificationsEmptySubtitle;
+
+  /// No description provided for @notificationsEmptyUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up — no unread notifications.'**
+  String get notificationsEmptyUnread;
+
+  /// No description provided for @notificationsEmptyRead.
+  ///
+  /// In en, this message translates to:
+  /// **'No read notifications yet.'**
+  String get notificationsEmptyRead;
+
+  /// No description provided for @notificationsFilterUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread notification} other{{count} unread notifications}}'**
+  String notificationsFilterUnreadCount(int count);
+
+  /// No description provided for @notificationsRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get notificationsRetry;
+
+  /// No description provided for @notificationsOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get notificationsOk;
+
+  /// No description provided for @notificationsLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load notifications'**
+  String get notificationsLoadError;
+
+  /// No description provided for @notificationsMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get notificationsMarkAllRead;
+
+  /// No description provided for @notificationsClearRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear read'**
+  String get notificationsClearRead;
+
+  /// No description provided for @notificationsFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get notificationsFilterAll;
+
+  /// No description provided for @notificationsFilterUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread'**
+  String get notificationsFilterUnread;
+
+  /// No description provided for @notificationsFilterRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get notificationsFilterRead;
+
+  /// No description provided for @notificationSomeone.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone'**
+  String get notificationSomeone;
+
+  /// No description provided for @notificationTitleDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification'**
+  String get notificationTitleDefault;
+
+  /// No description provided for @notificationTitleNewFollower.
+  ///
+  /// In en, this message translates to:
+  /// **'New follower'**
+  String get notificationTitleNewFollower;
+
+  /// No description provided for @notificationTitleFollowRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow request'**
+  String get notificationTitleFollowRequest;
+
+  /// No description provided for @notificationTitleFollowAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow request accepted'**
+  String get notificationTitleFollowAccepted;
+
+  /// No description provided for @notificationTitlePostLike.
+  ///
+  /// In en, this message translates to:
+  /// **'New like'**
+  String get notificationTitlePostLike;
+
+  /// No description provided for @notificationTitlePostComment.
+  ///
+  /// In en, this message translates to:
+  /// **'New comment'**
+  String get notificationTitlePostComment;
+
+  /// No description provided for @notificationTitleCommentReply.
+  ///
+  /// In en, this message translates to:
+  /// **'New reply'**
+  String get notificationTitleCommentReply;
+
+  /// No description provided for @notificationTitleCommentLike.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment liked'**
+  String get notificationTitleCommentLike;
+
+  /// No description provided for @notificationTitleMention.
+  ///
+  /// In en, this message translates to:
+  /// **'Mention'**
+  String get notificationTitleMention;
+
+  /// No description provided for @notificationTitleRepost.
+  ///
+  /// In en, this message translates to:
+  /// **'Repost'**
+  String get notificationTitleRepost;
+
+  /// No description provided for @notificationTitleGift.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift received'**
+  String get notificationTitleGift;
+
+  /// No description provided for @notificationTitleAuctionUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction update'**
+  String get notificationTitleAuctionUpdate;
+
+  /// No description provided for @notificationTitleAuctionWon.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction won'**
+  String get notificationTitleAuctionWon;
+
+  /// No description provided for @notificationBodyDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'You have a new notification'**
+  String get notificationBodyDefault;
+
+  /// No description provided for @notificationBodyNewFollower.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} started following you'**
+  String notificationBodyNewFollower(String name);
+
+  /// No description provided for @notificationBodyFollowRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} requested to follow you'**
+  String notificationBodyFollowRequest(String name);
+
+  /// No description provided for @notificationBodyFollowAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} accepted your follow request'**
+  String notificationBodyFollowAccepted(String name);
+
+  /// No description provided for @notificationBodyPostLike.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} liked your post'**
+  String notificationBodyPostLike(String name);
+
+  /// No description provided for @notificationBodyPostComment.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} commented on your post'**
+  String notificationBodyPostComment(String name);
+
+  /// No description provided for @notificationBodyCommentReply.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} replied to your comment'**
+  String notificationBodyCommentReply(String name);
+
+  /// No description provided for @notificationBodyCommentLike.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} liked your comment'**
+  String notificationBodyCommentLike(String name);
+
+  /// No description provided for @notificationBodyMention.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} mentioned you'**
+  String notificationBodyMention(String name);
+
+  /// No description provided for @notificationBodyRepost.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} reposted your post'**
+  String notificationBodyRepost(String name);
+
+  /// No description provided for @notificationBodyGift.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} sent you a gift'**
+  String notificationBodyGift(String name);
+
+  /// No description provided for @notificationBodyAuctionUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'An auction you follow was updated'**
+  String get notificationBodyAuctionUpdate;
+
+  /// No description provided for @notificationBodyAuctionWon.
+  ///
+  /// In en, this message translates to:
+  /// **'You won an auction'**
+  String get notificationBodyAuctionWon;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

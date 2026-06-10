@@ -56,6 +56,35 @@ class AuctionStatusBadge extends StatelessWidget {
       );
     }
 
+    if (auction.isEnded) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.p10,
+              vertical: AppSizes.p6,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 0.5,
+              ),
+            ),
+            child: CustomText(
+              l10n.auctionFinishedBadge.toUpperCase(),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
     if (auction.countdown != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),

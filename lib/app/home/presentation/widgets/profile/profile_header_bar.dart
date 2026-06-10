@@ -16,32 +16,41 @@ class ProfileHeaderBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final settingsOnRight =
+        Localizations.localeOf(context).languageCode == 'ar';
+
+    final settingsButton = IconButton(
+      onPressed: onSettings,
+      icon: Icon(
+        LucideIcons.menu,
+        size: ProfileLayoutConstants.headerMenuIconSize,
+        color: theme.iconTheme.color,
+      ),
+    );
+
+    const sideSpacer = SizedBox(width: 48);
+
+    final title = Expanded(
+      child: CustomText(
+        username,
+        textAlign: TextAlign.center,
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: ProfileLayoutConstants.headerHorizontalPadding,
         vertical: ProfileLayoutConstants.headerVerticalPadding,
       ),
-      child: Row(
-        children: [
-          const SizedBox(width: 48),
-          Expanded(
-            child: CustomText(
-              username,
-              textAlign: TextAlign.center,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          IconButton(
-            onPressed: onSettings,
-            icon: Icon(
-              LucideIcons.menu,
-              size: ProfileLayoutConstants.headerMenuIconSize,
-              color: theme.iconTheme.color,
-            ),
-          ),
-        ],
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          children: settingsOnRight
+              ? [sideSpacer, title, settingsButton]
+              : [settingsButton, title, sideSpacer],
+        ),
       ),
     );
   }

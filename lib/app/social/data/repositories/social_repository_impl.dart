@@ -265,8 +265,11 @@ class SocialRepositoryImpl implements SocialRepository {
       commentCount: post.commentCount,
       saveCount: post.saveCount,
       shareCount: post.shareCount,
+      repostCount: post.repostCount,
       isLiked: post.isLiked,
       isSaved: post.isSaved,
+      isReposted: post.isReposted,
+      recentReposters: post.recentReposters,
       createdAt: post.createdAt,
       user: post.user == null
           ? null

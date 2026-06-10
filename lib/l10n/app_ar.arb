@@ -90,9 +90,45 @@
   "noPostsYet": "لا توجد منشورات بعد",
   "noLikedPosts": "لا توجد منشورات معجب بها",
   "noSavedPosts": "لا توجد منشورات محفوظة",
+  "noRepostedPosts": "لا توجد إعادات نشر بعد",
+  "noOnlyMePosts": "لا توجد منشورات خاصة بك فقط",
+  "repostTitle": "إعادة النشر",
+  "repostSubtitle": "شارك هذا المنشور على ملفك الشخصي",
+  "repostAction": "إعادة النشر",
+  "repostUndo": "تراجع عن إعادة النشر",
+  "savePost": "حفظ المنشور",
+  "unsavePost": "إزالة من المحفوظات",
+  "repostQuoteHint": "أضف تعليقاً (اختياري)",
+  "repostSuccess": "تمت إعادة النشر",
+  "repostRemoved": "تم إلغاء إعادة النشر",
+  "cannotRepostOwnPost": "لا يمكنك إعادة نشر منشورك",
+  "repostCountLabel": "{count} إعادة نشر",
+  "@repostCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "repostedByUser": "أعاد {name} النشر",
+  "@repostedByUser": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "postRepostersTitle": "إعادات النشر · {count}",
+  "@postRepostersTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postRepostersEmpty": "لا توجد إعادات نشر بعد",
+  "profileRepostsTab": "إعادات النشر",
   "editProfile": "تعديل الملف الشخصي",
   "noBio": "لا يوجد نبذة شخصية بعد.",
-  "profileAvatarViewPhoto": "صورة الملف الشخصي",
+  "profileAvatarViewPhoto": "فتح صورة الملف الشخصي",
   "profileAvatarViewStory": "عرض القصة",
   "profileAvatarNoPhoto": "لا توجد صورة للملف الشخصي",
   "story": "قصة",
@@ -111,6 +147,14 @@
   },
   "storyTimeHoursAgo": "منذ {count} س",
   "@storyTimeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storyTimeDaysAgo": "منذ {count} ي",
+  "@storyTimeDaysAgo": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -196,6 +240,10 @@
   "auctionsFiltersPriceRange": "نطاق السعر (دولار)",
   "auctionsFiltersMinPrice": "أقل سعر",
   "auctionsFiltersMaxPrice": "أعلى سعر",
+  "auctionsFiltersLiveStatus": "حالة المزاد",
+  "auctionsFilterLive": "مباشر",
+  "auctionsFilterEnded": "منتهي",
+  "endedAuctionsNow": "مزادات منتهية",
   "auctionsFiltersTimeRemaining": "الوقت المتبقي",
   "auctionsFiltersInvalidPriceRange": "لا يمكن أن يكون أقل سعر أكبر من أعلى سعر",
   "auctionsTimeRemainingAny": "أي وقت",
@@ -609,6 +657,7 @@
   "messagesActivityActivities": "أنشطة",
   "messagesActivityComments": "تعليقات",
   "messagesActivityMentions": "إشارات",
+  "messagesActivityNotifications": "إشعارات",
   "messagesRecentMessages": "الرسائل الأخيرة",
   "messagesAllChats": "جميع المحادثات",
   "messagesAll": "الكل",
@@ -710,5 +759,58 @@
   "auctionEndDate": "نهاية المزاد",
   "auctionEndBeforeStart": "يجب أن يكون تاريخ النهاية بعد تاريخ البداية",
   "auctionTargetBelowStart": "يجب أن يكون السعر المستهدف أعلى من السعر الابتدائي",
-  "auctionInvalidPrice": "أدخل سعراً صالحاً"
+  "auctionInvalidPrice": "أدخل سعراً صالحاً",
+  "hashtagFeedSubtitle": "منشورات بهذا الوسم",
+  "noHashtagPosts": "لا توجد منشورات لهذا الوسم بعد",
+  "trendingHashtags": "الوسوم الرائجة",
+  "searchHashtagsHint": "ابحث عن وسوم",
+  "noHashtagsFound": "لم يتم العثور على وسوم",
+  "hashtagPostCount": "{count, plural, =0{لا منشورات} =1{منشور واحد} other{{count} منشورات}}",
+  "@hashtagPostCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsEmpty": "لا توجد إشعارات بعد",
+  "notificationsEmptySubtitle": "عندما يتفاعل شخص معك، ستظهر الإشعارات هنا.",
+  "notificationsEmptyUnread": "لا توجد إشعارات غير مقروءة.",
+  "notificationsEmptyRead": "لا توجد إشعارات مقروءة بعد.",
+  "notificationsFilterUnreadCount": "{count, plural, =1{إشعار واحد غير مقروء} other{{count} إشعارات غير مقروءة}}",
+  "notificationsRetry": "حاول مجدداً",
+  "notificationsOk": "حسناً",
+  "notificationsLoadError": "تعذّر تحميل الإشعارات",
+  "notificationsMarkAllRead": "تحديد الكل كمقروء",
+  "notificationsClearRead": "مسح المقروء",
+  "notificationsFilterAll": "الكل",
+  "notificationsFilterUnread": "غير مقروء",
+  "notificationsFilterRead": "مقروء",
+  "notificationSomeone": "شخص ما",
+  "notificationTitleDefault": "إشعار",
+  "notificationTitleNewFollower": "متابع جديد",
+  "notificationTitleFollowRequest": "طلب متابعة",
+  "notificationTitleFollowAccepted": "تم قبول طلب المتابعة",
+  "notificationTitlePostLike": "إعجاب جديد",
+  "notificationTitlePostComment": "تعليق جديد",
+  "notificationTitleCommentReply": "رد جديد",
+  "notificationTitleCommentLike": "إعجاب على تعليق",
+  "notificationTitleMention": "إشارة",
+  "notificationTitleRepost": "إعادة نشر",
+  "notificationTitleGift": "هدية مستلمة",
+  "notificationTitleAuctionUpdate": "تحديث مزاد",
+  "notificationTitleAuctionWon": "فوز في مزاد",
+  "notificationBodyDefault": "لديك إشعار جديد",
+  "notificationBodyNewFollower": "بدأ {name} بمتابعتك",
+  "notificationBodyFollowRequest": "طلب {name} متابعتك",
+  "notificationBodyFollowAccepted": "قبل {name} طلب متابعتك",
+  "notificationBodyPostLike": "أعجب {name} بمنشورك",
+  "notificationBodyPostComment": "علّق {name} على منشورك",
+  "notificationBodyCommentReply": "رد {name} على تعليقك",
+  "notificationBodyCommentLike": "أعجب {name} بتعليقك",
+  "notificationBodyMention": "أشار إليك {name}",
+  "notificationBodyRepost": "أعاد {name} نشر منشورك",
+  "notificationBodyGift": "أرسل لك {name} هدية",
+  "notificationBodyAuctionUpdate": "تم تحديث مزاد تتابعه",
+  "notificationBodyAuctionWon": "لقد فزت بمزاد"
 }

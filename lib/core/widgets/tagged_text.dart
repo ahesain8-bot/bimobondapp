@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/app/social/presentation/services/mention_friends_source.dart';
 import 'package:bimobondapp/core/utils/mention_user_resolver.dart';
@@ -19,6 +20,7 @@ class TaggedText extends StatefulWidget {
     this.mentionUserIds = const {},
     this.post,
     this.textAlign,
+    this.onHashtagTap,
   });
 
   final String text;
@@ -30,6 +32,7 @@ class TaggedText extends StatefulWidget {
   final Map<String, String> mentionUserIds;
   final PostEntity? post;
   final TextAlign? textAlign;
+  final void Function(String tagName)? onHashtagTap;
 
   @override
   State<TaggedText> createState() => _TaggedTextState();
@@ -93,6 +96,23 @@ class _TaggedTextState extends State<TaggedText> {
       r.dispose();
     }
     super.dispose();
+  }
+
+  String _resolveHashtagName(String token) {
+    final lower = token.toLowerCase();
+    for (final tag in widget.post?.hashtags ?? const <String>[]) {
+      if (tag.toLowerCase() == lower) return tag;
+    }
+    return lower;
+  }
+
+  void _onHashtagTap(String name) {
+    final resolved = _resolveHashtagName(name);
+    if (widget.onHashtagTap != null) {
+      widget.onHashtagTap!(resolved);
+      return;
+    }
+    openHashtagFeed(context, resolved);
   }
 
   Future<void> _onMentionTap(String username) async {
@@ -185,13 +205,20 @@ class _TaggedTextState extends State<TaggedText> {
           ),
         );
       } else {
+        final recognizer = TapGestureRecognizer()
+          ..onTap = () => _onHashtagTap(match.name);
+        _recognizers.add(recognizer);
+
         spans.add(
           TextSpan(
             text: match.raw,
             style: (widget.hashtagStyle ?? baseStyle).copyWith(
               color: hashtagColor,
               fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+              decorationColor: hashtagColor.withValues(alpha: 0.75),
             ),
+            recognizer: recognizer,
           ),
         );
       }

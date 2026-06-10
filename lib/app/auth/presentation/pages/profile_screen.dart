@@ -3,13 +3,16 @@ import 'dart:async';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_format_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_icon_tab_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_grid_sliver.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
@@ -122,19 +125,25 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (loadMore) {
       if (tab.hasReachedMax || tab.isLoadingMore) return;
-      tab.isLoadingMore = true;
-      tab.page++;
+      setState(() {
+        tab.isLoadingMore = true;
+        tab.page++;
+      });
     } else {
       if (refresh) {
-        tab.page = 1;
-        tab.hasReachedMax = false;
-        tab.isInitialLoading = tab.posts.isEmpty;
+        setState(() {
+          tab.page = 1;
+          tab.hasReachedMax = false;
+          tab.isInitialLoading = tab.posts.isEmpty;
+        });
       } else if (tab.posts.isNotEmpty) {
         return;
       } else {
-        tab.page = 1;
-        tab.hasReachedMax = false;
-        tab.isInitialLoading = true;
+        setState(() {
+          tab.page = 1;
+          tab.hasReachedMax = false;
+          tab.isInitialLoading = true;
+        });
       }
     }
 
@@ -142,18 +151,43 @@ class _ProfileScreenState extends State<ProfileScreen>
     tab.pendingLoadKey = loadKey;
     _fetchingForTabIndex = _selectedTabIndex;
 
-    final bool? isLiked = _selectedTabIndex == 1 ? true : null;
-    final bool? isSaved = _selectedTabIndex == 2 ? true : null;
+    final bool? isLiked =
+        _selectedTabIndex == ProfileLayoutConstants.likedTabIndex ? true : null;
+    final bool? isSaved =
+        _selectedTabIndex == ProfileLayoutConstants.savedTabIndex ? true : null;
+    final bool isRepostsTab =
+        _selectedTabIndex == ProfileLayoutConstants.repostsTabIndex;
+    final bool isOnlyMeTab =
+        _selectedTabIndex == ProfileLayoutConstants.onlyMeTabIndex;
     final bool isEngagementTab = isLiked == true || isSaved == true;
+
+    if (isRepostsTab) {
+      context.read<PostsBloc>().add(
+        FetchMyRepostsRequestedEvent(
+          page: tab.page,
+          limit: ProfileTabPostsState.pageSize,
+          isRefresh: refresh || tab.page == 1,
+          profileLoadKey: loadKey,
+        ),
+      );
+      return;
+    }
 
     context.read<PostsBloc>().add(
       FetchFeedRequestedEvent(
         page: tab.page,
         limit: ProfileTabPostsState.pageSize,
         userId: isEngagementTab ? null : authState.user.id,
+        sort: ProfileLayoutConstants.postsSortNewestFirst,
         isRefresh: refresh || tab.page == 1,
         isLiked: isLiked,
         isSaved: isSaved,
+        privacyStatus: isOnlyMeTab
+            ? ProfileLayoutConstants.onlyMePrivacyStatus
+            : null,
+        contentType: _selectedTabIndex == ProfileLayoutConstants.postsTabIndex
+            ? FeedContentType.all
+            : null,
         isStory: false,
         profileLoadKey: loadKey,
       ),
@@ -175,24 +209,51 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   String _emptyMessageForTab(AppLocalizations l10n) {
     switch (_selectedTabIndex) {
-      case 1:
+      case ProfileLayoutConstants.repostsTabIndex:
+        return l10n.noRepostedPosts;
+      case ProfileLayoutConstants.onlyMeTabIndex:
+        return l10n.noOnlyMePosts;
+      case ProfileLayoutConstants.likedTabIndex:
         return l10n.noLikedPosts;
-      case 2:
+      case ProfileLayoutConstants.savedTabIndex:
         return l10n.noSavedPosts;
       default:
         return l10n.noPostsYet;
     }
   }
 
-  void _mergeTabPosts(ProfileTabPostsState tab, List<PostEntity> incoming) {
+  void _mergeTabPosts(
+    ProfileTabPostsState tab,
+    List<PostEntity> incoming, {
+    required int tabIndex,
+  }) {
+    var merged = incoming;
+    if (tabIndex == ProfileLayoutConstants.postsTabIndex) {
+      merged = incoming
+          .where(
+            (post) =>
+                post.privacyStatus !=
+                ProfileLayoutConstants.onlyMePrivacyStatus,
+          )
+          .toList();
+    }
+
     if (tab.page == 1) {
       tab.posts
         ..clear()
-        ..addAll(incoming);
+        ..addAll(merged);
     } else {
       final existingIds = tab.posts.map((p) => p.id).toSet();
-      tab.posts.addAll(incoming.where((p) => !existingIds.contains(p.id)));
+      tab.posts.addAll(merged.where((p) => !existingIds.contains(p.id)));
     }
+    sortProfilePostsNewestFirst(tab.posts);
+  }
+
+  void _invalidateProfileTab(int tabIndex) {
+    final tab = _tabPosts[tabIndex];
+    tab.posts.clear();
+    tab.page = 1;
+    tab.hasReachedMax = false;
   }
 
   Future<void> _onPullToRefresh() async {
@@ -231,15 +292,26 @@ class _ProfileScreenState extends State<ProfileScreen>
       },
       child: BlocListener<PostsBloc, PostsState>(
         listener: (context, state) {
-          if (state is ProfilePostsLoadSuccess &&
+          if ((state is ProfilePostsLoadSuccess ||
+                  state is MyRepostsLoadSuccess) &&
               _fetchingForTabIndex != null) {
             final tabIndex = _fetchingForTabIndex!;
-            if (_isStaleProfileLoad(tabIndex, state.profileLoadKey)) return;
+            final loadKey = state is ProfilePostsLoadSuccess
+                ? state.profileLoadKey
+                : (state as MyRepostsLoadSuccess).profileLoadKey;
+            if (_isStaleProfileLoad(tabIndex, loadKey)) return;
+
+            final posts = state is ProfilePostsLoadSuccess
+                ? state.posts
+                : (state as MyRepostsLoadSuccess).posts;
+            final hasReachedMax = state is ProfilePostsLoadSuccess
+                ? state.hasReachedMax
+                : (state as MyRepostsLoadSuccess).hasReachedMax;
 
             final tab = _tabPosts[tabIndex];
             setState(() {
-              _mergeTabPosts(tab, state.posts);
-              tab.hasReachedMax = state.hasReachedMax;
+              _mergeTabPosts(tab, posts, tabIndex: tabIndex);
+              tab.hasReachedMax = hasReachedMax;
               tab.isLoadingMore = false;
               tab.isInitialLoading = false;
               tab.isRefreshing = false;
@@ -263,18 +335,30 @@ class _ProfileScreenState extends State<ProfileScreen>
             });
             _completePullRefreshIfNeeded();
           } else if (state is UpdatePostSuccess || state is DeletePostSuccess) {
+            _invalidateProfileTab(ProfileLayoutConstants.postsTabIndex);
+            _invalidateProfileTab(ProfileLayoutConstants.onlyMeTabIndex);
             final tab = _tabPosts[_selectedTabIndex];
-            tab.page = 1;
-            tab.hasReachedMax = false;
-            tab.isInitialLoading = tab.posts.isEmpty;
-            _fetchUserPosts(refresh: true);
+            if (_selectedTabIndex == ProfileLayoutConstants.postsTabIndex ||
+                _selectedTabIndex == ProfileLayoutConstants.onlyMeTabIndex) {
+              tab.isInitialLoading = tab.posts.isEmpty;
+              _fetchUserPosts(refresh: true);
+            }
           } else if (state is SavePostSuccess) {
-            final savedTab = _tabPosts[2];
+            final savedTab = _tabPosts[ProfileLayoutConstants.savedTabIndex];
             savedTab.posts.clear();
             savedTab.page = 1;
             savedTab.hasReachedMax = false;
-            if (_selectedTabIndex == 2) {
+            if (_selectedTabIndex == ProfileLayoutConstants.savedTabIndex) {
               savedTab.isInitialLoading = true;
+              _fetchUserPosts(refresh: true);
+            }
+          } else if (state is RepostPostSuccess) {
+            final repostsTab = _tabPosts[ProfileLayoutConstants.repostsTabIndex];
+            repostsTab.posts.clear();
+            repostsTab.page = 1;
+            repostsTab.hasReachedMax = false;
+            if (_selectedTabIndex == ProfileLayoutConstants.repostsTabIndex) {
+              repostsTab.isInitialLoading = true;
               _fetchUserPosts(refresh: true);
             }
           }
@@ -288,6 +372,13 @@ class _ProfileScreenState extends State<ProfileScreen>
             final user = authState.user;
             final theme = Theme.of(context);
             final username = user.username ?? 'username';
+            final postsTab = _tabPosts[0];
+            final displayPostCount = resolveProfilePostsCount(
+              apiPostCount: user.postCount,
+              loadedPostsCount: postsTab.posts.length,
+              hasLoadedAllPosts:
+                  postsTab.hasReachedMax && !postsTab.isInitialLoading,
+            );
 
             return Scaffold(
               backgroundColor: theme.scaffoldBackgroundColor,
@@ -313,6 +404,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: ProfileHeaderSection(
                           user: user,
                           l10n: l10n,
+                          postsCount: displayPostCount,
                           onEditProfile: () => _refreshProfileAfterNavigation(
                             context.pushNamed('personal_info'),
                           ),
@@ -347,6 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         tab: _tabPosts[_selectedTabIndex],
                         tabIndex: _selectedTabIndex,
                         emptyMessage: _emptyMessageForTab(l10n),
+                        userId: user.id,
                       ),
                     ],
                   ),

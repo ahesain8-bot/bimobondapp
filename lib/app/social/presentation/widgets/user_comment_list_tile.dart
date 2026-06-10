@@ -3,8 +3,9 @@ import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dar
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_comment_entity.dart';
+import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/activity_feed_card.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -58,94 +59,36 @@ class UserCommentListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final author = _author;
     final authorName =
         author?.displayName ?? l10n.messagesInboxUserFallback;
     final time = formatInboxTime(_createdAt, l10n);
 
-    return InkWell(
+    return ActivityFeedCard(
+      badgeColor: MessagesLayoutConstants.activityCommentsColor,
+      badgeIcon: Icons.chat_bubble_rounded,
       onTap: () => _openCommentedPost(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p16,
-          vertical: AppSizes.p12,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            StoryProfileAvatar(
-              userId: author?.id,
-              imageUrl: author?.avatarUrl,
-              radius: 22,
-              fallbackText: authorName,
-              username: author?.username,
-              fullName: author?.fullName,
-              isFollowing: author?.isFollowing,
-            ),
-            const SizedBox(width: AppSizes.p12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RichText(
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          text: TextSpan(
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              height: 1.3,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: authorName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              TextSpan(
-                                text: ' ${l10n.userCommentAction}',
-                                style: TextStyle(
-                                  color: theme.textTheme.bodyMedium?.color
-                                      ?.withValues(alpha: 0.75),
-                                ),
-                              ),
-                              if (comment.isReply)
-                                TextSpan(
-                                  text: ' · ${l10n.userCommentReplyLabel}',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (time.isNotEmpty) ...[
-                        const SizedBox(width: AppSizes.p8),
-                        Text(
-                          time,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodyMedium?.color
-                                ?.withValues(alpha: 0.45),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    comment.content,
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      avatar: StoryProfileAvatar(
+        userId: author?.id,
+        imageUrl: author?.avatarUrl,
+        radius: 24,
+        fallbackText: authorName,
+        username: author?.username,
+        fullName: author?.fullName,
+        isFollowing: author?.isFollowing,
+      ),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ActivityFeedActionText(
+            actorName: authorName,
+            action: l10n.userCommentAction,
+            time: time,
+            extra: comment.isReply ? l10n.userCommentReplyLabel : null,
+          ),
+          if (comment.content.trim().isNotEmpty)
+            ActivityFeedQuoteBox(text: comment.content.trim()),
+        ],
       ),
     );
   }

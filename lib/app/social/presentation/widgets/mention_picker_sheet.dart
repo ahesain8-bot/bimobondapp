@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/tag_text_editing.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -22,10 +23,12 @@ class MentionPickerSheet extends StatefulWidget {
     BuildContext context, {
     required TextEditingController controller,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
+    return GlassBottomSheet.showContent<void>(
+      context,
       isScrollControlled: true,
-      builder: (ctx) => MentionPickerSheet(controller: controller),
+      adaptTheme: true,
+      title: AppLocalizations.of(context)!.mentionsLabel,
+      child: MentionPickerSheet(controller: controller),
     );
   }
 
@@ -69,31 +72,23 @@ class _MentionPickerSheetState extends State<MentionPickerSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final bottom = MediaQuery.paddingOf(context).bottom;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          AppSizes.p16,
-          AppSizes.p12,
-          AppSizes.p16,
-          bottom + AppSizes.p16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            CustomText(
-              l10n.mentionsLabel,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-            const SizedBox(height: AppSizes.p4),
-            CustomText(
-              l10n.mentionsHint,
-              fontSize: 13,
-              variant: TextVariant.secondary,
-            ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSizes.p16,
+        0,
+        AppSizes.p16,
+        MediaQuery.paddingOf(context).bottom + AppSizes.p16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CustomText(
+            l10n.mentionsHint,
+            fontSize: 13,
+            variant: TextVariant.secondary,
+          ),
             const SizedBox(height: AppSizes.p12),
             ConstrainedBox(
               constraints: BoxConstraints(
@@ -162,7 +157,6 @@ class _MentionPickerSheetState extends State<MentionPickerSheet> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }

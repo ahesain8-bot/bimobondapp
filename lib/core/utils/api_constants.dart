@@ -15,11 +15,15 @@ class ApiConstants {
   static String postById(String postId) => '/posts/$postId';
   static const String getFeed = '/posts/feed';
   static const String publicFeed = '/posts/public/feed';
+  static const String postsHashtags = '/posts/hashtags';
   static String toggleLike(String postId) => '/posts/$postId/like';
   static String postLikes(String postId) => '/posts/$postId/likes';
   static String postViews(String postId) => '/posts/$postId/views';
   static String recordPostView(String postId) => '/posts/$postId/view';
   static String toggleSave(String postId) => '/posts/$postId/save';
+  static String toggleRepost(String postId) => '/posts/$postId/repost';
+  static String postReposts(String postId) => '/posts/$postId/reposts';
+  static const String myReposts = '/users/me/reposts';
   
   // Comments
   static String getComments(String postId) => '/posts/$postId/comments';
@@ -60,4 +64,11 @@ class ApiConstants {
   static String userById(String userId) => '/users/$userId';
   static String adminUserActivity(String userId) =>
       '/users/admin/$userId/activity';
+
+  static const String notifications = '/notifications';
+  static const String notificationsUnreadCount = '/notifications/unread-count';
+  static const String notificationsReadAll = '/notifications/read-all';
+  static const String notificationsClearRead = '/notifications/clear-read';
+  static String notificationById(String id) => '/notifications/$id';
+  static String notificationRead(String id) => '/notifications/$id/read';
 }

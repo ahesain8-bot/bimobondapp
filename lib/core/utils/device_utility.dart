@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class DeviceUtility {
   static Future<Map<String, dynamic>> getDeviceInfo() async {
@@ -20,6 +21,12 @@ class DeviceUtility {
     print('DeviceUtility: Fetching FCM token...');
     String? fcmToken;
     try {
+      if (Platform.isAndroid) {
+        final status = await Permission.notification.status;
+        if (!status.isGranted) {
+          await Permission.notification.request();
+        }
+      }
       fcmToken = await FirebaseMessaging.instance.getToken().timeout(
         const Duration(seconds: 5),
       );
@@ -36,12 +43,12 @@ class DeviceUtility {
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfo.androidInfo;
       deviceId = androidInfo.id;
-      deviceType = 'Android';
+      deviceType = 'android';
       osVersion = androidInfo.version.release;
     } else if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
       deviceId = iosInfo.identifierForVendor ?? '';
-      deviceType = 'iOS';
+      deviceType = 'ios';
       osVersion = iosInfo.systemVersion;
     }
 

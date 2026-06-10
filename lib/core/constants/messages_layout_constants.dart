@@ -37,6 +37,7 @@ class MessagesLayoutConstants {
   static const Color activityLikesColor = Color(0xFFFF2D55);
   static const Color activityCommentsColor = Color(0xFF34C759);
   static const Color activityMentionsColor = Color(0xFFAF52DE);
+  static const Color activityNotificationsColor = Color(0xFFFF9500);
   static const Color activityBadgeColor = Color(0xFFFF3B30);
 
   static const double suggestionsStripHeight = 220;

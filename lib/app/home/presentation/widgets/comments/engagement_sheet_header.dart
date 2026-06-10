@@ -34,15 +34,6 @@ class EngagementSheetHeader extends StatelessWidget {
 
     return Column(
       children: [
-        const SizedBox(height: AppSizes.p10),
-        Container(
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: theme.dividerColor.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
         Padding(
           padding: const EdgeInsetsDirectional.only(
             start: AppSizes.p16,

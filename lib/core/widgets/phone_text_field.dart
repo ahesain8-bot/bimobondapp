@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -59,54 +60,24 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
       {'code': '+974', 'name': l10n.qatar, 'flag': '🇶🇦'},
     ];
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: AppSizes.p16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomText(
-                l10n.selectCountry,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-              const Divider(),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: localizedCountries.length,
-                  itemBuilder: (context, index) {
-                    final country = localizedCountries[index];
-                    return ListTile(
-                      leading: Text(
-                        country['flag']!,
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                      title: Text(country['name']!),
-                      trailing: Text(
-                        country['code']!,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _selectedCountryCode = country['code']!;
-                        });
-                        widget.onCountryCodeChanged?.call(country['code']!);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
+    GlassBottomSheet.showActions<void>(
+      context,
+      title: l10n.selectCountry,
+      scrollable: true,
+      children: [
+        for (final country in localizedCountries)
+          GlassBottomSheetListTile(
+            label: '${country['flag']} ${country['name']}',
+            isSelected: _selectedCountryCode == country['code'],
+            onTap: () {
+              setState(() {
+                _selectedCountryCode = country['code']!;
+              });
+              widget.onCountryCodeChanged?.call(country['code']!);
+              Navigator.pop(context);
+            },
           ),
-        );
-      },
+      ],
     );
   }
 
