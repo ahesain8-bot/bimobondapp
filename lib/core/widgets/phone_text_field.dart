@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_auth_widgets.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -13,6 +16,7 @@ class PhoneTextField extends StatefulWidget {
   final String? labelText;
   final String? Function(String?)? validator;
   final bool isProfileStyle;
+  final bool isGlassStyle;
 
   const PhoneTextField({
     super.key,
@@ -23,6 +27,7 @@ class PhoneTextField extends StatefulWidget {
     this.labelText,
     this.validator,
     this.isProfileStyle = false,
+    this.isGlassStyle = false,
   });
 
   @override
@@ -46,6 +51,27 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
   void initState() {
     super.initState();
     _selectedCountryCode = widget.initialCountryCode ?? '+20';
+  }
+
+  String _flagForCode(String code) {
+    switch (code) {
+      case '+20':
+        return '🇪🇬';
+      case '+966':
+        return '🇸🇦';
+      case '+971':
+        return '🇦🇪';
+      case '+1':
+        return '🇺🇸';
+      case '+44':
+        return '🇬🇧';
+      case '+965':
+        return '🇰🇼';
+      case '+974':
+        return '🇶🇦';
+      default:
+        return '';
+    }
   }
 
   void _showCountryPicker() {
@@ -148,6 +174,109 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
       );
     }
 
+    if (widget.isGlassStyle) {
+      final style = AuthGlassStyle.of(context);
+
+      return FormField<String>(
+        validator: widget.validator,
+        initialValue: widget.controller.text,
+        builder: (field) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LiquidGlassSurface(
+                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                backgroundColor: style.glassFill,
+                borderColor: field.hasError
+                    ? AppTheme.errorAccent.withValues(alpha: 0.55)
+                    : style.glassBorder,
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: _showCountryPicker,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(AppSizes.radiusLg),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.p12,
+                          vertical: AppSizes.p16,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _flagForCode(_selectedCountryCode),
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(width: AppSizes.p6),
+                            CustomText(
+                              _selectedCountryCode,
+                              fontWeight: FontWeight.bold,
+                              color: style.textColor,
+                            ),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              size: 20,
+                              color: style.iconColor,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 28,
+                      color: style.glassBorder,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: widget.controller,
+                        keyboardType: TextInputType.phone,
+                        onChanged: (value) {
+                          field.didChange(value);
+                          if (field.hasError) field.validate();
+                        },
+                        style: TextStyle(color: style.textColor, fontSize: 16),
+                        cursorColor: AppTheme.primaryColor,
+                        decoration: InputDecoration(
+                          hintText: widget.hintText ?? l10n.phoneHint,
+                          hintStyle: TextStyle(color: style.hintColor),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSizes.p12,
+                            vertical: AppSizes.p16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (field.hasError && field.errorText != null)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: AppSizes.p6,
+                    left: AppSizes.p4,
+                  ),
+                  child: Text(
+                    field.errorText!,
+                    style: const TextStyle(
+                      color: AppTheme.errorAccent,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -178,13 +307,7 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                   child: Row(
                     children: [
                       Text(
-                        _selectedCountryCode == '+20' ? '🇪🇬' : 
-                        _selectedCountryCode == '+966' ? '🇸🇦' :
-                        _selectedCountryCode == '+971' ? '🇦🇪' :
-                        _selectedCountryCode == '+1' ? '🇺🇸' :
-                        _selectedCountryCode == '+44' ? '🇬🇧' :
-                        _selectedCountryCode == '+965' ? '🇰🇼' :
-                        _selectedCountryCode == '+974' ? '🇶🇦' : '',
+                        _flagForCode(_selectedCountryCode),
                         style: const TextStyle(fontSize: 20),
                       ),
                       const SizedBox(width: AppSizes.p4),

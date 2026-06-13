@@ -14,6 +14,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 abstract class AuthRemoteDataSource {
   Future<UserModel> login({required String name, required String password});
   Future<UserModel> signUpWithEmailAndPassword({
+    required String fullName,
     required String email,
     required String password,
   });
@@ -38,6 +39,7 @@ abstract class AuthRemoteDataSource {
     int limit = 10,
   });
   Future<void> syncDeviceRegistration();
+  Future<void> forgotPassword({required String email});
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -197,6 +199,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> signUpWithEmailAndPassword({
+    required String fullName,
     required String email,
     required String password,
   }) => _execute(() async {
@@ -204,6 +207,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         .createUserWithEmailAndPassword(email: email, password: password);
 
     if (userCredential.user != null) {
+      await userCredential.user!.updateDisplayName(fullName);
       await userCredential.user!.sendEmailVerification();
     }
     return _handleFirebaseUserAndBackendLogin(userCredential);
@@ -342,5 +346,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       data: deviceInfo,
       options: Options(headers: {'Authorization': 'Bearer $idToken'}),
     );
+  });
+
+  @override
+  Future<void> forgotPassword({required String email}) => _execute(() async {
+    final response = await apiClient.dio.post(
+      ApiConstants.forgotPassword,
+      data: {
+        'type': 'EMAIL',
+        'email': email,
+      },
+    );
+
+    if (response.statusCode == 200 ||
+        response.statusCode == 201 ||
+        response.statusCode == 204) {
+      return;
+    }
+    throw ServerException(message: 'Forgot password failed');
   });
 }

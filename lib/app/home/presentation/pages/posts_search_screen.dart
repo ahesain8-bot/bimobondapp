@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_search_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_grid_sliver.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;

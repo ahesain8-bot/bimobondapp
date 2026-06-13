@@ -15,6 +15,7 @@ class PostCoverCard extends StatelessWidget {
     required this.post,
     this.tabIndex = 0,
     this.theme,
+    this.showCenterPlayIcon = true,
     super.key,
   }) : snapshot = null,
        sharedStoryUi = null;
@@ -23,6 +24,7 @@ class PostCoverCard extends StatelessWidget {
     required this.snapshot,
     this.tabIndex = 0,
     this.theme,
+    this.showCenterPlayIcon = true,
     super.key,
   }) : post = null,
        sharedStoryUi = null;
@@ -31,6 +33,7 @@ class PostCoverCard extends StatelessWidget {
     required this.sharedStoryUi,
     this.tabIndex = 0,
     this.theme,
+    this.showCenterPlayIcon = true,
     super.key,
   }) : post = null,
        snapshot = null;
@@ -40,6 +43,7 @@ class PostCoverCard extends StatelessWidget {
   final Map<String, dynamic>? sharedStoryUi;
   final int tabIndex;
   final ThemeData? theme;
+  final bool showCenterPlayIcon;
 
   String get _type {
     if (post != null) return post!.type;
@@ -92,7 +96,8 @@ class PostCoverCard extends StatelessWidget {
             )
           else
             _placeholderIcon(resolvedTheme, isVideo, isAuction),
-          if (isVideo &&
+          if (showCenterPlayIcon &&
+              isVideo &&
               ((videoUrl != null && videoUrl.isNotEmpty) ||
                   (posterUrl != null && posterUrl.isNotEmpty)))
             const _ProfileVideoPlayIcon(),

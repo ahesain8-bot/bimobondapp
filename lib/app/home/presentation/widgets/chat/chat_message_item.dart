@@ -1,9 +1,7 @@
 import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_messages.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_image_preview.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
-import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_message.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_shared_preview.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
@@ -18,6 +16,9 @@ class ChatMessageItem extends StatelessWidget {
     required this.username,
     required this.peerImageUrl,
     this.peerUserId,
+    required this.currentUserName,
+    required this.currentUserImageUrl,
+    this.currentUserId,
     required this.isFirstInGroup,
     this.isFirstInList = false,
     required this.messageText,
@@ -32,6 +33,9 @@ class ChatMessageItem extends StatelessWidget {
   final String username;
   final String peerImageUrl;
   final String? peerUserId;
+  final String currentUserName;
+  final String currentUserImageUrl;
+  final String? currentUserId;
   final bool isFirstInGroup;
   final bool isFirstInList;
   final String messageText;
@@ -48,7 +52,7 @@ class ChatMessageItem extends StatelessWidget {
     final reactions = msg['reactions'] as List? ?? [];
     final screenWidth = MediaQuery.sizeOf(context).width;
     final maxBubbleWidth = screenWidth * ChatLayoutConstants.messageMaxWidthFactor -
-        (isMe ? 0 : ChatLayoutConstants.receivedMessageAvatarRowWidth);
+        ChatLayoutConstants.receivedMessageAvatarRowWidth;
 
     final bubble = GestureDetector(
       onLongPress: isDeleted ? null : onLongPress,
@@ -104,83 +108,85 @@ class ChatMessageItem extends StatelessWidget {
           )
         : footer;
 
-    final contentInset = isMe
-        ? 0.0
-        : ChatLayoutConstants.receivedMessageAvatarRowWidth;
+    final contentInset = ChatLayoutConstants.receivedMessageAvatarRowWidth;
 
     final messageColumn = Column(
       crossAxisAlignment:
           isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        if (isFirstInGroup && !isMe)
+        if (isFirstInGroup && isMe)
           Padding(
-            padding: EdgeInsetsDirectional.only(
-              start: contentInset,
+            padding: EdgeInsets.only(
+              right: contentInset,
               bottom: AppSizes.p4,
             ),
-            child: InkWell(
-              onTap: () {
-                final id = peerUserId?.trim() ?? '';
-                if (id.isNotEmpty) {
-                  openUserActiveStoriesOrProfile(
-                    context,
-                    userId: id,
-                    username: username,
-                    avatarUrl: peerImageUrl,
-                  );
-                  return;
-                }
-                ChatSheets.showUserInfo(
-                  context: context,
-                  username: username,
-                  imageUrl: peerImageUrl,
-                  userId: peerUserId,
-                );
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                child: Text(
-                  username,
-                  style: TextStyle(
-                    fontSize: ChatLayoutConstants.senderHeaderFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary.withValues(
-                      alpha: ChatLayoutConstants.senderHeaderPrimaryAlpha,
-                    ),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                currentUserName,
+                style: TextStyle(
+                  fontSize: ChatLayoutConstants.senderHeaderFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary.withValues(
+                    alpha: ChatLayoutConstants.senderHeaderPrimaryAlpha,
                   ),
                 ),
               ),
             ),
           ),
         if (isMe)
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: displayBubble,
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: displayBubble,
+                  ),
+                ),
+                const SizedBox(
+                  width: ChatLayoutConstants.receivedMessageAvatarGap,
+                ),
+                _SentMessageAvatarSlot(
+                  imageUrl: currentUserImageUrl,
+                  username: currentUserName,
+                  userId: currentUserId,
+                  showAvatar: isFirstInGroup,
+                ),
+              ],
+            ),
           )
         else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _ReceivedMessageAvatarSlot(
-                imageUrl: peerImageUrl,
-                username: username,
-                peerUserId: peerUserId,
-                showAvatar: isFirstInGroup,
-              ),
-              const SizedBox(
-                width: ChatLayoutConstants.receivedMessageAvatarGap,
-              ),
-              Expanded(
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: displayBubble,
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _ReceivedMessageAvatarSlot(
+                  imageUrl: peerImageUrl,
+                  username: username,
+                  peerUserId: peerUserId,
+                  showAvatar: isFirstInGroup,
                 ),
-              ),
-            ],
+                const SizedBox(
+                  width: ChatLayoutConstants.receivedMessageAvatarGap,
+                ),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: displayBubble,
+                  ),
+                ),
+              ],
+            ),
           ),
         Padding(
-          padding: EdgeInsetsDirectional.only(start: contentInset),
+          padding: EdgeInsets.only(
+            left: isMe ? 0 : contentInset,
+            right: isMe ? contentInset : 0,
+          ),
           child: displayFooter,
         ),
       ],
@@ -197,6 +203,38 @@ class ChatMessageItem extends StatelessWidget {
       ),
       child: messageColumn,
     );
+  }
+}
+
+class _SentMessageAvatarSlot extends StatelessWidget {
+  const _SentMessageAvatarSlot({
+    required this.imageUrl,
+    required this.username,
+    this.userId,
+    required this.showAvatar,
+  });
+
+  final String imageUrl;
+  final String username;
+  final String? userId;
+  final bool showAvatar;
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = ChatLayoutConstants.receivedMessageAvatarRadius;
+    const size = radius * 2;
+
+    if (showAvatar) {
+      return StoryProfileAvatar(
+        userId: userId,
+        imageUrl: imageUrl,
+        radius: radius,
+        fallbackText: username,
+        username: username,
+      );
+    }
+
+    return const SizedBox(width: size, height: size);
   }
 }
 
@@ -316,7 +354,7 @@ class ChatMessageBubble extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: maxWidth),
         padding: padding,
         decoration: BoxDecoration(
-          color: theme.cardColor,
+          color: chatTheme.receivedBubbleColor,
           borderRadius: borderRadius,
           boxShadow: shadow,
         ),
@@ -328,13 +366,13 @@ class ChatMessageBubble extends StatelessWidget {
       constraints: BoxConstraints(maxWidth: maxWidth),
       padding: padding,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            chatTheme.sentBubbleGradientStart,
-            chatTheme.sentBubbleGradientEnd,
-          ],
-        ),
+        color: chatTheme.sentBubbleColor,
         borderRadius: borderRadius,
+        border: Border.all(
+          color: theme.dividerColor.withValues(
+            alpha: ChatLayoutConstants.sentBubbleBorderAlpha,
+          ),
+        ),
         boxShadow: shadow,
       ),
       child: content,
@@ -356,8 +394,10 @@ class ChatBubbleReplyPreview extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSizes.p6),
       padding: const EdgeInsets.all(AppSizes.p8),
       decoration: BoxDecoration(
-        color: (isMe ? chatTheme.bubbleShadow : chatTheme.replyAccent)
-            .withValues(alpha: 0.1),
+        color: (isMe
+                ? chatTheme.replyAccent
+                : chatTheme.onReceivedBubbleMuted)
+            .withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(
           ChatLayoutConstants.replyPreviewRadius,
         ),
@@ -368,7 +408,7 @@ class ChatBubbleReplyPreview extends StatelessWidget {
           Container(
             width: ChatLayoutConstants.replyPreviewBarWidth,
             height: ChatLayoutConstants.replyPreviewBarHeight,
-            color: isMe ? chatTheme.onSentBubbleMuted : chatTheme.replyAccent,
+            color: isMe ? chatTheme.replyAccent : chatTheme.onReceivedBubble,
           ),
           const SizedBox(width: AppSizes.p8),
           Flexible(
@@ -380,9 +420,7 @@ class ChatBubbleReplyPreview extends StatelessWidget {
                 fontSize: ChatLayoutConstants.replyPreviewFontSize,
                 color: isMe
                     ? chatTheme.onSentBubbleMuted
-                    : theme.textTheme.bodyMedium?.color?.withValues(
-                        alpha: 0.6,
-                      ),
+                    : chatTheme.onReceivedBubbleMuted,
               ),
             ),
           ),
@@ -417,7 +455,7 @@ class ChatMessageContent extends StatelessWidget {
           style: theme.textTheme.bodyMedium?.copyWith(
             color: isMe
                 ? chatTheme.onSentBubble
-                : theme.textTheme.bodyLarge?.color,
+                : chatTheme.onReceivedBubble,
             fontSize: ChatLayoutConstants.messageFontSize,
             height: ChatLayoutConstants.messageLineHeight,
             fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,

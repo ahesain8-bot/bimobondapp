@@ -13,6 +13,9 @@ class ChatMessageList extends StatelessWidget {
     required this.username,
     required this.peerImageUrl,
     this.peerUserId,
+    required this.currentUserName,
+    required this.currentUserImageUrl,
+    this.currentUserId,
     required this.isRtl,
     required this.onReactionPicker,
     required this.onReplyTo,
@@ -25,6 +28,9 @@ class ChatMessageList extends StatelessWidget {
   final String username;
   final String peerImageUrl;
   final String? peerUserId;
+  final String currentUserName;
+  final String currentUserImageUrl;
+  final String? currentUserId;
   final bool isRtl;
   final void Function(Map<String, dynamic> msg) onReactionPicker;
   final void Function(Map<String, dynamic> msg) onReplyTo;
@@ -61,6 +67,9 @@ class ChatMessageList extends StatelessWidget {
           username: username,
           peerImageUrl: peerImageUrl,
           peerUserId: peerUserId,
+          currentUserName: currentUserName,
+          currentUserImageUrl: currentUserImageUrl,
+          currentUserId: currentUserId,
           isFirstInGroup: isFirstInGroup,
           isFirstInList: index == 0,
           messageText: chatMessageText(msg, l10n),

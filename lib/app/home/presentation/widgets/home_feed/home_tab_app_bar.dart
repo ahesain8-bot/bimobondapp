@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
+import 'package:bimobondapp/core/utils/app_bar_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
 
@@ -12,6 +13,7 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions = const [],
     this.centerTitle = true,
     this.titleWidget,
+    this.showBottomDivider = true,
     super.key,
   });
 
@@ -20,10 +22,15 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget> actions;
   final bool centerTitle;
   final Widget? titleWidget;
+  final bool showBottomDivider;
 
   @override
-  Size get preferredSize =>
-      const Size.fromHeight(MessagesLayoutConstants.appBarHeight);
+  Size get preferredSize => Size.fromHeight(
+        AppBarBottomDivider.toolbarHeightWithDivider(
+          MessagesLayoutConstants.appBarHeight,
+          showDivider: showBottomDivider,
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +87,7 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
           centerTitle: centerTitle,
           title: centerTitle ? Center(child: titleContent) : titleContent,
           actions: trailingActions,
+          bottom: showBottomDivider ? const AppBarBottomDivider() : null,
         ),
       ),
     );

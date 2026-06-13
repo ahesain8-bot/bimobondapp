@@ -1,34 +1,43 @@
-import 'dart:ui';
-import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
-import 'package:flutter/material.dart';
-import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
+import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class PopupDialogs {
   static void showSuccessDialog(
     BuildContext context,
     String message, {
-    String title = 'Success',
+    String? title,
   }) {
-    final overlay = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder: (context) => _AnimatedTopNotification(
-        title: title,
-        message: message,
-        onDismiss: () => overlayEntry.remove(),
-      ),
+    final l10n = AppLocalizations.of(context);
+    _showTopNotification(
+      context,
+      title: title ?? l10n?.notificationSuccessTitle ?? 'Success',
+      message: message,
     );
-
-    overlay.insert(overlayEntry);
   }
 
   static void showErrorDialog(
     BuildContext context,
     String message, {
-    String title = 'Error',
+    String? title,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    _showTopNotification(
+      context,
+      title: title ?? l10n?.notificationErrorTitle ?? 'Error',
+      message: message,
+      isError: true,
+    );
+  }
+
+  static void _showTopNotification(
+    BuildContext context, {
+    required String title,
+    required String message,
+    bool isError = false,
   }) {
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
@@ -37,7 +46,7 @@ class PopupDialogs {
       builder: (context) => _AnimatedTopNotification(
         title: title,
         message: message,
-        isError: true,
+        isError: isError,
         onDismiss: () => overlayEntry.remove(),
       ),
     );
@@ -114,18 +123,54 @@ class PopupDialogs {
   }
 }
 
+class _NotificationGlassStyle {
+  const _NotificationGlassStyle._({
+    required this.glassFill,
+    required this.glassBorder,
+    required this.titleColor,
+    required this.messageColor,
+    required this.closeColor,
+    required this.accentColor,
+  });
+
+  factory _NotificationGlassStyle.of(BuildContext context, bool isError) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = isError ? AppTheme.errorAccent : AppTheme.successAccent;
+
+    return _NotificationGlassStyle._(
+      glassFill: isDark ? const Color(0x40FFFFFF) : const Color(0xF0FFFFFF),
+      glassBorder: isDark ? const Color(0x4DFFFFFF) : const Color(0x33000000),
+      titleColor: isDark ? Colors.white : const Color(0xDE000000),
+      messageColor: isDark
+          ? Colors.white.withValues(alpha: 0.72)
+          : const Color(0x99000000),
+      closeColor: isDark
+          ? Colors.white.withValues(alpha: 0.55)
+          : Colors.black.withValues(alpha: 0.45),
+      accentColor: accentColor,
+    );
+  }
+
+  final Color glassFill;
+  final Color glassBorder;
+  final Color titleColor;
+  final Color messageColor;
+  final Color closeColor;
+  final Color accentColor;
+}
+
 class _AnimatedTopNotification extends StatefulWidget {
+  const _AnimatedTopNotification({
+    required this.title,
+    required this.message,
+    required this.onDismiss,
+    this.isError = false,
+  });
+
   final String title;
   final String message;
   final bool isError;
   final VoidCallback onDismiss;
-
-  const _AnimatedTopNotification({
-    required this.title,
-    required this.message,
-    this.isError = false,
-    required this.onDismiss,
-  });
 
   @override
   State<_AnimatedTopNotification> createState() =>
@@ -135,27 +180,36 @@ class _AnimatedTopNotification extends StatefulWidget {
 class _AnimatedTopNotificationState extends State<_AnimatedTopNotification>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  bool _isDismissing = false;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 420),
+      reverseDuration: const Duration(milliseconds: 280),
       vsync: this,
     );
 
-    _offsetAnimation = Tween<Offset>(
-      begin: const Offset(0.0, -1.0),
+    final curve = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    ).animate(curve);
+
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(curve);
 
     _controller.forward();
 
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        _controller.reverse().then((_) => widget.onDismiss());
-      }
+      if (mounted && !_isDismissing) _dismiss();
     });
   }
 
@@ -165,108 +219,109 @@ class _AnimatedTopNotificationState extends State<_AnimatedTopNotification>
     super.dispose();
   }
 
+  Future<void> _dismiss() async {
+    if (_isDismissing) return;
+    _isDismissing = true;
+    await _controller.reverse();
+    if (mounted) widget.onDismiss();
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final backgroundColor = widget.isError
-        ? AppTheme.errorColor
-        : AppTheme.successColor;
-    final accentColor = widget.isError
-        ? AppTheme.errorAccent
-        : AppTheme.successAccent;
-    final textColor = const Color(0xFF1A1A1A); // Dark gray/black for text
+    final style = _NotificationGlassStyle.of(context, widget.isError);
 
     return Positioned(
       top: topPadding + 10,
       left: 16,
       right: 16,
       child: SlideTransition(
-        position: _offsetAnimation,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(4),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Left Accent Border
-                  Container(
-                    width: 4,
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        bottomLeft: Radius.circular(4),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Icon
-                          Icon(
-                            widget.isError ? Icons.cancel : Icons.check_circle,
-                            color: accentColor,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          // Text Content
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                CustomText(
-                                  widget.title,
-                                  color: textColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                const SizedBox(height: 4),
-                                CustomText(
-                                  widget.message,
-                                  color: textColor.withOpacity(0.7),
-                                  fontSize: 16,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Close Icon
-                          GestureDetector(
-                            onTap: () {
-                              _controller.reverse().then(
-                                (_) => widget.onDismiss(),
-                              );
-                            },
-                            child: Icon(
-                              Icons.close,
-                              color: textColor.withOpacity(0.5),
-                              size: 20,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Material(
+            color: Colors.transparent,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
+              ),
+              child: LiquidGlassSurface(
+                borderRadius: BorderRadius.circular(16),
+                blurSigma: 24,
+                backgroundColor: style.glassFill,
+                borderColor: style.glassBorder,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LiquidGlassSurface(
+                        borderRadius: BorderRadius.circular(12),
+                        blurSigma: 12,
+                        backgroundColor: style.accentColor.withValues(
+                          alpha: 0.16,
+                        ),
+                        borderColor: style.accentColor.withValues(alpha: 0.35),
+                        child: SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Icon(
+                            widget.isError
+                                ? LucideIcons.circleX
+                                : LucideIcons.circleCheck,
+                            color: style.accentColor,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: TextStyle(
+                                color: style.titleColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.message,
+                              style: TextStyle(
+                                color: style.messageColor,
+                                fontSize: 14,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _dismiss,
+                        child: Icon(
+                          LucideIcons.x,
+                          color: style.closeColor,
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

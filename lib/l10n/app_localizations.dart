@@ -167,6 +167,18 @@ abstract class AppLocalizations {
   /// **'Continue with'**
   String get continueWith;
 
+  /// No description provided for @notificationErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get notificationErrorTitle;
+
+  /// No description provided for @notificationSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Success'**
+  String get notificationSuccessTitle;
+
   /// No description provided for @signUpTitle.
   ///
   /// In en, this message translates to:
@@ -419,6 +431,54 @@ abstract class AppLocalizations {
   /// **'Password must be at least 6 characters'**
   String get passwordTooShort;
 
+  /// No description provided for @passwordsDoNotMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match'**
+  String get passwordsDoNotMatch;
+
+  /// No description provided for @forgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot Password?'**
+  String get forgotPassword;
+
+  /// No description provided for @forgotPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot Password'**
+  String get forgotPasswordTitle;
+
+  /// No description provided for @forgotPasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address and we\'ll send you a link to reset your password.'**
+  String get forgotPasswordSubtitle;
+
+  /// No description provided for @forgotPasswordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Reset Link'**
+  String get forgotPasswordButton;
+
+  /// No description provided for @forgotPasswordSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset email sent. Check your inbox and spam folder.'**
+  String get forgotPasswordSuccess;
+
+  /// No description provided for @forgotPasswordFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send reset email. Please try again.'**
+  String get forgotPasswordFailed;
+
+  /// No description provided for @forgotPasswordUserNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No account found with this email address.'**
+  String get forgotPasswordUserNotFound;
+
   /// No description provided for @loginFailed.
   ///
   /// In en, this message translates to:
@@ -448,6 +508,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Google login failed'**
   String get googleLoginFailed;
+
+  /// No description provided for @googleLoginSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Google'**
+  String get googleLoginSheetTitle;
+
+  /// No description provided for @googleLoginSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your Google account to sign in quickly and securely.'**
+  String get googleLoginSheetSubtitle;
+
+  /// No description provided for @googleLoginContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get googleLoginContinue;
 
   /// No description provided for @updateProfileFailed.
   ///
@@ -2648,7 +2726,7 @@ abstract class AppLocalizations {
   /// No description provided for @userFollowerAction.
   ///
   /// In en, this message translates to:
-  /// **'started following you'**
+  /// **'followed you'**
   String get userFollowerAction;
 
   /// No description provided for @chatMessageDeleted.
@@ -3088,6 +3166,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read'**
   String get notificationsFilterRead;
+
+  /// No description provided for @notificationsFilterViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get notificationsFilterViewAll;
+
+  /// No description provided for @notificationsFilterActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get notificationsFilterActivity;
+
+  /// No description provided for @notificationsFilterAuctions.
+  ///
+  /// In en, this message translates to:
+  /// **'Auctions'**
+  String get notificationsFilterAuctions;
+
+  /// No description provided for @notificationsFilterInvites.
+  ///
+  /// In en, this message translates to:
+  /// **'Invites'**
+  String get notificationsFilterInvites;
+
+  /// No description provided for @notificationsAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get notificationsAccept;
+
+  /// No description provided for @notificationsDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get notificationsDecline;
+
+  /// No description provided for @notificationsEmptyActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity notifications yet.'**
+  String get notificationsEmptyActivity;
+
+  /// No description provided for @notificationsEmptyAuctions.
+  ///
+  /// In en, this message translates to:
+  /// **'No auction notifications yet.'**
+  String get notificationsEmptyAuctions;
+
+  /// No description provided for @notificationsEmptyInvites.
+  ///
+  /// In en, this message translates to:
+  /// **'No invite notifications yet.'**
+  String get notificationsEmptyInvites;
+
+  /// No description provided for @notificationContextPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Post'**
+  String get notificationContextPost;
+
+  /// No description provided for @notificationMediaVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get notificationMediaVideo;
+
+  /// No description provided for @notificationMediaImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get notificationMediaImage;
+
+  /// No description provided for @notificationActionFollowedYou.
+  ///
+  /// In en, this message translates to:
+  /// **'followed you'**
+  String get notificationActionFollowedYou;
+
+  /// No description provided for @notificationActionFollowRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'requested to follow you'**
+  String get notificationActionFollowRequest;
+
+  /// No description provided for @notificationActionFollowAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'accepted your follow request'**
+  String get notificationActionFollowAccepted;
+
+  /// No description provided for @notificationActionPostLike.
+  ///
+  /// In en, this message translates to:
+  /// **'liked your post'**
+  String get notificationActionPostLike;
+
+  /// No description provided for @notificationActionPostComment.
+  ///
+  /// In en, this message translates to:
+  /// **'commented on your post'**
+  String get notificationActionPostComment;
+
+  /// No description provided for @notificationActionCommentReply.
+  ///
+  /// In en, this message translates to:
+  /// **'replied to your comment'**
+  String get notificationActionCommentReply;
+
+  /// No description provided for @notificationActionCommentLike.
+  ///
+  /// In en, this message translates to:
+  /// **'liked your comment'**
+  String get notificationActionCommentLike;
+
+  /// No description provided for @notificationActionMention.
+  ///
+  /// In en, this message translates to:
+  /// **'mentioned you'**
+  String get notificationActionMention;
+
+  /// No description provided for @notificationActionRepost.
+  ///
+  /// In en, this message translates to:
+  /// **'reposted your post'**
+  String get notificationActionRepost;
+
+  /// No description provided for @notificationActionGift.
+  ///
+  /// In en, this message translates to:
+  /// **'sent you a gift'**
+  String get notificationActionGift;
+
+  /// No description provided for @notificationActionAuctionUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'updated an auction you follow'**
+  String get notificationActionAuctionUpdate;
+
+  /// No description provided for @notificationActionAuctionWon.
+  ///
+  /// In en, this message translates to:
+  /// **'you won an auction'**
+  String get notificationActionAuctionWon;
 
   /// No description provided for @notificationSomeone.
   ///

@@ -17,6 +17,9 @@ class ChatLayoutConstants {
   static const double appBarLeadingIconSize = 20;
   static const double appBarActionIconSize = 22;
   static const double headerTitleLetterSpacing = -0.3;
+  static const double appBarBottomRadius = 24;
+  static const double inputBarTopRadius = 24;
+  static const double sentBubbleBorderAlpha = 0.08;
 
   // Message list
   static const double messageListHorizontalPadding = AppSizes.p16;

@@ -197,7 +197,13 @@ class _UserCommentsScreenState extends State<UserCommentsScreen> {
       backgroundColor: theme.brightness == Brightness.light
           ? Colors.white
           : theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: title),
+      appBar: CustomAppBar(
+        title: title,
+        showBackButton: true,
+        backgroundColor: theme.brightness == Brightness.light
+            ? Colors.white
+            : theme.scaffoldBackgroundColor,
+      ),
       body: RefreshIndicator(
         onRefresh: () => _loadComments(refresh: true),
         color: theme.colorScheme.primary,
@@ -256,7 +262,7 @@ class _UserCommentsScreenState extends State<UserCommentsScreen> {
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.only(bottom: 8),
       itemCount: _comments.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _comments.length) {
@@ -269,6 +275,7 @@ class _UserCommentsScreenState extends State<UserCommentsScreen> {
         return UserCommentListTile(
           comment: _comments[index],
           authorFallback: _authorFallback,
+          showDivider: index < _comments.length - 1,
         );
       },
     );

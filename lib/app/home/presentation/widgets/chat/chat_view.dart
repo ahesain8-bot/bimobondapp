@@ -1,3 +1,5 @@
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_bloc.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_event.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_state.dart';
@@ -414,6 +416,15 @@ class _ChatViewState extends State<ChatView> {
           }
         }
 
+        final authState = context.watch<AuthBloc>().state;
+        final currentUser = authState is AuthSuccess ? authState.user : null;
+        final currentUserName = currentUser?.fullName?.trim().isNotEmpty == true
+            ? currentUser!.fullName!.trim()
+            : (currentUser?.username?.trim().isNotEmpty == true
+                ? currentUser!.username!.trim()
+                : 'User');
+        final currentUserImageUrl = currentUser?.avatarUrl?.trim() ?? '';
+
         return Scaffold(
           backgroundColor: chatTheme.chatBackgroundColor,
           appBar: ChatAppBar(
@@ -438,6 +449,9 @@ class _ChatViewState extends State<ChatView> {
                               username: widget.username,
                               peerImageUrl: widget.imageUrl,
                               peerUserId: widget.peerUserId,
+                              currentUserName: currentUserName,
+                              currentUserImageUrl: currentUserImageUrl,
+                              currentUserId: widget.currentUserId,
                               isRtl: _isRtl,
                               onReactionPicker: _showMessageActions,
                               onReplyTo: (msg) =>

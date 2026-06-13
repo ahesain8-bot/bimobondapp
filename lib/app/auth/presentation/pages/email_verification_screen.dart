@@ -1,12 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/email_verification/email_verification_hero.dart';
 import 'package:bimobondapp/core/widgets/custom_button.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -116,20 +116,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: AppSizes.p24),
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(AppSizes.p24),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    LucideIcons.mail,
-                    size: 80,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
+              const EmailVerificationHero(),
               const SizedBox(height: AppSizes.p32),
               CustomText(
                 l10n.emailVerificationTitle,

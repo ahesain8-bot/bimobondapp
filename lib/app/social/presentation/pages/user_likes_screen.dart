@@ -149,7 +149,13 @@ class _UserLikesScreenState extends State<UserLikesScreen> {
       backgroundColor: theme.brightness == Brightness.light
           ? Colors.white
           : theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: l10n.userLikesTitle),
+      appBar: CustomAppBar(
+        title: l10n.userLikesTitle,
+        showBackButton: true,
+        backgroundColor: theme.brightness == Brightness.light
+            ? Colors.white
+            : theme.scaffoldBackgroundColor,
+      ),
       body: RefreshIndicator(
         onRefresh: () => _loadLikes(refresh: true),
         color: theme.colorScheme.primary,
@@ -208,7 +214,7 @@ class _UserLikesScreenState extends State<UserLikesScreen> {
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.only(bottom: 8),
       itemCount: _likes.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _likes.length) {
@@ -218,7 +224,10 @@ class _UserLikesScreenState extends State<UserLikesScreen> {
           );
         }
 
-        return UserLikeListTile(like: _likes[index]);
+        return UserLikeListTile(
+          like: _likes[index],
+          showDivider: index < _likes.length - 1,
+        );
       },
     );
   }

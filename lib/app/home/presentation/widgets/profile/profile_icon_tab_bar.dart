@@ -77,6 +77,60 @@ class ProfileIconTabBar extends StatelessWidget {
   }
 }
 
+/// Posts-only tab strip for another user's profile (flush with grid below).
+class ProfileUserPostsTabBar extends StatelessWidget {
+  const ProfileUserPostsTabBar({
+    required this.backgroundColor,
+    super.key,
+  });
+
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return ColoredBox(
+      color: backgroundColor,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: ProfileLayoutConstants.iconTabBarHeight,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    LucideIcons.layoutGrid,
+                    size: ProfileLayoutConstants.iconTabSize,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(height: AppSizes.p6),
+                  Container(
+                    height: ProfileLayoutConstants.iconTabIndicatorHeight,
+                    width: ProfileLayoutConstants.iconTabIndicatorWidth,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.dividerColor.withValues(alpha: 0.15),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProfileIconTab extends StatelessWidget {
   const _ProfileIconTab({
     required this.isSelected,

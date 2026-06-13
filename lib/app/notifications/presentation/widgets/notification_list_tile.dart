@@ -1,275 +1,256 @@
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/app/notifications/domain/entities/notification_entity.dart';
+import 'package:bimobondapp/app/notifications/presentation/utils/notification_admin_helper.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_display_text.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
-import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
+import 'package:bimobondapp/core/constants/notifications_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/core/widgets/activity_feed_card.dart';
+import 'package:bimobondapp/core/widgets/dotted_divider.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class NotificationListTile extends StatelessWidget {
   const NotificationListTile({
     required this.notification,
     required this.onTap,
+    this.onAccept,
+    this.onDecline,
+    this.showDivider = true,
     super.key,
   });
 
   final NotificationEntity notification;
   final VoidCallback onTap;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
+  final bool showDivider;
 
   String? _resolveThumbnailUrl() {
     final post = notification.post;
     if (post == null) return null;
-
     final thumb = post.thumbnailUrl;
-    if (thumb != null && MediaUtils.isImage(thumb)) return thumb;
-    return thumb;
+    if (thumb != null && thumb.isNotEmpty) return thumb;
+    return null;
   }
+
+  bool get _isFollowRequest => notification.type == 'FOLLOW_REQUEST';
 
   bool get _hasCustomCopy {
     return notification.title?.trim().isNotEmpty == true ||
         notification.body?.trim().isNotEmpty == true;
   }
 
+  String _detailTimestamp(DateTime dateTime, AppLocalizations l10n) {
+    return DateFormat('EEEE h:mm a', l10n.localeName).format(dateTime.toLocal());
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final cardColor = activityFeedCardColor(theme);
     final isUnread = !notification.isRead;
-    final (typeIcon, typeColor) =
-        NotificationTypeStyle.forType(notification.type);
-    final time = formatInboxTime(notification.createdAt, l10n);
     final actorName =
         notification.actor?.displayName ?? l10n.notificationSomeone;
-    final body = NotificationDisplayText.body(l10n, notification);
-    final title = NotificationDisplayText.title(l10n, notification);
+    final relativeTime = formatInboxTime(notification.createdAt, l10n);
+    final detailTime = _detailTimestamp(notification.createdAt, l10n);
+    final actionPhrase = NotificationDisplayText.actionPhrase(l10n, notification);
     final thumbnailUrl = _resolveThumbnailUrl();
+    final showContextTag = NotificationDisplayText.hasPostContext(notification);
+    final contextLabel = NotificationDisplayText.postContextLabel(notification);
+    final resolvedContextLabel =
+        contextLabel.isNotEmpty ? contextLabel : l10n.notificationContextPost;
+    final (typeIcon, typeColor) =
+        NotificationTypeStyle.forType(notification.type);
+    final isAdmin =
+        NotificationAdminHelper.isAdminNotificationEntity(notification);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.p10),
-      child: Material(
-        color: isUnread
-            ? theme.colorScheme.primary.withValues(alpha: 0.04)
-            : cardColor,
-        elevation: isUnread ? 0 : 0,
-        shadowColor: Colors.black.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isUnread
-                    ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                    : theme.dividerColor.withValues(alpha: 0.08),
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: NotificationsLayoutConstants.cardPadding,
+                vertical: NotificationsLayoutConstants.itemVerticalPadding,
               ),
-              boxShadow: isUnread
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-            ),
-            child: IntrinsicHeight(
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (isUnread)
-                    Container(
-                      width: 3,
-                      color: theme.colorScheme.primary,
-                    ),
+                  isAdmin
+                      ? _NotificationIconAvatar(
+                          icon: typeIcon,
+                          color: typeColor,
+                        )
+                      : _AvatarWithStatus(
+                          userId: notification.actor?.id,
+                          imageUrl: notification.actor?.avatarUrl,
+                          name: actorName,
+                          username: notification.actor?.username,
+                          fullName: notification.actor?.fullName,
+                        ),
+                  const SizedBox(width: AppSizes.p12),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              StoryProfileAvatar(
-                                userId: notification.actor?.id,
-                                imageUrl: notification.actor?.avatarUrl,
-                                radius: 24,
-                                fallbackText: actorName,
-                                username: notification.actor?.username,
-                                fullName: notification.actor?.fullName,
-                              ),
-                              PositionedDirectional(
-                                end: -2,
-                                bottom: -2,
-                                child: Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    color: typeColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: cardColor,
-                                      width: 2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: typeColor.withValues(alpha: 0.35),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    typeIcon,
-                                    size: 11,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: AppSizes.p12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: _hasCustomCopy
-                                          ? Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  title,
-                                                  style: theme
-                                                      .textTheme.titleSmall
-                                                      ?.copyWith(
-                                                    fontWeight: FontWeight.w800,
-                                                    letterSpacing: -0.2,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 3),
-                                                Text(
-                                                  body,
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: theme.textTheme.bodyMedium
-                                                      ?.copyWith(
-                                                    height: 1.35,
-                                                    color: theme
-                                                        .textTheme.bodyMedium?.color
-                                                        ?.withValues(alpha: 0.75),
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : RichText(
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
-                                              text: TextSpan(
-                                                style: theme.textTheme.bodyMedium
-                                                    ?.copyWith(height: 1.35),
-                                                children: [
-                                                  TextSpan(
-                                                    text: actorName,
-                                                    style: const TextStyle(
-                                                      fontWeight: FontWeight.w800,
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text: ' ${_actionSuffix(l10n, body, actorName)}',
-                                                    style: TextStyle(
-                                                      color: theme.textTheme
-                                                          .bodyMedium?.color
-                                                          ?.withValues(alpha: 0.75),
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                    ),
-                                    if (time.isNotEmpty) ...[
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        time,
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant
-                                              .withValues(alpha: 0.7),
-                                          fontWeight: FontWeight.w600,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _hasCustomCopy
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          NotificationDisplayText.title(
+                                            l10n,
+                                            notification,
+                                          ),
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                if (notification.comment?.content?.trim().isNotEmpty ==
-                                    true) ...[
-                                  const SizedBox(height: 8),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          NotificationDisplayText.body(
+                                            l10n,
+                                            notification,
+                                          ),
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            height: 1.35,
+                                            color: theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.72),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : _ActionRichText(
+                                      actorName: actorName,
+                                      actionPhrase: actionPhrase,
+                                      contextTag: showContextTag
+                                          ? _ContextTag(
+                                              label: resolvedContextLabel,
+                                              color: typeColor,
+                                              icon: _contextIcon(
+                                                notification.type,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                            ),
+                            const SizedBox(width: AppSizes.p8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (relativeTime.isNotEmpty)
+                                  Text(
+                                    relativeTime,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant
+                                          .withValues(alpha: 0.65),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                if (isUnread) ...[
+                                  const SizedBox(height: 6),
                                   Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surfaceContainerHighest
-                                          .withValues(alpha: 0.55),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      notification.comment!.content!.trim(),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        height: 1.3,
-                                        fontStyle: FontStyle.italic,
-                                      ),
+                                    width:
+                                        NotificationsLayoutConstants.unreadDotSize,
+                                    height:
+                                        NotificationsLayoutConstants.unreadDotSize,
+                                    decoration: const BoxDecoration(
+                                      color:
+                                          NotificationsLayoutConstants.unreadDotColor,
+                                      shape: BoxShape.circle,
                                     ),
                                   ),
                                 ],
                               ],
                             ),
-                          ),
-                          if (thumbnailUrl != null &&
-                              thumbnailUrl.isNotEmpty) ...[
-                            const SizedBox(width: AppSizes.p10),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: SafeNetworkImage(
-                                imageUrl: thumbnailUrl,
-                                width: 52,
-                                height: 52,
-                                fit: BoxFit.cover,
-                                errorIcon: Icons.image_outlined,
-                              ),
+                          ],
+                        ),
+                        if (!_hasCustomCopy) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            detailTime,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.6),
                             ),
-                          ] else if (isUnread) ...[
-                            const SizedBox(width: 8),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: MessagesLayoutConstants.activityBadgeColor,
-                                  shape: BoxShape.circle,
+                          ),
+                        ],
+                        if (_isFollowRequest &&
+                            onAccept != null &&
+                            onDecline != null) ...[
+                          const SizedBox(height: AppSizes.p12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ActionButton(
+                                  label: l10n.notificationsDecline,
+                                  filled: false,
+                                  onTap: onDecline!,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: AppSizes.p8),
+                              Expanded(
+                                child: _ActionButton(
+                                  label: l10n.notificationsAccept,
+                                  filled: true,
+                                  onTap: onAccept!,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
-                      ),
+                        if (thumbnailUrl != null) ...[
+                          const SizedBox(height: AppSizes.p12),
+                          _MediaPreviewCard(
+                            thumbnailUrl: thumbnailUrl,
+                            title: resolvedContextLabel,
+                            subtitle: _mediaSubtitle(l10n),
+                            onTap: onTap,
+                          ),
+                        ] else if (notification.comment?.content
+                                ?.trim()
+                                .isNotEmpty ==
+                            true) ...[
+                          const SizedBox(height: AppSizes.p10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(AppSizes.p10),
+                            decoration: BoxDecoration(
+                              color: NotificationsLayoutConstants
+                                  .mediaCardBackground(theme),
+                              borderRadius: BorderRadius.circular(
+                                NotificationsLayoutConstants.mediaCardRadius,
+                              ),
+                            ),
+                            child: Text(
+                              notification.comment!.content!.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                height: 1.35,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
@@ -277,18 +258,339 @@ class NotificationListTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
+        if (showDivider)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: NotificationsLayoutConstants.cardPadding,
+            ),
+            child: DottedDivider(
+              color: NotificationsLayoutConstants.dottedDividerColor(theme),
+            ),
+          ),
+      ],
     );
   }
 
-  String _actionSuffix(
-    AppLocalizations l10n,
-    String body,
-    String actorName,
-  ) {
-    if (body.startsWith(actorName)) {
-      return body.substring(actorName.length).trimLeft();
+  String _mediaSubtitle(AppLocalizations l10n) {
+    final postType = notification.post?.type?.toLowerCase();
+    if (postType != null && postType.contains('video')) {
+      return l10n.notificationMediaVideo;
     }
-    return body;
+    if (postType != null && postType.contains('image')) {
+      return l10n.notificationMediaImage;
+    }
+  return l10n.notificationContextPost;
+  }
+
+  IconData _contextIcon(String type) {
+    return switch (type) {
+      'AUCTION_UPDATE' || 'AUCTION_WON' => LucideIcons.gavel,
+      'MENTION' || 'REPOST' => LucideIcons.sparkles,
+      _ => LucideIcons.image,
+    };
+  }
+}
+
+class _NotificationIconAvatar extends StatelessWidget {
+  const _NotificationIconAvatar({
+    required this.icon,
+    required this.color,
+  });
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = NotificationsLayoutConstants.avatarRadius * 2;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.95),
+            color.withValues(alpha: 0.72),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.22),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Icon(icon, size: 20, color: Colors.white),
+    );
+  }
+}
+
+class _AvatarWithStatus extends StatelessWidget {
+  const _AvatarWithStatus({
+    required this.userId,
+    required this.imageUrl,
+    required this.name,
+    this.username,
+    this.fullName,
+  });
+
+  final String? userId;
+  final String? imageUrl;
+  final String name;
+  final String? username;
+  final String? fullName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        StoryProfileAvatar(
+          userId: userId,
+          imageUrl: imageUrl,
+          radius: NotificationsLayoutConstants.avatarRadius,
+          fallbackText: name,
+          username: username,
+          fullName: fullName,
+        ),
+        PositionedDirectional(
+          end: 0,
+          bottom: 0,
+          child: Container(
+            width: NotificationsLayoutConstants.statusDotSize,
+            height: NotificationsLayoutConstants.statusDotSize,
+            decoration: BoxDecoration(
+              color: NotificationsLayoutConstants.unreadDotColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Theme.of(context).cardColor,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionRichText extends StatelessWidget {
+  const _ActionRichText({
+    required this.actorName,
+    required this.actionPhrase,
+    this.contextTag,
+  });
+
+  final String actorName;
+  final String actionPhrase;
+  final Widget? contextTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        RichText(
+          text: TextSpan(
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+            children: [
+              TextSpan(
+                text: actorName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              TextSpan(
+                text: ' $actionPhrase',
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.78),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (contextTag != null) contextTag!,
+      ],
+    );
+  }
+}
+
+class _ContextTag extends StatelessWidget {
+  const _ContextTag({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(
+          NotificationsLayoutConstants.contextTagRadius,
+        ),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+        color: color.withValues(alpha: 0.06),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.label,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: filled ? theme.colorScheme.onSurface : theme.cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          NotificationsLayoutConstants.actionButtonRadius,
+        ),
+        side: filled
+            ? BorderSide.none
+            : BorderSide(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+              ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: NotificationsLayoutConstants.actionButtonHeight,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: filled
+                    ? theme.colorScheme.surface
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaPreviewCard extends StatelessWidget {
+  const _MediaPreviewCard({
+    required this.thumbnailUrl,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String thumbnailUrl;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isVideo = MediaUtils.isVideo(thumbnailUrl);
+
+    return Material(
+      color: NotificationsLayoutConstants.mediaCardBackground(theme),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          NotificationsLayoutConstants.mediaCardRadius,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSizes.p10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SafeNetworkImage(
+                  imageUrl: thumbnailUrl,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorIcon: isVideo ? LucideIcons.video : LucideIcons.image,
+                ),
+              ),
+              const SizedBox(width: AppSizes.p10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                LucideIcons.download,
+                size: 18,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

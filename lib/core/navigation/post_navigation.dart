@@ -27,12 +27,22 @@ PostOpenArgs? postOpenArgsFromExtra(Object? extra) {
 }
 
 /// Opens [stories_viewer] for stories, otherwise [openPost].
-void openStoryOrPost(BuildContext context, PostEntity post) {
+void openStoryOrPost(
+  BuildContext context,
+  PostEntity post, {
+  bool openComments = false,
+  String? highlightCommentId,
+}) {
   if (post.isStory) {
     openStoryViewer(context, post);
     return;
   }
-  openPost(context, post);
+  openPost(
+    context,
+    post,
+    openComments: openComments,
+    highlightCommentId: highlightCommentId,
+  );
 }
 
 void openStoryViewer(BuildContext context, PostEntity post) {
@@ -108,6 +118,8 @@ Future<void> openPostById(
     (post) => openStoryOrPost(
       context,
       post,
+      openComments: openComments,
+      highlightCommentId: highlightCommentId,
     ),
   );
 }

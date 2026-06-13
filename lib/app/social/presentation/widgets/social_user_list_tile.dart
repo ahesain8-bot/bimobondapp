@@ -1,9 +1,8 @@
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
-import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
-import 'package:bimobondapp/core/widgets/activity_feed_card.dart';
+import 'package:bimobondapp/core/widgets/activity_feed_list_row.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +18,7 @@ class SocialUserListTile extends StatelessWidget {
     this.subtitleOverride,
     this.hideFollowButton = false,
     this.useActivityCard = false,
+    this.showDivider = true,
     super.key,
   });
 
@@ -31,6 +31,7 @@ class SocialUserListTile extends StatelessWidget {
   final ValueChanged<bool>? onProfileFollowStateChanged;
   final String? subtitleOverride;
   final bool useActivityCard;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
@@ -62,23 +63,22 @@ class SocialUserListTile extends StatelessWidget {
       }
     }
 
-    final handle = user.username?.trim();
-    final subtitle = handle != null && handle.isNotEmpty ? '@$handle' : null;
+    final displayName = user.fullName?.trim().isNotEmpty == true
+        ? user.fullName!.trim()
+        : user.displayName;
 
-    return ActivityFeedCard(
-      badgeColor: MessagesLayoutConstants.activityFollowersColor,
-      badgeIcon: Icons.person_add_rounded,
+    return ActivityFeedListRow(
+      actorName: displayName,
+      actionPhrase: l10n.userFollowerAction,
       onTap: openProfile,
-      avatar: StoryProfileAvatar(
-        userId: user.id,
-        imageUrl: user.avatarUrl,
-        radius: 24,
-        fallbackText: user.displayName,
-        username: user.username,
-        fullName: user.fullName,
-        isFollowing: user.isFollowing,
-        onTap: openProfile,
-      ),
+      userId: user.id,
+      imageUrl: user.avatarUrl,
+      username: user.username,
+      fullName: user.fullName,
+      isFollowing: user.isFollowing,
+      onAvatarTap: openProfile,
+      showUsernameUnderName: true,
+      compactPadding: true,
       trailing: showFollowButton
           ? ProfileFollowButton.listTile(
               isFollowing: user.isFollowing,
@@ -87,27 +87,7 @@ class SocialUserListTile extends StatelessWidget {
               onPressed: onFollowTap,
             )
           : null,
-      content: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ActivityFeedActionText(
-            actorName: user.displayName,
-            action: l10n.userFollowerAction,
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            CustomText(subtitle, fontSize: 13, variant: TextVariant.secondary),
-          ] else if (subtitleOverride != null &&
-              subtitleOverride!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            CustomText(
-              subtitleOverride!,
-              fontSize: 12,
-              variant: TextVariant.secondary,
-            ),
-          ],
-        ],
-      ),
+      showDivider: showDivider,
     );
   }
 

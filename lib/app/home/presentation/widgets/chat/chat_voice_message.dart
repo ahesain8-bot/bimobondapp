@@ -89,7 +89,7 @@ class _ChatVoiceMessageWidgetState extends State<ChatVoiceMessageWidget> {
     final chatTheme = ChatTheme.of(context);
     final iconColor = widget.isMe
         ? chatTheme.onSentBubble
-        : theme.colorScheme.primary;
+        : chatTheme.onReceivedBubble;
     final disabledAlpha = ChatLayoutConstants.voicePlayDisabledAlpha;
 
     return SizedBox(
@@ -163,7 +163,7 @@ class _ChatVoiceMessageWidgetState extends State<ChatVoiceMessageWidget> {
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: widget.isMe
                               ? chatTheme.onSentBubbleMuted
-                              : theme.textTheme.bodySmall?.color,
+                              : chatTheme.onReceivedBubbleMuted,
                           fontSize: ChatLayoutConstants.voiceDurationFontSize,
                           fontWeight:
                               _isPlaying ? FontWeight.w600 : FontWeight.normal,
@@ -306,7 +306,6 @@ class _ChatVoiceWaveformState extends State<ChatVoiceWaveform>
   }
 
   Color _barColor(BuildContext context, bool highlighted) {
-    final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
     if (widget.isMe) {
       return chatTheme.onSentBubble.withValues(
@@ -315,10 +314,10 @@ class _ChatVoiceWaveformState extends State<ChatVoiceWaveform>
             : ChatLayoutConstants.voiceWaveSentAlpha,
       );
     }
-    return theme.colorScheme.primary.withValues(
+    return chatTheme.onReceivedBubble.withValues(
       alpha: highlighted
-          ? ChatLayoutConstants.voiceWavePrimaryActiveAlpha
-          : ChatLayoutConstants.voiceWavePrimaryAlpha,
+          ? ChatLayoutConstants.voiceWaveSentActiveAlpha
+          : ChatLayoutConstants.voiceWaveSentAlpha,
     );
   }
 

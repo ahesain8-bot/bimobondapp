@@ -45,6 +45,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get continueWith => 'Continue with';
 
   @override
+  String get notificationErrorTitle => 'Error';
+
+  @override
+  String get notificationSuccessTitle => 'Success';
+
+  @override
   String get signUpTitle => 'Create Account';
 
   @override
@@ -173,6 +179,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordTooShort => 'Password must be at least 6 characters';
 
   @override
+  String get passwordsDoNotMatch => 'Passwords do not match';
+
+  @override
+  String get forgotPassword => 'Forgot Password?';
+
+  @override
+  String get forgotPasswordTitle => 'Forgot Password';
+
+  @override
+  String get forgotPasswordSubtitle => 'Enter your email address and we\'ll send you a link to reset your password.';
+
+  @override
+  String get forgotPasswordButton => 'Send Reset Link';
+
+  @override
+  String get forgotPasswordSuccess => 'Password reset email sent. Check your inbox and spam folder.';
+
+  @override
+  String get forgotPasswordFailed => 'Failed to send reset email. Please try again.';
+
+  @override
+  String get forgotPasswordUserNotFound => 'No account found with this email address.';
+
+  @override
   String get loginFailed => 'Login failed. Please try again.';
 
   @override
@@ -186,6 +216,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get googleLoginFailed => 'Google login failed';
+
+  @override
+  String get googleLoginSheetTitle => 'Sign in with Google';
+
+  @override
+  String get googleLoginSheetSubtitle => 'Use your Google account to sign in quickly and securely.';
+
+  @override
+  String get googleLoginContinue => 'Continue with Google';
 
   @override
   String get updateProfileFailed => 'Failed to update profile';
@@ -1366,7 +1405,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get userFollowersTitle => 'Followers';
 
   @override
-  String get userFollowerAction => 'started following you';
+  String get userFollowerAction => 'followed you';
 
   @override
   String get chatMessageDeleted => 'This message was deleted';
@@ -1603,6 +1642,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsFilterRead => 'Read';
+
+  @override
+  String get notificationsFilterViewAll => 'View all';
+
+  @override
+  String get notificationsFilterActivity => 'Activity';
+
+  @override
+  String get notificationsFilterAuctions => 'Auctions';
+
+  @override
+  String get notificationsFilterInvites => 'Invites';
+
+  @override
+  String get notificationsAccept => 'Accept';
+
+  @override
+  String get notificationsDecline => 'Decline';
+
+  @override
+  String get notificationsEmptyActivity => 'No activity notifications yet.';
+
+  @override
+  String get notificationsEmptyAuctions => 'No auction notifications yet.';
+
+  @override
+  String get notificationsEmptyInvites => 'No invite notifications yet.';
+
+  @override
+  String get notificationContextPost => 'Post';
+
+  @override
+  String get notificationMediaVideo => 'Video';
+
+  @override
+  String get notificationMediaImage => 'Image';
+
+  @override
+  String get notificationActionFollowedYou => 'followed you';
+
+  @override
+  String get notificationActionFollowRequest => 'requested to follow you';
+
+  @override
+  String get notificationActionFollowAccepted => 'accepted your follow request';
+
+  @override
+  String get notificationActionPostLike => 'liked your post';
+
+  @override
+  String get notificationActionPostComment => 'commented on your post';
+
+  @override
+  String get notificationActionCommentReply => 'replied to your comment';
+
+  @override
+  String get notificationActionCommentLike => 'liked your comment';
+
+  @override
+  String get notificationActionMention => 'mentioned you';
+
+  @override
+  String get notificationActionRepost => 'reposted your post';
+
+  @override
+  String get notificationActionGift => 'sent you a gift';
+
+  @override
+  String get notificationActionAuctionUpdate => 'updated an auction you follow';
+
+  @override
+  String get notificationActionAuctionWon => 'you won an auction';
 
   @override
   String get notificationSomeone => 'Someone';

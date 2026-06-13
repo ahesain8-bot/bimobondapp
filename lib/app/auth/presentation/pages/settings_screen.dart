@@ -32,7 +32,6 @@ class SettingsScreen extends StatelessWidget {
       appBar: CustomAppBar(
         title: l10n.settingsAndPrivacy,
         showBackButton: true,
-        showBottomDivider: true,
         // backgroundColor: theme.scaffoldBackgroundColor,
         onBackPressed: () => context.pop(),
       ),
@@ -118,9 +117,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(
-                    height: SettingsLayoutConstants.groupSpacing,
-                  ),
+                  const SizedBox(height: SettingsLayoutConstants.groupSpacing),
                 ],
               );
             },

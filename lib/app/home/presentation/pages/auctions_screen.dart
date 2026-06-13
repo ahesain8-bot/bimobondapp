@@ -520,6 +520,7 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: HomeTabAppBar(
         title: l10n.navAuctions,
+        showBottomDivider: false,
         actions: [
           HomeTabGlassIconButton(
             icon: LucideIcons.history,

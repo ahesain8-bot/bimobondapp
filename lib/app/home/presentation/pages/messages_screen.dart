@@ -335,7 +335,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: HomeTabAppBar(title: l10n.navChat),
+      appBar: HomeTabAppBar(title: l10n.navChat, showBottomDivider: false),
       body: SafeArea(
         top: false,
         child: MultiBlocListener(

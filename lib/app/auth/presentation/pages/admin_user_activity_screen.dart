@@ -4,18 +4,16 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
     as auth_di;
+import 'package:bimobondapp/app/auth/presentation/widgets/admin/admin_activity_tile.dart';
 import 'package:bimobondapp/core/utils/admin_activity_labels.dart';
 import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
-import 'package:bimobondapp/core/widgets/custom_text.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AdminUserActivityScreen extends StatefulWidget {
   const AdminUserActivityScreen({this.userId, super.key});
@@ -169,7 +167,6 @@ class _AdminUserActivityScreenState extends State<AdminUserActivityScreen> {
       appBar: CustomAppBar(
         title: l10n.adminActivityTitle,
         showBackButton: true,
-        showBottomDivider: true,
       ),
       body: RefreshIndicator(
         onRefresh: () => _loadActivities(refresh: true),
@@ -199,14 +196,12 @@ class _AdminUserActivityScreenState extends State<AdminUserActivityScreen> {
     if (_isLoading) {
       return ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: 6,
-        itemBuilder: (_, __) => const Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: SettingsLayoutConstants.horizontalPadding,
-            vertical: AppSizes.p12,
-          ),
-          child: SkeletonWidget(height: 72, borderRadius: AppSizes.radiusMd),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SettingsLayoutConstants.horizontalPadding,
+          vertical: AppSizes.p8,
         ),
+        itemCount: 6,
+        itemBuilder: (_, __) => const AdminActivitySkeletonTile(),
       );
     }
 
@@ -230,35 +225,15 @@ class _AdminUserActivityScreenState extends State<AdminUserActivityScreen> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSizes.p32),
-            child: Column(
-              children: [
-                Icon(
-                  LucideIcons.activity,
-                  size: 48,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
-                ),
-                const SizedBox(height: AppSizes.p16),
-                Text(
-                  l10n.adminActivityEmpty,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.textTheme.bodyMedium?.color?.withValues(
-                      alpha: 0.5,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.45,
+            child: AdminActivityEmptyState(message: l10n.adminActivityEmpty),
           ),
         ],
       );
     }
 
-    final localeName = l10n.localeName;
-
-    return ListView.separated(
+    return ListView.builder(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
@@ -268,139 +243,30 @@ class _AdminUserActivityScreenState extends State<AdminUserActivityScreen> {
         vertical: AppSizes.p8,
       ),
       itemCount: _activities.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: AppSizes.p8),
       itemBuilder: (context, index) {
         if (index >= _activities.length) {
-          return const Padding(
-            padding: EdgeInsets.all(AppSizes.p16),
-            child: Center(child: CircularProgressIndicator()),
+          return Padding(
+            padding: const EdgeInsets.all(AppSizes.p16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ),
           );
         }
 
         final activity = _activities[index];
-        final formatted = formatAdminActivityTime(
-          activity.createdAt,
-          localeName,
-        );
-        final timeLabel = formatted == null || formatted.isEmpty
-            ? l10n.adminActivityJustNow
-            : formatted;
-
-        return _AdminActivityTile(
+        return AdminActivityTile(
           activity: activity,
-          typeLabel: adminActivityTypeLabel(activity.type, l10n),
-          subtitle: adminActivitySubtitle(activity, l10n),
-          timeLabel: timeLabel,
-          icon: adminActivityIcon(activity.type),
+          l10n: l10n,
           onTap: () => _onActivityTap(activity),
         );
       },
-    );
-  }
-}
-
-class _AdminActivityTile extends StatelessWidget {
-  const _AdminActivityTile({
-    required this.activity,
-    required this.typeLabel,
-    required this.subtitle,
-    required this.timeLabel,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final UserActivityEntity activity;
-  final String typeLabel;
-  final String subtitle;
-  final String timeLabel;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  bool get _isTappable {
-    if (activityPostId(activity) != null) return true;
-    if (activity.type.toUpperCase() == 'SEND_GIFT' &&
-        activityReceiverId(activity) != null) {
-      return true;
-    }
-    return false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Material(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(SettingsLayoutConstants.groupRadius),
-      child: InkWell(
-        onTap: _isTappable ? onTap : null,
-        borderRadius: BorderRadius.circular(
-          SettingsLayoutConstants.groupRadius,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSizes.p10),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(
-                    SettingsLayoutConstants.iconContainerRadius,
-                  ),
-                ),
-                child: Icon(icon, color: colorScheme.primary, size: 22),
-              ),
-              const SizedBox(width: AppSizes.p12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomText(
-                            typeLabel,
-                            fontSize: SettingsLayoutConstants.itemTitleFontSize,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        CustomText(
-                          timeLabel,
-                          fontSize: SettingsLayoutConstants.trailingFontSize,
-                          variant: TextVariant.secondary,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSizes.p6),
-                    Text(
-                      subtitle,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withValues(
-                          alpha: 0.75,
-                        ),
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_isTappable) ...[
-                const SizedBox(width: AppSizes.p4),
-                Icon(
-                  LucideIcons.chevronRight,
-                  size: SettingsLayoutConstants.chevronSize,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -20,26 +20,25 @@ import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
 import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_format_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_icon_tab_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_load_more.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
-import 'package:bimobondapp/core/widgets/video_post_preview_placeholder.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({
@@ -625,12 +624,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               variant: TextVariant.secondary,
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: AppSizes.p16),
-                            Divider(
-                              color: theme.dividerColor.withValues(alpha: 0.15),
-                            ),
                           ],
                         ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: ProfileUserPostsTabBar(
+                        backgroundColor: theme.scaffoldBackgroundColor,
                       ),
                     ),
                     _UserProfilePostsGrid(
@@ -711,7 +711,9 @@ class _UserProfilePostsGrid extends StatelessWidget {
       return SliverGrid(
         gridDelegate: gridDelegate,
         delegate: SliverChildBuilderDelegate(
-          (_, _) => const SkeletonWidget(borderRadius: AppSizes.radiusSm),
+          (_, _) => SkeletonWidget(
+            borderRadius: ProfileLayoutConstants.gridItemRadius,
+          ),
           childCount: 9,
         ),
       );
@@ -728,28 +730,17 @@ class _UserProfilePostsGrid extends StatelessWidget {
       );
     }
 
-    final itemCount =
-        state.posts.length +
-        (state.isLoadingMore && !state.hasReachedMax ? 1 : 0);
+    final showLoadMoreFooter =
+        state.isLoadingMore && !state.hasReachedMax && state.posts.isNotEmpty;
 
-    return SliverGrid(
+    final grid = SliverGrid(
       gridDelegate: gridDelegate,
       delegate: SliverChildBuilderDelegate((context, index) {
-        if (state.isLoadingMore &&
-            !state.hasReachedMax &&
-            index == state.posts.length) {
-          return const Center(
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        }
-
         final post = state.posts[index];
-        return _UserProfileGridTile(
+        return ProfileGridTile(
           post: post,
+          tabIndex: ProfileLayoutConstants.postsTabIndex,
+          theme: Theme.of(context),
           onTap: () => openProfilePosts(
             context,
             posts: state.posts,
@@ -760,64 +751,16 @@ class _UserProfilePostsGrid extends StatelessWidget {
             userId: userId,
           ),
         );
-      }, childCount: itemCount),
+      }, childCount: state.posts.length),
     );
-  }
-}
 
-class _UserProfileGridTile extends StatelessWidget {
-  const _UserProfileGridTile({required this.post, required this.onTap});
+    if (!showLoadMoreFooter) return grid;
 
-  final PostEntity post;
-  final VoidCallback onTap;
-
-  bool _isVideoPost() {
-    if (post.type.toUpperCase() == 'VIDEO') return true;
-    return post.media.any(
-      (m) => MediaUtils.isVideo(m.url, mediaType: m.mediaType),
-    );
-  }
-
-  String? _resolveImageUrl() {
-    if (post.thumbnailUrl != null && MediaUtils.isImage(post.thumbnailUrl!)) {
-      return post.thumbnailUrl;
-    }
-    for (final media in post.media) {
-      if (MediaUtils.isImage(media.url, mediaType: media.mediaType)) {
-        return media.url;
-      }
-    }
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = _resolveImageUrl();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-        child: _isVideoPost()
-            ? const VideoPostPreviewPlaceholder(
-                iconSize: 28,
-                icon: LucideIcons.play,
-              )
-            : imageUrl != null
-            ? SafeNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              )
-            : ColoredBox(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Icon(
-                  LucideIcons.image,
-                  color: Theme.of(context).disabledColor,
-                ),
-              ),
-      ),
+    return SliverMainAxisGroup(
+      slivers: [
+        grid,
+        const SliverToBoxAdapter(child: ProfilePostsLoadMoreFooter()),
+      ],
     );
   }
 }

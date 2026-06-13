@@ -14,7 +14,6 @@ class SettingsPlaceholderScreen extends StatelessWidget {
       appBar: CustomAppBar(
         title: title,
         showBackButton: true,
-        showBottomDivider: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         onBackPressed: () => context.pop(),
       ),

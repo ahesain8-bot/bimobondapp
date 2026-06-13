@@ -45,6 +45,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get continueWith => 'المتابعة باستخدام';
 
   @override
+  String get notificationErrorTitle => 'خطأ';
+
+  @override
+  String get notificationSuccessTitle => 'نجاح';
+
+  @override
   String get signUpTitle => 'إنشاء حساب';
 
   @override
@@ -173,6 +179,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get passwordTooShort => 'يجب أن تكون كلمة المرور 6 أحرف على الأقل';
 
   @override
+  String get passwordsDoNotMatch => 'كلمتا المرور غير متطابقتين';
+
+  @override
+  String get forgotPassword => 'نسيت كلمة المرور؟';
+
+  @override
+  String get forgotPasswordTitle => 'نسيت كلمة المرور';
+
+  @override
+  String get forgotPasswordSubtitle => 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.';
+
+  @override
+  String get forgotPasswordButton => 'إرسال رابط إعادة التعيين';
+
+  @override
+  String get forgotPasswordSuccess => 'تم إرسال بريد إعادة تعيين كلمة المرور. تحقق من صندوق الوارد ومجلد البريد العشوائي.';
+
+  @override
+  String get forgotPasswordFailed => 'فشل إرسال بريد إعادة التعيين. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String get forgotPasswordUserNotFound => 'لا يوجد حساب مرتبط بهذا البريد الإلكتروني.';
+
+  @override
   String get loginFailed => 'فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.';
 
   @override
@@ -186,6 +216,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get googleLoginFailed => 'فشل تسجيل الدخول عبر جوجل';
+
+  @override
+  String get googleLoginSheetTitle => 'تسجيل الدخول عبر جوجل';
+
+  @override
+  String get googleLoginSheetSubtitle => 'استخدم حساب جوجل لتسجيل الدخول بسرعة وأمان.';
+
+  @override
+  String get googleLoginContinue => 'المتابعة عبر جوجل';
 
   @override
   String get updateProfileFailed => 'فشل تحديث الملف الشخصي';
@@ -1366,7 +1405,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get userFollowersTitle => 'المتابعون';
 
   @override
-  String get userFollowerAction => 'بدأ بمتابعتك';
+  String get userFollowerAction => 'تابعك';
 
   @override
   String get chatMessageDeleted => 'تم حذف هذه الرسالة';
@@ -1603,6 +1642,78 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notificationsFilterRead => 'مقروء';
+
+  @override
+  String get notificationsFilterViewAll => 'عرض الكل';
+
+  @override
+  String get notificationsFilterActivity => 'النشاط';
+
+  @override
+  String get notificationsFilterAuctions => 'المزادات';
+
+  @override
+  String get notificationsFilterInvites => 'الدعوات';
+
+  @override
+  String get notificationsAccept => 'قبول';
+
+  @override
+  String get notificationsDecline => 'رفض';
+
+  @override
+  String get notificationsEmptyActivity => 'لا توجد إشعارات نشاط بعد.';
+
+  @override
+  String get notificationsEmptyAuctions => 'لا توجد إشعارات مزادات بعد.';
+
+  @override
+  String get notificationsEmptyInvites => 'لا توجد إشعارات دعوات بعد.';
+
+  @override
+  String get notificationContextPost => 'منشور';
+
+  @override
+  String get notificationMediaVideo => 'فيديو';
+
+  @override
+  String get notificationMediaImage => 'صورة';
+
+  @override
+  String get notificationActionFollowedYou => 'تابعك';
+
+  @override
+  String get notificationActionFollowRequest => 'طلب متابعتك';
+
+  @override
+  String get notificationActionFollowAccepted => 'قبل طلب متابعتك';
+
+  @override
+  String get notificationActionPostLike => 'أعجب بمنشورك';
+
+  @override
+  String get notificationActionPostComment => 'علّق على منشورك';
+
+  @override
+  String get notificationActionCommentReply => 'رد على تعليقك';
+
+  @override
+  String get notificationActionCommentLike => 'أعجب بتعليقك';
+
+  @override
+  String get notificationActionMention => 'أشار إليك';
+
+  @override
+  String get notificationActionRepost => 'أعاد نشر منشورك';
+
+  @override
+  String get notificationActionGift => 'أرسل لك هدية';
+
+  @override
+  String get notificationActionAuctionUpdate => 'حدّث مزاد تتابعه';
+
+  @override
+  String get notificationActionAuctionWon => 'فزت بمزاد';
 
   @override
   String get notificationSomeone => 'شخص ما';

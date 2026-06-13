@@ -5,7 +5,6 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -172,7 +171,7 @@ class _PostRepostersListState extends State<_PostRepostersList> {
         itemCount: 5,
         itemBuilder: (_, __) => const Padding(
           padding: EdgeInsets.only(bottom: AppSizes.p10),
-          child: SkeletonWidget(height: 68, borderRadius: 14),
+          child: _ReposterCardSkeleton(),
         ),
       );
     }
@@ -222,6 +221,48 @@ class _PostRepostersListState extends State<_PostRepostersList> {
 
         return _ReposterCard(repost: _reposts[index]);
       },
+    );
+  }
+}
+
+class _ReposterCardSkeleton extends StatelessWidget {
+  const _ReposterCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return LiquidGlassSurface(
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.p12,
+          vertical: AppSizes.p10,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const LiquidGlassSkeletonBox.circular(size: 44),
+            const SizedBox(width: AppSizes.p12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const LiquidGlassSkeletonBox(height: 14, width: 120),
+                  const SizedBox(height: 6),
+                  LiquidGlassSkeletonBox(
+                    height: 12,
+                    width: MediaQuery.sizeOf(context).width * 0.28,
+                  ),
+                  const SizedBox(height: AppSizes.p8),
+                  LiquidGlassSkeletonBox(
+                    height: 12,
+                    width: MediaQuery.sizeOf(context).width * 0.45,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

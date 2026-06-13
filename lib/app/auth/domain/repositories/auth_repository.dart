@@ -13,6 +13,7 @@ abstract class AuthRepository {
   });
 
   Future<Either<Failure, UserEntity>> signUpWithEmailAndPassword({
+    required String fullName,
     required String email,
     required String password,
   });
@@ -44,6 +45,8 @@ abstract class AuthRepository {
   });
 
   Future<Either<Failure, UserEntity?>> getCachedUser();
+
+  Future<Either<Failure, void>> forgotPassword({required String email});
 
   Future<void> logout();
 }

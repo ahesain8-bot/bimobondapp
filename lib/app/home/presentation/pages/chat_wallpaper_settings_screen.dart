@@ -25,7 +25,6 @@ class ChatWallpaperSettingsScreen extends StatelessWidget {
       appBar: CustomAppBar(
         title: l10n.chatWallpaperTitle,
         showBackButton: true,
-        showBottomDivider: true,
         onBackPressed: () => Navigator.of(context).pop(),
       ),
       body: ListView(

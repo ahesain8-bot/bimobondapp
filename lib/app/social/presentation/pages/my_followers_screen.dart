@@ -237,7 +237,13 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
       backgroundColor: theme.brightness == Brightness.light
           ? Colors.white
           : theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: l10n.userFollowersTitle),
+      appBar: CustomAppBar(
+        title: l10n.userFollowersTitle,
+        showBackButton: true,
+        backgroundColor: theme.brightness == Brightness.light
+            ? Colors.white
+            : theme.scaffoldBackgroundColor,
+      ),
       body: RefreshIndicator(
         onRefresh: () => _loadFollowers(refresh: true),
         color: theme.colorScheme.primary,
@@ -296,7 +302,7 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.only(bottom: 8),
       itemCount: _followers.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _followers.length) {
@@ -318,6 +324,7 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
           isSelf: _isSelfUser(user),
           isFollowLoading: _followLoadingIds.contains(user.id),
           useActivityCard: true,
+          showDivider: index < _followers.length - 1,
           onFollowTap: () => _toggleFollow(index),
           onProfileFollowStateChanged: (isFollowing) =>
               _onProfileFollowStateChanged(index, isFollowing),

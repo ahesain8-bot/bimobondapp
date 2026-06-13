@@ -10,7 +10,9 @@ class AppAssets {
   static const String loadingAnimation = '$animationsPath/loading.json';
 
   static const String logo = '$imagesPath/logo.png';
-  static const String phoneAuth = '$imagesPath/phone_auth.png';
+  static const String phoneMockup = '$imagesPath/phone_auth.png';
+  static const String emailVerification =
+      '$imagesPath/email-address-computer-icons-symbol-email-box-gmail-e0844720a9dd1602e9d85f02387f558c.png';
 
   static const String homeIcon = '$iconsPath/home-angle-svgrepo-com.svg';
   static const String profileIcon = '$iconsPath/person-fill-svgrepo-com.svg';

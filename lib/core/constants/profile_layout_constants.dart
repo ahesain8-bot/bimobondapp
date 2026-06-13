@@ -22,12 +22,19 @@ class ProfileLayoutConstants {
   static const Duration tabAnimationDuration = Duration(milliseconds: 180);
 
   static const int gridCrossAxisCount = 3;
-  static const double gridSpacing = 6;
-  static const double gridAspectRatio = 0.72;
-  static const double gridItemRadius = 8;
+
+  /// TikTok-style tight grid with ~1px gaps.
+  static const double gridSpacing = 1;
+
+  /// Portrait tiles — shorter than full 9:16, still TikTok-style grid.
+  static const double gridAspectRatio = 9 / 10;
+  static const double gridItemRadius = 0;
   static const double gridPlaceholderIconSize = 34;
+  static const double gridViewCountIconSize = 12;
+  static const double gridViewCountFontSize = 12;
 
   static const int postsPageSize = 10;
+
   /// Feed API sort: newest posts first (`LATEST`).
   static const String postsSortNewestFirst = 'LATEST';
   static const double scrollLoadMoreThreshold = 200;

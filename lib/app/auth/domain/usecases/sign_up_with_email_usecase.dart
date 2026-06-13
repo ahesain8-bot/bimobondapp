@@ -14,6 +14,7 @@ class SignUpWithEmailUseCase
   @override
   Future<Either<Failure, UserEntity>> call(SignUpWithEmailParams params) async {
     return await repository.signUpWithEmailAndPassword(
+      fullName: params.fullName,
       email: params.email,
       password: params.password,
     );
@@ -21,14 +22,16 @@ class SignUpWithEmailUseCase
 }
 
 class SignUpWithEmailParams extends Equatable {
+  final String fullName;
   final String email;
   final String password;
 
   const SignUpWithEmailParams({
+    required this.fullName,
     required this.email,
     required this.password,
   });
 
   @override
-  List<Object?> get props => [email, password];
+  List<Object?> get props => [fullName, email, password];
 }

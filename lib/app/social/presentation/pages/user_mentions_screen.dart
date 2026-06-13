@@ -152,7 +152,13 @@ class _UserMentionsScreenState extends State<UserMentionsScreen> {
       backgroundColor: theme.brightness == Brightness.light
           ? Colors.white
           : theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: l10n.userMentionsTitle),
+      appBar: CustomAppBar(
+        title: l10n.userMentionsTitle,
+        showBackButton: true,
+        backgroundColor: theme.brightness == Brightness.light
+            ? Colors.white
+            : theme.scaffoldBackgroundColor,
+      ),
       body: RefreshIndicator(
         onRefresh: () => _loadMentions(refresh: true),
         color: theme.colorScheme.primary,
@@ -211,7 +217,7 @@ class _UserMentionsScreenState extends State<UserMentionsScreen> {
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.only(bottom: 8),
       itemCount: _mentions.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= _mentions.length) {
@@ -221,7 +227,10 @@ class _UserMentionsScreenState extends State<UserMentionsScreen> {
           );
         }
 
-        return UserMentionListTile(mention: _mentions[index]);
+        return UserMentionListTile(
+          mention: _mentions[index],
+          showDivider: index < _mentions.length - 1,
+        );
       },
     );
   }

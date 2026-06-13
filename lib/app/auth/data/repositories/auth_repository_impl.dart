@@ -58,11 +58,13 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, UserEntity>> signUpWithEmailAndPassword({
+    required String fullName,
     required String email,
     required String password,
   }) async {
     try {
       final userModel = await remoteDataSource.signUpWithEmailAndPassword(
+        fullName: fullName,
         email: email,
         password: password,
       );
@@ -257,6 +259,18 @@ class AuthRepositoryImpl implements AuthRepository {
       return Right(user);
     } catch (e) {
       return Left(CacheFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> forgotPassword({required String email}) async {
+    try {
+      await remoteDataSource.forgotPassword(email: email);
+      return const Right(null);
+    } on AppException catch (e) {
+      return Left(_mapExceptionToFailure(e));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
     }
   }
 

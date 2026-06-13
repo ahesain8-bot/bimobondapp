@@ -1,11 +1,25 @@
+import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
 
 Color activityFeedCardColor(ThemeData theme) {
+  return activityFeedCardSurface(theme);
+}
+
+/// White in light mode, themed card in dark mode.
+Color activityFeedCardSurface(ThemeData theme) {
   return theme.brightness == Brightness.light ? Colors.white : theme.cardColor;
 }
 
-/// Card shell matching [NotificationListTile] — rounded border, shadow, type badge.
+/// Light grey group border from theme (matches settings cards).
+Color activityFeedCardBorderColor(ThemeData theme, {bool highlighted = false}) {
+  if (highlighted) {
+    return theme.colorScheme.primary.withValues(alpha: 0.12);
+  }
+  return SettingsLayoutConstants.groupBorderColor(theme);
+}
+
+/// Card shell for activity feeds — white surface, light grey border, no shadow.
 class ActivityFeedCard extends StatelessWidget {
   const ActivityFeedCard({
     required this.badgeColor,
@@ -15,6 +29,10 @@ class ActivityFeedCard extends StatelessWidget {
     this.onTap,
     this.trailing,
     this.highlight = false,
+    this.showTypeBadge = true,
+    this.backgroundColor,
+    this.borderColor,
+    this.showShadow = false,
   });
 
   final Color badgeColor;
@@ -24,11 +42,17 @@ class ActivityFeedCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Widget? trailing;
   final bool highlight;
+  final bool showTypeBadge;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final bool showShadow;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = activityFeedCardColor(theme);
+    final cardColor = backgroundColor ?? activityFeedCardSurface(theme);
+    final resolvedBorderColor =
+        borderColor ?? activityFeedCardBorderColor(theme, highlighted: highlight);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSizes.p10),
       child: Material(
@@ -42,12 +66,8 @@ class ActivityFeedCard extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: highlight
-                    ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                    : theme.dividerColor.withValues(alpha: 0.08),
-              ),
-              boxShadow: highlight
+              border: Border.all(color: resolvedBorderColor),
+              boxShadow: highlight || !showShadow
                   ? null
                   : [
                       BoxShadow(
@@ -58,7 +78,7 @@ class ActivityFeedCard extends StatelessWidget {
                     ],
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 14, 14),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -66,34 +86,35 @@ class ActivityFeedCard extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       avatar,
-                      PositionedDirectional(
-                        end: -2,
-                        bottom: -2,
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: badgeColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: cardColor,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: badgeColor.withValues(alpha: 0.35),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
+                      if (showTypeBadge)
+                        PositionedDirectional(
+                          end: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: badgeColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: cardColor,
+                                width: 2,
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            badgeIcon,
-                            size: 11,
-                            color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: badgeColor.withValues(alpha: 0.35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              badgeIcon,
+                              size: 11,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(width: AppSizes.p12),

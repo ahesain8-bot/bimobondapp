@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/utils/app_bar_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Color? backgroundColor;
   final bool showBackButton;
   final bool showBottomDivider;
+  final bool hideBottomDivider;
   final VoidCallback? onBackPressed;
   final double elevation;
 
@@ -25,45 +27,69 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.showBackButton = true,
     this.showBottomDivider = false,
+    this.hideBottomDivider = false,
     this.onBackPressed,
     this.elevation = 0,
   });
 
+  bool get _hasTitle =>
+      titleWidget != null || (title != null && title!.isNotEmpty);
+
+  bool get _showBottomDivider =>
+      !hideBottomDivider && (showBottomDivider || _hasTitle);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final defaultFgColor = theme.textTheme.bodyLarge?.color ?? theme.colorScheme.onSurface;
+    final defaultFgColor =
+        theme.textTheme.bodyLarge?.color ?? theme.colorScheme.onSurface;
+
+    final titleContent =
+        titleWidget ??
+        (title != null
+            ? CustomText(title!, fontSize: 18, fontWeight: FontWeight.bold)
+            : null);
+
+    final backButton = showBackButton
+        ? IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            onPressed: onBackPressed ??
+                () {
+                  if (context.canPop()) {
+                    context.pop();
+                  }
+                },
+          )
+        : null;
+
+    final resolvedLeading = leading ?? backButton;
 
     return AppBar(
-      title:
-          titleWidget ??
-          (title != null
-              ? CustomText(title!, fontSize: 18, fontWeight: FontWeight.bold)
-              : null),
-      actions: actions,
-      leading:
-          leading ??
-          (showBackButton && (context.canPop() || Navigator.canPop(context))
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                  onPressed: onBackPressed ?? () => context.pop(),
-                )
-              : null),
+      automaticallyImplyLeading: false,
+      leadingWidth: resolvedLeading != null ? 48 : null,
+      leading: resolvedLeading,
       centerTitle: centerTitle,
-      backgroundColor: backgroundColor ?? Colors.transparent,
-      foregroundColor: backgroundColor != null ? null : defaultFgColor,
-      elevation: elevation,
-      bottom: showBottomDivider
-          ? PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Divider(
-                height: 1,
-                color: theme.dividerColor,
+      title: centerTitle
+          ? null
+          : titleContent,
+      actions: actions,
+      flexibleSpace: centerTitle && titleContent != null
+          ? SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 56),
+                  child: titleContent,
+                ),
               ),
             )
           : null,
+      backgroundColor: backgroundColor ?? Colors.transparent,
+      foregroundColor: defaultFgColor,
+      elevation: elevation,
+      bottom: _showBottomDivider ? const AppBarBottomDivider() : null,
       systemOverlayStyle: backgroundColor != null
-          ? (ThemeData.estimateBrightnessForColor(backgroundColor!) == Brightness.dark
+          ? (ThemeData.estimateBrightnessForColor(backgroundColor!) ==
+                  Brightness.dark
               ? SystemUiOverlayStyle.light
               : SystemUiOverlayStyle.dark)
           : (theme.brightness == Brightness.dark
@@ -74,6 +100,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => Size.fromHeight(
-    kToolbarHeight + (showBottomDivider ? 1 : 0),
-  );
+        AppBarBottomDivider.toolbarHeightWithDivider(
+          kToolbarHeight,
+          showDivider: _showBottomDivider,
+        ),
+      );
 }

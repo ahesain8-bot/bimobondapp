@@ -140,10 +140,7 @@ class FeedSkeleton extends StatelessWidget {
                       onBlackBackground: true,
                     ),
                   ),
-                  SkeletonWidget.circular(
-                    size: 45,
-                    onBlackBackground: true,
-                  ),
+                  SkeletonWidget.circular(size: 45, onBlackBackground: true),
                 ],
               ),
             ),
@@ -259,7 +256,6 @@ class AuctionCardSkeleton extends StatelessWidget {
   }
 }
 
-
 /// Horizontal category chips placeholder for [AuctionsScreen].
 class AuctionsCategoryStripSkeleton extends StatelessWidget {
   const AuctionsCategoryStripSkeleton({super.key, this.chipCount = 6});
@@ -338,10 +334,7 @@ class ListSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the user comments screen.
 class UserCommentsListSkeleton extends StatelessWidget {
-  const UserCommentsListSkeleton({
-    super.key,
-    this.itemCount = 8,
-  });
+  const UserCommentsListSkeleton({super.key, this.itemCount = 8});
 
   final int itemCount;
 
@@ -386,11 +379,7 @@ class _UserCommentTileSkeleton extends StatelessWidget {
                       child: SkeletonWidget(height: 14, width: double.infinity),
                     ),
                     const SizedBox(width: AppSizes.p8),
-                    SkeletonWidget(
-                      height: 12,
-                      width: 36,
-                      borderRadius: 6,
-                    ),
+                    SkeletonWidget(height: 12, width: 36, borderRadius: 6),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -411,10 +400,7 @@ class _UserCommentTileSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the user likes screen.
 class UserLikesListSkeleton extends StatelessWidget {
-  const UserLikesListSkeleton({
-    super.key,
-    this.itemCount = 8,
-  });
+  const UserLikesListSkeleton({super.key, this.itemCount = 8});
 
   final int itemCount;
 
@@ -455,11 +441,7 @@ class _UserLikeTileSkeleton extends StatelessWidget {
                   child: SkeletonWidget(height: 14, width: double.infinity),
                 ),
                 const SizedBox(width: AppSizes.p8),
-                SkeletonWidget(
-                  height: 12,
-                  width: 36,
-                  borderRadius: 6,
-                ),
+                SkeletonWidget(height: 12, width: 36, borderRadius: 6),
               ],
             ),
           ),
@@ -471,10 +453,7 @@ class _UserLikeTileSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the user mentions screen.
 class UserMentionsListSkeleton extends StatelessWidget {
-  const UserMentionsListSkeleton({
-    super.key,
-    this.itemCount = 8,
-  });
+  const UserMentionsListSkeleton({super.key, this.itemCount = 8});
 
   final int itemCount;
 
@@ -496,10 +475,7 @@ class UserMentionsListSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the my followers screen.
 class UserFollowersListSkeleton extends StatelessWidget {
-  const UserFollowersListSkeleton({
-    super.key,
-    this.itemCount = 8,
-  });
+  const UserFollowersListSkeleton({super.key, this.itemCount = 8});
 
   final int itemCount;
 
@@ -682,11 +658,7 @@ class _FollowSuggestionTileSkeleton extends StatelessWidget {
         padding: EdgeInsets.only(top: 6),
         child: SkeletonWidget(height: 12, width: 100),
       ),
-      trailing: const SkeletonWidget(
-        height: 34,
-        width: 96,
-        borderRadius: 12,
-      ),
+      trailing: const SkeletonWidget(height: 34, width: 96, borderRadius: 12),
     );
   }
 }
@@ -761,7 +733,8 @@ class MessagesSuggestionsStripSkeleton extends StatelessWidget {
                   const SkeletonWidget(height: 10, width: 72),
                   const SizedBox(height: 14),
                   SkeletonWidget(
-                    height: MessagesLayoutConstants.suggestionFollowButtonHeight,
+                    height:
+                        MessagesLayoutConstants.suggestionFollowButtonHeight,
                     width: double.infinity,
                     borderRadius: 12,
                   ),
@@ -830,7 +803,8 @@ class _MessagesChatTileSkeleton extends StatelessWidget {
                   SkeletonWidget(
                     height: 14,
                     width: avatarSize + 80,
-                    borderRadius: MessagesLayoutConstants.conversationTileRadius,
+                    borderRadius:
+                        MessagesLayoutConstants.conversationTileRadius,
                   ),
                 ],
               ),

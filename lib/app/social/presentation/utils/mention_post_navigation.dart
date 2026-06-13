@@ -11,8 +11,6 @@ Future<void> openMentionPost(
   final postId = mention.postId.trim();
   if (postId.isEmpty) return;
 
-  final openComments =
-      mention.isCommentMention || (mention.commentId?.trim().isNotEmpty ?? false);
   final highlightCommentId = mention.commentId?.trim();
 
   final embedded = mention.post;
@@ -20,8 +18,11 @@ Future<void> openMentionPost(
     openPost(
       context,
       embedded,
-      openComments: openComments,
-      highlightCommentId: highlightCommentId,
+      openComments: true,
+      highlightCommentId:
+          highlightCommentId != null && highlightCommentId.isNotEmpty
+              ? highlightCommentId
+              : null,
     );
     return;
   }
@@ -29,8 +30,11 @@ Future<void> openMentionPost(
   await openPostById(
     context,
     postId,
-    openComments: openComments,
-    highlightCommentId: highlightCommentId,
+    openComments: true,
+    highlightCommentId:
+        highlightCommentId != null && highlightCommentId.isNotEmpty
+            ? highlightCommentId
+            : null,
   );
 }
 

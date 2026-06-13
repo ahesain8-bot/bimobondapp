@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/auth/presentation/pages/phone_login_screen.dart'
 import 'package:bimobondapp/app/auth/presentation/pages/signup_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/otp_verification_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/email_otp_verification_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/forgot_password_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/email_verification_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/splash_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/personal_info_screen.dart';
@@ -89,6 +90,14 @@ class AppRouter {
         builder: (context, state) {
           final email = state.uri.queryParameters['email']!;
           return EmailOtpVerificationScreen(email: email);
+        },
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot_password',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'];
+          return ForgotPasswordScreen(initialEmail: email);
         },
       ),
       GoRoute(

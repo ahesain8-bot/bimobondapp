@@ -5,6 +5,7 @@ import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/widgets/activity_feed_card.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -124,20 +125,13 @@ class MessagesMentionsStrip extends StatelessWidget {
                   ),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: theme.cardColor,
+                    color: activityFeedCardSurface(theme),
                     borderRadius: BorderRadius.circular(
                       MessagesLayoutConstants.mentionCardRadius,
                     ),
                     border: Border.all(
-                      color: theme.dividerColor.withValues(alpha: 0.08),
+                      color: activityFeedCardBorderColor(theme),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Row(
                     children: [
@@ -164,7 +158,7 @@ class MessagesMentionsStrip extends StatelessWidget {
                                   color: theme.colorScheme.primary,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: theme.cardColor,
+                                    color: activityFeedCardSurface(theme),
                                     width: 1.5,
                                   ),
                                 ),

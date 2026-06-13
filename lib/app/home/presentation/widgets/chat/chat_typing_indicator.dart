@@ -1,4 +1,5 @@
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
+import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:flutter/material.dart';
 
@@ -17,6 +18,7 @@ class ChatTypingIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final chatTheme = ChatTheme.of(context);
     return Padding(
       padding: const EdgeInsets.only(
         top: ChatLayoutConstants.typingIndicatorTopPadding,
@@ -40,7 +42,7 @@ class ChatTypingIndicator extends StatelessWidget {
               vertical: ChatLayoutConstants.typingIndicatorVerticalPadding,
             ),
             decoration: BoxDecoration(
-              color: theme.cardColor,
+              color: chatTheme.receivedBubbleColor,
               borderRadius: BorderRadius.circular(
                 ChatLayoutConstants.typingIndicatorRadius,
               ),
@@ -49,6 +51,7 @@ class ChatTypingIndicator extends StatelessWidget {
               '...',
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: chatTheme.onReceivedBubble,
               ),
             ),
           ),

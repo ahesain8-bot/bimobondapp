@@ -7,6 +7,7 @@ class ApiConstants {
   static const String authMe = '/auth/me';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
+  static const String forgotPassword = '/auth/forgot-password';
   static const String register = '/register';
   static const String updateProfile = '/users/me';
   static const String uploadAvatar = '/users/avatar';

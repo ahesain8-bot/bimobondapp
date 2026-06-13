@@ -1,10 +1,12 @@
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
 
 class CommentSkeletonRow extends StatelessWidget {
   const CommentSkeletonRow({this.isReply = false, super.key});
+
+  static const _tone = LiquidGlassSkeletonTone.light;
 
   final bool isReply;
 
@@ -17,19 +19,35 @@ class CommentSkeletonRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SkeletonWidget.circular(size: avatarSize),
+        LiquidGlassSkeletonBox.circular(size: avatarSize, tone: _tone),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SkeletonWidget(height: 14, width: isReply ? 110 : 140),
+              LiquidGlassSkeletonBox(
+                height: 14,
+                width: isReply ? 110 : 140,
+                tone: _tone,
+              ),
               const SizedBox(height: 8),
-              const SkeletonWidget(height: 15, width: double.infinity),
+              const LiquidGlassSkeletonBox(
+                height: 15,
+                width: double.infinity,
+                tone: _tone,
+              ),
               const SizedBox(height: 4),
-              SkeletonWidget(height: 15, width: isReply ? 160 : 220),
+              LiquidGlassSkeletonBox(
+                height: 15,
+                width: isReply ? 160 : 220,
+                tone: _tone,
+              ),
               const SizedBox(height: 12),
-              SkeletonWidget(height: 14, width: isReply ? 72 : 100),
+              LiquidGlassSkeletonBox(
+                height: 14,
+                width: isReply ? 72 : 100,
+                tone: _tone,
+              ),
             ],
           ),
         ),

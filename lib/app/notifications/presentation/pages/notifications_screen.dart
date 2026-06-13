@@ -8,9 +8,11 @@ import 'package:bimobondapp/app/notifications/presentation/di/notifications_inje
     as notifications_di;
 import 'package:bimobondapp/app/notifications/presentation/services/notification_unread_badge.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_admin_helper.dart';
+import 'package:bimobondapp/app/notifications/presentation/utils/notification_category_filter.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_navigation.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_list_tile.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notifications_filter_tabs.dart';
+import 'package:bimobondapp/core/constants/notifications_layout_constants.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
@@ -19,6 +21,7 @@ import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -38,7 +41,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _hasReachedMax = false;
   bool _isLoading = false;
   bool _isLoadingMore = false;
-  NotificationsReadFilter _readFilter = NotificationsReadFilter.all;
+  NotificationsCategoryFilter _categoryFilter = NotificationsCategoryFilter.all;
   int _unreadCount = 0;
   String? _errorMessage;
   int _refreshGeneration = 0;
@@ -69,9 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!mounted) return;
       setState(() {
         _items.removeWhere((item) => item.id == notification.id);
-        if (_matchesFilter(notification)) {
-          _items.insert(0, notification);
-        }
+        _items.insert(0, notification);
         if (!notification.isRead) _unreadCount++;
       });
     });
@@ -93,20 +94,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  bool _matchesFilter(NotificationEntity notification) {
-    return switch (_readFilter) {
-      NotificationsReadFilter.all => true,
-      NotificationsReadFilter.unread => !notification.isRead,
-      NotificationsReadFilter.read => notification.isRead,
-    };
-  }
-
-  bool? get _isReadQuery {
-    return switch (_readFilter) {
-      NotificationsReadFilter.all => null,
-      NotificationsReadFilter.unread => false,
-      NotificationsReadFilter.read => true,
-    };
+  List<NotificationEntity> get _visibleItems {
+    return _items
+        .where((n) => _categoryFilter.matches(n.type))
+        .toList(growable: false);
   }
 
   Future<void> _load({bool refresh = false, bool loadMore = false}) async {
@@ -127,11 +118,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       });
 
       final result = await notifications_di.sl<GetNotificationsUseCase>()(
-        GetNotificationsParams(
-          page: 1,
-          limit: _pageSize,
-          isRead: _isReadQuery,
-        ),
+        const GetNotificationsParams(page: 1, limit: _pageSize),
       );
 
       if (!mounted || generation != _refreshGeneration) return;
@@ -147,9 +134,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ..clear()
               ..addAll(page.notifications);
             _unreadCount = page.unreadCount;
-            notifications_di
-                .sl<NotificationUnreadBadge>()
-                .setCount(page.unreadCount);
+            notifications_di.sl<NotificationUnreadBadge>().setCount(
+              page.unreadCount,
+            );
             _hasReachedMax = page.hasReachedMax;
             _isLoading = false;
           });
@@ -159,11 +146,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     final result = await notifications_di.sl<GetNotificationsUseCase>()(
-      GetNotificationsParams(
-        page: _page,
-        limit: _pageSize,
-        isRead: _isReadQuery,
-      ),
+      GetNotificationsParams(page: _page, limit: _pageSize),
     );
 
     if (!mounted) return;
@@ -180,7 +163,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             page.notifications.where((e) => !existing.contains(e.id)),
           );
           _unreadCount = page.unreadCount;
-          notifications_di.sl<NotificationUnreadBadge>().setCount(page.unreadCount);
+          notifications_di.sl<NotificationUnreadBadge>().setCount(
+            page.unreadCount,
+          );
           _hasReachedMax = page.hasReachedMax;
           _isLoadingMore = false;
         });
@@ -188,61 +173,50 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  void _onFilterSelected(NotificationsReadFilter filter) {
-    if (_readFilter == filter) return;
-    setState(() {
-      _readFilter = filter;
-      _items.clear();
-      _errorMessage = null;
-    });
+  void _onFilterSelected(NotificationsCategoryFilter filter) {
+    if (_categoryFilter == filter) return;
+    setState(() => _categoryFilter = filter);
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
-    _load(refresh: true);
   }
 
   Future<void> _markAllRead() async {
-    final result =
-        await notifications_di.sl<MarkAllNotificationsReadUseCase>()();
+    final result = await notifications_di
+        .sl<MarkAllNotificationsReadUseCase>()();
     if (!mounted) return;
     result.fold(
       (failure) => PopupDialogs.showErrorDialog(context, failure.message),
       (count) {
         setState(() {
-          _unreadCount = count;
+          _unreadCount = 0;
           for (var i = 0; i < _items.length; i++) {
             if (!_items[i].isRead) {
               _items[i] = _items[i].copyWith(isRead: true);
             }
           }
-          if (_readFilter == NotificationsReadFilter.unread) {
-            _items.clear();
-          }
         });
-        notifications_di.sl<NotificationUnreadBadge>().setCount(count);
+        notifications_di.sl<NotificationUnreadBadge>().setCount(0);
       },
     );
   }
 
+  Future<void> _markRead(NotificationEntity notification) async {
+    if (notification.isRead) return;
+    await notifications_di.sl<MarkNotificationReadUseCase>()(notification.id);
+    if (!mounted) return;
+    setState(() {
+      final index = _items.indexWhere((e) => e.id == notification.id);
+      if (index != -1) {
+        _items[index] = _items[index].copyWith(isRead: true);
+        if (_unreadCount > 0) _unreadCount--;
+      }
+    });
+    notifications_di.sl<NotificationUnreadBadge>().setCount(_unreadCount);
+  }
+
   Future<void> _onTap(NotificationEntity notification) async {
-    if (!notification.isRead) {
-      await notifications_di.sl<MarkNotificationReadUseCase>()(notification.id);
-      if (!mounted) return;
-      setState(() {
-        final index = _items.indexWhere((e) => e.id == notification.id);
-        if (index != -1) {
-          if (_readFilter == NotificationsReadFilter.unread) {
-            _items.removeAt(index);
-          } else if (_readFilter == NotificationsReadFilter.read) {
-            _items[index] = _items[index].copyWith(isRead: true);
-          } else {
-            _items[index] = _items[index].copyWith(isRead: true);
-          }
-          if (_unreadCount > 0) _unreadCount--;
-        }
-      });
-      notifications_di.sl<NotificationUnreadBadge>().setCount(_unreadCount);
-    }
+    await _markRead(notification);
 
     if (!mounted) return;
     if (NotificationAdminHelper.isAdminNotificationEntity(notification)) {
@@ -251,60 +225,58 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     await handleNotificationTap(context, notification);
   }
 
+  Future<void> _onAcceptFollowRequest(NotificationEntity notification) async {
+    await _markRead(notification);
+    if (!mounted) return;
+    await handleNotificationTap(context, notification);
+  }
+
+  Future<void> _onDeclineFollowRequest(NotificationEntity notification) async {
+    await _markRead(notification);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final screenBackground = theme.brightness == Brightness.light
+        ? Colors.white
+        : theme.scaffoldBackgroundColor;
 
     return Scaffold(
-      backgroundColor: theme.brightness == Brightness.light
-          ? Colors.white
-          : theme.scaffoldBackgroundColor,
+      backgroundColor: screenBackground,
       appBar: CustomAppBar(
         title: l10n.settingsNotifications,
         showBackButton: true,
+        backgroundColor: screenBackground,
         actions: [
           if (_unreadCount > 0)
-            TextButton.icon(
+            IconButton(
               onPressed: _markAllRead,
+              tooltip: l10n.notificationsMarkAllRead,
               icon: Icon(
                 LucideIcons.checkCheck,
-                size: 16,
-                color: theme.colorScheme.primary,
-              ),
-              label: Text(
-                l10n.notificationsMarkAllRead,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
+                size: 20,
+                color: theme.colorScheme.onSurface,
               ),
             ),
+          IconButton(
+            onPressed: () => context.pushNamed('settings'),
+            tooltip: l10n.settingsAndPrivacy,
+            icon: Icon(
+              LucideIcons.settings,
+              size: 20,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
         ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_unreadCount > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSizes.p16,
-                0,
-                AppSizes.p16,
-                AppSizes.p4,
-              ),
-              child: Text(
-                l10n.notificationsFilterUnreadCount(_unreadCount),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+          SizedBox(height: AppSizes.p12),
           NotificationsFilterTabs(
-            filter: _readFilter,
-            unreadCount: _unreadCount,
+            filter: _categoryFilter,
             onFilterSelected: _onFilterSelected,
           ),
           Expanded(child: _buildBody(l10n, theme)),
@@ -316,14 +288,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _buildBody(AppLocalizations l10n, ThemeData theme) {
     if (_isLoading && !_isLoadingMore) {
       return ListView.builder(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p16,
-          vertical: AppSizes.p8,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
         itemCount: 8,
         itemBuilder: (_, _) => const Padding(
-          padding: EdgeInsets.only(bottom: AppSizes.p10),
-          child: SkeletonWidget(height: 88, borderRadius: 18),
+          padding: EdgeInsets.symmetric(
+            horizontal: NotificationsLayoutConstants.cardPadding,
+            vertical: AppSizes.p8,
+          ),
+          child: SkeletonWidget(height: 72, borderRadius: 12),
         ),
       );
     }
@@ -338,11 +310,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
 
-    if (_items.isEmpty) {
-      final subtitle = switch (_readFilter) {
-        NotificationsReadFilter.unread => l10n.notificationsEmptyUnread,
-        NotificationsReadFilter.read => l10n.notificationsEmptyRead,
-        NotificationsReadFilter.all => l10n.notificationsEmptySubtitle,
+    final visibleItems = _visibleItems;
+
+    if (visibleItems.isEmpty) {
+      final subtitle = switch (_categoryFilter) {
+        NotificationsCategoryFilter.activity => l10n.notificationsEmptyActivity,
+        NotificationsCategoryFilter.auctions => l10n.notificationsEmptyAuctions,
+        NotificationsCategoryFilter.invites => l10n.notificationsEmptyInvites,
+        NotificationsCategoryFilter.all => l10n.notificationsEmptySubtitle,
       };
       return _NotificationsEmptyState(
         icon: LucideIcons.bellOff,
@@ -359,15 +334,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
-        padding: const EdgeInsets.fromLTRB(
-          AppSizes.p16,
-          0,
-          AppSizes.p16,
-          AppSizes.p24,
-        ),
-        itemCount: _items.length + (_isLoadingMore ? 1 : 0),
+        padding: const EdgeInsets.only(bottom: AppSizes.p8),
+        itemCount: visibleItems.length + (_isLoadingMore ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= _items.length) {
+          if (index >= visibleItems.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: AppSizes.p16),
               child: Center(
@@ -380,10 +350,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             );
           }
 
-          final notification = _items[index];
+          final notification = visibleItems[index];
+          final isLast = index == visibleItems.length - 1;
+
           return NotificationListTile(
             notification: notification,
             onTap: () => _onTap(notification),
+            onAccept: notification.type == 'FOLLOW_REQUEST'
+                ? () => _onAcceptFollowRequest(notification)
+                : null,
+            onDecline: notification.type == 'FOLLOW_REQUEST'
+                ? () => _onDeclineFollowRequest(notification)
+                : null,
+            showDivider: !isLast,
           );
         },
       ),
@@ -420,14 +399,17 @@ class _NotificationsEmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.65),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.65,
+                ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 30,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.7,
+                ),
               ),
             ),
             const SizedBox(height: AppSizes.p16),

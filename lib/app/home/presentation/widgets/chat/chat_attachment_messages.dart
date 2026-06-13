@@ -29,7 +29,7 @@ class ChatLocationMessageWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
-    final color = isMe ? chatTheme.onSentBubble : theme.colorScheme.primary;
+    final color = isMe ? chatTheme.onSentBubble : chatTheme.onReceivedBubble;
 
     return InkWell(
       onTap: _openMaps,
@@ -59,7 +59,7 @@ class ChatLocationMessageWidget extends StatelessWidget {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: isMe
                           ? chatTheme.onSentBubbleMuted
-                          : theme.textTheme.bodySmall?.color,
+                          : chatTheme.onReceivedBubbleMuted,
                     ),
                   ),
                 ],
@@ -97,7 +97,7 @@ class ChatFileMessageWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
-    final color = isMe ? chatTheme.onSentBubble : theme.colorScheme.primary;
+    final color = isMe ? chatTheme.onSentBubble : chatTheme.onReceivedBubble;
     final canOpen = fileUrl != null && fileUrl!.trim().isNotEmpty;
 
     return InkWell(
@@ -149,7 +149,7 @@ class ChatContactMessageWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
-    final color = isMe ? chatTheme.onSentBubble : theme.colorScheme.primary;
+    final color = isMe ? chatTheme.onSentBubble : chatTheme.onReceivedBubble;
 
     return InkWell(
       onTap: _call,
@@ -179,7 +179,7 @@ class ChatContactMessageWidget extends StatelessWidget {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: isMe
                           ? chatTheme.onSentBubbleMuted
-                          : theme.textTheme.bodySmall?.color,
+                          : chatTheme.onReceivedBubbleMuted,
                     ),
                   ),
                 ],

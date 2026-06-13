@@ -232,7 +232,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     final result = await signUpWithEmailUseCase(
-      SignUpWithEmailParams(email: event.email, password: event.password),
+      SignUpWithEmailParams(
+        fullName: event.fullName,
+        email: event.email,
+        password: event.password,
+      ),
     );
     result.fold(
       (failure) => emit(

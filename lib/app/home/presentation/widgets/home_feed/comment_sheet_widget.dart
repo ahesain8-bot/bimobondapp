@@ -17,7 +17,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -271,7 +271,10 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   Widget _buildCommentInputAvatar() {
     final authState = context.watch<AuthBloc>().state;
     if (authState is! AuthSuccess) {
-      return const SkeletonWidget.circular(size: 40);
+      return const LiquidGlassSkeletonBox.circular(
+        size: 40,
+        tone: LiquidGlassSkeletonTone.light,
+      );
     }
 
     final user = authState.user;

@@ -10,6 +10,10 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
   final Color replyAccent;
   final Color onSentBubble;
   final Color onSentBubbleMuted;
+  final Color receivedBubbleColor;
+  final Color onReceivedBubble;
+  final Color onReceivedBubbleMuted;
+  final Color sentBubbleColor;
   final Color inputFill;
   final Color recordingScrim;
   final Color recordingForeground;
@@ -29,6 +33,10 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     required this.replyAccent,
     required this.onSentBubble,
     required this.onSentBubbleMuted,
+    required this.receivedBubbleColor,
+    required this.onReceivedBubble,
+    required this.onReceivedBubbleMuted,
+    required this.sentBubbleColor,
     required this.inputFill,
     required this.recordingScrim,
     required this.recordingForeground,
@@ -50,8 +58,12 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       activeStatus: AppTheme.successAccent,
       readReceipt: scheme.secondary,
       replyAccent: scheme.primary,
-      onSentBubble: Colors.white,
-      onSentBubbleMuted: Colors.white.withValues(alpha: 0.7),
+      onSentBubble: scheme.onSurface,
+      onSentBubbleMuted: scheme.onSurface.withValues(alpha: 0.6),
+      receivedBubbleColor: scheme.primary,
+      onReceivedBubble: Colors.white,
+      onReceivedBubbleMuted: Colors.white.withValues(alpha: 0.7),
+      sentBubbleColor: isDark ? scheme.surface : Colors.white,
       inputFill: isDark
           ? Colors.white.withValues(alpha: ChatLayoutConstants.inputFillAlpha)
           : Colors.black.withValues(alpha: ChatLayoutConstants.inputFillAlpha),
@@ -103,6 +115,10 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     Color? replyAccent,
     Color? onSentBubble,
     Color? onSentBubbleMuted,
+    Color? receivedBubbleColor,
+    Color? onReceivedBubble,
+    Color? onReceivedBubbleMuted,
+    Color? sentBubbleColor,
     Color? inputFill,
     Color? recordingScrim,
     Color? recordingForeground,
@@ -122,6 +138,11 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       replyAccent: replyAccent ?? this.replyAccent,
       onSentBubble: onSentBubble ?? this.onSentBubble,
       onSentBubbleMuted: onSentBubbleMuted ?? this.onSentBubbleMuted,
+      receivedBubbleColor: receivedBubbleColor ?? this.receivedBubbleColor,
+      onReceivedBubble: onReceivedBubble ?? this.onReceivedBubble,
+      onReceivedBubbleMuted:
+          onReceivedBubbleMuted ?? this.onReceivedBubbleMuted,
+      sentBubbleColor: sentBubbleColor ?? this.sentBubbleColor,
       inputFill: inputFill ?? this.inputFill,
       recordingScrim: recordingScrim ?? this.recordingScrim,
       recordingForeground: recordingForeground ?? this.recordingForeground,
@@ -154,6 +175,18 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
         other.onSentBubbleMuted,
         t,
       )!,
+      receivedBubbleColor: Color.lerp(
+        receivedBubbleColor,
+        other.receivedBubbleColor,
+        t,
+      )!,
+      onReceivedBubble: Color.lerp(onReceivedBubble, other.onReceivedBubble, t)!,
+      onReceivedBubbleMuted: Color.lerp(
+        onReceivedBubbleMuted,
+        other.onReceivedBubbleMuted,
+        t,
+      )!,
+      sentBubbleColor: Color.lerp(sentBubbleColor, other.sentBubbleColor, t)!,
       inputFill: Color.lerp(inputFill, other.inputFill, t)!,
       recordingScrim: Color.lerp(recordingScrim, other.recordingScrim, t)!,
       recordingForeground: Color.lerp(
