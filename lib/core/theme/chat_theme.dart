@@ -56,7 +56,7 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
 
     return ChatTheme(
       activeStatus: AppTheme.successAccent,
-      readReceipt: scheme.secondary,
+      readReceipt: Colors.green,
       replyAccent: scheme.primary,
       onSentBubble: scheme.onSurface,
       onSentBubbleMuted: scheme.onSurface.withValues(alpha: 0.6),
@@ -65,8 +65,8 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       onReceivedBubbleMuted: Colors.white.withValues(alpha: 0.7),
       sentBubbleColor: isDark ? scheme.surface : Colors.white,
       inputFill: isDark
-          ? Colors.white.withValues(alpha: ChatLayoutConstants.inputFillAlpha)
-          : Colors.black.withValues(alpha: ChatLayoutConstants.inputFillAlpha),
+          ? const Color(0xFF2C2C2C)
+          : Colors.white,
       recordingScrim: Colors.black.withValues(
         alpha: ChatLayoutConstants.recordingOverlayAlpha,
       ),

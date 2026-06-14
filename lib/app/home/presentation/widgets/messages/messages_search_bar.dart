@@ -1,4 +1,5 @@
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
+import 'package:bimobondapp/core/widgets/common_search_bar.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -37,39 +38,6 @@ class MessagesSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-
-    final field = TextField(
-      controller: controller,
-      focusNode: focusNode,
-      autofocus: autofocus,
-      readOnly: readOnly,
-      onTap: readOnly ? onTap : null,
-      onChanged: onChanged,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-      decoration: InputDecoration(
-        hintText: l10n.messagesSearchHint,
-        hintStyle: TextStyle(
-          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
-          fontSize: 15,
-        ),
-        prefixIcon: Icon(
-          Icons.search_rounded,
-          color: theme.colorScheme.primary.withValues(
-            alpha: MessagesLayoutConstants.searchIconAlpha,
-          ),
-          size: 22,
-        ),
-        suffixIcon: !readOnly && searchQuery.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.cancel_rounded, size: 18),
-                onPressed: onClear,
-              )
-            : null,
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-      ),
-    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -78,35 +46,15 @@ class MessagesSearchBar extends StatelessWidget {
         MessagesLayoutConstants.horizontalPadding,
         MessagesLayoutConstants.searchBarBottomPadding,
       ),
-      child: Container(
-        height: MessagesLayoutConstants.searchBarHeight,
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(
-            MessagesLayoutConstants.searchBarRadius,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: MessagesLayoutConstants.searchBarShadowAlpha,
-              ),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: theme.dividerColor.withValues(
-              alpha: MessagesLayoutConstants.searchBarBorderAlpha,
-            ),
-          ),
-        ),
-        child: readOnly
-            ? GestureDetector(
-                onTap: onTap,
-                behavior: HitTestBehavior.opaque,
-                child: AbsorbPointer(child: field),
-              )
-            : field,
+      child: CommonSearchBar(
+        controller: controller,
+        focusNode: focusNode,
+        autofocus: autofocus,
+        readOnly: readOnly,
+        onTap: onTap,
+        onChanged: onChanged,
+        onClear: onClear,
+        hintText: l10n.messagesSearchHint,
       ),
     );
   }

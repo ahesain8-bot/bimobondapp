@@ -256,10 +256,7 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
       });
     }
 
-    final result = await _fetchUsersForType(
-      _selectedType,
-      page: tab.page,
-    );
+    final result = await _fetchUsersForType(_selectedType, page: tab.page);
 
     if (!mounted) return;
 
@@ -289,8 +286,7 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
           } else {
             final existingIds = tab.users.map((user) => user.id).toSet();
             tab.users.addAll(
-              normalizedUsers
-                  .where((user) => !existingIds.contains(user.id)),
+              normalizedUsers.where((user) => !existingIds.contains(user.id)),
             );
           }
           tab.hasReachedMax = pageResult.hasReachedMax;
@@ -309,19 +305,11 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
     switch (type) {
       case UserConnectionType.followers:
         return social_di.sl<GetFollowersUseCase>()(
-          GetUserListParams(
-            widget.userId,
-            page: page,
-            limit: _pageSize,
-          ),
+          GetUserListParams(widget.userId, page: page, limit: _pageSize),
         );
       case UserConnectionType.following:
         return social_di.sl<GetFollowingUseCase>()(
-          GetUserListParams(
-            widget.userId,
-            page: page,
-            limit: _pageSize,
-          ),
+          GetUserListParams(widget.userId, page: page, limit: _pageSize),
         );
       case UserConnectionType.friends:
         return social_di.sl<GetMyFriendsUseCase>()(
@@ -358,7 +346,10 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: CustomAppBar(title: l10n.connectionsTitle),
+      appBar: CustomAppBar(
+        title: l10n.connectionsTitle,
+        hideBottomDivider: true,
+      ),
       body: Column(
         children: [
           Material(
@@ -372,8 +363,7 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
               indicatorColor: theme.colorScheme.primary,
               dividerColor: theme.dividerColor.withValues(alpha: 0.15),
               tabs: [
-                for (final type in _tabTypes)
-                  Tab(text: _tabLabel(type, l10n)),
+                for (final type in _tabTypes) Tab(text: _tabLabel(type, l10n)),
               ],
             ),
           ),
@@ -453,7 +443,9 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
         );
       },
       itemBuilder: (context, index) {
-        if (tab.isLoadingMore && !tab.hasReachedMax && index == tab.users.length) {
+        if (tab.isLoadingMore &&
+            !tab.hasReachedMax &&
+            index == tab.users.length) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: AppSizes.p16),
             child: Center(

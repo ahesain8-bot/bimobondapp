@@ -726,7 +726,7 @@
   "chatDeleteMessageTitle": "Delete message?",
   "chatDeleteMessageMessage": "This message will be hidden for everyone in the chat.",
   "chatActiveNow": "Active now",
-  "chatAddComment": "Add comment...",
+  "chatAddComment": "Write message",
   "chatRecording": "Recording...",
   "chatSlideUpToCancel": "Slide up to cancel",
   "chatRecordingPermissionDenied": "Allow microphone access to record voice messages.",

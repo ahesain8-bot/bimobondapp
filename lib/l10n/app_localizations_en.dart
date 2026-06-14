@@ -1429,7 +1429,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatActiveNow => 'Active now';
 
   @override
-  String get chatAddComment => 'Add comment...';
+  String get chatAddComment => 'Write message';
 
   @override
   String get chatRecording => 'Recording...';

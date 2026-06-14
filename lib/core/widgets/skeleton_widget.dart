@@ -1,8 +1,11 @@
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
+import 'package:bimobondapp/core/constants/notifications_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/dotted_divider.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+
 
 class SkeletonWidget extends StatelessWidget {
   final double? height;
@@ -292,7 +295,7 @@ class AuctionsCategoryStripSkeleton extends StatelessWidget {
 class AuctionListSkeleton extends StatelessWidget {
   const AuctionListSkeleton({
     super.key,
-    this.itemCount = 3,
+    this.itemCount = 5,
     this.padding = const EdgeInsets.symmetric(horizontal: AppSizes.p16),
   });
 
@@ -321,7 +324,7 @@ class ListSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      itemCount: 10,
+      itemCount: 15,
       itemBuilder: (context, index) => ListTile(
         leading: const SkeletonWidget.circular(size: 40),
         title: const SkeletonWidget(height: 16, width: 150),
@@ -334,7 +337,7 @@ class ListSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the user comments screen.
 class UserCommentsListSkeleton extends StatelessWidget {
-  const UserCommentsListSkeleton({super.key, this.itemCount = 8});
+  const UserCommentsListSkeleton({super.key, this.itemCount = 15});
 
   final int itemCount;
 
@@ -400,7 +403,7 @@ class _UserCommentTileSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the user likes screen.
 class UserLikesListSkeleton extends StatelessWidget {
-  const UserLikesListSkeleton({super.key, this.itemCount = 8});
+  const UserLikesListSkeleton({super.key, this.itemCount = 15});
 
   final int itemCount;
 
@@ -453,7 +456,7 @@ class _UserLikeTileSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the user mentions screen.
 class UserMentionsListSkeleton extends StatelessWidget {
-  const UserMentionsListSkeleton({super.key, this.itemCount = 8});
+  const UserMentionsListSkeleton({super.key, this.itemCount = 15});
 
   final int itemCount;
 
@@ -475,7 +478,7 @@ class UserMentionsListSkeleton extends StatelessWidget {
 
 /// Notification-style placeholders for the my followers screen.
 class UserFollowersListSkeleton extends StatelessWidget {
-  const UserFollowersListSkeleton({super.key, this.itemCount = 8});
+  const UserFollowersListSkeleton({super.key, this.itemCount = 15});
 
   final int itemCount;
 
@@ -617,7 +620,7 @@ class MessagesMentionsStripSkeleton extends StatelessWidget {
 class FollowSuggestionsListSkeleton extends StatelessWidget {
   const FollowSuggestionsListSkeleton({
     super.key,
-    this.itemCount = 8,
+    this.itemCount = 15,
     this.scrollable = true,
   });
 
@@ -991,3 +994,109 @@ class _GiftSheetShimmerBox extends StatelessWidget {
     );
   }
 }
+
+/// A skeleton item mimicking [NotificationListTile]
+class NotificationListTileSkeleton extends StatelessWidget {
+  const NotificationListTileSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: NotificationsLayoutConstants.cardPadding,
+        vertical: NotificationsLayoutConstants.itemVerticalPadding,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Circular Avatar Shimmer
+          const SkeletonWidget.circular(
+            size: NotificationsLayoutConstants.avatarRadius * 2,
+          ),
+          const SizedBox(width: AppSizes.p12),
+          // Content Shimmer Columns
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Main notification text lines
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // First line representing user name + action phrase
+                          const SkeletonWidget(
+                            height: 14,
+                            width: double.infinity,
+                          ),
+                          const SizedBox(height: 6),
+                          // Second line representing action phrase continuation / detail context
+                          SkeletonWidget(
+                            height: 14,
+                            width: MediaQuery.sizeOf(context).width * 0.45,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSizes.p8),
+                    // Relative Time Shimmer
+                    const SkeletonWidget(
+                      height: 12,
+                      width: 36,
+                      borderRadius: 6,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Detailed Date Timestamp Shimmer
+                const SkeletonWidget(
+                  height: 12,
+                  width: 80,
+                  borderRadius: 6,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A vertical list of [NotificationListTileSkeleton] items separated by [DottedDivider] widgets.
+class NotificationsListSkeleton extends StatelessWidget {
+  const NotificationsListSkeleton({
+    super.key,
+    this.itemCount = 15,
+    this.physics,
+  });
+
+  final int itemCount;
+  final ScrollPhysics? physics;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView.separated(
+      physics: physics ??
+          const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+      padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
+      itemCount: itemCount,
+      separatorBuilder: (context, _) => Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: NotificationsLayoutConstants.cardPadding,
+        ),
+        child: DottedDivider(
+          color: NotificationsLayoutConstants.dottedDividerColor(theme),
+        ),
+      ),
+      itemBuilder: (context, _) => const NotificationListTileSkeleton(),
+    );
+  }
+}
+

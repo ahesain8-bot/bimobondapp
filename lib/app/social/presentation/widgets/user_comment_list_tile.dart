@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_comment_entity.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
@@ -50,6 +51,7 @@ class UserCommentListTile extends StatelessWidget {
     final author = _author;
     final authorName =
         author?.displayName ?? l10n.messagesInboxUserFallback;
+    final (badgeIcon, badgeColor) = NotificationTypeStyle.forType('POST_COMMENT');
 
     return ActivityFeedListRow(
       actorName: authorName,
@@ -63,6 +65,8 @@ class UserCommentListTile extends StatelessWidget {
       isFollowing: author?.isFollowing,
       createdAt: _createdAt,
       quoteText: comment.content.trim().isNotEmpty ? comment.content : null,
+      badgeIcon: badgeIcon,
+      badgeColor: badgeColor,
       showDivider: showDivider,
     );
   }

@@ -94,6 +94,8 @@ class NotificationListTile extends StatelessWidget {
                           name: actorName,
                           username: notification.actor?.username,
                           fullName: notification.actor?.fullName,
+                          badgeIcon: typeIcon,
+                          badgeColor: typeColor,
                         ),
                   const SizedBox(width: AppSizes.p12),
                   Expanded(
@@ -337,6 +339,8 @@ class _AvatarWithStatus extends StatelessWidget {
     required this.name,
     this.username,
     this.fullName,
+    required this.badgeIcon,
+    required this.badgeColor,
   });
 
   final String? userId;
@@ -344,6 +348,8 @@ class _AvatarWithStatus extends StatelessWidget {
   final String name;
   final String? username;
   final String? fullName;
+  final IconData badgeIcon;
+  final Color badgeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -359,18 +365,31 @@ class _AvatarWithStatus extends StatelessWidget {
           fullName: fullName,
         ),
         PositionedDirectional(
-          end: 0,
-          bottom: 0,
+          end: -2,
+          bottom: -2,
           child: Container(
-            width: NotificationsLayoutConstants.statusDotSize,
-            height: NotificationsLayoutConstants.statusDotSize,
+            width: 20,
+            height: 20,
             decoration: BoxDecoration(
-              color: NotificationsLayoutConstants.unreadDotColor,
+              color: badgeColor,
               shape: BoxShape.circle,
               border: Border.all(
                 color: Theme.of(context).cardColor,
-                width: 1.5,
+                width: 2,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: badgeColor.withValues(alpha: 0.35),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              badgeIcon,
+              size: 10,
+              color: Colors.white,
             ),
           ),
         ),
@@ -393,6 +412,7 @@ class _ActionRichText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tag = contextTag;
 
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -417,7 +437,7 @@ class _ActionRichText extends StatelessWidget {
             ],
           ),
         ),
-        if (contextTag != null) contextTag!,
+        if (tag != null) tag,
       ],
     );
   }

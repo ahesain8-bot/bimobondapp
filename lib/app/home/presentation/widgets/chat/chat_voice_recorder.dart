@@ -93,6 +93,18 @@ class ChatVoiceRecorder {
     return ChatVoiceRecordingResult(file: file, duration: duration);
   }
 
+  Future<void> pause() async {
+    if (_isRecordingActive) {
+      await _recorder.pause();
+    }
+  }
+
+  Future<void> resume() async {
+    if (_isRecordingActive) {
+      await _recorder.resume();
+    }
+  }
+
   Future<void> cancel() async {
     if (!_isRecordingActive) {
       _clearSession();

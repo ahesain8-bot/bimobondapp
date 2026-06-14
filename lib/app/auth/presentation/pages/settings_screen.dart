@@ -213,7 +213,6 @@ class SettingsScreen extends StatelessWidget {
 
     if (confirmed != true || !context.mounted) return;
     context.read<AuthBloc>().add(const LogoutRequestedEvent());
-    context.go('/');
   }
 
   void _showLanguageSheet(

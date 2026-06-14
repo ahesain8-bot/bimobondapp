@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
@@ -67,6 +68,8 @@ class SocialUserListTile extends StatelessWidget {
         ? user.fullName!.trim()
         : user.displayName;
 
+    final (badgeIcon, badgeColor) = NotificationTypeStyle.forType('NEW_FOLLOWER');
+
     return ActivityFeedListRow(
       actorName: displayName,
       actionPhrase: l10n.userFollowerAction,
@@ -79,6 +82,8 @@ class SocialUserListTile extends StatelessWidget {
       onAvatarTap: openProfile,
       showUsernameUnderName: true,
       compactPadding: true,
+      badgeIcon: badgeIcon,
+      badgeColor: badgeColor,
       trailing: showFollowButton
           ? ProfileFollowButton.listTile(
               isFollowing: user.isFollowing,

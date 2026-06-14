@@ -61,7 +61,7 @@ class MessagesLayoutConstants {
   static const double emptyStateHeight = 230;
   static const int recentMessagesPreviewCount = 2;
   static const int recentMentionsPreviewCount = 5;
-  static const int chatListSkeletonItemCount = 6;
+  static const int chatListSkeletonItemCount = 15;
   static const double chatListSkeletonTileHeight = 72;
 
   static const double glassButtonAlpha = 0.08;

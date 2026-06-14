@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_search_bar.dart';
+import 'package:bimobondapp/core/widgets/common_search_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
@@ -194,7 +194,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
                     AppSizes.p16,
                     AppSizes.p16,
                   ),
-                  child: AuctionsSearchBar(
+                  child: CommonSearchBar(
                     controller: _searchController,
                     fillColor: surfaceElevated,
                     hintText: l10n.postsSearchHint,

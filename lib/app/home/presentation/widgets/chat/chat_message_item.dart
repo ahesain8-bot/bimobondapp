@@ -540,6 +540,7 @@ class ChatMessageFooter extends StatelessWidget {
     required this.time,
     required this.isMe,
     required this.status,
+    super.key,
   });
 
   final String time;
@@ -550,35 +551,38 @@ class ChatMessageFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: ChatLayoutConstants.footerHorizontalPadding,
-        vertical: ChatLayoutConstants.footerVerticalPadding,
-      ),
-      child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          Text(
-            time,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontSize: ChatLayoutConstants.timeFontSize,
-              color: theme.textTheme.bodySmall?.color?.withValues(
-                alpha: ChatLayoutConstants.timeTextAlpha,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ChatLayoutConstants.footerHorizontalPadding,
+          vertical: ChatLayoutConstants.footerVerticalPadding,
+        ),
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            Text(
+              time,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: ChatLayoutConstants.timeFontSize,
+                color: theme.textTheme.bodySmall?.color?.withValues(
+                  alpha: ChatLayoutConstants.timeTextAlpha,
+                ),
               ),
             ),
-          ),
-          if (isMe) ...[
-            const SizedBox(width: AppSizes.p4),
-            Icon(
-              status == 'read' ? Icons.done_all : Icons.check,
-              size: ChatLayoutConstants.statusIconSize,
-              color: status == 'read'
-                  ? chatTheme.readReceipt
-                  : chatTheme.pendingReceipt,
-            ),
+            if (isMe) ...[
+              const SizedBox(width: AppSizes.p4),
+              Icon(
+                status == 'read' ? Icons.done_all : Icons.check,
+                size: ChatLayoutConstants.statusIconSize,
+                color: status == 'read'
+                    ? chatTheme.readReceipt
+                    : chatTheme.pendingReceipt,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

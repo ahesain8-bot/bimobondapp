@@ -583,7 +583,10 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
                 ),
               if (_isLoadingPostAuctions)
                 const SliverToBoxAdapter(
-                  child: AuctionListSkeleton(itemCount: 3),
+                  child: Padding(
+                    padding: EdgeInsets.only(top: AppSizes.p20),
+                    child: AuctionListSkeleton(),
+                  ),
                 )
               else
                 ..._buildAuctionSections(

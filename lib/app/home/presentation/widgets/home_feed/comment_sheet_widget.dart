@@ -404,7 +404,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
                             if (displayState is CommentsLoading) {
                               return ListView.builder(
-                                itemCount: 8,
+                                itemCount: 15,
                                 padding: const EdgeInsets.fromLTRB(
                                   AppSizes.p16,
                                   AppSizes.p16,

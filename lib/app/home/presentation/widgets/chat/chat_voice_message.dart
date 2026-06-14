@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:bimobondapp/app/home/presentation/utils/chat_voice_duration_formatter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_playback.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
@@ -87,9 +85,6 @@ class _ChatVoiceMessageWidgetState extends State<ChatVoiceMessageWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
-    final iconColor = widget.isMe
-        ? chatTheme.onSentBubble
-        : chatTheme.onReceivedBubble;
     final disabledAlpha = ChatLayoutConstants.voicePlayDisabledAlpha;
 
     return SizedBox(
@@ -102,92 +97,90 @@ class _ChatVoiceMessageWidgetState extends State<ChatVoiceMessageWidget> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _canPlay ? _onPlayTap : null,
-                customBorder: const CircleBorder(),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSizes.p4),
-                  child: Stack(
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _canPlay ? _onPlayTap : null,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: (widget.isMe
+                              ? theme.colorScheme.primary
+                              : Colors.white)
+                          .withValues(
+                        alpha: _canPlay ? 1.0 : disabledAlpha,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
                     alignment: Alignment.center,
-                    children: [
-                      if (_isLoading)
-                        SizedBox(
-                          width: ChatLayoutConstants.voicePlayIconSize,
-                          height: ChatLayoutConstants.voicePlayIconSize,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: iconColor.withValues(
-                              alpha: _canPlay ? 1 : disabledAlpha,
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: widget.isMe
+                                  ? Colors.white
+                                  : theme.colorScheme.primary,
                             ),
+                          )
+                        : Icon(
+                            _isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            color: widget.isMe
+                                ? Colors.white
+                                : theme.colorScheme.primary,
+                            size: 24,
                           ),
-                        )
-                      else
-                        Icon(
-                          _isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          color: iconColor.withValues(
-                            alpha: _canPlay ? 1 : disabledAlpha,
-                          ),
-                          size: ChatLayoutConstants.voicePlayIconSize,
-                        ),
-                      if (_isPlaying)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: _VoicePlayingPulse(color: iconColor),
-                        ),
-                    ],
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: AppSizes.p8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ChatVoiceWaveform(
-                    isMe: widget.isMe,
-                    isPlaying: _isPlaying,
-                    isPaused: _isActive && !_isPlaying,
-                    progress: _progress,
-                  ),
-                  const SizedBox(height: AppSizes.p6),
-                  Row(
-                    children: [
-                      Text(
-                        _timeLabel,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: widget.isMe
-                              ? chatTheme.onSentBubbleMuted
-                              : chatTheme.onReceivedBubbleMuted,
-                          fontSize: ChatLayoutConstants.voiceDurationFontSize,
-                          fontWeight:
-                              _isPlaying ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                      if (_isPlaying) ...[
-                        const SizedBox(width: AppSizes.p4),
+              const SizedBox(width: AppSizes.p8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ChatVoiceWaveform(
+                      isMe: widget.isMe,
+                      progress: _progress,
+                    ),
+                    const SizedBox(height: AppSizes.p6),
+                    Row(
+                      children: [
                         Text(
-                          '/ ${widget.duration}',
+                          _timeLabel,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: widget.isMe
-                                ? chatTheme.onSentBubbleMuted.withValues(
-                                    alpha: 0.7,
-                                  )
-                                : theme.hintColor,
+                                ? chatTheme.onSentBubbleMuted
+                                : chatTheme.onReceivedBubbleMuted,
                             fontSize: ChatLayoutConstants.voiceDurationFontSize,
+                            fontWeight: _isPlaying
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
+                        if (_isPlaying) ...[
+                          const SizedBox(width: AppSizes.p4),
+                          Text(
+                            '/ ${widget.duration}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: widget.isMe
+                                  ? chatTheme.onSentBubbleMuted.withValues(
+                                      alpha: 0.7,
+                                    )
+                                  : theme.hintColor,
+                              fontSize: ChatLayoutConstants.voiceDurationFontSize,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
-            ),
             ],
           ),
         ),
@@ -196,204 +189,62 @@ class _ChatVoiceMessageWidgetState extends State<ChatVoiceMessageWidget> {
   }
 }
 
-class _VoicePlayingPulse extends StatefulWidget {
-  const _VoicePlayingPulse({required this.color});
-
-  final Color color;
-
-  @override
-  State<_VoicePlayingPulse> createState() => _VoicePlayingPulseState();
-}
-
-class _VoicePlayingPulseState extends State<_VoicePlayingPulse>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final scale = 0.75 + _controller.value * 0.35;
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: ChatLayoutConstants.voicePlayingPulseSize,
-            height: ChatLayoutConstants.voicePlayingPulseSize,
-            decoration: BoxDecoration(
-              color: widget.color,
-              shape: BoxShape.circle,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class ChatVoiceWaveform extends StatefulWidget {
+class ChatVoiceWaveform extends StatelessWidget {
   const ChatVoiceWaveform({
     super.key,
     required this.isMe,
-    required this.isPlaying,
-    required this.isPaused,
     this.progress,
   });
 
   final bool isMe;
-  final bool isPlaying;
-  final bool isPaused;
   final double? progress;
 
   @override
-  State<ChatVoiceWaveform> createState() => _ChatVoiceWaveformState();
-}
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final currentProgress = progress ?? 0.0;
 
-class _ChatVoiceWaveformState extends State<ChatVoiceWaveform>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _waveController;
-  late final List<double> _baseHeights;
+    final activeColor = isMe
+        ? theme.colorScheme.primary
+        : Colors.white;
+    final trackColor = isMe
+        ? theme.colorScheme.primary.withValues(alpha: 0.25)
+        : Colors.white.withValues(alpha: 0.4);
 
-  @override
-  void initState() {
-    super.initState();
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(
-        milliseconds: ChatLayoutConstants.voiceWaveAnimationMs,
-      ),
-    );
-    _baseHeights = List<double>.generate(
+    final baseHeights = List<double>.generate(
       ChatLayoutConstants.voiceWaveBarCount,
       (index) =>
           ChatLayoutConstants.voiceWaveBarMinHeight +
           (index * 3 + 7) % ChatLayoutConstants.voiceWaveBarMaxExtra,
     );
-    _syncAnimation();
-  }
 
-  @override
-  void didUpdateWidget(ChatVoiceWaveform oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isPlaying != widget.isPlaying) {
-      _syncAnimation();
-    }
-  }
+    return SizedBox(
+      height: ChatLayoutConstants.voiceWaveBarMinHeight +
+          ChatLayoutConstants.voiceWaveBarMaxExtra,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(
+          ChatLayoutConstants.voiceWaveBarCount,
+          (index) {
+            final barProgress =
+                (index + 1) / ChatLayoutConstants.voiceWaveBarCount;
+            final isHighlighted = barProgress <= currentProgress;
+            final height = baseHeights[index];
 
-  void _syncAnimation() {
-    if (widget.isPlaying) {
-      _waveController.repeat(reverse: true);
-    } else {
-      _waveController
-        ..stop()
-        ..value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _waveController.dispose();
-    super.dispose();
-  }
-
-  Color _barColor(BuildContext context, bool highlighted) {
-    final chatTheme = ChatTheme.of(context);
-    if (widget.isMe) {
-      return chatTheme.onSentBubble.withValues(
-        alpha: highlighted
-            ? ChatLayoutConstants.voiceWaveSentActiveAlpha
-            : ChatLayoutConstants.voiceWaveSentAlpha,
-      );
-    }
-    return chatTheme.onReceivedBubble.withValues(
-      alpha: highlighted
-          ? ChatLayoutConstants.voiceWaveSentActiveAlpha
-          : ChatLayoutConstants.voiceWaveSentAlpha,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = widget.progress ?? 0;
-    final trackColor = _barColor(context, false).withValues(alpha: 0.35);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: ChatLayoutConstants.voiceWaveBarMinHeight +
-              ChatLayoutConstants.voiceWaveBarMaxExtra,
-          child: AnimatedBuilder(
-            animation: _waveController,
-            builder: (context, child) {
-              final t = _waveController.value * math.pi * 2;
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(
-                  ChatLayoutConstants.voiceWaveBarCount,
-                  (index) {
-                    final barProgress =
-                        (index + 1) / ChatLayoutConstants.voiceWaveBarCount;
-                    final passed = widget.isPlaying || widget.isPaused
-                        ? barProgress <= progress + 0.05
-                        : false;
-
-                    final waveBoost = widget.isPlaying
-                        ? math.sin(t + index * 0.65) *
-                            ChatLayoutConstants.voiceWaveBarMaxExtra *
-                            0.35
-                        : 0.0;
-
-                    final height = _baseHeights[index] + waveBoost;
-
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 80),
-                      width: ChatLayoutConstants.voiceWaveBarWidth,
-                      height: height.clamp(
-                        ChatLayoutConstants.voiceWaveBarMinHeight,
-                        ChatLayoutConstants.voiceWaveBarMinHeight +
-                            ChatLayoutConstants.voiceWaveBarMaxExtra,
-                      ),
-                      decoration: BoxDecoration(
-                        color: passed || widget.isPlaying
-                            ? _barColor(context, widget.isPlaying || passed)
-                            : trackColor,
-                        borderRadius: BorderRadius.circular(
-                          ChatLayoutConstants.voiceWaveBarRadius,
-                        ),
-                      ),
-                    );
-                  },
+            return Container(
+              width: ChatLayoutConstants.voiceWaveBarWidth,
+              height: height,
+              decoration: BoxDecoration(
+                color: isHighlighted ? activeColor : trackColor,
+                borderRadius: BorderRadius.circular(
+                  ChatLayoutConstants.voiceWaveBarRadius,
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-        if (widget.isPlaying || widget.isPaused) ...[
-          const SizedBox(height: AppSizes.p4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(
-              ChatLayoutConstants.voiceWaveBarRadius,
-            ),
-            child: LinearProgressIndicator(
-              value: widget.isPlaying || widget.isPaused ? progress : null,
-              minHeight: ChatLayoutConstants.voiceProgressBarHeight,
-              backgroundColor: trackColor,
-              color: _barColor(context, true),
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

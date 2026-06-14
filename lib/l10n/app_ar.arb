@@ -726,7 +726,7 @@
   "chatDeleteMessageTitle": "حذف الرسالة؟",
   "chatDeleteMessageMessage": "سيتم إخفاء هذه الرسالة عن الجميع في المحادثة.",
   "chatActiveNow": "نشط الآن",
-  "chatAddComment": "إضافة تعليق...",
+  "chatAddComment": "اكتب رسالة...",
   "chatRecording": "جاري التسجيل...",
   "chatSlideUpToCancel": "اسحب للأعلى للإلغاء",
   "chatRecordingPermissionDenied": "اسمح بالوصول إلى الميكروفون لتسجيل الرسائل الصوتية.",

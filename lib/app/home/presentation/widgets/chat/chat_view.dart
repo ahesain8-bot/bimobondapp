@@ -7,7 +7,6 @@ import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_app_bar.dart
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_input_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_message_list.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_pattern_background.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_recording_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_playback.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_recorder.dart';
 import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
@@ -49,6 +48,7 @@ class _ChatViewState extends State<ChatView> {
   bool _isRecording = false;
   Map<String, dynamic>? _replyTo;
   final ChatVoiceRecorder _voiceRecorder = ChatVoiceRecorder();
+  Future<void>? _startRecordingFuture;
 
   @override
   void initState() {
@@ -178,6 +178,11 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Future<void> _onRecordingStart() async {
+    _startRecordingFuture = _startRecordingProcess();
+    await _startRecordingFuture;
+  }
+
+  Future<void> _startRecordingProcess() async {
     final result = await _voiceRecorder.start();
     if (!mounted) return;
 
@@ -239,6 +244,11 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Future<void> _onRecordingEnd() async {
+    if (_startRecordingFuture != null) {
+      await _startRecordingFuture;
+      _startRecordingFuture = null;
+    }
+
     if (!_isRecording) return;
 
     final result = await _voiceRecorder.stop();
@@ -269,6 +279,11 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Future<void> _onRecordingCancel() async {
+    if (_startRecordingFuture != null) {
+      await _startRecordingFuture;
+      _startRecordingFuture = null;
+    }
+
     await _voiceRecorder.cancel();
     if (mounted) {
       setState(() => _isRecording = false);
@@ -501,11 +516,13 @@ class _ChatViewState extends State<ChatView> {
                       onRecordingCancel: _onRecordingCancel,
                       onReplyClose: () => setState(() => _replyTo = null),
                       onTextChanged: (typing) => _onTypingChanged(typing),
+                      isRecording: _isRecording,
+                      onRecordingPause: () => _voiceRecorder.pause(),
+                      onRecordingResume: () => _voiceRecorder.resume(),
                     ),
                   ],
                 ),
               ),
-              if (_isRecording) const ChatRecordingOverlay(),
             ],
           ),
         );

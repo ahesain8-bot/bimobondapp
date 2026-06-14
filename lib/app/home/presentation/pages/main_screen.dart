@@ -15,6 +15,7 @@ import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_bottom_nav.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -33,6 +34,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final ImagePicker _picker = ImagePicker();
+  String? _pendingOpenStoryUserId;
 
   @override
   void initState() {
@@ -158,10 +160,22 @@ class _MainScreenState extends State<MainScreen> {
                   auth_di.sl<ActiveStoriesRegistry>().updateFromStories(
                     state.stories,
                   );
+                  if (_pendingOpenStoryUserId != null) {
+                    final userId = _pendingOpenStoryUserId!;
+                    _pendingOpenStoryUserId = null;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      openUserActiveStories(context, userId);
+                    });
+                  }
                 } else if (state is CreatePostSuccess) {
-                  setState(() => _currentIndex = 0);
                   if (state.post.isStory) {
+                    setState(() {
+                      _currentIndex = 4;
+                      _pendingOpenStoryUserId = state.post.userId;
+                    });
                     _loadActiveStories();
+                  } else {
+                    setState(() => _currentIndex = 0);
                   }
                 } else if (state is DeletePostSuccess) {
                   _loadActiveStories();

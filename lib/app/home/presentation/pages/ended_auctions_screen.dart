@@ -324,7 +324,7 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
               ),
               if (_isLoading && _items.isEmpty)
                 const SliverToBoxAdapter(
-                  child: AuctionListSkeleton(itemCount: 3),
+                  child: AuctionListSkeleton(),
                 )
               else if (_items.isEmpty)
                 SliverFillRemaining(

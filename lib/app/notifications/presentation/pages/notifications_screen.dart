@@ -12,7 +12,6 @@ import 'package:bimobondapp/app/notifications/presentation/utils/notification_ca
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_navigation.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_list_tile.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notifications_filter_tabs.dart';
-import 'package:bimobondapp/core/constants/notifications_layout_constants.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
@@ -287,17 +286,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _buildBody(AppLocalizations l10n, ThemeData theme) {
     if (_isLoading && !_isLoadingMore) {
-      return ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
-        itemCount: 8,
-        itemBuilder: (_, _) => const Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: NotificationsLayoutConstants.cardPadding,
-            vertical: AppSizes.p8,
-          ),
-          child: SkeletonWidget(height: 72, borderRadius: 12),
-        ),
-      );
+      return const NotificationsListSkeleton();
     }
 
     if (_errorMessage != null && _items.isEmpty) {

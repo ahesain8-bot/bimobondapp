@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart';
 import 'package:bimobondapp/app/social/presentation/utils/mention_post_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -46,6 +47,7 @@ class UserMentionListTile extends StatelessWidget {
         author?.displayName ?? l10n.messagesInboxUserFallback;
     final thumbnailUrl = _resolveThumbnailUrl();
     final content = mention.content.trim();
+    final (badgeIcon, badgeColor) = NotificationTypeStyle.forType('MENTION');
 
     void openAuthorProfile() {
       if (author == null || author.id.isEmpty) return;
@@ -76,6 +78,8 @@ class UserMentionListTile extends StatelessWidget {
       mediaThumbnailUrl: thumbnailUrl,
       mediaTitle: l10n.notificationContextPost,
       mediaSubtitle: l10n.notificationContextPost,
+      badgeIcon: badgeIcon,
+      badgeColor: badgeColor,
       showDivider: showDivider,
     );
   }

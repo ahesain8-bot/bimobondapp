@@ -36,6 +36,8 @@ class ActivityFeedListRow extends StatelessWidget {
     this.showDivider = true,
     this.showUsernameUnderName = false,
     this.compactPadding = false,
+    this.badgeIcon,
+    this.badgeColor,
     super.key,
   });
 
@@ -62,6 +64,8 @@ class ActivityFeedListRow extends StatelessWidget {
   final bool showDivider;
   final bool showUsernameUnderName;
   final bool compactPadding;
+  final IconData? badgeIcon;
+  final Color? badgeColor;
 
   String _detailTimestamp(DateTime dateTime, AppLocalizations l10n) {
     return DateFormat('EEEE h:mm a', l10n.localeName).format(dateTime.toLocal());
@@ -102,6 +106,8 @@ class ActivityFeedListRow extends StatelessWidget {
                     fullName: fullName,
                     isFollowing: isFollowing,
                     onTap: onAvatarTap,
+                    badgeIcon: badgeIcon,
+                    badgeColor: badgeColor,
                   ),
                   const SizedBox(width: AppSizes.p12),
                   Expanded(
@@ -225,6 +231,8 @@ class ActivityFeedAvatarWithStatus extends StatelessWidget {
     this.fullName,
     this.isFollowing,
     this.onTap,
+    this.badgeIcon,
+    this.badgeColor,
     super.key,
   });
 
@@ -235,6 +243,8 @@ class ActivityFeedAvatarWithStatus extends StatelessWidget {
   final String? fullName;
   final bool? isFollowing;
   final VoidCallback? onTap;
+  final IconData? badgeIcon;
+  final Color? badgeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -251,22 +261,53 @@ class ActivityFeedAvatarWithStatus extends StatelessWidget {
           isFollowing: isFollowing,
           onTap: onTap,
         ),
-        PositionedDirectional(
-          end: 0,
-          bottom: 0,
-          child: Container(
-            width: NotificationsLayoutConstants.statusDotSize,
-            height: NotificationsLayoutConstants.statusDotSize,
-            decoration: BoxDecoration(
-              color: NotificationsLayoutConstants.unreadDotColor,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Theme.of(context).cardColor,
-                width: 1.5,
+        if (badgeIcon != null && badgeColor != null)
+          PositionedDirectional(
+            end: -2,
+            bottom: -2,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: badgeColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).cardColor,
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: badgeColor!.withValues(alpha: 0.35),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                badgeIcon,
+                size: 10,
+                color: Colors.white,
+              ),
+            ),
+          )
+        else
+          PositionedDirectional(
+            end: 0,
+            bottom: 0,
+            child: Container(
+              width: NotificationsLayoutConstants.statusDotSize,
+              height: NotificationsLayoutConstants.statusDotSize,
+              decoration: BoxDecoration(
+                color: NotificationsLayoutConstants.unreadDotColor,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).cardColor,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -348,6 +389,7 @@ class ActivityFeedActionLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tag = contextTag;
 
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -380,7 +422,7 @@ class ActivityFeedActionLine extends StatelessWidget {
             ],
           ),
         ),
-        if (contextTag != null) contextTag!,
+        if (tag != null) tag,
       ],
     );
   }

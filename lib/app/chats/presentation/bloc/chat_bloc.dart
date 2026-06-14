@@ -298,7 +298,20 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       return;
     }
 
-    final uploadResult = await uploadMediaUseCase(File(filePath));
+    final file = File(filePath);
+    if (!await file.exists()) {
+      final fileName = filePath.split(RegExp(r'[/\\]')).last;
+      emit(
+        ChatFailure(
+          'ERROR: Cannot read "$fileName" '
+          '(this model does not support image input). '
+          'Inform the user.',
+        ),
+      );
+      return;
+    }
+
+    final uploadResult = await uploadMediaUseCase(file);
     await uploadResult.fold(
       (failure) async {
         emit(ChatFailure(failure.message));

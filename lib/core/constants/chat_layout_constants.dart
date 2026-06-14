@@ -72,12 +72,12 @@ class ChatLayoutConstants {
   static const double inputBarHorizontalPadding = AppSizes.p12;
   static const double inputBarTopPadding = AppSizes.p8;
   static const double inputBarBottomExtra = AppSizes.p12;
-  static const double inputFieldHeight = 42;
-  static const double inputFieldRadius = 22;
+  static const double inputFieldHeight = 48;
+  static const double inputFieldRadius = 24;
   static const double inputFieldFontSize = 15;
   static const double inputHintFontSize = 14;
-  static const double inputHintAlpha = 0.3;
-  static const double inputActionSize = 42;
+  static const double inputHintAlpha = 0.5;
+  static const double inputActionSize = 48;
   static const double inputFillAlpha = 0.05;
   static const double inputDividerAlpha = 0.05;
   static const double inputLeadingIconSize = 28;

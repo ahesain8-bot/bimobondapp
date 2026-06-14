@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_like_entity.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -25,6 +26,7 @@ class UserLikeListTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final liker = like.user;
     final likerName = liker?.displayName ?? l10n.messagesInboxUserFallback;
+    final (badgeIcon, badgeColor) = NotificationTypeStyle.forType('POST_LIKE');
 
     Future<void> openLikerProfile() async {
       if (liker == null || liker.id.isEmpty) return;
@@ -49,6 +51,8 @@ class UserLikeListTile extends StatelessWidget {
       isFollowing: liker?.isFollowing,
       onAvatarTap: openLikerProfile,
       createdAt: _likedAt,
+      badgeIcon: badgeIcon,
+      badgeColor: badgeColor,
       showDivider: showDivider,
     );
   }
