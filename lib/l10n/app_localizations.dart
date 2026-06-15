@@ -2774,7 +2774,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatAddComment.
   ///
   /// In en, this message translates to:
-  /// **'Add comment...'**
+  /// **'Write message'**
   String get chatAddComment;
 
   /// No description provided for @chatRecording.
@@ -3472,6 +3472,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You won an auction'**
   String get notificationBodyAuctionWon;
+
+  /// No description provided for @walletTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get walletTitle;
+
+  /// No description provided for @walletBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Coins Balance'**
+  String get walletBalanceLabel;
+
+  /// No description provided for @walletChoosePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a Package'**
+  String get walletChoosePackage;
+
+  /// No description provided for @walletPurchaseSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully purchased {amount} coins!'**
+  String walletPurchaseSuccess(int amount);
+
+  /// No description provided for @walletTopUpButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Up'**
+  String get walletTopUpButton;
+
+  /// No description provided for @walletProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing payment...'**
+  String get walletProcessing;
+
+  /// No description provided for @walletCardNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Card Number'**
+  String get walletCardNumber;
+
+  /// No description provided for @walletExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date (MM/YY)'**
+  String get walletExpiry;
+
+  /// No description provided for @walletCvv.
+  ///
+  /// In en, this message translates to:
+  /// **'CVV'**
+  String get walletCvv;
+
+  /// No description provided for @walletCardHolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardholder Name'**
+  String get walletCardHolder;
+
+  /// No description provided for @walletPayButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {price}'**
+  String walletPayButton(String price);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

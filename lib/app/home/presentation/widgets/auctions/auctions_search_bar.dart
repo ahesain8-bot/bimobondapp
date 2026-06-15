@@ -99,9 +99,10 @@ class _FilterButton extends StatelessWidget {
                 color: hasActiveFilters ? theme.primaryColor : theme.hintColor,
               ),
               if (hasActiveFilters)
-                Positioned(
+                Positioned.directional(
+                  textDirection: Directionality.of(context),
                   top: -6,
-                  right: -8,
+                  end: -8,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(

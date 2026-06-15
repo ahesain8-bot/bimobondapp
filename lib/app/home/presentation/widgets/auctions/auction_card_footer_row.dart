@@ -9,6 +9,7 @@ class AuctionCardFooterRow extends StatelessWidget {
   const AuctionCardFooterRow({
     required this.userId,
     required this.username,
+    this.fullName,
     required this.avatarUrl,
     this.categoryLabel,
     this.categorySlug,
@@ -17,6 +18,7 @@ class AuctionCardFooterRow extends StatelessWidget {
 
   final String userId;
   final String username;
+  final String? fullName;
   final String? avatarUrl;
   final String? categoryLabel;
   final String? categorySlug;
@@ -30,6 +32,7 @@ class AuctionCardFooterRow extends StatelessWidget {
       context,
       userId: userId,
       username: username,
+      fullName: fullName,
       avatarUrl: avatarUrl,
     );
   }
@@ -38,6 +41,9 @@ class AuctionCardFooterRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final displayName = fullName?.trim().isNotEmpty == true
+        ? fullName!.trim()
+        : '@$username';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -46,8 +52,9 @@ class AuctionCardFooterRow extends StatelessWidget {
           userId: userId,
           imageUrl: avatarUrl,
           radius: 14,
-          fallbackText: username,
+          fallbackText: displayName,
           username: username,
+          fullName: fullName,
           onTap: () => _openProfile(context),
         ),
         const SizedBox(width: AppSizes.p8),
@@ -58,7 +65,7 @@ class AuctionCardFooterRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSizes.p4),
               child: Text(
-                l10n.auctionAddedBy('@$username'),
+                l10n.auctionAddedBy(displayName),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(

@@ -847,7 +847,31 @@
   "notificationBodyCommentLike": "أعجب {name} بتعليقك",
   "notificationBodyMention": "أشار إليك {name}",
   "notificationBodyRepost": "أعاد {name} نشر منشورك",
-  "notificationBodyGift": "أرسل لك {name} هدية",
   "notificationBodyAuctionUpdate": "تم تحديث مزاد تتابعه",
-  "notificationBodyAuctionWon": "لقد فزت بمزاد"
+  "notificationBodyAuctionWon": "لقد فزت بمزاد",
+  "walletTitle": "المحفظة",
+  "walletBalanceLabel": "رصيد العملات",
+  "walletChoosePackage": "اختر باقة",
+  "walletPurchaseSuccess": "تم شراء {amount} عملة بنجاح!",
+  "@walletPurchaseSuccess": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "walletTopUpButton": "شحن الرصيد",
+  "walletProcessing": "جاري معالجة الدفع...",
+  "walletCardNumber": "رقم البطاقة",
+  "walletExpiry": "تاريخ الانتهاء (MM/YY)",
+  "walletCvv": "رمز التحقق (CVV)",
+  "walletCardHolder": "اسم حامل البطاقة",
+  "walletPayButton": "دفع {price}",
+  "@walletPayButton": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  }
 }

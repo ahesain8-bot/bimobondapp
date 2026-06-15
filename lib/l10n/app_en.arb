@@ -864,5 +864,30 @@
   "notificationBodyGift": "{name} sent you a gift",
   "@notificationBodyGift": { "placeholders": { "name": { "type": "String" } } },
   "notificationBodyAuctionUpdate": "An auction you follow was updated",
-  "notificationBodyAuctionWon": "You won an auction"
+  "notificationBodyAuctionWon": "You won an auction",
+  "walletTitle": "Wallet",
+  "walletBalanceLabel": "Coins Balance",
+  "walletChoosePackage": "Choose a Package",
+  "walletPurchaseSuccess": "Successfully purchased {amount} coins!",
+  "@walletPurchaseSuccess": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "walletTopUpButton": "Top Up",
+  "walletProcessing": "Processing payment...",
+  "walletCardNumber": "Card Number",
+  "walletExpiry": "Expiry Date (MM/YY)",
+  "walletCvv": "CVV",
+  "walletCardHolder": "Cardholder Name",
+  "walletPayButton": "Pay {price}",
+  "@walletPayButton": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  }
 }

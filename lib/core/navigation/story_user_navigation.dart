@@ -1,8 +1,11 @@
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
 import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 /// True when the user has active stories the viewer has not finished yet.
@@ -30,6 +33,16 @@ Future<bool?> openUserActiveStoriesOrProfile(
   bool? isFollowing,
 }) async {
   if (userId.trim().isEmpty) return null;
+
+  final authState = context.read<AuthBloc>().state;
+  if (authState is AuthSuccess) {
+    final myId = authState.user.id;
+    final myFirebaseUid = authState.user.firebaseUid;
+    if (userId == myId || (myFirebaseUid != null && userId == myFirebaseUid)) {
+      context.go('/?tab=profile');
+      return null;
+    }
+  }
 
   final stories =
       auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(userId);
@@ -64,6 +77,16 @@ Future<bool?> openUserStoryOrProfile(
   bool? isFollowing,
 }) async {
   if (userId.trim().isEmpty) return null;
+
+  final authState = context.read<AuthBloc>().state;
+  if (authState is AuthSuccess) {
+    final myId = authState.user.id;
+    final myFirebaseUid = authState.user.firebaseUid;
+    if (userId == myId || (myFirebaseUid != null && userId == myFirebaseUid)) {
+      context.go('/?tab=profile');
+      return null;
+    }
+  }
 
   if (userHasUnseenActiveStories(userId)) {
     final stories =

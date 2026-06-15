@@ -553,7 +553,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 context.goNamed('home');
               }
             } else {
-              context.goNamed('home');
+              context.goNamed('home', queryParameters: {'tab': 'profile'});
             }
           }
         },

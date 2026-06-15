@@ -65,7 +65,7 @@ class LiveDetailsHeader extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+          padding: const EdgeInsets.fromLTRB(8, 6, 12, 6),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(50),
@@ -82,60 +82,60 @@ class LiveDetailsHeader extends StatelessWidget {
             ],
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: onProfileTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Row(
-                    children: [
-                      StoryProfileAvatar(
-                        userId: hostUserId,
-                        imageUrl: avatarUrl,
-                        radius: 16,
-                        fallbackText: hostName,
-                        username: hostName,
-                        onTap: onProfileTap,
-                      ),
-                      const SizedBox(width: AppSizes.p10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              hostName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                                letterSpacing: 0.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+              GestureDetector(
+                onTap: onProfileTap,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    StoryProfileAvatar(
+                      userId: hostUserId,
+                      imageUrl: avatarUrl,
+                      radius: 16,
+                      fallbackText: hostName,
+                      username: hostName,
+                      onTap: onProfileTap,
+                    ),
+                    const SizedBox(width: AppSizes.p10),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            hostName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              letterSpacing: 0.3,
                             ),
-                            Text(
-                              subtitle != null && subtitle!.isNotEmpty
-                                  ? subtitle!
-                                  : viewersLabel,
-                              style: TextStyle(
-                                color: subtitle != null && subtitle!.isNotEmpty
-                                    ? Colors.amberAccent
-                                    : Colors.white.withValues(alpha: 0.8),
-                                fontSize: 10,
-                                fontWeight:
-                                    subtitle != null && subtitle!.isNotEmpty
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            subtitle != null && subtitle!.isNotEmpty
+                                ? subtitle!
+                                : viewersLabel,
+                            style: TextStyle(
+                              color: subtitle != null && subtitle!.isNotEmpty
+                                  ? Colors.amberAccent
+                                  : Colors.white.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight:
+                                  subtitle != null && subtitle!.isNotEmpty
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                             ),
-                          ],
-                        ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               if (showFollowButton) ...[
@@ -153,72 +153,75 @@ class LiveDetailsHeader extends StatelessWidget {
       ),
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.p16,
-        vertical: AppSizes.p8,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                profileCard,
-                if (countdownBelowProfile != null) ...[
-                  const SizedBox(height: AppSizes.p6),
-                  countdownBelowProfile!,
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSizes.p8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.p16,
+          vertical: AppSizes.p8,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (showAuctionGifts && onAuctionGifts != null)
-                    IconButton(
-                      onPressed: onAuctionGifts,
-                      icon: const Icon(
-                        LucideIcons.gift,
-                        color: LiveDetailsLayoutConstants.giftCommentGold,
-                        size: LiveDetailsLayoutConstants.closeIconSize,
-                      ),
-                    ),
-                  if (showOwnerMenu && onOwnerMenu != null)
-                    IconButton(
-                      onPressed: onOwnerMenu,
-                      icon: const Icon(
-                        LucideIcons.ellipsis,
-                        color: Colors.white,
-                        size: LiveDetailsLayoutConstants.closeIconSize,
-                      ),
-                    ),
-                  if (showCloseButton)
-                    IconButton(
-                      onPressed: onClose,
-                      icon: const Icon(
-                        LucideIcons.x,
-                        color: Colors.white,
-                        size: LiveDetailsLayoutConstants.closeIconSize,
-                      ),
-                    ),
+                  profileCard,
+                  if (countdownBelowProfile != null) ...[
+                    const SizedBox(height: AppSizes.p6),
+                    countdownBelowProfile!,
+                  ],
                 ],
               ),
-              LiveStatusBadge(
-                label: liveBadgeLabel,
-                isAuctionActive: isAuctionActiveBadge,
-                isAuctionFinished: isAuctionFinishedBadge,
-                pulseAnimation: pulseAnimation,
-              ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: AppSizes.p8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showAuctionGifts && onAuctionGifts != null)
+                      IconButton(
+                        onPressed: onAuctionGifts,
+                        icon: const Icon(
+                          LucideIcons.gift,
+                          color: LiveDetailsLayoutConstants.giftCommentGold,
+                          size: LiveDetailsLayoutConstants.closeIconSize,
+                        ),
+                      ),
+                    if (showOwnerMenu && onOwnerMenu != null)
+                      IconButton(
+                        onPressed: onOwnerMenu,
+                        icon: const Icon(
+                          LucideIcons.ellipsis,
+                          color: Colors.white,
+                          size: LiveDetailsLayoutConstants.closeIconSize,
+                        ),
+                      ),
+                    if (showCloseButton)
+                      IconButton(
+                        onPressed: onClose,
+                        icon: const Icon(
+                          LucideIcons.x,
+                          color: Colors.white,
+                          size: LiveDetailsLayoutConstants.closeIconSize,
+                        ),
+                      ),
+                  ],
+                ),
+                LiveStatusBadge(
+                  label: liveBadgeLabel,
+                  isAuctionActive: isAuctionActiveBadge,
+                  isAuctionFinished: isAuctionFinishedBadge,
+                  pulseAnimation: pulseAnimation,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

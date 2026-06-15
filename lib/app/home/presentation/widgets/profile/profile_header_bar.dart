@@ -7,11 +7,13 @@ class ProfileHeaderBar extends StatelessWidget {
   const ProfileHeaderBar({
     required this.username,
     required this.onSettings,
+    required this.onWallet,
     super.key,
   });
 
   final String username;
   final VoidCallback onSettings;
+  final VoidCallback onWallet;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,14 @@ class ProfileHeaderBar extends StatelessWidget {
       ),
     );
 
-    const sideSpacer = SizedBox(width: 48);
+    final walletButton = IconButton(
+      onPressed: onWallet,
+      icon: Icon(
+        LucideIcons.wallet,
+        size: ProfileLayoutConstants.headerMenuIconSize,
+        color: theme.iconTheme.color,
+      ),
+    );
 
     final title = Expanded(
       child: CustomText(
@@ -48,8 +57,8 @@ class ProfileHeaderBar extends StatelessWidget {
         textDirection: TextDirection.ltr,
         child: Row(
           children: settingsOnRight
-              ? [sideSpacer, title, settingsButton]
-              : [settingsButton, title, sideSpacer],
+              ? [walletButton, title, settingsButton]
+              : [settingsButton, title, walletButton],
         ),
       ),
     );

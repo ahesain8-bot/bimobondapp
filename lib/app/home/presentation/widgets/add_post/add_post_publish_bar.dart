@@ -53,17 +53,24 @@ class AddPostPublishBar extends StatelessWidget {
             height: 52,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [colorScheme.primary, colorScheme.secondary],
-                ),
+                gradient: isLoading
+                    ? null
+                    : LinearGradient(
+                        colors: [colorScheme.primary, colorScheme.secondary],
+                      ),
+                color: isLoading
+                    ? (isDark ? const Color(0xFF2E2E30) : const Color(0xFFE5E5EA))
+                    : null,
                 borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.primary.withValues(alpha: 0.32),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                boxShadow: isLoading
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: colorScheme.primary.withValues(alpha: 0.32),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
               ),
               child: Material(
                 color: Colors.transparent,

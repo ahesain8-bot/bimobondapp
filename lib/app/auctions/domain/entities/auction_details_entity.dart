@@ -4,15 +4,17 @@ class AuctionUserEntity extends Equatable {
   const AuctionUserEntity({
     required this.id,
     this.username,
+    this.fullName,
     this.avatarUrl,
   });
 
   final String id;
   final String? username;
+  final String? fullName;
   final String? avatarUrl;
 
   @override
-  List<Object?> get props => [id, username, avatarUrl];
+  List<Object?> get props => [id, username, fullName, avatarUrl];
 }
 
 class AuctionGiftSummaryEntity extends Equatable {

@@ -39,6 +39,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_mock
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_post_comments_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_page_indicator.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -144,13 +145,22 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       vsync: this,
       duration: LiveDetailsLayoutConstants.bidPopDuration,
     );
-    _bidPopAnimation =
-        Tween<double>(
+    _bidPopAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
           begin: 1.0,
           end: LiveDetailsLayoutConstants.bidPopScaleEnd,
-        ).animate(
-          CurvedAnimation(parent: _bidPopController, curve: Curves.elasticOut),
-        );
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: LiveDetailsLayoutConstants.bidPopScaleEnd,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 60,
+      ),
+    ]).animate(_bidPopController);
 
     final postId = widget.post?.id;
     if (postId != null) {
@@ -461,6 +471,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final auctionId = _auctionId;
     if (_isAuctionPost && auctionId != null && auctionId.isNotEmpty) {
       await _refreshAuctionGiftTotal(auctionId);
+    } else {
+      _bidPopController.forward(from: 0);
     }
   }
 
@@ -511,18 +523,30 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final userId = _hostUserId;
     if (userId == null || userId.isEmpty) return;
 
-    final isFollowing = await openUserStoryOrProfile(
-      context,
-      userId: userId,
-      username: widget.post?.user?.username,
-      avatarUrl: _avatarUrl(),
-      isFollowing: _isFollowing,
-    );
+    final isFollowing = await (_isAuctionPost
+        ? openUserProfile(
+            context,
+            userId: userId,
+            username: widget.post?.user?.username,
+            fullName: widget.post?.user?.fullName,
+            avatarUrl: _avatarUrl(),
+            isFollowing: _isFollowing,
+          )
+        : openUserStoryOrProfile(
+            context,
+            userId: userId,
+            username: widget.post?.user?.username,
+            fullName: widget.post?.user?.fullName,
+            avatarUrl: _avatarUrl(),
+            isFollowing: _isFollowing,
+          ));
     if (!mounted || isFollowing == null) return;
     setState(() => _isFollowing = isFollowing);
   }
 
   String _hostName(AppLocalizations l10n) {
+    final fullName = widget.post?.user?.fullName;
+    if (fullName != null && fullName.trim().isNotEmpty) return fullName.trim();
     final username = widget.post?.user?.username;
     if (username != null && username.isNotEmpty) return username;
     return l10n.liveHostName(_streamIndex + 1);
@@ -696,7 +720,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                         showAuctionGifts: _isAuctionPost,
                         onAuctionGifts: _showAuctionGiftsSheet,
                         showOwnerMenu: isPostOwner,
-                        showFollowButton: !isPostOwner && _hostUserId != null,
+                        showFollowButton: !isPostOwner && _hostUserId != null && !_isAuctionPost,
                         onProfileTap: _hostUserId != null ? _openHostProfile : null,
                         onOwnerMenu: _showOwnerOptions,
                         onClose: () => context.pop(),

@@ -749,7 +749,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                           GestureDetector(
                             onTap: _openAuthorProfile,
                             child: Text(
-                              '@${post.user?.username ?? 'user'}',
+                              post.user?.fullName?.trim().isNotEmpty == true
+                                  ? post.user!.fullName!.trim()
+                                  : '@${post.user?.username ?? 'user'}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,

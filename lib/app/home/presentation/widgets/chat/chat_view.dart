@@ -101,6 +101,7 @@ class _ChatViewState extends State<ChatView> {
         username: widget.username,
         imageUrl: widget.imageUrl,
         userId: widget.peerUserId,
+        fullName: widget.username,
       );
       return;
     }
@@ -109,6 +110,7 @@ class _ChatViewState extends State<ChatView> {
       context,
       userId: id,
       username: widget.username,
+      fullName: widget.username,
       avatarUrl: widget.imageUrl,
     );
   }

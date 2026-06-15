@@ -18,8 +18,17 @@ class GiftEntity extends Equatable {
   final double priceUsd;
   final String? imageUrl;
 
-  bool get hasNetworkIcon =>
-      icon.startsWith('http://') || icon.startsWith('https://');
+  bool get hasNetworkIcon {
+    final clean = icon.trim();
+    if (clean.startsWith('assets/') || clean.startsWith('packages/')) {
+      return false;
+    }
+    return clean.startsWith('http://') ||
+        clean.startsWith('https://') ||
+        clean.startsWith('/') ||
+        clean.contains('/') ||
+        clean.contains(r'\');
+  }
 
   String priceUsdLabel(Locale locale) {
     final amount = priceUsd == priceUsd.roundToDouble()

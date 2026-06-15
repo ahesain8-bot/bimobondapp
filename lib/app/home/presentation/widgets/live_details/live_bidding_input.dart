@@ -9,6 +9,7 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/quick_bid_chip.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 
 class LiveBiddingInput extends StatelessWidget {
   const LiveBiddingInput({
@@ -121,7 +122,11 @@ class LiveBiddingInput extends StatelessWidget {
                         child: Row(
                           children: [
                             IconButton(
-                              onPressed: () {},
+                              onPressed: () => ChatSheets.showEmojiPicker(
+                                context: context,
+                                messageController: controller,
+                                onEmojiInserted: () {},
+                              ),
                               icon: Icon(
                                 LucideIcons.smile,
                                 color: Colors.white.withValues(alpha: 0.7),

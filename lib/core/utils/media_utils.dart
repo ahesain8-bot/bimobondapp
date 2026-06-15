@@ -11,10 +11,13 @@ class MediaUtils {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }
+    if (trimmed.startsWith('assets/') || trimmed.startsWith('packages/')) {
+      return trimmed;
+    }
     if (trimmed.startsWith('/')) {
       return '${ApiConstants.baseUrl}$trimmed';
     }
-    return trimmed;
+    return '${ApiConstants.baseUrl}/$trimmed';
   }
 
   static const List<String> videoExtensions = [

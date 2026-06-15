@@ -72,6 +72,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                             radius: ChatLayoutConstants.headerAvatarRadius,
                             fallbackText: username,
                             username: username,
+                            fullName: username,
                             onTap: onProfileTap,
                           ),
                           const SizedBox(width: AppSizes.p12),

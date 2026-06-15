@@ -10,7 +10,7 @@ import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.d
 import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -328,23 +328,38 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
           vertical: AppSizes.p12,
         ),
         itemCount: 15,
-        itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.only(bottom: AppSizes.p16),
+        itemBuilder: (context, index) => const Padding(
+          padding: EdgeInsets.only(bottom: AppSizes.p16),
           child: Row(
             children: [
-              const SkeletonWidget.circular(size: 44),
-              const SizedBox(width: AppSizes.p12),
-              const Expanded(
+              LiquidGlassSkeletonBox.circular(
+                size: 44,
+                tone: LiquidGlassSkeletonTone.light,
+              ),
+              SizedBox(width: AppSizes.p12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SkeletonWidget(height: 14, width: 120),
+                    LiquidGlassSkeletonBox(
+                      height: 14,
+                      width: 120,
+                      tone: LiquidGlassSkeletonTone.light,
+                    ),
                     SizedBox(height: 6),
-                    SkeletonWidget(height: 12, width: 80),
+                    LiquidGlassSkeletonBox(
+                      height: 12,
+                      width: 80,
+                      tone: LiquidGlassSkeletonTone.light,
+                    ),
                   ],
                 ),
               ),
-              const SkeletonWidget(height: 32, width: 72),
+              LiquidGlassSkeletonBox(
+                height: 32,
+                width: 72,
+                tone: LiquidGlassSkeletonTone.light,
+              ),
             ],
           ),
         ),
@@ -390,26 +405,41 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
       },
       itemBuilder: (context, index) {
         if (showFooter && index == _itemCount) {
-          return Padding(
-            padding: const EdgeInsets.only(
+          return const Padding(
+            padding: EdgeInsets.only(
               top: AppSizes.p8,
               bottom: AppSizes.p16,
             ),
             child: Row(
               children: [
-                const SkeletonWidget.circular(size: 44),
-                const SizedBox(width: AppSizes.p12),
-                const Expanded(
+                LiquidGlassSkeletonBox.circular(
+                  size: 44,
+                  tone: LiquidGlassSkeletonTone.light,
+                ),
+                SizedBox(width: AppSizes.p12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SkeletonWidget(height: 14, width: 120),
+                      LiquidGlassSkeletonBox(
+                        height: 14,
+                        width: 120,
+                        tone: LiquidGlassSkeletonTone.light,
+                      ),
                       SizedBox(height: 6),
-                      SkeletonWidget(height: 12, width: 80),
+                      LiquidGlassSkeletonBox(
+                        height: 12,
+                        width: 80,
+                        tone: LiquidGlassSkeletonTone.light,
+                      ),
                     ],
                   ),
                 ),
-                const SkeletonWidget(height: 32, width: 72),
+                LiquidGlassSkeletonBox(
+                  height: 32,
+                  width: 72,
+                  tone: LiquidGlassSkeletonTone.light,
+                ),
               ],
             ),
           );

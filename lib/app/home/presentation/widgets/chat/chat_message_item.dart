@@ -231,6 +231,7 @@ class _SentMessageAvatarSlot extends StatelessWidget {
         radius: radius,
         fallbackText: username,
         username: username,
+        fullName: username,
       );
     }
 
@@ -263,6 +264,7 @@ class _ReceivedMessageAvatarSlot extends StatelessWidget {
         radius: radius,
         fallbackText: username,
         username: username,
+        fullName: username,
       );
     }
 

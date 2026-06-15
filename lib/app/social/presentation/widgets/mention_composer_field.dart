@@ -368,72 +368,101 @@ class _MentionSuggestionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = theme.brightness == Brightness.dark;
+    final isTransparentSurface = theme.colorScheme.surface == Colors.transparent;
+
+    final dropdownBgColor = isTransparentSurface
+        ? Colors.black.withValues(alpha: 0.85)
+        : (isDark ? const Color(0xFF1F1F1F) : theme.colorScheme.surface);
+
+    final dropdownBorderColor = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.15)
+        : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.shade200);
+
+    final textColor = isTransparentSurface || isDark ? Colors.white : theme.colorScheme.onSurface;
+    final subtextColor = isTransparentSurface || isDark ? Colors.white70 : theme.colorScheme.onSurfaceVariant;
+    final dividerColor = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.15)
+        : (isDark ? Colors.white.withValues(alpha: 0.1) : theme.dividerColor.withValues(alpha: 0.4));
+
     return Material(
-      elevation: 2,
+      elevation: 4,
       borderRadius: BorderRadius.circular(AppSizes.p12),
-      color: theme.colorScheme.surface,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 220),
-        child: loading
-            ? const Padding(
-                padding: EdgeInsets.all(AppSizes.p16),
-                child: Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+      color: dropdownBgColor,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppSizes.p12),
+          border: Border.all(color: dropdownBorderColor),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppSizes.p12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: loading
+                ? const Padding(
+                    padding: EdgeInsets.all(AppSizes.p16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  )
+                : suggestions.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(AppSizes.p12),
+                    child: CustomText(
+                      emptyLabel,
+                      fontSize: 13,
+                      variant: TextVariant.secondary,
+                      textAlign: TextAlign.center,
+                      color: subtextColor,
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: AppSizes.p4),
+                    itemCount: suggestions.length,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      indent: 56,
+                      color: dividerColor,
+                    ),
+                    itemBuilder: (context, index) {
+                      final user = suggestions[index];
+                      return ListTile(
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        leading: StoryProfileAvatar(
+                          userId: user.id,
+                          imageUrl: user.avatarUrl,
+                          radius: 18,
+                          fallbackText: user.username ?? user.displayName,
+                          username: user.username,
+                          fullName: user.fullName,
+                          onTap: () => onPick(user),
+                        ),
+                        title: CustomText(
+                          user.displayName,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                        subtitle: user.username != null
+                            ? CustomText(
+                                '@${user.username}',
+                                fontSize: 12,
+                                variant: TextVariant.secondary,
+                                color: subtextColor,
+                              )
+                            : null,
+                        onTap: () => onPick(user),
+                      );
+                    },
                   ),
-                ),
-              )
-            : suggestions.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.all(AppSizes.p12),
-                child: CustomText(
-                  emptyLabel,
-                  fontSize: 13,
-                  variant: TextVariant.secondary,
-                  textAlign: TextAlign.center,
-                ),
-              )
-            : ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: AppSizes.p4),
-                itemCount: suggestions.length,
-                separatorBuilder: (context, index) => Divider(
-                  height: 1,
-                  indent: 56,
-                  color: theme.dividerColor.withValues(alpha: 0.4),
-                ),
-                itemBuilder: (context, index) {
-                  final user = suggestions[index];
-                  return ListTile(
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    leading: StoryProfileAvatar(
-                      userId: user.id,
-                      imageUrl: user.avatarUrl,
-                      radius: 18,
-                      fallbackText: user.username ?? user.displayName,
-                      username: user.username,
-                      fullName: user.fullName,
-                      onTap: () => onPick(user),
-                    ),
-                    title: CustomText(
-                      user.displayName,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    subtitle: user.username != null
-                        ? CustomText(
-                            '@${user.username}',
-                            fontSize: 12,
-                            variant: TextVariant.secondary,
-                          )
-                        : null,
-                    onTap: () => onPick(user),
-                  );
-                },
-              ),
+          ),
+        ),
       ),
     );
   }

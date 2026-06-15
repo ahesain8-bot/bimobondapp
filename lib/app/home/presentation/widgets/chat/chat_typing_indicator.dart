@@ -32,6 +32,7 @@ class ChatTypingIndicator extends StatelessWidget {
             radius: ChatLayoutConstants.receivedMessageAvatarRadius,
             fallbackText: username,
             username: username,
+            fullName: username,
           ),
           const SizedBox(
             width: ChatLayoutConstants.receivedMessageAvatarGap,

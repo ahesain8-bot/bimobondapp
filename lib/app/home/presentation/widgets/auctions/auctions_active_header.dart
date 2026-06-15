@@ -14,6 +14,12 @@ class AuctionsActiveHeader extends StatelessWidget {
 
     return Row(
       children: [
+        CustomText(
+          l10n.activeAuctionsNow,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+        const Spacer(),
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSizes.p10,
@@ -36,12 +42,6 @@ class AuctionsActiveHeader extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        const Spacer(),
-        CustomText(
-          l10n.activeAuctionsNow,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
         ),
       ],
     );

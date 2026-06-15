@@ -224,22 +224,28 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
       }
     }
 
+    final mappedEnded = postsById.values.map(
+      (post) => AuctionItem.fromPost(
+        post,
+        categoryLabel: _categoryLabelFor(post.categoryId),
+        categorySlug: CategoryLookup.slugForId(
+          post.categoryId,
+          _categories,
+        ),
+      ),
+    ).toList();
+
+    mappedEnded.sort((a, b) {
+      final aDate = a.post?.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.post?.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+
     if (!mounted) return;
     setState(() {
       _endedPreviewItems
         ..clear()
-        ..addAll(
-          postsById.values.take(_endedPreviewLimit).map(
-            (post) => AuctionItem.fromPost(
-              post,
-              categoryLabel: _categoryLabelFor(post.categoryId),
-              categorySlug: CategoryLookup.slugForId(
-                post.categoryId,
-                _categories,
-              ),
-            ),
-          ),
-        );
+        ..addAll(mappedEnded.take(_endedPreviewLimit));
       _isLoadingEndedPreview = false;
     });
   }
@@ -283,22 +289,28 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
       }
     }
 
+    final mappedItems = postsById.values.map(
+      (post) => AuctionItem.fromPost(
+        post,
+        categoryLabel: _categoryLabelFor(post.categoryId),
+        categorySlug: CategoryLookup.slugForId(
+          post.categoryId,
+          _categories,
+        ),
+      ),
+    ).toList();
+
+    mappedItems.sort((a, b) {
+      final aDate = a.post?.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.post?.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+
     if (!mounted) return;
     setState(() {
       _postAuctionItems
         ..clear()
-        ..addAll(
-          postsById.values.map(
-            (post) => AuctionItem.fromPost(
-              post,
-              categoryLabel: _categoryLabelFor(post.categoryId),
-              categorySlug: CategoryLookup.slugForId(
-                post.categoryId,
-                _categories,
-              ),
-            ),
-          ),
-        );
+        ..addAll(mappedItems);
       _isLoadingPostAuctions = false;
     });
   }
@@ -314,42 +326,18 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
 
   List<AuctionItem> get _activeAuctionItems => _postAuctionItems;
 
-  AuctionItem? _getSpotlightItem(List<AuctionItem> source) {
-    if (source.isEmpty) return null;
-    final liveAuctions = source.where((item) => item.isLive).toList();
-    if (liveAuctions.isNotEmpty) {
-      liveAuctions.sort((a, b) => b.giftTotalUsd.compareTo(a.giftTotalUsd));
-      return liveAuctions.first;
-    }
-    return source.first;
-  }
-
   List<Widget> _buildAuctionSections({
     required BuildContext context,
     required ThemeData theme,
     required Color surfaceElevated,
     required AppLocalizations l10n,
   }) {
-    final showSpotlightBase =
-        !_isLoadingPostAuctions &&
-        _searchQuery.isEmpty &&
-        !_filters.hasActiveFilters;
-
-    final activeItems = _activeAuctionItems;
-    final spotlightItem =
-        showSpotlightBase ? _getSpotlightItem(activeItems) : null;
-    final listItems = spotlightItem != null
-        ? activeItems.where((item) => item.id != spotlightItem.id).toList()
-        : activeItems;
-
     return _buildActiveAuctionSection(
       context: context,
       theme: theme,
       surfaceElevated: surfaceElevated,
       l10n: l10n,
-      items: listItems,
-      showSpotlight: showSpotlightBase,
-      spotlightItem: spotlightItem,
+      items: _activeAuctionItems,
     );
   }
 
@@ -359,20 +347,8 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
     required Color surfaceElevated,
     required AppLocalizations l10n,
     required List<AuctionItem> items,
-    required bool showSpotlight,
-    AuctionItem? spotlightItem,
   }) {
     return [
-      if (showSpotlight && spotlightItem != null)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.only(top: AppSizes.p20),
-            child: _FeaturedSpotlight(
-              item: spotlightItem,
-              onTap: () => _openAuction(spotlightItem),
-            ),
-          ),
-        ),
       if (items.isNotEmpty) ...[
         const SliverToBoxAdapter(
           child: Padding(
@@ -392,7 +368,7 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
           items: items,
         ),
       ],
-      if (items.isEmpty && (spotlightItem == null || !showSpotlight))
+      if (items.isEmpty)
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -603,251 +579,4 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   }
 }
 
-class _FeaturedSpotlight extends StatelessWidget {
-  const _FeaturedSpotlight({required this.item, required this.onTap});
 
-  final AuctionItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final l10n = AppLocalizations.of(context)!;
-    final locale = Localizations.localeOf(context);
-
-    final total = item.giftTotalUsd;
-    final text = total == total.roundToDouble()
-        ? total.round().toString()
-        : total.toStringAsFixed(2);
-    final localizedAmount = LocaleFormatUtils.localizeDigits(text, locale);
-    final bidText = l10n.liveHighestBidAmount(
-      localizedAmount,
-      l10n.currencyUsd,
-    );
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        boxShadow: [
-          if (!isDark)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            )
-          else
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        child: AspectRatio(
-          aspectRatio: 1.85,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.network(
-                item.imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => ColoredBox(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Icon(
-                    LucideIcons.image,
-                    color: theme.disabledColor,
-                    size: 48,
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.1),
-                        Colors.black.withValues(alpha: 0.75),
-                      ],
-                      stops: const [0.35, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: AppSizes.p12,
-                right: AppSizes.p12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.p8,
-                    vertical: AppSizes.p4,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [theme.primaryColor, const Color(0xFFFF5E97)],
-                    ),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.primaryColor.withValues(alpha: 0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        LucideIcons.sparkles,
-                        size: 11,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        l10n.viewAll.toUpperCase() == "VIEW ALL"
-                            ? "SPOTLIGHT"
-                            : "مميز",
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: AppSizes.p12,
-                left: AppSizes.p12,
-                child: AuctionStatusBadge(auction: item),
-              ),
-              Positioned(
-                bottom: AppSizes.p16,
-                left: AppSizes.p16,
-                right: AppSizes.p16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      item.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black45,
-                            blurRadius: 4,
-                            offset: Offset(0, 1.5),
-                          ),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                    ),
-                    const SizedBox(height: AppSizes.p8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSizes.p12,
-                            vertical: AppSizes.p8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusMd,
-                            ),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              width: 0.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    l10n.liveTopBid,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.75,
-                                      ),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    bidText,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.primaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              ElevatedButton(
-                                onPressed: onTap,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSizes.p16,
-                                    vertical: 0,
-                                  ),
-                                  minimumSize: const Size(0, 32),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      AppSizes.radiusSm,
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      LucideIcons.gavel,
-                                      size: 12,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      l10n.bidNow,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

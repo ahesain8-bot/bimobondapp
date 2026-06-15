@@ -440,207 +440,214 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           context.pop(_isFollowing);
         },
         child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: CustomAppBar(
-          title: '@$username',
-          onBackPressed: () => context.pop(_isFollowing),
-        ),
-        body: _errorMessage != null && user == null && !_isLoadingUser
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSizes.p24),
-                  child: CustomText(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    variant: TextVariant.secondary,
+          backgroundColor: theme.scaffoldBackgroundColor,
+          appBar: CustomAppBar(
+            title: '@$username',
+            onBackPressed: () => context.pop(_isFollowing),
+            hideBottomDivider: true,
+          ),
+          body: _errorMessage != null && user == null && !_isLoadingUser
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSizes.p24),
+                    child: CustomText(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      variant: TextVariant.secondary,
+                    ),
                   ),
-                ),
-              )
-            : RefreshIndicator(
-                onRefresh: _onPullToRefresh,
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: ClampingScrollPhysics(),
-                  ),
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal:
-                              ProfileLayoutConstants.headerHorizontalPadding,
-                        ),
-                        child: Column(
-                          children: [
-                            const SizedBox(height: AppSizes.p12),
-                            if (_isLoadingUser && user == null)
-                              const SkeletonWidget.circular(size: 96)
-                            else
-                              StoryProfileAvatar(
-                                userId: widget.userId,
-                                imageUrl: user?.avatarUrl,
-                                radius: ProfileLayoutConstants.avatarRadius,
-                                fallbackText: user?.username ?? username,
-                                backgroundColor: theme.dividerColor.withValues(
-                                  alpha: 0.08,
-                                ),
-                                username: user?.username ?? username,
-                                fullName: user?.fullName,
-                                isFollowing: _isFollowing,
-                                onTap: () => handleProfileScreenAvatarTap(
-                                  context,
+                )
+              : RefreshIndicator(
+                  onRefresh: _onPullToRefresh,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal:
+                                ProfileLayoutConstants.headerHorizontalPadding,
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: AppSizes.p12),
+                              if (_isLoadingUser && user == null)
+                                const SkeletonWidget.circular(size: 96)
+                              else
+                                StoryProfileAvatar(
                                   userId: widget.userId,
-                                  avatarUrl: user?.avatarUrl,
+                                  imageUrl: user?.avatarUrl,
+                                  radius: ProfileLayoutConstants.avatarRadius,
+                                  fallbackText: user?.username ?? username,
+                                  backgroundColor: theme.dividerColor
+                                      .withValues(alpha: 0.08),
+                                  username: user?.username ?? username,
+                                  fullName: user?.fullName,
+                                  isFollowing: _isFollowing,
+                                  onTap: () => handleProfileScreenAvatarTap(
+                                    context,
+                                    userId: widget.userId,
+                                    avatarUrl: user?.avatarUrl,
+                                  ),
                                 ),
-                              ),
-                            const SizedBox(height: AppSizes.p12),
-                            if (_isLoadingUser && user?.fullName == null)
-                              const SkeletonWidget(height: 18, width: 160)
-                            else
-                              Text(
-                                user?.fullName?.trim().isNotEmpty == true
-                                    ? user!.fullName!.trim()
-                                    : username,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 18,
+                              const SizedBox(height: AppSizes.p12),
+                              if (_isLoadingUser && user?.fullName == null)
+                                const SkeletonWidget(height: 18, width: 160)
+                              else
+                                Text(
+                                  user?.fullName?.trim().isNotEmpty == true
+                                      ? user!.fullName!.trim()
+                                      : username,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 18,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
+                              const SizedBox(height: AppSizes.p6),
+                              CustomText(
+                                '@$username',
+                                fontSize: 14,
+                                variant: TextVariant.secondary,
                                 textAlign: TextAlign.center,
                               ),
-                            const SizedBox(height: AppSizes.p6),
-                            CustomText(
-                              '@$username',
-                              fontSize: 14,
-                              variant: TextVariant.secondary,
-                              textAlign: TextAlign.center,
-                            ),
-                            if (!_isSelf) ...[
-                              const SizedBox(height: AppSizes.p16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  ProfileFollowButton(
-                                    width: 140,
-                                    isFollowing: _isFollowing,
-                                    isFollowedBy: _isFollowedBy,
-                                    isLoading: _isFollowLoading,
-                                    onPressed: _toggleFollow,
-                                  ),
-                                  const SizedBox(width: AppSizes.p12),
-                                  SizedBox(
-                                    width: 140,
-                                    height: 40,
-                                    child: OutlinedButton(
-                                      onPressed: _isMessageLoading
-                                          ? null
-                                          : _openMessage,
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor:
-                                            theme.colorScheme.primary,
-                                        side: BorderSide(
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            AppSizes.radiusMd,
+                              if (!_isSelf) ...[
+                                const SizedBox(height: AppSizes.p16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    ProfileFollowButton(
+                                      width: 140,
+                                      isFollowing: _isFollowing,
+                                      isFollowedBy: _isFollowedBy,
+                                      isLoading: _isFollowLoading,
+                                      onPressed: _toggleFollow,
+                                    ),
+                                    const SizedBox(width: AppSizes.p12),
+                                    SizedBox(
+                                      width: 140,
+                                      height: 40,
+                                      child: OutlinedButton(
+                                        onPressed: _isMessageLoading
+                                            ? null
+                                            : _openMessage,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor:
+                                              theme.colorScheme.primary,
+                                          side: BorderSide(
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              AppSizes.radiusMd,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      child: _isMessageLoading
-                                          ? SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
+                                        child: _isMessageLoading
+                                            ? SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .primary,
+                                                    ),
+                                              )
+                                            : CustomText(
+                                                l10n.profileMessageButton,
+                                                fontWeight: FontWeight.bold,
                                                 color:
                                                     theme.colorScheme.primary,
                                               ),
-                                            )
-                                          : CustomText(
-                                              l10n.profileMessageButton,
-                                              fontWeight: FontWeight.bold,
-                                              color: theme.colorScheme.primary,
-                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: AppSizes.p16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _UserProfileStatItem(
+                                      number: _formatCount(displayPostCount),
+                                      label: l10n.profilePostsTab,
                                     ),
                                   ),
+                                  Expanded(
+                                    child: _UserProfileStatItem(
+                                      number: _formatCount(
+                                        user?.followerCount ?? 0,
+                                      ),
+                                      label: l10n.followers,
+                                      onTap: () =>
+                                          _refreshProfileAfterNavigation(
+                                            context.pushNamed(
+                                              'user_connections',
+                                              extra: {
+                                                'userId': widget.userId,
+                                                'type': UserConnectionType
+                                                    .followers,
+                                              },
+                                            ),
+                                          ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _UserProfileStatItem(
+                                      number: _formatCount(
+                                        user?.followingCount ?? 0,
+                                      ),
+                                      label: l10n.following,
+                                      onTap: () =>
+                                          _refreshProfileAfterNavigation(
+                                            context.pushNamed(
+                                              'user_connections',
+                                              extra: {
+                                                'userId': widget.userId,
+                                                'type': UserConnectionType
+                                                    .following,
+                                              },
+                                            ),
+                                          ),
+                                    ),
+                                  ),
+                                  // _UserProfileStatItem(
+                                  //   number: _formatCount(user?.totalLikes ?? 0),
+                                  //   label: l10n.likes,
+                                  // ),
                                 ],
                               ),
+                              const SizedBox(height: AppSizes.p12),
+                              CustomText(
+                                user?.bio?.trim().isNotEmpty == true
+                                    ? user!.bio!.trim()
+                                    : l10n.noBio,
+                                fontSize: 14,
+                                variant: TextVariant.secondary,
+                                textAlign: TextAlign.center,
+                              ),
                             ],
-                            const SizedBox(height: AppSizes.p16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _UserProfileStatItem(
-                                    number: _formatCount(displayPostCount),
-                                    label: l10n.profilePostsTab,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _UserProfileStatItem(
-                                    number: _formatCount(
-                                      user?.followerCount ?? 0,
-                                    ),
-                                    label: l10n.followers,
-                                    onTap: () => _refreshProfileAfterNavigation(
-                                      context.pushNamed(
-                                        'user_connections',
-                                        extra: {
-                                          'userId': widget.userId,
-                                          'type': UserConnectionType.followers,
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _UserProfileStatItem(
-                                    number: _formatCount(
-                                      user?.followingCount ?? 0,
-                                    ),
-                                    label: l10n.following,
-                                    onTap: () => _refreshProfileAfterNavigation(
-                                      context.pushNamed(
-                                        'user_connections',
-                                        extra: {
-                                          'userId': widget.userId,
-                                          'type': UserConnectionType.following,
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                // _UserProfileStatItem(
-                                //   number: _formatCount(user?.totalLikes ?? 0),
-                                //   label: l10n.likes,
-                                // ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSizes.p12),
-                            CustomText(
-                              user?.bio?.trim().isNotEmpty == true
-                                  ? user!.bio!.trim()
-                                  : l10n.noBio,
-                              fontSize: 14,
-                              variant: TextVariant.secondary,
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: ProfileUserPostsTabBar(
-                        backgroundColor: theme.scaffoldBackgroundColor,
+                      SliverToBoxAdapter(
+                        child: ProfileUserPostsTabBar(
+                          backgroundColor: theme.scaffoldBackgroundColor,
+                        ),
                       ),
-                    ),
-                    _UserProfilePostsGrid(
-                      state: _postsState,
-                      emptyMessage: l10n.noPostsYet,
-                      userId: widget.userId,
-                    ),
-                  ],
+                      _UserProfilePostsGrid(
+                        state: _postsState,
+                        emptyMessage: l10n.noPostsYet,
+                        userId: widget.userId,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
         ),
       ),
     );

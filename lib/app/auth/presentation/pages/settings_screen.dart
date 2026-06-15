@@ -59,6 +59,11 @@ class SettingsScreen extends StatelessWidget {
                 title: l10n.settingsPrivacy,
                 onTap: () => _openPlaceholder(context, l10n.settingsPrivacy),
               ),
+              _SettingsTile(
+                icon: LucideIcons.wallet,
+                title: l10n.walletTitle,
+                onTap: () => context.pushNamed('wallet'),
+              ),
             ],
           ),
           const SizedBox(height: SettingsLayoutConstants.groupSpacing),

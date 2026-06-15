@@ -215,8 +215,9 @@ class SocialRepositoryImpl implements SocialRepository {
       );
       return Right(
         UserMentionsPageEntity(
-          mentions:
-              pageResult.mentions.map(_mentionToEntity).toList(growable: true),
+          mentions: pageResult.mentions
+              .map(_mentionToEntity)
+              .toList(growable: true),
           page: pageResult.page,
           lastPage: pageResult.lastPage,
           total: pageResult.total,

@@ -382,17 +382,7 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
     final tab = _currentTab;
 
     if (tab.isLoading && tab.users.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: AppSizes.p16),
-          SkeletonWidget(height: 64, borderRadius: AppSizes.radiusMd),
-          SizedBox(height: AppSizes.p8),
-          SkeletonWidget(height: 64, borderRadius: AppSizes.radiusMd),
-          SizedBox(height: AppSizes.p8),
-          SkeletonWidget(height: 64, borderRadius: AppSizes.radiusMd),
-        ],
-      );
+      return const UserFollowersListSkeleton(itemCount: 15);
     }
 
     if (tab.errorMessage != null && tab.users.isEmpty) {

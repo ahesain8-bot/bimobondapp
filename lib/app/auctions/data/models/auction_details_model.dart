@@ -45,6 +45,7 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
     return AuctionUserEntity(
       id: json['id']?.toString() ?? '',
       username: json['username']?.toString(),
+      fullName: json['fullName']?.toString() ?? json['name']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
     );
   }

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -9,12 +10,14 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 /// One tab in [LiquidGlassBottomNav].
 class LiquidGlassBottomNavItem {
   const LiquidGlassBottomNavItem({
-    required this.icon,
+    this.icon,
+    this.assetPath,
     required this.label,
     required this.index,
-  });
+  }) : assert(icon != null || assetPath != null);
 
-  final IconData icon;
+  final IconData? icon;
+  final String? assetPath;
   final String label;
   final int index;
 }
@@ -39,7 +42,7 @@ abstract final class LiquidGlassBottomNavItems {
         index: 1,
       ),
       LiquidGlassBottomNavItem(
-        icon: LucideIcons.messageSquare,
+        assetPath: AppAssets.chatNavIcon,
         label: chatLabel,
         index: 3,
       ),
@@ -209,6 +212,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
       children.add(
         _LiquidGlassBottomNavTile(
           icon: item.icon,
+          assetPath: item.assetPath,
           label: item.label,
           isSelected: currentIndex == item.index,
           selectedColor: selectedColor,
@@ -228,7 +232,8 @@ class LiquidGlassBottomNav extends StatelessWidget {
 
 class _LiquidGlassBottomNavTile extends StatelessWidget {
   const _LiquidGlassBottomNavTile({
-    required this.icon,
+    this.icon,
+    this.assetPath,
     required this.label,
     required this.isSelected,
     required this.selectedColor,
@@ -236,7 +241,8 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final String? assetPath;
   final String label;
   final bool isSelected;
   final Color selectedColor;
@@ -248,13 +254,30 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected ? selectedColor : unselectedColor;
 
+    final Widget iconWidget;
+    if (assetPath != null) {
+      iconWidget = Image.asset(
+        assetPath!,
+        width: HomeLayoutConstants.navIconSize,
+        height: HomeLayoutConstants.navIconSize,
+        color: color,
+        colorBlendMode: BlendMode.srcIn,
+      );
+    } else {
+      iconWidget = Icon(
+        icon!,
+        color: color,
+        size: HomeLayoutConstants.navIconSize,
+      );
+    }
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: HomeLayoutConstants.navIconSize),
+          iconWidget,
           const SizedBox(height: AppSizes.p4),
           Text(
             label,

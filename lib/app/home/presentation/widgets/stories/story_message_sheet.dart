@@ -79,8 +79,13 @@ class _StoryMessageSheetState extends State<StoryMessageSheet> {
 
     Navigator.pop(context);
     final l10n = AppLocalizations.of(context)!;
-    final username = widget.story.user?.username.trim() ?? '';
-    final name = username.isNotEmpty ? username : 'User';
+    final user = widget.story.user;
+    final name = (user?.fullName?.trim().isNotEmpty == true
+            ? user!.fullName!.trim()
+            : user?.username?.trim().isNotEmpty == true
+                ? user!.username!.trim()
+                : null) ??
+        'User';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(l10n.storyMessageSent(name))),
     );

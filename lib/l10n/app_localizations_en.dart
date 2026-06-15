@@ -1815,4 +1815,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationBodyAuctionWon => 'You won an auction';
+
+  @override
+  String get walletTitle => 'Wallet';
+
+  @override
+  String get walletBalanceLabel => 'Coins Balance';
+
+  @override
+  String get walletChoosePackage => 'Choose a Package';
+
+  @override
+  String walletPurchaseSuccess(int amount) {
+    return 'Successfully purchased $amount coins!';
+  }
+
+  @override
+  String get walletTopUpButton => 'Top Up';
+
+  @override
+  String get walletProcessing => 'Processing payment...';
+
+  @override
+  String get walletCardNumber => 'Card Number';
+
+  @override
+  String get walletExpiry => 'Expiry Date (MM/YY)';
+
+  @override
+  String get walletCvv => 'CVV';
+
+  @override
+  String get walletCardHolder => 'Cardholder Name';
+
+  @override
+  String walletPayButton(String price) {
+    return 'Pay $price';
+  }
 }

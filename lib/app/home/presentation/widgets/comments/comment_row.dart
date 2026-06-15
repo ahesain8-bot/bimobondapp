@@ -78,7 +78,7 @@ class CommentRow extends StatelessWidget {
           userId: userId,
           imageUrl: comment.user.avatarUrl,
           radius: avatarRadius,
-          fallbackText: comment.user.username ?? 'User',
+          fallbackText: comment.user.fullName ?? comment.user.username ?? 'User',
           username: comment.user.username,
           fullName: comment.user.fullName,
           onTap: openProfile,
@@ -95,7 +95,9 @@ class CommentRow extends StatelessWidget {
                       onTap: openProfile,
                       behavior: HitTestBehavior.opaque,
                       child: Text(
-                        comment.user.username ?? 'user',
+                        comment.user.fullName?.trim().isNotEmpty == true
+                            ? comment.user.fullName!.trim()
+                            : (comment.user.username ?? 'user'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

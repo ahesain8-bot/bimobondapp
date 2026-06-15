@@ -108,17 +108,19 @@ class AuctionCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Live/Status badge at top-left
-                  Positioned(
+                  // Live/Status badge at top-start
+                  Positioned.directional(
+                    textDirection: Directionality.of(context),
                     top: AppSizes.p12,
-                    left: AppSizes.p12,
+                    start: AppSizes.p12,
                     child: AuctionStatusBadge(auction: auction),
                   ),
-                  // Glassmorphic Countdown overlay at bottom-left
+                  // Glassmorphic Countdown overlay at bottom-start
                   if (auction.post?.auction != null)
-                    Positioned(
+                    Positioned.directional(
+                      textDirection: Directionality.of(context),
                       bottom: AppSizes.p12,
-                      left: AppSizes.p12,
+                      start: AppSizes.p12,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                         child: BackdropFilter(
@@ -171,11 +173,11 @@ class AuctionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         CustomText(
                           auction.title,
-                          textAlign: TextAlign.end,
+                          textAlign: TextAlign.start,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -183,7 +185,7 @@ class AuctionCard extends StatelessWidget {
                           const SizedBox(height: AppSizes.p4),
                           CustomText(
                             auction.subtitle,
-                            textAlign: TextAlign.end,
+                            textAlign: TextAlign.start,
                             fontSize: 13,
                             variant: TextVariant.secondary,
                             // maxLines: 1,
@@ -346,6 +348,7 @@ class AuctionCard extends StatelessWidget {
                       AuctionCardFooterRow(
                         userId: auction.ownerUserId ?? '',
                         username: auction.ownerUsername!,
+                        fullName: auction.ownerFullName,
                         avatarUrl: auction.ownerAvatarUrl,
                         categoryLabel: auction.categoryLabel,
                         categorySlug: auction.categorySlug,

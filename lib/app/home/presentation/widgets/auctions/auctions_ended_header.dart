@@ -22,6 +22,12 @@ class AuctionsEndedHeader extends StatelessWidget {
 
     final content = Row(
       children: [
+        CustomText(
+          l10n.endedAuctionsNow,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+        const Spacer(),
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSizes.p10,
@@ -49,12 +55,6 @@ class AuctionsEndedHeader extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        const Spacer(),
-        CustomText(
-          l10n.endedAuctionsNow,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
         ),
         if (showViewAll) ...[
           const SizedBox(width: AppSizes.p8),

@@ -19,4 +19,5 @@ class AppAssets {
   static const String mobileIcon =
       '$iconsPath/mobile-phone-svgrepo-com (1).svg';
   static const String googleIcon = '$iconsPath/google-color-svgrepo-com.svg';
+  static const String chatNavIcon = '$iconsPath/chat_icon.png';
 }

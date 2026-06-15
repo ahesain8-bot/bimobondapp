@@ -22,18 +22,20 @@ class CustomText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isGlass = theme.colorScheme.surface == Colors.transparent;
     
     Color defaultColor;
     switch (variant) {
       case TextVariant.primary:
-        defaultColor = isDark ? Colors.white : Colors.black87;
+        defaultColor = (isDark || isGlass) ? Colors.white : Colors.black87;
         break;
       case TextVariant.secondary:
-        defaultColor = isDark ? Colors.white70 : Colors.black54;
+        defaultColor = (isDark || isGlass) ? Colors.white70 : Colors.black54;
         break;
       case TextVariant.muted:
-        defaultColor = isDark ? Colors.white54 : Colors.black45;
+        defaultColor = (isDark || isGlass) ? Colors.white54 : Colors.black45;
         break;
     }
 

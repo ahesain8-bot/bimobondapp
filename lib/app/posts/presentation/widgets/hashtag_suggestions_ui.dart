@@ -20,12 +20,24 @@ class HashtagSuggestionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isTransparentSurface = theme.colorScheme.surface == Colors.transparent;
+
+    final dropdownBgColor = isTransparentSurface
+        ? Colors.black.withValues(alpha: 0.85)
+        : (isDark ? const Color(0xFF1F1F1F) : Colors.white);
+
+    final dropdownBorderColor = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.15)
+        : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.shade200);
+
     return Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: dropdownBgColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: dropdownBorderColor),
         boxShadow: const [
           BoxShadow(
             color: Color(0x14000000),
@@ -54,7 +66,13 @@ class HashtagSuggestionsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isTransparentSurface = theme.colorScheme.surface == Colors.transparent;
     final iconSize = compact ? 28.0 : 36.0;
+
+    final titleColor = isTransparentSurface || isDark ? Colors.white : theme.colorScheme.onSurface;
+    final subtitleColor = isTransparentSurface || isDark ? Colors.white70 : theme.colorScheme.onSurfaceVariant;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -89,7 +107,7 @@ class HashtagSuggestionsHeader extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.black87,
+                    color: titleColor,
                     fontWeight: FontWeight.w800,
                     fontSize: compact ? 12 : 15,
                     letterSpacing: -0.2,
@@ -100,7 +118,7 @@ class HashtagSuggestionsHeader extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: TextStyle(
-                      color: Colors.grey.shade600,
+                      color: subtitleColor,
                       fontSize: compact ? 10 : 12,
                     ),
                   ),
@@ -126,6 +144,19 @@ class HashtagSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isTransparentSurface = theme.colorScheme.surface == Colors.transparent;
+
+    final textColor = isTransparentSurface || isDark ? Colors.white : theme.colorScheme.onSurface;
+    final hintColor = isTransparentSurface || isDark ? Colors.white60 : theme.colorScheme.onSurfaceVariant;
+    final fillColor = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.08)
+        : (isDark ? const Color(0xFF2C2C2E) : Colors.grey.shade50);
+    final borderClr = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.1)
+        : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade200);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSizes.p12,
@@ -135,36 +166,36 @@ class HashtagSearchField extends StatelessWidget {
       ),
       child: TextField(
         controller: controller,
-        style: const TextStyle(
-          color: Colors.black87,
+        style: TextStyle(
+          color: textColor,
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(
-            color: Colors.grey.shade500,
+            color: hintColor,
             fontWeight: FontWeight.w400,
           ),
           prefixIcon: Icon(
             LucideIcons.search,
             size: 16,
-            color: Colors.grey.shade500,
+            color: hintColor,
           ),
           isDense: true,
           filled: true,
-          fillColor: Colors.grey.shade50,
+          fillColor: fillColor,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSizes.p10,
             vertical: AppSizes.p8,
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
+            borderSide: BorderSide(color: borderClr),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
+            borderSide: BorderSide(color: borderClr),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -278,18 +309,35 @@ class HashtagSuggestionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isTransparentSurface = theme.colorScheme.surface == Colors.transparent;
+
+    final tileBgColor = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.08)
+        : (isDark ? const Color(0xFF2C2C2E) : Colors.grey.shade50);
+
+    final tileBorderColor = isTransparentSurface
+        ? Colors.white.withValues(alpha: 0.1)
+        : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade200);
+
+    final textColor = isTransparentSurface || isDark ? Colors.white : theme.colorScheme.onSurface;
+    final postCountColor = isTransparentSurface || isDark ? Colors.white70 : theme.colorScheme.onSurfaceVariant;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         splashColor: hashtagAccent.withValues(alpha: 0.08),
-        highlightColor: Colors.grey.shade100,
+        highlightColor: isTransparentSurface || isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.shade100,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: tileBgColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: tileBorderColor),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -317,8 +365,8 @@ class HashtagSuggestionTile extends StatelessWidget {
                     '#${tag.name}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.black87,
+                    style: TextStyle(
+                      color: textColor,
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                       height: 1.2,
@@ -331,7 +379,7 @@ class HashtagSuggestionTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey.shade500,
+                    color: postCountColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),

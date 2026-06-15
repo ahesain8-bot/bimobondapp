@@ -17,12 +17,14 @@ class ChatSheets {
     required String username,
     required String imageUrl,
     String? userId,
+    String? fullName,
   }) {
     if (userId != null && userId.isNotEmpty) {
       openUserActiveStoriesOrProfile(
         context,
         userId: userId,
         username: username,
+        fullName: fullName,
         avatarUrl: imageUrl,
       );
       return;
@@ -43,10 +45,11 @@ class ChatSheets {
               radius: ChatLayoutConstants.userInfoAvatarRadius,
               fallbackText: username,
               username: username,
+              fullName: fullName,
             ),
             const SizedBox(height: AppSizes.p12),
             Text(
-              username,
+              fullName ?? username,
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,

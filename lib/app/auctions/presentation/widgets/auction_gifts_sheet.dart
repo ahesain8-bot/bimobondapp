@@ -304,7 +304,10 @@ class _AuctionGiftTransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final sender = transaction.sender;
     final gift = transaction.gift;
-    final senderName = sender.username ?? 'User';
+    final senderName = (sender.fullName?.trim().isNotEmpty == true
+            ? sender.fullName!.trim()
+            : sender.username) ??
+        'User';
     final thumb = gift.thumbnailUrl;
     final contribution = transaction.contributionUsd == transaction.contributionUsd.roundToDouble()
         ? transaction.contributionUsd.round().toString()

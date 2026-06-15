@@ -168,8 +168,10 @@ class PostModel extends PostEntity {
           .map(
             (e) => e is MentionRefModel
                 ? e.toJson()
-                : MentionRefModel(userId: e.userId, username: e.username)
-                    .toJson(),
+                : MentionRefModel(
+                    userId: e.userId,
+                    username: e.username,
+                  ).toJson(),
           )
           .toList(),
       'isAuctionable': isAuctionable,
@@ -222,7 +224,8 @@ class PostUserModel extends PostUserEntity {
       id: json['id'] ?? '',
       username: json['username'] ?? '',
       avatarUrl: PostModel._normalizeUrl(json['avatarUrl']),
-      isFollowing: _parseOptionalBool(json['isFollowing']) ??
+      isFollowing:
+          _parseOptionalBool(json['isFollowing']) ??
           _parseOptionalBool(json['isFollowed']),
     );
   }

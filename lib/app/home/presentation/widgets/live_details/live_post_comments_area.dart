@@ -21,7 +21,9 @@ class LivePostCommentsArea extends StatelessWidget {
   final ScrollController scrollController;
 
   String _displayName(CommentEntity comment) {
-    return comment.user.username ?? comment.user.fullName ?? 'User';
+    return comment.user.fullName?.trim().isNotEmpty == true
+        ? comment.user.fullName!.trim()
+        : (comment.user.username ?? 'User');
   }
 
   String _commentBody(AppLocalizations l10n, CommentEntity comment) {
@@ -58,7 +60,7 @@ class LivePostCommentsArea extends StatelessWidget {
           padding: LiveDetailsLayoutConstants.screenHorizontalPadding,
           itemCount: comments.length,
           itemBuilder: (context, index) {
-            final comment = comments[comments.length - 1 - index];
+            final comment = comments[index];
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSizes.p8),
               child: Align(

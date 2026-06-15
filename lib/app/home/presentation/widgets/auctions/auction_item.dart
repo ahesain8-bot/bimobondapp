@@ -10,6 +10,7 @@ class AuctionItem {
     required this.giftTotalUsd,
     required this.giftCount,
     this.ownerUsername,
+    this.ownerFullName,
     this.ownerAvatarUrl,
     this.ownerUserId,
     this.categorySlug,
@@ -27,6 +28,7 @@ class AuctionItem {
   final double giftTotalUsd;
   final int giftCount;
   final String? ownerUsername;
+  final String? ownerFullName;
   final String? ownerAvatarUrl;
   final String? ownerUserId;
   final String? categorySlug;
@@ -63,6 +65,9 @@ class AuctionItem {
       giftTotalUsd: auction.currentTotalUsd,
       giftCount: auction.giftCount,
       ownerUsername: hasOwnerHandle ? ownerHandle : null,
+      ownerFullName: owner?.fullName?.trim().isNotEmpty == true
+          ? owner!.fullName!.trim()
+          : null,
       ownerAvatarUrl: owner?.avatarUrl,
       ownerUserId: owner?.id ?? post.userId,
       categorySlug: categorySlug,

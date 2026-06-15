@@ -9,6 +9,7 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
@@ -806,11 +807,21 @@ class _GiftIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconSize = size ?? (isSelected ? 32.0 : 28.0);
-    final icon = gift.icon;
+    final icon = gift.icon.trim();
     if (gift.hasNetworkIcon ||
         icon.startsWith('http://') ||
         icon.startsWith('https://')) {
       return Image.network(
+        MediaUtils.resolveAbsoluteUrl(icon),
+        width: iconSize,
+        height: iconSize,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) =>
+            Text('🎁', style: TextStyle(fontSize: iconSize)),
+      );
+    }
+    if (icon.startsWith('assets/')) {
+      return Image.asset(
         icon,
         width: iconSize,
         height: iconSize,

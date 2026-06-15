@@ -11,7 +11,8 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
-import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
+    as auth_di;
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
 import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -149,14 +150,13 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     _progressController?.dispose();
     if (!mounted || _stories.isEmpty) return;
 
-    _progressController = AnimationController(
-      vsync: this,
-      duration: _kStorySegmentDuration,
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && !_paused && mounted) {
-          _goNextStory();
-        }
-      });
+    _progressController =
+        AnimationController(vsync: this, duration: _kStorySegmentDuration)
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed && !_paused && mounted) {
+              _goNextStory();
+            }
+          });
 
     if (!_paused) {
       _progressController!.forward();
@@ -363,7 +363,10 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                       style: const TextStyle(color: Colors.white70),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
                       onPressed: () => context.pop(),
                     ),
                   ],
@@ -454,8 +457,10 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                       userId: post.user?.id,
                       imageUrl: post.user?.avatarUrl,
                       radius: 16,
-                      fallbackText: post.user?.username ?? '',
+                      fallbackText:
+                          post.user?.fullName ?? post.user?.username ?? '',
                       username: post.user?.username,
+                      fullName: post.user?.fullName,
                       onTap: () {
                         final id = post.user?.id.trim() ?? '';
                         if (id.isEmpty) return;
@@ -463,6 +468,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                           context,
                           userId: id,
                           username: post.user?.username,
+                          fullName: post.user?.fullName,
                           avatarUrl: post.user?.avatarUrl,
                         );
                       },
@@ -473,7 +479,9 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            post.user?.username ?? '',
+                            post.user?.fullName?.trim().isNotEmpty == true
+                                ? post.user!.fullName!.trim()
+                                : (post.user?.username ?? ''),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
@@ -513,10 +521,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                 icon: const Icon(Icons.close_rounded, color: Colors.white),
                 onPressed: () => context.pop(),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 40,
-                  minHeight: 40,
-                ),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               ),
             ],
           ),
@@ -608,10 +613,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
 }
 
 class _StoryPageContent extends StatelessWidget {
-  const _StoryPageContent({
-    required this.post,
-    this.videoController,
-  });
+  const _StoryPageContent({required this.post, this.videoController});
 
   final PostEntity post;
   final VideoPlayerController? videoController;
@@ -641,10 +643,7 @@ class _StoryPageContent extends StatelessWidget {
     }
 
     return Center(
-      child: SafeNetworkImage(
-        imageUrl: url,
-        fit: BoxFit.contain,
-      ),
+      child: SafeNetworkImage(imageUrl: url, fit: BoxFit.contain),
     );
   }
 }

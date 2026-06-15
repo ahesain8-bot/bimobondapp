@@ -132,6 +132,7 @@ class _ConversationTile extends StatelessWidget {
                 radius: MessagesLayoutConstants.conversationAvatarRadius,
                 fallbackText: chat.name,
                 username: chat.name,
+                fullName: chat.name,
               ),
             ),
             if (chat.active)

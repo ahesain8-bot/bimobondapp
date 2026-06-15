@@ -1807,7 +1807,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String notificationBodyGift(String name) {
-    return 'أرسل لك $name هدية';
+    return '$name sent you a gift';
   }
 
   @override
@@ -1815,4 +1815,41 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notificationBodyAuctionWon => 'لقد فزت بمزاد';
+
+  @override
+  String get walletTitle => 'المحفظة';
+
+  @override
+  String get walletBalanceLabel => 'رصيد العملات';
+
+  @override
+  String get walletChoosePackage => 'اختر باقة';
+
+  @override
+  String walletPurchaseSuccess(int amount) {
+    return 'تم شراء $amount عملة بنجاح!';
+  }
+
+  @override
+  String get walletTopUpButton => 'شحن الرصيد';
+
+  @override
+  String get walletProcessing => 'جاري معالجة الدفع...';
+
+  @override
+  String get walletCardNumber => 'رقم البطاقة';
+
+  @override
+  String get walletExpiry => 'تاريخ الانتهاء (MM/YY)';
+
+  @override
+  String get walletCvv => 'رمز التحقق (CVV)';
+
+  @override
+  String get walletCardHolder => 'اسم حامل البطاقة';
+
+  @override
+  String walletPayButton(String price) {
+    return 'دفع $price';
+  }
 }

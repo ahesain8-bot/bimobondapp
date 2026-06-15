@@ -25,21 +25,33 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+  const MainScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   final ImagePicker _picker = ImagePicker();
   String? _pendingOpenStoryUserId;
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadActiveStories());
+  }
+
+  @override
+  void didUpdateWidget(MainScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialIndex != oldWidget.initialIndex) {
+      setState(() {
+        _currentIndex = widget.initialIndex;
+      });
+    }
   }
 
   void _loadActiveStories() {
@@ -175,7 +187,7 @@ class _MainScreenState extends State<MainScreen> {
                     });
                     _loadActiveStories();
                   } else {
-                    setState(() => _currentIndex = 0);
+                    setState(() => _currentIndex = 4);
                   }
                 } else if (state is DeletePostSuccess) {
                   _loadActiveStories();

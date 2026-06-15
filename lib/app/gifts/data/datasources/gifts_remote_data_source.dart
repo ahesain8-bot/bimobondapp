@@ -94,6 +94,17 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     throw ServerException(message: 'Invalid inventory response');
   }
 
+  GiftInventoryModel _overlayOffset(GiftInventoryModel inventory) {
+    final purchasedOffset = apiClient.sharedPreferences.getInt('MOCK_COIN_PURCHASED_OFFSET') ?? 0;
+    if (purchasedOffset > 0) {
+      return GiftInventoryModel(
+        coinBalance: inventory.coinBalance + purchasedOffset,
+        items: inventory.items,
+      );
+    }
+    return inventory;
+  }
+
   @override
   Future<GiftInventoryModel> getInventory() async {
     try {
@@ -102,7 +113,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
         options: Options(headers: await _authHeaders()),
       );
       if (response.statusCode == 200) {
-        return _parseInventoryResponse(response.data);
+        return _overlayOffset(_parseInventoryResponse(response.data));
       }
       throw ServerException(
         message:
@@ -132,12 +143,12 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;
         if (body is Map<String, dynamic>) {
-          return GiftInventoryModel.fromApiResponse(body);
+          return _overlayOffset(GiftInventoryModel.fromApiResponse(body));
         }
         if (body is Map) {
-          return GiftInventoryModel.fromApiResponse(
+          return _overlayOffset(GiftInventoryModel.fromApiResponse(
             Map<String, dynamic>.from(body),
-          );
+          ));
         }
         return getInventory();
       }
@@ -181,12 +192,12 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;
         if (body is Map<String, dynamic>) {
-          return GiftInventoryModel.fromApiResponse(body);
+          return _overlayOffset(GiftInventoryModel.fromApiResponse(body));
         }
         if (body is Map) {
-          return GiftInventoryModel.fromApiResponse(
+          return _overlayOffset(GiftInventoryModel.fromApiResponse(
             Map<String, dynamic>.from(body),
-          );
+          ));
         }
         return null;
       }

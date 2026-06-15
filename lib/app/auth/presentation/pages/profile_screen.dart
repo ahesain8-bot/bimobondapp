@@ -334,7 +334,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               tab.isRefreshing = false;
             });
             _completePullRefreshIfNeeded();
-          } else if (state is UpdatePostSuccess || state is DeletePostSuccess) {
+          } else if (state is CreatePostSuccess ||
+              state is UpdatePostSuccess ||
+              state is DeletePostSuccess) {
             _invalidateProfileTab(ProfileLayoutConstants.postsTabIndex);
             _invalidateProfileTab(ProfileLayoutConstants.onlyMeTabIndex);
             final tab = _tabPosts[_selectedTabIndex];
@@ -397,6 +399,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                           username: '@$username',
                           onSettings: () => _refreshProfileAfterNavigation(
                             context.pushNamed('settings'),
+                          ),
+                          onWallet: () => _refreshProfileAfterNavigation(
+                            context.pushNamed('wallet'),
                           ),
                         ),
                       ),

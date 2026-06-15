@@ -29,6 +29,7 @@ import 'package:bimobondapp/app/social/presentation/pages/user_comments_screen.d
 import 'package:bimobondapp/app/social/presentation/pages/my_followers_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_likes_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_mentions_screen.dart';
+import 'package:bimobondapp/app/gifts/presentation/pages/wallet_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
@@ -55,7 +56,16 @@ class AppRouter {
       GoRoute(
         path: '/',
         name: 'home',
-        builder: (context, state) => const MainScreen(),
+        builder: (context, state) {
+          final tab = state.uri.queryParameters['tab'];
+          int initialIndex = 0;
+          if (tab == 'profile') {
+            initialIndex = 4;
+          } else if (tab != null) {
+            initialIndex = int.tryParse(tab) ?? 0;
+          }
+          return MainScreen(initialIndex: initialIndex);
+        },
       ),
       GoRoute(
         path: '/login',
@@ -122,6 +132,11 @@ class AppRouter {
         path: '/settings/chat-wallpaper',
         name: 'chat_wallpaper_settings',
         builder: (context, state) => const ChatWallpaperSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/wallet',
+        name: 'wallet',
+        builder: (context, state) => const WalletScreen(),
       ),
       GoRoute(
         path: '/settings/admin-activity',
