@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/chats/presentation/bloc/inbox_event.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -63,7 +64,61 @@ class MessagesConversationList extends StatelessWidget {
             ? const Color(0xFFE4E7EC)
             : theme.dividerColor.withValues(alpha: 0.12),
       ),
-      itemBuilder: (context, index) => _ConversationTile(chat: items[index]),
+      itemBuilder: (context, index) {
+        final chat = items[index];
+        bool deleteForEveryone = false;
+        return Dismissible(
+          key: Key('dismiss_${chat.chatId}'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: AlignmentDirectional.centerEnd,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF3B30),
+              borderRadius: BorderRadius.circular(
+                MessagesLayoutConstants.conversationTileRadius,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.deleteAction,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.delete_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+          confirmDismiss: (direction) async {
+            final result = await showDialog<Map<String, bool>?>(
+              context: context,
+              builder: (dialogContext) => const _DeleteConfirmDialog(),
+            );
+            if (result != null && result['confirmed'] == true) {
+              deleteForEveryone = result['deleteForEveryone'] ?? false;
+              return true;
+            }
+            return false;
+          },
+          onDismissed: (direction) {
+            context.read<InboxBloc>().add(InboxChatDismissed(
+              chatId: chat.chatId,
+              deleteForEveryone: deleteForEveryone,
+            ));
+          },
+          child: _ConversationTile(chat: chat),
+        );
+      },
     );
   }
 }
@@ -116,23 +171,22 @@ class _ConversationTile extends StatelessWidget {
         leading: Stack(
           children: [
             Container(
-              padding: const EdgeInsets.all(2),
+              padding: chat.unread ? const EdgeInsets.all(2) : EdgeInsets.zero,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: chat.unread
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
-                  width: 2,
-                ),
+                border: chat.unread
+                    ? Border.all(color: theme.colorScheme.primary, width: 2)
+                    : null,
               ),
-              child: StoryProfileAvatar(
-                userId: chat.peerUserId,
-                imageUrl: chat.imageUrl,
-                radius: MessagesLayoutConstants.conversationAvatarRadius,
-                fallbackText: chat.name,
-                username: chat.name,
-                fullName: chat.name,
+              child: ClipOval(
+                child: StoryProfileAvatar(
+                  userId: chat.peerUserId,
+                  imageUrl: chat.imageUrl,
+                  //   radius: MessagesLayoutConstants.conversationAvatarRadius,
+                  fallbackText: chat.name,
+                  username: chat.name,
+                  fullName: chat.name,
+                ),
               ),
             ),
             if (chat.active)
@@ -216,6 +270,101 @@ class _ConversationTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DeleteConfirmDialog extends StatefulWidget {
+  const _DeleteConfirmDialog();
+
+  @override
+  State<_DeleteConfirmDialog> createState() => _DeleteConfirmDialogState();
+}
+
+class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
+  bool _deleteForEveryone = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    return AlertDialog(
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      title: Text(
+        l10n.deleteChatTitle,
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: theme.colorScheme.onSurface,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.deleteChatMessage,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Theme(
+            data: theme.copyWith(
+              checkboxTheme: CheckboxThemeData(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                l10n.deleteForEveryone,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              value: _deleteForEveryone,
+              onChanged: (val) {
+                setState(() {
+                  _deleteForEveryone = val ?? false;
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              activeColor: theme.colorScheme.error,
+              dense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: Text(
+            l10n.cancel,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, {
+            'confirmed': true,
+            'deleteForEveryone': _deleteForEveryone,
+          }),
+          child: Text(
+            l10n.deleteChatConfirm,
+            style: TextStyle(
+              color: theme.colorScheme.error,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

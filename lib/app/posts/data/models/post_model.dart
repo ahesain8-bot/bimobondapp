@@ -196,6 +196,7 @@ class PostUserModel extends PostUserEntity {
   const PostUserModel({
     required super.id,
     required super.username,
+    super.fullName,
     super.avatarUrl,
     super.isFollowing,
   });
@@ -223,6 +224,7 @@ class PostUserModel extends PostUserEntity {
     return PostUserModel(
       id: json['id'] ?? '',
       username: json['username'] ?? '',
+      fullName: json['fullName']?.toString() ?? json['name']?.toString() ?? json['displayName']?.toString(),
       avatarUrl: PostModel._normalizeUrl(json['avatarUrl']),
       isFollowing:
           _parseOptionalBool(json['isFollowing']) ??
@@ -234,6 +236,7 @@ class PostUserModel extends PostUserEntity {
     return {
       'id': id,
       'username': username,
+      'fullName': fullName,
       'avatarUrl': avatarUrl,
       if (isFollowing != null) 'isFollowing': isFollowing,
     };

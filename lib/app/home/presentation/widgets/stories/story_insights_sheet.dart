@@ -76,11 +76,13 @@ class StoryInsightsSheet extends StatelessWidget {
                   PostEngagementUsersTab(
                     postId: postId,
                     kind: PostEngagementUserListKind.likes,
+                    hideFollowButton: true,
                   ),
                   PostEngagementUsersTab(
                     postId: postId,
                     kind: PostEngagementUserListKind.views,
                     hideFollowForViewers: true,
+                    hideFollowButton: true,
                   ),
                 ],
               ),

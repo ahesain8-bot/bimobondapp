@@ -44,6 +44,7 @@ class ApiConstants {
 
   // Chats
   static const String chats = '/chats';
+  static String chatById(String chatId) => '/chats/$chatId';
   static String chatMessages(String chatId) => '/chats/$chatId/messages';
   static String markMessageRead(String messageId) =>
       '/chats/messages/$messageId/read';

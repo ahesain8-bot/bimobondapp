@@ -24,6 +24,7 @@ class PostEngagementUsersTab extends StatefulWidget {
     required this.postId,
     required this.kind,
     this.hideFollowForViewers = false,
+    this.hideFollowButton = false,
   });
 
   final String postId;
@@ -31,6 +32,9 @@ class PostEngagementUsersTab extends StatefulWidget {
 
   /// Story viewers sheet: list viewers only, no follow actions.
   final bool hideFollowForViewers;
+
+  /// Explicit flag to hide the follow button entirely.
+  final bool hideFollowButton;
 
   @override
   State<PostEngagementUsersTab> createState() => _PostEngagementUsersTabState();
@@ -285,7 +289,7 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
     String? subtitle,
     bool disableProfileTap = false,
   }) {
-    final hideFollow = _isViews && widget.hideFollowForViewers;
+    final hideFollow = widget.hideFollowButton || (_isViews && widget.hideFollowForViewers);
 
     return SocialUserListTile(
       user: user,

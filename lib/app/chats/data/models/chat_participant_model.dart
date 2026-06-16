@@ -11,18 +11,31 @@ class ChatParticipantModel extends ChatParticipantEntity {
   });
 
   factory ChatParticipantModel.fromJson(Map<String, dynamic> json) {
-    final avatar = json['avatarUrl'] ??
+    final userMap = json['user'] is Map ? Map<String, dynamic>.from(json['user'] as Map) : null;
+    final source = userMap ?? json;
+
+    final avatar = source['avatarUrl'] ??
+        source['avatar'] ??
+        source['image'] ??
+        source['profileImage'] ??
+        json['avatarUrl'] ??
         json['avatar'] ??
         json['image'] ??
         json['profileImage'];
+
     return ChatParticipantModel(
-      id: (json['id'] ?? json['userId'] ?? '').toString(),
-      username: json['username']?.toString(),
-      fullName: json['fullName']?.toString() ?? json['name']?.toString(),
+      id: (source['id'] ?? source['userId'] ?? json['id'] ?? json['userId'] ?? '').toString(),
+      username: source['username']?.toString() ?? json['username']?.toString(),
+      fullName: source['fullName']?.toString() ??
+          source['displayName']?.toString() ??
+          source['name']?.toString() ??
+          json['fullName']?.toString() ??
+          json['displayName']?.toString() ??
+          json['name']?.toString(),
       avatarUrl: avatar != null
           ? MediaUtils.resolveAbsoluteUrl(avatar.toString())
           : null,
-      isActive: json['isActive'] as bool? ?? json['active'] as bool?,
+      isActive: (source['isActive'] ?? source['active'] ?? json['isActive'] ?? json['active']) as bool?,
     );
   }
 }

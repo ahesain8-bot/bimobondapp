@@ -31,7 +31,10 @@ List<StoryUserGroup> groupStoriesByUser(List<PostEntity> stories) {
     final user = first.user;
     return StoryUserGroup(
       userId: entry.key,
-      displayName: user?.username ?? entry.key,
+      displayName: (user?.fullName?.trim().isNotEmpty == true
+              ? user!.fullName!.trim()
+              : user?.username) ??
+          entry.key,
       avatarUrl: user?.avatarUrl,
       stories: entry.value,
     );

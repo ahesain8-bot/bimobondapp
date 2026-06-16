@@ -128,4 +128,14 @@ class ChatsRepositoryImpl implements ChatsRepository {
       return Left(_mapException(e));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deleteChat(String chatId, {bool deleteForEveryone = false}) async {
+    try {
+      await remoteDataSource.deleteChat(chatId, deleteForEveryone: deleteForEveryone);
+      return const Right(null);
+    } catch (e) {
+      return Left(_mapException(e));
+    }
+  }
 }

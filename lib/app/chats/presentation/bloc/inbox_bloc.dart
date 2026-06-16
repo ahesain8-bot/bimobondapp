@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/chats/presentation/bloc/inbox_state.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.dart';
 import 'package:bimobondapp/app/social/domain/usecases/get_suggestions_usecase.dart';
+import 'package:bimobondapp/app/chats/domain/usecases/delete_chat_usecase.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -12,13 +13,16 @@ class InboxBloc extends Bloc<InboxEvent, InboxState> {
   InboxBloc({
     required this.getChatsUseCase,
     required this.getSuggestionsUseCase,
+    required this.deleteChatUseCase,
   }) : super(const InboxInitial()) {
     on<InboxLoadRequested>(_onLoadRequested);
     on<InboxSuggestionsLoadRequested>(_onSuggestionsLoadRequested);
+    on<InboxChatDismissed>(_onChatDismissed);
   }
 
   final GetChatsUseCase getChatsUseCase;
   final GetSuggestionsUseCase getSuggestionsUseCase;
+  final DeleteChatUseCase deleteChatUseCase;
 
   int _loadGeneration = 0;
 
@@ -79,5 +83,32 @@ class InboxBloc extends Bloc<InboxEvent, InboxState> {
         suggestionsLoaded: true,
       ),
     );
+  }
+
+  Future<void> _onChatDismissed(
+    InboxChatDismissed event,
+    Emitter<InboxState> emit,
+  ) async {
+    final current = _currentSuccess;
+    if (current == null) return;
+
+    final updatedChats = current.chats
+        .where((chat) => chat.id != event.chatId)
+        .toList();
+
+    _emitSuccess(emit, chats: updatedChats);
+
+    if (!event.chatId.startsWith('mock-')) {
+      final result = await deleteChatUseCase(DeleteChatParams(
+        chatId: event.chatId,
+        deleteForEveryone: event.deleteForEveryone,
+      ));
+      result.fold(
+        (failure) {
+          add(const InboxLoadRequested(refresh: true));
+        },
+        (_) => null,
+      );
+    }
   }
 }

@@ -1852,4 +1852,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String walletPayButton(String price) {
     return 'دفع $price';
   }
+
+  @override
+  String get deleteChatTitle => 'حذف المحادثة';
+
+  @override
+  String get deleteChatMessage => 'هل أنت متأكد من رغبتك في حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get deleteChatConfirm => 'حذف';
+
+  @override
+  String get deleteForEveryone => 'حذف للجميع';
 }

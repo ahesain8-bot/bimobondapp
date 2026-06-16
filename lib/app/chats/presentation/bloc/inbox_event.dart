@@ -24,3 +24,17 @@ class InboxSuggestionsLoadRequested extends InboxEvent {
   @override
   List<Object?> get props => [limit];
 }
+
+class InboxChatDismissed extends InboxEvent {
+  const InboxChatDismissed({
+    required this.chatId,
+    this.deleteForEveryone = false,
+  });
+
+  final String chatId;
+  final bool deleteForEveryone;
+
+  @override
+  List<Object?> get props => [chatId, deleteForEveryone];
+}
+

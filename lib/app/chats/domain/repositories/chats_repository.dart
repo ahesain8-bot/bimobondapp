@@ -35,4 +35,6 @@ abstract class ChatsRepository {
   });
 
   Future<Either<Failure, void>> deleteMessage(String messageId);
+
+  Future<Either<Failure, void>> deleteChat(String chatId, {bool deleteForEveryone = false});
 }

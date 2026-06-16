@@ -35,6 +35,8 @@ abstract class ChatsRemoteDataSource {
   });
 
   Future<void> deleteMessage(String messageId);
+
+  Future<void> deleteChat(String chatId, {bool deleteForEveryone = false});
 }
 
 class ChatsRemoteDataSourceImpl implements ChatsRemoteDataSource {
@@ -244,6 +246,25 @@ class ChatsRemoteDataSourceImpl implements ChatsRemoteDataSource {
         throw ServerException(
           message:
               _extractErrorMessage(response.data) ?? 'Failed to delete message',
+        );
+      }
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> deleteChat(String chatId, {bool deleteForEveryone = false}) async {
+    try {
+      final response = await apiClient.dio.delete(
+        ApiConstants.chatById(chatId),
+        queryParameters: {'deleteForEveryone': deleteForEveryone},
+        options: Options(headers: await _authHeaders()),
+      );
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw ServerException(
+          message:
+              _extractErrorMessage(response.data) ?? 'Failed to delete chat',
         );
       }
     } on DioException catch (e) {

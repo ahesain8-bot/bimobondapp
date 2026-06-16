@@ -152,12 +152,16 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       );
     }
 
-    Widget image = RawImage(
-      image: _imageInfo!.image,
+    Widget image = SizedBox(
       width: widget.width,
       height: widget.height,
-      fit: widget.fit,
-      filterQuality: FilterQuality.medium,
+      child: RawImage(
+        image: _imageInfo!.image,
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        filterQuality: FilterQuality.medium,
+      ),
     );
 
     if (widget.borderRadius != null) {

@@ -873,5 +873,9 @@
         "type": "String"
       }
     }
-  }
+  },
+  "deleteChatTitle": "حذف المحادثة",
+  "deleteChatMessage": "هل أنت متأكد من رغبتك في حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.",
+  "deleteChatConfirm": "حذف",
+  "deleteForEveryone": "حذف للجميع"
 }
