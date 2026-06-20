@@ -14,6 +14,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_publ
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_section_card.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_setting_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_tag_button.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -31,6 +33,7 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -40,11 +43,13 @@ class AddPostScreen extends StatefulWidget {
     this.initialFiles,
     this.initialType,
     this.isStory = false,
+    this.initialSound,
   });
 
   final List<File>? initialFiles;
   final String? initialType;
   final bool isStory;
+  final SoundEntity? initialSound;
 
   @override
   State<AddPostScreen> createState() => _AddPostScreenState();
@@ -73,6 +78,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
   bool _isAuction = false;
   late DateTime _auctionStartDate;
   late DateTime _auctionEndDate;
+  SoundEntity? _selectedSound;
 
   @override
   void initState() {
@@ -84,6 +90,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
     _auctionEndDate = now.add(
       const Duration(days: AddPostLayoutConstants.defaultAuctionDurationDays),
     );
+    _selectedSound = widget.initialSound;
     _loadCategories();
   }
 
@@ -286,8 +293,32 @@ class _AddPostScreenState extends State<AddPostScreen> {
         isAuctionable: widget.isStory ? false : _isAuction,
         auction: widget.isStory ? null : auction,
         files: _selectedFiles,
+        soundId: _selectedSound?.id,
       ),
     );
+  }
+
+  Future<void> _showSoundPicker() async {
+    final picked = await SoundPickerSheet.show(
+      context,
+      initialSelection: _selectedSound,
+    );
+    if (!mounted) return;
+    setState(() => _selectedSound = picked);
+  }
+
+  Future<void> _openSoundDetail() async {
+    final sound = _selectedSound;
+    if (sound == null) return;
+    final picked = await openSoundDetail(
+      context,
+      soundId: sound.id,
+      pickMode: true,
+      preview: sound,
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedSound = picked);
+    }
   }
 
   Future<void> _pickAuctionDate({required bool isStart}) async {
@@ -480,6 +511,38 @@ class _AddPostScreenState extends State<AddPostScreen> {
             onTap: _categories.isEmpty && !_isLoadingCategories
                 ? null
                 : _showCategoryPicker,
+          ),
+          AddPostSettingItem(
+            icon: LucideIcons.music,
+            title: l10n.soundLabel,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    _selectedSound?.name ?? l10n.soundNoneSelected,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+                if (_selectedSound != null)
+                  IconButton(
+                    onPressed: _openSoundDetail,
+                    icon: const Icon(LucideIcons.info, size: 18),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                const AddPostChevronIcon(),
+              ],
+            ),
+            onTap: _showSoundPicker,
           ),
           AddPostSettingItem(
             icon: LucideIcons.lock,

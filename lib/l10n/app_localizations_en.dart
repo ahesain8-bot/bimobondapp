@@ -1864,4 +1864,494 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteForEveryone => 'Delete for everyone';
+
+  @override
+  String get cameraFlip => 'Flip';
+
+  @override
+  String get cameraFlash => 'Flash';
+
+  @override
+  String get cameraSpeed => 'Speed';
+
+  @override
+  String get cameraBeauty => 'Beauty';
+
+  @override
+  String get cameraFilters => 'Filters';
+
+  @override
+  String get cameraTimer => 'Timer';
+
+  @override
+  String get cameraMusic => 'Music';
+
+  @override
+  String get cameraEffects => 'Effects';
+
+  @override
+  String get cameraUpload => 'Upload';
+
+  @override
+  String get cameraOriginalSound => 'Original Sound';
+
+  @override
+  String get cameraSeconds => 'seconds';
+
+  @override
+  String get cameraRecording => 'Recording';
+
+  @override
+  String get cameraMusicComingSoon => 'Music selection is coming soon.';
+
+  @override
+  String get cameraPermissionDenied => 'Camera and microphone permissions are required to record.';
+
+  @override
+  String get cameraStarting => 'Starting camera...';
+
+  @override
+  String get cameraOpenSettings => 'Open settings';
+
+  @override
+  String get cameraUnavailable => 'No camera was found on this device.';
+
+  @override
+  String cameraInitError(String error) {
+    return 'Could not start the camera: $error';
+  }
+
+  @override
+  String cameraCaptureError(String error) {
+    return 'Capture failed: $error';
+  }
+
+  @override
+  String get cameraCategoryTrending => 'Trending';
+
+  @override
+  String get cameraCategoryNew => 'New';
+
+  @override
+  String get cameraCategoryPortrait => 'Portrait';
+
+  @override
+  String get cameraCategoryVibe => 'Vibe';
+
+  @override
+  String get cameraCategoryLandscape => 'Landscape';
+
+  @override
+  String get cameraFilterOriginal => 'Original';
+
+  @override
+  String get cameraFilterWarm => 'Warm';
+
+  @override
+  String get cameraFilterCool => 'Cool';
+
+  @override
+  String get cameraFilterSunny => 'Sunny';
+
+  @override
+  String get cameraFilterPink => 'Pink';
+
+  @override
+  String get cameraFilterMoody => 'Moody';
+
+  @override
+  String get cameraFilterBw => 'B&W';
+
+  @override
+  String get cameraFilterRetro => 'Retro';
+
+  @override
+  String get cameraFilterFlashVintage => 'Flash';
+
+  @override
+  String get cameraFilterBeautyGlow => 'Glow';
+
+  @override
+  String get cameraFilterNaturalBright => 'Natural';
+
+  @override
+  String get cameraFilterGoldenHour => 'Golden';
+
+  @override
+  String get openCameraStudio => 'Open camera';
+
+  @override
+  String get cameraModePhoto => 'Photo';
+
+  @override
+  String get cameraModeVideo => 'Video';
+
+  @override
+  String get cameraModeLive => 'LIVE';
+
+  @override
+  String get cameraGoLive => 'Go LIVE';
+
+  @override
+  String get cameraLiveTitleHint => 'Add a title';
+
+  @override
+  String get cameraLiveComingSoon => 'Live streaming is coming soon.';
+
+  @override
+  String get cameraEffectCrown => 'Crown';
+
+  @override
+  String get cameraEffectBunny => 'Bunny';
+
+  @override
+  String get cameraEffectSunglasses => 'Shades';
+
+  @override
+  String get cameraEffectDog => 'Dog';
+
+  @override
+  String get cameraEffectHearts => 'Hearts';
+
+  @override
+  String get cameraEffectSparkle => 'Sparkle';
+
+  @override
+  String get cameraEffectNeon => 'Neon';
+
+  @override
+  String get cameraEffectGlitch => 'Glitch';
+
+  @override
+  String get promotePostTitle => 'Promote post';
+
+  @override
+  String get promotionScreenTitle => 'Promotion';
+
+  @override
+  String get promotePostAction => 'Promote';
+
+  @override
+  String get promoteGoalTitle => 'Choose your goal';
+
+  @override
+  String get promoteAudienceTitle => 'Define your audience';
+
+  @override
+  String get promoteAgeRange => 'Age range';
+
+  @override
+  String get promoteGeoTarget => 'Target people nearby';
+
+  @override
+  String get promoteGeoTargetHint => 'Use your current location for local reach';
+
+  @override
+  String get promoteBudgetTitle => 'Select budget';
+
+  @override
+  String get promoteProcessing => 'Processing...';
+
+  @override
+  String promotePostCta(String price) {
+    return 'Promote for $price';
+  }
+
+  @override
+  String promotePostSuccess(String balance) {
+    return 'Promotion started! Wallet balance: $balance';
+  }
+
+  @override
+  String get promotedBadge => 'Promoted';
+
+  @override
+  String get promoteLanguages => 'Languages';
+
+  @override
+  String get promoteInterests => 'Interests';
+
+  @override
+  String promoteRadiusKm(int km) {
+    return 'Radius: $km km';
+  }
+
+  @override
+  String get promotePayFailedTitle => 'Payment failed';
+
+  @override
+  String get promoteRetryPay => 'Retry payment';
+
+  @override
+  String get promoteAudienceCustomize => 'Customize audience';
+
+  @override
+  String get promoteAudienceAllGenders => 'All genders';
+
+  @override
+  String get promoteAudienceNearby => 'Nearby';
+
+  @override
+  String get promoteAudienceGender => 'Gender';
+
+  @override
+  String get promotePostNoCaption => 'No caption';
+
+  @override
+  String get promotePopularBadge => 'POPULAR';
+
+  @override
+  String promoteImpressions(int count) {
+    return '$count impressions';
+  }
+
+  @override
+  String get promoteStepGoalHeading => 'What is your goal?';
+
+  @override
+  String get promoteStepGoalSubtitle => 'Choose a goal for promoting this video.';
+
+  @override
+  String get promoteStepAudienceSubtitle => 'Select how you want to reach your audience for your promotion.';
+
+  @override
+  String get promoteAudienceDefault => 'Default audience';
+
+  @override
+  String get promoteAudienceDefaultHint => 'We\'ll choose the best audience for you';
+
+  @override
+  String get promoteAudienceCreateOwn => 'Create your own';
+
+  @override
+  String get promoteStepBudgetSubtitle => 'Choose a promotion package for your campaign.';
+
+  @override
+  String promoteBudgetTotal(String price) {
+    return '$price total';
+  }
+
+  @override
+  String promoteEstimatedViews(String min, String max) {
+    return '$min – $max';
+  }
+
+  @override
+  String get promoteEstimatedViewsLabel => 'Estimated video views';
+
+  @override
+  String get promoteOverviewTitle => 'Overview';
+
+  @override
+  String get promoteOverviewGoal => 'Goal';
+
+  @override
+  String get promoteOverviewAudience => 'Audience';
+
+  @override
+  String get promoteOverviewBudget => 'Budget';
+
+  @override
+  String get promoteOverviewSubtotal => 'Subtotal';
+
+  @override
+  String get promoteOverviewTotal => 'Total';
+
+  @override
+  String get promoteNext => 'Next';
+
+  @override
+  String get promotePayStart => 'Pay and start promotion';
+
+  @override
+  String get promoteQuickPack => 'Ready-to-use promotion pack';
+
+  @override
+  String promoteStepOf(int current, int total) {
+    return 'Step $current of $total';
+  }
+
+  @override
+  String get promoteInsightsDashboardTitle => 'Promoted posts';
+
+  @override
+  String get promoteInsightsTitle => 'Promotion insights';
+
+  @override
+  String get promoteInsightsEmptyTitle => 'No promoted posts yet';
+
+  @override
+  String get promoteInsightsEmptyHint => 'Promote a video from your feed to see performance here.';
+
+  @override
+  String get promoteInsightsPerformanceTitle => 'Performance';
+
+  @override
+  String get promoteInsightsPromotedImpressions => 'Promoted impressions';
+
+  @override
+  String get promoteInsightsFollowersGained => 'Followers gained';
+
+  @override
+  String get promoteInsightsSpend => 'Promotion spend';
+
+  @override
+  String get promoteInsightsEngagementRate => 'Engagement rate';
+
+  @override
+  String get promoteInsightsShares => 'Shares';
+
+  @override
+  String get promoteInsightsCostPerImpression => 'Cost / impression';
+
+  @override
+  String get promoteInsightsCostPerView => 'Cost / view';
+
+  @override
+  String get promoteInsightsUniqueViewers => 'Unique viewers';
+
+  @override
+  String get promoteInsightsChartTitle => 'Impressions (last 7 days)';
+
+  @override
+  String get promoteInsightsNoChartData => 'No impression data yet';
+
+  @override
+  String get promoteInsightsCampaignProgress => 'Campaign progress';
+
+  @override
+  String get promoteInsightsImpressions => 'Impressions';
+
+  @override
+  String get promoteInsightsBudget => 'Budget';
+
+  @override
+  String get promoteInsightsPauseCampaign => 'Pause campaign';
+
+  @override
+  String get promoteInsightsResumeCampaign => 'Resume campaign';
+
+  @override
+  String get promoteInsightsCampaignHistory => 'Campaign history';
+
+  @override
+  String get promoteInsightsCampaignHistoryHint => 'Tap a campaign to filter stats';
+
+  @override
+  String get promoteInsightsAllCampaigns => 'All campaigns';
+
+  @override
+  String get promoteInsightsMultipleCampaigns => 'Multiple campaigns';
+
+  @override
+  String get promoteInsightsViewInsights => 'View insights';
+
+  @override
+  String get promoteInsightsObjectiveViews => 'Video views';
+
+  @override
+  String get promoteInsightsObjectiveFollowers => 'Followers';
+
+  @override
+  String get promoteInsightsObjectiveEngagement => 'Engagement';
+
+  @override
+  String get promoteInsightsObjectiveChallenges => 'Challenges';
+
+  @override
+  String get promoteInsightsObjectiveProfileVisits => 'Profile visits';
+
+  @override
+  String get promoteInsightsObjectiveSales => 'Sales';
+
+  @override
+  String get promoteInsightsStatusActive => 'Active';
+
+  @override
+  String get promoteInsightsStatusPaused => 'Paused';
+
+  @override
+  String get promoteInsightsStatusPendingPayment => 'Pending payment';
+
+  @override
+  String get promoteInsightsStatusCompleted => 'Completed';
+
+  @override
+  String get promoteInsightsStatusCancelled => 'Cancelled';
+
+  @override
+  String promoteInsightsCampaignProgressSummary(String percent, String spent) {
+    return '$percent · $spent spent';
+  }
+
+  @override
+  String get settingsPromotedPosts => 'Promoted posts';
+
+  @override
+  String get soundLabel => 'Sound';
+
+  @override
+  String get soundNoneSelected => 'None';
+
+  @override
+  String get soundPickerTitle => 'Add sound';
+
+  @override
+  String get soundSearchHint => 'Search sounds';
+
+  @override
+  String get soundTabTrending => 'Trending';
+
+  @override
+  String get soundTabBrowse => 'Browse';
+
+  @override
+  String get soundTabMine => 'My sounds';
+
+  @override
+  String get soundPickerEmpty => 'No sounds found';
+
+  @override
+  String get soundPickFromFiles => 'Pick from files';
+
+  @override
+  String get soundUseThis => 'Use';
+
+  @override
+  String get soundUseThisSound => 'Use this sound';
+
+  @override
+  String get soundConfirmSelection => 'Use selected sound';
+
+  @override
+  String get soundClearSelection => 'Clear';
+
+  @override
+  String get soundDetailTitle => 'Sound';
+
+  @override
+  String get soundVideosUsing => 'Videos using this sound';
+
+  @override
+  String get soundNoVideosYet => 'No videos yet';
+
+  @override
+  String soundOriginalLink(String name) {
+    return 'Original: $name';
+  }
+
+  @override
+  String soundUseCount(int count) {
+    return '$count videos';
+  }
+
+  @override
+  String soundUseCountThousands(String count) {
+    return '${count}K videos';
+  }
+
+  @override
+  String soundUseCountMillions(String count) {
+    return '${count}M videos';
+  }
 }

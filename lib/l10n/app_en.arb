@@ -893,5 +893,232 @@
   "deleteChatTitle": "Delete chat",
   "deleteChatMessage": "Are you sure you want to delete this conversation? This action cannot be undone.",
   "deleteChatConfirm": "Delete",
-  "deleteForEveryone": "Delete for everyone"
+  "deleteForEveryone": "Delete for everyone",
+  "cameraFlip": "Flip",
+  "cameraFlash": "Flash",
+  "cameraSpeed": "Speed",
+  "cameraBeauty": "Beauty",
+  "cameraFilters": "Filters",
+  "cameraTimer": "Timer",
+  "cameraMusic": "Music",
+  "cameraEffects": "Effects",
+  "cameraUpload": "Upload",
+  "cameraOriginalSound": "Original Sound",
+  "cameraSeconds": "seconds",
+  "cameraRecording": "Recording",
+  "cameraMusicComingSoon": "Music selection is coming soon.",
+  "cameraPermissionDenied": "Camera and microphone permissions are required to record.",
+  "cameraStarting": "Starting camera...",
+  "cameraOpenSettings": "Open settings",
+  "cameraUnavailable": "No camera was found on this device.",
+  "cameraInitError": "Could not start the camera: {error}",
+  "@cameraInitError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraCaptureError": "Capture failed: {error}",
+  "@cameraCaptureError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraCategoryTrending": "Trending",
+  "cameraCategoryNew": "New",
+  "cameraCategoryPortrait": "Portrait",
+  "cameraCategoryVibe": "Vibe",
+  "cameraCategoryLandscape": "Landscape",
+  "cameraFilterOriginal": "Original",
+  "cameraFilterWarm": "Warm",
+  "cameraFilterCool": "Cool",
+  "cameraFilterSunny": "Sunny",
+  "cameraFilterPink": "Pink",
+  "cameraFilterMoody": "Moody",
+  "cameraFilterBw": "B&W",
+  "cameraFilterRetro": "Retro",
+  "cameraFilterFlashVintage": "Flash",
+  "cameraFilterBeautyGlow": "Glow",
+  "cameraFilterNaturalBright": "Natural",
+  "cameraFilterGoldenHour": "Golden",
+  "openCameraStudio": "Open camera",
+  "cameraModePhoto": "Photo",
+  "cameraModeVideo": "Video",
+  "cameraModeLive": "LIVE",
+  "cameraGoLive": "Go LIVE",
+  "cameraLiveTitleHint": "Add a title",
+  "cameraLiveComingSoon": "Live streaming is coming soon.",
+  "cameraEffectCrown": "Crown",
+  "cameraEffectBunny": "Bunny",
+  "cameraEffectSunglasses": "Shades",
+  "cameraEffectDog": "Dog",
+  "cameraEffectHearts": "Hearts",
+  "cameraEffectSparkle": "Sparkle",
+  "cameraEffectNeon": "Neon",
+  "cameraEffectGlitch": "Glitch",
+  "promotePostTitle": "Promote post",
+  "promotionScreenTitle": "Promotion",
+  "promotePostAction": "Promote",
+  "promoteGoalTitle": "Choose your goal",
+  "promoteAudienceTitle": "Define your audience",
+  "promoteAgeRange": "Age range",
+  "promoteGeoTarget": "Target people nearby",
+  "promoteGeoTargetHint": "Use your current location for local reach",
+  "promoteBudgetTitle": "Select budget",
+  "promoteProcessing": "Processing...",
+  "promotePostCta": "Promote for {price}",
+  "@promotePostCta": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "promotePostSuccess": "Promotion started! Wallet balance: {balance}",
+  "@promotePostSuccess": {
+    "placeholders": {
+      "balance": { "type": "String" }
+    }
+  },
+  "promotedBadge": "Promoted",
+  "promoteLanguages": "Languages",
+  "promoteInterests": "Interests",
+  "promoteRadiusKm": "Radius: {km} km",
+  "@promoteRadiusKm": {
+    "placeholders": {
+      "km": { "type": "int" }
+    }
+  },
+  "promotePayFailedTitle": "Payment failed",
+  "promoteRetryPay": "Retry payment",
+  "promoteAudienceCustomize": "Customize audience",
+  "promoteAudienceAllGenders": "All genders",
+  "promoteAudienceNearby": "Nearby",
+  "promoteAudienceGender": "Gender",
+  "promotePostNoCaption": "No caption",
+  "promotePopularBadge": "POPULAR",
+  "promoteImpressions": "{count} impressions",
+  "@promoteImpressions": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "promoteStepGoalHeading": "What is your goal?",
+  "promoteStepGoalSubtitle": "Choose a goal for promoting this video.",
+  "promoteStepAudienceSubtitle": "Select how you want to reach your audience for your promotion.",
+  "promoteAudienceDefault": "Default audience",
+  "promoteAudienceDefaultHint": "We'll choose the best audience for you",
+  "promoteAudienceCreateOwn": "Create your own",
+  "promoteStepBudgetSubtitle": "Choose a promotion package for your campaign.",
+  "promoteBudgetTotal": "{price} total",
+  "@promoteBudgetTotal": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "promoteEstimatedViews": "{min} – {max}",
+  "@promoteEstimatedViews": {
+    "placeholders": {
+      "min": { "type": "String" },
+      "max": { "type": "String" }
+    }
+  },
+  "promoteEstimatedViewsLabel": "Estimated video views",
+  "promoteOverviewTitle": "Overview",
+  "promoteOverviewGoal": "Goal",
+  "promoteOverviewAudience": "Audience",
+  "promoteOverviewBudget": "Budget",
+  "promoteOverviewSubtotal": "Subtotal",
+  "promoteOverviewTotal": "Total",
+  "promoteNext": "Next",
+  "promotePayStart": "Pay and start promotion",
+  "promoteQuickPack": "Ready-to-use promotion pack",
+  "promoteStepOf": "Step {current} of {total}",
+  "@promoteStepOf": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "promoteInsightsDashboardTitle": "Promoted posts",
+  "promoteInsightsTitle": "Promotion insights",
+  "promoteInsightsEmptyTitle": "No promoted posts yet",
+  "promoteInsightsEmptyHint": "Promote a video from your feed to see performance here.",
+  "promoteInsightsPerformanceTitle": "Performance",
+  "promoteInsightsPromotedImpressions": "Promoted impressions",
+  "promoteInsightsFollowersGained": "Followers gained",
+  "promoteInsightsSpend": "Promotion spend",
+  "promoteInsightsEngagementRate": "Engagement rate",
+  "promoteInsightsShares": "Shares",
+  "promoteInsightsCostPerImpression": "Cost / impression",
+  "promoteInsightsCostPerView": "Cost / view",
+  "promoteInsightsUniqueViewers": "Unique viewers",
+  "promoteInsightsChartTitle": "Impressions (last 7 days)",
+  "promoteInsightsNoChartData": "No impression data yet",
+  "promoteInsightsCampaignProgress": "Campaign progress",
+  "promoteInsightsImpressions": "Impressions",
+  "promoteInsightsBudget": "Budget",
+  "promoteInsightsPauseCampaign": "Pause campaign",
+  "promoteInsightsResumeCampaign": "Resume campaign",
+  "promoteInsightsCampaignHistory": "Campaign history",
+  "promoteInsightsCampaignHistoryHint": "Tap a campaign to filter stats",
+  "promoteInsightsAllCampaigns": "All campaigns",
+  "promoteInsightsMultipleCampaigns": "Multiple campaigns",
+  "promoteInsightsViewInsights": "View insights",
+  "promoteInsightsObjectiveViews": "Video views",
+  "promoteInsightsObjectiveFollowers": "Followers",
+  "promoteInsightsObjectiveEngagement": "Engagement",
+  "promoteInsightsObjectiveChallenges": "Challenges",
+  "promoteInsightsObjectiveProfileVisits": "Profile visits",
+  "promoteInsightsObjectiveSales": "Sales",
+  "promoteInsightsStatusActive": "Active",
+  "promoteInsightsStatusPaused": "Paused",
+  "promoteInsightsStatusPendingPayment": "Pending payment",
+  "promoteInsightsStatusCompleted": "Completed",
+  "promoteInsightsStatusCancelled": "Cancelled",
+  "promoteInsightsCampaignProgressSummary": "{percent} · {spent} spent",
+  "@promoteInsightsCampaignProgressSummary": {
+    "placeholders": {
+      "percent": { "type": "String" },
+      "spent": { "type": "String" }
+    }
+  },
+  "settingsPromotedPosts": "Promoted posts",
+  "soundLabel": "Sound",
+  "soundNoneSelected": "None",
+  "soundPickerTitle": "Add sound",
+  "soundSearchHint": "Search sounds",
+  "soundTabTrending": "Trending",
+  "soundTabBrowse": "Browse",
+  "soundTabMine": "My sounds",
+  "soundPickerEmpty": "No sounds found",
+  "soundPickFromFiles": "Pick from files",
+  "soundUseThis": "Use",
+  "soundUseThisSound": "Use this sound",
+  "soundConfirmSelection": "Use selected sound",
+  "soundClearSelection": "Clear",
+  "soundDetailTitle": "Sound",
+  "soundVideosUsing": "Videos using this sound",
+  "soundNoVideosYet": "No videos yet",
+  "soundOriginalLink": "Original: {name}",
+  "@soundOriginalLink": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "soundUseCount": "{count} videos",
+  "@soundUseCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "soundUseCountThousands": "{count}K videos",
+  "@soundUseCountThousands": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundUseCountMillions": "{count}M videos",
+  "@soundUseCountMillions": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  }
 }

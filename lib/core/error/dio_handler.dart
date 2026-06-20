@@ -4,6 +4,16 @@ import 'package:flutter/services.dart';
 import 'exceptions.dart';
 
 class DioHandler {
+  static String? _extractErrorMessage(dynamic data) {
+    if (data is! Map) return null;
+    final message = data['message'];
+    if (message is String && message.isNotEmpty) return message;
+    if (message is List) {
+      return message.map((e) => e.toString()).join('\n');
+    }
+    return null;
+  }
+
   static Exception handle(dynamic e) {
     if (e is DioException) {
       switch (e.type) {
@@ -27,8 +37,9 @@ class DioHandler {
               return ServerException(message: 'Server Error');
 
             default:
+              final message = _extractErrorMessage(e.response?.data);
               return ServerException(
-                message: e.response?.data?['message'] ?? 'Something went wrong',
+                message: message ?? 'Something went wrong',
               );
           }
 

@@ -1,6 +1,8 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
     context.read<AuthBloc>().add(CheckAuthStatusEvent());
+    auth_di.sl<AppLocationService>().requestAndSaveLocation();
     _navigateToNext();
   }
 

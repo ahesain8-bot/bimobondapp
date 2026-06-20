@@ -3,6 +3,7 @@ import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/constants/notifications_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/dotted_divider.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -313,6 +314,111 @@ class AuctionListSkeleton extends StatelessWidget {
             const AuctionCardSkeleton(),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Vertical list of promoted post card placeholders.
+class PromotedPostsListSkeleton extends StatelessWidget {
+  const PromotedPostsListSkeleton({
+    super.key,
+    this.itemCount = 4,
+    this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 24),
+  });
+
+  final int itemCount;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      padding: padding,
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
+      itemBuilder: (_, _) => const PromotedPostCardSkeleton(),
+    );
+  }
+}
+
+/// Shimmer placeholder matching a promoted post list card.
+class PromotedPostCardSkeleton extends StatelessWidget {
+  const PromotedPostCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.65),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AspectRatio(
+              aspectRatio: 16 / 9,
+              child: SkeletonWidget(borderRadius: 0),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SkeletonWidget(
+                          height: 16,
+                          borderRadius: AppSizes.radiusSm,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SkeletonWidget(
+                        height: 28,
+                        width: 64,
+                        borderRadius: 999,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      for (var i = 0; i < 3; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(
+                          child: SkeletonWidget(
+                            height: 72,
+                            borderRadius: AppSizes.radiusSm,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const SkeletonWidget(height: 12, width: 120),
+                  const SizedBox(height: 8),
+                  SkeletonWidget(
+                    height: 8,
+                    borderRadius: AppSizes.radiusSm,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -909,7 +1015,7 @@ class GiftBalanceChipSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _GiftSheetShimmerBox(height: 32, width: 88, borderRadius: 20);
+    return const LiquidGlassSkeletonBox(height: 32, width: 88, borderRadius: 20);
   }
 }
 
@@ -930,7 +1036,7 @@ class GiftSheetFooterSkeleton extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: LayoutBuilder(
-          builder: (context, constraints) => _GiftSheetShimmerBox(
+          builder: (context, constraints) => LiquidGlassSkeletonBox(
             height: 50,
             width: constraints.maxWidth,
             borderRadius: 25,
@@ -956,40 +1062,12 @@ class _GiftCardSkeleton extends StatelessWidget {
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _GiftSheetShimmerBox(height: 32, width: 32, borderRadius: 8),
+          LiquidGlassSkeletonBox(height: 32, width: 32, borderRadius: 8),
           SizedBox(height: 10),
-          _GiftSheetShimmerBox(height: 10, width: 52),
+          LiquidGlassSkeletonBox(height: 10, width: 52),
           SizedBox(height: 6),
-          _GiftSheetShimmerBox(height: 10, width: 36),
+          LiquidGlassSkeletonBox(height: 10, width: 36),
         ],
-      ),
-    );
-  }
-}
-
-class _GiftSheetShimmerBox extends StatelessWidget {
-  const _GiftSheetShimmerBox({
-    required this.height,
-    required this.width,
-    this.borderRadius = 8,
-  });
-
-  final double height;
-  final double width;
-  final double borderRadius;
-
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor: Colors.white.withValues(alpha: 0.08),
-      highlightColor: Colors.white.withValues(alpha: 0.2),
-      child: Container(
-        height: height,
-        width: width,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
       ),
     );
   }

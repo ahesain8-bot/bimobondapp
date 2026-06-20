@@ -222,6 +222,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           isAuctionable: event.isAuctionable,
           auction: event.isAuctionable ? auction : null,
           media: mediaEntities,
+          soundId: event.soundId,
         ),
       );
 
@@ -257,6 +258,9 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         isStory: event.isStory,
         contentType: event.contentType,
         privacyStatus: event.privacyStatus,
+        latitude: event.latitude,
+        longitude: event.longitude,
+        radiusKm: event.radiusKm,
       ),
     );
 
@@ -343,6 +347,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         isAuctionable: event.isAuctionable,
         auction: event.auction,
         locationId: event.locationId,
+        location: event.location,
         playlistId: event.playlistId,
         soundId: event.soundId,
         originalPostId: event.originalPostId,

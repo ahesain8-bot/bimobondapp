@@ -877,5 +877,232 @@
   "deleteChatTitle": "حذف المحادثة",
   "deleteChatMessage": "هل أنت متأكد من رغبتك في حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.",
   "deleteChatConfirm": "حذف",
-  "deleteForEveryone": "حذف للجميع"
+  "deleteForEveryone": "حذف للجميع",
+  "cameraFlip": "قلب",
+  "cameraFlash": "فلاش",
+  "cameraSpeed": "السرعة",
+  "cameraBeauty": "تجميل",
+  "cameraFilters": "فلاتر",
+  "cameraTimer": "مؤقت",
+  "cameraMusic": "موسيقى",
+  "cameraEffects": "تأثيرات",
+  "cameraUpload": "رفع",
+  "cameraOriginalSound": "الصوت الأصلي",
+  "cameraSeconds": "ثانية",
+  "cameraRecording": "جاري التسجيل",
+  "cameraMusicComingSoon": "اختيار الموسيقى قريباً.",
+  "cameraPermissionDenied": "يلزم السماح بالكاميرا والميكروفون للتسجيل.",
+  "cameraStarting": "جاري تشغيل الكاميرا...",
+  "cameraOpenSettings": "فتح الإعدادات",
+  "cameraUnavailable": "لم يتم العثور على كاميرا على هذا الجهاز.",
+  "cameraInitError": "تعذر تشغيل الكاميرا: {error}",
+  "@cameraInitError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraCaptureError": "فشل الالتقاط: {error}",
+  "@cameraCaptureError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraCategoryTrending": "رائج",
+  "cameraCategoryNew": "جديد",
+  "cameraCategoryPortrait": "بورتريه",
+  "cameraCategoryVibe": "أجواء",
+  "cameraCategoryLandscape": "مناظر",
+  "cameraFilterOriginal": "أصلي",
+  "cameraFilterWarm": "دافئ",
+  "cameraFilterCool": "بارد",
+  "cameraFilterSunny": "مشمس",
+  "cameraFilterPink": "وردي",
+  "cameraFilterMoody": "داكن",
+  "cameraFilterBw": "أبيض وأسود",
+  "cameraFilterRetro": "ريترو",
+  "cameraFilterFlashVintage": "فلاش",
+  "cameraFilterBeautyGlow": "توهج",
+  "cameraFilterNaturalBright": "طبيعي",
+  "cameraFilterGoldenHour": "ذهبي",
+  "openCameraStudio": "فتح الكاميرا",
+  "cameraModePhoto": "صورة",
+  "cameraModeVideo": "فيديو",
+  "cameraModeLive": "مباشر",
+  "cameraGoLive": "بدء البث",
+  "cameraLiveTitleHint": "أضف عنواناً",
+  "cameraLiveComingSoon": "البث المباشر قريباً.",
+  "cameraEffectCrown": "تاج",
+  "cameraEffectBunny": "أرنب",
+  "cameraEffectSunglasses": "نظارات",
+  "cameraEffectDog": "كلب",
+  "cameraEffectHearts": "قلوب",
+  "cameraEffectSparkle": "بريق",
+  "cameraEffectNeon": "نيون",
+  "cameraEffectGlitch": "تشويش",
+  "promotePostTitle": "ترويج المنشور",
+  "promotionScreenTitle": "الترويج",
+  "promotePostAction": "ترويج",
+  "promoteGoalTitle": "اختر هدفك",
+  "promoteAudienceTitle": "حدد جمهورك",
+  "promoteAgeRange": "الفئة العمرية",
+  "promoteGeoTarget": "استهداف الأشخاص القريبين",
+  "promoteGeoTargetHint": "استخدم موقعك الحالي للوصول المحلي",
+  "promoteBudgetTitle": "اختر الميزانية",
+  "promoteProcessing": "جاري المعالجة...",
+  "promotePostCta": "ترويج مقابل {price}",
+  "@promotePostCta": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "promotePostSuccess": "بدأ الترويج! رصيد المحفظة: {balance}",
+  "@promotePostSuccess": {
+    "placeholders": {
+      "balance": { "type": "String" }
+    }
+  },
+  "promotedBadge": "مروّج",
+  "promoteLanguages": "اللغات",
+  "promoteInterests": "الاهتمامات",
+  "promoteRadiusKm": "نطاق: {km} كم",
+  "@promoteRadiusKm": {
+    "placeholders": {
+      "km": { "type": "int" }
+    }
+  },
+  "promotePayFailedTitle": "فشل الدفع",
+  "promoteRetryPay": "إعادة محاولة الدفع",
+  "promoteAudienceCustomize": "تخصيص الجمهور",
+  "promoteAudienceAllGenders": "جميع الأجناس",
+  "promoteAudienceNearby": "قريب",
+  "promoteAudienceGender": "الجنس",
+  "promotePostNoCaption": "بدون وصف",
+  "promotePopularBadge": "شائع",
+  "promoteImpressions": "{count} مشاهدة",
+  "@promoteImpressions": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "promoteStepGoalHeading": "ما هو هدفك؟",
+  "promoteStepGoalSubtitle": "اختر هدفاً لترويج هذا الفيديو.",
+  "promoteStepAudienceSubtitle": "حدد كيف تريد الوصول إلى جمهورك.",
+  "promoteAudienceDefault": "جمهور افتراضي",
+  "promoteAudienceDefaultHint": "سنختار أفضل جمهور لك",
+  "promoteAudienceCreateOwn": "إنشاء جمهورك الخاص",
+  "promoteStepBudgetSubtitle": "اختر باقة الترويج لحملتك.",
+  "promoteBudgetTotal": "{price} الإجمالي",
+  "@promoteBudgetTotal": {
+    "placeholders": {
+      "price": { "type": "String" }
+    }
+  },
+  "promoteEstimatedViews": "{min} – {max}",
+  "@promoteEstimatedViews": {
+    "placeholders": {
+      "min": { "type": "String" },
+      "max": { "type": "String" }
+    }
+  },
+  "promoteEstimatedViewsLabel": "مشاهدات الفيديو المتوقعة",
+  "promoteOverviewTitle": "نظرة عامة",
+  "promoteOverviewGoal": "الهدف",
+  "promoteOverviewAudience": "الجمهور",
+  "promoteOverviewBudget": "الميزانية",
+  "promoteOverviewSubtotal": "المجموع الفرعي",
+  "promoteOverviewTotal": "الإجمالي",
+  "promoteNext": "التالي",
+  "promotePayStart": "ادفع وابدأ الترويج",
+  "promoteQuickPack": "باقة ترويج جاهزة",
+  "promoteStepOf": "الخطوة {current} من {total}",
+  "@promoteStepOf": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "promoteInsightsDashboardTitle": "المنشورات المروّجة",
+  "promoteInsightsTitle": "إحصائيات الترويج",
+  "promoteInsightsEmptyTitle": "لا توجد منشورات مروّجة بعد",
+  "promoteInsightsEmptyHint": "روّج فيديو من خلاصتك لمشاهدة الأداء هنا.",
+  "promoteInsightsPerformanceTitle": "الأداء",
+  "promoteInsightsPromotedImpressions": "مرات الظهور المروّجة",
+  "promoteInsightsFollowersGained": "متابعون جدد",
+  "promoteInsightsSpend": "إنفاق الترويج",
+  "promoteInsightsEngagementRate": "معدل التفاعل",
+  "promoteInsightsShares": "مشاركات",
+  "promoteInsightsCostPerImpression": "التكلفة / ظهور",
+  "promoteInsightsCostPerView": "التكلفة / مشاهدة",
+  "promoteInsightsUniqueViewers": "مشاهدون فريدون",
+  "promoteInsightsChartTitle": "مرات الظهور (آخر 7 أيام)",
+  "promoteInsightsNoChartData": "لا توجد بيانات ظهور بعد",
+  "promoteInsightsCampaignProgress": "تقدم الحملة",
+  "promoteInsightsImpressions": "مرات الظهور",
+  "promoteInsightsBudget": "الميزانية",
+  "promoteInsightsPauseCampaign": "إيقاف الحملة",
+  "promoteInsightsResumeCampaign": "استئناف الحملة",
+  "promoteInsightsCampaignHistory": "سجل الحملات",
+  "promoteInsightsCampaignHistoryHint": "اضغط على حملة لتصفية الإحصائيات",
+  "promoteInsightsAllCampaigns": "جميع الحملات",
+  "promoteInsightsMultipleCampaigns": "حملات متعددة",
+  "promoteInsightsViewInsights": "عرض الإحصائيات",
+  "promoteInsightsObjectiveViews": "مشاهدات الفيديو",
+  "promoteInsightsObjectiveFollowers": "متابعون",
+  "promoteInsightsObjectiveEngagement": "تفاعل",
+  "promoteInsightsObjectiveChallenges": "تحديات",
+  "promoteInsightsObjectiveProfileVisits": "زيارات الملف",
+  "promoteInsightsObjectiveSales": "مبيعات",
+  "promoteInsightsStatusActive": "نشطة",
+  "promoteInsightsStatusPaused": "متوقفة",
+  "promoteInsightsStatusPendingPayment": "بانتظار الدفع",
+  "promoteInsightsStatusCompleted": "مكتملة",
+  "promoteInsightsStatusCancelled": "ملغاة",
+  "promoteInsightsCampaignProgressSummary": "{percent} · {spent} مُنفَق",
+  "@promoteInsightsCampaignProgressSummary": {
+    "placeholders": {
+      "percent": { "type": "String" },
+      "spent": { "type": "String" }
+    }
+  },
+  "settingsPromotedPosts": "المنشورات المروّجة",
+  "soundLabel": "الصوت",
+  "soundNoneSelected": "بدون",
+  "soundPickerTitle": "إضافة صوت",
+  "soundSearchHint": "ابحث عن أصوات",
+  "soundTabTrending": "الرائج",
+  "soundTabBrowse": "تصفح",
+  "soundTabMine": "أصواتي",
+  "soundPickerEmpty": "لا توجد أصوات",
+  "soundPickFromFiles": "اختر من الملفات",
+  "soundUseThis": "استخدام",
+  "soundUseThisSound": "استخدم هذا الصوت",
+  "soundConfirmSelection": "استخدام الصوت المحدد",
+  "soundClearSelection": "مسح",
+  "soundDetailTitle": "الصوت",
+  "soundVideosUsing": "فيديوهات تستخدم هذا الصوت",
+  "soundNoVideosYet": "لا توجد فيديوهات بعد",
+  "soundOriginalLink": "الأصل: {name}",
+  "@soundOriginalLink": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "soundUseCount": "{count} فيديو",
+  "@soundUseCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "soundUseCountThousands": "{count} ألف فيديو",
+  "@soundUseCountThousands": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundUseCountMillions": "{count} مليون فيديو",
+  "@soundUseCountMillions": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  }
 }

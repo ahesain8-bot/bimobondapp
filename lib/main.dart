@@ -22,6 +22,10 @@ import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/chat_wallpaper_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
+import 'package:bimobondapp/app/promotions/presentation/di/promotions_injector.dart'
+    as promotions_di;
+import 'package:bimobondapp/app/sounds/presentation/di/sounds_injector.dart'
+    as sounds_di;
 import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
     as notifications_di;
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
@@ -36,6 +40,8 @@ void main() async {
   await auth_di.initAuth();
   await social_di.initSocial();
   await posts_di.initPosts();
+  await promotions_di.initPromotions();
+  await sounds_di.initSounds();
   await categories_di.initCategories();
   await gifts_di.initGifts();
   await auctions_di.initAuctions();

@@ -28,6 +28,9 @@ class GetFeedUseCase implements UseCase<List<FeedItemEntity>, GetFeedParams> {
       contentType: params.contentType,
       auctionQuery: params.auctionQuery,
       privacyStatus: params.privacyStatus,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      radiusKm: params.radiusKm,
     );
   }
 }
@@ -48,6 +51,9 @@ class GetFeedParams extends Equatable {
     this.contentType,
     this.auctionQuery,
     this.privacyStatus,
+    this.latitude,
+    this.longitude,
+    this.radiusKm,
   });
 
   final int page;
@@ -64,6 +70,9 @@ class GetFeedParams extends Equatable {
   final FeedContentType? contentType;
   final FeedAuctionQuery? auctionQuery;
   final String? privacyStatus;
+  final double? latitude;
+  final double? longitude;
+  final double? radiusKm;
 
   @override
   List<Object?> get props => [
@@ -81,5 +90,8 @@ class GetFeedParams extends Equatable {
     contentType,
     auctionQuery,
     privacyStatus,
+    latitude,
+    longitude,
+    radiusKm,
   ];
 }

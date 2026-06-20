@@ -19,7 +19,10 @@ import 'package:bimobondapp/app/auth/data/datasources/auth_remote_data_source.da
 import 'package:bimobondapp/app/auth/data/datasources/auth_local_data_source.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/core/data/likes_local_data_source.dart';
+import 'package:bimobondapp/core/data/datasources/user_location_remote_data_source.dart';
+import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
+import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 
 final sl = GetIt.instance;
@@ -37,12 +40,27 @@ Future<void> initAuth() async {
     () => ViewedStoriesStore(sl()),
   );
 
+  sl.registerLazySingleton<UserLocationStore>(
+    () => UserLocationStore(sl()),
+  );
+
   sl.registerLazySingleton<ActiveStoriesRegistry>(
     () => ActiveStoriesRegistry(),
   );
 
   // Core
   sl.registerLazySingleton(() => ApiClient(sharedPreferences: sl()));
+
+  sl.registerLazySingleton<UserLocationRemoteDataSource>(
+    () => UserLocationRemoteDataSource(apiClient: sl()),
+  );
+
+  sl.registerLazySingleton<AppLocationService>(
+    () => AppLocationService(
+      store: sl(),
+      remote: sl(),
+    ),
+  );
 
   // Data sources
   sl.registerLazySingleton<AuthLocalDataSource>(

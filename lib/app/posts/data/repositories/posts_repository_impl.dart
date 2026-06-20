@@ -9,6 +9,7 @@ import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
@@ -153,6 +154,9 @@ class PostsRepositoryImpl implements PostsRepository {
     FeedContentType? contentType,
     FeedAuctionQuery? auctionQuery,
     String? privacyStatus,
+    double? latitude,
+    double? longitude,
+    double? radiusKm,
   }) async {
     try {
       final queryParams = {
@@ -168,6 +172,9 @@ class PostsRepositoryImpl implements PostsRepository {
         if (isLiked != null) 'isLiked': isLiked,
         if (isSaved != null) 'isSaved': isSaved,
         if (privacyStatus != null) 'privacyStatus': privacyStatus,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (radiusKm != null) 'radiusKm': radiusKm,
         if (contentType != null && contentType != FeedContentType.all)
           'contentType': contentType.apiValue,
         ...?auctionQuery?.toQueryParams(),
@@ -221,6 +228,7 @@ class PostsRepositoryImpl implements PostsRepository {
     bool? isAuctionable,
     PostAuctionInput? auction,
     String? locationId,
+    PostInlineLocationInput? location,
     String? playlistId,
     String? soundId,
     String? originalPostId,
@@ -248,6 +256,7 @@ class PostsRepositoryImpl implements PostsRepository {
         if (isAuctionable != null) 'isAuctionable': isAuctionable,
         if (auction != null) 'auction': auction.toJson(),
         if (locationId != null) 'locationId': locationId,
+        if (location != null) 'location': location.toJson(),
         if (playlistId != null) 'playlistId': playlistId,
         if (soundId != null) 'soundId': soundId,
         if (originalPostId != null) 'originalPostId': originalPostId,

@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
@@ -36,6 +37,7 @@ abstract class PostsRepository {
     bool? isAuctionable,
     PostAuctionInput? auction,
     String? locationId,
+    PostInlineLocationInput? location,
     String? playlistId,
     String? soundId,
     String? originalPostId,
@@ -64,6 +66,9 @@ abstract class PostsRepository {
     FeedContentType? contentType,
     FeedAuctionQuery? auctionQuery,
     String? privacyStatus,
+    double? latitude,
+    double? longitude,
+    double? radiusKm,
   });
 
   Future<Either<Failure, PostEntity>> getPostById(String postId);

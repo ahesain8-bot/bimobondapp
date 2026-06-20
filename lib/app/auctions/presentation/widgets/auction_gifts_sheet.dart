@@ -7,7 +7,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -449,21 +449,21 @@ class _AuctionGiftRowSkeleton extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          SkeletonWidget.circular(size: 40),
+          LiquidGlassSkeletonBox.circular(size: 40),
           SizedBox(width: AppSizes.p10),
-          SkeletonWidget(height: 40, width: 40, borderRadius: 10),
+          LiquidGlassSkeletonBox(height: 40, width: 40, borderRadius: 10),
           SizedBox(width: AppSizes.p10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SkeletonWidget(height: 12, width: 100),
+                LiquidGlassSkeletonBox(height: 12, width: 100),
                 SizedBox(height: 6),
-                SkeletonWidget(height: 10, width: 72),
+                LiquidGlassSkeletonBox(height: 10, width: 72),
               ],
             ),
           ),
-          SkeletonWidget(height: 12, width: 56),
+          LiquidGlassSkeletonBox(height: 12, width: 56),
         ],
       ),
     );

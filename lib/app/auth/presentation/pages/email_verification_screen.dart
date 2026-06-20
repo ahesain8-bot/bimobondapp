@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/email_verification/email_verification_hero.dart';
 import 'package:bimobondapp/core/widgets/custom_button.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -97,8 +98,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         leadingWidth: 100,
         leading: TextButton.icon(
           onPressed: () => context.pop(),
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
+          icon: DirectionalBackIcon(
             color: theme.colorScheme.onSurface,
             size: 20,
           ),

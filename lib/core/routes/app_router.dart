@@ -21,6 +21,7 @@ import 'package:bimobondapp/app/posts/presentation/pages/profile_posts_viewer_sc
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/add_post_camera_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
@@ -35,6 +36,11 @@ import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/posts_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/ended_auctions_screen.dart';
+import 'package:bimobondapp/app/promotions/presentation/pages/promote_post_screen.dart';
+import 'package:bimobondapp/app/promotions/presentation/pages/promoted_post_insights_screen.dart';
+import 'package:bimobondapp/app/promotions/presentation/pages/promoted_posts_screen.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/pages/sound_detail_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/edit_post_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/user_profile_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
@@ -299,6 +305,17 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/add-post-camera',
+        name: 'add_post_camera',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return AddPostCameraScreen(
+            isStory: extra?['isStory'] as bool? ?? false,
+            initialSound: extra?['initialSound'] as SoundEntity?,
+          );
+        },
+      ),
+      GoRoute(
         path: '/add-post',
         name: 'add_post',
         builder: (context, state) {
@@ -307,6 +324,21 @@ class AppRouter {
             initialFiles: extra?['files'] as List<File>?,
             initialType: extra?['type'] as String?,
             isStory: extra?['isStory'] as bool? ?? false,
+            initialSound: extra?['initialSound'] as SoundEntity?,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/sounds/:id',
+        name: 'sound_detail',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          final pickMode = state.uri.queryParameters['pick'] == 'true';
+          final preview = state.extra as SoundEntity?;
+          return SoundDetailScreen(
+            soundId: id,
+            pickMode: pickMode,
+            previewSound: preview,
           );
         },
       ),
@@ -316,6 +348,31 @@ class AppRouter {
         builder: (context, state) {
           final post = state.extra as PostEntity;
           return EditPostScreen(post: post);
+        },
+      ),
+      GoRoute(
+        path: '/promote-post',
+        name: 'promote_post',
+        builder: (context, state) {
+          final post = state.extra as PostEntity;
+          return PromotePostScreen(post: post);
+        },
+      ),
+      GoRoute(
+        path: '/promoted-posts',
+        name: 'promoted_posts',
+        builder: (context, state) => const PromotedPostsScreen(),
+      ),
+      GoRoute(
+        path: '/promoted-posts/:postId/insights',
+        name: 'promoted_post_insights',
+        builder: (context, state) {
+          final postId = state.pathParameters['postId'] ?? '';
+          final campaignId = state.uri.queryParameters['campaignId'];
+          return PromotedPostInsightsScreen(
+            postId: postId,
+            initialCampaignId: campaignId,
+          );
         },
       ),
       GoRoute(

@@ -8,6 +8,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/custom_text_field.dart';
 import 'package:bimobondapp/core/widgets/custom_button.dart';
+import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -76,8 +77,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         leadingWidth: 100,
         leading: TextButton.icon(
           onPressed: () => context.pop(),
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
+          icon: DirectionalBackIcon(
             color: theme.colorScheme.onSurface,
             size: 20,
           ),

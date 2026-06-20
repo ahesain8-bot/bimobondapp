@@ -3562,6 +3562,930 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete for everyone'**
   String get deleteForEveryone;
+
+  /// No description provided for @cameraFlip.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip'**
+  String get cameraFlip;
+
+  /// No description provided for @cameraFlash.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash'**
+  String get cameraFlash;
+
+  /// No description provided for @cameraSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get cameraSpeed;
+
+  /// No description provided for @cameraBeauty.
+  ///
+  /// In en, this message translates to:
+  /// **'Beauty'**
+  String get cameraBeauty;
+
+  /// No description provided for @cameraFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get cameraFilters;
+
+  /// No description provided for @cameraTimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Timer'**
+  String get cameraTimer;
+
+  /// No description provided for @cameraMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Music'**
+  String get cameraMusic;
+
+  /// No description provided for @cameraEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'Effects'**
+  String get cameraEffects;
+
+  /// No description provided for @cameraUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get cameraUpload;
+
+  /// No description provided for @cameraOriginalSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Sound'**
+  String get cameraOriginalSound;
+
+  /// No description provided for @cameraSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'seconds'**
+  String get cameraSeconds;
+
+  /// No description provided for @cameraRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get cameraRecording;
+
+  /// No description provided for @cameraMusicComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Music selection is coming soon.'**
+  String get cameraMusicComingSoon;
+
+  /// No description provided for @cameraPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera and microphone permissions are required to record.'**
+  String get cameraPermissionDenied;
+
+  /// No description provided for @cameraStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting camera...'**
+  String get cameraStarting;
+
+  /// No description provided for @cameraOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get cameraOpenSettings;
+
+  /// No description provided for @cameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No camera was found on this device.'**
+  String get cameraUnavailable;
+
+  /// No description provided for @cameraInitError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the camera: {error}'**
+  String cameraInitError(String error);
+
+  /// No description provided for @cameraCaptureError.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture failed: {error}'**
+  String cameraCaptureError(String error);
+
+  /// No description provided for @cameraCategoryTrending.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending'**
+  String get cameraCategoryTrending;
+
+  /// No description provided for @cameraCategoryNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get cameraCategoryNew;
+
+  /// No description provided for @cameraCategoryPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get cameraCategoryPortrait;
+
+  /// No description provided for @cameraCategoryVibe.
+  ///
+  /// In en, this message translates to:
+  /// **'Vibe'**
+  String get cameraCategoryVibe;
+
+  /// No description provided for @cameraCategoryLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get cameraCategoryLandscape;
+
+  /// No description provided for @cameraFilterOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get cameraFilterOriginal;
+
+  /// No description provided for @cameraFilterWarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm'**
+  String get cameraFilterWarm;
+
+  /// No description provided for @cameraFilterCool.
+  ///
+  /// In en, this message translates to:
+  /// **'Cool'**
+  String get cameraFilterCool;
+
+  /// No description provided for @cameraFilterSunny.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunny'**
+  String get cameraFilterSunny;
+
+  /// No description provided for @cameraFilterPink.
+  ///
+  /// In en, this message translates to:
+  /// **'Pink'**
+  String get cameraFilterPink;
+
+  /// No description provided for @cameraFilterMoody.
+  ///
+  /// In en, this message translates to:
+  /// **'Moody'**
+  String get cameraFilterMoody;
+
+  /// No description provided for @cameraFilterBw.
+  ///
+  /// In en, this message translates to:
+  /// **'B&W'**
+  String get cameraFilterBw;
+
+  /// No description provided for @cameraFilterRetro.
+  ///
+  /// In en, this message translates to:
+  /// **'Retro'**
+  String get cameraFilterRetro;
+
+  /// No description provided for @cameraFilterFlashVintage.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash'**
+  String get cameraFilterFlashVintage;
+
+  /// No description provided for @cameraFilterBeautyGlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Glow'**
+  String get cameraFilterBeautyGlow;
+
+  /// No description provided for @cameraFilterNaturalBright.
+  ///
+  /// In en, this message translates to:
+  /// **'Natural'**
+  String get cameraFilterNaturalBright;
+
+  /// No description provided for @cameraFilterGoldenHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Golden'**
+  String get cameraFilterGoldenHour;
+
+  /// No description provided for @openCameraStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Open camera'**
+  String get openCameraStudio;
+
+  /// No description provided for @cameraModePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get cameraModePhoto;
+
+  /// No description provided for @cameraModeVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get cameraModeVideo;
+
+  /// No description provided for @cameraModeLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get cameraModeLive;
+
+  /// No description provided for @cameraGoLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Go LIVE'**
+  String get cameraGoLive;
+
+  /// No description provided for @cameraLiveTitleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a title'**
+  String get cameraLiveTitleHint;
+
+  /// No description provided for @cameraLiveComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Live streaming is coming soon.'**
+  String get cameraLiveComingSoon;
+
+  /// No description provided for @cameraEffectCrown.
+  ///
+  /// In en, this message translates to:
+  /// **'Crown'**
+  String get cameraEffectCrown;
+
+  /// No description provided for @cameraEffectBunny.
+  ///
+  /// In en, this message translates to:
+  /// **'Bunny'**
+  String get cameraEffectBunny;
+
+  /// No description provided for @cameraEffectSunglasses.
+  ///
+  /// In en, this message translates to:
+  /// **'Shades'**
+  String get cameraEffectSunglasses;
+
+  /// No description provided for @cameraEffectDog.
+  ///
+  /// In en, this message translates to:
+  /// **'Dog'**
+  String get cameraEffectDog;
+
+  /// No description provided for @cameraEffectHearts.
+  ///
+  /// In en, this message translates to:
+  /// **'Hearts'**
+  String get cameraEffectHearts;
+
+  /// No description provided for @cameraEffectSparkle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sparkle'**
+  String get cameraEffectSparkle;
+
+  /// No description provided for @cameraEffectNeon.
+  ///
+  /// In en, this message translates to:
+  /// **'Neon'**
+  String get cameraEffectNeon;
+
+  /// No description provided for @cameraEffectGlitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Glitch'**
+  String get cameraEffectGlitch;
+
+  /// No description provided for @promotePostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote post'**
+  String get promotePostTitle;
+
+  /// No description provided for @promotionScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion'**
+  String get promotionScreenTitle;
+
+  /// No description provided for @promotePostAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote'**
+  String get promotePostAction;
+
+  /// No description provided for @promoteGoalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your goal'**
+  String get promoteGoalTitle;
+
+  /// No description provided for @promoteAudienceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Define your audience'**
+  String get promoteAudienceTitle;
+
+  /// No description provided for @promoteAgeRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Age range'**
+  String get promoteAgeRange;
+
+  /// No description provided for @promoteGeoTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target people nearby'**
+  String get promoteGeoTarget;
+
+  /// No description provided for @promoteGeoTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your current location for local reach'**
+  String get promoteGeoTargetHint;
+
+  /// No description provided for @promoteBudgetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select budget'**
+  String get promoteBudgetTitle;
+
+  /// No description provided for @promoteProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing...'**
+  String get promoteProcessing;
+
+  /// No description provided for @promotePostCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote for {price}'**
+  String promotePostCta(String price);
+
+  /// No description provided for @promotePostSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion started! Wallet balance: {balance}'**
+  String promotePostSuccess(String balance);
+
+  /// No description provided for @promotedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Promoted'**
+  String get promotedBadge;
+
+  /// No description provided for @promoteLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'Languages'**
+  String get promoteLanguages;
+
+  /// No description provided for @promoteInterests.
+  ///
+  /// In en, this message translates to:
+  /// **'Interests'**
+  String get promoteInterests;
+
+  /// No description provided for @promoteRadiusKm.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius: {km} km'**
+  String promoteRadiusKm(int km);
+
+  /// No description provided for @promotePayFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get promotePayFailedTitle;
+
+  /// No description provided for @promoteRetryPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry payment'**
+  String get promoteRetryPay;
+
+  /// No description provided for @promoteAudienceCustomize.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize audience'**
+  String get promoteAudienceCustomize;
+
+  /// No description provided for @promoteAudienceAllGenders.
+  ///
+  /// In en, this message translates to:
+  /// **'All genders'**
+  String get promoteAudienceAllGenders;
+
+  /// No description provided for @promoteAudienceNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby'**
+  String get promoteAudienceNearby;
+
+  /// No description provided for @promoteAudienceGender.
+  ///
+  /// In en, this message translates to:
+  /// **'Gender'**
+  String get promoteAudienceGender;
+
+  /// No description provided for @promotePostNoCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'No caption'**
+  String get promotePostNoCaption;
+
+  /// No description provided for @promotePopularBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'POPULAR'**
+  String get promotePopularBadge;
+
+  /// No description provided for @promoteImpressions.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} impressions'**
+  String promoteImpressions(int count);
+
+  /// No description provided for @promoteStepGoalHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your goal?'**
+  String get promoteStepGoalHeading;
+
+  /// No description provided for @promoteStepGoalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a goal for promoting this video.'**
+  String get promoteStepGoalSubtitle;
+
+  /// No description provided for @promoteStepAudienceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select how you want to reach your audience for your promotion.'**
+  String get promoteStepAudienceSubtitle;
+
+  /// No description provided for @promoteAudienceDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default audience'**
+  String get promoteAudienceDefault;
+
+  /// No description provided for @promoteAudienceDefaultHint.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll choose the best audience for you'**
+  String get promoteAudienceDefaultHint;
+
+  /// No description provided for @promoteAudienceCreateOwn.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your own'**
+  String get promoteAudienceCreateOwn;
+
+  /// No description provided for @promoteStepBudgetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a promotion package for your campaign.'**
+  String get promoteStepBudgetSubtitle;
+
+  /// No description provided for @promoteBudgetTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} total'**
+  String promoteBudgetTotal(String price);
+
+  /// No description provided for @promoteEstimatedViews.
+  ///
+  /// In en, this message translates to:
+  /// **'{min} – {max}'**
+  String promoteEstimatedViews(String min, String max);
+
+  /// No description provided for @promoteEstimatedViewsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated video views'**
+  String get promoteEstimatedViewsLabel;
+
+  /// No description provided for @promoteOverviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get promoteOverviewTitle;
+
+  /// No description provided for @promoteOverviewGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal'**
+  String get promoteOverviewGoal;
+
+  /// No description provided for @promoteOverviewAudience.
+  ///
+  /// In en, this message translates to:
+  /// **'Audience'**
+  String get promoteOverviewAudience;
+
+  /// No description provided for @promoteOverviewBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Budget'**
+  String get promoteOverviewBudget;
+
+  /// No description provided for @promoteOverviewSubtotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtotal'**
+  String get promoteOverviewSubtotal;
+
+  /// No description provided for @promoteOverviewTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get promoteOverviewTotal;
+
+  /// No description provided for @promoteNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get promoteNext;
+
+  /// No description provided for @promotePayStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay and start promotion'**
+  String get promotePayStart;
+
+  /// No description provided for @promoteQuickPack.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready-to-use promotion pack'**
+  String get promoteQuickPack;
+
+  /// No description provided for @promoteStepOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String promoteStepOf(int current, int total);
+
+  /// No description provided for @promoteInsightsDashboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promoted posts'**
+  String get promoteInsightsDashboardTitle;
+
+  /// No description provided for @promoteInsightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion insights'**
+  String get promoteInsightsTitle;
+
+  /// No description provided for @promoteInsightsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No promoted posts yet'**
+  String get promoteInsightsEmptyTitle;
+
+  /// No description provided for @promoteInsightsEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote a video from your feed to see performance here.'**
+  String get promoteInsightsEmptyHint;
+
+  /// No description provided for @promoteInsightsPerformanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance'**
+  String get promoteInsightsPerformanceTitle;
+
+  /// No description provided for @promoteInsightsPromotedImpressions.
+  ///
+  /// In en, this message translates to:
+  /// **'Promoted impressions'**
+  String get promoteInsightsPromotedImpressions;
+
+  /// No description provided for @promoteInsightsFollowersGained.
+  ///
+  /// In en, this message translates to:
+  /// **'Followers gained'**
+  String get promoteInsightsFollowersGained;
+
+  /// No description provided for @promoteInsightsSpend.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotion spend'**
+  String get promoteInsightsSpend;
+
+  /// No description provided for @promoteInsightsEngagementRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Engagement rate'**
+  String get promoteInsightsEngagementRate;
+
+  /// No description provided for @promoteInsightsShares.
+  ///
+  /// In en, this message translates to:
+  /// **'Shares'**
+  String get promoteInsightsShares;
+
+  /// No description provided for @promoteInsightsCostPerImpression.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost / impression'**
+  String get promoteInsightsCostPerImpression;
+
+  /// No description provided for @promoteInsightsCostPerView.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost / view'**
+  String get promoteInsightsCostPerView;
+
+  /// No description provided for @promoteInsightsUniqueViewers.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique viewers'**
+  String get promoteInsightsUniqueViewers;
+
+  /// No description provided for @promoteInsightsChartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Impressions (last 7 days)'**
+  String get promoteInsightsChartTitle;
+
+  /// No description provided for @promoteInsightsNoChartData.
+  ///
+  /// In en, this message translates to:
+  /// **'No impression data yet'**
+  String get promoteInsightsNoChartData;
+
+  /// No description provided for @promoteInsightsCampaignProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Campaign progress'**
+  String get promoteInsightsCampaignProgress;
+
+  /// No description provided for @promoteInsightsImpressions.
+  ///
+  /// In en, this message translates to:
+  /// **'Impressions'**
+  String get promoteInsightsImpressions;
+
+  /// No description provided for @promoteInsightsBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Budget'**
+  String get promoteInsightsBudget;
+
+  /// No description provided for @promoteInsightsPauseCampaign.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause campaign'**
+  String get promoteInsightsPauseCampaign;
+
+  /// No description provided for @promoteInsightsResumeCampaign.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume campaign'**
+  String get promoteInsightsResumeCampaign;
+
+  /// No description provided for @promoteInsightsCampaignHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Campaign history'**
+  String get promoteInsightsCampaignHistory;
+
+  /// No description provided for @promoteInsightsCampaignHistoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a campaign to filter stats'**
+  String get promoteInsightsCampaignHistoryHint;
+
+  /// No description provided for @promoteInsightsAllCampaigns.
+  ///
+  /// In en, this message translates to:
+  /// **'All campaigns'**
+  String get promoteInsightsAllCampaigns;
+
+  /// No description provided for @promoteInsightsMultipleCampaigns.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple campaigns'**
+  String get promoteInsightsMultipleCampaigns;
+
+  /// No description provided for @promoteInsightsViewInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'View insights'**
+  String get promoteInsightsViewInsights;
+
+  /// No description provided for @promoteInsightsObjectiveViews.
+  ///
+  /// In en, this message translates to:
+  /// **'Video views'**
+  String get promoteInsightsObjectiveViews;
+
+  /// No description provided for @promoteInsightsObjectiveFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'Followers'**
+  String get promoteInsightsObjectiveFollowers;
+
+  /// No description provided for @promoteInsightsObjectiveEngagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Engagement'**
+  String get promoteInsightsObjectiveEngagement;
+
+  /// No description provided for @promoteInsightsObjectiveChallenges.
+  ///
+  /// In en, this message translates to:
+  /// **'Challenges'**
+  String get promoteInsightsObjectiveChallenges;
+
+  /// No description provided for @promoteInsightsObjectiveProfileVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile visits'**
+  String get promoteInsightsObjectiveProfileVisits;
+
+  /// No description provided for @promoteInsightsObjectiveSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get promoteInsightsObjectiveSales;
+
+  /// No description provided for @promoteInsightsStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get promoteInsightsStatusActive;
+
+  /// No description provided for @promoteInsightsStatusPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get promoteInsightsStatusPaused;
+
+  /// No description provided for @promoteInsightsStatusPendingPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending payment'**
+  String get promoteInsightsStatusPendingPayment;
+
+  /// No description provided for @promoteInsightsStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get promoteInsightsStatusCompleted;
+
+  /// No description provided for @promoteInsightsStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get promoteInsightsStatusCancelled;
+
+  /// No description provided for @promoteInsightsCampaignProgressSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} · {spent} spent'**
+  String promoteInsightsCampaignProgressSummary(String percent, String spent);
+
+  /// No description provided for @settingsPromotedPosts.
+  ///
+  /// In en, this message translates to:
+  /// **'Promoted posts'**
+  String get settingsPromotedPosts;
+
+  /// No description provided for @soundLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get soundLabel;
+
+  /// No description provided for @soundNoneSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get soundNoneSelected;
+
+  /// No description provided for @soundPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sound'**
+  String get soundPickerTitle;
+
+  /// No description provided for @soundSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search sounds'**
+  String get soundSearchHint;
+
+  /// No description provided for @soundTabTrending.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending'**
+  String get soundTabTrending;
+
+  /// No description provided for @soundTabBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get soundTabBrowse;
+
+  /// No description provided for @soundTabMine.
+  ///
+  /// In en, this message translates to:
+  /// **'My sounds'**
+  String get soundTabMine;
+
+  /// No description provided for @soundPickerEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No sounds found'**
+  String get soundPickerEmpty;
+
+  /// No description provided for @soundPickFromFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from files'**
+  String get soundPickFromFiles;
+
+  /// No description provided for @soundUseThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get soundUseThis;
+
+  /// No description provided for @soundUseThisSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this sound'**
+  String get soundUseThisSound;
+
+  /// No description provided for @soundConfirmSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Use selected sound'**
+  String get soundConfirmSelection;
+
+  /// No description provided for @soundClearSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get soundClearSelection;
+
+  /// No description provided for @soundDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get soundDetailTitle;
+
+  /// No description provided for @soundVideosUsing.
+  ///
+  /// In en, this message translates to:
+  /// **'Videos using this sound'**
+  String get soundVideosUsing;
+
+  /// No description provided for @soundNoVideosYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No videos yet'**
+  String get soundNoVideosYet;
+
+  /// No description provided for @soundOriginalLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Original: {name}'**
+  String soundOriginalLink(String name);
+
+  /// No description provided for @soundUseCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} videos'**
+  String soundUseCount(int count);
+
+  /// No description provided for @soundUseCountThousands.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}K videos'**
+  String soundUseCountThousands(String count);
+
+  /// No description provided for @soundUseCountMillions.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}M videos'**
+  String soundUseCountMillions(String count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -90,6 +90,11 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => _showThemeSheet(context, l10n, themeMode),
               ),
               _SettingsTile(
+                icon: LucideIcons.megaphone,
+                title: l10n.settingsPromotedPosts,
+                onTap: () => context.pushNamed('promoted_posts'),
+              ),
+              _SettingsTile(
                 icon: LucideIcons.messageCircle,
                 title: l10n.settingsChatWallpaper,
                 onTap: () => context.pushNamed('chat_wallpaper_settings'),

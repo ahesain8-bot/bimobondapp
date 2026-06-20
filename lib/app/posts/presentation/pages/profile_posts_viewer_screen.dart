@@ -14,6 +14,7 @@ import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/core/utils/one_page_scroll_physics.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
+import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -247,11 +248,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
+            icon: const DirectionalBackIcon(color: Colors.white, size: 20),
             onPressed: () => context.pop(),
           ),
         ),

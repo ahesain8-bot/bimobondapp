@@ -1864,4 +1864,494 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get deleteForEveryone => 'حذف للجميع';
+
+  @override
+  String get cameraFlip => 'قلب';
+
+  @override
+  String get cameraFlash => 'فلاش';
+
+  @override
+  String get cameraSpeed => 'السرعة';
+
+  @override
+  String get cameraBeauty => 'تجميل';
+
+  @override
+  String get cameraFilters => 'فلاتر';
+
+  @override
+  String get cameraTimer => 'مؤقت';
+
+  @override
+  String get cameraMusic => 'موسيقى';
+
+  @override
+  String get cameraEffects => 'تأثيرات';
+
+  @override
+  String get cameraUpload => 'رفع';
+
+  @override
+  String get cameraOriginalSound => 'الصوت الأصلي';
+
+  @override
+  String get cameraSeconds => 'ثانية';
+
+  @override
+  String get cameraRecording => 'جاري التسجيل';
+
+  @override
+  String get cameraMusicComingSoon => 'اختيار الموسيقى قريباً.';
+
+  @override
+  String get cameraPermissionDenied => 'يلزم السماح بالكاميرا والميكروفون للتسجيل.';
+
+  @override
+  String get cameraStarting => 'جاري تشغيل الكاميرا...';
+
+  @override
+  String get cameraOpenSettings => 'فتح الإعدادات';
+
+  @override
+  String get cameraUnavailable => 'لم يتم العثور على كاميرا على هذا الجهاز.';
+
+  @override
+  String cameraInitError(String error) {
+    return 'تعذر تشغيل الكاميرا: $error';
+  }
+
+  @override
+  String cameraCaptureError(String error) {
+    return 'فشل الالتقاط: $error';
+  }
+
+  @override
+  String get cameraCategoryTrending => 'رائج';
+
+  @override
+  String get cameraCategoryNew => 'جديد';
+
+  @override
+  String get cameraCategoryPortrait => 'بورتريه';
+
+  @override
+  String get cameraCategoryVibe => 'أجواء';
+
+  @override
+  String get cameraCategoryLandscape => 'مناظر';
+
+  @override
+  String get cameraFilterOriginal => 'أصلي';
+
+  @override
+  String get cameraFilterWarm => 'دافئ';
+
+  @override
+  String get cameraFilterCool => 'بارد';
+
+  @override
+  String get cameraFilterSunny => 'مشمس';
+
+  @override
+  String get cameraFilterPink => 'وردي';
+
+  @override
+  String get cameraFilterMoody => 'داكن';
+
+  @override
+  String get cameraFilterBw => 'أبيض وأسود';
+
+  @override
+  String get cameraFilterRetro => 'ريترو';
+
+  @override
+  String get cameraFilterFlashVintage => 'فلاش';
+
+  @override
+  String get cameraFilterBeautyGlow => 'توهج';
+
+  @override
+  String get cameraFilterNaturalBright => 'طبيعي';
+
+  @override
+  String get cameraFilterGoldenHour => 'ذهبي';
+
+  @override
+  String get openCameraStudio => 'فتح الكاميرا';
+
+  @override
+  String get cameraModePhoto => 'صورة';
+
+  @override
+  String get cameraModeVideo => 'فيديو';
+
+  @override
+  String get cameraModeLive => 'مباشر';
+
+  @override
+  String get cameraGoLive => 'بدء البث';
+
+  @override
+  String get cameraLiveTitleHint => 'أضف عنواناً';
+
+  @override
+  String get cameraLiveComingSoon => 'البث المباشر قريباً.';
+
+  @override
+  String get cameraEffectCrown => 'تاج';
+
+  @override
+  String get cameraEffectBunny => 'أرنب';
+
+  @override
+  String get cameraEffectSunglasses => 'نظارات';
+
+  @override
+  String get cameraEffectDog => 'كلب';
+
+  @override
+  String get cameraEffectHearts => 'قلوب';
+
+  @override
+  String get cameraEffectSparkle => 'بريق';
+
+  @override
+  String get cameraEffectNeon => 'نيون';
+
+  @override
+  String get cameraEffectGlitch => 'تشويش';
+
+  @override
+  String get promotePostTitle => 'ترويج المنشور';
+
+  @override
+  String get promotionScreenTitle => 'الترويج';
+
+  @override
+  String get promotePostAction => 'ترويج';
+
+  @override
+  String get promoteGoalTitle => 'اختر هدفك';
+
+  @override
+  String get promoteAudienceTitle => 'حدد جمهورك';
+
+  @override
+  String get promoteAgeRange => 'الفئة العمرية';
+
+  @override
+  String get promoteGeoTarget => 'استهداف الأشخاص القريبين';
+
+  @override
+  String get promoteGeoTargetHint => 'استخدم موقعك الحالي للوصول المحلي';
+
+  @override
+  String get promoteBudgetTitle => 'اختر الميزانية';
+
+  @override
+  String get promoteProcessing => 'جاري المعالجة...';
+
+  @override
+  String promotePostCta(String price) {
+    return 'ترويج مقابل $price';
+  }
+
+  @override
+  String promotePostSuccess(String balance) {
+    return 'بدأ الترويج! رصيد المحفظة: $balance';
+  }
+
+  @override
+  String get promotedBadge => 'مروّج';
+
+  @override
+  String get promoteLanguages => 'اللغات';
+
+  @override
+  String get promoteInterests => 'الاهتمامات';
+
+  @override
+  String promoteRadiusKm(int km) {
+    return 'نطاق: $km كم';
+  }
+
+  @override
+  String get promotePayFailedTitle => 'فشل الدفع';
+
+  @override
+  String get promoteRetryPay => 'إعادة محاولة الدفع';
+
+  @override
+  String get promoteAudienceCustomize => 'تخصيص الجمهور';
+
+  @override
+  String get promoteAudienceAllGenders => 'جميع الأجناس';
+
+  @override
+  String get promoteAudienceNearby => 'قريب';
+
+  @override
+  String get promoteAudienceGender => 'الجنس';
+
+  @override
+  String get promotePostNoCaption => 'بدون وصف';
+
+  @override
+  String get promotePopularBadge => 'شائع';
+
+  @override
+  String promoteImpressions(int count) {
+    return '$count مشاهدة';
+  }
+
+  @override
+  String get promoteStepGoalHeading => 'ما هو هدفك؟';
+
+  @override
+  String get promoteStepGoalSubtitle => 'اختر هدفاً لترويج هذا الفيديو.';
+
+  @override
+  String get promoteStepAudienceSubtitle => 'حدد كيف تريد الوصول إلى جمهورك.';
+
+  @override
+  String get promoteAudienceDefault => 'جمهور افتراضي';
+
+  @override
+  String get promoteAudienceDefaultHint => 'سنختار أفضل جمهور لك';
+
+  @override
+  String get promoteAudienceCreateOwn => 'إنشاء جمهورك الخاص';
+
+  @override
+  String get promoteStepBudgetSubtitle => 'اختر باقة الترويج لحملتك.';
+
+  @override
+  String promoteBudgetTotal(String price) {
+    return '$price الإجمالي';
+  }
+
+  @override
+  String promoteEstimatedViews(String min, String max) {
+    return '$min – $max';
+  }
+
+  @override
+  String get promoteEstimatedViewsLabel => 'مشاهدات الفيديو المتوقعة';
+
+  @override
+  String get promoteOverviewTitle => 'نظرة عامة';
+
+  @override
+  String get promoteOverviewGoal => 'الهدف';
+
+  @override
+  String get promoteOverviewAudience => 'الجمهور';
+
+  @override
+  String get promoteOverviewBudget => 'الميزانية';
+
+  @override
+  String get promoteOverviewSubtotal => 'المجموع الفرعي';
+
+  @override
+  String get promoteOverviewTotal => 'الإجمالي';
+
+  @override
+  String get promoteNext => 'التالي';
+
+  @override
+  String get promotePayStart => 'ادفع وابدأ الترويج';
+
+  @override
+  String get promoteQuickPack => 'باقة ترويج جاهزة';
+
+  @override
+  String promoteStepOf(int current, int total) {
+    return 'الخطوة $current من $total';
+  }
+
+  @override
+  String get promoteInsightsDashboardTitle => 'المنشورات المروّجة';
+
+  @override
+  String get promoteInsightsTitle => 'إحصائيات الترويج';
+
+  @override
+  String get promoteInsightsEmptyTitle => 'لا توجد منشورات مروّجة بعد';
+
+  @override
+  String get promoteInsightsEmptyHint => 'روّج فيديو من خلاصتك لمشاهدة الأداء هنا.';
+
+  @override
+  String get promoteInsightsPerformanceTitle => 'الأداء';
+
+  @override
+  String get promoteInsightsPromotedImpressions => 'مرات الظهور المروّجة';
+
+  @override
+  String get promoteInsightsFollowersGained => 'متابعون جدد';
+
+  @override
+  String get promoteInsightsSpend => 'إنفاق الترويج';
+
+  @override
+  String get promoteInsightsEngagementRate => 'معدل التفاعل';
+
+  @override
+  String get promoteInsightsShares => 'مشاركات';
+
+  @override
+  String get promoteInsightsCostPerImpression => 'التكلفة / ظهور';
+
+  @override
+  String get promoteInsightsCostPerView => 'التكلفة / مشاهدة';
+
+  @override
+  String get promoteInsightsUniqueViewers => 'مشاهدون فريدون';
+
+  @override
+  String get promoteInsightsChartTitle => 'مرات الظهور (آخر 7 أيام)';
+
+  @override
+  String get promoteInsightsNoChartData => 'لا توجد بيانات ظهور بعد';
+
+  @override
+  String get promoteInsightsCampaignProgress => 'تقدم الحملة';
+
+  @override
+  String get promoteInsightsImpressions => 'مرات الظهور';
+
+  @override
+  String get promoteInsightsBudget => 'الميزانية';
+
+  @override
+  String get promoteInsightsPauseCampaign => 'إيقاف الحملة';
+
+  @override
+  String get promoteInsightsResumeCampaign => 'استئناف الحملة';
+
+  @override
+  String get promoteInsightsCampaignHistory => 'سجل الحملات';
+
+  @override
+  String get promoteInsightsCampaignHistoryHint => 'اضغط على حملة لتصفية الإحصائيات';
+
+  @override
+  String get promoteInsightsAllCampaigns => 'جميع الحملات';
+
+  @override
+  String get promoteInsightsMultipleCampaigns => 'حملات متعددة';
+
+  @override
+  String get promoteInsightsViewInsights => 'عرض الإحصائيات';
+
+  @override
+  String get promoteInsightsObjectiveViews => 'مشاهدات الفيديو';
+
+  @override
+  String get promoteInsightsObjectiveFollowers => 'متابعون';
+
+  @override
+  String get promoteInsightsObjectiveEngagement => 'تفاعل';
+
+  @override
+  String get promoteInsightsObjectiveChallenges => 'تحديات';
+
+  @override
+  String get promoteInsightsObjectiveProfileVisits => 'زيارات الملف';
+
+  @override
+  String get promoteInsightsObjectiveSales => 'مبيعات';
+
+  @override
+  String get promoteInsightsStatusActive => 'نشطة';
+
+  @override
+  String get promoteInsightsStatusPaused => 'متوقفة';
+
+  @override
+  String get promoteInsightsStatusPendingPayment => 'بانتظار الدفع';
+
+  @override
+  String get promoteInsightsStatusCompleted => 'مكتملة';
+
+  @override
+  String get promoteInsightsStatusCancelled => 'ملغاة';
+
+  @override
+  String promoteInsightsCampaignProgressSummary(String percent, String spent) {
+    return '$percent · $spent مُنفَق';
+  }
+
+  @override
+  String get settingsPromotedPosts => 'المنشورات المروّجة';
+
+  @override
+  String get soundLabel => 'الصوت';
+
+  @override
+  String get soundNoneSelected => 'بدون';
+
+  @override
+  String get soundPickerTitle => 'إضافة صوت';
+
+  @override
+  String get soundSearchHint => 'ابحث عن أصوات';
+
+  @override
+  String get soundTabTrending => 'الرائج';
+
+  @override
+  String get soundTabBrowse => 'تصفح';
+
+  @override
+  String get soundTabMine => 'أصواتي';
+
+  @override
+  String get soundPickerEmpty => 'لا توجد أصوات';
+
+  @override
+  String get soundPickFromFiles => 'اختر من الملفات';
+
+  @override
+  String get soundUseThis => 'استخدام';
+
+  @override
+  String get soundUseThisSound => 'استخدم هذا الصوت';
+
+  @override
+  String get soundConfirmSelection => 'استخدام الصوت المحدد';
+
+  @override
+  String get soundClearSelection => 'مسح';
+
+  @override
+  String get soundDetailTitle => 'الصوت';
+
+  @override
+  String get soundVideosUsing => 'فيديوهات تستخدم هذا الصوت';
+
+  @override
+  String get soundNoVideosYet => 'لا توجد فيديوهات بعد';
+
+  @override
+  String soundOriginalLink(String name) {
+    return 'الأصل: $name';
+  }
+
+  @override
+  String soundUseCount(int count) {
+    return '$count فيديو';
+  }
+
+  @override
+  String soundUseCountThousands(String count) {
+    return '$count ألف فيديو';
+  }
+
+  @override
+  String soundUseCountMillions(String count) {
+    return '$count مليون فيديو';
+  }
 }

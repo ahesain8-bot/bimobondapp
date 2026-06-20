@@ -10,6 +10,23 @@ class ApiConstants {
   static const String forgotPassword = '/auth/forgot-password';
   static const String register = '/register';
   static const String updateProfile = '/users/me';
+  static const String updateUserLocation = '/users/me/location';
+  static const String userLocationHistory = '/users/me/locations/history';
+  static const String userLocationMovements = '/users/me/locations/movements';
+
+  static const String promotionsOptions = '/promotions/options';
+  static const String promotions = '/promotions';
+  static const String promotionsPackages = '/promotions/packages';
+  static const String promotionsMine = '/promotions/mine';
+  static String promotionById(String id) => '/promotions/$id';
+  static String promotionPay(String id) => '/promotions/$id/pay';
+  static String promotionStats(String id) => '/promotions/$id/stats';
+  static String promotionPause(String id) => '/promotions/$id/pause';
+  static String promotionResume(String id) => '/promotions/$id/resume';
+  static const String promotionsPosts = '/promotions/posts';
+  static String promotionPostById(String postId) => '/promotions/posts/$postId';
+  static String promotionPostStats(String postId) =>
+      '/promotions/posts/$postId/stats';
   static const String uploadAvatar = '/users/avatar';
   static const String uploadMedia = '/posts/upload';
   static const String createPost = '/posts';
@@ -73,4 +90,10 @@ class ApiConstants {
   static const String notificationsClearRead = '/notifications/clear-read';
   static String notificationById(String id) => '/notifications/$id';
   static String notificationRead(String id) => '/notifications/$id/read';
+
+  static const String sounds = '/sounds';
+  static const String soundsTrending = '/sounds/trending';
+  static const String soundsMine = '/sounds/mine';
+  static const String soundsUpload = '/sounds/upload';
+  static String soundById(String id) => '/sounds/$id';
 }

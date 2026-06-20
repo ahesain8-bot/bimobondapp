@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:equatable/equatable.dart';
@@ -41,6 +42,7 @@ class CreatePostRequestedEvent extends PostsEvent {
   final bool? isAuctionable;
   final PostAuctionInput? auction;
   final String? locationId;
+  final PostInlineLocationInput? location;
   final String? playlistId;
   final String? soundId;
   final String? originalPostId;
@@ -67,6 +69,7 @@ class CreatePostRequestedEvent extends PostsEvent {
     this.isAuctionable,
     this.auction,
     this.locationId,
+    this.location,
     this.playlistId,
     this.soundId,
     this.originalPostId,
@@ -95,6 +98,7 @@ class CreatePostRequestedEvent extends PostsEvent {
     isAuctionable,
     auction,
     locationId,
+    location,
     playlistId,
     soundId,
     originalPostId,
@@ -115,6 +119,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final bool isStory;
   final PostAuctionInput? auction;
   final List<File> files;
+  final String? soundId;
 
   const CreatePostWithMediaRequestedEvent({
     this.type,
@@ -129,6 +134,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     this.isStory = false,
     this.auction,
     required this.files,
+    this.soundId,
   });
 
   @override
@@ -145,6 +151,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     isStory,
     auction,
     files,
+    soundId,
   ];
 }
 
@@ -236,6 +243,9 @@ class FetchFeedRequestedEvent extends PostsEvent {
   final bool isRefresh;
   final int? profileLoadKey;
   final String? privacyStatus;
+  final double? latitude;
+  final double? longitude;
+  final double? radiusKm;
 
   const FetchFeedRequestedEvent({
     this.page = 1,
@@ -253,6 +263,9 @@ class FetchFeedRequestedEvent extends PostsEvent {
     this.isRefresh = false,
     this.profileLoadKey,
     this.privacyStatus,
+    this.latitude,
+    this.longitude,
+    this.radiusKm,
   });
 
   @override
@@ -272,6 +285,9 @@ class FetchFeedRequestedEvent extends PostsEvent {
     isRefresh,
     profileLoadKey,
     privacyStatus,
+    latitude,
+    longitude,
+    radiusKm,
   ];
 }
 

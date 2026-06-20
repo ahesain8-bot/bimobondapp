@@ -1,5 +1,8 @@
 import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_promotion_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_sound_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:equatable/equatable.dart';
 
@@ -31,6 +34,11 @@ class PostEntity extends Equatable {
   final bool isAuctionable;
   final bool isStory;
   final PostAuctionEntity? auction;
+  final bool isPromoted;
+  final bool isAd;
+  final PostPromotionEntity? promotion;
+  final PostLocationEntity? location;
+  final PostSoundEntity? sound;
 
   const PostEntity({
     required this.id,
@@ -60,6 +68,11 @@ class PostEntity extends Equatable {
     this.isAuctionable = false,
     this.isStory = false,
     this.auction,
+    this.isPromoted = false,
+    this.isAd = false,
+    this.promotion,
+    this.location,
+    this.sound,
   });
 
   PostEntity copyWith({
@@ -102,8 +115,16 @@ class PostEntity extends Equatable {
       isAuctionable: isAuctionable,
       isStory: isStory,
       auction: auction,
+      isPromoted: isPromoted,
+      isAd: isAd,
+      promotion: promotion,
+      location: location,
+      sound: sound,
     );
   }
+
+  /// Public videos and auctions (non-stories) can be promoted by their owner.
+  bool get canBePromoted => !isStory && privacyStatus == 'PUBLIC';
 
   @override
   List<Object?> get props => [
@@ -134,6 +155,11 @@ class PostEntity extends Equatable {
     isAuctionable,
     isStory,
     auction,
+    isPromoted,
+    isAd,
+    promotion,
+    location,
+    sound,
   ];
 }
 

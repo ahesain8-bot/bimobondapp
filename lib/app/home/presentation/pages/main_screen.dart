@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/login_screen.dart';
@@ -8,7 +6,6 @@ import 'package:bimobondapp/app/auth/presentation/pages/profile_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/auctions_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/home_feed_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/messages_screen.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_picker_sheet.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
     as auth_di;
 import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
@@ -17,12 +14,10 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_bottom_nav.dart';
-import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
@@ -34,7 +29,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
-  final ImagePicker _picker = ImagePicker();
   String? _pendingOpenStoryUserId;
 
   @override
@@ -63,60 +57,14 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _showAddPostOptions() {
-    return AddPostMediaPickerSheet.show(context, onPick: _pickMedia);
-  }
-
-  Future<void> _pickMedia(ImageSource source, {required bool isVideo}) async {
-    try {
-      if (isVideo) {
-        final XFile? video = await _picker.pickVideo(source: source);
-        if (video != null && mounted) {
-          context.pushNamed(
-            'add_post',
-            extra: {
-              'files': [File(video.path)],
-              'type': 'VIDEO',
-            },
-          );
-        }
-      } else if (source == ImageSource.camera) {
-        final XFile? photo = await _picker.pickImage(
-          source: ImageSource.camera,
-        );
-        if (photo != null && mounted) {
-          context.pushNamed(
-            'add_post',
-            extra: {
-              'files': [File(photo.path)],
-              'type': 'IMAGE',
-            },
-          );
-        }
-      } else {
-        final List<XFile> images = await _picker.pickMultiImage();
-        if (images.isNotEmpty && mounted) {
-          final files = images.map((e) => File(e.path)).toList();
-          context.pushNamed(
-            'add_post',
-            extra: {
-              'files': files,
-              'type': files.length > 1 ? 'CAROUSEL' : 'IMAGE',
-            },
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        PopupDialogs.showErrorDialog(context, 'Error picking media: $e');
-      }
-    }
+  void _openAddPostCamera() {
+    context.pushNamed('add_post_camera');
   }
 
   void _onNavTap(int index, {required bool isLoggedIn}) {
     if (isLoggedIn &&
         index == LiquidGlassBottomNavItems.loggedInAddButtonIndex) {
-      _showAddPostOptions();
+      _openAddPostCamera();
       return;
     }
 

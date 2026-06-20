@@ -1,5 +1,6 @@
 import 'package:bimobondapp/core/utils/app_bar_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -52,7 +53,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     final backButton = showBackButton
         ? IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            icon: const DirectionalBackIcon(size: 20),
             onPressed: onBackPressed ??
                 () {
                   if (context.canPop()) {

@@ -2,6 +2,7 @@ import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -32,8 +33,7 @@ class PhoneLoginToolbar extends StatelessWidget {
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
+          icon: DirectionalBackIcon(
             color: theme.colorScheme.onSurface,
             size: 18,
           ),

@@ -1,8 +1,12 @@
 import 'package:bimobondapp/app/posts/data/models/mention_ref_model.dart';
 import 'package:bimobondapp/app/posts/data/models/repost_model.dart';
-import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_sound_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_promotion_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 
@@ -35,6 +39,11 @@ class PostModel extends PostEntity {
     super.isAuctionable = false,
     super.isStory = false,
     super.auction,
+    super.isPromoted = false,
+    super.isAd = false,
+    super.promotion,
+    super.location,
+    super.sound,
   });
 
   static List<String> _parseHashtagNames(dynamic raw) {
@@ -47,6 +56,12 @@ class PostModel extends PostEntity {
         })
         .where((s) => s.isNotEmpty)
         .toList();
+  }
+
+  static PostSoundEntity? _soundFromId(dynamic raw) {
+    final id = raw?.toString();
+    if (id == null || id.isEmpty) return null;
+    return PostSoundEntity(id: id, name: 'Original Sound');
   }
 
   static String? _normalizeUrl(String? url) {
@@ -137,6 +152,65 @@ class PostModel extends PostEntity {
       auction: json['auction'] is Map<String, dynamic>
           ? PostAuctionEntity.fromJson(json['auction'] as Map<String, dynamic>)
           : null,
+      isPromoted: PostModel._parseBoolField(json['isPromoted']),
+      isAd: PostModel._parseBoolField(json['isAd']),
+      promotion: json['promotion'] is Map<String, dynamic>
+          ? PostPromotionEntity.fromJson(json['promotion'] as Map<String, dynamic>)
+          : null,
+      location: json['location'] is Map<String, dynamic>
+          ? PostLocationEntity.fromJson(json['location'] as Map<String, dynamic>)
+          : null,
+      sound: json['sound'] is Map<String, dynamic>
+          ? PostSoundEntity.fromJson(json['sound'] as Map<String, dynamic>)
+          : _soundFromId(json['soundId']),
+    );
+  }
+
+  PostModel copyWith({
+    int? commentCount,
+    int? likeCount,
+    int? saveCount,
+    int? repostCount,
+    bool? isLiked,
+    bool? isSaved,
+    bool? isReposted,
+    List<RepostUserEntity>? recentReposters,
+    String? description,
+    String? privacyStatus,
+  }) {
+    return PostModel(
+      id: id,
+      userId: userId,
+      type: type,
+      videoUrl: videoUrl,
+      hlsUrl: hlsUrl,
+      thumbnailUrl: thumbnailUrl,
+      description: description ?? this.description,
+      categoryId: categoryId,
+      privacyStatus: privacyStatus ?? this.privacyStatus,
+      viewCount: viewCount,
+      likeCount: likeCount ?? this.likeCount,
+      commentCount: commentCount ?? this.commentCount,
+      saveCount: saveCount ?? this.saveCount,
+      shareCount: shareCount,
+      repostCount: repostCount ?? this.repostCount,
+      isLiked: isLiked ?? this.isLiked,
+      isSaved: isSaved ?? this.isSaved,
+      isReposted: isReposted ?? this.isReposted,
+      recentReposters: recentReposters ?? this.recentReposters,
+      createdAt: createdAt,
+      user: user as PostUserModel?,
+      media: media.cast<PostMediaModel>(),
+      hashtags: hashtags,
+      mentions: mentions,
+      isAuctionable: isAuctionable,
+      isStory: isStory,
+      auction: auction,
+      isPromoted: isPromoted,
+      isAd: isAd,
+      promotion: promotion,
+      location: location,
+      sound: sound,
     );
   }
 

@@ -301,10 +301,21 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (!_checkAuth() || !_isPostOwner()) return;
 
     final l10n = AppLocalizations.of(context)!;
+    final post = widget.post;
 
     GlassBottomSheet.showActions<void>(
       context,
       children: [
+        if (post != null && post.canBePromoted)
+          GlassBottomSheetActionTile(
+            icon: LucideIcons.megaphone,
+            label: l10n.promotePostAction,
+            showChevron: false,
+            onTap: () {
+              Navigator.pop(context);
+              context.pushNamed('promote_post', extra: post);
+            },
+          ),
         GlassBottomSheetListTile(
           label: l10n.deletePost,
           destructive: true,

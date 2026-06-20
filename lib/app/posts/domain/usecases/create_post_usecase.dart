@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
@@ -34,6 +35,7 @@ class CreatePostUseCase implements UseCase<PostEntity, CreatePostParams> {
       isAuctionable: params.isAuctionable,
       auction: params.auction,
       locationId: params.locationId,
+      location: params.location,
       playlistId: params.playlistId,
       soundId: params.soundId,
       originalPostId: params.originalPostId,
@@ -63,6 +65,7 @@ class CreatePostParams extends Equatable {
   final bool? isAuctionable;
   final PostAuctionInput? auction;
   final String? locationId;
+  final PostInlineLocationInput? location;
   final String? playlistId;
   final String? soundId;
   final String? originalPostId;
@@ -89,6 +92,7 @@ class CreatePostParams extends Equatable {
     this.isAuctionable,
     this.auction,
     this.locationId,
+    this.location,
     this.playlistId,
     this.soundId,
     this.originalPostId,
@@ -117,6 +121,7 @@ class CreatePostParams extends Equatable {
         isAuctionable,
         auction,
         locationId,
+        location,
         playlistId,
         soundId,
         originalPostId,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
@@ -18,6 +19,7 @@ import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
+import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/tag_parser.dart';
 import 'package:bimobondapp/core/widgets/tagged_text.dart';
@@ -433,6 +435,16 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             _openEditPost();
           },
         ),
+        if (widget.post.canBePromoted)
+          GlassBottomSheetActionTile(
+            icon: LucideIcons.megaphone,
+            label: l10n.promotePostAction,
+            showChevron: false,
+            onTap: () {
+              Navigator.pop(context);
+              context.pushNamed('promote_post', extra: widget.post);
+            },
+          ),
         GlassBottomSheetListTile(
           label: l10n.deletePost,
           destructive: true,
@@ -697,7 +709,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   onTap: _handleSave,
                 ),
                 const SizedBox(height: _actionSpacing),
-                _buildMusicDisc(theme),
+                _buildMusicDisc(theme, post),
                 if (_isPostOwner()) ...[
                   const SizedBox(height: _actionSpacing),
                   _buildActionButton(
@@ -767,6 +779,29 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                               ),
                             ),
                           ),
+                          if (post.isPromoted || post.isAd) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.white30),
+                              ),
+                              child: Text(
+                                post.promotion?.label ??
+                                    AppLocalizations.of(context)!.promotedBadge,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -1010,36 +1045,52 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     );
   }
 
+  void _openPostSound(PostEntity post) {
+    final sound = post.sound;
+    if (sound == null || sound.id.isEmpty) return;
+    unawaited(openSoundDetail(context, soundId: sound.id));
+  }
+
   Widget _buildMusicSoundLabel(PostEntity post) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(right: 10, left: 10, bottom: 24),
-      // decoration: BoxDecoration(
-      //   color: Colors.black.withValues(alpha: 0.3),
-      //   borderRadius: BorderRadius.circular(20),
-      //   border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      // ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(LucideIcons.music, color: Colors.white70, size: 12),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              'Original Sound · @${post.user?.username ?? 'user'}',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 12,
+    final sound = post.sound;
+    final label = sound?.name ??
+        'Original Sound · @${post.user?.username ?? 'user'}';
+
+    return GestureDetector(
+      onTap: sound != null ? () => _openPostSound(post) : null,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.only(right: 10, left: 10, bottom: 24),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.music, color: Colors.white70, size: 12),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMusicDisc(ThemeData theme) {
+  Widget _buildMusicDisc(ThemeData theme, PostEntity post) {
+    return GestureDetector(
+      onTap: post.sound != null ? () => _openPostSound(post) : null,
+      child: _buildMusicDiscVisual(theme),
+    );
+  }
+
+  Widget _buildMusicDiscVisual(ThemeData theme) {
     return AnimatedBuilder(
       animation: _musicController,
       builder: (context, child) {

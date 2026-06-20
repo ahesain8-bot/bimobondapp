@@ -5,6 +5,8 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -74,12 +76,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       return;
     }
 
+    final locationStore = auth_di.sl<UserLocationStore>();
+
     context.read<PostsBloc>().add(
       FetchFeedRequestedEvent(
         page: _feedPage,
         limit: HomeLayoutConstants.feedPageSize,
         isRefresh: refresh,
         isStory: false,
+        sort: 'RANKED',
+        latitude: locationStore.latitude,
+        longitude: locationStore.longitude,
+        radiusKm: 50,
       ),
     );
   }

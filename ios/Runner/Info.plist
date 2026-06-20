@@ -85,13 +85,13 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access to record voice messages in chat.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs your location to send location messages in chat.</string>
+	<string>This app uses your location to personalize your experience and improve nearby features.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>This app needs contacts access to share contacts in chat.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs photo library access to send images and videos in chat.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to take photos and videos for chat.</string>
+	<string>This app needs camera access to record posts, stories, and chat media.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 	  <string>fbapi</string>

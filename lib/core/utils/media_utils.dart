@@ -112,6 +112,33 @@ class MediaUtils {
     return null;
   }
 
+  /// Cover image for feed cards, promotions, auctions, and profile grids.
+  static String? resolvePostCoverUrl(PostEntity post) {
+    if (post.isAuctionable) {
+      final auctionImage = post.auction?.itemImageUrl;
+      if (auctionImage != null && auctionImage.isNotEmpty) {
+        return resolveAbsoluteUrl(auctionImage);
+      }
+    }
+
+    final poster = resolveVideoPosterUrl(post);
+    if (poster != null && poster.isNotEmpty) return poster;
+
+    for (final item in post.media) {
+      if (item.url.isEmpty) continue;
+      if (isImage(item.url, mediaType: item.mediaType)) {
+        return resolveAbsoluteUrl(item.url);
+      }
+    }
+
+    final thumb = post.thumbnailUrl;
+    if (thumb != null && thumb.isNotEmpty && !isVideo(thumb)) {
+      return resolveAbsoluteUrl(thumb);
+    }
+
+    return null;
+  }
+
   /// Checks if a URL points to a video based on extension or metadata
   static bool isVideo(String url, {String? mediaType}) {
     if (url.isEmpty) return false;

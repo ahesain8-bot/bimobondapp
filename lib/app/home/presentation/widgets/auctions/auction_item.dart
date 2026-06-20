@@ -81,21 +81,7 @@ class AuctionItem {
 }
 
 String resolveAuctionPostImageUrl(PostEntity post) {
-  final auctionImage = post.auction?.itemImageUrl;
-  if (auctionImage != null && auctionImage.isNotEmpty) {
-    return MediaUtils.resolveAbsoluteUrl(auctionImage);
-  }
-  if (post.thumbnailUrl != null &&
-      post.thumbnailUrl!.isNotEmpty &&
-      MediaUtils.isImage(post.thumbnailUrl!)) {
-    return MediaUtils.resolveAbsoluteUrl(post.thumbnailUrl!);
-  }
-  for (final media in post.media) {
-    if (MediaUtils.isImage(media.url, mediaType: media.mediaType)) {
-      return MediaUtils.resolveAbsoluteUrl(media.url);
-    }
-  }
-  return '';
+  return MediaUtils.resolvePostCoverUrl(post) ?? '';
 }
 
 String? formatAuctionCountdown(

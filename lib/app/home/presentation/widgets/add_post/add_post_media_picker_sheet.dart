@@ -5,6 +5,7 @@ import 'package:bimobondapp/core/widgets/attachment_grid_menu_item.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -14,6 +15,7 @@ class AddPostMediaPickerSheet {
   static Future<void> show(
     BuildContext context, {
     required void Function(ImageSource source, {required bool isVideo}) onPick,
+    bool isStory = false,
   }) {
     final l10n = AppLocalizations.of(context)!;
     final menuColors = ChatTheme.of(context).moreMenuIconColors;
@@ -32,6 +34,19 @@ class AddPostMediaPickerSheet {
           AppSizes.p16,
         ),
         children: [
+          AttachmentGridMenuItem(
+            icon: LucideIcons.clapperboard,
+            label: l10n.openCameraStudio,
+            color: menuColors[0],
+            glassStyle: true,
+            onTap: () {
+              Navigator.pop(context);
+              context.pushNamed(
+                'add_post_camera',
+                extra: {'isStory': isStory},
+              );
+            },
+          ),
           AttachmentGridMenuItem(
             icon: LucideIcons.camera,
             label: l10n.takePhoto,
