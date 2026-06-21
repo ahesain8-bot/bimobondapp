@@ -2047,6 +2047,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteGeoTargetHint => 'Use your current location for local reach';
 
   @override
+  String get promoteGeoMapHint => 'Tap the map to choose your target area. Default is your location.';
+
+  @override
+  String get promoteGeoUseMyLocation => 'Use my location';
+
+  @override
+  String get promoteGeoPlaceLoading => 'Looking up place…';
+
+  @override
+  String get promoteGeoCity => 'City';
+
+  @override
+  String get promoteGeoRegion => 'Region';
+
+  @override
+  String get promoteGeoTown => 'Town';
+
+  @override
+  String get promoteGeoCountry => 'Country';
+
+  @override
+  String get promoteGeoContinent => 'Continent';
+
+  @override
   String get promoteBudgetTitle => 'Select budget';
 
   @override
@@ -2124,6 +2148,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteAudienceCreateOwn => 'Create your own';
 
   @override
+  String get promoteStepLocationHeading => 'Choose your target area';
+
+  @override
+  String get promoteStepLocationSubtitle => 'Detect your location and set a radius to reach people nearby.';
+
+  @override
   String get promoteStepBudgetSubtitle => 'Choose a promotion package for your campaign.';
 
   @override
@@ -2149,7 +2179,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteOverviewAudience => 'Audience';
 
   @override
+  String get promoteOverviewLocation => 'Location';
+
+  @override
   String get promoteOverviewBudget => 'Budget';
+
+  @override
+  String get promoteLocationOff => 'Location targeting off';
+
+  @override
+  String get promoteLocationPending => 'Location not set';
+
+  @override
+  String promoteAudienceNearbyWithRadius(int km) {
+    return 'Nearby · $km km';
+  }
+
+  @override
+  String get promoteLocationModeRegional => 'Regionally';
+
+  @override
+  String get promoteLocationModeRegionalHint => 'Choose country, region, and town';
+
+  @override
+  String get promoteLocationModeMap => 'On map';
+
+  @override
+  String get promoteLocationModeMapHint => 'Detect GPS and pick a radius on the map';
+
+  @override
+  String get promoteSelectCountry => 'Country';
+
+  @override
+  String get promoteSelectCountryHint => 'Select country';
+
+  @override
+  String get promoteSelectRegion => 'Region';
+
+  @override
+  String get promoteSelectRegionHint => 'Select region';
+
+  @override
+  String get promoteSelectTown => 'Town';
+
+  @override
+  String get promoteSelectTownHint => 'Select town';
+
+  @override
+  String promoteLocationRegionalSummary(String town, String region, String country) {
+    return '$town · $region · $country';
+  }
+
+  @override
+  String get promoteLocationCountryRequired => 'Please select a country.';
+
+  @override
+  String get promoteLocationRegionRequired => 'Please select a region.';
+
+  @override
+  String get promoteLocationTownRequired => 'Please select a town.';
+
+  @override
+  String get promoteLocationTownCoordinatesRequired => 'This town has no coordinates. Please choose another town.';
+
+  @override
+  String get promoteLocationMapRequired => 'Please allow location or pick a point on the map.';
 
   @override
   String get promoteOverviewSubtotal => 'Subtotal';

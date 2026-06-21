@@ -28,6 +28,15 @@ class UserLocationStore {
 
   bool get hasLocation => latitude != null && longitude != null;
 
+  /// Valid viewer coordinates for feed personalization (-90..90, -180..180).
+  ({double latitude, double longitude})? get viewerCoordinates {
+    final lat = latitude;
+    final lng = longitude;
+    if (lat == null || lng == null) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return (latitude: lat, longitude: lng);
+  }
+
   Future<void> save({
     required double latitude,
     required double longitude,

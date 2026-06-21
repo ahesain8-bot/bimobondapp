@@ -203,12 +203,101 @@ class PromotionCategoryOptionEntity extends Equatable {
   List<Object?> get props => [id, name, slug, iconUrl];
 }
 
+class PromoteRegionalTownEntity extends Equatable {
+  const PromoteRegionalTownEntity({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+
+  factory PromoteRegionalTownEntity.fromJson(Map<String, dynamic> json) {
+    return PromoteRegionalTownEntity(
+      id: json['id']?.toString() ?? json['value']?.toString() ?? '',
+      name: json['name']?.toString() ?? json['label']?.toString() ?? '',
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name];
+}
+
+class PromoteRegionalRegionEntity extends Equatable {
+  const PromoteRegionalRegionEntity({
+    required this.id,
+    required this.name,
+    required this.towns,
+  });
+
+  final String id;
+  final String name;
+  final List<PromoteRegionalTownEntity> towns;
+
+  factory PromoteRegionalRegionEntity.fromJson(Map<String, dynamic> json) {
+    final rawTowns = json['towns'] ?? json['cities'];
+    return PromoteRegionalRegionEntity(
+      id: json['id']?.toString() ?? json['value']?.toString() ?? '',
+      name: json['name']?.toString() ?? json['label']?.toString() ?? '',
+      towns: rawTowns is List
+          ? rawTowns
+              .whereType<Map>()
+              .map(
+                (e) => PromoteRegionalTownEntity.fromJson(
+                  Map<String, dynamic>.from(e),
+                ),
+              )
+              .where((t) => t.id.isNotEmpty && t.name.isNotEmpty)
+              .toList()
+          : const [],
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, name, towns];
+}
+
+class PromoteRegionalCountryEntity extends Equatable {
+  const PromoteRegionalCountryEntity({
+    required this.code,
+    required this.name,
+    required this.regions,
+  });
+
+  final String code;
+  final String name;
+  final List<PromoteRegionalRegionEntity> regions;
+
+  factory PromoteRegionalCountryEntity.fromJson(Map<String, dynamic> json) {
+    final rawRegions = json['regions'];
+    return PromoteRegionalCountryEntity(
+      code: json['code']?.toString() ?? json['value']?.toString() ?? '',
+      name: json['name']?.toString() ?? json['label']?.toString() ?? '',
+      regions: rawRegions is List
+          ? rawRegions
+              .whereType<Map>()
+              .map(
+                (e) => PromoteRegionalRegionEntity.fromJson(
+                  Map<String, dynamic>.from(e),
+                ),
+              )
+              .where((r) => r.id.isNotEmpty && r.name.isNotEmpty)
+              .toList()
+          : const [],
+    );
+  }
+
+  @override
+  List<Object?> get props => [code, name, regions];
+}
+
 class PromotionOptionsEntity extends Equatable {
   const PromotionOptionsEntity({
     required this.objectives,
     required this.genders,
     required this.languages,
     required this.categories,
+    required this.countries,
     required this.ageMin,
     required this.ageMax,
   });
@@ -217,6 +306,7 @@ class PromotionOptionsEntity extends Equatable {
   final List<PromotionOptionItemEntity> genders;
   final List<PromotionOptionItemEntity> languages;
   final List<PromotionCategoryOptionEntity> categories;
+  final List<PromoteRegionalCountryEntity> countries;
   final int ageMin;
   final int ageMax;
 
@@ -234,6 +324,17 @@ class PromotionOptionsEntity extends Equatable {
                   Map<String, dynamic>.from(e),
                 ),
               )
+              .toList()
+          : const [],
+      countries: json['countries'] is List
+          ? (json['countries'] as List)
+              .whereType<Map>()
+              .map(
+                (e) => PromoteRegionalCountryEntity.fromJson(
+                  Map<String, dynamic>.from(e),
+                ),
+              )
+              .where((c) => c.code.isNotEmpty && c.name.isNotEmpty)
               .toList()
           : const [],
       ageMin: ageRange is Map ? _parseInt(ageRange['min'], fallback: 13) : 13,
@@ -255,7 +356,7 @@ class PromotionOptionsEntity extends Equatable {
 
   @override
   List<Object?> get props =>
-      [objectives, genders, languages, categories, ageMin, ageMax];
+      [objectives, genders, languages, categories, countries, ageMin, ageMax];
 }
 
 class PromotionPackageEntity extends Equatable {

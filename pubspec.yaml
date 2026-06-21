@@ -77,6 +77,7 @@ dependencies:
   google_mlkit_face_detection: ^0.13.2
   flutter_map: ^8.3.0
   latlong2: ^0.9.1
+  countrify: ^2.5.0
 
 dev_dependencies:
   flutter_test:

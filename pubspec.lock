@@ -153,6 +153,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.8"
+  countrify:
+    dependency: "direct main"
+    description:
+      name: countrify
+      sha256: "694a0c40ea19576fbd29590cfe7ce9038cf06a1db1260c42ca6544db69fd5fd4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.5.0"
   cross_file:
     dependency: transitive
     description:

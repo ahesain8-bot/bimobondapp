@@ -46,23 +46,23 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
     context.read<AuthBloc>().add(CheckAuthStatusEvent());
-    auth_di.sl<AppLocationService>().requestAndSaveLocation();
     _navigateToNext();
   }
 
   void _navigateToNext() async {
-    // Wait for 3 seconds as requested
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.wait([
+      Future.delayed(const Duration(seconds: 3)),
+      auth_di.sl<AppLocationService>().ensureViewerLocation(),
+    ]);
 
-    if (mounted) {
-      final authState = context.read<AuthBloc>().state;
-      if (authState is AuthSuccess) {
-        context.goNamed('home');
-      } else {
-        context.goNamed(
-          'home',
-        ); // Still go home, the home logic handles auth tabs
-      }
+    if (!mounted) return;
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthSuccess) {
+      context.goNamed('home');
+    } else {
+      context.goNamed(
+        'home',
+      ); // Still go home, the home logic handles auth tabs
     }
   }
 

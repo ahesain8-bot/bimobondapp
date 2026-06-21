@@ -358,7 +358,7 @@ class PromotedPostInsightsBody extends StatelessWidget {
         Text(
           l10n.promoteInsightsPerformanceTitle,
           style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 12),
@@ -424,7 +424,7 @@ class PromotedPostInsightsBody extends StatelessWidget {
           Text(
             l10n.promoteInsightsCampaignHistory,
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 4),
@@ -502,7 +502,7 @@ class PromotedCampaignProgressSection extends StatelessWidget {
               Text(
                 formatPercent(progress.progressPercent),
                 style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: scheme.primary,
                 ),
               ),
@@ -662,7 +662,7 @@ class PromotedCostCell extends StatelessWidget {
           Text(
             value,
             style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
           ),

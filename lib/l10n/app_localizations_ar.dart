@@ -2047,6 +2047,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteGeoTargetHint => 'استخدم موقعك الحالي للوصول المحلي';
 
   @override
+  String get promoteGeoMapHint => 'اضغط على الخريطة لاختيار منطقة الاستهداف. الافتراضي هو موقعك.';
+
+  @override
+  String get promoteGeoUseMyLocation => 'استخدم موقعي';
+
+  @override
+  String get promoteGeoPlaceLoading => 'جاري تحديد المكان…';
+
+  @override
+  String get promoteGeoCity => 'المدينة';
+
+  @override
+  String get promoteGeoRegion => 'المنطقة';
+
+  @override
+  String get promoteGeoTown => 'المدينة';
+
+  @override
+  String get promoteGeoCountry => 'الدولة';
+
+  @override
+  String get promoteGeoContinent => 'القارة';
+
+  @override
   String get promoteBudgetTitle => 'اختر الميزانية';
 
   @override
@@ -2124,6 +2148,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteAudienceCreateOwn => 'إنشاء جمهورك الخاص';
 
   @override
+  String get promoteStepLocationHeading => 'اختر منطقة الاستهداف';
+
+  @override
+  String get promoteStepLocationSubtitle => 'حدّد موقعك واضبط نطاق الوصول للأشخاص القريبين.';
+
+  @override
   String get promoteStepBudgetSubtitle => 'اختر باقة الترويج لحملتك.';
 
   @override
@@ -2149,7 +2179,71 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteOverviewAudience => 'الجمهور';
 
   @override
+  String get promoteOverviewLocation => 'الموقع';
+
+  @override
   String get promoteOverviewBudget => 'الميزانية';
+
+  @override
+  String get promoteLocationOff => 'استهداف الموقع متوقف';
+
+  @override
+  String get promoteLocationPending => 'لم يُحدَّد الموقع';
+
+  @override
+  String promoteAudienceNearbyWithRadius(int km) {
+    return 'قريب · $km كم';
+  }
+
+  @override
+  String get promoteLocationModeRegional => 'إقليمياً';
+
+  @override
+  String get promoteLocationModeRegionalHint => 'اختر الدولة والمنطقة والمدينة';
+
+  @override
+  String get promoteLocationModeMap => 'على الخريطة';
+
+  @override
+  String get promoteLocationModeMapHint => 'حدّد موقعك GPS واختر النطاق على الخريطة';
+
+  @override
+  String get promoteSelectCountry => 'الدولة';
+
+  @override
+  String get promoteSelectCountryHint => 'اختر الدولة';
+
+  @override
+  String get promoteSelectRegion => 'المنطقة';
+
+  @override
+  String get promoteSelectRegionHint => 'اختر المنطقة';
+
+  @override
+  String get promoteSelectTown => 'المدينة';
+
+  @override
+  String get promoteSelectTownHint => 'اختر المدينة';
+
+  @override
+  String promoteLocationRegionalSummary(String town, String region, String country) {
+    return '$town · $region · $country';
+  }
+
+  @override
+  String get promoteLocationCountryRequired => 'يرجى اختيار الدولة.';
+
+  @override
+  String get promoteLocationRegionRequired => 'يرجى اختيار المنطقة.';
+
+  @override
+  String get promoteLocationTownRequired => 'يرجى اختيار المدينة.';
+
+  @override
+  String get promoteLocationTownCoordinatesRequired => 'لا توجد إحداثيات لهذه المدينة. يرجى اختيار مدينة أخرى.';
+
+  @override
+  String get promoteLocationMapRequired => 'يرجى السماح بالموقع أو اختيار نقطة على الخريطة.';
 
   @override
   String get promoteOverviewSubtotal => 'المجموع الفرعي';

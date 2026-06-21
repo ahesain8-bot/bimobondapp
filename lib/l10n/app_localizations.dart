@@ -3917,6 +3917,54 @@ abstract class AppLocalizations {
   /// **'Use your current location for local reach'**
   String get promoteGeoTargetHint;
 
+  /// No description provided for @promoteGeoMapHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the map to choose your target area. Default is your location.'**
+  String get promoteGeoMapHint;
+
+  /// No description provided for @promoteGeoUseMyLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use my location'**
+  String get promoteGeoUseMyLocation;
+
+  /// No description provided for @promoteGeoPlaceLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up place…'**
+  String get promoteGeoPlaceLoading;
+
+  /// No description provided for @promoteGeoCity.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get promoteGeoCity;
+
+  /// No description provided for @promoteGeoRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get promoteGeoRegion;
+
+  /// No description provided for @promoteGeoTown.
+  ///
+  /// In en, this message translates to:
+  /// **'Town'**
+  String get promoteGeoTown;
+
+  /// No description provided for @promoteGeoCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get promoteGeoCountry;
+
+  /// No description provided for @promoteGeoContinent.
+  ///
+  /// In en, this message translates to:
+  /// **'Continent'**
+  String get promoteGeoContinent;
+
   /// No description provided for @promoteBudgetTitle.
   ///
   /// In en, this message translates to:
@@ -4055,6 +4103,18 @@ abstract class AppLocalizations {
   /// **'Create your own'**
   String get promoteAudienceCreateOwn;
 
+  /// No description provided for @promoteStepLocationHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your target area'**
+  String get promoteStepLocationHeading;
+
+  /// No description provided for @promoteStepLocationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect your location and set a radius to reach people nearby.'**
+  String get promoteStepLocationSubtitle;
+
   /// No description provided for @promoteStepBudgetSubtitle.
   ///
   /// In en, this message translates to:
@@ -4097,11 +4157,131 @@ abstract class AppLocalizations {
   /// **'Audience'**
   String get promoteOverviewAudience;
 
+  /// No description provided for @promoteOverviewLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get promoteOverviewLocation;
+
   /// No description provided for @promoteOverviewBudget.
   ///
   /// In en, this message translates to:
   /// **'Budget'**
   String get promoteOverviewBudget;
+
+  /// No description provided for @promoteLocationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location targeting off'**
+  String get promoteLocationOff;
+
+  /// No description provided for @promoteLocationPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Location not set'**
+  String get promoteLocationPending;
+
+  /// No description provided for @promoteAudienceNearbyWithRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby · {km} km'**
+  String promoteAudienceNearbyWithRadius(int km);
+
+  /// No description provided for @promoteLocationModeRegional.
+  ///
+  /// In en, this message translates to:
+  /// **'Regionally'**
+  String get promoteLocationModeRegional;
+
+  /// No description provided for @promoteLocationModeRegionalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose country, region, and town'**
+  String get promoteLocationModeRegionalHint;
+
+  /// No description provided for @promoteLocationModeMap.
+  ///
+  /// In en, this message translates to:
+  /// **'On map'**
+  String get promoteLocationModeMap;
+
+  /// No description provided for @promoteLocationModeMapHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect GPS and pick a radius on the map'**
+  String get promoteLocationModeMapHint;
+
+  /// No description provided for @promoteSelectCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get promoteSelectCountry;
+
+  /// No description provided for @promoteSelectCountryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select country'**
+  String get promoteSelectCountryHint;
+
+  /// No description provided for @promoteSelectRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get promoteSelectRegion;
+
+  /// No description provided for @promoteSelectRegionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select region'**
+  String get promoteSelectRegionHint;
+
+  /// No description provided for @promoteSelectTown.
+  ///
+  /// In en, this message translates to:
+  /// **'Town'**
+  String get promoteSelectTown;
+
+  /// No description provided for @promoteSelectTownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select town'**
+  String get promoteSelectTownHint;
+
+  /// No description provided for @promoteLocationRegionalSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{town} · {region} · {country}'**
+  String promoteLocationRegionalSummary(String town, String region, String country);
+
+  /// No description provided for @promoteLocationCountryRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a country.'**
+  String get promoteLocationCountryRequired;
+
+  /// No description provided for @promoteLocationRegionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a region.'**
+  String get promoteLocationRegionRequired;
+
+  /// No description provided for @promoteLocationTownRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a town.'**
+  String get promoteLocationTownRequired;
+
+  /// No description provided for @promoteLocationTownCoordinatesRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This town has no coordinates. Please choose another town.'**
+  String get promoteLocationTownCoordinatesRequired;
+
+  /// No description provided for @promoteLocationMapRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please allow location or pick a point on the map.'**
+  String get promoteLocationMapRequired;
 
   /// No description provided for @promoteOverviewSubtotal.
   ///

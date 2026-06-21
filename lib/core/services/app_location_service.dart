@@ -1,8 +1,8 @@
 import 'package:bimobondapp/core/data/datasources/user_location_remote_data_source.dart';
 import 'package:bimobondapp/core/data/user_location_store.dart';
+import 'package:bimobondapp/core/utils/geo_place_resolver.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
 /// Requests location permission, stores coordinates locally, and syncs to backend.
@@ -15,6 +15,15 @@ class AppLocationService {
 
   final UserLocationStore _store;
   final UserLocationRemoteDataSource _remote;
+
+  /// Uses cached coordinates when available; otherwise requests GPS once.
+  Future<bool> ensureViewerLocation() async {
+    if (_store.viewerCoordinates != null) {
+      await syncStoredLocationToBackend();
+      return true;
+    }
+    return requestAndSaveLocation();
+  }
 
   Future<bool> requestAndSaveLocation() async {
     try {
@@ -43,7 +52,13 @@ class AppLocationService {
         longitude: position.longitude,
       );
 
-      await _syncToBackend(position);
+      await _syncToBackend(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: _validDouble(position.accuracy),
+        altitude: _validDouble(position.altitude),
+        source: 'APP_OPEN',
+      );
       return true;
     } catch (error, stackTrace) {
       debugPrint('AppLocationService: $error\n$stackTrace');
@@ -51,23 +66,40 @@ class AppLocationService {
     }
   }
 
-  Future<void> _syncToBackend(Position position) async {
+  Future<void> syncStoredLocationToBackend({String source = 'APP_OPEN'}) async {
+    final coords = _store.viewerCoordinates;
+    if (coords == null) return;
+
+    await _syncToBackend(
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      source: source,
+    );
+  }
+
+  Future<void> _syncToBackend({
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? altitude,
+    String source = 'APP_OPEN',
+  }) async {
     if (FirebaseAuth.instance.currentUser == null) return;
 
-    final place = await _resolvePlace(
-      latitude: position.latitude,
-      longitude: position.longitude,
+    final address = await GeoPlaceResolver.resolveAddress(
+      latitude: latitude,
+      longitude: longitude,
     );
 
     final payload = UserLocationPayload(
-      latitude: position.latitude,
-      longitude: position.longitude,
-      accuracy: _validDouble(position.accuracy),
-      altitude: _validDouble(position.altitude),
-      city: place?.city,
-      region: place?.region,
-      country: place?.country,
-      source: 'APP_OPEN',
+      latitude: latitude,
+      longitude: longitude,
+      accuracy: accuracy,
+      altitude: altitude,
+      city: address?.city,
+      region: address?.region,
+      country: address?.country,
+      source: source,
     );
 
     try {
@@ -77,50 +109,8 @@ class AppLocationService {
     }
   }
 
-  Future<_ResolvedPlace?> _resolvePlace({
-    required double latitude,
-    required double longitude,
-  }) async {
-    try {
-      final placemarks = await placemarkFromCoordinates(latitude, longitude);
-      if (placemarks.isEmpty) return null;
-
-      final placemark = placemarks.first;
-      return _ResolvedPlace(
-        city: _firstNonEmpty([
-          placemark.locality,
-          placemark.subAdministrativeArea,
-          placemark.subLocality,
-        ]),
-        region: _firstNonEmpty([
-          placemark.administrativeArea,
-          placemark.subAdministrativeArea,
-        ]),
-        country: placemark.country,
-      );
-    } catch (error) {
-      debugPrint('AppLocationService geocoding failed: $error');
-      return null;
-    }
-  }
-
   double? _validDouble(double value) {
     if (value.isNaN || value.isInfinite) return null;
     return value;
   }
-
-  String? _firstNonEmpty(List<String?> values) {
-    for (final value in values) {
-      if (value != null && value.trim().isNotEmpty) return value.trim();
-    }
-    return null;
-  }
-}
-
-class _ResolvedPlace {
-  const _ResolvedPlace({this.city, this.region, this.country});
-
-  final String? city;
-  final String? region;
-  final String? country;
 }

@@ -947,6 +947,14 @@
   "promoteAgeRange": "الفئة العمرية",
   "promoteGeoTarget": "استهداف الأشخاص القريبين",
   "promoteGeoTargetHint": "استخدم موقعك الحالي للوصول المحلي",
+  "promoteGeoMapHint": "اضغط على الخريطة لاختيار منطقة الاستهداف. الافتراضي هو موقعك.",
+  "promoteGeoUseMyLocation": "استخدم موقعي",
+  "promoteGeoPlaceLoading": "جاري تحديد المكان…",
+  "promoteGeoCity": "المدينة",
+  "promoteGeoRegion": "المنطقة",
+  "promoteGeoTown": "المدينة",
+  "promoteGeoCountry": "الدولة",
+  "promoteGeoContinent": "القارة",
   "promoteBudgetTitle": "اختر الميزانية",
   "promoteProcessing": "جاري المعالجة...",
   "promotePostCta": "ترويج مقابل {price}",
@@ -990,6 +998,8 @@
   "promoteAudienceDefault": "جمهور افتراضي",
   "promoteAudienceDefaultHint": "سنختار أفضل جمهور لك",
   "promoteAudienceCreateOwn": "إنشاء جمهورك الخاص",
+  "promoteStepLocationHeading": "اختر منطقة الاستهداف",
+  "promoteStepLocationSubtitle": "حدّد موقعك واضبط نطاق الوصول للأشخاص القريبين.",
   "promoteStepBudgetSubtitle": "اختر باقة الترويج لحملتك.",
   "promoteBudgetTotal": "{price} الإجمالي",
   "@promoteBudgetTotal": {
@@ -1008,7 +1018,39 @@
   "promoteOverviewTitle": "نظرة عامة",
   "promoteOverviewGoal": "الهدف",
   "promoteOverviewAudience": "الجمهور",
+  "promoteOverviewLocation": "الموقع",
   "promoteOverviewBudget": "الميزانية",
+  "promoteLocationOff": "استهداف الموقع متوقف",
+  "promoteLocationPending": "لم يُحدَّد الموقع",
+  "promoteAudienceNearbyWithRadius": "قريب · {km} كم",
+  "@promoteAudienceNearbyWithRadius": {
+    "placeholders": {
+      "km": { "type": "int" }
+    }
+  },
+  "promoteLocationModeRegional": "إقليمياً",
+  "promoteLocationModeRegionalHint": "اختر الدولة والمنطقة والمدينة",
+  "promoteLocationModeMap": "على الخريطة",
+  "promoteLocationModeMapHint": "حدّد موقعك GPS واختر النطاق على الخريطة",
+  "promoteSelectCountry": "الدولة",
+  "promoteSelectCountryHint": "اختر الدولة",
+  "promoteSelectRegion": "المنطقة",
+  "promoteSelectRegionHint": "اختر المنطقة",
+  "promoteSelectTown": "المدينة",
+  "promoteSelectTownHint": "اختر المدينة",
+  "promoteLocationRegionalSummary": "{town} · {region} · {country}",
+  "@promoteLocationRegionalSummary": {
+    "placeholders": {
+      "town": { "type": "String" },
+      "region": { "type": "String" },
+      "country": { "type": "String" }
+    }
+  },
+  "promoteLocationCountryRequired": "يرجى اختيار الدولة.",
+  "promoteLocationRegionRequired": "يرجى اختيار المنطقة.",
+  "promoteLocationTownRequired": "يرجى اختيار المدينة.",
+  "promoteLocationTownCoordinatesRequired": "لا توجد إحداثيات لهذه المدينة. يرجى اختيار مدينة أخرى.",
+  "promoteLocationMapRequired": "يرجى السماح بالموقع أو اختيار نقطة على الخريطة.",
   "promoteOverviewSubtotal": "المجموع الفرعي",
   "promoteOverviewTotal": "الإجمالي",
   "promoteNext": "التالي",

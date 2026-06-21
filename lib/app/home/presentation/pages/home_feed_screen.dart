@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_p
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
 import 'package:bimobondapp/core/data/user_location_store.dart';
+import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -58,6 +59,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _loadTabData() {
+    unawaited(_loadTabDataWithLocation());
+  }
+
+  Future<void> _loadTabDataWithLocation() async {
+    await auth_di.sl<AppLocationService>().ensureViewerLocation();
+    if (!mounted) return;
     _fetchFeed(refresh: true);
   }
 
@@ -76,7 +83,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       return;
     }
 
-    final locationStore = auth_di.sl<UserLocationStore>();
+    final viewerLocation = auth_di.sl<UserLocationStore>().viewerCoordinates;
 
     context.read<PostsBloc>().add(
       FetchFeedRequestedEvent(
@@ -85,9 +92,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         isRefresh: refresh,
         isStory: false,
         sort: 'RANKED',
-        latitude: locationStore.latitude,
-        longitude: locationStore.longitude,
-        radiusKm: 50,
+        latitude: viewerLocation?.latitude,
+        longitude: viewerLocation?.longitude,
       ),
     );
   }

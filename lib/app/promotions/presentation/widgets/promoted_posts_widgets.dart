@@ -243,7 +243,7 @@ class _PromotedPostCardState extends State<PromotedPostCard> {
                             child: Text(
                               formatUsd(promo.totalSpentUsd),
                               style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: scheme.primary,
                               ),
                             ),
@@ -294,7 +294,7 @@ class _PromotedPostCardState extends State<PromotedPostCard> {
                             Text(
                               formatPercent(progress),
                               style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: scheme.primary,
                               ),
                             ),
@@ -348,7 +348,7 @@ class PromotedStatPill extends StatelessWidget {
           Text(
             value,
             style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

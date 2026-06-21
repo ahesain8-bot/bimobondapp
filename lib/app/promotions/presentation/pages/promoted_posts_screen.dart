@@ -109,7 +109,7 @@ class _PromotedPostsScreenState extends State<PromotedPostsScreen> {
     final scheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: scheme.surface,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: CustomAppBar(
         title: l10n.promoteInsightsDashboardTitle,
         showBackButton: true,

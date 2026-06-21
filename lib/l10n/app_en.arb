@@ -963,6 +963,14 @@
   "promoteAgeRange": "Age range",
   "promoteGeoTarget": "Target people nearby",
   "promoteGeoTargetHint": "Use your current location for local reach",
+  "promoteGeoMapHint": "Tap the map to choose your target area. Default is your location.",
+  "promoteGeoUseMyLocation": "Use my location",
+  "promoteGeoPlaceLoading": "Looking up place…",
+  "promoteGeoCity": "City",
+  "promoteGeoRegion": "Region",
+  "promoteGeoTown": "Town",
+  "promoteGeoCountry": "Country",
+  "promoteGeoContinent": "Continent",
   "promoteBudgetTitle": "Select budget",
   "promoteProcessing": "Processing...",
   "promotePostCta": "Promote for {price}",
@@ -1006,6 +1014,8 @@
   "promoteAudienceDefault": "Default audience",
   "promoteAudienceDefaultHint": "We'll choose the best audience for you",
   "promoteAudienceCreateOwn": "Create your own",
+  "promoteStepLocationHeading": "Choose your target area",
+  "promoteStepLocationSubtitle": "Detect your location and set a radius to reach people nearby.",
   "promoteStepBudgetSubtitle": "Choose a promotion package for your campaign.",
   "promoteBudgetTotal": "{price} total",
   "@promoteBudgetTotal": {
@@ -1024,7 +1034,39 @@
   "promoteOverviewTitle": "Overview",
   "promoteOverviewGoal": "Goal",
   "promoteOverviewAudience": "Audience",
+  "promoteOverviewLocation": "Location",
   "promoteOverviewBudget": "Budget",
+  "promoteLocationOff": "Location targeting off",
+  "promoteLocationPending": "Location not set",
+  "promoteAudienceNearbyWithRadius": "Nearby · {km} km",
+  "@promoteAudienceNearbyWithRadius": {
+    "placeholders": {
+      "km": { "type": "int" }
+    }
+  },
+  "promoteLocationModeRegional": "Regionally",
+  "promoteLocationModeRegionalHint": "Choose country, region, and town",
+  "promoteLocationModeMap": "On map",
+  "promoteLocationModeMapHint": "Detect GPS and pick a radius on the map",
+  "promoteSelectCountry": "Country",
+  "promoteSelectCountryHint": "Select country",
+  "promoteSelectRegion": "Region",
+  "promoteSelectRegionHint": "Select region",
+  "promoteSelectTown": "Town",
+  "promoteSelectTownHint": "Select town",
+  "promoteLocationRegionalSummary": "{town} · {region} · {country}",
+  "@promoteLocationRegionalSummary": {
+    "placeholders": {
+      "town": { "type": "String" },
+      "region": { "type": "String" },
+      "country": { "type": "String" }
+    }
+  },
+  "promoteLocationCountryRequired": "Please select a country.",
+  "promoteLocationRegionRequired": "Please select a region.",
+  "promoteLocationTownRequired": "Please select a town.",
+  "promoteLocationTownCoordinatesRequired": "This town has no coordinates. Please choose another town.",
+  "promoteLocationMapRequired": "Please allow location or pick a point on the map.",
   "promoteOverviewSubtotal": "Subtotal",
   "promoteOverviewTotal": "Total",
   "promoteNext": "Next",

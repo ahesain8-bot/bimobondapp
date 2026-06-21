@@ -352,10 +352,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<void> forgotPassword({required String email}) => _execute(() async {
     final response = await apiClient.dio.post(
       ApiConstants.forgotPassword,
-      data: {
-        'type': 'EMAIL',
-        'email': email,
-      },
+      data: {'type': 'EMAIL', 'email': email},
     );
 
     if (response.statusCode == 200 ||
