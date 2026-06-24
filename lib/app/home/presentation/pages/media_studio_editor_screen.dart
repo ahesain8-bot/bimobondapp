@@ -342,8 +342,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
               ],
             ),
           ),
-          if (_isProcessing)
-            CameraAppLoading(message: l10n.promoteProcessing),
+          if (_isProcessing) CameraAppLoading(message: l10n.promoteProcessing),
         ],
       ),
     );

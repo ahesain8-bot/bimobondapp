@@ -162,7 +162,9 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         media = const Center(
           child: CircularProgressIndicator(color: Colors.white54),
         );
-      } else if (_videoFailed || controller == null || !controller.value.isInitialized) {
+      } else if (_videoFailed ||
+          controller == null ||
+          !controller.value.isInitialized) {
         media = _VideoFallbackThumb(file: widget.file);
       } else {
         media = FittedBox(

@@ -13,8 +13,7 @@ class CameraFilterPreset {
 
   bool get isOriginal => filter == AwesomeFilter.None;
 
-  bool get hasThumbnail =>
-      thumbnailAsset != null && thumbnailAsset!.isNotEmpty;
+  bool get hasThumbnail => thumbnailAsset != null && thumbnailAsset!.isNotEmpty;
 
   String label({String? originalLabel}) {
     if (isOriginal && originalLabel != null) return originalLabel;

@@ -80,13 +80,7 @@ class CameraArEffectsPainter extends CustomPainter {
     for (final face in frame.faces) {
       switch (effect.id) {
         case CameraEffectId.crown:
-          _drawAboveFace(
-            canvas,
-            face,
-            emoji: '👑',
-            scale: 1.1,
-            yOffset: -0.55,
-          );
+          _drawAboveFace(canvas, face, emoji: '👑', scale: 1.1, yOffset: -0.55);
         case CameraEffectId.bunny:
           _drawBunnyEars(canvas, face);
         case CameraEffectId.sunglasses:
@@ -150,13 +144,7 @@ class CameraArEffectsPainter extends CustomPainter {
     final leftEye = face.landmarks[FaceLandmarkType.leftEye];
     final rightEye = face.landmarks[FaceLandmarkType.rightEye];
     if (leftEye == null || rightEye == null) {
-      _drawAboveFace(
-        canvas,
-        face,
-        emoji: '😎',
-        scale: 1.0,
-        yOffset: 0.35,
-      );
+      _drawAboveFace(canvas, face, emoji: '😎', scale: 1.0, yOffset: 0.35);
       return;
     }
 
@@ -339,7 +327,10 @@ class CameraScreenEffectsPainter extends CustomPainter {
 
   void _drawEmojiAt(Canvas canvas, String emoji, Offset center, double size) {
     final painter = TextPainter(
-      text: TextSpan(text: emoji, style: TextStyle(fontSize: size)),
+      text: TextSpan(
+        text: emoji,
+        style: TextStyle(fontSize: size),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     painter.paint(

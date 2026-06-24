@@ -45,10 +45,7 @@ extension CameraAnalysisImageMlKit on AnalysisImage {
 }
 
 class CameraFaceDetectionFrame {
-  const CameraFaceDetectionFrame({
-    required this.faces,
-    required this.image,
-  });
+  const CameraFaceDetectionFrame({required this.faces, required this.image});
 
   final List<Face> faces;
   final AnalysisImage image;

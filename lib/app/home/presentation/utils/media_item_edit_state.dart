@@ -80,11 +80,11 @@ class MediaEditorSeed {
   final CameraFilterCategory filterCategory;
 
   Map<String, dynamic> toExtra() => {
-        if (filterName != null) 'filterName': filterName,
-        if (effect != null) 'effect': effect!.name,
-        'beautyEnabled': beautyEnabled,
-        'filterCategory': filterCategory.name,
-      };
+    if (filterName != null) 'filterName': filterName,
+    if (effect != null) 'effect': effect!.name,
+    'beautyEnabled': beautyEnabled,
+    'filterCategory': filterCategory.name,
+  };
 
   static MediaEditorSeed? fromExtra(Object? raw) {
     if (raw is! Map<String, dynamic>) return null;
@@ -95,8 +95,9 @@ class MediaEditorSeed {
           ? null
           : CameraEffectId.values.asNameMap()[effectName],
       beautyEnabled: raw['beautyEnabled'] as bool? ?? false,
-      filterCategory: CameraFilterCategory.values.asNameMap()[
-              raw['filterCategory'] as String?] ??
+      filterCategory:
+          CameraFilterCategory.values.asNameMap()[raw['filterCategory']
+              as String?] ??
           CameraFilterCategory.trending,
     );
   }
@@ -108,7 +109,8 @@ List<GalleryMediaItem> galleryItemsFromExtra(List<dynamic> raw) {
         final map = entry as Map<String, dynamic>;
         return GalleryMediaItem(
           file: File(map['path'] as String),
-          type: map['type'] as String? ??
+          type:
+              map['type'] as String? ??
               MediaGalleryPicker.typeForPath(map['path'] as String),
         );
       })

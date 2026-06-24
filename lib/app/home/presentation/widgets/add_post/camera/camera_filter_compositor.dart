@@ -113,7 +113,9 @@ class CameraFilterCompositor {
     final filteredImage = await picture.toImage(width, height);
     picture.dispose();
 
-    final pngData = await filteredImage.toByteData(format: ui.ImageByteFormat.png);
+    final pngData = await filteredImage.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
     filteredImage.dispose();
     if (pngData == null) return null;
 
@@ -170,12 +172,13 @@ class CameraFilterCompositor {
       return null;
     }
 
-    final frames = framesDir
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.toLowerCase().endsWith('.jpg'))
-        .toList()
-      ..sort((a, b) => a.path.compareTo(b.path));
+    final frames =
+        framesDir
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.toLowerCase().endsWith('.jpg'))
+            .toList()
+          ..sort((a, b) => a.path.compareTo(b.path));
 
     if (frames.isEmpty) {
       await _deleteDir(framesDir);

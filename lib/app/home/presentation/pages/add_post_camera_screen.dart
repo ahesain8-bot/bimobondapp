@@ -214,33 +214,33 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     var file = File(path);
     final isVideo = capture.isVideo;
 
-    if (widget.isStory && (hasFilter || hasEffect)) {
-      setState(() => _isProcessingCapture = true);
-      try {
-        if (hasFilter) {
-          file = await CameraFilterCompositor.applyIfNeeded(
-            input: file,
-            filter: captureFilter,
-            isVideo: isVideo,
-          );
-        }
-        if (hasEffect) {
-          file = await CameraEffectCompositor.applyIfNeeded(
-            input: file,
-            effectId: _selectedEffect,
-            isVideo: isVideo,
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isProcessingCapture = false);
-      }
-    } else if (_isBusy) {
-      setState(() => _isBusy = false);
-    }
-
-    if (!mounted) return;
-
     if (widget.isStory) {
+      if (hasFilter || hasEffect) {
+        setState(() => _isProcessingCapture = true);
+        try {
+          if (hasFilter) {
+            file = await CameraFilterCompositor.applyIfNeeded(
+              input: file,
+              filter: captureFilter,
+              isVideo: isVideo,
+            );
+          }
+          if (hasEffect) {
+            file = await CameraEffectCompositor.applyIfNeeded(
+              input: file,
+              effectId: _selectedEffect,
+              isVideo: isVideo,
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _isProcessingCapture = false);
+        }
+      } else if (_isBusy) {
+        setState(() => _isBusy = false);
+      }
+
+      if (!mounted) return;
+
       setState(() {
         _storyCapturedFile = file;
         _storyCapturedType = capture.isPicture ? 'IMAGE' : 'VIDEO';
@@ -248,25 +248,20 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
       return;
     }
 
-    if (capture.isPicture) {
-      await _openCapturedMediaEditor(file, type: 'IMAGE');
-      return;
+    if (_isBusy) {
+      setState(() => _isBusy = false);
     }
 
-    final type = 'VIDEO';
-    if (widget.returnMediaOnDone) {
-      _returnPickedMedia([file]);
-      return;
+    if (!mounted) return;
+
+    if (isVideo) {
+      await CameraFilterCompositor.waitForCaptureFile(file);
+      if (!mounted) return;
     }
 
-    context.pushReplacementNamed(
-      'add_post',
-      extra: {
-        'files': [file],
-        'type': type,
-        'isStory': false,
-        'initialSound': _selectedSound,
-      },
+    await _openCapturedMediaEditor(
+      file,
+      type: capture.isPicture ? 'IMAGE' : 'VIDEO',
     );
   }
 
