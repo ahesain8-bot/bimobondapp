@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/stories/story_caption_display.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_grouping.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_l10n_format.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_insights_sheet.dart';
@@ -18,6 +19,7 @@ import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
+import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
@@ -69,7 +71,8 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
   VideoPlayerController? _videoController;
   AnimationController? _progressController;
   int _currentIndex = 0;
-  bool _paused = false;
+  bool _paused = true;
+  bool _isMediaReady = false;
 
   @override
   void initState() {
@@ -168,7 +171,12 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     if (post.type != 'VIDEO') return;
 
     final url = storyDisplayMediaUrl(post);
-    if (url == null || url.isEmpty) return;
+    if (url == null || url.isEmpty) {
+      if (mounted && _currentPost?.id == post.id) {
+        _markMediaReady();
+      }
+      return;
+    }
 
     final resolved = MediaUtils.resolveAbsoluteUrl(url);
     final controller = VideoPlayerController.networkUrl(Uri.parse(resolved));
@@ -176,25 +184,52 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     try {
       await controller.initialize();
       await controller.setLooping(true);
-      if (!_paused) await controller.play();
       if (mounted) setState(() {});
     } catch (_) {
       if (mounted) setState(() {});
+    } finally {
+      if (mounted && _currentPost?.id == post.id) {
+        _markMediaReady();
+      }
     }
+  }
+
+  void _markMediaReady() {
+    if (!mounted || _isMediaReady) return;
+    final post = _currentPost;
+    if (post == null) return;
+
+    setState(() => _isMediaReady = true);
+    _paused = false;
+    _resetProgressAnimation();
+    if (post.type == 'VIDEO') {
+      unawaited(_videoController?.play());
+    }
+    _recordStoryViewIfNeeded(post);
+    auth_di.sl<ViewedStoriesStore>().markViewed(post.id);
   }
 
   void _onStoryActivated(int index) {
     if (index < 0 || index >= _stories.length) return;
-    setState(() => _currentIndex = index);
+
+    _progressController?.dispose();
+    _progressController = null;
+
+    setState(() {
+      _currentIndex = index;
+      _isMediaReady = false;
+      _paused = true;
+    });
+
     final post = _stories[index];
     if (!isStoryStillActive(post)) {
       _removeStoryAt(index);
       return;
     }
-    _initVideoForPost(post);
-    _resetProgressAnimation();
-    _recordStoryViewIfNeeded(post);
-    auth_di.sl<ViewedStoriesStore>().markViewed(post.id);
+
+    if (post.type == 'VIDEO') {
+      unawaited(_initVideoForPost(post));
+    }
   }
 
   Future<void> _recordStoryViewIfNeeded(PostEntity post) async {
@@ -385,9 +420,23 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                         videoController: index == _currentIndex
                             ? _videoController
                             : null,
+                        isActive: index == _currentIndex,
+                        onMediaReady: index == _currentIndex &&
+                                _stories[index].type != 'VIDEO'
+                            ? _markMediaReady
+                            : null,
                       );
                     },
                   ),
+                  if (!_isMediaReady)
+                    const Positioned.fill(
+                      child: ColoredBox(
+                        color: Colors.black,
+                        child: Center(
+                          child: CustomLoadingWidget(size: 48),
+                        ),
+                      ),
+                    ),
                   Positioned.fill(
                     child: IgnorePointer(
                       child: DecoratedBox(
@@ -539,7 +588,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                     color: Colors.white.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(2),
                   ),
-                  child: active && progress != null
+                  child: active && progress != null && _isMediaReady
                       ? AnimatedBuilder(
                           animation: progress,
                           builder: (context, child) {
@@ -569,7 +618,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
 
   Widget _buildBottomOverlay(AppLocalizations l10n) {
     final post = _currentPost!;
-    final caption = post.description?.trim() ?? '';
+    final caption = StoryCaptionUtils.plainCaption(post.description);
     final e = _engagementFor(post);
     final isOwner = _isOwner(post);
 
@@ -578,20 +627,9 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       right: AppSizes.p16,
       bottom: MediaQuery.paddingOf(context).bottom + AppSizes.p16,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (caption.isNotEmpty)
-            Text(
-              caption,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                height: 1.35,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
-              ),
-            ),
-          if (caption.isNotEmpty) const SizedBox(height: AppSizes.p12),
           if (isOwner) ...[
             StoryViewerViewersChip(
               viewCount: e.viewCount,
@@ -600,6 +638,8 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
             ),
             const SizedBox(height: AppSizes.p10),
           ],
+          StoryCaptionDisplay(caption: caption),
+          if (caption.isNotEmpty) const SizedBox(height: AppSizes.p12),
           StoryViewerBottomActions(
             isLiked: e.isLiked,
             onLike: () => _handleLike(post),
@@ -613,26 +653,44 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
 }
 
 class _StoryPageContent extends StatelessWidget {
-  const _StoryPageContent({required this.post, this.videoController});
+  const _StoryPageContent({
+    required this.post,
+    this.videoController,
+    this.isActive = false,
+    this.onMediaReady,
+  });
 
   final PostEntity post;
   final VideoPlayerController? videoController;
+  final bool isActive;
+  final VoidCallback? onMediaReady;
 
   @override
   Widget build(BuildContext context) {
     if (post.type == 'VIDEO' &&
         videoController != null &&
         videoController!.value.isInitialized) {
-      return Center(
-        child: AspectRatio(
-          aspectRatio: videoController!.value.aspectRatio,
-          child: VideoPlayer(videoController!),
+      return SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: videoController!.value.size.width,
+            height: videoController!.value.size.height,
+            child: VideoPlayer(videoController!),
+          ),
         ),
       );
     }
 
+    if (post.type == 'VIDEO') {
+      return const ColoredBox(color: Colors.black);
+    }
+
     final url = storyDisplayMediaUrl(post);
     if (url == null || url.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onMediaReady?.call();
+      });
       return const Center(
         child: Icon(
           Icons.broken_image_outlined,
@@ -642,8 +700,14 @@ class _StoryPageContent extends StatelessWidget {
       );
     }
 
-    return Center(
-      child: SafeNetworkImage(imageUrl: url, fit: BoxFit.contain),
+    return SizedBox.expand(
+      child: SafeNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        blankOnError: true,
+        onLoaded: isActive ? onMediaReady : null,
+        onLoadFailed: isActive ? onMediaReady : null,
+      ),
     );
   }
 }

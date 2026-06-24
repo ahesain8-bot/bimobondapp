@@ -28,6 +28,13 @@ class CameraFilterCatalog {
 
   static final List<AwesomeFilter> allGpuFilters = awesomePresetFiltersList;
 
+  static AwesomeFilter filterByName(String name) {
+    for (final filter in allGpuFilters) {
+      if (filter.name == name) return filter;
+    }
+    return AwesomeFilter.None;
+  }
+
   static final List<CameraFilterPreset> trending = [
     AwesomeFilter.None,
     AwesomeFilter.Amaro,

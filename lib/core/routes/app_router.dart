@@ -22,6 +22,9 @@ import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_camera_screen.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
+import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
@@ -312,6 +315,33 @@ class AppRouter {
           return AddPostCameraScreen(
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
+            returnMediaOnDone: extra?['returnMediaOnDone'] as bool? ?? false,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/media-studio-editor',
+        name: 'media_studio_editor',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final List<GalleryMediaItem> items;
+          if (extra?['items'] is List) {
+            items = galleryItemsFromExtra(extra!['items'] as List<dynamic>);
+          } else {
+            items = [
+              GalleryMediaItem(
+                file: extra!['file'] as File,
+                type: extra['type'] as String? ?? 'IMAGE',
+              ),
+            ];
+          }
+          return MediaStudioEditorScreen(
+            items: items,
+            initialIndex: extra?['initialIndex'] as int? ?? 0,
+            isStory: extra?['isStory'] as bool? ?? false,
+            initialSound: extra?['initialSound'] as SoundEntity?,
+            popOnDone: extra?['popOnDone'] as bool? ?? false,
+            initialEdit: MediaEditorSeed.fromExtra(extra?['initialEdit']),
           );
         },
       ),

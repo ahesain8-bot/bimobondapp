@@ -1,5 +1,5 @@
-import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/video_post_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_auction_preview.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/utils/one_page_scroll_physics.dart';
@@ -35,7 +35,11 @@ class HomeFeedPageView extends StatelessWidget {
         final item = feedItems[index];
         final post = item.post;
         if (post.isAuctionable) {
-          return LiveDetailsScreen(post: post, embeddedInFeed: true);
+          return FeedAuctionPreview(
+            key: ValueKey(item.id),
+            post: post,
+            bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
+          );
         }
         return VideoPostWidget(
           key: ValueKey(item.id),

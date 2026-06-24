@@ -26,6 +26,7 @@ class SafeNetworkImage extends StatefulWidget {
     this.errorIcon = Icons.broken_image_outlined,
     this.blankOnError = false,
     this.onLoadFailed,
+    this.onLoaded,
     super.key,
   });
 
@@ -39,6 +40,7 @@ class SafeNetworkImage extends StatefulWidget {
   /// When true, loading/error states are solid black with no icon (e.g. video posters).
   final bool blankOnError;
   final VoidCallback? onLoadFailed;
+  final VoidCallback? onLoaded;
 
   @override
   State<SafeNetworkImage> createState() => _SafeNetworkImageState();
@@ -50,6 +52,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   ImageInfo? _imageInfo;
   bool _failed = false;
   bool _resolveStarted = false;
+  bool _loadedNotified = false;
 
   String? get _resolvedUrl {
     final raw = widget.imageUrl?.trim();
@@ -73,6 +76,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       _disposeStream();
       _imageInfo = null;
       _failed = false;
+      _loadedNotified = false;
       _resolveStarted = true;
       _resolveImage();
     }
@@ -82,6 +86,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     final url = _resolvedUrl;
     if (!isValidNetworkImageUrl(url)) {
       _failed = true;
+      _notifyLoaded();
       return;
     }
 
@@ -95,6 +100,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
           _imageInfo = info;
           _failed = false;
         });
+        _notifyLoaded();
       },
       onError: (exception, stackTrace) {
         debugPrint('SafeNetworkImage failed for $url: $exception');
@@ -104,9 +110,16 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
           _failed = true;
           _imageInfo = null;
         });
+        _notifyLoaded();
       },
     );
     stream.addListener(_listener!);
+  }
+
+  void _notifyLoaded() {
+    if (_loadedNotified) return;
+    _loadedNotified = true;
+    widget.onLoaded?.call();
   }
 
   void _disposeStream() {

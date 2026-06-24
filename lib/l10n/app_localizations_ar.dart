@@ -383,7 +383,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get shareStoryButton => 'نشر القصة';
 
   @override
+  String get storyAddText => 'نص';
+
+  @override
+  String get storyTextDone => 'تم';
+
+  @override
   String get storyCaptionHint => 'أضف تعليقاً (اختياري)';
+
+  @override
+  String get storyLoadMore => 'عرض المزيد';
+
+  @override
+  String get storyShowLess => 'عرض أقل';
 
   @override
   String storyPickMediaError(String error) {
@@ -471,7 +483,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get takePhoto => 'التقاط صورة';
 
   @override
-  String get selectFromGallery => 'اختيار من المعرض';
+  String get importFromLibrary => 'استيراد';
+
+  @override
+  String get uploadFromLibrary => 'رفع من المكتبة';
 
   @override
   String get removeCurrentPhoto => 'إزالة الصورة الحالية';
@@ -651,6 +666,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get auctionActiveBadge => 'نشط';
+
+  @override
+  String get auctionTapToEnter => 'اضغط للدخول';
 
   @override
   String get auctionFinishedBadge => 'انتهى';
@@ -962,13 +980,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get imagesLabel => 'صور';
 
   @override
-  String get imageFromLibrary => 'صور من المعرض';
+  String get imageFromLibrary => 'رفع صور من المكتبة';
 
   @override
-  String get videoFromLibrary => 'فيديوهات من المعرض';
+  String get videoFromLibrary => 'استيراد فيديوهات من المكتبة';
 
   @override
-  String get tapToSelectMedia => 'اضغط لاختيار الوسائط';
+  String get tapToSelectMedia => 'اضغط للرفع من المكتبة';
 
   @override
   String get pleaseSelectMediaFirst => 'يرجى اختيار الوسائط أولاً';
@@ -1501,7 +1519,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatUserBio => 'مهتم بالعقارات والتصميم.';
 
   @override
-  String get chatMoreGallery => 'المعرض';
+  String get chatMoreGallery => 'استيراد';
 
   @override
   String get chatMoreCamera => 'الكاميرا';
@@ -1890,7 +1908,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraEffects => 'تأثيرات';
 
   @override
-  String get cameraUpload => 'رفع';
+  String get cameraUpload => 'رفع من المكتبة';
 
   @override
   String get cameraOriginalSound => 'الصوت الأصلي';

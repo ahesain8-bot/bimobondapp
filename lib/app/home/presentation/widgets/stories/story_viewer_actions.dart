@@ -105,6 +105,12 @@ class StoryViewerViewersChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
+              LucideIcons.chevronUp,
+              size: 16,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+            const SizedBox(width: AppSizes.p4),
+            Icon(
               LucideIcons.eye,
               size: 18,
               color: Colors.white.withValues(alpha: 0.9),

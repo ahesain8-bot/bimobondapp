@@ -237,6 +237,7 @@ class CameraCaptureControls extends StatelessWidget {
     required this.onUploadTap,
     required this.onGoLiveTap,
     required this.onRecordTap,
+    this.showUpload = true,
     this.onLongPressStart,
     this.onLongPressEnd,
   });
@@ -253,6 +254,7 @@ class CameraCaptureControls extends StatelessWidget {
   final VoidCallback onUploadTap;
   final VoidCallback onGoLiveTap;
   final VoidCallback onRecordTap;
+  final bool showUpload;
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
 
@@ -286,11 +288,14 @@ class CameraCaptureControls extends StatelessWidget {
               ),
             ),
           ),
-          CameraBottomAction(
-            icon: LucideIcons.imageUp,
-            label: uploadLabel,
-            onTap: onUploadTap,
-          ),
+          if (showUpload)
+            CameraBottomAction(
+              icon: LucideIcons.imageUp,
+              label: uploadLabel,
+              onTap: onUploadTap,
+            )
+          else
+            const SizedBox(width: 72),
         ],
       ),
     );

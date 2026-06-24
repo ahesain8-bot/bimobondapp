@@ -7,7 +7,6 @@ import 'package:bimobondapp/app/categories/presentation/di/categories_injector.d
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_auction_fields.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_category_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_chevron_icon.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_widgets.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_privacy_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_publish_bar.dart';
@@ -29,12 +28,15 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_picker_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_sheets.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AddPostScreen extends StatefulWidget {
@@ -57,7 +59,6 @@ class AddPostScreen extends StatefulWidget {
 
 class _AddPostScreenState extends State<AddPostScreen> {
   static const int _maxFiles = 5;
-  final ImagePicker _picker = ImagePicker();
 
   late List<File> _selectedFiles;
   late String _type;
@@ -92,12 +93,26 @@ class _AddPostScreenState extends State<AddPostScreen> {
     );
     _selectedSound = widget.initialSound;
     _loadCategories();
+    if (widget.isStory &&
+        (widget.initialFiles == null || widget.initialFiles!.isEmpty)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openStoryCamera();
+      });
+    }
   }
+
+  void _openStoryCamera() {
+    context.pushReplacementNamed(
+      'add_post_camera',
+      extra: const {'isStory': true},
+    );
+  }
+
+  void _retakeStory() => _openStoryCamera();
 
   Future<void> _loadCategories() async {
     setState(() => _isLoadingCategories = true);
-    final result =
-        await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
     if (!mounted) return;
     setState(() {
       _isLoadingCategories = false;
@@ -137,82 +152,103 @@ class _AddPostScreenState extends State<AddPostScreen> {
     });
   }
 
+  Future<void> _editMediaAt(int index) async {
+    if (widget.isStory || index < 0 || index >= _selectedFiles.length) return;
+
+    final items = _selectedFiles
+        .map(
+          (file) => GalleryMediaItem(
+            file: file,
+            type: addPostIsVideoFile(file) ? 'VIDEO' : 'IMAGE',
+          ),
+        )
+        .toList(growable: false);
+
+    final edited = await MediaGalleryImportFlow.openBatchEditor(
+      context,
+      items: items,
+      initialIndex: index,
+      initialSound: _selectedSound,
+    );
+    if (!mounted || edited == null || edited.isEmpty) return;
+
+    setState(() {
+      _selectedFiles = edited;
+      _updateType();
+    });
+  }
+
   Future<void> _showMediaPickerOptions() {
+    if (widget.isStory) {
+      _openStoryCamera();
+      return Future.value();
+    }
     return AddPostMediaPickerSheet.show(
       context,
-      onPick: _pickMedia,
+      onOpenCamera: _openAddPostCamera,
+      onOpenGallery: _pickFromGallery,
     );
   }
 
-  Future<void> _pickMedia(ImageSource source, {required bool isVideo}) async {
-    final l10n = AppLocalizations.of(context)!;
-    final maxFiles = _maxFilesLimit;
-    try {
-      if (_selectedFiles.length >= maxFiles) {
-        PopupDialogs.showErrorDialog(
-          context,
-          l10n.fieldIsRequired('Maximum $maxFiles files allowed'),
-        );
-        return;
-      }
-      if (isVideo) {
-        final XFile? video = await _picker.pickVideo(source: source);
-        if (!mounted) return;
-        if (video != null) {
-          setState(() {
-            if (widget.isStory) {
-              _selectedFiles = [File(video.path)];
-            } else {
-              _selectedFiles = [..._selectedFiles, File(video.path)];
-            }
-            _updateType();
-          });
-        }
-      } else {
-        if (source == ImageSource.camera || widget.isStory) {
-          final XFile? photo = await _picker.pickImage(
-            source: source,
-          );
-          if (!mounted) return;
-          if (photo != null) {
-            setState(() {
-              if (widget.isStory) {
-                _selectedFiles = [File(photo.path)];
-              } else {
-                _selectedFiles = [..._selectedFiles, File(photo.path)];
-              }
-              _updateType();
-            });
-          }
-        } else {
-          final List<XFile> picked = await _picker.pickMultiImage();
-          if (!mounted) return;
-          if (picked.isNotEmpty) {
-            final remaining = maxFiles - _selectedFiles.length;
-            final toAdd = picked
-                .take(remaining)
-                .map((e) => File(e.path))
-                .toList();
-            if (toAdd.length < picked.length) {
-              PopupDialogs.showErrorDialog(
-                context,
-                l10n.fieldIsRequired('Maximum $maxFiles files allowed'),
-              );
-            }
-            setState(() {
-              _selectedFiles = [..._selectedFiles, ...toAdd];
-              _updateType();
-            });
-          }
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
+  Future<void> _pickFromGallery() async {
+    final remaining = _maxFilesLimit - _selectedFiles.length;
+    if (remaining <= 0) {
+      final l10n = AppLocalizations.of(context)!;
       PopupDialogs.showErrorDialog(
         context,
-        '${l10n.fieldIsRequired('Media')}: $e',
+        l10n.fieldIsRequired('Maximum $_maxFilesLimit files allowed'),
       );
+      return;
     }
+
+    final l10n = AppLocalizations.of(context)!;
+    await CameraStudioSheets.pickFromLibrary(
+      context,
+      l10n: l10n,
+      limit: remaining,
+      chooseMediaType: true,
+      onPicked: (items) async {
+        if (!mounted) return;
+
+        final edited = await MediaGalleryImportFlow.openBatchEditor(
+          context,
+          items: items,
+          initialSound: _selectedSound,
+        );
+        if (!mounted || edited == null || edited.isEmpty) return;
+
+        final toAdd = edited.take(remaining).toList();
+        setState(() {
+          _selectedFiles = [..._selectedFiles, ...toAdd];
+          _updateType();
+        });
+      },
+    );
+  }
+
+  Future<void> _openAddPostCamera() async {
+    final remaining = _maxFilesLimit - _selectedFiles.length;
+    if (remaining <= 0) {
+      final l10n = AppLocalizations.of(context)!;
+      PopupDialogs.showErrorDialog(
+        context,
+        l10n.fieldIsRequired('Maximum $_maxFilesLimit files allowed'),
+      );
+      return;
+    }
+
+    final result = await context.pushNamed<CameraMediaPickResult>(
+      'add_post_camera',
+      extra: {'returnMediaOnDone': true, 'initialSound': _selectedSound},
+    );
+
+    if (!mounted || result == null || result.files.isEmpty) return;
+
+    final toAdd = result.files.take(remaining).toList();
+    setState(() {
+      _selectedFiles = [..._selectedFiles, ...toAdd];
+      _updateType();
+    });
   }
 
   PostAuctionInput? _buildAuctionInput(AppLocalizations l10n) {
@@ -447,16 +483,20 @@ class _AddPostScreenState extends State<AddPostScreen> {
   Widget _mediaCard(AppLocalizations l10n) {
     return AddPostSectionCard(
       title: l10n.mediaLabel,
-      trailing: _selectedFiles.isEmpty
+      trailing: widget.isStory
           ? null
-          : AddPostMediaCountChip(
-              label: '${_selectedFiles.length}/$_maxFilesLimit',
-            ),
+          : (_selectedFiles.isEmpty
+                ? null
+                : AddPostMediaCountChip(
+                    label: '${_selectedFiles.length}/$_maxFilesLimit',
+                  )),
       child: AddPostMediaStrip(
         files: _selectedFiles,
         maxFiles: _maxFilesLimit,
-        onAddTap: _showMediaPickerOptions,
-        onRemoveAt: _removeFile,
+        allowAdd: !widget.isStory,
+        onAddTap: widget.isStory ? _retakeStory : _showMediaPickerOptions,
+        onRemoveAt: widget.isStory ? (_) => _retakeStory() : _removeFile,
+        onEditAt: widget.isStory ? null : _editMediaAt,
       ),
     );
   }
@@ -524,7 +564,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
                     _selectedSound?.name ?? l10n.soundNoneSelected,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -610,11 +652,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
             PopupDialogs.showErrorDialog(context, state.message);
           } else if (state is CreatePostSuccess) {
             if (widget.isStory) {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.goNamed('home');
-              }
+              context.goNamed('home');
             } else {
               context.goNamed('home', queryParameters: {'tab': 'profile'});
             }

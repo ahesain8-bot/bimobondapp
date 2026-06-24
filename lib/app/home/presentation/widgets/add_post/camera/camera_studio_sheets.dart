@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_bottom_controls.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_overlays.dart';
@@ -8,7 +7,6 @@ import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class CameraStudioSheets {
@@ -160,20 +158,17 @@ class CameraStudioSheets {
     PopupDialogs.showErrorDialog(context, message);
   }
 
-  static Future<void> pickFromGallery(
+  static Future<String?> showImportTypeSheet(
     BuildContext context, {
     required AppLocalizations l10n,
-    required void Function(File file, {required String type}) onPicked,
-  }) async {
-    final picker = ImagePicker();
-
-    final choice = await GlassBottomSheet.open<String>(
+  }) {
+    return GlassBottomSheet.open<String>(
       context,
       builder: (context) {
         return GlassBottomSheetShell(
           children: [
             GlassBottomSheetActionTile(
-              icon: LucideIcons.images,
+              icon: LucideIcons.image,
               label: l10n.imageFromLibrary,
               showChevron: false,
               onTap: () => Navigator.pop(context, 'image'),
@@ -188,19 +183,37 @@ class CameraStudioSheets {
         );
       },
     );
+  }
 
-    if (choice == null || !context.mounted) return;
-
+  static Future<void> pickFromLibrary(
+    BuildContext context, {
+    required AppLocalizations l10n,
+    required void Function(List<GalleryMediaItem> items) onPicked,
+    int limit = 5,
+    bool chooseMediaType = false,
+  }) async {
     try {
-      if (choice == 'video') {
-        final picked = await picker.pickVideo(source: ImageSource.gallery);
-        if (picked == null || !context.mounted) return;
-        onPicked(File(picked.path), type: 'VIDEO');
+      final List<GalleryMediaItem> items;
+
+      if (chooseMediaType) {
+        final choice = await showImportTypeSheet(context, l10n: l10n);
+        if (choice == null || !context.mounted) return;
+
+        if (limit == 1) {
+          items = choice == 'video'
+              ? await MediaGalleryPicker.pickSingleVideo()
+              : await MediaGalleryPicker.pickSingleImage();
+        } else {
+          items = choice == 'video'
+              ? await MediaGalleryPicker.pickVideos(limit: limit)
+              : await MediaGalleryPicker.pickImages(limit: limit);
+        }
       } else {
-        final picked = await picker.pickImage(source: ImageSource.gallery);
-        if (picked == null || !context.mounted) return;
-        onPicked(File(picked.path), type: 'IMAGE');
+        items = await MediaGalleryPicker.pickMixed(limit: limit);
       }
+
+      if (items.isEmpty || !context.mounted) return;
+      onPicked(items);
     } catch (e) {
       if (!context.mounted) return;
       PopupDialogs.showErrorDialog(

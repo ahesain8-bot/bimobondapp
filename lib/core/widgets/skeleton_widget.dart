@@ -7,7 +7,6 @@ import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
-
 class SkeletonWidget extends StatelessWidget {
   final double? height;
   final double? width;
@@ -362,7 +361,9 @@ class PromotedPostCardSkeleton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.65),
+            color: scheme.outlineVariant.withValues(
+              alpha: isDark ? 0.35 : 0.65,
+            ),
           ),
         ),
         child: Column(
@@ -386,11 +387,7 @@ class PromotedPostCardSkeleton extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      SkeletonWidget(
-                        height: 28,
-                        width: 64,
-                        borderRadius: 999,
-                      ),
+                      SkeletonWidget(height: 28, width: 64, borderRadius: 999),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -410,10 +407,7 @@ class PromotedPostCardSkeleton extends StatelessWidget {
                   const SizedBox(height: 14),
                   const SkeletonWidget(height: 12, width: 120),
                   const SizedBox(height: 8),
-                  SkeletonWidget(
-                    height: 8,
-                    borderRadius: AppSizes.radiusSm,
-                  ),
+                  SkeletonWidget(height: 8, borderRadius: AppSizes.radiusSm),
                 ],
               ),
             ),
@@ -1015,7 +1009,11 @@ class GiftBalanceChipSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const LiquidGlassSkeletonBox(height: 32, width: 88, borderRadius: 20);
+    return const LiquidGlassSkeletonBox(
+      height: 32,
+      width: 88,
+      borderRadius: 20,
+    );
   }
 }
 
@@ -1130,11 +1128,7 @@ class NotificationListTileSkeleton extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 // Detailed Date Timestamp Shimmer
-                const SkeletonWidget(
-                  height: 12,
-                  width: 80,
-                  borderRadius: 6,
-                ),
+                const SkeletonWidget(height: 12, width: 80, borderRadius: 6),
               ],
             ),
           ),
@@ -1159,10 +1153,9 @@ class NotificationsListSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListView.separated(
-      physics: physics ??
-          const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
+      physics:
+          physics ??
+          const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
       itemCount: itemCount,
       separatorBuilder: (context, _) => Padding(
@@ -1177,4 +1170,3 @@ class NotificationsListSkeleton extends StatelessWidget {
     );
   }
 }
-

@@ -51,7 +51,7 @@ class ChangeAvatarView extends StatelessWidget {
           ),
           ChangeAvatarOptionTile(
             icon: LucideIcons.image,
-            label: l10n.selectFromGallery,
+            label: l10n.imageFromLibrary,
             onTap: isUploading ? null : onGalleryTap,
           ),
           ChangeAvatarOptionTile(

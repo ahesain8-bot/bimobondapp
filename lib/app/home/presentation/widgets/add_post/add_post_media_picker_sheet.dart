@@ -5,8 +5,6 @@ import 'package:bimobondapp/core/widgets/attachment_grid_menu_item.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AddPostMediaPickerSheet {
@@ -14,8 +12,8 @@ class AddPostMediaPickerSheet {
 
   static Future<void> show(
     BuildContext context, {
-    required void Function(ImageSource source, {required bool isVideo}) onPick,
-    bool isStory = false,
+    required VoidCallback onOpenCamera,
+    required VoidCallback onOpenGallery,
   }) {
     final l10n = AppLocalizations.of(context)!;
     final menuColors = ChatTheme.of(context).moreMenuIconColors;
@@ -41,50 +39,17 @@ class AddPostMediaPickerSheet {
             glassStyle: true,
             onTap: () {
               Navigator.pop(context);
-              context.pushNamed(
-                'add_post_camera',
-                extra: {'isStory': isStory},
-              );
-            },
-          ),
-          AttachmentGridMenuItem(
-            icon: LucideIcons.camera,
-            label: l10n.takePhoto,
-            color: menuColors[0],
-            glassStyle: true,
-            onTap: () {
-              Navigator.pop(context);
-              onPick(ImageSource.camera, isVideo: false);
-            },
-          ),
-          AttachmentGridMenuItem(
-            icon: LucideIcons.video,
-            label: l10n.recordVideo,
-            color: menuColors[1],
-            glassStyle: true,
-            onTap: () {
-              Navigator.pop(context);
-              onPick(ImageSource.camera, isVideo: true);
+              onOpenCamera();
             },
           ),
           AttachmentGridMenuItem(
             icon: LucideIcons.images,
-            label: l10n.imageFromLibrary,
+            label: l10n.uploadFromLibrary,
             color: menuColors[2],
             glassStyle: true,
             onTap: () {
               Navigator.pop(context);
-              onPick(ImageSource.gallery, isVideo: false);
-            },
-          ),
-          AttachmentGridMenuItem(
-            icon: LucideIcons.film,
-            label: l10n.videoFromLibrary,
-            color: menuColors[3],
-            glassStyle: true,
-            onTap: () {
-              Navigator.pop(context);
-              onPick(ImageSource.gallery, isVideo: true);
+              onOpenGallery();
             },
           ),
         ],

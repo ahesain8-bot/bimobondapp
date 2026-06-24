@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -7,13 +5,10 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
-/// Opens the TikTok-style camera or gallery for story creation.
+/// Opens the TikTok-style in-app camera for story creation (capture only).
 class StoryFlow {
   StoryFlow._();
-
-  static final ImagePicker _picker = ImagePicker();
 
   static bool _ensureLoggedIn(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
@@ -37,28 +32,5 @@ class StoryFlow {
       'add_post_camera',
       extra: const {'isStory': true},
     );
-  }
-
-  static Future<void> pickFromGallery(BuildContext context) async {
-    if (!_ensureLoggedIn(context)) return;
-
-    try {
-      final file = await _picker.pickImage(source: ImageSource.gallery);
-      if (file == null || !context.mounted) return;
-      context.pushNamed(
-        'add_post',
-        extra: {
-          'files': [File(file.path)],
-          'type': 'IMAGE',
-          'isStory': true,
-        },
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      PopupDialogs.showErrorDialog(
-        context,
-        AppLocalizations.of(context)!.storyPickMediaError(e.toString()),
-      );
-    }
   }
 }

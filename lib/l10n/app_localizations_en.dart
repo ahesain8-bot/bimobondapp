@@ -383,7 +383,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareStoryButton => 'Share story';
 
   @override
+  String get storyAddText => 'Text';
+
+  @override
+  String get storyTextDone => 'Done';
+
+  @override
   String get storyCaptionHint => 'Add a caption (optional)';
+
+  @override
+  String get storyLoadMore => 'Load more';
+
+  @override
+  String get storyShowLess => 'Show less';
 
   @override
   String storyPickMediaError(String error) {
@@ -471,7 +483,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get takePhoto => 'Take a photo';
 
   @override
-  String get selectFromGallery => 'Select from gallery';
+  String get importFromLibrary => 'Import';
+
+  @override
+  String get uploadFromLibrary => 'Upload from library';
 
   @override
   String get removeCurrentPhoto => 'Remove current photo';
@@ -651,6 +666,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get auctionActiveBadge => 'Active';
+
+  @override
+  String get auctionTapToEnter => 'Tap to enter';
 
   @override
   String get auctionFinishedBadge => 'Finished';
@@ -962,13 +980,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imagesLabel => 'Images';
 
   @override
-  String get imageFromLibrary => 'Images from library';
+  String get imageFromLibrary => 'Upload images from library';
 
   @override
-  String get videoFromLibrary => 'Videos from library';
+  String get videoFromLibrary => 'Import videos from library';
 
   @override
-  String get tapToSelectMedia => 'Tap to select media';
+  String get tapToSelectMedia => 'Tap to upload from library';
 
   @override
   String get pleaseSelectMediaFirst => 'Please select media first';
@@ -1501,7 +1519,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatUserBio => 'Interested in real estate and design.';
 
   @override
-  String get chatMoreGallery => 'Gallery';
+  String get chatMoreGallery => 'Import';
 
   @override
   String get chatMoreCamera => 'Camera';
@@ -1890,7 +1908,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraEffects => 'Effects';
 
   @override
-  String get cameraUpload => 'Upload';
+  String get cameraUpload => 'Upload from library';
 
   @override
   String get cameraOriginalSound => 'Original Sound';

@@ -24,4 +24,9 @@ class CameraStudioConstants {
     CameraStudioMode.video,
     CameraStudioMode.live,
   ];
+
+  static const storyStudioModes = [
+    CameraStudioMode.photo,
+    CameraStudioMode.video,
+  ];
 }

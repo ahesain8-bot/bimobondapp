@@ -827,11 +827,35 @@ abstract class AppLocalizations {
   /// **'Share story'**
   String get shareStoryButton;
 
+  /// No description provided for @storyAddText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get storyAddText;
+
+  /// No description provided for @storyTextDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get storyTextDone;
+
   /// No description provided for @storyCaptionHint.
   ///
   /// In en, this message translates to:
   /// **'Add a caption (optional)'**
   String get storyCaptionHint;
+
+  /// No description provided for @storyLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get storyLoadMore;
+
+  /// No description provided for @storyShowLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get storyShowLess;
 
   /// No description provided for @storyPickMediaError.
   ///
@@ -983,11 +1007,17 @@ abstract class AppLocalizations {
   /// **'Take a photo'**
   String get takePhoto;
 
-  /// No description provided for @selectFromGallery.
+  /// No description provided for @importFromLibrary.
   ///
   /// In en, this message translates to:
-  /// **'Select from gallery'**
-  String get selectFromGallery;
+  /// **'Import'**
+  String get importFromLibrary;
+
+  /// No description provided for @uploadFromLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload from library'**
+  String get uploadFromLibrary;
 
   /// No description provided for @removeCurrentPhoto.
   ///
@@ -1342,6 +1372,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Active'**
   String get auctionActiveBadge;
+
+  /// No description provided for @auctionTapToEnter.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to enter'**
+  String get auctionTapToEnter;
 
   /// No description provided for @auctionFinishedBadge.
   ///
@@ -1892,19 +1928,19 @@ abstract class AppLocalizations {
   /// No description provided for @imageFromLibrary.
   ///
   /// In en, this message translates to:
-  /// **'Images from library'**
+  /// **'Upload images from library'**
   String get imageFromLibrary;
 
   /// No description provided for @videoFromLibrary.
   ///
   /// In en, this message translates to:
-  /// **'Videos from library'**
+  /// **'Import videos from library'**
   String get videoFromLibrary;
 
   /// No description provided for @tapToSelectMedia.
   ///
   /// In en, this message translates to:
-  /// **'Tap to select media'**
+  /// **'Tap to upload from library'**
   String get tapToSelectMedia;
 
   /// No description provided for @pleaseSelectMediaFirst.
@@ -2918,7 +2954,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatMoreGallery.
   ///
   /// In en, this message translates to:
-  /// **'Gallery'**
+  /// **'Import'**
   String get chatMoreGallery;
 
   /// No description provided for @chatMoreCamera.
@@ -3614,7 +3650,7 @@ abstract class AppLocalizations {
   /// No description provided for @cameraUpload.
   ///
   /// In en, this message translates to:
-  /// **'Upload'**
+  /// **'Upload from library'**
   String get cameraUpload;
 
   /// No description provided for @cameraOriginalSound.

@@ -107,50 +107,93 @@ class AddPostAddMediaTile extends StatelessWidget {
   }
 }
 
-class AddPostMediaTile extends StatelessWidget {
+class AddPostMediaTile extends StatefulWidget {
   const AddPostMediaTile({
     required this.file,
     required this.onRemove,
+    this.onTap,
     super.key,
   });
 
   final File file;
   final VoidCallback onRemove;
+  final VoidCallback? onTap;
+
+  @override
+  State<AddPostMediaTile> createState() => _AddPostMediaTileState();
+}
+
+class _AddPostMediaTileState extends State<AddPostMediaTile> {
+  File? _videoThumb;
+
+  @override
+  void initState() {
+    super.initState();
+    if (addPostIsVideoFile(widget.file)) {
+      _loadVideoThumb();
+    }
+  }
+
+  @override
+  void didUpdateWidget(AddPostMediaTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path && addPostIsVideoFile(widget.file)) {
+      _videoThumb = null;
+      _loadVideoThumb();
+    }
+  }
+
+  Future<void> _loadVideoThumb() async {
+    final thumb = await VideoThumbnailUtils.generateThumbnailFile(
+      widget.file,
+      maxHeight: 264,
+    );
+    if (mounted) setState(() => _videoThumb = thumb);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = addPostIsVideoFile(file);
+    final isVideo = addPostIsVideoFile(widget.file);
 
     return SizedBox(
       width: _tileWidth,
       height: _tileHeight,
       child: Stack(
         children: [
-          Container(
-            width: _tileWidth,
-            height: _tileHeight,
-            decoration: BoxDecoration(
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
               borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+              child: Container(
+                width: _tileWidth,
+                height: _tileHeight,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
+                clipBehavior: Clip.antiAlias,
+                child: isVideo
+                    ? (_videoThumb != null
+                        ? Image.file(_videoThumb!, fit: BoxFit.cover)
+                        : const VideoPostPreviewPlaceholder(
+                            iconSize: 32,
+                            icon: LucideIcons.play,
+                          ))
+                    : Image.file(
+                        widget.file,
+                        fit: BoxFit.cover,
+                        width: _tileWidth,
+                        height: _tileHeight,
+                      ),
+              ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: isVideo
-                ? const VideoPostPreviewPlaceholder(
-                    iconSize: 32,
-                    icon: LucideIcons.play,
-                  )
-                : Image.file(
-                    file,
-                    fit: BoxFit.cover,
-                    width: _tileWidth,
-                    height: _tileHeight,
-                  ),
           ),
           if (isVideo)
             Positioned(
@@ -188,7 +231,7 @@ class AddPostMediaTile extends StatelessWidget {
               shape: const CircleBorder(),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                onTap: onRemove,
+                onTap: widget.onRemove,
                 child: const SizedBox(
                   width: 26,
                   height: 26,
@@ -281,6 +324,8 @@ class AddPostMediaStrip extends StatelessWidget {
     required this.maxFiles,
     required this.onAddTap,
     required this.onRemoveAt,
+    this.onEditAt,
+    this.allowAdd = true,
     super.key,
   });
 
@@ -288,6 +333,8 @@ class AddPostMediaStrip extends StatelessWidget {
   final int maxFiles;
   final VoidCallback onAddTap;
   final ValueChanged<int> onRemoveAt;
+  final ValueChanged<int>? onEditAt;
+  final bool allowAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +347,7 @@ class AddPostMediaStrip extends StatelessWidget {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            itemCount: files.length + (files.length < maxFiles ? 1 : 0),
+            itemCount: files.length + (allowAdd && files.length < maxFiles ? 1 : 0),
             separatorBuilder: (_, _) => const SizedBox(width: AppSizes.p10),
             itemBuilder: (context, index) {
               if (index == files.length) {
@@ -308,6 +355,7 @@ class AddPostMediaStrip extends StatelessWidget {
               }
               return AddPostMediaTile(
                 file: files[index],
+                onTap: onEditAt == null ? null : () => onEditAt!(index),
                 onRemove: () => onRemoveAt(index),
               );
             },

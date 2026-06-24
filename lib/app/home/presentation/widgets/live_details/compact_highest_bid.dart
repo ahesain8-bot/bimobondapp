@@ -15,6 +15,7 @@ class CompactHighestBid extends StatelessWidget {
     this.showGiftIcon = false,
     required this.popAnimation,
     required this.theme,
+    this.margin = LiveDetailsLayoutConstants.screenHorizontalPadding,
   });
 
   final String topBidLabel;
@@ -25,6 +26,7 @@ class CompactHighestBid extends StatelessWidget {
   final bool showGiftIcon;
   final Animation<double> popAnimation;
   final ThemeData theme;
+  final EdgeInsetsGeometry margin;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,7 @@ class CompactHighestBid extends StatelessWidget {
     return ScaleTransition(
       scale: popAnimation,
       child: Container(
-        margin: LiveDetailsLayoutConstants.screenHorizontalPadding,
+        margin: margin,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(

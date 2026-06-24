@@ -54,6 +54,8 @@ class CameraStudioOverlay extends StatelessWidget {
     required this.onTimerToggle,
     required this.onMusicTap,
     this.soundLabel,
+    this.isStoryMode = false,
+    this.showGalleryUpload = true,
     this.onLongPressStart,
     this.onLongPressEnd,
     required this.filterCategoryLabelBuilder,
@@ -98,6 +100,8 @@ class CameraStudioOverlay extends StatelessWidget {
   final VoidCallback onTimerToggle;
   final VoidCallback onMusicTap;
   final String? soundLabel;
+  final bool isStoryMode;
+  final bool showGalleryUpload;
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
   final String Function(CameraFilterCategory category)
@@ -137,7 +141,7 @@ class CameraStudioOverlay extends StatelessWidget {
                 onDurationTap: onDurationTap,
                 soundLabel: soundLabel ?? l10n.cameraOriginalSound,
                 onSoundTap: onMusicTap,
-                showDuration: isVideoMode,
+                showDuration: isVideoMode && !isStoryMode,
                 isLiveMode: isLiveMode,
               ),
               const Spacer(),
@@ -171,18 +175,23 @@ class CameraStudioOverlay extends StatelessWidget {
                     ? 0
                     : recordSeconds / selectedDuration,
                 effectsLabel: l10n.cameraEffects,
-                uploadLabel: l10n.cameraUpload,
+                uploadLabel: isStoryMode
+                    ? l10n.importFromLibrary
+                    : l10n.uploadFromLibrary,
                 goLiveLabel: l10n.cameraGoLive,
                 onEffectsTap: onEffectsTap,
                 onUploadTap: onUploadTap,
                 onGoLiveTap: onGoLiveTap,
                 onRecordTap: onRecordTap,
+                showUpload: showGalleryUpload,
                 onLongPressStart: onLongPressStart,
                 onLongPressEnd: onLongPressEnd,
               ),
               const SizedBox(height: 8),
               CameraModeSelector(
-                modes: CameraStudioConstants.studioModes,
+                modes: isStoryMode
+                    ? CameraStudioConstants.storyStudioModes
+                    : CameraStudioConstants.studioModes,
                 selected: studioMode,
                 labelBuilder: studioModeLabelBuilder,
                 onSelected: onStudioModeSelected,
