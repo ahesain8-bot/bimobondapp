@@ -741,14 +741,25 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: Colors.white30),
                           ),
-                          child: Text(
-                            post.promotion?.label ??
-                                AppLocalizations.of(context)!.promotedBadge,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                LucideIcons.flame,
+                                size: 12,
+                                color: Color(0xFFFF8C42),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                post.promotion?.label ??
+                                    AppLocalizations.of(context)!.promotedBadge,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 6),

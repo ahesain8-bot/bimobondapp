@@ -19,7 +19,6 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/common_search_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
-import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -241,9 +240,9 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           widget.onPromote != null &&
           widget.post.canBePromoted)
         _PostOptionItem(
-          icon: LucideIcons.megaphone,
+          icon: LucideIcons.flame,
           label: l10n.promotePostAction,
-          color: const Color(0xFFF59E0B),
+          color: const Color(0xFFFF6B35),
           onTap: widget.onPromote!,
         ),
       if (!widget.isOwner)
