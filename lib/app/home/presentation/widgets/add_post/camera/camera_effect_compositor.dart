@@ -1,13 +1,15 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
-import 'package:flutter/material.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
+import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
@@ -26,10 +28,14 @@ class CameraEffectCompositor {
     if (effect == null || effect.isNone) return input;
 
     try {
+      final File? result;
       if (isVideo) {
-        return await _applyToVideo(input, effect) ?? input;
+        result = await _applyToVideo(input, effect);
+      } else {
+        result = await _applyToImage(input, effect);
       }
-      return await _applyToImage(input, effect) ?? input;
+      if (result == null) return input;
+      return MediaTempUtils.replaceKeepingOutput(input: input, output: result);
     } catch (e, st) {
       debugPrint('Camera effect compositing failed: $e\n$st');
       return input;
@@ -66,15 +72,25 @@ class CameraEffectCompositor {
     image.dispose();
     picture.dispose();
 
-    final outBytes = await outImage.toByteData(format: ui.ImageByteFormat.png);
+    final raw = await outImage.toByteData(format: ui.ImageByteFormat.rawRgba);
     outImage.dispose();
-    if (outBytes == null) return null;
+    if (raw == null) return null;
+
+    final encoded = img.encodeJpg(
+      img.Image.fromBytes(
+        width: width,
+        height: height,
+        bytes: raw.buffer,
+        numChannels: 4,
+      ),
+      quality: 92,
+    );
 
     final tempDir = await getTemporaryDirectory();
     final outPath =
-        '${tempDir.path}/effect_${DateTime.now().millisecondsSinceEpoch}.png';
+        '${tempDir.path}/effect_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final outFile = File(outPath);
-    await outFile.writeAsBytes(outBytes.buffer.asUint8List());
+    await outFile.writeAsBytes(encoded);
     return outFile;
   }
 

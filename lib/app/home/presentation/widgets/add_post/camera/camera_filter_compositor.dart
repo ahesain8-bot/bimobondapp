@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffprobe_kit.dart';
@@ -14,7 +14,6 @@ import 'package:path_provider/path_provider.dart';
 class CameraFilterCompositor {
   CameraFilterCompositor._();
 
-  static const _videoFrameFps = 15;
   static const _maxVideoFilterSeconds = 60;
 
   static bool isActiveFilter(AwesomeFilter filter) {
@@ -34,17 +33,21 @@ class CameraFilterCompositor {
         return input;
       }
 
+      final File? result;
       if (isVideo) {
-        final result = await _applyToVideo(input, filter).timeout(
+        result = await _applyToVideo(input, filter).timeout(
           const Duration(minutes: 2),
           onTimeout: () {
             debugPrint('Camera filter: video bake timed out (${input.path})');
-            return input;
+            return null;
           },
         );
-        return result ?? input;
+      } else {
+        result = await _applyToImage(input, filter);
       }
-      return await _applyToImage(input, filter) ?? input;
+
+      if (result == null) return input;
+      return MediaTempUtils.replaceKeepingOutput(input: input, output: result);
     } catch (e, st) {
       debugPrint('Camera filter compositing failed: $e\n$st');
       return input;
@@ -113,22 +116,18 @@ class CameraFilterCompositor {
     final filteredImage = await picture.toImage(width, height);
     picture.dispose();
 
-    final pngData = await filteredImage.toByteData(
-      format: ui.ImageByteFormat.png,
-    );
+    final raw = await filteredImage.toByteData(format: ui.ImageByteFormat.rawRgba);
     filteredImage.dispose();
-    if (pngData == null) return null;
+    if (raw == null) return null;
 
-    final pngBytes = pngData.buffer.asUint8List(
-      pngData.offsetInBytes,
-      pngData.lengthInBytes,
+    final image = img.Image.fromBytes(
+      width: width,
+      height: height,
+      bytes: raw.buffer,
+      numChannels: 4,
     );
-
-    final decoded = img.decodeImage(pngBytes);
-    if (decoded == null) return pngBytes;
-
-    final jpg = img.encodeJpg(decoded, quality: 92);
-    return jpg.isEmpty ? pngBytes : Uint8List.fromList(jpg);
+    final jpg = img.encodeJpg(image, quality: 92);
+    return jpg.isEmpty ? null : Uint8List.fromList(jpg);
   }
 
   static Future<File?> _applyToImage(File file, AwesomeFilter filter) async {
@@ -148,114 +147,21 @@ class CameraFilterCompositor {
     return outFile;
   }
 
+  /// Applies the color matrix in one FFmpeg pass — no per-frame JPEG extraction.
   static Future<File?> _applyToVideo(File file, AwesomeFilter filter) async {
     final tempDir = await getTemporaryDirectory();
-    final workId = DateTime.now().millisecondsSinceEpoch;
-    final framesDir = Directory('${tempDir.path}/vf_$workId');
-    await framesDir.create(recursive: true);
+    final outPath =
+        '${tempDir.path}/filter_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final matrixFilter = _colorMatrixVideoFilter(filter.matrix);
+    final hasAudio = await _hasAudioTrack(file);
 
-    final framePattern = '${framesDir.path}/frame_%06d.jpg';
-    final extractOk = await _runFfmpeg([
+    final args = <String>[
       '-i',
       file.path,
       '-t',
       '$_maxVideoFilterSeconds',
       '-vf',
-      'fps=$_videoFrameFps',
-      '-q:v',
-      '3',
-      '-y',
-      framePattern,
-    ]);
-    if (!extractOk) {
-      await _deleteDir(framesDir);
-      return null;
-    }
-
-    final frames =
-        framesDir
-            .listSync()
-            .whereType<File>()
-            .where((f) => f.path.toLowerCase().endsWith('.jpg'))
-            .toList()
-          ..sort((a, b) => a.path.compareTo(b.path));
-
-    if (frames.isEmpty) {
-      await _deleteDir(framesDir);
-      return null;
-    }
-
-    for (final frame in frames) {
-      final bytes = await frame.readAsBytes();
-      final filtered = await bakeMatrixFilter(bytes, filter);
-      if (filtered != null) {
-        await frame.writeAsBytes(filtered);
-      }
-    }
-
-    final outPath = '${tempDir.path}/filter_$workId.mp4';
-    final assembled = await _assembleVideo(
-      framePattern: framePattern,
-      sourceVideo: file,
-      outputPath: outPath,
-      fps: _videoFrameFps,
-    );
-
-    await _deleteDir(framesDir);
-    if (!assembled) return null;
-
-    final outFile = File(outPath);
-    return await outFile.exists() ? outFile : null;
-  }
-
-  static Future<bool> _assembleVideo({
-    required String framePattern,
-    required File sourceVideo,
-    required String outputPath,
-    required int fps,
-  }) async {
-    final hasAudio = await _hasAudioTrack(sourceVideo);
-
-    if (hasAudio) {
-      final withAudio = await _runFfmpeg([
-        '-framerate',
-        '$fps',
-        '-start_number',
-        '1',
-        '-i',
-        framePattern,
-        '-i',
-        sourceVideo.path,
-        '-map',
-        '0:v:0',
-        '-map',
-        '1:a:0',
-        '-c:v',
-        'libx264',
-        '-pix_fmt',
-        'yuv420p',
-        '-preset',
-        'veryfast',
-        '-crf',
-        '23',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        '-shortest',
-        '-y',
-        outputPath,
-      ]);
-      if (withAudio) return true;
-    }
-
-    return _runFfmpeg([
-      '-framerate',
-      '$fps',
-      '-start_number',
-      '1',
-      '-i',
-      framePattern,
+      matrixFilter,
       '-c:v',
       'libx264',
       '-pix_fmt',
@@ -264,9 +170,41 @@ class CameraFilterCompositor {
       'veryfast',
       '-crf',
       '23',
+      if (hasAudio) ...['-c:a', 'copy'],
       '-y',
-      outputPath,
-    ]);
+      outPath,
+    ];
+
+    final ok = await _runFfmpeg(args);
+    if (!ok) return null;
+
+    final outFile = File(outPath);
+    return await outFile.exists() ? outFile : null;
+  }
+
+  /// Maps Flutter's 4×5 [ColorFilter.matrix] to FFmpeg `geq` (same math as preview).
+  static String _colorMatrixVideoFilter(List<double> matrix) {
+    String channel(int row) {
+      final o = matrix[row + 4];
+      final offset = o.abs() < 0.0001 ? '' : '+${_formatCoeff(o)}';
+      return "clip(${_formatCoeff(matrix[row])}*r(X,Y)"
+          '+${_formatCoeff(matrix[row + 1])}*g(X,Y)'
+          '+${_formatCoeff(matrix[row + 2])}*b(X,Y)'
+          '+${_formatCoeff(matrix[row + 3])}*a(X,Y)'
+          '$offset,0,255)';
+    }
+
+    return "geq=r='${channel(0)}':g='${channel(5)}':b='${channel(10)}':"
+        "a='${channel(15)}'";
+  }
+
+  static String _formatCoeff(double value) {
+    if (value == 0) return '0';
+    if (value == value.roundToDouble()) return value.round().toString();
+    return value
+        .toStringAsFixed(6)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
   }
 
   static Future<bool> _hasAudioTrack(File file) async {
@@ -294,13 +232,6 @@ class CameraFilterCompositor {
     final logs = await session.getAllLogsAsString();
     debugPrint('FFmpeg filter failed: $logs');
     return false;
-  }
-
-  static Future<void> _deleteDir(Directory dir) async {
-    if (!await dir.exists()) return;
-    try {
-      await dir.delete(recursive: true);
-    } catch (_) {}
   }
 
   static String _imageExtension(String path) {
