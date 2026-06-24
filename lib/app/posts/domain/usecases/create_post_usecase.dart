@@ -40,6 +40,7 @@ class CreatePostUseCase implements UseCase<PostEntity, CreatePostParams> {
       soundId: params.soundId,
       originalPostId: params.originalPostId,
       media: params.media,
+      filterName: params.filterName,
     );
   }
 }
@@ -70,6 +71,7 @@ class CreatePostParams extends Equatable {
   final String? soundId;
   final String? originalPostId;
   final List<PostMediaEntity>? media;
+  final String? filterName;
 
   const CreatePostParams({
     this.type,
@@ -97,6 +99,7 @@ class CreatePostParams extends Equatable {
     this.soundId,
     this.originalPostId,
     this.media,
+    this.filterName,
   });
 
   @override
@@ -126,5 +129,6 @@ class CreatePostParams extends Equatable {
         soundId,
         originalPostId,
         media,
+        filterName,
       ];
 }

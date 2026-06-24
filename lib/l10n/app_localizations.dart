@@ -2135,6 +2135,204 @@ abstract class AppLocalizations {
   /// **'This post will be permanently removed. Only you can delete your own posts.'**
   String get deletePostMessage;
 
+  /// No description provided for @postOptionShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get postOptionShare;
+
+  /// No description provided for @postOptionReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get postOptionReport;
+
+  /// No description provided for @postOptionNotInterested.
+  ///
+  /// In en, this message translates to:
+  /// **'Not interested'**
+  String get postOptionNotInterested;
+
+  /// No description provided for @postOptionDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get postOptionDownload;
+
+  /// No description provided for @postOptionAddToStory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to story'**
+  String get postOptionAddToStory;
+
+  /// No description provided for @postOptionShareAsGif.
+  ///
+  /// In en, this message translates to:
+  /// **'Share as GIF'**
+  String get postOptionShareAsGif;
+
+  /// No description provided for @postOptionCreateGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Create group'**
+  String get postOptionCreateGroup;
+
+  /// No description provided for @postLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied to clipboard'**
+  String get postLinkCopied;
+
+  /// No description provided for @postReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report post?'**
+  String get postReportTitle;
+
+  /// No description provided for @postReportMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us if this post breaks our community guidelines.'**
+  String get postReportMessage;
+
+  /// No description provided for @postReportSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for reporting. We\'ll review this post.'**
+  String get postReportSubmitted;
+
+  /// No description provided for @postNotInterestedApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll show fewer posts like this'**
+  String get postNotInterestedApplied;
+
+  /// No description provided for @postDownloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get postDownloadStarted;
+
+  /// No description provided for @postDownloadSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to app downloads'**
+  String get postDownloadSaved;
+
+  /// No description provided for @postDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not download media'**
+  String get postDownloadFailed;
+
+  /// No description provided for @postShareAsGifUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'GIF share is only available for videos'**
+  String get postShareAsGifUnavailable;
+
+  /// No description provided for @postShareSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share post'**
+  String get postShareSheetTitle;
+
+  /// No description provided for @postShareSearchUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Search friends and users'**
+  String get postShareSearchUsers;
+
+  /// No description provided for @postShareNoUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'No users found'**
+  String get postShareNoUsers;
+
+  /// No description provided for @postShareToApps.
+  ///
+  /// In en, this message translates to:
+  /// **'Share to apps'**
+  String get postShareToApps;
+
+  /// No description provided for @postShareMessenger.
+  ///
+  /// In en, this message translates to:
+  /// **'Messenger'**
+  String get postShareMessenger;
+
+  /// No description provided for @postShareFacebook.
+  ///
+  /// In en, this message translates to:
+  /// **'Facebook'**
+  String get postShareFacebook;
+
+  /// No description provided for @postShareWhatsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp'**
+  String get postShareWhatsApp;
+
+  /// No description provided for @postShareTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get postShareTelegram;
+
+  /// No description provided for @postShareTwitter.
+  ///
+  /// In en, this message translates to:
+  /// **'X'**
+  String get postShareTwitter;
+
+  /// No description provided for @postShareSms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS'**
+  String get postShareSms;
+
+  /// No description provided for @postShareEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get postShareEmail;
+
+  /// No description provided for @postShareCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get postShareCopyLink;
+
+  /// No description provided for @postShareMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get postShareMore;
+
+  /// No description provided for @postShareSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send post'**
+  String get postShareSendFailed;
+
+  /// No description provided for @postShareSentTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to {name}'**
+  String postShareSentTo(String name);
+
+  /// No description provided for @postAddToStoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your story — the post is ready to share'**
+  String get postAddToStoryHint;
+
+  /// No description provided for @postCreateGroupHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick contacts to start a group chat'**
+  String get postCreateGroupHint;
+
   /// No description provided for @postUpdatedSuccessfully.
   ///
   /// In en, this message translates to:

@@ -14,6 +14,9 @@ class CommonSearchBar extends StatefulWidget {
     this.onClear,
     this.hintText,
     this.fillColor,
+    this.hintColor,
+    this.textColor,
+    this.iconColor,
     super.key,
   });
 
@@ -27,6 +30,9 @@ class CommonSearchBar extends StatefulWidget {
   final VoidCallback? onClear;
   final String? hintText;
   final Color? fillColor;
+  final Color? hintColor;
+  final Color? textColor;
+  final Color? iconColor;
 
   @override
   State<CommonSearchBar> createState() => _CommonSearchBarState();
@@ -79,6 +85,10 @@ class _CommonSearchBarState extends State<CommonSearchBar> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final fallbackColor = isDark ? const Color(0xFF1E1E1E) : theme.colorScheme.surface;
+    final fieldTextColor = widget.textColor ?? theme.textTheme.bodyMedium?.color;
+    final fieldHintColor =
+        widget.hintColor ?? theme.hintColor.withValues(alpha: 0.5);
+    final fieldIconColor = widget.iconColor ?? theme.hintColor;
 
     final field = TextField(
       controller: _effectiveController,
@@ -92,21 +102,22 @@ class _CommonSearchBarState extends State<CommonSearchBar> {
       style: theme.textTheme.bodyMedium?.copyWith(
         fontSize: 15,
         fontWeight: FontWeight.w500,
+        color: fieldTextColor,
       ),
       decoration: InputDecoration(
         hintText: widget.hintText,
         hintStyle: TextStyle(
-          color: theme.hintColor.withValues(alpha: 0.5),
+          color: fieldHintColor,
           fontSize: 14,
         ),
         prefixIcon: Icon(
           LucideIcons.search,
           size: 20,
-          color: theme.hintColor,
+          color: fieldIconColor,
         ),
         suffixIcon: !widget.readOnly && _showClearButton
             ? IconButton(
-                icon: Icon(LucideIcons.x, size: 18, color: theme.hintColor),
+                icon: Icon(LucideIcons.x, size: 18, color: fieldIconColor),
                 onPressed: () {
                   _effectiveController.clear();
                   widget.onClear?.call();

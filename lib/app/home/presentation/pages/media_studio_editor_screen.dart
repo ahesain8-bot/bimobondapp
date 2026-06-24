@@ -154,7 +154,13 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
       if (!mounted) return;
 
       if (widget.popOnDone) {
-        context.pop(files);
+        context.pop(
+          MediaStudioExportResult(
+            files: files,
+            filterName: primaryFilterNameFromStates(_states),
+            filterCategory: primaryFilterCategoryFromStates(_states),
+          ),
+        );
         return;
       }
 
@@ -181,6 +187,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
           'type': type,
           'isStory': false,
           'initialSound': widget.initialSound,
+          if (primaryFilterNameFromStates(_states) != null)
+            'filterName': primaryFilterNameFromStates(_states),
         },
       );
     } finally {

@@ -1099,6 +1099,107 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deletePostMessage => 'سيتم حذف هذا المنشور نهائيًا. يمكنك حذف منشوراتك فقط.';
 
   @override
+  String get postOptionShare => 'مشاركة';
+
+  @override
+  String get postOptionReport => 'إبلاغ';
+
+  @override
+  String get postOptionNotInterested => 'غير مهتم';
+
+  @override
+  String get postOptionDownload => 'تنزيل';
+
+  @override
+  String get postOptionAddToStory => 'إضافة للقصة';
+
+  @override
+  String get postOptionShareAsGif => 'مشاركة كصورة متحركة';
+
+  @override
+  String get postOptionCreateGroup => 'إنشاء مجموعة';
+
+  @override
+  String get postLinkCopied => 'تم نسخ الرابط';
+
+  @override
+  String get postReportTitle => 'الإبلاغ عن المنشور؟';
+
+  @override
+  String get postReportMessage => 'أخبرنا إذا كان هذا المنشور يخالف إرشادات المجتمع.';
+
+  @override
+  String get postReportSubmitted => 'شكرًا على الإبلاغ. سنراجع هذا المنشور.';
+
+  @override
+  String get postNotInterestedApplied => 'سنعرض منشورات أقل من هذا النوع';
+
+  @override
+  String get postDownloadStarted => 'جاري التنزيل…';
+
+  @override
+  String get postDownloadSaved => 'تم الحفظ في مجلد التنزيلات';
+
+  @override
+  String get postDownloadFailed => 'تعذر تنزيل الوسائط';
+
+  @override
+  String get postShareAsGifUnavailable => 'مشاركة GIF متاحة للفيديو فقط';
+
+  @override
+  String get postShareSheetTitle => 'مشاركة المنشور';
+
+  @override
+  String get postShareSearchUsers => 'ابحث عن الأصدقاء والمستخدمين';
+
+  @override
+  String get postShareNoUsers => 'لم يتم العثور على مستخدمين';
+
+  @override
+  String get postShareToApps => 'مشاركة عبر التطبيقات';
+
+  @override
+  String get postShareMessenger => 'ماسنجر';
+
+  @override
+  String get postShareFacebook => 'فيسبوك';
+
+  @override
+  String get postShareWhatsApp => 'واتساب';
+
+  @override
+  String get postShareTelegram => 'تيليجرام';
+
+  @override
+  String get postShareTwitter => 'إكس';
+
+  @override
+  String get postShareSms => 'رسائل';
+
+  @override
+  String get postShareEmail => 'بريد';
+
+  @override
+  String get postShareCopyLink => 'نسخ الرابط';
+
+  @override
+  String get postShareMore => 'المزيد';
+
+  @override
+  String get postShareSendFailed => 'تعذر إرسال المنشور';
+
+  @override
+  String postShareSentTo(String name) {
+    return 'تم الإرسال إلى $name';
+  }
+
+  @override
+  String get postAddToStoryHint => 'أنشئ قصتك — المنشور جاهز للمشاركة';
+
+  @override
+  String get postCreateGroupHint => 'اختر جهات اتصال لبدء مجموعة';
+
+  @override
   String get postUpdatedSuccessfully => 'تم تحديث المنشور بنجاح';
 
   @override

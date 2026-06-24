@@ -213,6 +213,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           }
         }
       });
+    } else if (state is PostHiddenFromFeedState) {
+      setState(() {
+        final index = _feedItems.indexWhere(
+          (item) => item.post.id == state.postId,
+        );
+        if (index != -1) {
+          _feedItems.removeAt(index);
+          if (_feedItems.isEmpty) {
+            _feedPage = 1;
+            _hasReachedMax = false;
+          } else if (_pageController.hasClients) {
+            final next = index.clamp(0, _feedItems.length - 1);
+            _currentPostIndex = next;
+            _pageController.jumpToPage(next);
+          }
+        }
+      });
     } else if (state is PostsFailure) {
       setState(() {
         if (_feedPage == 1) {

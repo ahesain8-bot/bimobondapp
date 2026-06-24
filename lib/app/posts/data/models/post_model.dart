@@ -44,6 +44,7 @@ class PostModel extends PostEntity {
     super.promotion,
     super.location,
     super.sound,
+    super.filterName,
   });
 
   static List<String> _parseHashtagNames(dynamic raw) {
@@ -109,6 +110,14 @@ class PostModel extends PostEntity {
         .toList();
   }
 
+  static String? _parseFilterName(Map<String, dynamic> json) {
+    final raw = json['filterName'] ?? json['filter_name'] ?? json['cameraFilter'];
+    final name = raw?.toString().trim();
+    if (name == null || name.isEmpty) return null;
+    if (name == 'None' || name == 'Original') return null;
+    return name;
+  }
+
   factory PostModel.fromJson(Map<String, dynamic> json) {
     return PostModel(
       id: json['id'] ?? '',
@@ -163,6 +172,7 @@ class PostModel extends PostEntity {
       sound: json['sound'] is Map<String, dynamic>
           ? PostSoundEntity.fromJson(json['sound'] as Map<String, dynamic>)
           : _soundFromId(json['soundId']),
+      filterName: _parseFilterName(json),
     );
   }
 
@@ -211,6 +221,7 @@ class PostModel extends PostEntity {
       promotion: promotion,
       location: location,
       sound: sound,
+      filterName: filterName,
     );
   }
 
@@ -250,6 +261,7 @@ class PostModel extends PostEntity {
           .toList(),
       'isAuctionable': isAuctionable,
       if (auction != null) 'auction': _auctionToJson(auction!),
+      if (filterName != null) 'filterName': filterName,
     };
   }
 

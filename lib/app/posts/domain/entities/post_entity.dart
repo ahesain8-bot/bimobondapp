@@ -39,6 +39,7 @@ class PostEntity extends Equatable {
   final PostPromotionEntity? promotion;
   final PostLocationEntity? location;
   final PostSoundEntity? sound;
+  final String? filterName;
 
   const PostEntity({
     required this.id,
@@ -73,6 +74,7 @@ class PostEntity extends Equatable {
     this.promotion,
     this.location,
     this.sound,
+    this.filterName,
   });
 
   PostEntity copyWith({
@@ -120,6 +122,7 @@ class PostEntity extends Equatable {
       promotion: promotion,
       location: location,
       sound: sound,
+      filterName: filterName,
     );
   }
 
@@ -160,6 +163,7 @@ class PostEntity extends Equatable {
     promotion,
     location,
     sound,
+    filterName,
   ];
 }
 

@@ -8,10 +8,15 @@ import 'package:go_router/go_router.dart';
 
 /// Result when [AddPostCameraScreen] is opened only to pick more media.
 class CameraMediaPickResult {
-  const CameraMediaPickResult({required this.files, required this.type});
+  const CameraMediaPickResult({
+    required this.files,
+    required this.type,
+    this.filterName,
+  });
 
   final List<File> files;
   final String type;
+  final String? filterName;
 }
 
 /// Runs gallery items through the media studio editor, then opens add post.
@@ -38,7 +43,7 @@ class MediaGalleryImportFlow {
     return hasVideo ? 'VIDEO' : 'IMAGE';
   }
 
-  static Future<List<File>?> openBatchEditor(
+  static Future<MediaStudioExportResult?> openBatchEditor(
     BuildContext context, {
     required List<GalleryMediaItem> items,
     bool isStory = false,
@@ -46,9 +51,9 @@ class MediaGalleryImportFlow {
     int initialIndex = 0,
     MediaEditorSeed? initialEdit,
   }) {
-    if (items.isEmpty) return Future.value(const []);
+    if (items.isEmpty) return Future.value(null);
 
-    return context.pushNamed<List<File>>(
+    return context.pushNamed<MediaStudioExportResult>(
       'media_studio_editor',
       extra: {
         'items': itemsToExtra(items),
@@ -74,13 +79,14 @@ class MediaGalleryImportFlow {
       isStory: isStory,
       initialSound: initialSound,
     );
-    if (edited == null || edited.isEmpty || !context.mounted) return;
+    if (edited == null || edited.files.isEmpty || !context.mounted) return;
 
     final extra = {
-      'files': edited,
-      'type': resolvePostType(edited),
+      'files': edited.files,
+      'type': resolvePostType(edited.files),
       'isStory': isStory,
       'initialSound': initialSound,
+      if (edited.filterName != null) 'filterName': edited.filterName,
     };
 
     if (replaceRoute) {
@@ -90,7 +96,7 @@ class MediaGalleryImportFlow {
     }
   }
 
-  static Future<List<File>?> editAndReturn(
+  static Future<MediaStudioExportResult?> editAndReturn(
     BuildContext context, {
     required List<GalleryMediaItem> items,
     bool isStory = false,

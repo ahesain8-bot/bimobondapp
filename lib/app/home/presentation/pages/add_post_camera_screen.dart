@@ -28,11 +28,15 @@ class AddPostCameraScreen extends StatefulWidget {
     this.isStory = false,
     this.initialSound,
     this.returnMediaOnDone = false,
+    this.initialFilterName,
+    this.initialFilterCategory,
   });
 
   final bool isStory;
   final SoundEntity? initialSound;
   final bool returnMediaOnDone;
+  final String? initialFilterName;
+  final CameraFilterCategory? initialFilterCategory;
 
   @override
   State<AddPostCameraScreen> createState() => _AddPostCameraScreenState();
@@ -54,6 +58,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
   int? _countdownValue;
   CameraFilterCategory _filterCategory = CameraFilterCategory.trending;
   AwesomeFilter _selectedFilter = AwesomeFilter.None;
+  bool _initialFilterApplied = false;
   double _selectedZoom = CameraStudioConstants.zoomSteps[1].value;
   int _selectedDuration = CameraStudioConstants.durationOptions.first;
   double _selectedSpeed = CameraStudioConstants.speedOptions[1];
@@ -68,6 +73,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
   void initState() {
     super.initState();
     _selectedSound = widget.initialSound;
+    if (widget.initialFilterName != null &&
+        CameraFilterCatalog.isUsableFilterName(widget.initialFilterName)) {
+      _selectedFilter = CameraFilterCatalog.filterByName(widget.initialFilterName!);
+      _filterCategory =
+          widget.initialFilterCategory ??
+          CameraFilterCatalog.categoryForFilter(_selectedFilter);
+      _showFilters = true;
+    }
     if (widget.isStory) {
       _selectedDuration = CameraStudioConstants.durationOptions.first;
       _studioMode = CameraStudioMode.photo;
@@ -110,14 +123,21 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     }
   }
 
-  void _returnPickedMedia(List<File> files) {
-    if (files.isEmpty) return;
+  void _returnPickedMedia(MediaStudioExportResult result) {
+    if (result.files.isEmpty) return;
     context.pop(
       CameraMediaPickResult(
-        files: files,
-        type: MediaGalleryImportFlow.resolvePostType(files),
+        files: result.files,
+        type: MediaGalleryImportFlow.resolvePostType(result.files),
+        filterName: result.filterName ?? _activeFilterName,
       ),
     );
+  }
+
+  String? get _activeFilterName {
+    final filter = _effectiveCaptureFilter();
+    if (!CameraFilterCompositor.isActiveFilter(filter)) return null;
+    return filter.name;
   }
 
   MediaEditorSeed get _captureEditSeed => MediaEditorSeed(
@@ -138,7 +158,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
       initialSound: _selectedSound,
       initialEdit: _captureEditSeed,
     );
-    if (!mounted || edited == null || edited.isEmpty) return;
+    if (!mounted || edited == null || edited.files.isEmpty) return;
 
     if (widget.returnMediaOnDone) {
       _returnPickedMedia(edited);
@@ -148,10 +168,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     context.pushReplacementNamed(
       'add_post',
       extra: {
-        'files': edited,
-        'type': MediaGalleryImportFlow.resolvePostType(edited),
+        'files': edited.files,
+        'type': MediaGalleryImportFlow.resolvePostType(edited.files),
         'isStory': false,
         'initialSound': _selectedSound,
+        if (edited.filterName != null) 'filterName': edited.filterName,
       },
     );
   }
@@ -393,6 +414,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     await _cameraState?.setFilter(preset.filter);
   }
 
+  void _ensureInitialFilterApplied(CameraState state) {
+    if (_initialFilterApplied) return;
+    _initialFilterApplied = true;
+    if (CameraFilterCompositor.isActiveFilter(_selectedFilter)) {
+      unawaited(state.setFilter(_selectedFilter));
+    }
+  }
+
   Future<void> _applyBeauty(bool enabled) async {
     setState(() => _beautyEnabled = enabled);
     final state = _cameraState;
@@ -529,6 +558,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
             progressIndicator: CameraAppLoading(message: l10n.cameraStarting),
             builder: (state, preview) {
               _cameraState = state;
+              _ensureInitialFilterApplied(state);
               _handlePendingVideoStart(state);
 
               return CameraStudioOverlay(

@@ -233,6 +233,7 @@ class PostsRepositoryImpl implements PostsRepository {
     String? soundId,
     String? originalPostId,
     List<PostMediaEntity>? media,
+    String? filterName,
   }) async {
     try {
       final postData = {
@@ -260,6 +261,7 @@ class PostsRepositoryImpl implements PostsRepository {
         if (playlistId != null) 'playlistId': playlistId,
         if (soundId != null) 'soundId': soundId,
         if (originalPostId != null) 'originalPostId': originalPostId,
+        if (filterName != null) 'filterName': filterName,
         if (media != null)
           'media': media
               .map((e) => PostMediaModel.fromEntity(e).toJson())

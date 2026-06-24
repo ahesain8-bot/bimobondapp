@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_preset.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
 
@@ -33,6 +34,36 @@ class CameraFilterCatalog {
       if (filter.name == name) return filter;
     }
     return AwesomeFilter.None;
+  }
+
+  static CameraFilterPreset? presetForName(String name) {
+    for (final category in CameraFilterCategory.values) {
+      for (final preset in forCategory(category)) {
+        if (preset.filter.name == name) return preset;
+      }
+    }
+    return null;
+  }
+
+  static CameraFilterCategory categoryForFilter(AwesomeFilter filter) {
+    for (final category in CameraFilterCategory.values) {
+      final presets = forCategory(category);
+      if (presets.any((preset) => preset.filter.name == filter.name)) {
+        return category;
+      }
+    }
+    return CameraFilterCategory.trending;
+  }
+
+  static String localizedFilterLabel(AppLocalizations l10n, String filterName) {
+    final preset = presetForName(filterName);
+    if (preset == null) return filterName;
+    return preset.label(originalLabel: l10n.cameraFilterOriginal);
+  }
+
+  static bool isUsableFilterName(String? filterName) {
+    if (filterName == null || filterName.isEmpty) return false;
+    return filterByName(filterName).name != AwesomeFilter.None.name;
   }
 
   static final List<CameraFilterPreset> trending = [

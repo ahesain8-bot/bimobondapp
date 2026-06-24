@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="messenger" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00B2FF"/>
+      <stop offset="100%" stop-color="#006AFF"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#messenger)" d="M24 4C13.507 4 5 11.82 5 21.333c0 5.198 2.6 9.84 6.667 12.88V40l6.1-3.347c1.627.447 3.36.693 5.233.693C34.493 37.347 43 29.527 43 20.013 43 11.82 34.493 4 24 4zm2.382 12.48-3.66 3.907-7.147 3.907 6.318-6.8 3.75 3.907 9.15-6.8-8.41 8.88z"/>
+</svg>

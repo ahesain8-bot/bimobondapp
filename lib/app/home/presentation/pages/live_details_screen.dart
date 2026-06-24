@@ -41,12 +41,11 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_pag
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_options_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class LiveDetailsScreen extends StatefulWidget {
   final int index;
@@ -300,32 +299,17 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   void _showOwnerOptions() {
     if (!_checkAuth() || !_isPostOwner()) return;
 
-    final l10n = AppLocalizations.of(context)!;
     final post = widget.post;
+    if (post == null) return;
 
-    GlassBottomSheet.showActions<void>(
+    PostOptionsSheet.show(
       context,
-      children: [
-        if (post != null && post.canBePromoted)
-          GlassBottomSheetActionTile(
-            icon: LucideIcons.megaphone,
-            label: l10n.promotePostAction,
-            showChevron: false,
-            onTap: () {
-              Navigator.pop(context);
-              context.pushNamed('promote_post', extra: post);
-            },
-          ),
-        GlassBottomSheetListTile(
-          label: l10n.deletePost,
-          destructive: true,
-          icon: LucideIcons.trash2,
-          onTap: () {
-            Navigator.pop(context);
-            _confirmDeletePost();
-          },
-        ),
-      ],
+      post: post,
+      isOwner: true,
+      onPromote: post.canBePromoted
+          ? () => context.pushNamed('promote_post', extra: post)
+          : null,
+      onDelete: _confirmDeletePost,
     );
   }
 

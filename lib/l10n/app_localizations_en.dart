@@ -1099,6 +1099,107 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deletePostMessage => 'This post will be permanently removed. Only you can delete your own posts.';
 
   @override
+  String get postOptionShare => 'Share';
+
+  @override
+  String get postOptionReport => 'Report';
+
+  @override
+  String get postOptionNotInterested => 'Not interested';
+
+  @override
+  String get postOptionDownload => 'Download';
+
+  @override
+  String get postOptionAddToStory => 'Add to story';
+
+  @override
+  String get postOptionShareAsGif => 'Share as GIF';
+
+  @override
+  String get postOptionCreateGroup => 'Create group';
+
+  @override
+  String get postLinkCopied => 'Link copied to clipboard';
+
+  @override
+  String get postReportTitle => 'Report post?';
+
+  @override
+  String get postReportMessage => 'Tell us if this post breaks our community guidelines.';
+
+  @override
+  String get postReportSubmitted => 'Thanks for reporting. We\'ll review this post.';
+
+  @override
+  String get postNotInterestedApplied => 'We\'ll show fewer posts like this';
+
+  @override
+  String get postDownloadStarted => 'Downloading…';
+
+  @override
+  String get postDownloadSaved => 'Saved to app downloads';
+
+  @override
+  String get postDownloadFailed => 'Could not download media';
+
+  @override
+  String get postShareAsGifUnavailable => 'GIF share is only available for videos';
+
+  @override
+  String get postShareSheetTitle => 'Share post';
+
+  @override
+  String get postShareSearchUsers => 'Search friends and users';
+
+  @override
+  String get postShareNoUsers => 'No users found';
+
+  @override
+  String get postShareToApps => 'Share to apps';
+
+  @override
+  String get postShareMessenger => 'Messenger';
+
+  @override
+  String get postShareFacebook => 'Facebook';
+
+  @override
+  String get postShareWhatsApp => 'WhatsApp';
+
+  @override
+  String get postShareTelegram => 'Telegram';
+
+  @override
+  String get postShareTwitter => 'X';
+
+  @override
+  String get postShareSms => 'SMS';
+
+  @override
+  String get postShareEmail => 'Email';
+
+  @override
+  String get postShareCopyLink => 'Copy link';
+
+  @override
+  String get postShareMore => 'More';
+
+  @override
+  String get postShareSendFailed => 'Could not send post';
+
+  @override
+  String postShareSentTo(String name) {
+    return 'Sent to $name';
+  }
+
+  @override
+  String get postAddToStoryHint => 'Create your story — the post is ready to share';
+
+  @override
+  String get postCreateGroupHint => 'Pick contacts to start a group chat';
+
+  @override
   String get postUpdatedSuccessfully => 'Post updated successfully';
 
   @override

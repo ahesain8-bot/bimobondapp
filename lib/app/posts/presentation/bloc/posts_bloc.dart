@@ -52,6 +52,14 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<FetchMyRepostsRequestedEvent>(_onFetchMyRepostsRequested);
     on<UpdatePostRequestedEvent>(_onUpdatePostRequested);
     on<DeletePostRequestedEvent>(_onDeletePostRequested);
+    on<HidePostFromFeedEvent>(_onHidePostFromFeed);
+  }
+
+  void _onHidePostFromFeed(
+    HidePostFromFeedEvent event,
+    Emitter<PostsState> emit,
+  ) {
+    emit(PostHiddenFromFeedState(event.postId));
   }
 
   Future<void> _onUpdatePostRequested(
@@ -223,6 +231,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           auction: event.isAuctionable ? auction : null,
           media: mediaEntities,
           soundId: event.soundId,
+          filterName: event.filterName,
         ),
       );
 

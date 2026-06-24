@@ -138,3 +138,12 @@ class DeletePostSuccess extends PostsState {
   @override
   List<Object?> get props => [postId];
 }
+
+class PostHiddenFromFeedState extends PostsState {
+  const PostHiddenFromFeedState(this.postId);
+
+  final String postId;
+
+  @override
+  List<Object?> get props => [postId];
+}

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_compositor.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
@@ -63,6 +64,41 @@ class MediaItemEditState {
       filterCategory: seed.filterCategory,
     );
   }
+}
+
+String? primaryFilterNameFromStates(List<MediaItemEditState> states) {
+  for (final state in states) {
+    final filter = state.effectiveFilter;
+    if (CameraFilterCompositor.isActiveFilter(filter)) {
+      return filter.name;
+    }
+  }
+  return null;
+}
+
+CameraFilterCategory primaryFilterCategoryFromStates(
+  List<MediaItemEditState> states,
+) {
+  for (final state in states) {
+    final filter = state.effectiveFilter;
+    if (CameraFilterCompositor.isActiveFilter(filter)) {
+      return state.filterCategory;
+    }
+  }
+  return CameraFilterCategory.trending;
+}
+
+/// Export result from the media studio editor.
+class MediaStudioExportResult {
+  const MediaStudioExportResult({
+    required this.files,
+    this.filterName,
+    this.filterCategory = CameraFilterCategory.trending,
+  });
+
+  final List<File> files;
+  final String? filterName;
+  final CameraFilterCategory filterCategory;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.

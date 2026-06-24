@@ -29,4 +29,14 @@ class AppAssets {
       '$iconsPath/mobile-phone-svgrepo-com (1).svg';
   static const String googleIcon = '$iconsPath/google-color-svgrepo-com.svg';
   static const String chatNavIcon = '$iconsPath/chat_icon.png';
+
+  static const String shareMessengerIcon = '$iconsPath/share_messenger.svg';
+  static const String shareFacebookIcon = '$iconsPath/share_facebook.svg';
+  static const String shareWhatsAppIcon = '$iconsPath/share_whatsapp.svg';
+  static const String shareTelegramIcon = '$iconsPath/share_telegram.svg';
+  static const String shareXIcon = '$iconsPath/share_x.svg';
+  static const String shareGmailIcon = '$iconsPath/share_gmail.svg';
+  static const String shareSmsIcon = '$iconsPath/share_sms.svg';
+  static const String shareCopyLinkIcon = '$iconsPath/share_copy_link.svg';
+  static const String shareMoreIcon = '$iconsPath/share_more.svg';
 }

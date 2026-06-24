@@ -22,6 +22,7 @@ import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_camera_screen.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_screen.dart';
@@ -316,6 +317,10 @@ class AppRouter {
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
             returnMediaOnDone: extra?['returnMediaOnDone'] as bool? ?? false,
+            initialFilterName: extra?['initialFilterName'] as String?,
+            initialFilterCategory:
+                CameraFilterCategory.values.asNameMap()[extra?['initialFilterCategory']
+                    as String?],
           );
         },
       ),
@@ -355,6 +360,7 @@ class AppRouter {
             initialType: extra?['type'] as String?,
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
+            initialFilterName: extra?['filterName'] as String?,
           );
         },
       ),

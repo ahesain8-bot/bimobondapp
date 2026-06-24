@@ -18,6 +18,8 @@ import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dar
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/camera_filter_navigation.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -30,7 +32,7 @@ import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
-import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_options_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -419,42 +421,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   void _showMoreOptions() {
-    if (!_checkAuth() || !_isPostOwner()) return;
+    if (!_checkAuth()) return;
 
-    final l10n = AppLocalizations.of(context)!;
-
-    GlassBottomSheet.showActions<void>(
+    PostOptionsSheet.show(
       context,
-      children: [
-        GlassBottomSheetActionTile(
-          icon: LucideIcons.pencil,
-          label: l10n.editPost,
-          showChevron: false,
-          onTap: () {
-            Navigator.pop(context);
-            _openEditPost();
-          },
-        ),
-        if (widget.post.canBePromoted)
-          GlassBottomSheetActionTile(
-            icon: LucideIcons.megaphone,
-            label: l10n.promotePostAction,
-            showChevron: false,
-            onTap: () {
-              Navigator.pop(context);
-              context.pushNamed('promote_post', extra: widget.post);
-            },
-          ),
-        GlassBottomSheetListTile(
-          label: l10n.deletePost,
-          destructive: true,
-          icon: LucideIcons.trash2,
-          onTap: () {
-            Navigator.pop(context);
-            _confirmDeletePost();
-          },
-        ),
-      ],
+      post: widget.post,
+      isOwner: _isPostOwner(),
+      onEdit: _isPostOwner() ? _openEditPost : null,
+      onPromote: _isPostOwner() && widget.post.canBePromoted
+          ? () => context.pushNamed('promote_post', extra: widget.post)
+          : null,
+      onDelete: _isPostOwner() ? _confirmDeletePost : null,
     );
   }
 
@@ -710,15 +687,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                 ),
                 const SizedBox(height: _actionSpacing),
                 _buildMusicDisc(theme, post),
-                if (_isPostOwner()) ...[
-                  const SizedBox(height: _actionSpacing),
-                  _buildActionButton(
-                    icon: LucideIcons.ellipsis,
-                    label: '',
-                    color: Colors.white,
-                    onTap: _showMoreOptions,
-                  ),
-                ],
+                const SizedBox(height: _actionSpacing),
+                _buildActionButton(
+                  icon: LucideIcons.ellipsis,
+                  label: '',
+                  color: Colors.white,
+                  onTap: _showMoreOptions,
+                ),
               ],
             ),
           ),
@@ -755,56 +730,29 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                         feedItem: widget.feedItem,
                         repostQuote: _repostQuote,
                       ),
-                      // Username
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: _openAuthorProfile,
-                            child: Text(
-                              post.user?.fullName?.trim().isNotEmpty == true
-                                  ? post.user!.fullName!.trim()
-                                  : '@${post.user?.username ?? 'user'}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                                letterSpacing: 0.2,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
+                      if (post.isPromoted || post.isAd) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white30),
+                          ),
+                          child: Text(
+                            post.promotion?.label ??
+                                AppLocalizations.of(context)!.promotedBadge,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (post.isPromoted || post.isAd) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.white30),
-                              ),
-                              child: Text(
-                                post.promotion?.label ??
-                                    AppLocalizations.of(context)!.promotedBadge,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 6),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
 
                       // Description + hashtags
                       if ((post.description ?? '').isNotEmpty)
@@ -812,6 +760,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                       else if (post.hashtags.isNotEmpty)
                         _PostHashtagChips(tags: post.hashtags),
                       const SizedBox(height: 10),
+                      if (CameraFilterCatalog.isUsableFilterName(post.filterName))
+                        _buildFilterLabel(post),
                       _buildMusicSoundLabel(post),
                     ],
                   ),
@@ -1051,10 +1001,48 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     unawaited(openSoundDetail(context, soundId: sound.id));
   }
 
+  void _openPostFilter(PostEntity post) {
+    final filterName = post.filterName;
+    if (filterName == null || filterName.isEmpty) return;
+    unawaited(openCameraWithFilter(context, filterName: filterName));
+  }
+
+  Widget _buildFilterLabel(PostEntity post) {
+    final filterName = post.filterName!;
+    final l10n = AppLocalizations.of(context)!;
+    final label = CameraFilterCatalog.localizedFilterLabel(l10n, filterName);
+
+    return GestureDetector(
+      onTap: () => _openPostFilter(post),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.sparkles, color: Colors.white70, size: 12),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMusicSoundLabel(PostEntity post) {
     final sound = post.sound;
-    final label = sound?.name ??
-        'Original Sound · @${post.user?.username ?? 'user'}';
+    final l10n = AppLocalizations.of(context)!;
+    final label = sound?.name ?? l10n.cameraOriginalSound;
 
     return GestureDetector(
       onTap: sound != null ? () => _openPostSound(post) : null,
