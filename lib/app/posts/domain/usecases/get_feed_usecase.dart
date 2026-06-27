@@ -25,6 +25,7 @@ class GetFeedUseCase implements UseCase<List<FeedItemEntity>, GetFeedParams> {
       isLiked: params.isLiked,
       isSaved: params.isSaved,
       isStory: params.isStory,
+      activeStory: params.activeStory,
       contentType: params.contentType,
       auctionQuery: params.auctionQuery,
       privacyStatus: params.privacyStatus,
@@ -48,6 +49,7 @@ class GetFeedParams extends Equatable {
     this.isLiked,
     this.isSaved,
     this.isStory = false,
+    this.activeStory = false,
     this.contentType,
     this.auctionQuery,
     this.privacyStatus,
@@ -67,6 +69,7 @@ class GetFeedParams extends Equatable {
   final bool? isLiked;
   final bool? isSaved;
   final bool isStory;
+  final bool activeStory;
   final FeedContentType? contentType;
   final FeedAuctionQuery? auctionQuery;
   final String? privacyStatus;
@@ -87,6 +90,7 @@ class GetFeedParams extends Equatable {
     isLiked,
     isSaved,
     isStory,
+    activeStory,
     contentType,
     auctionQuery,
     privacyStatus,

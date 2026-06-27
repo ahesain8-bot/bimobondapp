@@ -42,7 +42,6 @@ abstract class PostsRepository {
     String? soundId,
     String? originalPostId,
     List<PostMediaEntity>? media,
-    String? filterName,
   });
 
   Future<Either<Failure, HashtagsPageEntity>> getHashtags({
@@ -64,6 +63,7 @@ abstract class PostsRepository {
     bool? isLiked,
     bool? isSaved,
     bool isStory = false,
+    bool activeStory = false,
     FeedContentType? contentType,
     FeedAuctionQuery? auctionQuery,
     String? privacyStatus,

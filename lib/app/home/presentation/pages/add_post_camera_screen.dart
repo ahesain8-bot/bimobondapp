@@ -172,7 +172,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
         'type': MediaGalleryImportFlow.resolvePostType(edited.files),
         'isStory': false,
         'initialSound': _selectedSound,
-        if (edited.filterName != null) 'filterName': edited.filterName,
       },
     );
   }

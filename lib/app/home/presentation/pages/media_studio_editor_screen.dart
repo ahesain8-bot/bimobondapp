@@ -187,8 +187,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
           'type': type,
           'isStory': false,
           'initialSound': widget.initialSound,
-          if (primaryFilterNameFromStates(_states) != null)
-            'filterName': primaryFilterNameFromStates(_states),
         },
       );
     } finally {

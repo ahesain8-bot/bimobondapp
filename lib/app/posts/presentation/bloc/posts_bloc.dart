@@ -231,7 +231,6 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           auction: event.isAuctionable ? auction : null,
           media: mediaEntities,
           soundId: event.soundId,
-          filterName: event.filterName,
         ),
       );
 
@@ -303,6 +302,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         page: event.page,
         limit: event.limit,
         isStory: true,
+        activeStory: true,
       ),
     );
 

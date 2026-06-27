@@ -120,7 +120,6 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final PostAuctionInput? auction;
   final List<File> files;
   final String? soundId;
-  final String? filterName;
 
   const CreatePostWithMediaRequestedEvent({
     this.type,
@@ -136,7 +135,6 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     this.auction,
     required this.files,
     this.soundId,
-    this.filterName,
   });
 
   @override
@@ -154,7 +152,6 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     auction,
     files,
     soundId,
-    filterName,
   ];
 }
 

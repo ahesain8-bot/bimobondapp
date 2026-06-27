@@ -261,7 +261,6 @@ class PostModel extends PostEntity {
           .toList(),
       'isAuctionable': isAuctionable,
       if (auction != null) 'auction': _auctionToJson(auction!),
-      if (filterName != null) 'filterName': filterName,
     };
   }
 

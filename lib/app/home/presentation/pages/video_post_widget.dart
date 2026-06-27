@@ -18,8 +18,6 @@ import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dar
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
-import 'package:bimobondapp/core/navigation/camera_filter_navigation.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -771,8 +769,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                       else if (post.hashtags.isNotEmpty)
                         _PostHashtagChips(tags: post.hashtags),
                       const SizedBox(height: 10),
-                      if (CameraFilterCatalog.isUsableFilterName(post.filterName))
-                        _buildFilterLabel(post),
                       _buildMusicSoundLabel(post),
                     ],
                   ),
@@ -1010,44 +1006,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final sound = post.sound;
     if (sound == null || sound.id.isEmpty) return;
     unawaited(openSoundDetail(context, soundId: sound.id));
-  }
-
-  void _openPostFilter(PostEntity post) {
-    final filterName = post.filterName;
-    if (filterName == null || filterName.isEmpty) return;
-    unawaited(openCameraWithFilter(context, filterName: filterName));
-  }
-
-  Widget _buildFilterLabel(PostEntity post) {
-    final filterName = post.filterName!;
-    final l10n = AppLocalizations.of(context)!;
-    final label = CameraFilterCatalog.localizedFilterLabel(l10n, filterName);
-
-    return GestureDetector(
-      onTap: () => _openPostFilter(post),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(LucideIcons.sparkles, color: Colors.white70, size: 12),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildMusicSoundLabel(PostEntity post) {

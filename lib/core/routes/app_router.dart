@@ -360,7 +360,6 @@ class AppRouter {
             initialType: extra?['type'] as String?,
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
-            initialFilterName: extra?['filterName'] as String?,
           );
         },
       ),

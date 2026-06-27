@@ -421,7 +421,8 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                             ? _videoController
                             : null,
                         isActive: index == _currentIndex,
-                        onMediaReady: index == _currentIndex &&
+                        onMediaReady:
+                            index == _currentIndex &&
                                 _stories[index].type != 'VIDEO'
                             ? _markMediaReady
                             : null,
@@ -432,9 +433,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                     const Positioned.fill(
                       child: ColoredBox(
                         color: Colors.black,
-                        child: Center(
-                          child: CustomLoadingWidget(size: 48),
-                        ),
+                        child: Center(child: CustomLoadingWidget(size: 48)),
                       ),
                     ),
                   Positioned.fill(

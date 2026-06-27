@@ -32,7 +32,8 @@ class PromoteRadiusMapPreview extends StatefulWidget {
   final bool detectLocation;
 
   @override
-  State<PromoteRadiusMapPreview> createState() => _PromoteRadiusMapPreviewState();
+  State<PromoteRadiusMapPreview> createState() =>
+      _PromoteRadiusMapPreviewState();
 }
 
 class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
@@ -85,7 +86,8 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
   @override
   void didUpdateWidget(PromoteRadiusMapPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final centerChanged = oldWidget.latitude != widget.latitude ||
+    final centerChanged =
+        oldWidget.latitude != widget.latitude ||
         oldWidget.longitude != widget.longitude;
     final radiusChanged = oldWidget.radiusKm != widget.radiusKm;
     final detectChanged = oldWidget.detectLocation != widget.detectLocation;
@@ -292,7 +294,11 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
             alignment: AlignmentDirectional.centerEnd,
             child: TextButton.icon(
               onPressed: _resetToUserLocation,
-              icon: Icon(LucideIcons.crosshair, size: 16, color: scheme.primary),
+              icon: Icon(
+                LucideIcons.crosshair,
+                size: 16,
+                color: scheme.primary,
+              ),
               label: Text(l10n.promoteGeoUseMyLocation),
             ),
           ),
@@ -394,10 +400,7 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
               Text(
                 l10n.chatLocationPermissionDenied,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
               ),
               const SizedBox(height: 12),
               TextButton(

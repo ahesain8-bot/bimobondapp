@@ -16,10 +16,6 @@ class DirectionalChevronIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Icon(
-      iconData(context),
-      size: size,
-      color: color,
-    );
+    return Icon(iconData(context), size: size, color: color);
   }
 }

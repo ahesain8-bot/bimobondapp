@@ -86,7 +86,6 @@ class MediaGalleryImportFlow {
       'type': resolvePostType(edited.files),
       'isStory': isStory,
       'initialSound': initialSound,
-      if (edited.filterName != null) 'filterName': edited.filterName,
     };
 
     if (replaceRoute) {

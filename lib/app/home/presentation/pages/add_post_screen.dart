@@ -46,14 +46,12 @@ class AddPostScreen extends StatefulWidget {
     this.initialType,
     this.isStory = false,
     this.initialSound,
-    this.initialFilterName,
   });
 
   final List<File>? initialFiles;
   final String? initialType;
   final bool isStory;
   final SoundEntity? initialSound;
-  final String? initialFilterName;
 
   @override
   State<AddPostScreen> createState() => _AddPostScreenState();
@@ -82,7 +80,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
   late DateTime _auctionStartDate;
   late DateTime _auctionEndDate;
   SoundEntity? _selectedSound;
-  String? _filterName;
 
   @override
   void initState() {
@@ -95,7 +92,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
       const Duration(days: AddPostLayoutConstants.defaultAuctionDurationDays),
     );
     _selectedSound = widget.initialSound;
-    _filterName = widget.initialFilterName;
     _loadCategories();
     if (widget.isStory &&
         (widget.initialFiles == null || widget.initialFiles!.isEmpty)) {
@@ -178,7 +174,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
     setState(() {
       _selectedFiles = edited.files;
-      if (edited.filterName != null) _filterName = edited.filterName;
       _updateType();
     });
   }
@@ -225,7 +220,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
         final toAdd = edited.files.take(remaining).toList();
         setState(() {
           _selectedFiles = [..._selectedFiles, ...toAdd];
-          if (edited.filterName != null) _filterName = edited.filterName;
           _updateType();
         });
       },
@@ -253,7 +247,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
     final toAdd = result.files.take(remaining).toList();
     setState(() {
       _selectedFiles = [..._selectedFiles, ...toAdd];
-      if (result.filterName != null) _filterName = result.filterName;
       _updateType();
     });
   }
@@ -337,7 +330,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
         auction: widget.isStory ? null : auction,
         files: _selectedFiles,
         soundId: _selectedSound?.id,
-        filterName: _filterName,
       ),
     );
   }

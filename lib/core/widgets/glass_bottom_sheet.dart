@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -388,10 +389,9 @@ class GlassBottomSheetActionTile extends StatelessWidget {
         size: 20,
       );
     } else if (showChevron) {
-      trailing = Icon(
-        LucideIcons.chevronRight,
-        color: Colors.white.withValues(alpha: 0.45),
-        size: 18,
+      trailing = DirectionalChevronIcon(
+        size: 20,
+        color: Colors.white.withValues(alpha: 0.82),
       );
     }
 
