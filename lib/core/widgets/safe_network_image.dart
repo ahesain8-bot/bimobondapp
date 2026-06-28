@@ -79,6 +79,14 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       _loadedNotified = false;
       _resolveStarted = true;
       _resolveImage();
+      return;
+    }
+
+    if (widget.onLoaded != null &&
+        oldWidget.onLoaded != widget.onLoaded &&
+        (_imageInfo != null || _failed)) {
+      _loadedNotified = false;
+      _notifyLoaded();
     }
   }
 
@@ -255,8 +263,7 @@ class _SafeNetworkAvatarState extends State<SafeNetworkAvatar> {
     return CircleAvatar(
       radius: widget.radius,
       backgroundColor:
-          widget.backgroundColor ??
-          theme.colorScheme.surfaceContainerHighest,
+          widget.backgroundColor ?? theme.colorScheme.surfaceContainerHighest,
       child: ClipOval(
         child: SafeNetworkImage(
           imageUrl: resolved,

@@ -89,14 +89,14 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     };
     _currentIndex = widget.initialIndex.clamp(0, _stories.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
+    if (_stories.isNotEmpty) {
+      _onStoryActivated(_currentIndex);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final authState = context.read<AuthBloc>().state;
       if (authState is AuthSuccess) {
         auth_di.sl<ViewedStoriesStore>().bindUser(authState.user.id);
-      }
-      if (_stories.isNotEmpty) {
-        _onStoryActivated(_currentIndex);
       }
     });
   }
@@ -227,8 +227,50 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       return;
     }
 
+    _prefetchAdjacentStoryImages(index);
+
     if (post.type == 'VIDEO') {
       unawaited(_initVideoForPost(post));
+    } else {
+      unawaited(_prepareImageStory(post));
+    }
+  }
+
+  void _prefetchAdjacentStoryImages(int index) {
+    for (final i in [index - 1, index + 1]) {
+      if (i < 0 || i >= _stories.length) continue;
+      final neighbor = _stories[i];
+      if (neighbor.type == 'VIDEO') continue;
+      final url = storyDisplayMediaUrl(neighbor);
+      if (url == null || url.isEmpty) continue;
+      final resolved = MediaUtils.resolveAbsoluteUrl(url);
+      if (!isValidNetworkImageUrl(resolved)) continue;
+      unawaited(
+        precacheImage(NetworkImage(resolved), context).catchError((_) {}),
+      );
+    }
+  }
+
+  Future<void> _prepareImageStory(PostEntity post) async {
+    final url = storyDisplayMediaUrl(post);
+    if (url == null || url.isEmpty) {
+      if (mounted && _currentPost?.id == post.id) {
+        _markMediaReady();
+      }
+      return;
+    }
+
+    final resolved = MediaUtils.resolveAbsoluteUrl(url);
+    if (isValidNetworkImageUrl(resolved)) {
+      try {
+        await precacheImage(NetworkImage(resolved), context);
+      } catch (_) {
+        // Show broken/blank state once ready overlay is dismissed.
+      }
+    }
+
+    if (mounted && _currentPost?.id == post.id) {
+      _markMediaReady();
     }
   }
 
@@ -416,15 +458,10 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                     onPageChanged: _onStoryActivated,
                     itemBuilder: (context, index) {
                       return _StoryPageContent(
+                        key: ValueKey(_stories[index].id),
                         post: _stories[index],
                         videoController: index == _currentIndex
                             ? _videoController
-                            : null,
-                        isActive: index == _currentIndex,
-                        onMediaReady:
-                            index == _currentIndex &&
-                                _stories[index].type != 'VIDEO'
-                            ? _markMediaReady
                             : null,
                       );
                     },
@@ -653,16 +690,13 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
 
 class _StoryPageContent extends StatelessWidget {
   const _StoryPageContent({
+    super.key,
     required this.post,
     this.videoController,
-    this.isActive = false,
-    this.onMediaReady,
   });
 
   final PostEntity post;
   final VideoPlayerController? videoController;
-  final bool isActive;
-  final VoidCallback? onMediaReady;
 
   @override
   Widget build(BuildContext context) {
@@ -687,9 +721,6 @@ class _StoryPageContent extends StatelessWidget {
 
     final url = storyDisplayMediaUrl(post);
     if (url == null || url.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        onMediaReady?.call();
-      });
       return const Center(
         child: Icon(
           Icons.broken_image_outlined,
@@ -704,8 +735,6 @@ class _StoryPageContent extends StatelessWidget {
         imageUrl: url,
         fit: BoxFit.cover,
         blankOnError: true,
-        onLoaded: isActive ? onMediaReady : null,
-        onLoadFailed: isActive ? onMediaReady : null,
       ),
     );
   }
