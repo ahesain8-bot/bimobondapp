@@ -1,4 +1,5 @@
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:flutter/material.dart';
 
 /// True when [url] is a non-empty http(s) URL that is not a video file.
@@ -25,6 +26,8 @@ class SafeNetworkImage extends StatefulWidget {
     this.borderRadius,
     this.errorIcon = Icons.broken_image_outlined,
     this.blankOnError = false,
+    this.showLoadingIndicator = true,
+    this.loadingSize,
     this.onLoadFailed,
     this.onLoaded,
     super.key,
@@ -39,6 +42,8 @@ class SafeNetworkImage extends StatefulWidget {
 
   /// When true, loading/error states are solid black with no icon (e.g. video posters).
   final bool blankOnError;
+  final bool showLoadingIndicator;
+  final double? loadingSize;
   final VoidCallback? onLoadFailed;
   final VoidCallback? onLoaded;
 
@@ -144,6 +149,34 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     super.dispose();
   }
 
+  double get _effectiveLoadingSize {
+    if (widget.loadingSize != null) return widget.loadingSize!;
+    final w = widget.width;
+    final h = widget.height;
+    if (w != null && h != null) {
+      return ((w < h ? w : h) * 0.55).clamp(20.0, 48.0);
+    }
+    return 48;
+  }
+
+  Widget _loadingPlaceholder(ThemeData theme) {
+    if (!widget.showLoadingIndicator && widget.blankOnError) {
+      return _blackBox();
+    }
+
+    final background = widget.blankOnError
+        ? Colors.black
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2);
+
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      color: background,
+      alignment: Alignment.center,
+      child: CustomLoadingWidget(size: _effectiveLoadingSize),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -153,24 +186,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     }
 
     if (_imageInfo == null) {
-      if (widget.blankOnError) {
-        return _blackBox();
-      }
-      return Container(
-        width: widget.width,
-        height: widget.height,
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        child: Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: theme.colorScheme.primary.withValues(alpha: 0.4),
-            ),
-          ),
-        ),
-      );
+      return _loadingPlaceholder(theme);
     }
 
     Widget image = SizedBox(

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -94,14 +95,7 @@ class _PreviewImage extends StatelessWidget {
         filterQuality: FilterQuality.high,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
-          return const SizedBox(
-            width: 48,
-            height: 48,
-            child: CircularProgressIndicator(
-              color: Colors.white54,
-              strokeWidth: 2,
-            ),
-          );
+          return const Center(child: CustomLoadingWidget(size: 48));
         },
         errorBuilder: (_, _, _) => const Icon(
           Icons.broken_image_outlined,

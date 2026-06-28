@@ -89,14 +89,14 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     };
     _currentIndex = widget.initialIndex.clamp(0, _stories.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
-    if (_stories.isNotEmpty) {
-      _onStoryActivated(_currentIndex);
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final authState = context.read<AuthBloc>().state;
       if (authState is AuthSuccess) {
         auth_di.sl<ViewedStoriesStore>().bindUser(authState.user.id);
+      }
+      if (_stories.isNotEmpty) {
+        _onStoryActivated(_currentIndex);
       }
     });
   }
@@ -735,6 +735,7 @@ class _StoryPageContent extends StatelessWidget {
         imageUrl: url,
         fit: BoxFit.cover,
         blankOnError: true,
+        showLoadingIndicator: false,
       ),
     );
   }
