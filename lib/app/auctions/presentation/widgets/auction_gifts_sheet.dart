@@ -8,6 +8,7 @@ import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -122,7 +123,7 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
                 child: _AuctionGiftsSummaryBar(
                   itemName: details.itemName,
                   summary: l10n.auctionGiftsSummary(
-                    _formatCoins(details.currentTotalCoins, locale),
+                    _formatCoins(details.displayHighestPriceCoins, locale),
                     _formatCoins(details.targetPriceCoins, locale),
                     l10n.coinsUnit,
                   ),
@@ -407,14 +408,12 @@ class _GiftThumbnail extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: url != null && url!.isNotEmpty
-          ? Image.network(
-              MediaUtils.resolveAbsoluteUrl(url!),
+          ? SafeNetworkImage(
+              imageUrl: url!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(
-                LucideIcons.gift,
-                color: LiveDetailsLayoutConstants.giftCommentGold,
-                size: 20,
-              ),
+              width: double.infinity,
+              height: double.infinity,
+              errorIcon: LucideIcons.gift,
             )
           : const Icon(
               LucideIcons.gift,

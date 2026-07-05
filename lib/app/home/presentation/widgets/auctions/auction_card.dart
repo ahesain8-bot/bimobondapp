@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_item.
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_status_badge.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_display_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -27,10 +28,9 @@ class AuctionCard extends StatelessWidget {
 
   String _formatHostEarnings(AppLocalizations l10n, Locale locale) {
     final auctionEntity = auction.post?.auction;
-    final amount = formatAuctionPricingCoins(
-      auctionEntity?.displayHostEarningsCoins ?? auction.giftTotalCoins,
-      locale,
-    );
+    final highest = auctionEntity?.displayHighestPriceCoins ??
+        auction.giftTotalCoins + (auctionEntity?.startingPriceCoins ?? 0);
+    final amount = formatAuctionPricingCoins(highest, locale);
     return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
   }
 
@@ -46,7 +46,6 @@ class AuctionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final locale = Localizations.localeOf(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -86,17 +85,12 @@ class AuctionCard extends StatelessWidget {
                 children: [
                   AspectRatio(
                     aspectRatio: 16 / 10,
-                    child: Image.network(
-                      auction.imageUrl,
+                    child: SafeNetworkImage(
+                      imageUrl: auction.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => ColoredBox(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          LucideIcons.image,
-                          color: theme.disabledColor,
-                          size: 40,
-                        ),
-                      ),
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorIcon: LucideIcons.image,
                     ),
                   ),
                   // Sleek bottom gradient overlay on image for readability

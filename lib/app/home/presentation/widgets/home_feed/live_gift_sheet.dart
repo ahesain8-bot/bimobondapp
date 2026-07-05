@@ -9,9 +9,9 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -843,13 +843,13 @@ class _GiftIcon extends StatelessWidget {
     if (gift.hasNetworkIcon ||
         icon.startsWith('http://') ||
         icon.startsWith('https://')) {
-      return Image.network(
-        MediaUtils.resolveAbsoluteUrl(icon),
+      return SafeNetworkImage(
+        imageUrl: icon,
         width: iconSize,
         height: iconSize,
         fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            Text('🎁', style: TextStyle(fontSize: iconSize)),
+        showLoadingIndicator: false,
+        errorIcon: Icons.card_giftcard_outlined,
       );
     }
     if (icon.startsWith('assets/')) {

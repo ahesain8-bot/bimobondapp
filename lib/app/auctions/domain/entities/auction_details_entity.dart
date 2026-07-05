@@ -63,6 +63,7 @@ class AuctionDetailsEntity extends Equatable {
     required this.itemName,
     required this.targetPrice,
     required this.targetPriceCoins,
+    required this.startingPriceCoins,
     required this.currentTotalCoins,
     required this.currencyCode,
     required this.status,
@@ -76,6 +77,7 @@ class AuctionDetailsEntity extends Equatable {
   final String itemName;
   final double targetPrice;
   final int targetPriceCoins;
+  final int startingPriceCoins;
   final int currentTotalCoins;
   final String currencyCode;
   final String status;
@@ -89,8 +91,13 @@ class AuctionDetailsEntity extends Equatable {
       return pricing!.progressPercent.clamp(0, 100);
     }
     if (targetPriceCoins <= 0) return 0;
-    return (currentTotalCoins / targetPriceCoins * 100).clamp(0, 100);
+    return (displayHighestPriceCoins / targetPriceCoins * 100).clamp(0, 100);
   }
+
+  int get giftContributionCoins => currentTotalCoins;
+
+  int get displayHighestPriceCoins =>
+      startingPriceCoins + giftContributionCoins;
 
   @override
   List<Object?> get props => [
@@ -98,6 +105,7 @@ class AuctionDetailsEntity extends Equatable {
         itemName,
         targetPrice,
         targetPriceCoins,
+        startingPriceCoins,
         currentTotalCoins,
         currencyCode,
         status,

@@ -7,6 +7,7 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
     required super.itemName,
     required super.targetPrice,
     required super.targetPriceCoins,
+    required super.startingPriceCoins,
     required super.currentTotalCoins,
     required super.currencyCode,
     required super.status,
@@ -27,6 +28,14 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
     final targetPriceCoins = _readInt(
       data['targetPriceCoins'] ?? data['targetPriceUsd'] ?? targetPrice.round(),
     );
+    final startingPrice = _readDouble(
+      data['startingPrice'] ?? data['startingPriceUsd'],
+    );
+    final startingPriceCoins = _readInt(
+      data['startingPriceCoins'] ??
+          data['startingPriceUsd'] ??
+          startingPrice.round(),
+    );
     final currentTotalCoins = _readInt(
       data['currentTotalCoins'] ??
           data['currentTotalUsd'] ??
@@ -38,6 +47,7 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
       itemName: data['itemName']?.toString() ?? '',
       targetPrice: targetPrice,
       targetPriceCoins: targetPriceCoins,
+      startingPriceCoins: startingPriceCoins,
       currentTotalCoins: currentTotalCoins,
       currencyCode: (data['currencyCode'] ?? 'USD').toString(),
       status: data['status']?.toString() ?? '',

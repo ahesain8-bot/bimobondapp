@@ -246,7 +246,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       final resolved = MediaUtils.resolveAbsoluteUrl(url);
       if (!isValidNetworkImageUrl(resolved)) continue;
       unawaited(
-        precacheImage(NetworkImage(resolved), context).catchError((_) {}),
+        precacheSafeNetworkImage(context, resolved).catchError((_) {}),
       );
     }
   }
@@ -263,7 +263,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     final resolved = MediaUtils.resolveAbsoluteUrl(url);
     if (isValidNetworkImageUrl(resolved)) {
       try {
-        await precacheImage(NetworkImage(resolved), context);
+        await precacheSafeNetworkImage(context, resolved);
       } catch (_) {
         // Show broken/blank state once ready overlay is dismissed.
       }

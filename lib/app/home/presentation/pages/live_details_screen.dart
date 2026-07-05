@@ -24,6 +24,7 @@ import 'package:bimobondapp/app/social/domain/entities/follow_status.dart';
 import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
@@ -74,12 +75,18 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   final PageController _mediaPageController = PageController();
   int _currentImageIndex = 0;
   int _highestBid = LiveDetailsLayoutConstants.initialHighestBid;
-  int? _giftTotalCoinsOverride;
+  int? _giftContributionOverride;
+  int? _startingPriceOverride;
   bool _isAuctionFinished = false;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
   bool _isUIHidden = false;
   Timer? _countdownTimer;
+  AuctionSocketService? _auctionSocket;
+  StreamSubscription<AuctionUpdatedPayload>? _auctionUpdatedSub;
+  StreamSubscription<CommentEntity>? _newCommentSub;
+  String? _joinedAuctionId;
+  String? _joinedPostId;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -90,39 +97,31 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       ? widget.post!.id.hashCode.abs() % 1000
       : widget.index;
 
-  List<String> get _backgroundImageUrls {
+  List<PostMediaEntity> get _displayMedia {
     final post = widget.post;
     if (post == null) {
-      return ['https://picsum.photos/800/1200?random=${_streamIndex + 200}'];
+      return [
+        PostMediaEntity(
+          url: 'https://picsum.photos/800/1200?random=${_streamIndex + 200}',
+          mediaType: 'IMAGE',
+          order: 0,
+        ),
+      ];
     }
-
-    final urls = <String>[];
-    void addUrl(String? raw) {
-      if (raw == null || raw.isEmpty || raw == 'null') return;
-      final resolved = MediaUtils.resolveAbsoluteUrl(raw);
-      if (!urls.contains(resolved)) urls.add(resolved);
-    }
-
-    addUrl(post.auction?.itemImageUrl);
-    final sortedMedia = [...post.media]
-      ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-    for (final item in sortedMedia) {
-      if (item.mediaType == 'IMAGE') {
-        addUrl(item.url);
-      }
-    }
-    if (urls.isEmpty) {
-      addUrl(post.thumbnailUrl);
-    }
-    return urls;
+    return resolveAuctionDisplayMedia(post);
   }
 
-  int get _giftTotalCoins {
-    if (_giftTotalCoinsOverride != null) return _giftTotalCoinsOverride!;
-    final auction = widget.post?.auction;
-    if (auction != null) return auction.currentTotalCoins;
-    return _highestBid;
+  int get _startingPriceCoins {
+    if (_startingPriceOverride != null) return _startingPriceOverride!;
+    return widget.post?.auction?.startingPriceCoins ?? 0;
   }
+
+  int get _giftContributionCoins {
+    if (_giftContributionOverride != null) return _giftContributionOverride!;
+    return widget.post?.auction?.giftContributionCoins ?? 0;
+  }
+
+  int get _highestBidCoins => _startingPriceCoins + _giftContributionCoins;
 
   bool get _usesGiftTotal => widget.post?.auction != null;
 
@@ -179,6 +178,167 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     _syncAuctionFinishedFromGiftTotal();
     _recordPostViewIfNeeded();
+    unawaited(_startAuctionRealtime());
+  }
+
+  Future<void> _startAuctionRealtime() async {
+    final post = widget.post;
+    if (post == null || post.id.isEmpty) return;
+
+    _auctionSocket = auctions_di.sl<AuctionSocketService>();
+    await _auctionSocket!.connect();
+
+    await _auctionUpdatedSub?.cancel();
+    await _newCommentSub?.cancel();
+
+    // Post room: newComment events (comment list).
+    _newCommentSub = _auctionSocket!.onNewComment.listen(_onRealtimeComment);
+    // Auction room: auctionUpdated with lastComment / lastGift / totals.
+    _auctionUpdatedSub =
+        _auctionSocket!.onAuctionUpdated.listen(_onRealtimeAuctionUpdate);
+
+    _auctionSocket!.joinPost(post.id);
+    _joinedPostId = post.id;
+
+    final auctionId = widget.post?.auction?.id;
+    if (auctionId != null && auctionId.isNotEmpty) {
+      _auctionSocket!.joinAuction(auctionId);
+      _joinedAuctionId = auctionId;
+    }
+  }
+
+  void _stopAuctionRealtime() {
+    final socket = _auctionSocket;
+    if (socket != null) {
+      final auctionId = _joinedAuctionId;
+      if (auctionId != null && auctionId.isNotEmpty) {
+        socket.leaveAuction(auctionId);
+      }
+      final postId = _joinedPostId;
+      if (postId != null && postId.isNotEmpty) {
+        socket.leavePost(postId);
+      }
+    }
+
+    unawaited(_auctionUpdatedSub?.cancel());
+    unawaited(_newCommentSub?.cancel());
+    _auctionUpdatedSub = null;
+    _newCommentSub = null;
+    _joinedAuctionId = null;
+    _joinedPostId = null;
+  }
+
+  void _onRealtimeComment(CommentEntity comment) {
+    if (!mounted) return;
+    if (!_matchesCommentUpdate(comment)) return;
+
+    _appendCommentIfNew(comment);
+
+    if (comment.isGift) {
+      _bidPopController.forward(from: 0);
+    }
+  }
+
+  bool _matchesCommentUpdate(CommentEntity comment) {
+    final postId = widget.post?.id;
+    if (postId == null) return false;
+
+    if (comment.postId.isEmpty || comment.postId == postId) {
+      return true;
+    }
+
+    return false;
+  }
+
+  void _appendCommentIfNew(CommentEntity comment) {
+    if (comment.parentId != null) return;
+    if (_postComments.any((existing) => existing.id == comment.id)) return;
+    setState(() => _postComments.add(comment));
+    _scrollChatToBottom();
+  }
+
+  void _onRealtimeAuctionUpdate(AuctionUpdatedPayload payload) {
+    if (!mounted) return;
+    if (!_matchesAuctionUpdate(payload)) return;
+
+    var shouldAnimateBid = false;
+
+    final lastComment = payload.lastComment;
+    if (lastComment != null && lastComment.parentId == null) {
+      _appendCommentIfNew(lastComment);
+    }
+
+    setState(() {
+      if (payload.startingPriceCoins != null) {
+        _startingPriceOverride = payload.startingPriceCoins;
+      }
+      if (payload.currentTotalCoins != null) {
+        _giftContributionOverride = payload.currentTotalCoins;
+        shouldAnimateBid = true;
+      }
+      if (_isFinishedStatus(payload.status)) {
+        _isAuctionFinished = true;
+        _pulseController.stop();
+      }
+    });
+
+    if (payload.hasGiftActivity) {
+      shouldAnimateBid = true;
+      _refreshAuctionComments();
+    }
+
+    final target = payload.targetPriceCoins ??
+        widget.post?.auction?.targetPriceCoins ??
+        0;
+    if (target > 0 && _highestBidCoins >= target) {
+      if (!_isAuctionFinished) {
+        _completeAuction();
+      }
+      return;
+    }
+
+    if (shouldAnimateBid || lastComment != null) {
+      _bidPopController.forward(from: 0);
+    }
+  }
+
+  bool _matchesAuctionUpdate(AuctionUpdatedPayload payload) {
+    final postId = widget.post?.id;
+    final auctionId = widget.post?.auction?.id;
+
+    if (payload.postId != null &&
+        postId != null &&
+        payload.postId == postId) {
+      return true;
+    }
+
+    if (payload.auctionId != null) {
+      if (auctionId != null && payload.auctionId == auctionId) return true;
+      if (postId != null && payload.auctionId == postId) return true;
+    }
+
+    return payload.postId == null && payload.auctionId == null;
+  }
+
+  bool _isFinishedStatus(String? status) {
+    if (status == null) return false;
+    switch (status.toUpperCase()) {
+      case 'ENDED':
+      case 'FINISHED':
+      case 'COMPLETED':
+      case 'CLOSED':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  void _refreshAuctionComments() {
+    final postId = widget.post?.id;
+    if (postId == null) return;
+    _commentsBloc?.add(
+      FetchCommentsRequested(postId: postId, isRefresh: true),
+    );
   }
 
   void _recordPostViewIfNeeded() {
@@ -193,7 +353,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final prevTotal = oldWidget.post?.auction?.currentTotalCoins;
     final nextTotal = widget.post?.auction?.currentTotalCoins;
     if (prevTotal != nextTotal) {
-      _giftTotalCoinsOverride = null;
+      _giftContributionOverride = null;
+      _startingPriceOverride = null;
       if (nextTotal != null && nextTotal != prevTotal) {
         _bidPopController.forward(from: 0);
       }
@@ -205,7 +366,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final auction = widget.post?.auction;
     if (auction == null || _isAuctionFinished) return;
     final targetCoins = auction.targetPriceCoins;
-    if (targetCoins > 0 && _giftTotalCoins >= targetCoins) {
+    if (targetCoins > 0 && _highestBidCoins >= targetCoins) {
       _isAuctionFinished = true;
       _pulseController.stop();
     }
@@ -213,6 +374,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
   @override
   void dispose() {
+    _stopAuctionRealtime();
     _chatController.dispose();
     _chatScrollController.dispose();
     _mediaPageController.dispose();
@@ -341,12 +503,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     } else if (state is AddCommentSuccess) {
       _chatController.clear();
       FocusScope.of(context).unfocus();
-      final postId = widget.post?.id;
-      if (postId != null) {
-        _commentsBloc?.add(
-          FetchCommentsRequested(postId: postId, isRefresh: true),
-        );
-      }
+      _appendCommentIfNew(state.comment);
     } else if (state is CommentsFailure) {
       PopupDialogs.showErrorDialog(context, state.message);
     }
@@ -475,9 +632,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     result.fold((_) {}, (details) {
       setState(() {
-        _giftTotalCoinsOverride = details.currentTotalCoins;
+        _giftContributionOverride = details.currentTotalCoins;
+        _startingPriceOverride = details.startingPriceCoins;
+        final highest = details.displayHighestPriceCoins;
         if (details.targetPriceCoins > 0 &&
-            details.currentTotalCoins >= details.targetPriceCoins) {
+            highest >= details.targetPriceCoins) {
           if (!_isAuctionFinished) {
             _completeAuction();
           }
@@ -558,13 +717,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final locale = Localizations.localeOf(context);
     final auction = widget.post?.auction;
     if (auction != null) {
-      final amount = formatAuctionPricingCoins(
-        auction.displayHostEarningsCoins,
-        locale,
-      );
+      final amount = formatAuctionPricingCoins(_highestBidCoins, locale);
       return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
     }
-    final amount = LocaleFormatUtils.localizeDigits('$_giftTotalCoins', locale);
+    final amount = LocaleFormatUtils.localizeDigits('$_highestBid', locale);
     return l10n.liveHighestBidAmount(amount, _bidCurrencyLabel(l10n));
   }
 
@@ -626,8 +782,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final hostName = _hostName(l10n);
-    final imageUrls = _backgroundImageUrls;
-    final hasMultipleImages = imageUrls.length > 1;
+    final imageUrls = _displayMedia;
+    final hasMultipleMedia = imageUrls.length > 1;
     final isAuctionActive = _isAuctionInPeriod && !_isAuctionFinished;
     final isAuctionFinishedBadge = _isAuctionFinished;
     final targetPrice = _auctionTargetPrice;
@@ -640,8 +796,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         fit: StackFit.expand,
         children: [
           LiveMediaBackground(
-            imageUrls: imageUrls,
+            mediaItems: imageUrls,
             pageController: _mediaPageController,
+            currentIndex: _currentImageIndex,
+            posterUrl: widget.post == null
+                ? null
+                : MediaUtils.resolveVideoPosterUrl(widget.post!),
             onPageChanged: (index) =>
                 setState(() => _currentImageIndex = index),
           ),
@@ -669,7 +829,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
           ),
           GestureDetector(
             onTap: () => setState(() => _isUIHidden = !_isUIHidden),
-            onHorizontalDragEnd: hasMultipleImages
+            onHorizontalDragEnd: hasMultipleMedia
                 ? null
                 : (details) {
                     final velocity = details.primaryVelocity ?? 0;
@@ -699,7 +859,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                 child: SafeArea(
                   child: Column(
                     children: [
-                      if (hasMultipleImages) ...[
+                      if (hasMultipleMedia) ...[
                         const SizedBox(
                           height: LiveDetailsLayoutConstants
                               .mediaPageIndicatorTopPadding,

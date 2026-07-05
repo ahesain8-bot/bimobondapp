@@ -32,6 +32,8 @@ class ProfileGridTile extends StatelessWidget {
     );
   }
 
+  bool get _hasMultipleMedia => post.media.length > 1;
+
   ProfileAuctionStatus _auctionStatus(AppLocalizations l10n) {
     if (!_isAuctionPost) return ProfileAuctionStatus.none;
 
@@ -137,6 +139,12 @@ class ProfileGridTile extends StatelessWidget {
                 left: AppSizes.p6,
                 child: ProfileAuctionBadge(status: auctionStatus),
               ),
+            if (_hasMultipleMedia)
+              const Positioned(
+                top: AppSizes.p6,
+                right: AppSizes.p6,
+                child: ProfileGridMultiMediaIcon(),
+              ),
             if (isAuction && itemName != null && itemName.isNotEmpty)
               Positioned(
                 left: AppSizes.p6,
@@ -177,6 +185,22 @@ class ProfileGridTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class ProfileGridMultiMediaIcon extends StatelessWidget {
+  const ProfileGridMultiMediaIcon({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Icon(
+      Icons.filter_none_rounded,
+      size: 18,
+      color: Colors.white,
+      shadows: const [
+        Shadow(color: Color(0x99000000), blurRadius: 4, offset: Offset(0, 1)),
+      ],
     );
   }
 }

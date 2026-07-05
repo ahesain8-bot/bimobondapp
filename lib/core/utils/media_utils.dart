@@ -152,6 +152,9 @@ class MediaUtils {
     // Handle Firebase/Cloud storage URLs with query params
     final cleanUrl = lowerUrl.split('?').first;
 
+    // Image extensions win over path keywords like "/video/" in the URL.
+    if (imageExtensions.any((ext) => cleanUrl.endsWith(ext))) return false;
+
     // Check extensions
     if (videoExtensions.any((ext) => cleanUrl.endsWith(ext))) return true;
 

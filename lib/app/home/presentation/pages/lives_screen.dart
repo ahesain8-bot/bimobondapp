@@ -3,7 +3,9 @@ import 'dart:ui';
 import 'package:bimobondapp/core/constants/lives_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -278,13 +280,13 @@ class _LiveStreamCardState extends State<LiveStreamCard>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.network(
-                'https://picsum.photos/400/600?random=${widget.index + 200}',
+              SafeNetworkImage(
+                imageUrl:
+                    'https://picsum.photos/400/600?random=${widget.index + 200}',
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => ColoredBox(
-                  color: Colors.grey.shade800,
-                  child: const Icon(LucideIcons.image, color: Colors.white54),
-                ),
+                width: double.infinity,
+                height: double.infinity,
+                errorIcon: LucideIcons.image,
               ),
               Container(
                 decoration: BoxDecoration(
@@ -412,7 +414,7 @@ class _LiveStreamCardState extends State<LiveStreamCard>
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 1.5),
                             image: DecorationImage(
-                              image: NetworkImage(
+                              image: CachedNetworkImageProvider(
                                 'https://i.pravatar.cc/100?u=${widget.index + 50}',
                               ),
                               fit: BoxFit.cover,

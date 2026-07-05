@@ -25,25 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 List<String> auctionPostCoverUrls(PostEntity post) {
-  final urls = <String>[];
-  void addUrl(String? raw) {
-    if (raw == null || raw.isEmpty || raw == 'null') return;
-    final resolved = MediaUtils.resolveAbsoluteUrl(raw);
-    if (!urls.contains(resolved)) urls.add(resolved);
-  }
-
-  addUrl(post.auction?.itemImageUrl);
-  final sortedMedia = [...post.media]
-    ..sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-  for (final item in sortedMedia) {
-    if (item.mediaType == 'IMAGE') {
-      addUrl(item.url);
-    }
-  }
-  if (urls.isEmpty) {
-    addUrl(post.thumbnailUrl);
-  }
-  return urls;
+  return resolveAuctionDisplayMedia(post).map((item) => item.url).toList();
 }
 
 ProfileAuctionStatus auctionStatusForPost(
@@ -153,7 +135,7 @@ class FeedAuctionPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final status = auctionStatusForPost(post, l10n);
-    final imageUrl = auctionPostCoverUrls(post).firstOrNull ?? '';
+    final imageUrl = MediaUtils.resolvePostCoverUrl(post) ?? '';
     final itemName = _auctionItemName(post);
     final title = _auctionTitle(post);
     final userName = _auctionUserName(post);
@@ -287,7 +269,7 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
 
   String _formatHighestBid(AppLocalizations l10n, Locale locale) {
     final amount = formatAuctionPricingCoins(
-      auction?.displayHostEarningsCoins ?? 0,
+      auction?.displayHighestPriceCoins ?? 0,
       locale,
     );
     return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);

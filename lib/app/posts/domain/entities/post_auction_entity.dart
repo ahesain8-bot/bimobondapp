@@ -39,15 +39,21 @@ class PostAuctionEntity extends Equatable {
       return pricing!.progressPercent.clamp(0, 100);
     }
     if (targetPriceCoins <= 0) return 0;
-    return (currentTotalCoins / targetPriceCoins * 100).clamp(0, 100);
+    return (displayHighestPriceCoins / targetPriceCoins * 100).clamp(0, 100);
   }
 
   bool get isTargetReached =>
-      targetPriceCoins > 0 && currentTotalCoins >= targetPriceCoins;
+      targetPriceCoins > 0 && displayHighestPriceCoins >= targetPriceCoins;
 
-  /// Shown in the "highest price" slot (`pricing.estimatedHostEarningsCoins`).
-  int get displayHostEarningsCoins =>
-      pricing?.estimatedHostEarningsCoins ?? targetPriceCoins;
+  /// Gift coins contributed on this auction (excludes starting price).
+  int get giftContributionCoins => currentTotalCoins;
+
+  /// Highest price shown in UI: starting price + gift contributions.
+  int get displayHighestPriceCoins =>
+      startingPriceCoins + giftContributionCoins;
+
+  /// Shown in the "highest price" slot across feed, cards, and live view.
+  int get displayHostEarningsCoins => displayHighestPriceCoins;
 
   /// Shown in the "target price" slot (`pricing.estimatedBidderSpendCoins`).
   double get displayBidderSpendCoins =>

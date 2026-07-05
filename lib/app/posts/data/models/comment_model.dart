@@ -38,9 +38,14 @@ class CommentModel extends CommentEntity {
       parsedUser = UserModel.fromJson(Map<String, dynamic>.from(json['user']));
     } else if (json['user'] is String) {
       parsedUser = UserModel(id: json['user']);
+    } else if (json['userId'] != null &&
+        json['userId'].toString().trim().isNotEmpty) {
+      parsedUser = UserModel(id: json['userId'].toString());
     } else {
       parsedUser = const UserModel(id: '');
     }
+
+    final now = DateTime.now().toUtc().toIso8601String();
 
     return CommentModel(
       id: json['id']?.toString() ?? '',
@@ -48,22 +53,22 @@ class CommentModel extends CommentEntity {
       postId: json['postId']?.toString() ?? '',
       user: parsedUser,
       parentId: json['parentId']?.toString(),
-      likeCount: json['likeCount'] is num 
-          ? (json['likeCount'] as num).toInt() 
+      likeCount: json['likeCount'] is num
+          ? (json['likeCount'] as num).toInt()
           : int.tryParse(json['likeCount']?.toString() ?? '0') ?? 0,
-      replyCount: json['replyCount'] is num 
-          ? (json['replyCount'] as num).toInt() 
+      replyCount: json['replyCount'] is num
+          ? (json['replyCount'] as num).toInt()
           : int.tryParse(json['replyCount']?.toString() ?? '0') ?? 0,
-      isLiked: json['isLiked'] is bool 
-          ? json['isLiked'] 
+      isLiked: json['isLiked'] is bool
+          ? json['isLiked']
           : json['isLiked']?.toString().toLowerCase() == 'true',
       isGift: json['isGift'] is bool
           ? json['isGift']
           : json['isGift']?.toString().toLowerCase() == 'true',
       giftName: _giftField(json, 'name'),
       giftIcon: _giftField(json, 'icon'),
-      createdAt: json['createdAt']?.toString() ?? '',
-      updatedAt: json['updatedAt']?.toString() ?? '',
+      createdAt: json['createdAt']?.toString() ?? now,
+      updatedAt: json['updatedAt']?.toString() ?? now,
       mentions: MentionRefModel.listFromJson(json['mentions']),
     );
   }

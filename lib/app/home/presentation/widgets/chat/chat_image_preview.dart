@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -89,19 +88,10 @@ class _PreviewImage extends StatelessWidget {
     }
 
     if (isValidNetworkImageUrl(resolved)) {
-      return Image.network(
-        resolved,
+      return SafeNetworkImage(
+        imageUrl: resolved,
         fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return const Center(child: CustomLoadingWidget(size: 48));
-        },
-        errorBuilder: (_, _, _) => const Icon(
-          Icons.broken_image_outlined,
-          color: Colors.white54,
-          size: 56,
-        ),
+        loadingSize: 48,
       );
     }
 

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +17,16 @@ bool isValidNetworkImageUrl(String? url) {
     return false;
   }
 
-  return !MediaUtils.isVideo(resolved);
+  final cleanUrl = resolved.toLowerCase().split('?').first;
+  if (cleanUrl.contains('.m3u8')) return false;
+
+  if (MediaUtils.isLikelyImageUrl(resolved)) return true;
+
+  for (final ext in MediaUtils.videoExtensions) {
+    if (cleanUrl.endsWith(ext)) return false;
+  }
+
+  return true;
 }
 
 class SafeNetworkImage extends StatefulWidget {
@@ -39,8 +51,6 @@ class SafeNetworkImage extends StatefulWidget {
   final BoxFit fit;
   final BorderRadius? borderRadius;
   final IconData errorIcon;
-
-  /// When true, loading/error states are solid black with no icon (e.g. video posters).
   final bool blankOnError;
   final bool showLoadingIndicator;
   final double? loadingSize;
@@ -58,6 +68,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   bool _failed = false;
   bool _resolveStarted = false;
   bool _loadedNotified = false;
+  String? _activeUrl;
 
   String? get _resolvedUrl {
     final raw = widget.imageUrl?.trim();
@@ -65,13 +76,19 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     return MediaUtils.resolveAbsoluteUrl(raw);
   }
 
+  bool get _hasExplicitSize {
+    final width = widget.width;
+    final height = widget.height;
+    return width != null &&
+        height != null &&
+        width.isFinite &&
+        height.isFinite;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_resolveStarted) {
-      _resolveStarted = true;
-      _resolveImage();
-    }
+    _ensureImageResolved();
   }
 
   @override
@@ -82,8 +99,9 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       _imageInfo = null;
       _failed = false;
       _loadedNotified = false;
-      _resolveStarted = true;
-      _resolveImage();
+      _activeUrl = null;
+      _resolveStarted = false;
+      _ensureImageResolved();
       return;
     }
 
@@ -95,20 +113,35 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     }
   }
 
+  void _ensureImageResolved() {
+    if (_resolveStarted && _activeUrl == _resolvedUrl) return;
+    _resolveStarted = true;
+    _resolveImage();
+  }
+
   void _resolveImage() {
+    _disposeStream();
+    _imageInfo = null;
+
     final url = _resolvedUrl;
+    _activeUrl = url;
+
     if (!isValidNetworkImageUrl(url)) {
       _failed = true;
       _notifyLoaded();
+      if (mounted) setState(() {});
       return;
     }
 
-    final provider = NetworkImage(url!);
+    _failed = false;
+    unawaited(_cacheImageInBackground(url!));
+
+    final provider = NetworkImage(url);
     final stream = provider.resolve(createLocalImageConfiguration(context));
     _stream = stream;
     _listener = ImageStreamListener(
       (info, _) {
-        if (!mounted) return;
+        if (!mounted || _activeUrl != url) return;
         setState(() {
           _imageInfo = info;
           _failed = false;
@@ -118,7 +151,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       onError: (exception, stackTrace) {
         debugPrint('SafeNetworkImage failed for $url: $exception');
         widget.onLoadFailed?.call();
-        if (!mounted) return;
+        if (!mounted || _activeUrl != url) return;
         setState(() {
           _failed = true;
           _imageInfo = null;
@@ -127,6 +160,14 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       },
     );
     stream.addListener(_listener!);
+  }
+
+  Future<void> _cacheImageInBackground(String url) async {
+    try {
+      await AppMediaCacheManager.instance.downloadFile(url);
+    } catch (_) {
+      // Display uses NetworkImage; cache is best-effort only.
+    }
   }
 
   void _notifyLoaded() {
@@ -153,27 +194,58 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     if (widget.loadingSize != null) return widget.loadingSize!;
     final w = widget.width;
     final h = widget.height;
-    if (w != null && h != null) {
+    if (w != null && h != null && w.isFinite && h.isFinite) {
       return ((w < h ? w : h) * 0.55).clamp(20.0, 48.0);
     }
     return 48;
   }
 
+  Widget _wrapSized(Widget child) {
+    if (_hasExplicitSize) {
+      return SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: child,
+      );
+    }
+    return SizedBox.expand(child: child);
+  }
+
   Widget _loadingPlaceholder(ThemeData theme) {
     if (!widget.showLoadingIndicator && widget.blankOnError) {
-      return _blackBox();
+      return _wrapSized(_blackBox());
     }
 
     final background = widget.blankOnError
         ? Colors.black
         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2);
 
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: background,
-      alignment: Alignment.center,
-      child: CustomLoadingWidget(size: _effectiveLoadingSize),
+    return _wrapSized(
+      ColoredBox(
+        color: background,
+        child: Center(
+          child: CustomLoadingWidget(size: _effectiveLoadingSize),
+        ),
+      ),
+    );
+  }
+
+  Widget _blackBox() {
+    return const ColoredBox(color: Colors.black);
+  }
+
+  Widget _placeholder(ThemeData theme) {
+    if (widget.blankOnError) {
+      return _wrapSized(_blackBox());
+    }
+    return _wrapSized(
+      ColoredBox(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        child: Icon(
+          widget.errorIcon,
+          color: theme.iconTheme.color?.withValues(alpha: 0.35),
+        ),
+      ),
     );
   }
 
@@ -189,46 +261,29 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       return _loadingPlaceholder(theme);
     }
 
-    Widget image = SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: RawImage(
-        image: _imageInfo!.image,
-        width: widget.width,
-        height: widget.height,
-        fit: widget.fit,
-        filterQuality: FilterQuality.medium,
-      ),
+    Widget image = RawImage(
+      image: _imageInfo!.image,
+      fit: widget.fit,
+      width: _hasExplicitSize ? widget.width : null,
+      height: _hasExplicitSize ? widget.height : null,
+      filterQuality: FilterQuality.medium,
     );
+
+    if (!_hasExplicitSize) {
+      image = SizedBox.expand(
+        child: FittedBox(
+          fit: widget.fit,
+          clipBehavior: Clip.hardEdge,
+          child: image,
+        ),
+      );
+    }
 
     if (widget.borderRadius != null) {
       image = ClipRRect(borderRadius: widget.borderRadius!, child: image);
     }
 
     return image;
-  }
-
-  Widget _blackBox() {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: Colors.black,
-    );
-  }
-
-  Widget _placeholder(ThemeData theme) {
-    if (widget.blankOnError) {
-      return _blackBox();
-    }
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-      child: Icon(
-        widget.errorIcon,
-        color: theme.iconTheme.color?.withValues(alpha: 0.35),
-      ),
-    );
   }
 }
 
@@ -325,4 +380,11 @@ class _SafeNetworkAvatarState extends State<SafeNetworkAvatar> {
     }
     return value[0].toUpperCase();
   }
+}
+
+/// Precache a remote image using the disk cache.
+Future<void> precacheSafeNetworkImage(BuildContext context, String url) {
+  final resolved = MediaUtils.resolveAbsoluteUrl(url.trim());
+  if (!isValidNetworkImageUrl(resolved)) return Future.value();
+  return precacheImage(NetworkImage(resolved), context);
 }

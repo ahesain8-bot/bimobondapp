@@ -1,52 +1,71 @@
-import 'dart:ui';
-
-import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
-import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/core/widgets/custom_video_player.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class LiveMediaBackground extends StatelessWidget {
   const LiveMediaBackground({
-    required this.imageUrls,
+    required this.mediaItems,
     required this.pageController,
     required this.onPageChanged,
+    required this.currentIndex,
+    this.posterUrl,
+    this.isActive = true,
+    super.key,
   });
 
-  final List<String> imageUrls;
+  final List<PostMediaEntity> mediaItems;
   final PageController pageController;
   final ValueChanged<int> onPageChanged;
+  final int currentIndex;
+  final String? posterUrl;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrls.length <= 1) {
-      final url = imageUrls.isNotEmpty ? imageUrls.first : '';
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black),
-      );
+    if (mediaItems.isEmpty) {
+      return const ColoredBox(color: Colors.black);
+    }
+
+    if (mediaItems.length <= 1) {
+      return _buildMediaItem(mediaItems.first, 0);
     }
 
     return PageView.builder(
       controller: pageController,
-      itemCount: imageUrls.length,
+      itemCount: mediaItems.length,
       onPageChanged: onPageChanged,
       physics: const BouncingScrollPhysics(),
-      itemBuilder: (context, index) {
-        return Image.network(
-          imageUrls[index],
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, _, _) => const ColoredBox(color: Colors.black),
-        );
-      },
+      itemBuilder: (context, index) => _buildMediaItem(mediaItems[index], index),
+    );
+  }
+
+  Widget _buildMediaItem(PostMediaEntity media, int index) {
+    final url = MediaUtils.resolveAbsoluteUrl(media.url);
+    final isVideo = MediaUtils.isVideo(url, mediaType: media.mediaType);
+
+    if (isVideo) {
+      return CustomVideoPlayer(
+        key: ValueKey('auction_media_video_$url'),
+        url: url,
+        posterUrl: posterUrl,
+        isActive: isActive && currentIndex == index,
+      );
+    }
+
+    if (url.isEmpty) {
+      return const ColoredBox(color: Colors.black);
+    }
+
+    return SafeNetworkImage(
+      key: ValueKey('auction_media_image_$url'),
+      imageUrl: url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorIcon: LucideIcons.imageOff,
     );
   }
 }
