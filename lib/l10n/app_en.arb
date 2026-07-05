@@ -914,6 +914,24 @@
   "walletTitle": "Wallet",
   "walletBalanceLabel": "Coins Balance",
   "walletChoosePackage": "Choose a Package",
+  "walletCustomAmountTitle": "Custom amount",
+  "walletCustomCoinsLabel": "How many coins?",
+  "walletCustomCoinsHint": "e.g. 500",
+  "walletCustomCoinsReceive": "You receive",
+  "walletCustomCoinsValue": "{coins} coins",
+  "@walletCustomCoinsValue": {
+    "placeholders": {
+      "coins": {
+        "type": "String"
+      }
+    }
+  },
+  "walletCustomYouPay": "You pay",
+  "walletPackageQuotes": "Package quotes",
+  "walletPackageQuotePrice": "Package price",
+  "walletPricingPreviewCost": "Total cost",
+  "walletPricingPreviewLoading": "Calculating...",
+  "walletCustomAmountInvalid": "Enter a valid coin amount.",
   "walletPurchaseSuccess": "Successfully purchased {amount} coins!",
   "@walletPurchaseSuccess": {
     "placeholders": {
@@ -936,6 +954,43 @@
       }
     }
   },
+  "coinsHubTitle": "Coins",
+  "coinsAvailableBalance": "Available balance",
+  "coinsWalletAccountName": "{name}'s Account",
+  "@coinsWalletAccountName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "coinsBalanceRefresh": "Refresh balance",
+  "coinsBalanceFooterHint": "UPDATED ON OPEN",
+  "coinsBalanceFooter": "{date} | {hint}",
+  "@coinsBalanceFooter": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "hint": {
+        "type": "String"
+      }
+    }
+  },
+  "coinsTabBuy": "Buy",
+  "coinsTabMarket": "Market",
+  "coinsTabVault": "Vault",
+  "coinsUnit": "coins",
+  "coinsHistoryTitle": "Recent activity",
+  "coinsMarketSuccess": "Gift added to your vault!",
+  "coinsVaultEmpty": "No gifts in your vault yet. Visit the market to buy gifts with coins.",
+  "coinsVaultOwned": "In vault",
+  "coinsInsufficientBalance": "Not enough coins. Buy more in the Buy tab.",
+  "walletAccountingPurchase": "Bought coins",
+  "walletAccountingGiftPurchase": "Bought gift",
+  "walletAccountingGiftReceived": "Received gift",
+  "walletAccountingPromotion": "Post promotion",
+  "walletAccountingAdmin": "Balance adjustment",
   "deleteChatTitle": "Delete chat",
   "deleteChatMessage": "Are you sure you want to delete this conversation? This action cannot be undone.",
   "deleteChatConfirm": "Delete",

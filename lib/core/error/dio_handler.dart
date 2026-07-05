@@ -4,18 +4,27 @@ import 'package:flutter/services.dart';
 import 'exceptions.dart';
 
 class DioHandler {
-  static String? _extractErrorMessage(dynamic data) {
+  static String? extractErrorMessage(dynamic data) {
     if (data is! Map) return null;
+
     final message = data['message'];
     if (message is String && message.isNotEmpty) return message;
     if (message is List) {
       return message.map((e) => e.toString()).join('\n');
     }
+
+    final error = data['error'];
+    if (error is String && error.isNotEmpty) return error;
+
     return null;
   }
 
   static Exception handle(dynamic e) {
     if (e is DioException) {
+      if (e.error is AppException) {
+        return e.error as AppException;
+      }
+
       switch (e.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.receiveTimeout:
@@ -23,23 +32,27 @@ class DioHandler {
           return RequestTimeoutException(message: 'Request timeout');
 
         case DioExceptionType.badResponse:
-          switch (e.response?.statusCode) {
+          final apiMessage = extractErrorMessage(e.response?.data);
+          final statusCode = e.response?.statusCode;
+
+          switch (statusCode) {
             case 401:
-              return UnauthorizedException(message: 'Unauthorized');
+              return UnauthorizedException(
+                message: apiMessage ?? 'Unauthorized',
+              );
 
             case 403:
-              return ForbiddenException(message: 'Forbidden');
+              return ForbiddenException(message: apiMessage ?? 'Forbidden');
 
             case 404:
-              return NotFoundException(message: 'Not Found');
+              return NotFoundException(message: apiMessage ?? 'Not Found');
 
             case 500:
-              return ServerException(message: 'Server Error');
+              return ServerException(message: apiMessage ?? 'Server Error');
 
             default:
-              final message = _extractErrorMessage(e.response?.data);
               return ServerException(
-                message: message ?? 'Something went wrong',
+                message: apiMessage ?? 'Something went wrong',
               );
           }
 

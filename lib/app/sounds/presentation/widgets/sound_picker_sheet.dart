@@ -218,7 +218,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     } catch (e) {
       if (!mounted) return;
       setState(() => _uploading = false);
-      PopupDialogs.showErrorDialog(context, e.toString());
+      PopupDialogs.showErrorFrom(context, e);
     }
   }
 

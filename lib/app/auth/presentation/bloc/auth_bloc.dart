@@ -12,6 +12,7 @@ import 'package:bimobondapp/core/usecases/usecase.dart';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
@@ -138,7 +139,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         },
       );
     } catch (e) {
-      emit(AuthFailure(message: e.toString()));
+      emit(AuthFailure(message: ErrorMessageResolver.resolve(e)));
     }
   }
 
@@ -182,12 +183,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     final result = await signInWithFacebookUseCase();
     result.fold(
-      (failure) => emit(
-        const AuthFailure(
-          message: 'Facebook login failed',
-          messageKey: 'facebookLoginFailed',
-        ),
-      ),
+      (failure) => emit(AuthFailure(message: failure.message)),
       (user) => emit(AuthSuccess(user: user)),
     );
   }
@@ -199,12 +195,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     final result = await signInWithGoogleUseCase();
     result.fold(
-      (failure) => emit(
-        const AuthFailure(
-          message: 'Google login failed',
-          messageKey: 'googleLoginFailed',
-        ),
-      ),
+      (failure) => emit(AuthFailure(message: failure.message)),
       (user) => emit(AuthSuccess(user: user)),
     );
   }

@@ -13,7 +13,7 @@ import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart'
 import 'package:bimobondapp/app/social/domain/entities/user_mentions_page_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.dart';
 import 'package:bimobondapp/app/social/domain/repositories/social_repository.dart';
-import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -22,15 +22,7 @@ class SocialRepositoryImpl implements SocialRepository {
 
   final SocialRemoteDataSource remoteDataSource;
 
-  Failure _mapException(Object e) {
-    if (e is ServerException) {
-      return ServerFailure(e.message ?? 'Something went wrong');
-    }
-    if (e is UnauthorizedException) {
-      return UnauthorizedFailure(e.message ?? 'Unauthorized');
-    }
-    return ServerFailure(e.toString());
-  }
+  Failure _mapException(Object e) => FailureMapper.from(e);
 
   @override
   Future<Either<Failure, FollowStatus>> toggleFollow(String userId) async {

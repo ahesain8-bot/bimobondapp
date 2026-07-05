@@ -1,7 +1,7 @@
 import 'package:bimobondapp/app/notifications/data/datasources/notifications_remote_data_source.dart';
 import 'package:bimobondapp/app/notifications/domain/entities/notification_entity.dart';
 import 'package:bimobondapp/app/notifications/domain/repositories/notifications_repository.dart';
-import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -10,15 +10,7 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
 
   final NotificationsRemoteDataSource remoteDataSource;
 
-  Failure _mapException(Object e) {
-    if (e is ServerException) {
-      return ServerFailure(e.message ?? 'Something went wrong');
-    }
-    if (e is UnauthorizedException) {
-      return UnauthorizedFailure(e.message ?? 'Unauthorized');
-    }
-    return ServerFailure(e.toString());
-  }
+  Failure _mapException(Object e) => FailureMapper.from(e);
 
   @override
   Future<Either<Failure, NotificationsPageEntity>> getNotifications({

@@ -5,7 +5,7 @@ class GiftModel extends GiftEntity {
     required super.id,
     required super.name,
     required super.icon,
-    required super.priceUsd,
+    required super.priceCoins,
     super.imageUrl,
   });
 
@@ -32,23 +32,22 @@ class GiftModel extends GiftEntity {
       icon = '🎁';
     }
 
-    final priceUsd = _readDouble(
-      json['priceUsd'] ?? json['price'] ?? json['cost'] ?? json['amount'] ?? 0,
+    final priceCoins = _readInt(
+      json['priceCoins'] ??
+          json['priceUsd'] ??
+          json['price'] ??
+          json['cost'] ??
+          json['amount'] ??
+          0,
     );
 
     return GiftModel(
       id: id,
       name: name.isEmpty ? 'Gift' : name,
       icon: icon,
-      priceUsd: priceUsd,
+      priceCoins: priceCoins,
       imageUrl: imageUrl,
     );
-  }
-
-  static double _readDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0;
-    return 0;
   }
 
   static int _readInt(dynamic value) {
@@ -74,9 +73,9 @@ class GiftInventoryItemModel extends GiftInventoryItemEntity {
     }
 
     final giftId = (json['giftId'] ??
-            json['id'] ??
             gift?.id ??
-            (nestedGift is Map ? nestedGift['id'] : null))
+            (nestedGift is Map ? nestedGift['id'] : null) ??
+            json['id'])
         ?.toString();
 
     return GiftInventoryItemModel(
@@ -91,7 +90,7 @@ class GiftInventoryItemModel extends GiftInventoryItemEntity {
 
 class GiftInventoryModel extends GiftInventoryEntity {
   const GiftInventoryModel({
-    required super.coinBalance,
+    required super.balanceCoins,
     required super.items,
   });
 
@@ -111,7 +110,7 @@ class GiftInventoryModel extends GiftInventoryEntity {
 
     final items = _parseItems(json);
     return GiftInventoryModel(
-      coinBalance: _readBalance(json),
+      balanceCoins: _readBalance(json),
       items: items,
     );
   }
@@ -132,9 +131,9 @@ class GiftInventoryModel extends GiftInventoryEntity {
       }
     }
     return GiftInventoryModel(
-      coinBalance: update.coinBalance > 0
-          ? update.coinBalance
-          : (current?.coinBalance ?? 0),
+      balanceCoins: update.balanceCoins > 0
+          ? update.balanceCoins
+          : (current?.balanceCoins ?? 0),
       items: byGiftId.values.toList(),
     );
   }
@@ -155,7 +154,13 @@ class GiftInventoryModel extends GiftInventoryEntity {
       }
     }
 
-    for (final key in ['items', 'gifts', 'inventory', 'inventories']) {
+    for (final key in [
+      'items',
+      'gifts',
+      'inventory',
+      'inventories',
+      'senderInventory',
+    ]) {
       final value = json[key];
       if (value != null) {
         addFromDynamic(value);
@@ -167,12 +172,15 @@ class GiftInventoryModel extends GiftInventoryEntity {
 
   static int _readBalance(Map<String, dynamic> json) {
     for (final key in [
+      'newBalanceCoins',
       'newBalance',
+      'balanceCoins',
       'coinBalance',
       'coins',
       'balance',
       'walletBalance',
       'totalCoins',
+      'balanceUsd',
     ]) {
       final value = json[key];
       if (value is num) return value.toInt();

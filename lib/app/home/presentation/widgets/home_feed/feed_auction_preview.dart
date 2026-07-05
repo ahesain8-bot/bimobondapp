@@ -9,6 +9,7 @@ import 'package:bimobondapp/app/categories/presentation/utils/category_icons.dar
 import 'package:bimobondapp/app/categories/presentation/utils/category_lookup.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/compact_highest_bid.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_auction_display_utils.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
@@ -16,7 +17,6 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -100,8 +100,7 @@ class _FeedAuctionCategoriesCache {
   }
 
   static Future<List<CategoryEntity>> _load() async {
-    final result =
-        await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
     return result.fold((_) => <CategoryEntity>[], (list) => list);
   }
 }
@@ -160,7 +159,8 @@ class FeedAuctionPreview extends StatelessWidget {
     final userName = _auctionUserName(post);
     final avatarUrl = post.user?.avatarUrl;
     final auction = post.auction;
-    final isAuctionFinished = auction != null &&
+    final isAuctionFinished =
+        auction != null &&
         DateTime.now().toUtc().isAfter(auction.endedAt.toUtc());
     final showTapToEnter = showAuctionTapToEnter(post);
 
@@ -175,11 +175,13 @@ class FeedAuctionPreview extends StatelessWidget {
             future: _FeedAuctionCategoriesCache.categories(),
             builder: (context, snapshot) {
               final categories = snapshot.data ?? const <CategoryEntity>[];
-              final categoryLabel =
-                  CategoryLookup.labelForId(post.categoryId, categories);
+              final categoryLabel = CategoryLookup.labelForId(
+                post.categoryId,
+                categories,
+              );
               final categorySlug =
                   CategoryLookup.slugForId(post.categoryId, categories) ??
-                      'default';
+                  'default';
 
               return Stack(
                 fit: StackFit.expand,
@@ -284,12 +286,11 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
   final bool isAuctionFinished;
 
   String _formatHighestBid(AppLocalizations l10n, Locale locale) {
-    final total = auction?.currentTotalUsd ?? 0;
-    final text = total == total.roundToDouble()
-        ? total.round().toString()
-        : total.toStringAsFixed(2);
-    final amount = LocaleFormatUtils.localizeDigits(text, locale);
-    return l10n.liveHighestBidAmount(amount, l10n.currencyUsd);
+    final amount = formatAuctionPricingCoins(
+      auction?.displayHostEarningsCoins ?? 0,
+      locale,
+    );
+    return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
   }
 
   @override
@@ -297,11 +298,11 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context);
     final theme = Theme.of(context);
-    final targetPrice = auction?.targetPriceUsd.round();
-    final targetPriceLabel = targetPrice != null && targetPrice > 0
+    final bidderSpend = auction?.displayBidderSpendCoins;
+    final targetPriceLabel = bidderSpend != null && bidderSpend > 0
         ? l10n.auctionTargetPrice(
-            LocaleFormatUtils.localizeDigits('$targetPrice', locale),
-            l10n.currencyUsd,
+            formatAuctionPricingCoins(bidderSpend, locale),
+            l10n.coinsUnit,
           )
         : null;
 
@@ -313,7 +314,7 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
           CompactHighestBid(
             topBidLabel: l10n.liveTopBid,
             bidAmountText: _formatHighestBid(l10n, locale),
-            targetPrice: targetPrice,
+            targetPrice: bidderSpend?.round(),
             targetPriceLabel: targetPriceLabel,
             isFinished: isAuctionFinished,
             showGiftIcon: true,
@@ -461,8 +462,7 @@ class _FeedAuctionTapToEnterHintState extends State<_FeedAuctionTapToEnterHint>
         final rippleProgress = ((t - 0.2) / 0.65).clamp(0.0, 1.0);
         final rippleScale = 0.5 + rippleProgress * 2.2;
         final rippleOpacity = (1 - rippleProgress) * 0.65;
-        final textOpacity =
-            0.6 + 0.4 * math.sin(t * math.pi * 2).abs();
+        final textOpacity = 0.6 + 0.4 * math.sin(t * math.pi * 2).abs();
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -487,7 +487,9 @@ class _FeedAuctionTapToEnterHintState extends State<_FeedAuctionTapToEnterHint>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: accent.withValues(alpha: rippleOpacity * 0.5),
+                              color: accent.withValues(
+                                alpha: rippleOpacity * 0.5,
+                              ),
                               blurRadius: 12,
                               spreadRadius: 2,
                             ),

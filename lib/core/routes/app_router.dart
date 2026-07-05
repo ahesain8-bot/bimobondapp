@@ -34,7 +34,7 @@ import 'package:bimobondapp/app/social/presentation/pages/user_comments_screen.d
 import 'package:bimobondapp/app/social/presentation/pages/my_followers_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_likes_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_mentions_screen.dart';
-import 'package:bimobondapp/app/gifts/presentation/pages/wallet_screen.dart';
+import 'package:bimobondapp/app/wallets/presentation/pages/coins_hub_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
@@ -146,7 +146,10 @@ class AppRouter {
       GoRoute(
         path: '/settings/wallet',
         name: 'wallet',
-        builder: (context, state) => const WalletScreen(),
+        builder: (context, state) {
+          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
+          return CoinsHubScreen(initialTab: tab);
+        },
       ),
       GoRoute(
         path: '/settings/admin-activity',
@@ -172,9 +175,7 @@ class AppRouter {
         builder: (context, state) {
           final args = postOpenArgsFromExtra(state.extra);
           if (args == null) {
-            return const Scaffold(
-              body: Center(child: Text('Post not found')),
-            );
+            return const Scaffold(body: Center(child: Text('Post not found')));
           }
           if (args.post.isAuctionable) {
             return LiveDetailsScreen(post: args.post);
@@ -192,9 +193,7 @@ class AppRouter {
         builder: (context, state) {
           final args = profilePostsOpenArgsFromExtra(state.extra);
           if (args == null) {
-            return const Scaffold(
-              body: Center(child: Text('Post not found')),
-            );
+            return const Scaffold(body: Center(child: Text('Post not found')));
           }
           return ProfilePostsViewerScreen(args: args);
         },
@@ -318,9 +317,8 @@ class AppRouter {
             initialSound: extra?['initialSound'] as SoundEntity?,
             returnMediaOnDone: extra?['returnMediaOnDone'] as bool? ?? false,
             initialFilterName: extra?['initialFilterName'] as String?,
-            initialFilterCategory:
-                CameraFilterCategory.values.asNameMap()[extra?['initialFilterCategory']
-                    as String?],
+            initialFilterCategory: CameraFilterCategory.values
+                .asNameMap()[extra?['initialFilterCategory'] as String?],
           );
         },
       ),

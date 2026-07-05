@@ -1,12 +1,11 @@
 import 'dart:ui';
-import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_bid_stat_column.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_card_countdown_stat.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_card_footer_row.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_post_category_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_status_badge.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_auction_display_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -26,13 +25,21 @@ class AuctionCard extends StatelessWidget {
   final VoidCallback onOpen;
   final bool showBidButton;
 
-  String _formatGiftTotal(AppLocalizations l10n, Locale locale) {
-    final total = auction.giftTotalUsd;
-    final text = total == total.roundToDouble()
-        ? total.round().toString()
-        : total.toStringAsFixed(2);
-    final amount = LocaleFormatUtils.localizeDigits(text, locale);
-    return l10n.liveHighestBidAmount(amount, l10n.currencyUsd);
+  String _formatHostEarnings(AppLocalizations l10n, Locale locale) {
+    final auctionEntity = auction.post?.auction;
+    final amount = formatAuctionPricingCoins(
+      auctionEntity?.displayHostEarningsCoins ?? auction.giftTotalCoins,
+      locale,
+    );
+    return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
+  }
+
+  String _formatBidderSpend(Locale locale) {
+    final auctionEntity = auction.post?.auction;
+    return formatAuctionPricingCoins(
+      auctionEntity?.displayBidderSpendCoins ?? auction.giftTotalCoins,
+      locale,
+    );
   }
 
   @override
@@ -214,19 +221,15 @@ class AuctionCard extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            // Target price
+                            // Target (coins)
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   CustomText(
                                     l10n.auctionTargetPrice(
-                                      LocaleFormatUtils.localizeDigits(
-                                        auction.post!.auction!.targetPriceUsd
-                                            .toStringAsFixed(0),
-                                        locale,
-                                      ),
-                                      l10n.currencyUsd,
+                                      _formatBidderSpend(locale),
+                                      l10n.coinsUnit,
                                     ),
                                     fontSize: 11,
                                     variant: TextVariant.secondary,
@@ -235,17 +238,14 @@ class AuctionCard extends StatelessWidget {
                                   Row(
                                     children: [
                                       Icon(
-                                        LucideIcons.target,
+                                        LucideIcons.coins,
                                         size: 13,
                                         color: theme.colorScheme.onSurface
                                             .withValues(alpha: 0.65),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        LocaleFormatUtils.localizeDigits(
-                                          '\$${auction.post!.auction!.targetPriceUsd.toStringAsFixed(0)}',
-                                          locale,
-                                        ),
+                                        _formatBidderSpend(locale),
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
@@ -286,7 +286,7 @@ class AuctionCard extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _formatGiftTotal(l10n, locale),
+                                        _formatHostEarnings(l10n, locale),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,

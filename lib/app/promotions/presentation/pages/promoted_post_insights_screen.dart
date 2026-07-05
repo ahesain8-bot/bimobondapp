@@ -4,7 +4,7 @@ import 'package:bimobondapp/app/promotions/data/datasources/promotions_remote_da
 import 'package:bimobondapp/app/promotions/domain/entities/promotion_entities.dart';
 import 'package:bimobondapp/app/promotions/presentation/utils/promoted_post_loader.dart';
 import 'package:bimobondapp/app/promotions/presentation/widgets/promoted_post_insights_widgets.dart';
-import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -72,10 +72,7 @@ class _PromotedPostInsightsScreenState
     }
   }
 
-  String _message(Object error) {
-    if (error is AppException) return error.message ?? error.toString();
-    return error.toString();
-  }
+  String _message(Object error) => ErrorMessageResolver.resolve(error);
 
   Future<void> _toggleCampaignStatus() async {
     final campaign = _stats?.primaryCampaign;

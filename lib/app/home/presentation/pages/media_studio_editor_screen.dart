@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
+    as camera_studio_di;
+import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
@@ -50,10 +54,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
   late int _currentIndex;
 
   CameraFilterCategory _filterCategory = CameraFilterCategory.trending;
+  String _filterCategorySlug = 'trending';
   AwesomeFilter _selectedFilter = AwesomeFilter.None;
   CameraEffectId? _selectedEffect;
   bool _beautyEnabled = false;
   bool _showFilters = true;
+  bool _filtersReady = false;
   bool _isProcessing = false;
 
   MediaItemEditState get _currentState => _states[_currentIndex];
@@ -79,6 +85,25 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
     }
     _currentIndex = widget.initialIndex.clamp(0, widget.items.length - 1);
     _applyStateToUi(_states[_currentIndex]);
+    unawaited(_loadCatalog());
+  }
+
+  Future<void> _loadCatalog() async {
+    await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded();
+    if (!mounted) return;
+    final categories = CameraFilterCatalog.filterCategories;
+    setState(() {
+      _filtersReady = CameraFilterCatalog.hasBackendCatalog;
+      if (categories.isNotEmpty) {
+        final slugs = categories.map((c) => c.slug).toList();
+        if (!slugs.contains(_filterCategorySlug)) {
+          _filterCategorySlug = categories.first.slug;
+        }
+        _filterCategory =
+            CameraFilterCatalog.categoryFromSlug(_filterCategorySlug) ??
+            CameraFilterCategory.trending;
+      }
+    });
   }
 
   void _applyStateToUi(MediaItemEditState state) {
@@ -86,6 +111,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
     _selectedEffect = state.effect;
     _beautyEnabled = state.beautyEnabled;
     _filterCategory = state.filterCategory;
+    _filterCategorySlug = state.filterCategory.name;
   }
 
   void _saveUiToCurrentState() {
@@ -215,24 +241,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
     });
   }
 
-  String _categoryLabel(AppLocalizations l10n, CameraFilterCategory category) {
-    return switch (category) {
-      CameraFilterCategory.trending => l10n.cameraCategoryTrending,
-      CameraFilterCategory.newFilters => l10n.cameraCategoryNew,
-      CameraFilterCategory.portrait => l10n.cameraCategoryPortrait,
-      CameraFilterCategory.vibe => l10n.cameraCategoryVibe,
-      CameraFilterCategory.landscape => l10n.cameraCategoryLandscape,
-    };
-  }
-
   String _filterLabel(AppLocalizations l10n, CameraFilterPreset preset) {
-    return preset.label(originalLabel: l10n.cameraFilterOriginal);
+    return preset.label(l10n: l10n, originalLabel: l10n.cameraFilterOriginal);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final filters = CameraFilterCatalog.forCategory(_filterCategory);
+    final filters = CameraFilterCatalog.forCategorySlug(_filterCategorySlug);
     final currentItem = _currentState.item;
 
     return Scaffold(
@@ -292,11 +308,18 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
                   onSelected: _selectIndex,
                 ),
                 if (widget.items.length > 1) const SizedBox(height: 10),
-                if (_showFilters) ...[
+                if (_showFilters && _filtersReady) ...[
                   CameraFilterCategoryTabs(
-                    selected: _filterCategory,
-                    labelBuilder: (c) => _categoryLabel(l10n, c),
-                    onSelected: (c) => setState(() => _filterCategory = c),
+                    categories: CameraFilterCatalog.filterCategories,
+                    selectedSlug: _filterCategorySlug,
+                    labelBuilder: (category) =>
+                        CameraFilterCatalog.labelForCategory(l10n, category),
+                    onSelected: (slug) => setState(() {
+                      _filterCategorySlug = slug;
+                      _filterCategory =
+                          CameraFilterCatalog.categoryFromSlug(slug) ??
+                          CameraFilterCategory.trending;
+                    }),
                   ),
                   const SizedBox(height: 10),
                   CameraFilterStrip(

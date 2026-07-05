@@ -8,14 +8,14 @@ class GiftEntity extends Equatable {
     required this.id,
     required this.name,
     required this.icon,
-    required this.priceUsd,
+    required this.priceCoins,
     this.imageUrl,
   });
 
   final String id;
   final String name;
   final String icon;
-  final double priceUsd;
+  final int priceCoins;
   final String? imageUrl;
 
   bool get hasNetworkIcon {
@@ -30,15 +30,12 @@ class GiftEntity extends Equatable {
         clean.contains(r'\');
   }
 
-  String priceUsdLabel(Locale locale) {
-    final amount = priceUsd == priceUsd.roundToDouble()
-        ? priceUsd.round().toString()
-        : priceUsd.toStringAsFixed(2);
-    return '\$${LocaleFormatUtils.localizeDigits(amount, locale)}';
+  String priceCoinsLabel(Locale locale) {
+    return LocaleFormatUtils.localizeDigits(priceCoins.toString(), locale);
   }
 
   @override
-  List<Object?> get props => [id, name, icon, priceUsd, imageUrl];
+  List<Object?> get props => [id, name, icon, priceCoins, imageUrl];
 }
 
 class GiftInventoryItemEntity extends Equatable {
@@ -58,11 +55,11 @@ class GiftInventoryItemEntity extends Equatable {
 
 class GiftInventoryEntity extends Equatable {
   const GiftInventoryEntity({
-    required this.coinBalance,
+    required this.balanceCoins,
     required this.items,
   });
 
-  final int coinBalance;
+  final int balanceCoins;
   final List<GiftInventoryItemEntity> items;
 
   int quantityFor(String giftId) {
@@ -73,5 +70,5 @@ class GiftInventoryEntity extends Equatable {
   }
 
   @override
-  List<Object?> get props => [coinBalance, items];
+  List<Object?> get props => [balanceCoins, items];
 }

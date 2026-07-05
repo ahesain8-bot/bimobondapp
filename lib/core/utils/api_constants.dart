@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'http://192.168.1.123:3000';
+  static const String baseUrl = 'http://134.209.2.225';
   static const String apiKey =
       'YOUR_API_KEY'; // Replace with your ReqRes API Key
   static const String login = '/login';
@@ -42,13 +42,15 @@ class ApiConstants {
   static String toggleRepost(String postId) => '/posts/$postId/repost';
   static String postReposts(String postId) => '/posts/$postId/reposts';
   static const String myReposts = '/users/me/reposts';
-  
+
   // Comments
   static String getComments(String postId) => '/posts/$postId/comments';
   static String addComment(String postId) => '/posts/$postId/comments';
-  static String getReplies(String commentId) => '/posts/comments/$commentId/replies';
+  static String getReplies(String commentId) =>
+      '/posts/comments/$commentId/replies';
   static String deleteComment(String commentId) => '/posts/comments/$commentId';
-  static String toggleLikeComment(String commentId) => '/posts/comments/$commentId/like';
+  static String toggleLikeComment(String commentId) =>
+      '/posts/comments/$commentId/like';
 
   static const String categories = '/categories';
 
@@ -57,7 +59,17 @@ class ApiConstants {
   static const String giftsPurchase = '/gifts/purchase';
   static const String giftsSend = '/gifts/send';
 
+  static const String walletsMe = '/wallets/me';
+  static const String walletsPackages = '/wallets/packages';
+  static const String walletsPurchase = '/wallets/purchase';
+  static const String walletsTopUp = '/wallets/top-up';
+
   static String auctionById(String auctionId) => '/auctions/$auctionId';
+  static const String auctionsPricingPreview = '/auctions/pricing/preview';
+
+  static const String cameraStudioCatalog = '/camera-studio/catalog';
+
+  static String get cameraStudioCatalogUrl => '$baseUrl$cameraStudioCatalog';
 
   // Chats
   static const String chats = '/chats';

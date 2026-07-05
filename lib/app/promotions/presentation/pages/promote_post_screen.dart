@@ -4,7 +4,7 @@ import 'package:bimobondapp/app/promotions/data/datasources/promotions_remote_da
 import 'package:bimobondapp/app/promotions/domain/entities/promotion_entities.dart';
 import 'package:bimobondapp/app/promotions/presentation/widgets/promote_post_widgets.dart';
 import 'package:bimobondapp/core/data/user_location_store.dart';
-import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -53,12 +53,7 @@ class _PromotePostScreenState extends State<PromotePostScreen> {
 
   int get _stepNumber => _step.index + 1;
 
-  String _errorMessage(Object error) {
-    if (error is AppException) {
-      return error.message ?? 'Something went wrong';
-    }
-    return error.toString();
-  }
+  String _errorMessage(Object error) => ErrorMessageResolver.resolve(error);
 
   @override
   void initState() {

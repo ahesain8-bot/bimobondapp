@@ -267,11 +267,9 @@ class PostModel extends PostEntity {
   static Map<String, dynamic> _auctionToJson(PostAuctionEntity auction) => {
     if (auction.id != null) 'id': auction.id,
     'itemName': auction.itemName,
-    'itemImageUrl': auction.itemImageUrl,
-    'startingPriceUsd': auction.startingPriceUsd,
-    'targetPriceUsd': auction.targetPriceUsd,
-    'currentTotalUsd': auction.currentTotalUsd,
-    'giftCount': auction.giftCount,
+    if (auction.itemImageUrl != null) 'itemImageUrl': auction.itemImageUrl,
+    'startingPrice': auction.startingPrice,
+    'targetPrice': auction.targetPrice,
     'startedAt': auction.startedAt.toUtc().toIso8601String(),
     'endedAt': auction.endedAt.toUtc().toIso8601String(),
   };

@@ -15,7 +15,10 @@ Future<void> initGifts() async {
   );
 
   sl.registerLazySingleton<GiftsRepository>(
-    () => GiftsRepositoryImpl(remoteDataSource: sl()),
+    () => GiftsRepositoryImpl(
+      remoteDataSource: sl(),
+      walletsRepository: sl(),
+    ),
   );
 
   sl.registerLazySingleton(() => GetGiftsUseCase(sl()));

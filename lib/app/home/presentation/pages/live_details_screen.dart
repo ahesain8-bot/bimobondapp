@@ -14,6 +14,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as di;
 import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_auction_display_utils.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -73,7 +74,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   final PageController _mediaPageController = PageController();
   int _currentImageIndex = 0;
   int _highestBid = LiveDetailsLayoutConstants.initialHighestBid;
-  double? _giftTotalUsdOverride;
+  int? _giftTotalCoinsOverride;
   bool _isAuctionFinished = false;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
@@ -116,11 +117,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     return urls;
   }
 
-  double get _giftTotalUsd {
-    if (_giftTotalUsdOverride != null) return _giftTotalUsdOverride!;
+  int get _giftTotalCoins {
+    if (_giftTotalCoinsOverride != null) return _giftTotalCoinsOverride!;
     final auction = widget.post?.auction;
-    if (auction != null) return auction.currentTotalUsd;
-    return _highestBid.toDouble();
+    if (auction != null) return auction.currentTotalCoins;
+    return _highestBid;
   }
 
   bool get _usesGiftTotal => widget.post?.auction != null;
@@ -183,19 +184,16 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   void _recordPostViewIfNeeded() {
     final post = widget.post;
     if (post == null || post.isStory) return;
-    PostViewRecorder.recordIfNeeded(
-      postId: post.id,
-      isOwner: _isPostOwner(),
-    );
+    PostViewRecorder.recordIfNeeded(postId: post.id, isOwner: _isPostOwner());
   }
 
   @override
   void didUpdateWidget(LiveDetailsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final prevTotal = oldWidget.post?.auction?.currentTotalUsd;
-    final nextTotal = widget.post?.auction?.currentTotalUsd;
+    final prevTotal = oldWidget.post?.auction?.currentTotalCoins;
+    final nextTotal = widget.post?.auction?.currentTotalCoins;
     if (prevTotal != nextTotal) {
-      _giftTotalUsdOverride = null;
+      _giftTotalCoinsOverride = null;
       if (nextTotal != null && nextTotal != prevTotal) {
         _bidPopController.forward(from: 0);
       }
@@ -206,8 +204,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   void _syncAuctionFinishedFromGiftTotal() {
     final auction = widget.post?.auction;
     if (auction == null || _isAuctionFinished) return;
-    final target = auction.targetPriceUsd;
-    if (target > 0 && _giftTotalUsd >= target) {
+    final targetCoins = auction.targetPriceCoins;
+    if (targetCoins > 0 && _giftTotalCoins >= targetCoins) {
       _isAuctionFinished = true;
       _pulseController.stop();
     }
@@ -376,8 +374,6 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     return l10n.liveViewersShort(formatted);
   }
 
-  int? get _auctionTargetPrice => widget.post?.auction?.targetPriceUsd.round();
-
   bool get _biddingEnabled {
     final auction = widget.post?.auction;
     if (auction == null) return true;
@@ -405,7 +401,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   void _addBid(int amount) {
     if (!_biddingEnabled) return;
 
-    final target = _auctionTargetPrice;
+    final target = widget.post?.auction?.targetPriceCoins;
     if (target != null && target > 0) {
       final nextBid = _highestBid + amount;
       if (nextBid >= target) {
@@ -479,9 +475,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     result.fold((_) {}, (details) {
       setState(() {
-        _giftTotalUsdOverride = details.currentTotalUsd;
-        if (details.targetPriceUsd > 0 &&
-            details.currentTotalUsd >= details.targetPriceUsd) {
+        _giftTotalCoinsOverride = details.currentTotalCoins;
+        if (details.targetPriceCoins > 0 &&
+            details.currentTotalCoins >= details.targetPriceCoins) {
           if (!_isAuctionFinished) {
             _completeAuction();
           }
@@ -553,18 +549,38 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     return avatar;
   }
 
-  String _bidCurrencyLabel(AppLocalizations l10n) =>
-      widget.post?.auction != null ? l10n.currencyUsd : l10n.currencySar;
+  String _bidCurrencyLabel(AppLocalizations l10n) {
+    if (widget.post?.auction != null) return l10n.coinsUnit;
+    return widget.post?.auction?.currencyCode ?? l10n.currencySar;
+  }
 
   String _formatHighestBid(AppLocalizations l10n) {
     final locale = Localizations.localeOf(context);
-    final total = _giftTotalUsd;
-    final text = total == total.roundToDouble()
-        ? total.round().toString()
-        : total.toStringAsFixed(2);
-    final amount = LocaleFormatUtils.localizeDigits(text, locale);
+    final auction = widget.post?.auction;
+    if (auction != null) {
+      final amount = formatAuctionPricingCoins(
+        auction.displayHostEarningsCoins,
+        locale,
+      );
+      return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
+    }
+    final amount = LocaleFormatUtils.localizeDigits('$_giftTotalCoins', locale);
     return l10n.liveHighestBidAmount(amount, _bidCurrencyLabel(l10n));
   }
+
+  String? _auctionTargetPriceLabel(AppLocalizations l10n) {
+    final auction = widget.post?.auction;
+    if (auction == null) return null;
+    final spend = auction.displayBidderSpendCoins;
+    if (spend <= 0) return null;
+    return l10n.auctionTargetPrice(
+      formatAuctionPricingCoins(spend, Localizations.localeOf(context)),
+      l10n.coinsUnit,
+    );
+  }
+
+  int? get _auctionTargetPrice =>
+      widget.post?.auction?.displayBidderSpendCoins.round();
 
   bool get _isAuctionInPeriod {
     final auction = widget.post?.auction;
@@ -715,8 +731,13 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                         showAuctionGifts: _isAuctionPost,
                         onAuctionGifts: _showAuctionGiftsSheet,
                         showOwnerMenu: isPostOwner,
-                        showFollowButton: !isPostOwner && _hostUserId != null && !_isAuctionPost,
-                        onProfileTap: _hostUserId != null ? _openHostProfile : null,
+                        showFollowButton:
+                            !isPostOwner &&
+                            _hostUserId != null &&
+                            !_isAuctionPost,
+                        onProfileTap: _hostUserId != null
+                            ? _openHostProfile
+                            : null,
                         onOwnerMenu: _showOwnerOptions,
                         onClose: () => context.pop(),
                         onFollowTap: _isFollowLoading ? () {} : _toggleFollow,
@@ -738,15 +759,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                           bidAmountText: _formatHighestBid(l10n),
                           showGiftIcon: _usesGiftTotal,
                           targetPrice: targetPrice,
-                          targetPriceLabel: targetPrice != null
-                              ? l10n.auctionTargetPrice(
-                                  LocaleFormatUtils.localizeDigits(
-                                    '$targetPrice',
-                                    Localizations.localeOf(context),
-                                  ),
-                                  _bidCurrencyLabel(l10n),
-                                )
-                              : null,
+                          targetPriceLabel: _auctionTargetPriceLabel(l10n),
                           isFinished: _isAuctionFinished,
                           popAnimation: _bidPopAnimation,
                           theme: theme,

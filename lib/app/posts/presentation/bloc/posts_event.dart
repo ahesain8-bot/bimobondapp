@@ -246,6 +246,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
   final String? userId;
   final bool? isLiked;
   final bool? isSaved;
+
   /// `false` for posts feed/profile; must stay false for non-story lists.
   final bool isStory;
   final FeedContentType? contentType;

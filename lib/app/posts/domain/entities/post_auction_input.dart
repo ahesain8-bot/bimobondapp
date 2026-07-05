@@ -4,16 +4,16 @@ class PostAuctionInput extends Equatable {
   const PostAuctionInput({
     required this.itemName,
     this.itemImageUrl,
-    required this.startingPriceUsd,
-    required this.targetPriceUsd,
+    required this.startingPrice,
+    required this.targetPrice,
     required this.startedAt,
     required this.endedAt,
   });
 
   final String itemName;
   final String? itemImageUrl;
-  final double startingPriceUsd;
-  final double targetPriceUsd;
+  final double startingPrice;
+  final double targetPrice;
   final DateTime startedAt;
   final DateTime endedAt;
 
@@ -21,8 +21,8 @@ class PostAuctionInput extends Equatable {
     return PostAuctionInput(
       itemName: itemName,
       itemImageUrl: itemImageUrl ?? this.itemImageUrl,
-      startingPriceUsd: startingPriceUsd,
-      targetPriceUsd: targetPriceUsd,
+      startingPrice: startingPrice,
+      targetPrice: targetPrice,
       startedAt: startedAt,
       endedAt: endedAt,
     );
@@ -30,9 +30,9 @@ class PostAuctionInput extends Equatable {
 
   Map<String, dynamic> toJson() => {
         'itemName': itemName,
-        'itemImageUrl': itemImageUrl,
-        'startingPriceUsd': startingPriceUsd,
-        'targetPriceUsd': targetPriceUsd,
+        if (itemImageUrl != null) 'itemImageUrl': itemImageUrl,
+        'startingPrice': startingPrice,
+        'targetPrice': targetPrice,
         'startedAt': startedAt.toUtc().toIso8601String(),
         'endedAt': endedAt.toUtc().toIso8601String(),
       };
@@ -41,8 +41,8 @@ class PostAuctionInput extends Equatable {
   List<Object?> get props => [
         itemName,
         itemImageUrl,
-        startingPriceUsd,
-        targetPriceUsd,
+        startingPrice,
+        targetPrice,
         startedAt,
         endedAt,
       ];

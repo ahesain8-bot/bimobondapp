@@ -3725,6 +3725,72 @@ abstract class AppLocalizations {
   /// **'Choose a Package'**
   String get walletChoosePackage;
 
+  /// No description provided for @walletCustomAmountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom amount'**
+  String get walletCustomAmountTitle;
+
+  /// No description provided for @walletCustomCoinsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How many coins?'**
+  String get walletCustomCoinsLabel;
+
+  /// No description provided for @walletCustomCoinsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 500'**
+  String get walletCustomCoinsHint;
+
+  /// No description provided for @walletCustomCoinsReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'You receive'**
+  String get walletCustomCoinsReceive;
+
+  /// No description provided for @walletCustomCoinsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{coins} coins'**
+  String walletCustomCoinsValue(String coins);
+
+  /// No description provided for @walletCustomYouPay.
+  ///
+  /// In en, this message translates to:
+  /// **'You pay'**
+  String get walletCustomYouPay;
+
+  /// No description provided for @walletPackageQuotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Package quotes'**
+  String get walletPackageQuotes;
+
+  /// No description provided for @walletPackageQuotePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Package price'**
+  String get walletPackageQuotePrice;
+
+  /// No description provided for @walletPricingPreviewCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Total cost'**
+  String get walletPricingPreviewCost;
+
+  /// No description provided for @walletPricingPreviewLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating...'**
+  String get walletPricingPreviewLoading;
+
+  /// No description provided for @walletCustomAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid coin amount.'**
+  String get walletCustomAmountInvalid;
+
   /// No description provided for @walletPurchaseSuccess.
   ///
   /// In en, this message translates to:
@@ -3772,6 +3838,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pay {price}'**
   String walletPayButton(String price);
+
+  /// No description provided for @coinsHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Coins'**
+  String get coinsHubTitle;
+
+  /// No description provided for @coinsAvailableBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Available balance'**
+  String get coinsAvailableBalance;
+
+  /// No description provided for @coinsWalletAccountName.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}\'s Account'**
+  String coinsWalletAccountName(String name);
+
+  /// No description provided for @coinsBalanceRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh balance'**
+  String get coinsBalanceRefresh;
+
+  /// No description provided for @coinsBalanceFooterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'UPDATED ON OPEN'**
+  String get coinsBalanceFooterHint;
+
+  /// No description provided for @coinsBalanceFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'{date} | {hint}'**
+  String coinsBalanceFooter(String date, String hint);
+
+  /// No description provided for @coinsTabBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get coinsTabBuy;
+
+  /// No description provided for @coinsTabMarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Market'**
+  String get coinsTabMarket;
+
+  /// No description provided for @coinsTabVault.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault'**
+  String get coinsTabVault;
+
+  /// No description provided for @coinsUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'coins'**
+  String get coinsUnit;
+
+  /// No description provided for @coinsHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent activity'**
+  String get coinsHistoryTitle;
+
+  /// No description provided for @coinsMarketSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift added to your vault!'**
+  String get coinsMarketSuccess;
+
+  /// No description provided for @coinsVaultEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No gifts in your vault yet. Visit the market to buy gifts with coins.'**
+  String get coinsVaultEmpty;
+
+  /// No description provided for @coinsVaultOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'In vault'**
+  String get coinsVaultOwned;
+
+  /// No description provided for @coinsInsufficientBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough coins. Buy more in the Buy tab.'**
+  String get coinsInsufficientBalance;
+
+  /// No description provided for @walletAccountingPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Bought coins'**
+  String get walletAccountingPurchase;
+
+  /// No description provided for @walletAccountingGiftPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Bought gift'**
+  String get walletAccountingGiftPurchase;
+
+  /// No description provided for @walletAccountingGiftReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Received gift'**
+  String get walletAccountingGiftReceived;
+
+  /// No description provided for @walletAccountingPromotion.
+  ///
+  /// In en, this message translates to:
+  /// **'Post promotion'**
+  String get walletAccountingPromotion;
+
+  /// No description provided for @walletAccountingAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance adjustment'**
+  String get walletAccountingAdmin;
 
   /// No description provided for @deleteChatTitle.
   ///

@@ -19,7 +19,7 @@ class CameraStudioOverlay extends StatelessWidget {
     super.key,
     required this.l10n,
     required this.filters,
-    required this.filterCategory,
+    required this.filterCategorySlug,
     required this.selectedFilter,
     required this.selectedZoom,
     required this.selectedDuration,
@@ -58,14 +58,13 @@ class CameraStudioOverlay extends StatelessWidget {
     this.showGalleryUpload = true,
     this.onLongPressStart,
     this.onLongPressEnd,
-    required this.filterCategoryLabelBuilder,
     required this.filterLabelBuilder,
     required this.studioModeLabelBuilder,
   });
 
   final AppLocalizations l10n;
   final List<CameraFilterPreset> filters;
-  final CameraFilterCategory filterCategory;
+  final String filterCategorySlug;
   final AwesomeFilter selectedFilter;
   final double selectedZoom;
   final int selectedDuration;
@@ -84,7 +83,7 @@ class CameraStudioOverlay extends StatelessWidget {
   final CameraEffectId? selectedEffect;
   final VoidCallback onClose;
   final VoidCallback onDurationTap;
-  final ValueChanged<CameraFilterCategory> onFilterCategorySelected;
+  final ValueChanged<String> onFilterCategorySelected;
   final ValueChanged<CameraFilterPreset> onFilterSelected;
   final ValueChanged<double> onZoomSelected;
   final ValueChanged<CameraStudioMode> onStudioModeSelected;
@@ -104,8 +103,6 @@ class CameraStudioOverlay extends StatelessWidget {
   final bool showGalleryUpload;
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
-  final String Function(CameraFilterCategory category)
-  filterCategoryLabelBuilder;
   final String Function(CameraFilterPreset preset) filterLabelBuilder;
   final String Function(CameraStudioMode mode) studioModeLabelBuilder;
 
@@ -147,8 +144,10 @@ class CameraStudioOverlay extends StatelessWidget {
               const Spacer(),
               if (showFilters && !isLiveMode) ...[
                 CameraFilterCategoryTabs(
-                  selected: filterCategory,
-                  labelBuilder: filterCategoryLabelBuilder,
+                  categories: CameraFilterCatalog.filterCategories,
+                  selectedSlug: filterCategorySlug,
+                  labelBuilder: (category) =>
+                      CameraFilterCatalog.labelForCategory(l10n, category),
                   onSelected: onFilterCategorySelected,
                 ),
                 const SizedBox(height: 10),

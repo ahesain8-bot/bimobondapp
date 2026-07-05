@@ -1,0 +1,32 @@
+import 'package:bimobondapp/l10n/app_localizations.dart';
+
+String cameraStudioLabelFromKey(AppLocalizations l10n, String key) {
+  return switch (key) {
+    'cameraCategoryTrending' => l10n.cameraCategoryTrending,
+    'cameraCategoryNew' => l10n.cameraCategoryNew,
+    'cameraCategoryPortrait' => l10n.cameraCategoryPortrait,
+    'cameraCategoryVibe' => l10n.cameraCategoryVibe,
+    'cameraCategoryLandscape' => l10n.cameraCategoryLandscape,
+    'cameraFilterOriginal' => l10n.cameraFilterOriginal,
+    'cameraFilterWarm' => l10n.cameraFilterWarm,
+    'cameraFilterCool' => l10n.cameraFilterCool,
+    'cameraFilterSunny' => l10n.cameraFilterSunny,
+    'cameraFilterPink' => l10n.cameraFilterPink,
+    'cameraFilterMoody' => l10n.cameraFilterMoody,
+    'cameraFilterBw' => l10n.cameraFilterBw,
+    'cameraFilterRetro' => l10n.cameraFilterRetro,
+    'cameraFilterFlashVintage' => l10n.cameraFilterFlashVintage,
+    'cameraFilterBeautyGlow' => l10n.cameraFilterBeautyGlow,
+    'cameraFilterNaturalBright' => l10n.cameraFilterNaturalBright,
+    'cameraFilterGoldenHour' => l10n.cameraFilterGoldenHour,
+    'cameraEffectCrown' => l10n.cameraEffectCrown,
+    'cameraEffectBunny' => l10n.cameraEffectBunny,
+    'cameraEffectSunglasses' => l10n.cameraEffectSunglasses,
+    'cameraEffectDog' => l10n.cameraEffectDog,
+    'cameraEffectHearts' => l10n.cameraEffectHearts,
+    'cameraEffectSparkle' => l10n.cameraEffectSparkle,
+    'cameraEffectNeon' => l10n.cameraEffectNeon,
+    'cameraEffectGlitch' => l10n.cameraEffectGlitch,
+    _ => key,
+  };
+}

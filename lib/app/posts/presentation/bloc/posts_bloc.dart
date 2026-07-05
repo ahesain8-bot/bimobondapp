@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/create_post_usecase.dart';
@@ -111,9 +112,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     );
     result.fold(
       (failure) => emit(PostsFailure(failure.message)),
-      (isReposted) => emit(
-        RepostPostSuccess(postId: event.postId, isReposted: isReposted),
-      ),
+      (isReposted) =>
+          emit(RepostPostSuccess(postId: event.postId, isReposted: isReposted)),
     );
   }
 
@@ -165,7 +165,9 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   }
 
   Future<String?> _uploadVideoThumbnail(File videoFile) async {
-    final thumbFile = await VideoThumbnailUtils.generateThumbnailFile(videoFile);
+    final thumbFile = await VideoThumbnailUtils.generateThumbnailFile(
+      videoFile,
+    );
     if (thumbFile == null) return null;
 
     try {
@@ -239,7 +241,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         (post) => emit(CreatePostSuccess(post)),
       );
     } catch (e) {
-      emit(PostsFailure(e.toString()));
+      emit(PostsFailure(ErrorMessageResolver.resolve(e)));
     }
   }
 

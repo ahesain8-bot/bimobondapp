@@ -16,6 +16,7 @@ import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 typedef OnGiftSentCallback = void Function();
 
@@ -161,11 +162,34 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   int _ownedQuantity(String giftId) =>
       _inventory?.quantityFor(giftId) ?? 0;
 
+  bool _canAfford(GiftEntity gift) {
+    if (_ownedQuantity(gift.id) > 0) return true;
+    final balance = _inventory?.balanceCoins ?? 0;
+    return balance >= gift.priceCoins;
+  }
+
+  Future<bool> _offerTopUp() async {
+    final l10n = AppLocalizations.of(context)!;
+    var confirmed = false;
+    await PopupDialogs.showConfirmDialog(
+      context,
+      title: l10n.coinsInsufficientBalance,
+      message: '',
+      confirmLabel: l10n.walletTopUpButton,
+      cancelLabel: l10n.cancel,
+      onConfirm: () => confirmed = true,
+    );
+    if (!mounted || !confirmed) return false;
+    Navigator.pop(context);
+    context.push('/settings/wallet?tab=0');
+    return false;
+  }
+
   void _applyInventoryUpdate(GiftInventoryEntity inventory) {
     final update = inventory is GiftInventoryModel
         ? inventory
         : GiftInventoryModel(
-            coinBalance: inventory.coinBalance,
+            balanceCoins: inventory.balanceCoins,
             items: inventory.items,
           );
     setState(() {
@@ -194,6 +218,10 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   Future<void> _purchase(GiftEntity gift) async {
     if (!_isLoggedIn) {
       _showLoginRequired();
+      return;
+    }
+    if (!_canAfford(gift)) {
+      await _offerTopUp();
       return;
     }
 
@@ -241,6 +269,11 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     }
 
     final needsPurchase = _ownedQuantity(gift.id) < 1;
+    if (needsPurchase && !_canAfford(gift)) {
+      await _offerTopUp();
+      return;
+    }
+
     setState(() {
       _busy = true;
       _isPurchasing = needsPurchase;
@@ -335,7 +368,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                           ? const GiftBalanceChipSkeleton()
                           : _CoinBalanceChip(
                               label: l10n.liveCoinsBalance(
-                                _inventory?.coinBalance ?? 0,
+                                _inventory?.balanceCoins ?? 0,
                               ),
                             ),
                     ),
@@ -568,7 +601,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       onPrimary = () => _purchase(selected);
     } else {
       primaryLabel = l10n.liveGiftBuy(
-        selected.priceUsdLabel(Localizations.localeOf(context)),
+        selected.priceCoinsLabel(Localizations.localeOf(context)),
       );
       onPrimary = () => _purchase(selected);
     }
@@ -693,18 +726,17 @@ class _GiftPriceChip extends StatelessWidget {
   final bool emphasized;
 
   String _formattedAmount(Locale locale) {
-    final amount = gift.priceUsd;
-    final text = amount == amount.roundToDouble()
-        ? amount.round().toString()
-        : amount.toStringAsFixed(2);
-    return LocaleFormatUtils.localizeDigits(text, locale);
+    return LocaleFormatUtils.localizeDigits(
+      gift.priceCoins.toString(),
+      locale,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
     final amountText = _formattedAmount(locale);
-    final priceText = l10n.liveGiftPriceAmount(amountText, l10n.currencyUsd);
+    final priceText = l10n.liveGiftPriceAmount(amountText, l10n.coinsUnit);
     final priceFontSize = compact
         ? LiveDetailsLayoutConstants.giftTilePriceFontSize
         : LiveDetailsLayoutConstants.giftFooterPriceFontSize;

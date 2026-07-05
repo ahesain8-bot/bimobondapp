@@ -7,7 +7,7 @@ class AuctionItem {
     required this.title,
     required this.subtitle,
     required this.imageUrl,
-    required this.giftTotalUsd,
+    required this.giftTotalCoins,
     required this.giftCount,
     this.ownerUsername,
     this.ownerFullName,
@@ -25,7 +25,7 @@ class AuctionItem {
   final String title;
   final String subtitle;
   final String imageUrl;
-  final double giftTotalUsd;
+  final int giftTotalCoins;
   final int giftCount;
   final String? ownerUsername;
   final String? ownerFullName;
@@ -62,7 +62,7 @@ class AuctionItem {
           ? post.description!.trim()
           : '',
       imageUrl: resolveAuctionPostImageUrl(post),
-      giftTotalUsd: auction.currentTotalUsd,
+      giftTotalCoins: auction.currentTotalCoins,
       giftCount: auction.giftCount,
       ownerUsername: hasOwnerHandle ? ownerHandle : null,
       ownerFullName: owner?.fullName?.trim().isNotEmpty == true

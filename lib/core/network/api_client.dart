@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
-import 'package:bimobondapp/core/utils/api_constants.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
+import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/core/utils/api_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
@@ -47,8 +48,20 @@ class ApiClient {
       onResponse: (response, handler) {
         return handler.next(response);
       },
-      onError: (DioException e, handler) {
-        throw DioHandler.handle(e);
+      onError: (DioException error, handler) {
+        final exception = DioHandler.handle(error);
+        if (exception is AppException) {
+          return handler.reject(
+            DioException(
+              requestOptions: error.requestOptions,
+              response: error.response,
+              type: error.type,
+              error: exception,
+              message: exception.message,
+            ),
+          );
+        }
+        return handler.next(error);
       },
     ));
   }

@@ -15,10 +15,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 class AuctionGiftsSheet {
   AuctionGiftsSheet._();
 
-  static Future<void> show(
-    BuildContext context, {
-    required String auctionId,
-  }) {
+  static Future<void> show(BuildContext context, {required String auctionId}) {
     return GlassBottomSheet.open<void>(
       context,
       isScrollControlled: true,
@@ -72,11 +69,8 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
     );
   }
 
-  String _formatUsd(double amount, Locale locale) {
-    final text = amount == amount.roundToDouble()
-        ? amount.round().toString()
-        : amount.toStringAsFixed(2);
-    return LocaleFormatUtils.localizeDigits(text, locale);
+  String _formatCoins(int amount, Locale locale) {
+    return LocaleFormatUtils.localizeDigits('$amount', locale);
   }
 
   @override
@@ -93,52 +87,52 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
           children: [
             const SizedBox(height: AppSizes.p4),
             Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.p24),
-                child: Row(
-                  children: [
-                    const Icon(
-                      LucideIcons.gift,
-                      color: LiveDetailsLayoutConstants.giftCommentGold,
-                      size: 22,
-                    ),
-                    const SizedBox(width: AppSizes.p8),
-                    Expanded(
-                      child: Text(
-                        l10n.auctionGiftsTitle,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                        ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSizes.p24),
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.gift,
+                    color: LiveDetailsLayoutConstants.giftCommentGold,
+                    size: 22,
+                  ),
+                  const SizedBox(width: AppSizes.p8),
+                  Expanded(
+                    child: Text(
+                      l10n.auctionGiftsTitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(LucideIcons.x, color: Colors.white70),
-                    ),
-                  ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(LucideIcons.x, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            if (details != null) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.p24,
+                  vertical: AppSizes.p8,
+                ),
+                child: _AuctionGiftsSummaryBar(
+                  itemName: details.itemName,
+                  summary: l10n.auctionGiftsSummary(
+                    _formatCoins(details.currentTotalCoins, locale),
+                    _formatCoins(details.targetPriceCoins, locale),
+                    l10n.coinsUnit,
+                  ),
                 ),
               ),
-              if (details != null) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.p24,
-                    vertical: AppSizes.p8,
-                  ),
-                  child: _AuctionGiftsSummaryBar(
-                    itemName: details.itemName,
-                    summary: l10n.auctionGiftsSummary(
-                      _formatUsd(details.currentTotalUsd, locale),
-                      _formatUsd(details.targetPriceUsd, locale),
-                      l10n.currencyUsd,
-                    ),
-                  ),
-                ),
-              ],
-              Expanded(child: _buildBody(l10n, locale)),
             ],
-          ),
+            Expanded(child: _buildBody(l10n, locale)),
+          ],
         ),
+      ),
     );
   }
 
@@ -170,10 +164,7 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
                 style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: AppSizes.p16),
-              TextButton(
-                onPressed: _load,
-                child: Text(l10n.liveGiftRetry),
-              ),
+              TextButton(onPressed: _load, child: Text(l10n.liveGiftRetry)),
             ],
           ),
         ),
@@ -206,10 +197,8 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
         return _AuctionGiftTransactionTile(
           transaction: sorted[index],
           locale: locale,
-          contributionLabel: (amount) => l10n.auctionGiftsContribution(
-            amount,
-            l10n.currencyUsd,
-          ),
+          contributionLabel: (amount) =>
+              l10n.auctionGiftsContribution(amount, l10n.coinsUnit),
         );
       },
     );
@@ -238,8 +227,9 @@ class _AuctionGiftsSummaryBar extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            LiveDetailsLayoutConstants.giftCommentGoldDeep
-                .withValues(alpha: 0.5),
+            LiveDetailsLayoutConstants.giftCommentGoldDeep.withValues(
+              alpha: 0.5,
+            ),
             LiveDetailsLayoutConstants.giftCommentGold.withValues(alpha: 0.2),
           ],
         ),
@@ -304,16 +294,17 @@ class _AuctionGiftTransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final sender = transaction.sender;
     final gift = transaction.gift;
-    final senderName = (sender.fullName?.trim().isNotEmpty == true
+    final senderName =
+        (sender.fullName?.trim().isNotEmpty == true
             ? sender.fullName!.trim()
             : sender.username) ??
         'User';
     final thumb = gift.thumbnailUrl;
-    final contribution = transaction.contributionUsd == transaction.contributionUsd.roundToDouble()
-        ? transaction.contributionUsd.round().toString()
-        : transaction.contributionUsd.toStringAsFixed(2);
-    final localizedContribution =
-        LocaleFormatUtils.localizeDigits(contribution, locale);
+    final contribution = LocaleFormatUtils.localizeDigits(
+      '${transaction.contributionCoins}',
+      locale,
+    );
+    final localizedContribution = contribution;
 
     return Container(
       padding: const EdgeInsets.all(AppSizes.p12),
@@ -328,9 +319,7 @@ class _AuctionGiftTransactionTile extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
@@ -338,8 +327,8 @@ class _AuctionGiftTransactionTile extends StatelessWidget {
             radius: 20,
             backgroundColor: LiveDetailsLayoutConstants.giftCommentGoldDeep
                 .withValues(alpha: 0.5),
-            backgroundImage: sender.avatarUrl != null &&
-                    sender.avatarUrl!.isNotEmpty
+            backgroundImage:
+                sender.avatarUrl != null && sender.avatarUrl!.isNotEmpty
                 ? NetworkImage(MediaUtils.resolveAbsoluteUrl(sender.avatarUrl!))
                 : null,
             child: sender.avatarUrl == null || sender.avatarUrl!.isEmpty

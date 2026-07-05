@@ -24,6 +24,7 @@ import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.dart';
 import 'package:bimobondapp/core/data/likes_local_data_source.dart';
+import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:dartz/dartz.dart';
@@ -76,10 +77,8 @@ class PostsRepositoryImpl implements PostsRepository {
     try {
       final url = await remoteDataSource.uploadMedia(file);
       return Right(url);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -87,34 +86,33 @@ class PostsRepositoryImpl implements PostsRepository {
     final userId = _userId;
     if (userId == null) return items;
 
-    return items
-        .map((item) {
-          final post = item.post;
-          if (post is! PostModel) return item;
-          final liked = likesLocalDataSource.resolvePostLiked(
-            userId,
-            post.id,
-            post.isLiked,
-          );
-          return FeedItemModel(
-            id: item.id,
-            feedType: item.feedType,
-            sortAt: item.sortAt,
-            post: post.copyWith(isLiked: liked),
-            repostId: item.repostId,
-            repostedAt: item.repostedAt,
-            quote: item.quote,
-            repostedBy: item.repostedBy,
-          );
-        })
-        .toList();
+    return items.map((item) {
+      final post = item.post;
+      if (post is! PostModel) return item;
+      final liked = likesLocalDataSource.resolvePostLiked(
+        userId,
+        post.id,
+        post.isLiked,
+      );
+      return FeedItemModel(
+        id: item.id,
+        feedType: item.feedType,
+        sortAt: item.sortAt,
+        post: post.copyWith(isLiked: liked),
+        repostId: item.repostId,
+        repostedAt: item.repostedAt,
+        quote: item.quote,
+        repostedBy: item.repostedBy,
+      );
+    }).toList();
   }
 
   List<FeedItemEntity> _excludeStoryFeedItems(List<FeedItemEntity> items) =>
       items.where((item) => !item.post.isStory).toList();
 
-  List<FeedItemEntity> _onlyStoryFeedItems(List<FeedItemEntity> items) =>
-      items.where((item) => item.post.isStory && isStoryStillActive(item.post)).toList();
+  List<FeedItemEntity> _onlyStoryFeedItems(List<FeedItemEntity> items) => items
+      .where((item) => item.post.isStory && isStoryStillActive(item.post))
+      .toList();
 
   @override
   Future<Either<Failure, HashtagsPageEntity>> getHashtags({
@@ -131,10 +129,8 @@ class PostsRepositoryImpl implements PostsRepository {
         sort: sort,
       );
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -188,10 +184,8 @@ class PostsRepositoryImpl implements PostsRepository {
           ? _onlyStoryFeedItems(withLikes)
           : _excludeStoryFeedItems(withLikes);
       return Right(filtered);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -201,10 +195,8 @@ class PostsRepositoryImpl implements PostsRepository {
       final post = await remoteDataSource.getPostById(postId);
       final posts = _applyPostLikes([post]);
       return Right(posts.first);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -270,10 +262,8 @@ class PostsRepositoryImpl implements PostsRepository {
 
       final postModel = await remoteDataSource.createPost(postData);
       return Right(postModel);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -289,10 +279,8 @@ class PostsRepositoryImpl implements PostsRepository {
         await likesLocalDataSource.setPostLiked(userId, postId, liked);
       }
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -309,10 +297,8 @@ class PostsRepositoryImpl implements PostsRepository {
         limit: limit,
       );
       return Right(_mapSocialUserPage(pageModel));
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -329,10 +315,8 @@ class PostsRepositoryImpl implements PostsRepository {
         limit: limit,
       );
       return Right(_mapPostViewsPage(pageModel));
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -389,10 +373,8 @@ class PostsRepositoryImpl implements PostsRepository {
         watchedDuration: watchedDuration,
       );
       return Right(count);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -423,10 +405,8 @@ class PostsRepositoryImpl implements PostsRepository {
     try {
       final result = await remoteDataSource.toggleSave(postId);
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -438,10 +418,8 @@ class PostsRepositoryImpl implements PostsRepository {
     try {
       final result = await remoteDataSource.toggleRepost(postId, quote: quote);
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -458,10 +436,8 @@ class PostsRepositoryImpl implements PostsRepository {
         limit: limit,
       );
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -476,10 +452,8 @@ class PostsRepositoryImpl implements PostsRepository {
         limit: limit,
       );
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -522,7 +496,7 @@ class PostsRepositoryImpl implements PostsRepository {
     } on AppException catch (e) {
       return Left(_mapPostMutationFailure(e, isDelete: false));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -534,7 +508,7 @@ class PostsRepositoryImpl implements PostsRepository {
     } on AppException catch (e) {
       return Left(_mapPostMutationFailure(e, isDelete: true));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -553,10 +527,8 @@ class PostsRepositoryImpl implements PostsRepository {
       });
       final withLikes = _applyCommentLikes(result);
       return Right(sortCommentsByKey(withLikes, sort));
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -572,10 +544,8 @@ class PostsRepositoryImpl implements PostsRepository {
         if (parentId != null) 'parentId': parentId,
       });
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -591,10 +561,8 @@ class PostsRepositoryImpl implements PostsRepository {
         'limit': limit,
       });
       return Right(_applyCommentLikes(result));
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -603,10 +571,8 @@ class PostsRepositoryImpl implements PostsRepository {
     try {
       final result = await remoteDataSource.deleteComment(commentId);
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -622,10 +588,8 @@ class PostsRepositoryImpl implements PostsRepository {
         await likesLocalDataSource.setCommentLiked(userId, commentId, liked);
       }
       return Right(result);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message!));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 }

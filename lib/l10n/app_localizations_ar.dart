@@ -1945,6 +1945,41 @@ class AppLocalizationsAr extends AppLocalizations {
   String get walletChoosePackage => 'اختر باقة';
 
   @override
+  String get walletCustomAmountTitle => 'مبلغ مخصص';
+
+  @override
+  String get walletCustomCoinsLabel => 'كم عملة تريد؟';
+
+  @override
+  String get walletCustomCoinsHint => 'مثال: 500';
+
+  @override
+  String get walletCustomCoinsReceive => 'ستحصل على';
+
+  @override
+  String walletCustomCoinsValue(String coins) {
+    return '$coins عملة';
+  }
+
+  @override
+  String get walletCustomYouPay => 'ستدفع';
+
+  @override
+  String get walletPackageQuotes => 'عروض الباقات';
+
+  @override
+  String get walletPackageQuotePrice => 'سعر الباقة';
+
+  @override
+  String get walletPricingPreviewCost => 'التكلفة الإجمالية';
+
+  @override
+  String get walletPricingPreviewLoading => 'جاري الحساب...';
+
+  @override
+  String get walletCustomAmountInvalid => 'أدخل عدد عملات صالح.';
+
+  @override
   String walletPurchaseSuccess(int amount) {
     return 'تم شراء $amount عملة بنجاح!';
   }
@@ -1971,6 +2006,70 @@ class AppLocalizationsAr extends AppLocalizations {
   String walletPayButton(String price) {
     return 'دفع $price';
   }
+
+  @override
+  String get coinsHubTitle => 'العملات';
+
+  @override
+  String get coinsAvailableBalance => 'الرصيد المتاح';
+
+  @override
+  String coinsWalletAccountName(String name) {
+    return 'حساب $name';
+  }
+
+  @override
+  String get coinsBalanceRefresh => 'تحديث الرصيد';
+
+  @override
+  String get coinsBalanceFooterHint => 'يُحدَّث عند الفتح';
+
+  @override
+  String coinsBalanceFooter(String date, String hint) {
+    return '$date | $hint';
+  }
+
+  @override
+  String get coinsTabBuy => 'شراء';
+
+  @override
+  String get coinsTabMarket => 'السوق';
+
+  @override
+  String get coinsTabVault => 'المخزن';
+
+  @override
+  String get coinsUnit => 'عملة';
+
+  @override
+  String get coinsHistoryTitle => 'النشاط الأخير';
+
+  @override
+  String get coinsMarketSuccess => 'تمت إضافة الهدية إلى مخزنك!';
+
+  @override
+  String get coinsVaultEmpty => 'لا توجد هدايا في مخزنك بعد. زُر السوق لشراء هدايا بالعملات.';
+
+  @override
+  String get coinsVaultOwned => 'في المخزن';
+
+  @override
+  String get coinsInsufficientBalance => 'رصيد العملات غير كافٍ. اشترِ المزيد من تبويب الشراء.';
+
+  @override
+  String get walletAccountingPurchase => 'شراء عملات';
+
+  @override
+  String get walletAccountingGiftPurchase => 'شراء هدية';
+
+  @override
+  String get walletAccountingGiftReceived => 'هدية مستلمة';
+
+  @override
+  String get walletAccountingPromotion => 'ترويج منشور';
+
+  @override
+  String get walletAccountingAdmin => 'تعديل الرصيد';
 
   @override
   String get deleteChatTitle => 'حذف المحادثة';

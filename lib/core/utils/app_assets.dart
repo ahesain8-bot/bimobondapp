@@ -11,15 +11,6 @@ class AppAssets {
 
   static const String logo = '$imagesPath/logo.png';
   static const String phoneMockup = '$imagesPath/phone_auth.png';
-  static const String cameraFiltersPath = '$imagesPath/camera_filters';
-  static const String cameraFilterFlashVintage =
-      '$cameraFiltersPath/flash_vintage.png';
-  static const String cameraFilterBeautyGlow =
-      '$cameraFiltersPath/beauty_glow.png';
-  static const String cameraFilterNaturalBright =
-      '$cameraFiltersPath/natural_bright.png';
-  static const String cameraFilterGoldenHour =
-      '$cameraFiltersPath/golden_hour.png';
   static const String emailVerification =
       '$imagesPath/email-address-computer-icons-symbol-email-box-gmail-e0844720a9dd1602e9d85f02387f558c.png';
 

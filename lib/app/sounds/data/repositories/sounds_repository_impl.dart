@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:bimobondapp/app/sounds/data/datasources/sounds_remote_data_source.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/domain/repositories/sounds_repository.dart';
-import 'package:bimobondapp/core/error/exceptions.dart';
+import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -29,10 +29,8 @@ class SoundsRepositoryImpl implements SoundsRepository {
         creatorId: creatorId,
       );
       return Right(pageResult);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message ?? e.toString()));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -43,10 +41,8 @@ class SoundsRepositoryImpl implements SoundsRepository {
     try {
       final sounds = await remoteDataSource.getTrending(limit: limit);
       return Right(sounds);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message ?? e.toString()));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -61,10 +57,8 @@ class SoundsRepositoryImpl implements SoundsRepository {
         limit: limit,
       );
       return Right(pageResult);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message ?? e.toString()));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -73,10 +67,8 @@ class SoundsRepositoryImpl implements SoundsRepository {
     try {
       final detail = await remoteDataSource.getSoundById(id);
       return Right(detail);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message ?? e.toString()));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -93,10 +85,8 @@ class SoundsRepositoryImpl implements SoundsRepository {
         name: name,
       );
       return Right(sound);
-    } on AppException catch (e) {
-      return Left(ServerFailure(e.message ?? e.toString()));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 }

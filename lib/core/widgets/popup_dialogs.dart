@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
@@ -30,6 +31,18 @@ class PopupDialogs {
       title: title ?? l10n?.notificationErrorTitle ?? 'Error',
       message: message,
       isError: true,
+    );
+  }
+
+  static void showErrorFrom(
+    BuildContext context,
+    Object error, {
+    String? title,
+  }) {
+    showErrorDialog(
+      context,
+      ErrorMessageResolver.resolve(error),
+      title: title,
     );
   }
 

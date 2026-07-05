@@ -137,7 +137,7 @@ class AddPostAuctionFields extends StatelessWidget {
                         controller: startingPriceController,
                         label: l10n.auctionsFiltersMinPrice,
                         hint: '0',
-                        icon: LucideIcons.dollarSign,
+                        icon: LucideIcons.banknote,
                         fillColor: fieldFill,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,

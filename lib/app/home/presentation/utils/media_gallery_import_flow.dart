@@ -25,12 +25,7 @@ class MediaGalleryImportFlow {
 
   static List<Map<String, String>> itemsToExtra(List<GalleryMediaItem> items) {
     return items
-        .map(
-          (item) => {
-            'path': item.file.path,
-            'type': item.type,
-          },
-        )
+        .map((item) => {'path': item.file.path, 'type': item.type})
         .toList(growable: false);
   }
 

@@ -898,6 +898,24 @@
   "walletTitle": "المحفظة",
   "walletBalanceLabel": "رصيد العملات",
   "walletChoosePackage": "اختر باقة",
+  "walletCustomAmountTitle": "مبلغ مخصص",
+  "walletCustomCoinsLabel": "كم عملة تريد؟",
+  "walletCustomCoinsHint": "مثال: 500",
+  "walletCustomCoinsReceive": "ستحصل على",
+  "walletCustomCoinsValue": "{coins} عملة",
+  "@walletCustomCoinsValue": {
+    "placeholders": {
+      "coins": {
+        "type": "String"
+      }
+    }
+  },
+  "walletCustomYouPay": "ستدفع",
+  "walletPackageQuotes": "عروض الباقات",
+  "walletPackageQuotePrice": "سعر الباقة",
+  "walletPricingPreviewCost": "التكلفة الإجمالية",
+  "walletPricingPreviewLoading": "جاري الحساب...",
+  "walletCustomAmountInvalid": "أدخل عدد عملات صالح.",
   "walletPurchaseSuccess": "تم شراء {amount} عملة بنجاح!",
   "@walletPurchaseSuccess": {
     "placeholders": {
@@ -920,6 +938,43 @@
       }
     }
   },
+  "coinsHubTitle": "العملات",
+  "coinsAvailableBalance": "الرصيد المتاح",
+  "coinsWalletAccountName": "حساب {name}",
+  "@coinsWalletAccountName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "coinsBalanceRefresh": "تحديث الرصيد",
+  "coinsBalanceFooterHint": "يُحدَّث عند الفتح",
+  "coinsBalanceFooter": "{date} | {hint}",
+  "@coinsBalanceFooter": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "hint": {
+        "type": "String"
+      }
+    }
+  },
+  "coinsTabBuy": "شراء",
+  "coinsTabMarket": "السوق",
+  "coinsTabVault": "المخزن",
+  "coinsUnit": "عملة",
+  "coinsHistoryTitle": "النشاط الأخير",
+  "coinsMarketSuccess": "تمت إضافة الهدية إلى مخزنك!",
+  "coinsVaultEmpty": "لا توجد هدايا في مخزنك بعد. زُر السوق لشراء هدايا بالعملات.",
+  "coinsVaultOwned": "في المخزن",
+  "coinsInsufficientBalance": "رصيد العملات غير كافٍ. اشترِ المزيد من تبويب الشراء.",
+  "walletAccountingPurchase": "شراء عملات",
+  "walletAccountingGiftPurchase": "شراء هدية",
+  "walletAccountingGiftReceived": "هدية مستلمة",
+  "walletAccountingPromotion": "ترويج منشور",
+  "walletAccountingAdmin": "تعديل الرصيد",
   "deleteChatTitle": "حذف المحادثة",
   "deleteChatMessage": "هل أنت متأكد من رغبتك في حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.",
   "deleteChatConfirm": "حذف",

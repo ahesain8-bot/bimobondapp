@@ -116,7 +116,9 @@ class CameraFilterCompositor {
     final filteredImage = await picture.toImage(width, height);
     picture.dispose();
 
-    final raw = await filteredImage.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final raw = await filteredImage.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    );
     filteredImage.dispose();
     if (raw == null) return null;
 

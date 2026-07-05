@@ -46,19 +46,19 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
 
     if (!mounted) return;
     context.read<PostsBloc>().add(
-          CreatePostWithMediaRequestedEvent(
-            type: widget.type,
-            description: caption.isEmpty ? null : caption,
-            privacyStatus: 'PUBLIC',
-            allowComments: true,
-            allowDuets: false,
-            allowStitch: false,
-            status: 'PUBLISHED',
-            isStory: true,
-            files: [widget.file],
-            soundId: widget.sound?.id,
-          ),
-        );
+      CreatePostWithMediaRequestedEvent(
+        type: widget.type,
+        description: caption.isEmpty ? null : caption,
+        privacyStatus: 'PUBLIC',
+        allowComments: true,
+        allowDuets: false,
+        allowStitch: false,
+        status: 'PUBLISHED',
+        isStory: true,
+        files: [widget.file],
+        soundId: widget.sound?.id,
+      ),
+    );
   }
 
   @override
@@ -83,10 +83,7 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
             body: Stack(
               fit: StackFit.expand,
               children: [
-                StoryMediaPreview(
-                  file: widget.file,
-                  type: widget.type,
-                ),
+                StoryMediaPreview(file: widget.file, type: widget.type),
                 SafeArea(
                   child: Column(
                     children: [
@@ -98,8 +95,7 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
                         child: Row(
                           children: [
                             IconButton(
-                              onPressed:
-                                  isPublishing ? null : widget.onRetake,
+                              onPressed: isPublishing ? null : widget.onRetake,
                               icon: const Icon(
                                 LucideIcons.x,
                                 color: Colors.white,

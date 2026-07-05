@@ -137,7 +137,8 @@ class _AddPostMediaTileState extends State<AddPostMediaTile> {
   @override
   void didUpdateWidget(AddPostMediaTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.file.path != widget.file.path && addPostIsVideoFile(widget.file)) {
+    if (oldWidget.file.path != widget.file.path &&
+        addPostIsVideoFile(widget.file)) {
       _videoThumb = null;
       _loadVideoThumb();
     }
@@ -181,11 +182,11 @@ class _AddPostMediaTileState extends State<AddPostMediaTile> {
                 clipBehavior: Clip.antiAlias,
                 child: isVideo
                     ? (_videoThumb != null
-                        ? Image.file(_videoThumb!, fit: BoxFit.cover)
-                        : const VideoPostPreviewPlaceholder(
-                            iconSize: 32,
-                            icon: LucideIcons.play,
-                          ))
+                          ? Image.file(_videoThumb!, fit: BoxFit.cover)
+                          : const VideoPostPreviewPlaceholder(
+                              iconSize: 32,
+                              icon: LucideIcons.play,
+                            ))
                     : Image.file(
                         widget.file,
                         fit: BoxFit.cover,
@@ -343,23 +344,23 @@ class AddPostMediaStrip extends StatelessWidget {
     }
 
     return SizedBox(
-          height: _tileHeight,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            itemCount: files.length + (allowAdd && files.length < maxFiles ? 1 : 0),
-            separatorBuilder: (_, _) => const SizedBox(width: AppSizes.p10),
-            itemBuilder: (context, index) {
-              if (index == files.length) {
-                return AddPostAddMediaTile(onTap: onAddTap);
-              }
-              return AddPostMediaTile(
-                file: files[index],
-                onTap: onEditAt == null ? null : () => onEditAt!(index),
-                onRemove: () => onRemoveAt(index),
-              );
-            },
-          ),
-        );
+      height: _tileHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: files.length + (allowAdd && files.length < maxFiles ? 1 : 0),
+        separatorBuilder: (_, _) => const SizedBox(width: AppSizes.p10),
+        itemBuilder: (context, index) {
+          if (index == files.length) {
+            return AddPostAddMediaTile(onTap: onAddTap);
+          }
+          return AddPostMediaTile(
+            file: files[index],
+            onTap: onEditAt == null ? null : () => onEditAt!(index),
+            onRemove: () => onRemoveAt(index),
+          );
+        },
+      ),
+    );
   }
 }

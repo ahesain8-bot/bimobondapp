@@ -1945,6 +1945,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletChoosePackage => 'Choose a Package';
 
   @override
+  String get walletCustomAmountTitle => 'Custom amount';
+
+  @override
+  String get walletCustomCoinsLabel => 'How many coins?';
+
+  @override
+  String get walletCustomCoinsHint => 'e.g. 500';
+
+  @override
+  String get walletCustomCoinsReceive => 'You receive';
+
+  @override
+  String walletCustomCoinsValue(String coins) {
+    return '$coins coins';
+  }
+
+  @override
+  String get walletCustomYouPay => 'You pay';
+
+  @override
+  String get walletPackageQuotes => 'Package quotes';
+
+  @override
+  String get walletPackageQuotePrice => 'Package price';
+
+  @override
+  String get walletPricingPreviewCost => 'Total cost';
+
+  @override
+  String get walletPricingPreviewLoading => 'Calculating...';
+
+  @override
+  String get walletCustomAmountInvalid => 'Enter a valid coin amount.';
+
+  @override
   String walletPurchaseSuccess(int amount) {
     return 'Successfully purchased $amount coins!';
   }
@@ -1971,6 +2006,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String walletPayButton(String price) {
     return 'Pay $price';
   }
+
+  @override
+  String get coinsHubTitle => 'Coins';
+
+  @override
+  String get coinsAvailableBalance => 'Available balance';
+
+  @override
+  String coinsWalletAccountName(String name) {
+    return '$name\'s Account';
+  }
+
+  @override
+  String get coinsBalanceRefresh => 'Refresh balance';
+
+  @override
+  String get coinsBalanceFooterHint => 'UPDATED ON OPEN';
+
+  @override
+  String coinsBalanceFooter(String date, String hint) {
+    return '$date | $hint';
+  }
+
+  @override
+  String get coinsTabBuy => 'Buy';
+
+  @override
+  String get coinsTabMarket => 'Market';
+
+  @override
+  String get coinsTabVault => 'Vault';
+
+  @override
+  String get coinsUnit => 'coins';
+
+  @override
+  String get coinsHistoryTitle => 'Recent activity';
+
+  @override
+  String get coinsMarketSuccess => 'Gift added to your vault!';
+
+  @override
+  String get coinsVaultEmpty => 'No gifts in your vault yet. Visit the market to buy gifts with coins.';
+
+  @override
+  String get coinsVaultOwned => 'In vault';
+
+  @override
+  String get coinsInsufficientBalance => 'Not enough coins. Buy more in the Buy tab.';
+
+  @override
+  String get walletAccountingPurchase => 'Bought coins';
+
+  @override
+  String get walletAccountingGiftPurchase => 'Bought gift';
+
+  @override
+  String get walletAccountingGiftReceived => 'Received gift';
+
+  @override
+  String get walletAccountingPromotion => 'Post promotion';
+
+  @override
+  String get walletAccountingAdmin => 'Balance adjustment';
 
   @override
   String get deleteChatTitle => 'Delete chat';

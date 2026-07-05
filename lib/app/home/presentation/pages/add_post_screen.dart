@@ -283,8 +283,8 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
     return PostAuctionInput(
       itemName: itemName,
-      startingPriceUsd: startingPrice,
-      targetPriceUsd: targetPrice,
+      startingPrice: startingPrice,
+      targetPrice: targetPrice,
       startedAt: _auctionStartDate,
       endedAt: _auctionEndDate,
     );

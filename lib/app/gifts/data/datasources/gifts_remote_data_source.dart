@@ -70,6 +70,10 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200) {
         return _extractList(response.data)
             .whereType<Map>()
+            .where((json) {
+              final isActive = json['isActive'];
+              return isActive == null || isActive == true;
+            })
             .map(
               (json) => GiftModel.fromJson(Map<String, dynamic>.from(json)),
             )
@@ -91,18 +95,12 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     if (body is Map<String, dynamic>) {
       return GiftInventoryModel.fromApiResponse(body);
     }
-    throw ServerException(message: 'Invalid inventory response');
-  }
-
-  GiftInventoryModel _overlayOffset(GiftInventoryModel inventory) {
-    final purchasedOffset = apiClient.sharedPreferences.getInt('MOCK_COIN_PURCHASED_OFFSET') ?? 0;
-    if (purchasedOffset > 0) {
-      return GiftInventoryModel(
-        coinBalance: inventory.coinBalance + purchasedOffset,
-        items: inventory.items,
+    if (body is Map) {
+      return GiftInventoryModel.fromApiResponse(
+        Map<String, dynamic>.from(body),
       );
     }
-    return inventory;
+    throw ServerException(message: 'Invalid inventory response');
   }
 
   @override
@@ -113,7 +111,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
         options: Options(headers: await _authHeaders()),
       );
       if (response.statusCode == 200) {
-        return _overlayOffset(_parseInventoryResponse(response.data));
+        return _parseInventoryResponse(response.data);
       }
       throw ServerException(
         message:
@@ -143,12 +141,12 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;
         if (body is Map<String, dynamic>) {
-          return _overlayOffset(GiftInventoryModel.fromApiResponse(body));
+          return GiftInventoryModel.fromApiResponse(body);
         }
         if (body is Map) {
-          return _overlayOffset(GiftInventoryModel.fromApiResponse(
+          return GiftInventoryModel.fromApiResponse(
             Map<String, dynamic>.from(body),
-          ));
+          );
         }
         return getInventory();
       }
@@ -192,12 +190,12 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;
         if (body is Map<String, dynamic>) {
-          return _overlayOffset(GiftInventoryModel.fromApiResponse(body));
+          return GiftInventoryModel.fromApiResponse(body);
         }
         if (body is Map) {
-          return _overlayOffset(GiftInventoryModel.fromApiResponse(
+          return GiftInventoryModel.fromApiResponse(
             Map<String, dynamic>.from(body),
-          ));
+          );
         }
         return null;
       }

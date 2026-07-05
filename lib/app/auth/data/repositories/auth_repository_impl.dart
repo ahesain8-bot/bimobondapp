@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/auth/data/models/user_model.dart';
 import 'package:dartz/dartz.dart';
+import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_activity_page_entity.dart';
@@ -50,9 +51,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -85,9 +86,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -126,9 +127,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -148,9 +149,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -170,9 +171,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -182,9 +183,9 @@ class AuthRepositoryImpl implements AuthRepository {
       final url = await remoteDataSource.uploadAvatar(file);
       return Right(url);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -198,9 +199,9 @@ class AuthRepositoryImpl implements AuthRepository {
       await localDataSource.saveUser(updatedUser);
       return Right(updatedUser);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
     // } else {
     //   return Left(ServerFailure());
@@ -214,9 +215,9 @@ class AuthRepositoryImpl implements AuthRepository {
       await localDataSource.saveUser(userModel);
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -226,9 +227,9 @@ class AuthRepositoryImpl implements AuthRepository {
       final userModel = await remoteDataSource.getUserById(userId);
       return Right(userModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -246,9 +247,9 @@ class AuthRepositoryImpl implements AuthRepository {
       );
       return Right(pageModel);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -258,7 +259,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final user = await localDataSource.getUser();
       return Right(user);
     } catch (e) {
-      return Left(CacheFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -268,9 +269,9 @@ class AuthRepositoryImpl implements AuthRepository {
       await remoteDataSource.forgotPassword(email: email);
       return const Right(null);
     } on AppException catch (e) {
-      return Left(_mapExceptionToFailure(e));
+      return Left(FailureMapper.from(e));
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(FailureMapper.from(e));
     }
   }
 
@@ -282,14 +283,5 @@ class AuthRepositoryImpl implements AuthRepository {
     }
     await localDataSource.clearAuthData();
     await FirebaseAuth.instance.signOut();
-  }
-
-  Failure _mapExceptionToFailure(AppException e) {
-    if (e is RequestTimeoutException)
-      return TimeoutFailure(e.message ?? 'Timeout');
-    if (e is UnauthorizedException)
-      return UnauthorizedFailure(e.message ?? 'Unauthorized');
-    if (e is NetworkException) return NetworkFailure(e.message ?? 'No network');
-    return ServerFailure(e.message ?? 'Server Error');
   }
 }

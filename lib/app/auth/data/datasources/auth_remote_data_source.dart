@@ -7,6 +7,7 @@ import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
 import 'package:bimobondapp/core/utils/device_utility.dart';
+import 'package:bimobondapp/core/utils/firebase_auth_constants.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -85,43 +86,45 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> signInWithGoogle() => _execute(() async {
-    await GoogleSignIn.instance.initialize();
-    final GoogleSignInAccount? googleUser = await GoogleSignIn.instance
-        .authenticate();
+  Future<UserModel> signInWithGoogle() async {
+    try {
+      await GoogleSignIn.instance.initialize(
+        serverClientId: FirebaseAuthConstants.googleWebClientId,
+      );
 
-    if (googleUser == null) {
-      throw ServerException(message: 'User canceled sign-in');
+      final googleUser = await GoogleSignIn.instance.authenticate(
+        scopeHint: const ['email', 'profile'],
+      );
+
+      final idToken = googleUser.authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        throw ServerException(message: 'Google sign-in failed: missing ID token');
+      }
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        GoogleAuthProvider.credential(idToken: idToken),
+      );
+      return _handleFirebaseUserAndBackendLogin(userCredential);
+    } on GoogleSignInException catch (e) {
+      throw ServerException(message: _googleSignInMessage(e));
+    } catch (e) {
+      throw DioHandler.handle(e);
     }
-
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-    final scopes = [
-      'email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-    ];
-    final authorizedUser = await googleUser.authorizationClient.authorizeScopes(
-      scopes,
-    );
-
-    final OAuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: authorizedUser.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    final userCredential = await FirebaseAuth.instance.signInWithCredential(
-      credential,
-    );
-    return _handleFirebaseUserAndBackendLogin(userCredential);
-  });
+  }
 
   @override
   Future<UserModel> signInWithFacebook() => _execute(() async {
     final LoginResult loginResult = await FacebookAuth.instance.login();
 
+    if (loginResult.status == LoginStatus.cancelled) {
+      throw ServerException(message: 'Facebook login cancelled');
+    }
+
     if (loginResult.status != LoginStatus.success) {
       throw ServerException(
-        message: loginResult.message ?? 'Facebook login failed',
+        message: _facebookLoginMessage(
+          loginResult.message ?? 'Facebook login failed',
+        ),
       );
     }
 
@@ -362,4 +365,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
     throw ServerException(message: 'Forgot password failed');
   });
+
+  String _facebookLoginMessage(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('api access blocked')) {
+      return 'Facebook login is blocked for this app. Check Meta Developer Console: app status, tester roles, and Facebook Login settings.';
+    }
+    return raw;
+  }
+
+  String _googleSignInMessage(GoogleSignInException error) {
+    switch (error.code) {
+      case GoogleSignInExceptionCode.canceled:
+        return 'Google sign-in cancelled';
+      case GoogleSignInExceptionCode.clientConfigurationError:
+      case GoogleSignInExceptionCode.providerConfigurationError:
+        return 'Google sign-in is misconfigured. Add your debug SHA-1 fingerprint to Firebase for com.dubai.bimobondapp, download a new google-services.json, then rebuild.';
+      case GoogleSignInExceptionCode.uiUnavailable:
+        return 'Google sign-in UI is unavailable. Try again from the login screen.';
+      default:
+        final description = error.description?.trim();
+        if (description != null && description.isNotEmpty) {
+          return description;
+        }
+        return 'Google sign-in failed';
+    }
+  }
 }
