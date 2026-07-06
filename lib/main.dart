@@ -38,6 +38,7 @@ import 'package:bimobondapp/app/notifications/presentation/services/push_notific
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:bimobondapp/firebase_options.dart';
 
 Future<void> _preloadCameraStudioCatalog() async {
   await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded();
@@ -45,7 +46,9 @@ Future<void> _preloadCameraStudioCatalog() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await auth_di.initAuth();

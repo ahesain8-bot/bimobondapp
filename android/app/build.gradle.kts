@@ -49,20 +49,7 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
-       // Import the BoM for the Firebase platform
-    implementation(platform("com.google.firebase:firebase-bom:34.13.0"))
-
-    // Add the dependency for the Firebase Authentication library
-    // When using the BoM, you don't specify versions in Firebase library dependencies
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-messaging")
-
-    // Also add the dependency for the Google Play services library and specify its version
+    // FlutterFire plugins supply Firebase SDK versions.
     implementation("com.google.android.gms:play-services-auth:21.5.1")
-
-
     implementation("com.facebook.android:facebook-android-sdk:latest.release")
-
-    // Add the dependencies for any other desired Firebase products
-    // https://firebase.google.com/docs/android/setup#available-libraries
 }

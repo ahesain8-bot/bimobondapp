@@ -31,7 +31,9 @@ class PushNotificationService {
   Future<void> initializeEarly() async {
     if (kIsWeb || _initialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -50,7 +52,8 @@ class PushNotificationService {
     if (Platform.isAndroid) {
       await _localNotifications
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(
             const AndroidNotificationChannel(
               channelId,
@@ -64,9 +67,7 @@ class PushNotificationService {
     _initialized = true;
   }
 
-  Future<void> initialize({
-    TokenRefreshCallback? onTokenRefresh,
-  }) async {
+  Future<void> initialize({TokenRefreshCallback? onTokenRefresh}) async {
     if (kIsWeb) return;
 
     await initializeEarly();
@@ -114,7 +115,9 @@ class PushNotificationService {
 
   Future<void> _onForegroundMessage(RemoteMessage message) async {
     if (kDebugMode) {
-      debugPrint('PushNotificationService: foreground message ${message.messageId}');
+      debugPrint(
+        'PushNotificationService: foreground message ${message.messageId}',
+      );
     }
     await showRemoteMessage(message);
   }

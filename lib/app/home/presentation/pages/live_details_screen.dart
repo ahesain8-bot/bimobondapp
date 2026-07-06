@@ -85,6 +85,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   AuctionSocketService? _auctionSocket;
   StreamSubscription<AuctionUpdatedPayload>? _auctionUpdatedSub;
   StreamSubscription<CommentEntity>? _newCommentSub;
+  StreamSubscription<bool>? _socketConnectionSub;
   String? _joinedAuctionId;
   String? _joinedPostId;
 
@@ -181,6 +182,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     unawaited(_startAuctionRealtime());
   }
 
+  String? get _auctionId => widget.post?.auction?.id ?? widget.post?.id;
+
+  bool get _isAuctionPost => widget.post != null && widget.post!.isAuctionable;
+
   Future<void> _startAuctionRealtime() async {
     final post = widget.post;
     if (post == null || post.id.isEmpty) return;
@@ -190,19 +195,34 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     await _auctionUpdatedSub?.cancel();
     await _newCommentSub?.cancel();
+    await _socketConnectionSub?.cancel();
 
     // Post room: newComment events (comment list).
     _newCommentSub = _auctionSocket!.onNewComment.listen(_onRealtimeComment);
     // Auction room: auctionUpdated with lastComment / lastGift / totals.
     _auctionUpdatedSub =
         _auctionSocket!.onAuctionUpdated.listen(_onRealtimeAuctionUpdate);
+    _socketConnectionSub =
+        _auctionSocket!.onConnectionChanged.listen((connected) {
+      if (connected && mounted) {
+        _joinAuctionRooms();
+      }
+    });
 
-    _auctionSocket!.joinPost(post.id);
+    _joinAuctionRooms();
+  }
+
+  void _joinAuctionRooms() {
+    final post = widget.post;
+    final socket = _auctionSocket;
+    if (post == null || socket == null || post.id.isEmpty) return;
+
+    socket.joinPost(post.id);
     _joinedPostId = post.id;
 
-    final auctionId = widget.post?.auction?.id;
-    if (auctionId != null && auctionId.isNotEmpty) {
-      _auctionSocket!.joinAuction(auctionId);
+    final auctionId = _auctionId;
+    if (_isAuctionPost && auctionId != null && auctionId.isNotEmpty) {
+      socket.joinAuction(auctionId);
       _joinedAuctionId = auctionId;
     }
   }
@@ -222,8 +242,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     unawaited(_auctionUpdatedSub?.cancel());
     unawaited(_newCommentSub?.cancel());
+    unawaited(_socketConnectionSub?.cancel());
     _auctionUpdatedSub = null;
     _newCommentSub = null;
+    _socketConnectionSub = null;
     _joinedAuctionId = null;
     _joinedPostId = null;
   }
@@ -253,7 +275,15 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   void _appendCommentIfNew(CommentEntity comment) {
     if (comment.parentId != null) return;
     if (_postComments.any((existing) => existing.id == comment.id)) return;
-    setState(() => _postComments.add(comment));
+
+    setState(() {
+      _postComments.add(comment);
+      _postComments.sort((a, b) {
+        final aTime = DateTime.tryParse(a.createdAt) ?? DateTime(1970);
+        final bTime = DateTime.tryParse(b.createdAt) ?? DateTime(1970);
+        return aTime.compareTo(bTime);
+      });
+    });
     _scrollChatToBottom();
   }
 
@@ -263,16 +293,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     var shouldAnimateBid = false;
 
-    final lastComment = payload.lastComment;
-    if (lastComment != null && lastComment.parentId == null) {
-      _appendCommentIfNew(lastComment);
-    }
-
     setState(() {
       if (payload.startingPriceCoins != null) {
         _startingPriceOverride = payload.startingPriceCoins;
       }
-      if (payload.currentTotalCoins != null) {
+      if (payload.currentTotalCoins != null &&
+          payload.currentTotalCoins != _giftContributionCoins) {
         _giftContributionOverride = payload.currentTotalCoins;
         shouldAnimateBid = true;
       }
@@ -297,14 +323,14 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       return;
     }
 
-    if (shouldAnimateBid || lastComment != null) {
+    if (shouldAnimateBid) {
       _bidPopController.forward(from: 0);
     }
   }
 
   bool _matchesAuctionUpdate(AuctionUpdatedPayload payload) {
     final postId = widget.post?.id;
-    final auctionId = widget.post?.auction?.id;
+    final auctionId = _auctionId;
 
     if (payload.postId != null &&
         postId != null &&
@@ -388,7 +414,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   bool get _usesPostComments => widget.post != null;
 
   bool get _showCommentsArea => _usesPostComments
-      ? _postComments.isNotEmpty
+      ? (_isAuctionPost || _postComments.isNotEmpty)
       : _mockChatMessages.isNotEmpty;
 
   List<CommentEntity> get _visiblePostComments =>
@@ -492,13 +518,34 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     );
   }
 
+  List<CommentEntity> _mergeCommentsById(
+    List<CommentEntity> remote,
+    List<CommentEntity> local,
+  ) {
+    final byId = <String, CommentEntity>{
+      for (final comment in remote) comment.id: comment,
+    };
+    for (final comment in local) {
+      byId.putIfAbsent(comment.id, () => comment);
+    }
+
+    final merged = byId.values.toList();
+    merged.sort((a, b) {
+      final aTime = DateTime.tryParse(a.createdAt) ?? DateTime(1970);
+      final bTime = DateTime.tryParse(b.createdAt) ?? DateTime(1970);
+      return aTime.compareTo(bTime);
+    });
+    return merged;
+  }
+
   void _onCommentsState(CommentsState state) {
     if (state is CommentsLoadSuccess) {
-      setState(
-        () => _postComments
+      setState(() {
+        final existing = List<CommentEntity>.from(_postComments);
+        _postComments
           ..clear()
-          ..addAll(state.comments),
-      );
+          ..addAll(_mergeCommentsById(state.comments, existing));
+      });
       _scrollChatToBottom();
     } else if (state is AddCommentSuccess) {
       _chatController.clear();
@@ -589,10 +636,6 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     FocusScope.of(context).unfocus();
     _scrollChatToBottom();
   }
-
-  String? get _auctionId => widget.post?.auction?.id ?? widget.post?.id;
-
-  bool get _isAuctionPost => widget.post != null && widget.post!.isAuctionable;
 
   void _showAuctionGiftsSheet() {
     final auctionId = _auctionId;

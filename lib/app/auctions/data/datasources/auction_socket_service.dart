@@ -62,7 +62,10 @@ class AuctionSocketService {
   bool get isConnected => _socket?.connected ?? false;
 
   Future<void> connect() async {
-    if (_socket?.connected == true) return;
+    if (_socket?.connected == true) {
+      _rejoinRooms();
+      return;
+    }
 
     final user = FirebaseAuth.instance.currentUser;
     final token = user != null ? await user.getIdToken() : null;
@@ -77,16 +80,28 @@ class AuctionSocketService {
           .build(),
     );
 
+    final connected = Completer<void>();
+
     _socket!
       ..onConnect((_) {
         _connectionController.add(true);
         _rejoinRooms();
+        if (!connected.isCompleted) connected.complete();
       })
       ..onDisconnect((_) => _connectionController.add(false))
+      ..onConnectError((_) {
+        if (!connected.isCompleted) connected.complete();
+      })
       ..on(AuctionSocketEvent.auctionUpdated, _handleAuctionUpdated)
       ..on(AuctionSocketEvent.newComment, _handleNewComment);
 
     _socket!.connect();
+
+    try {
+      await connected.future.timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Room joins are retried on reconnect via _rejoinRooms().
+    }
   }
 
   void joinAuction(String auctionId) {
@@ -137,6 +152,12 @@ class AuctionSocketService {
   void _handleAuctionUpdated(dynamic data) {
     final payload = _parseAuctionUpdatedPayload(data);
     if (payload == null) return;
+
+    final lastComment = payload.lastComment;
+    if (lastComment != null) {
+      _newCommentController.add(lastComment);
+    }
+
     _auctionUpdatedController.add(payload);
   }
 
@@ -145,14 +166,20 @@ class AuctionSocketService {
     final map = _unwrapPayload(data);
     if (map == null) return null;
 
+    final fallbackPostId =
+        map['postId']?.toString() ?? _joinedPostId;
+
     for (final key in ['newComment', 'comment']) {
       final raw = map[key];
       if (raw is! Map) continue;
-      final comment = _tryParseComment(Map<String, dynamic>.from(raw));
+      final comment = _tryParseComment(
+        Map<String, dynamic>.from(raw),
+        fallbackPostId: fallbackPostId,
+      );
       if (comment != null) return comment;
     }
 
-    return _tryParseComment(map);
+    return _tryParseComment(map, fallbackPostId: fallbackPostId);
   }
 
   AuctionUpdatedPayload? _parseAuctionUpdatedPayload(dynamic data) {
@@ -167,11 +194,15 @@ class AuctionSocketService {
     final status = map['status']?.toString();
     final winnerId = map['winnerId']?.toString();
 
+    final fallbackPostId =
+        postId ?? map['postId']?.toString() ?? _joinedPostId;
+
     CommentModel? lastComment;
     final lastCommentRaw = map['lastComment'];
     if (lastCommentRaw is Map) {
       lastComment = _tryParseComment(
         Map<String, dynamic>.from(lastCommentRaw),
+        fallbackPostId: fallbackPostId,
       );
     }
 
@@ -206,20 +237,42 @@ class AuctionSocketService {
 
   Map<String, dynamic>? _unwrapPayload(dynamic data) {
     if (data is! Map) return null;
-    final map = Map<String, dynamic>.from(data);
+    var map = Map<String, dynamic>.from(data);
+
     final nested = map['data'];
-    if (nested is Map && !map.containsKey('auctionId') && !map.containsKey('id')) {
-      return Map<String, dynamic>.from(nested);
+    if (nested is Map) {
+      final nestedMap = Map<String, dynamic>.from(nested);
+      final isEnvelope = map.containsKey('event') ||
+          (map.containsKey('data') &&
+              !map.containsKey('auctionId') &&
+              !map.containsKey('lastComment') &&
+              !map.containsKey('lastGift') &&
+              !map.containsKey('content'));
+      if (isEnvelope) {
+        map = nestedMap;
+      }
     }
+
     return map;
   }
 
-  CommentModel? _tryParseComment(Map<String, dynamic> json) {
+  CommentModel? _tryParseComment(
+    Map<String, dynamic> json, {
+    String? fallbackPostId,
+  }) {
     if (!json.containsKey('id') && !json.containsKey('content')) {
       return null;
     }
     try {
-      final comment = CommentModel.fromJson(json);
+      final merged = Map<String, dynamic>.from(json);
+      final postId = merged['postId']?.toString() ?? '';
+      if (postId.isEmpty &&
+          fallbackPostId != null &&
+          fallbackPostId.isNotEmpty) {
+        merged['postId'] = fallbackPostId;
+      }
+
+      final comment = CommentModel.fromJson(merged);
       if (comment.id.isEmpty) return null;
       return comment;
     } catch (_) {
