@@ -455,13 +455,28 @@ class _BalanceActionButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LiquidGlassSurface(
-              borderRadius: BorderRadius.circular(14),
-              blurSigma: 12,
-              backgroundColor: style.buttonFill,
-              borderColor: style.buttonBorder,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-              child: Icon(icon, size: 20, color: style.primaryText),
+            SizedBox(
+              width: double.infinity,
+              child: LiquidGlassSurface(
+                borderRadius: BorderRadius.circular(14),
+                blurSigma: 12,
+                backgroundColor: style.buttonFill,
+                borderColor: style.buttonBorder,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 40,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 6),
+
+                    Icon(icon, size: 20, color: style.primaryText),
+                    const SizedBox(height: 6),
+                    // const SizedBox(height: 13),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             AnimatedContainer(
@@ -514,8 +529,7 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
   final _purchaseCoins = wallets_di.sl<PurchaseCoinsUseCase>();
   final _topUpWallet = wallets_di.sl<TopUpWalletUseCase>();
   final _getWallet = wallets_di.sl<GetMyWalletUseCase>();
-  final _getPricingPreview =
-      auctions_di.sl<GetAuctionPricingPreviewUseCase>();
+  final _getPricingPreview = auctions_di.sl<GetAuctionPricingPreviewUseCase>();
   final _customCoinsController = TextEditingController();
 
   List<CoinPackageEntity> _packages = [];
@@ -530,11 +544,14 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
   int? _previewForCoins;
 
   WalletTopUpQuote get _activeQuote {
-    final customCoins =
-        WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
+    final customCoins = WalletCoinPricing.parseCoinsInput(
+      _customCoinsController.text,
+    );
     if (customCoins > 0) {
-      final packageMatch =
-          WalletCoinPricing.packageForCoins(customCoins, _packages);
+      final packageMatch = WalletCoinPricing.packageForCoins(
+        customCoins,
+        _packages,
+      );
       if (packageMatch != null) {
         return WalletTopUpQuote.fromEntity(packageMatch);
       }
@@ -570,7 +587,9 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
   }
 
   void _onCustomCoinsChanged() {
-    final coins = WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
+    final coins = WalletCoinPricing.parseCoinsInput(
+      _customCoinsController.text,
+    );
     setState(() {});
     _schedulePricingPreview(coins);
   }
@@ -581,8 +600,9 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
     );
     if (!mounted) return;
 
-    final currentCoins =
-        WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
+    final currentCoins = WalletCoinPricing.parseCoinsInput(
+      _customCoinsController.text,
+    );
     if (currentCoins != coins) return;
 
     result.fold(
@@ -659,10 +679,7 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
   Future<void> _purchaseCustom(WalletTopUpQuote quote) async {
     final l10n = AppLocalizations.of(context)!;
     if (!quote.isValid) {
-      PopupDialogs.showErrorDialog(
-        context,
-        l10n.walletCustomAmountInvalid,
-      );
+      PopupDialogs.showErrorDialog(context, l10n.walletCustomAmountInvalid);
       return;
     }
 
@@ -694,19 +711,18 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
         if (!mounted) return;
         setState(() => _purchasing = false);
 
-        result.fold(
-          (f) => PopupDialogs.showErrorDialog(context, f.message),
-          (_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.walletPurchaseSuccess(quote.coins)),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-            widget.onBalanceChanged();
-            _load();
-          },
-        );
+        result.fold((f) => PopupDialogs.showErrorDialog(context, f.message), (
+          _,
+        ) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.walletPurchaseSuccess(quote.coins)),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          widget.onBalanceChanged();
+          _load();
+        });
       },
     );
   }
@@ -715,10 +731,7 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
     final l10n = AppLocalizations.of(context)!;
     final quote = _activeQuote;
     if (!quote.isValid) {
-      PopupDialogs.showErrorDialog(
-        context,
-        l10n.walletCustomAmountInvalid,
-      );
+      PopupDialogs.showErrorDialog(context, l10n.walletCustomAmountInvalid);
       return;
     }
 
@@ -736,8 +749,9 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
       return;
     }
 
-    final customCoins =
-        WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
+    final customCoins = WalletCoinPricing.parseCoinsInput(
+      _customCoinsController.text,
+    );
     if (customCoins > 0) {
       await _purchaseCustom(quote);
       return;
@@ -834,8 +848,9 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
             pricingPreview: _pricingPreview,
             previewForCoins: _previewForCoins,
             loadingPricingPreview: _loadingPricingPreview,
-            currencyCode:
-                _packages.isNotEmpty ? _packages.first.currencyCode : 'USD',
+            currencyCode: _packages.isNotEmpty
+                ? _packages.first.currencyCode
+                : 'USD',
             onPackageSelected: (pack) {
               setState(() {
                 _selectedIndex = _packages.indexOf(pack);
@@ -858,8 +873,7 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
             onPackageSelected: (index) {
               setState(() {
                 _selectedIndex = index;
-                _customCoinsController.text =
-                    '${_packages[index].coinAmount}';
+                _customCoinsController.text = '${_packages[index].coinAmount}';
                 _pricingPreview = null;
                 _previewForCoins = null;
                 _loadingPricingPreview = false;
