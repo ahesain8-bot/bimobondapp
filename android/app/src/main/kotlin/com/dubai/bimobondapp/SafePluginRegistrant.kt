@@ -5,11 +5,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 
 /**
- * Registers Flutter plugins one-by-one so a single failing plugin (notably FFmpegKit
- * on 16 KB page-size devices) does not abort registration for Firebase and others.
- *
- * Update this list when [io.flutter.plugins.GeneratedPluginRegistrant] changes
- * after `flutter pub get`.
+ * Registers plugins individually so FFmpegKit failures do not block Firebase and others.
  */
 object SafePluginRegistrant {
     private const val TAG = "SafePluginRegistrant"
@@ -27,7 +23,7 @@ object SafePluginRegistrant {
         safeAdd(flutterEngine, "device_info_plus") {
             dev.fluttercommunity.plus.device_info.DeviceInfoPlusPlugin()
         }
-        safeAdd(flutterEngine, "ffmpeg_kit_flutter_new_https") {
+        safeAdd(flutterEngine, "ffmpeg_kit_flutter_new") {
             com.antonkarpenko.ffmpegkit.FFmpegKitFlutterPlugin()
         }
         safeAdd(flutterEngine, "file_selector_android") {
@@ -47,6 +43,9 @@ object SafePluginRegistrant {
         }
         safeAdd(flutterEngine, "flutter_facebook_auth") {
             app.meedu.flutter_facebook_auth.FlutterFacebookAuthPlugin()
+        }
+        safeAdd(flutterEngine, "flutter_image_compress") {
+            com.fluttercandies.flutter_image_compress.ImageCompressPlugin()
         }
         safeAdd(flutterEngine, "flutter_local_notifications") {
             com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin()
@@ -101,6 +100,9 @@ object SafePluginRegistrant {
         }
         safeAdd(flutterEngine, "video_player_android") {
             io.flutter.plugins.videoplayer.VideoPlayerPlugin()
+        }
+        safeAdd(flutterEngine, "video_thumbnail") {
+            xyz.justsoft.video_thumbnail.VideoThumbnailPlugin()
         }
     }
 

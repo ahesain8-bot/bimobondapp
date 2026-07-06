@@ -1406,7 +1406,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesNoResults => 'No results found';
 
   @override
-  String get messagesInboxNoMessagesYet => 'No chats available';
+  String get messagesInboxNoMessagesYet => 'No messages yet';
 
   @override
   String get messagesInboxYouPrefix => 'You';

@@ -1,9 +1,8 @@
-import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter/foundation.dart';
 
-/// Guards FFmpeg usage when the native plugin is missing or unsupported
-/// (e.g. 16 KB page-size Android emulators).
+/// Guards FFmpeg usage when the native plugin is missing or unsupported.
 class FfmpegKitSupport {
   FfmpegKitSupport._();
 

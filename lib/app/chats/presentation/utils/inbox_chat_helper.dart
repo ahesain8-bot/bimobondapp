@@ -1,6 +1,8 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_entity.dart';
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_seed_data.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 
 class InboxChatItem {
@@ -133,4 +135,23 @@ List<InboxChatItem> filterInboxChats(
             c.preview.toLowerCase().contains(q),
       )
       .toList();
+}
+
+List<InboxChatItem> messagesMockInboxItems(AppLocalizations l10n) {
+  return messagesSeedChats().asMap().entries.map((entry) {
+    final index = entry.key;
+    final chat = entry.value;
+    final name = chat['name'] as String;
+
+    return InboxChatItem(
+      chatId: 'mock-chat-$index',
+      name: name,
+      imageUrl: null,
+      preview: messagesPreviewText(chat['messageKey'] as String?, l10n),
+      time: chat['time'] as String,
+      unread: chat['unread'] as bool? ?? false,
+      peerUserId: 'mock-user-$index',
+      active: chat['active'] as bool? ?? false,
+    );
+  }).toList();
 }
