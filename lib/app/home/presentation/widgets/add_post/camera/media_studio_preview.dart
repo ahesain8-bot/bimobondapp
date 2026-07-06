@@ -103,6 +103,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         return;
       }
       await controller.setLooping(true);
+      await controller.setVolume(1);
       await controller.play();
       setState(() {
         _mediaSize = controller.value.size;
