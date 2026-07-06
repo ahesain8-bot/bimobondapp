@@ -200,7 +200,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         final description =
             controller.value.errorDescription ?? 'Video playback failed';
         if (_isAudioFailure(description)) {
-          unawaited(_playWithVolume(controller, generation, muted: true));
+          unawaited(_startPlayback(controller, generation, muted: true));
           return;
         }
         setState(() => _errorMessage = description);
@@ -231,14 +231,14 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
       if (mounted) setState(() => _isInitializing = false);
 
-      var ok = await _playWithVolume(controller, generation, muted: false);
-      if (!ok) {
-        ok = await _playWithVolume(controller, generation, muted: true);
-      }
+      final ok = await _startPlayback(controller, generation, muted: false);
       if (!ok && mounted && generation == _initGeneration) {
-        setState(() {
-          _errorMessage = 'Video unavailable';
-        });
+        final mutedOk = await _startPlayback(controller, generation, muted: true);
+        if (!mutedOk) {
+          setState(() {
+            _errorMessage = 'Video unavailable (audio not supported)';
+          });
+        }
       }
     } catch (e) {
       debugPrint('Video player initialization error: $e');
@@ -246,7 +246,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           controller.value.isInitialized &&
           mounted &&
           generation == _initGeneration) {
-        final ok = await _playWithVolume(controller, generation, muted: true);
+        final ok = await _startPlayback(controller, generation, muted: true);
         if (ok) return;
       }
       await _disposeController(controller, listener);
@@ -277,32 +277,41 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       return;
     }
     _playbackMuted = false;
-    var ok = await _playWithVolume(controller, generation, muted: false);
+    final ok = await _startPlayback(controller, generation, muted: false);
     if (!ok) {
-      await _playWithVolume(controller, generation, muted: true);
+      await _startPlayback(controller, generation, muted: true);
     }
   }
 
-  Future<bool> _playWithVolume(
+  Future<bool> _startPlayback(
     VideoPlayerController controller,
     int generation, {
-    required bool muted,
+    bool? muted,
   }) async {
     if (!widget.isActive || generation != _initGeneration) return false;
+
+    final wantMuted = muted ?? _playbackMuted;
     try {
-      await controller.setVolume(muted ? 0 : 1);
-      _playbackMuted = muted;
+      await controller.setVolume(wantMuted ? 0 : 1);
+      _playbackMuted = wantMuted;
       await controller.play();
       if (!mounted || generation != _initGeneration) return false;
       setState(() => _errorMessage = null);
       _syncFeedProgress();
+      _notifyPlaybackChanged();
       return true;
     } on PlatformException catch (e) {
       debugPrint('Video play failed: $e');
-      return muted;
+      if (!wantMuted && _isAudioFailure(e)) {
+        return _startPlayback(controller, generation, muted: true);
+      }
+      return false;
     } catch (e) {
       debugPrint('Video play failed: $e');
-      return muted || !_isAudioFailure(e);
+      if (!wantMuted && _isAudioFailure(e)) {
+        return _startPlayback(controller, generation, muted: true);
+      }
+      return false;
     }
   }
 
@@ -320,7 +329,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (controller.value.isPlaying) {
       await controller.pause();
     } else {
-      await _playWithVolume(
+      await _startPlayback(
         controller,
         _initGeneration,
         muted: _playbackMuted,
