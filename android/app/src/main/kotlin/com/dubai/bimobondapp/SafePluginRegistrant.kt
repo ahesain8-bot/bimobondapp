@@ -27,14 +27,8 @@ object SafePluginRegistrant {
         safeAdd(flutterEngine, "device_info_plus") {
             dev.fluttercommunity.plus.device_info.DeviceInfoPlusPlugin()
         }
-        safeAdd(flutterEngine, "ffmpeg_kit_flutter_new") {
+        safeAdd(flutterEngine, "ffmpeg_kit_flutter_new_https") {
             com.antonkarpenko.ffmpegkit.FFmpegKitFlutterPlugin()
-        }
-        safeAdd(flutterEngine, "flutter_image_compress_common") {
-            com.fluttercandies.flutter_image_compress.ImageCompressPlugin()
-        }
-        safeAdd(flutterEngine, "video_thumbnail") {
-            xyz.justsoft.video_thumbnail.VideoThumbnailPlugin()
         }
         safeAdd(flutterEngine, "file_selector_android") {
             dev.flutter.packages.file_selector_android.FileSelectorAndroidPlugin()

@@ -5,8 +5,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
-import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
-    as auth_di;
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
 import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';

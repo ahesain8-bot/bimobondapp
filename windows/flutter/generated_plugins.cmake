@@ -4,13 +4,11 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   cloud_firestore
-  ffmpeg_kit_flutter_new
+  ffmpeg_kit_flutter_new_https
   file_selector_windows
   firebase_auth
   firebase_core
   geolocator_windows
-  media_kit_libs_windows_video
-  media_kit_video
   permission_handler_windows
   record_windows
   share_plus
