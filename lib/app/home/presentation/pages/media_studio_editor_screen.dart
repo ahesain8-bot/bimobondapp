@@ -93,7 +93,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
     if (!mounted) return;
     final categories = CameraFilterCatalog.filterCategories;
     setState(() {
-      _filtersReady = CameraFilterCatalog.hasBackendCatalog;
+      _filtersReady = CameraFilterCatalog.hasCatalog;
       if (categories.isNotEmpty) {
         final slugs = categories.map((c) => c.slug).toList();
         if (!slugs.contains(_filterCategorySlug)) {
@@ -257,7 +257,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
         fit: StackFit.expand,
         children: [
           MediaStudioPreview(
-            key: ValueKey('${currentItem.file.path}-$_currentIndex'),
+            key: ValueKey(
+              '${currentItem.file.path}-$_currentIndex-'
+              '${_effectiveFilter.name}-${_selectedEffect?.name}',
+            ),
             file: currentItem.file,
             isVideo: currentItem.isVideo,
             filter: _effectiveFilter,

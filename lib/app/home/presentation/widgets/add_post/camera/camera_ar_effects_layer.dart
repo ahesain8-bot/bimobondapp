@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detector_service.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class CameraArEffectsLayer extends StatelessWidget {
   const CameraArEffectsLayer({
@@ -77,124 +78,23 @@ class CameraArEffectsPainter extends CustomPainter {
       canvas.applyTransformation(canvasTransformation!, size);
     }
 
-    for (final face in frame.faces) {
-      switch (effect.id) {
-        case CameraEffectId.crown:
-          _drawAboveFace(canvas, face, emoji: '👑', scale: 1.1, yOffset: -0.55);
-        case CameraEffectId.bunny:
-          _drawBunnyEars(canvas, face);
-        case CameraEffectId.sunglasses:
-          _drawSunglasses(canvas, face);
-        case CameraEffectId.dog:
-          _drawAboveFace(
-            canvas,
-            face,
-            emoji: '🐶',
-            scale: 0.95,
-            yOffset: -0.15,
-          );
-          _drawOnLandmark(canvas, face, FaceLandmarkType.noseBase, '👃', 28);
-        case CameraEffectId.hearts:
-          _drawOnLandmark(canvas, face, FaceLandmarkType.leftEye, '❤️', 34);
-          _drawOnLandmark(canvas, face, FaceLandmarkType.rightEye, '❤️', 34);
-        case CameraEffectId.none:
-        case CameraEffectId.sparkle:
-        case CameraEffectId.neon:
-        case CameraEffectId.glitch:
-          break;
-      }
-    }
+    final mapped = CameraFaceEffectMapper.mapForLivePreview(
+      faces: frame.faces,
+      preview: preview,
+      image: frame.image,
+    );
+    CameraEffectImagePainter.paintArScreenSpace(canvas, mapped, effect);
 
     if (canvasTransformation != null) {
       canvas.restore();
     }
   }
 
-  void _drawAboveFace(
-    Canvas canvas,
-    Face face, {
-    required String emoji,
-    required double scale,
-    required double yOffset,
-  }) {
-    final box = face.boundingBox;
-    final center = preview.convertFromImage(
-      Offset(box.center.dx, box.top + box.height * yOffset),
-      frame.image,
-    );
-    _drawEmoji(canvas, emoji, center, box.width * scale * 0.45);
-  }
-
-  void _drawBunnyEars(Canvas canvas, Face face) {
-    final box = face.boundingBox;
-    final left = preview.convertFromImage(
-      Offset(box.left + box.width * 0.22, box.top - box.height * 0.15),
-      frame.image,
-    );
-    final right = preview.convertFromImage(
-      Offset(box.right - box.width * 0.22, box.top - box.height * 0.15),
-      frame.image,
-    );
-    final size = box.width * 0.35;
-    _drawEmoji(canvas, '🐰', left, size);
-    _drawEmoji(canvas, '🐰', right, size);
-  }
-
-  void _drawSunglasses(Canvas canvas, Face face) {
-    final leftEye = face.landmarks[FaceLandmarkType.leftEye];
-    final rightEye = face.landmarks[FaceLandmarkType.rightEye];
-    if (leftEye == null || rightEye == null) {
-      _drawAboveFace(canvas, face, emoji: '😎', scale: 1.0, yOffset: 0.35);
-      return;
-    }
-
-    final left = preview.convertFromImage(
-      Offset(leftEye.position.x.toDouble(), leftEye.position.y.toDouble()),
-      frame.image,
-    );
-    final right = preview.convertFromImage(
-      Offset(rightEye.position.x.toDouble(), rightEye.position.y.toDouble()),
-      frame.image,
-    );
-    final center = Offset((left.dx + right.dx) / 2, (left.dy + right.dy) / 2);
-    final width = (right.dx - left.dx).abs() * 2.2;
-    _drawEmoji(canvas, '😎', center, width);
-  }
-
-  void _drawOnLandmark(
-    Canvas canvas,
-    Face face,
-    FaceLandmarkType type,
-    String emoji,
-    double size,
-  ) {
-    final landmark = face.landmarks[type];
-    if (landmark == null) return;
-    final point = preview.convertFromImage(
-      Offset(landmark.position.x.toDouble(), landmark.position.y.toDouble()),
-      frame.image,
-    );
-    _drawEmoji(canvas, emoji, point, size);
-  }
-
-  void _drawEmoji(Canvas canvas, String emoji, Offset center, double size) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: emoji,
-        style: TextStyle(fontSize: size.clamp(24, 120)),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    painter.paint(
-      canvas,
-      center - Offset(painter.width / 2, painter.height / 2),
-    );
-  }
-
   @override
   bool shouldRepaint(CameraArEffectsPainter oldDelegate) {
-    return oldDelegate.frame != frame || oldDelegate.effect != effect;
+    return oldDelegate.frame.image != frame.image ||
+        oldDelegate.frame.faces.length != frame.faces.length ||
+        oldDelegate.effect != effect;
   }
 }
 

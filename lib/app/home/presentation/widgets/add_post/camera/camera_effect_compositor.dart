@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
@@ -48,14 +50,30 @@ class CameraEffectCompositor {
     CameraEffectDefinition effect,
   ) async {
     final bytes = await file.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
+    final normalized = CameraCaptureUtils.normalizeImageBytes(bytes);
+    final working = normalized ?? bytes;
+
+    final codec = await ui.instantiateImageCodec(working);
     final frame = await codec.getNextFrame();
     final image = frame.image;
     final width = image.width;
     final height = image.height;
     final size = Size(width.toDouble(), height.toDouble());
 
-    final faces = await _detectFaces(file.path, effect);
+    File? tempDetectFile;
+    List<Face> faces;
+    if (normalized != null) {
+      final tempDir = await getTemporaryDirectory();
+      final detectFile = File(
+        '${tempDir.path}/effect_detect_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      tempDetectFile = detectFile;
+      await detectFile.writeAsBytes(normalized);
+      faces = await _detectFaces(detectFile.path, effect);
+    } else {
+      faces = await _detectFaces(file.path, effect);
+    }
+    await VideoThumbnailUtils.deleteIfExists(tempDetectFile);
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -232,7 +250,7 @@ class CameraEffectCompositor {
   ) async {
     if (!effect.requiresFaceDetection) return const [];
     final detector = FaceDetector(
-      options: FaceDetectorOptions(enableLandmarks: true),
+      options: CameraFaceEffectMapper.staticDetectorOptions(),
     );
     try {
       return await detector.processImage(InputImage.fromFilePath(path));

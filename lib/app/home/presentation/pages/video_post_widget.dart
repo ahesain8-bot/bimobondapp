@@ -13,6 +13,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/repost_sheet.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
@@ -35,6 +36,7 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:video_player/video_player.dart';
 
 class VideoPostWidget extends StatefulWidget {
   final PostEntity post;
@@ -77,6 +79,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   late AnimationController _likeAnimController;
   late Animation<double> _likeScaleAnim;
   final CarouselSliderController _carouselCtrl = CarouselSliderController();
+  final Map<int, CustomVideoPlayerController> _videoPlayerControllers = {};
+  VideoPlayerController? _postSoundController;
+  VoidCallback? _postSoundListener;
 
   // Local state for optimistic UI
   late bool _isLiked;
@@ -126,6 +131,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     if (widget.isActive) {
       _resolveFollowStatusIfNeeded();
       _recordViewIfNeeded();
+      unawaited(SoundAudioPreview.stop());
+      unawaited(_syncPostSoundPlayback().then((_) {
+        if (mounted) _syncMusicDiscAnimation();
+      }));
     }
 
     if (widget.openCommentsOnLoad) {
@@ -159,6 +168,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     if (widget.isActive && !oldWidget.isActive) {
       _resolveFollowStatusIfNeeded();
       _recordViewIfNeeded();
+      unawaited(SoundAudioPreview.stop());
+      unawaited(_syncPostSoundPlayback().then((_) {
+        if (mounted) _syncMusicDiscAnimation();
+      }));
+    } else if (!widget.isActive && oldWidget.isActive) {
+      unawaited(_stopPostSound());
+      _syncMusicDiscAnimation();
+    } else if (widget.isActive &&
+        (widget.post.id != oldWidget.post.id ||
+            widget.post.sound != oldWidget.post.sound)) {
+      unawaited(_syncPostSoundPlayback());
     }
   }
 
@@ -463,6 +483,140 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     return [];
   }
 
+  bool get _canTogglePlayback =>
+      _isSlideVideo(_currentPage) ||
+      (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false);
+
+  bool _isPostPlaybackActive() {
+    if (_isSlideVideo(_currentPage)) {
+      return _videoPlayerControllers[_currentPage]?.isPlaying ?? false;
+    }
+    return _postSoundController?.value.isPlaying ?? false;
+  }
+
+  void _syncMusicDiscAnimation() {
+    if (!widget.isActive || !_isPostPlaybackActive()) {
+      if (_musicController.isAnimating) _musicController.stop();
+      return;
+    }
+    if (!_musicController.isAnimating) _musicController.repeat();
+  }
+
+  Future<void> _togglePostPlayback() async {
+    if (!_canTogglePlayback) return;
+
+    if (_isSlideVideo(_currentPage)) {
+      await _videoPlayerControllers[_currentPage]?.togglePlayback();
+    } else {
+      final controller = _postSoundController;
+      if (controller != null && controller.value.isInitialized) {
+        if (controller.value.isPlaying) {
+          await controller.pause();
+        } else {
+          await controller.setVolume(1);
+          await controller.play();
+        }
+      } else {
+        await _syncPostSoundPlayback();
+      }
+    }
+
+    if (mounted) {
+      _syncMusicDiscAnimation();
+      setState(() {});
+    }
+  }
+
+  bool _isSlideVideo(int index) {
+    final media = _displayMedia;
+    if (media.isEmpty) {
+      final videoUrl = widget.post.videoUrl;
+      return widget.post.type == 'VIDEO' ||
+          (videoUrl != null && MediaUtils.isVideo(videoUrl));
+    }
+    if (index < 0 || index >= media.length) return false;
+    final item = media[index];
+    final url = MediaUtils.resolveAbsoluteUrl(item.url);
+    return MediaUtils.isVideo(url, mediaType: item.mediaType) ||
+        widget.post.type == 'VIDEO';
+  }
+
+  Future<void> _stopPostSound() async {
+    final controller = _postSoundController;
+    final listener = _postSoundListener;
+    _postSoundController = null;
+    _postSoundListener = null;
+    if (controller == null) return;
+    if (listener != null) {
+      controller.removeListener(listener);
+    }
+    try {
+      await controller.pause();
+      await controller.dispose();
+    } catch (_) {}
+    _syncMusicDiscAnimation();
+  }
+
+  Future<void> _syncPostSoundPlayback() async {
+    if (!widget.isActive || _isSlideVideo(_currentPage)) {
+      await _stopPostSound();
+      return;
+    }
+
+    final audioUrl = widget.post.sound?.resolvedAudioUrl;
+    if (audioUrl == null || audioUrl.isEmpty) {
+      await _stopPostSound();
+      return;
+    }
+
+    final existing = _postSoundController;
+    if (existing != null &&
+        existing.dataSource == audioUrl &&
+        existing.value.isInitialized) {
+      if (!existing.value.isPlaying) {
+        await existing.setVolume(1);
+        await existing.play();
+      }
+      return;
+    }
+
+    await _stopPostSound();
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(audioUrl),
+      videoPlayerOptions: VideoPlayerOptions(
+        mixWithOthers: false,
+        allowBackgroundPlayback: false,
+      ),
+    );
+    _postSoundController = controller;
+    void onSoundPlaybackChanged() {
+      if (!mounted) return;
+      _syncMusicDiscAnimation();
+      setState(() {});
+    }
+
+    _postSoundListener = onSoundPlaybackChanged;
+    controller.addListener(onSoundPlaybackChanged);
+
+    try {
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.setVolume(1);
+      if (!mounted ||
+          !widget.isActive ||
+          _isSlideVideo(_currentPage) ||
+          _postSoundController != controller) {
+        await controller.dispose();
+        return;
+      }
+      await controller.play();
+      _syncMusicDiscAnimation();
+    } catch (_) {
+      await _stopPostSound();
+    }
+  }
+
   bool _checkAuth() {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthSuccess) return true;
@@ -483,32 +637,64 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final isVideo =
         MediaUtils.isVideo(mediaUrl, mediaType: media.mediaType) ||
         widget.post.type == 'VIDEO';
+    final isActiveSlide = widget.isActive && _currentPage == index;
+    final videoController = _videoPlayerControllers.putIfAbsent(
+      index,
+      CustomVideoPlayerController.new,
+    );
+
+    Widget child = isVideo
+        ? CustomVideoPlayer(
+            url: mediaUrl,
+            posterUrl: MediaUtils.resolveVideoPosterUrl(widget.post),
+            isActive: isActiveSlide,
+            controller: videoController,
+            onPlaybackChanged: _syncMusicDiscAnimation,
+          )
+        : mediaUrl.isEmpty
+        ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)
+        : SafeNetworkImage(
+            imageUrl: mediaUrl,
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+            errorIcon: LucideIcons.imageOff,
+          );
+
+    if (!isVideo &&
+        isActiveSlide &&
+        (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false)) {
+      final isPlaying = isActiveSlide && _isPostPlaybackActive();
+      child = GestureDetector(
+        onTap: () => unawaited(_togglePostPlayback()),
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          fit: StackFit.expand,
+          alignment: Alignment.center,
+          children: [
+            child,
+            if (isActiveSlide && !isPlaying)
+              Icon(
+                LucideIcons.play,
+                size: 80,
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       key: ValueKey('${mediaUrl}_$index'),
       width: MediaQuery.of(context).size.width,
       height: MediaQuery.of(context).size.height,
-      child: Center(
-        child: isVideo
-            ? CustomVideoPlayer(
-                url: mediaUrl,
-                posterUrl: MediaUtils.resolveVideoPosterUrl(widget.post),
-                isActive: widget.isActive,
-              )
-            : mediaUrl.isEmpty
-            ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)
-            : SafeNetworkImage(
-                imageUrl: mediaUrl,
-                fit: BoxFit.contain,
-                width: double.infinity,
-                height: double.infinity,
-                errorIcon: LucideIcons.imageOff,
-              ),
-      ),
+      child: Center(child: child),
     );
   }
 
   @override
   void dispose() {
+    unawaited(_stopPostSound());
     _musicController.dispose();
     _likeAnimController.dispose();
     super.dispose();
@@ -597,6 +783,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   : const NeverScrollableScrollPhysics(),
               onPageChanged: (index, reason) {
                 setState(() => _currentPage = index);
+                unawaited(_syncPostSoundPlayback());
               },
             ),
             itemBuilder: (context, index, _) =>
@@ -1014,7 +1201,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final label = sound?.name ?? l10n.cameraOriginalSound;
 
     return GestureDetector(
-      onTap: sound != null ? () => _openPostSound(post) : null,
+      onTap: _canTogglePlayback ? () => unawaited(_togglePostPlayback()) : null,
+      onLongPress: sound != null ? () => _openPostSound(post) : null,
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: double.infinity,
@@ -1042,7 +1230,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   Widget _buildMusicDisc(ThemeData theme, PostEntity post) {
     return GestureDetector(
-      onTap: post.sound != null ? () => _openPostSound(post) : null,
+      onTap: _canTogglePlayback ? () => unawaited(_togglePostPlayback()) : null,
+      onLongPress: post.sound != null ? () => _openPostSound(post) : null,
       child: _buildMusicDiscVisual(theme),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_mlkit_utils.dart';
 
 export 'camera_mlkit_utils.dart';
@@ -11,11 +12,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 class CameraFaceDetectorService {
   CameraFaceDetectorService() {
     _detector = FaceDetector(
-      options: FaceDetectorOptions(
-        enableLandmarks: true,
-        enableClassification: true,
-        performanceMode: FaceDetectorMode.fast,
-      ),
+      options: CameraFaceEffectMapper.liveDetectorOptions(),
     );
   }
 

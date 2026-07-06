@@ -51,17 +51,25 @@ class _StoryMediaPreviewState extends State<StoryMediaPreview> {
         );
       }
       return SizedBox.expand(
-        child: FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
-            child: VideoPlayer(controller),
+        child: ColoredBox(
+          color: Colors.black,
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
           ),
         ),
       );
     }
 
-    return SizedBox.expand(child: Image.file(widget.file, fit: BoxFit.cover));
+    return SizedBox.expand(
+      child: ColoredBox(
+        color: Colors.black,
+        child: Image.file(widget.file, fit: BoxFit.contain),
+      ),
+    );
   }
 }

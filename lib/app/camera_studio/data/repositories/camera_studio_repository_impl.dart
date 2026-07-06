@@ -45,7 +45,7 @@ class CameraStudioRepositoryImpl implements CameraStudioRepository {
     } catch (e) {
       final cached = await localDataSource.readCachedCatalog();
       if (cached != null) return Right(cached);
-      return Right(CameraStudioCatalogModel.empty);
+      return Right(CameraStudioCatalogModel.bundled());
     }
   }
 }

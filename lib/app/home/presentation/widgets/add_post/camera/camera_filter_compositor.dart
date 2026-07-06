@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
@@ -101,7 +102,10 @@ class CameraFilterCompositor {
   ) async {
     if (!isActiveFilter(filter)) return bytes;
 
-    final codec = await ui.instantiateImageCodec(bytes);
+    final normalized = CameraCaptureUtils.normalizeImageBytes(bytes);
+    final working = normalized ?? bytes;
+
+    final codec = await ui.instantiateImageCodec(working);
     final frame = await codec.getNextFrame();
     final source = frame.image;
     final width = source.width;

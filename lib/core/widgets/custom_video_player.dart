@@ -10,17 +10,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
+
+class CustomVideoPlayerController {
+  _CustomVideoPlayerState? _state;
+
+  bool get isPlaying => _state?.isPlaying ?? false;
+
+  Future<void> togglePlayback() async {
+    await _state?._togglePlayback();
+  }
+
+  void _attach(_CustomVideoPlayerState state) => _state = state;
+
+  void _detach(_CustomVideoPlayerState state) {
+    if (_state == state) _state = null;
+  }
+}
+
 class CustomVideoPlayer extends StatefulWidget {
   const CustomVideoPlayer({
     super.key,
     required this.url,
     this.posterUrl,
     this.isActive = true,
+    this.controller,
+    this.onPlaybackChanged,
   });
 
   final String url;
   final String? posterUrl;
   final bool isActive;
+  final CustomVideoPlayerController? controller;
+  final VoidCallback? onPlaybackChanged;
 
   @override
   State<CustomVideoPlayer> createState() => _CustomVideoPlayerState();
@@ -29,16 +50,12 @@ class CustomVideoPlayer extends StatefulWidget {
 class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   static const Duration _initTimeout = Duration(seconds: 20);
 
-  /// Android emulators often hit AudioTrack -12 (ENOMEM); feed plays muted.
-  static bool get _muteByDefault =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-
   VideoPlayerController? _controller;
   VoidCallback? _playbackListener;
   FeedVideoProgressNotifier? _progressNotifier;
   String? _errorMessage;
   bool _isInitializing = false;
-  bool _playbackMuted = _muteByDefault;
+  bool _playbackMuted = false;
   int _initGeneration = 0;
   Uint8List? _generatedPosterBytes;
   bool _posterGenerationStarted = false;
@@ -67,10 +84,13 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         text.contains('audio/3gpp');
   }
 
+  bool get isPlaying =>
+      _controller?.value.isInitialized == true && _controller!.value.isPlaying;
+
   @override
   void initState() {
     super.initState();
-    _playbackMuted = _muteByDefault;
+    widget.controller?._attach(this);
     _maybeGeneratePoster();
     if (widget.isActive) {
       unawaited(_initController());
@@ -86,6 +106,10 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   @override
   void didUpdateWidget(CustomVideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (oldWidget.posterUrl != widget.posterUrl) {
       _generatedPosterBytes = null;
       _posterGenerationStarted = false;
@@ -94,7 +118,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (oldWidget.url != widget.url) {
       _generatedPosterBytes = null;
       _posterGenerationStarted = false;
-      _playbackMuted = _muteByDefault;
+      _playbackMuted = false;
       _maybeGeneratePoster();
       if (widget.isActive) {
         unawaited(_initController());
@@ -106,7 +130,12 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (oldWidget.isActive != widget.isActive) {
       if (widget.isActive) {
         _maybeGeneratePoster();
-        unawaited(_initController());
+        final controller = _controller;
+        if (controller != null && controller.value.isInitialized) {
+          unawaited(_ensureAudiblePlayback());
+        } else {
+          unawaited(_initController());
+        }
       } else {
         unawaited(_releasePlayer());
         _resetFeedProgress();
@@ -159,7 +188,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
       videoPlayerOptions: VideoPlayerOptions(
-        mixWithOthers: true,
+        mixWithOthers: false,
         allowBackgroundPlayback: false,
       ),
     );
@@ -171,7 +200,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         final description =
             controller.value.errorDescription ?? 'Video playback failed';
         if (_isAudioFailure(description)) {
-          unawaited(_playMuted(controller, generation));
+          unawaited(_playWithVolume(controller, generation, muted: true));
           return;
         }
         setState(() => _errorMessage = description);
@@ -179,6 +208,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       } else {
         if (mounted) setState(() {});
         _syncFeedProgress();
+        _notifyPlaybackChanged();
       }
     }
 
@@ -201,14 +231,13 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
       if (mounted) setState(() => _isInitializing = false);
 
-      final ok = await _playMuted(
-        controller,
-        generation,
-        force: _muteByDefault,
-      );
+      var ok = await _playWithVolume(controller, generation, muted: false);
+      if (!ok) {
+        ok = await _playWithVolume(controller, generation, muted: true);
+      }
       if (!ok && mounted && generation == _initGeneration) {
         setState(() {
-          _errorMessage = 'Video unavailable (audio not supported)';
+          _errorMessage = 'Video unavailable';
         });
       }
     } catch (e) {
@@ -217,7 +246,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           controller.value.isInitialized &&
           mounted &&
           generation == _initGeneration) {
-        final ok = await _playMuted(controller, generation, force: true);
+        final ok = await _playWithVolume(controller, generation, muted: true);
         if (ok) return;
       }
       await _disposeController(controller, listener);
@@ -239,15 +268,30 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     }
   }
 
-  Future<bool> _playMuted(
+  Future<void> _ensureAudiblePlayback() async {
+    final controller = _controller;
+    final generation = _initGeneration;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        !widget.isActive) {
+      return;
+    }
+    _playbackMuted = false;
+    var ok = await _playWithVolume(controller, generation, muted: false);
+    if (!ok) {
+      await _playWithVolume(controller, generation, muted: true);
+    }
+  }
+
+  Future<bool> _playWithVolume(
     VideoPlayerController controller,
     int generation, {
-    bool force = true,
+    required bool muted,
   }) async {
     if (!widget.isActive || generation != _initGeneration) return false;
     try {
-      await controller.setVolume(force ? 0 : 1);
-      _playbackMuted = force;
+      await controller.setVolume(muted ? 0 : 1);
+      _playbackMuted = muted;
       await controller.play();
       if (!mounted || generation != _initGeneration) return false;
       setState(() => _errorMessage = null);
@@ -255,11 +299,36 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       return true;
     } on PlatformException catch (e) {
       debugPrint('Video play failed: $e');
-      return false;
+      return muted;
     } catch (e) {
       debugPrint('Video play failed: $e');
-      return _isAudioFailure(e) ? false : true;
+      return muted || !_isAudioFailure(e);
     }
+  }
+
+  void _notifyPlaybackChanged() {
+    widget.onPlaybackChanged?.call();
+  }
+
+  Future<void> _togglePlayback() async {
+    final controller = _controller;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        _isInitializing) {
+      return;
+    }
+    if (controller.value.isPlaying) {
+      await controller.pause();
+    } else {
+      await _playWithVolume(
+        controller,
+        _initGeneration,
+        muted: _playbackMuted,
+      );
+    }
+    if (mounted) setState(() {});
+    _syncFeedProgress();
+    _notifyPlaybackChanged();
   }
 
   Future<void> _disposeController(
@@ -298,7 +367,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   Future<void> _releasePlayer() async {
     _initGeneration++;
     _isInitializing = false;
-    _playbackMuted = _muteByDefault;
+    _playbackMuted = false;
     await _tearDownController();
     if (mounted) setState(() {});
   }
@@ -351,6 +420,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _initGeneration++;
     if (widget.isActive) _resetFeedProgress();
     unawaited(_tearDownController());
@@ -408,16 +478,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         (!isReady || (isReady && controller.value.isBuffering));
 
     return GestureDetector(
-      onTap: () async {
-        if (!isReady) return;
-        if (controller.value.isPlaying) {
-          await controller.pause();
-        } else {
-          await _playMuted(controller, _initGeneration, force: _playbackMuted);
-        }
-        if (mounted) setState(() {});
-        _syncFeedProgress();
-      },
+      onTap: () => unawaited(_togglePlayback()),
       child: Stack(
         fit: StackFit.expand,
         children: [

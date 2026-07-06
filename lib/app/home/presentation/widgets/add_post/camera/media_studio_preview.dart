@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_ar_effects_layer.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/gallery_ar_effects_layer.dart';
@@ -126,6 +127,18 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
 
     try {
       final bytes = await widget.file.readAsBytes();
+      final decoded = CameraCaptureUtils.decodeNormalized(bytes);
+      if (decoded != null) {
+        if (!mounted) return;
+        setState(() {
+          _mediaSize = Size(
+            decoded.width.toDouble(),
+            decoded.height.toDouble(),
+          );
+        });
+        return;
+      }
+
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       if (!mounted) {
@@ -167,23 +180,31 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           !controller.value.isInitialized) {
         media = _VideoFallbackThumb(file: widget.file);
       } else {
-        media = FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
-            child: VideoPlayer(controller),
+        media = ColoredBox(
+          color: Colors.black,
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
           ),
         );
       }
     } else {
-      media = Image.file(
-        widget.file,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const ColoredBox(
-          color: Colors.black,
-          child: Center(
-            child: Icon(LucideIcons.imageOff, color: Colors.white38),
+      media = ColoredBox(
+        color: Colors.black,
+        child: Image.file(
+          widget.file,
+          fit: BoxFit.contain,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => const ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: Icon(LucideIcons.imageOff, color: Colors.white38),
+            ),
           ),
         ),
       );
@@ -200,12 +221,13 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         if (activeEffect != null &&
             activeEffect.requiresFaceDetection &&
             _mediaSize != Size.zero)
-          GalleryArEffectsLayer(
-            file: widget.file,
-            isVideo: _treatAsVideo,
-            effect: activeEffect,
-            mediaSize: _mediaSize,
-          ),
+                GalleryArEffectsLayer(
+                  file: widget.file,
+                  isVideo: _treatAsVideo,
+                  effect: activeEffect,
+                  mediaSize: _mediaSize,
+                  previewFit: BoxFit.contain,
+                ),
         if (activeEffect != null && activeEffect.isScreenEffect)
           CameraScreenEffectsLayer(effect: activeEffect),
       ],

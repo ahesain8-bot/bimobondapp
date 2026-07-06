@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
+import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
+import 'package:bimobondapp/app/home/presentation/utils/camera_studio_permissions.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
@@ -13,6 +15,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_compositor.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detector_service.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_preset.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_mode.dart';
@@ -76,6 +79,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
   late final CameraFaceDetectorService _faceDetectorService;
   Type? _lastCameraStateType;
   String? _appliedFilterId;
+  bool _isFrontCamera = false;
 
   @override
   void initState() {
@@ -105,7 +109,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     final categories = CameraFilterCatalog.filterCategories;
     setState(() {
       _catalogLoading = false;
-      _filtersReady = CameraFilterCatalog.hasBackendCatalog;
+      _filtersReady = CameraFilterCatalog.hasCatalog;
       if (categories.isNotEmpty) {
         final slugs = categories.map((c) => c.slug).toList();
         if (!slugs.contains(_filterCategorySlug)) {
@@ -114,9 +118,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
         _filterCategory =
             CameraFilterCatalog.categoryFromSlug(_filterCategorySlug) ??
             CameraFilterCategory.trending;
-      }
-      if (!_filtersReady) {
-        _selectedFilter = AwesomeFilter.None;
       }
     });
   }
@@ -300,6 +301,13 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     var file = File(path);
     final isVideo = capture.isVideo;
 
+    if (!isVideo && capture.isPicture) {
+      file = await CameraCaptureUtils.normalizeCapturedImage(file);
+    } else if (isVideo) {
+      await CameraFilterCompositor.waitForCaptureFile(file);
+      if (!mounted) return;
+    }
+
     if (widget.isStory) {
       if (hasFilter || hasEffect) {
         setState(() => _isProcessingCapture = true);
@@ -339,11 +347,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
     }
 
     if (!mounted) return;
-
-    if (isVideo) {
-      await CameraFilterCompositor.waitForCaptureFile(file);
-      if (!mounted) return;
-    }
 
     await _openCapturedMediaEditor(
       file,
@@ -520,6 +523,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
 
   Future<void> _flipCamera() async {
     await _cameraState?.switchCameraSensor();
+    if (mounted) setState(() => _isFrontCamera = !_isFrontCamera);
   }
 
   void _toggleFlash() {
@@ -626,6 +630,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
                     : (_studioMode == CameraStudioMode.video
                           ? CaptureMode.video
                           : CaptureMode.photo),
+                mirrorFrontCamera: true,
               ),
               sensorConfig: SensorConfig.single(
                 sensor: Sensor.position(SensorPosition.back),
@@ -633,13 +638,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
                 zoom: _selectedZoom,
                 aspectRatio: CameraAspectRatios.ratio_16_9,
               ),
-              filter: _selectedFilter,
+              filter: _effectiveCaptureFilter(),
               filters: CameraFilterCatalog.gpuFiltersForCamera,
-              previewFit: CameraPreviewFit.cover,
+              previewFit: CameraPreviewFit.contain,
               onMediaCaptureEvent: _onMediaCapture,
               onImageForAnalysis: _onImageForAnalysis,
               imageAnalysisConfig: AnalysisConfig(
-                androidOptions: const AndroidAnalysisOptions.nv21(width: 250),
+                androidOptions: AndroidAnalysisOptions.nv21(
+                  width: CameraFaceEffectMapper.liveAnalysisWidth,
+                ),
                 maxFramesPerSecond: 8,
               ),
               progressIndicator: CameraAppLoading(message: l10n.cameraStarting),

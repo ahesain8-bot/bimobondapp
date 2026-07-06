@@ -1,7 +1,6 @@
 import 'package:bimobondapp/app/camera_studio/data/models/camera_studio_catalog_model.dart';
 import 'package:bimobondapp/app/camera_studio/domain/entities/camera_studio_catalog_entity.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/utils/camera_studio_l10n.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -40,15 +39,15 @@ class CameraEffectDefinition {
 class CameraEffectsCatalog {
   CameraEffectsCatalog._();
 
-  static CameraStudioCatalogEntity _catalog = CameraStudioCatalogModel.empty;
+  static CameraStudioCatalogEntity _catalog = CameraStudioCatalogModel.bundled();
 
   static void apply(CameraStudioCatalogEntity catalog) {
-    if (!CameraFilterCatalog.isBackendCatalog(catalog)) return;
+    if (catalog.effectCategories.isEmpty) return;
     _catalog = catalog;
   }
 
   static List<CameraEffectEntity> get _effects {
-    if (!CameraFilterCatalog.hasBackendCatalog) return const [];
+    if (_catalog.effectCategories.isEmpty) return const [];
     final categories = List<CameraEffectCategoryEntity>.from(
       _catalog.effectCategories,
     )..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
@@ -15,37 +16,91 @@ class CameraEffectImagePainter {
     CameraEffectDefinition effect,
   ) {
     for (final face in faces) {
-      switch (effect.id) {
-        case CameraEffectId.crown:
-          _drawAboveFace(
-            canvas,
-            face,
-            emoji: '👑',
-            scale: 1.1,
-            yOffset: -0.55,
-          );
-        case CameraEffectId.bunny:
-          _drawBunnyEars(canvas, face);
-        case CameraEffectId.sunglasses:
-          _drawSunglasses(canvas, face);
-        case CameraEffectId.dog:
-          _drawAboveFace(
-            canvas,
-            face,
-            emoji: '🐶',
-            scale: 0.95,
-            yOffset: -0.15,
-          );
-          _drawOnLandmark(canvas, face, FaceLandmarkType.noseBase, '👃', 28);
-        case CameraEffectId.hearts:
-          _drawOnLandmark(canvas, face, FaceLandmarkType.leftEye, '❤️', 34);
-          _drawOnLandmark(canvas, face, FaceLandmarkType.rightEye, '❤️', 34);
-        case CameraEffectId.none:
-        case CameraEffectId.sparkle:
-        case CameraEffectId.neon:
-        case CameraEffectId.glitch:
-          break;
-      }
+      _paintScreenFace(canvas, _faceToScreen(face), effect);
+    }
+  }
+
+  /// Paints AR effects using coordinates already mapped to the target canvas.
+  static void paintArScreenSpace(
+    Canvas canvas,
+    List<ScreenFace> faces,
+    CameraEffectDefinition effect,
+  ) {
+    for (final face in faces) {
+      _paintScreenFace(canvas, face, effect);
+    }
+  }
+
+  static ScreenFace _faceToScreen(Face face) {
+    final box = face.boundingBox;
+    final landmarks = <FaceLandmarkType, Offset>{};
+    for (final entry in face.landmarks.entries) {
+      final landmark = entry.value;
+      if (landmark == null) continue;
+      landmarks[entry.key] = Offset(
+        landmark.position.x.toDouble(),
+        landmark.position.y.toDouble(),
+      );
+    }
+    return ScreenFace(
+      boundingBox: Rect.fromLTRB(box.left, box.top, box.right, box.bottom),
+      landmarks: landmarks,
+    );
+  }
+
+  static void _paintScreenFace(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+  ) {
+    switch (effect.id) {
+      case CameraEffectId.crown:
+        _drawAboveScreenFace(
+          canvas,
+          face,
+          emoji: '👑',
+          scale: 1.1,
+          yOffset: -0.55,
+        );
+      case CameraEffectId.bunny:
+        _drawBunnyEarsScreen(canvas, face);
+      case CameraEffectId.sunglasses:
+        _drawSunglassesScreen(canvas, face);
+      case CameraEffectId.dog:
+        _drawAboveScreenFace(
+          canvas,
+          face,
+          emoji: '🐶',
+          scale: 0.95,
+          yOffset: -0.15,
+        );
+        _drawOnScreenLandmark(
+          canvas,
+          face,
+          FaceLandmarkType.noseBase,
+          '👃',
+          face.boundingBox.width * 0.18,
+        );
+      case CameraEffectId.hearts:
+        _drawOnScreenLandmark(
+          canvas,
+          face,
+          FaceLandmarkType.leftEye,
+          '❤️',
+          face.boundingBox.width * 0.22,
+        );
+        _drawOnScreenLandmark(
+          canvas,
+          face,
+          FaceLandmarkType.rightEye,
+          '❤️',
+          face.boundingBox.width * 0.22,
+        );
+      case CameraEffectId.none:
+      case CameraEffectId.sparkle:
+      case CameraEffectId.neon:
+      case CameraEffectId.glitch:
+        break;
     }
   }
 
@@ -67,9 +122,9 @@ class CameraEffectImagePainter {
     }
   }
 
-  static void _drawAboveFace(
+  static void _drawAboveScreenFace(
     Canvas canvas,
-    Face face, {
+    ScreenFace face, {
     required String emoji,
     required double scale,
     required double yOffset,
@@ -82,7 +137,7 @@ class CameraEffectImagePainter {
     _drawEmoji(canvas, emoji, center, box.width * scale * 0.45);
   }
 
-  static void _drawBunnyEars(Canvas canvas, Face face) {
+  static void _drawBunnyEarsScreen(Canvas canvas, ScreenFace face) {
     final box = face.boundingBox;
     final left = Offset(
       box.left + box.width * 0.22,
@@ -97,11 +152,11 @@ class CameraEffectImagePainter {
     _drawEmoji(canvas, '🐰', right, size);
   }
 
-  static void _drawSunglasses(Canvas canvas, Face face) {
+  static void _drawSunglassesScreen(Canvas canvas, ScreenFace face) {
     final leftEye = face.landmarks[FaceLandmarkType.leftEye];
     final rightEye = face.landmarks[FaceLandmarkType.rightEye];
     if (leftEye == null || rightEye == null) {
-      _drawAboveFace(
+      _drawAboveScreenFace(
         canvas,
         face,
         emoji: '😎',
@@ -111,32 +166,23 @@ class CameraEffectImagePainter {
       return;
     }
 
-    final left = Offset(
-      leftEye.position.x.toDouble(),
-      leftEye.position.y.toDouble(),
+    final center = Offset(
+      (leftEye.dx + rightEye.dx) / 2,
+      (leftEye.dy + rightEye.dy) / 2,
     );
-    final right = Offset(
-      rightEye.position.x.toDouble(),
-      rightEye.position.y.toDouble(),
-    );
-    final center = Offset((left.dx + right.dx) / 2, (left.dy + right.dy) / 2);
-    final width = (right.dx - left.dx).abs() * 2.2;
+    final width = (rightEye.dx - leftEye.dx).abs() * 2.2;
     _drawEmoji(canvas, '😎', center, width);
   }
 
-  static void _drawOnLandmark(
+  static void _drawOnScreenLandmark(
     Canvas canvas,
-    Face face,
+    ScreenFace face,
     FaceLandmarkType type,
     String emoji,
     double size,
   ) {
-    final landmark = face.landmarks[type];
-    if (landmark == null) return;
-    final point = Offset(
-      landmark.position.x.toDouble(),
-      landmark.position.y.toDouble(),
-    );
+    final point = face.landmarks[type];
+    if (point == null) return;
     _drawEmoji(canvas, emoji, point, size);
   }
 

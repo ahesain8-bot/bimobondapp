@@ -12,7 +12,7 @@ enum CameraFilterCategory { trending, newFilters, portrait, vibe, landscape }
 class CameraFilterCatalog {
   CameraFilterCatalog._();
 
-  static CameraStudioCatalogEntity _catalog = CameraStudioCatalogModel.empty;
+  static CameraStudioCatalogEntity _catalog = CameraStudioCatalogModel.bundled();
 
   static CameraStudioCatalogEntity get bundledCatalog =>
       CameraStudioCatalogModel.bundled();
@@ -27,14 +27,16 @@ class CameraFilterCatalog {
 
   static bool get hasBackendCatalog => isBackendCatalog(_catalog);
 
+  static bool get hasCatalog => _catalog.filterCategories.isNotEmpty;
+
   static void apply(CameraStudioCatalogEntity catalog) {
-    if (!isBackendCatalog(catalog)) return;
+    if (catalog.filterCategories.isEmpty) return;
     _catalog = catalog;
   }
 
-  /// Active filter tabs from `GET /camera-studio/catalog`.
+  /// Active filter tabs from catalog (API or bundled offline fallback).
   static List<CameraFilterCategoryEntity> get filterCategories {
-    if (!hasBackendCatalog) return const [];
+    if (!hasCatalog) return const [];
     return _sortedFilterCategories;
   }
 
@@ -46,16 +48,16 @@ class CameraFilterCatalog {
   }
 
   static List<CameraFilterCategory> get availableCategories {
-    if (!hasBackendCatalog) return const [];
+    if (!hasCatalog) return const [];
     return _sortedFilterCategories
         .map((category) => _categoryFromSlug(category.slug))
         .whereType<CameraFilterCategory>()
         .toList(growable: false);
   }
 
-  /// CamerAwesome presets enabled on the camera — backend catalog only.
+  /// CamerAwesome presets enabled on the camera.
   static List<AwesomeFilter> get gpuFiltersForCamera {
-    if (!hasBackendCatalog) return [AwesomeFilter.None];
+    if (!hasCatalog) return awesomePresetFiltersList;
     final filters = <AwesomeFilter>{AwesomeFilter.None};
     for (final category in _sortedFilterCategories) {
       for (final entity in category.filters) {
@@ -181,7 +183,7 @@ class CameraFilterCatalog {
   }
 
   static List<CameraFilterPreset> forCategorySlug(String slug) {
-    if (!hasBackendCatalog) return const [];
+    if (!hasCatalog) return const [];
     for (final category in _sortedFilterCategories) {
       if (category.slug == slug) {
         return category.filters.map(presetFromEntity).toList(growable: false);
