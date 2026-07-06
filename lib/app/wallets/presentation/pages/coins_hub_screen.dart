@@ -470,7 +470,6 @@ class _BalanceActionButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: 6),
-
                     Icon(icon, size: 20, color: style.primaryText),
                     const SizedBox(height: 6),
                     // const SizedBox(height: 13),

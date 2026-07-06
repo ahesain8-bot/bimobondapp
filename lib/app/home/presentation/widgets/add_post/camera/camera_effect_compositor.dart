@@ -6,8 +6,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
-import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
+import 'package:bimobondapp/core/utils/ffmpeg_kit_binding.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;

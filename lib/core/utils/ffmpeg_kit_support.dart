@@ -1,5 +1,4 @@
-import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
+import 'package:bimobondapp/core/utils/ffmpeg_kit_binding.dart';
 import 'package:flutter/foundation.dart';
 
 /// Guards FFmpeg usage when the native plugin is missing or unsupported

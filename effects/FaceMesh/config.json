@@ -1,0 +1,144 @@
+{
+    "assets": {
+        "attachments": {
+            "effect_color": {
+                "type": "color"
+            }
+        },
+        "images": {
+            "camera": {
+                "type": "procedural_texture",
+                "algorithm": "camera_composer"
+            }
+        },
+        "materials": {
+            "$builtin$materials/copy_pixels.0": {
+                "parameters": {},
+                "samplers": [
+                {
+                    "image": "camera",
+                    "name": "tex_src"
+                }
+                ],
+                "state": {
+                "backfaces": true,
+                "blend": "off",
+                "colorwrite": true,
+                "ztest": false,
+                "zwrite": false
+                }
+            },
+            "wireframe": {
+                "samplers": [
+                ],
+                "state": {
+                    "backfaces": false,
+                    "blend": "alpha",
+                    "colorwrite": true,
+                    "ztest": false,
+                    "zwrite": false
+                },
+                "geometry_topology": "lines_list",
+                "parameters": {}
+            },
+            "landmarks": {
+                "samplers": [
+                ],
+                "state": {
+                    "backfaces": false,
+                    "blend": "alpha",
+                    "colorwrite": true,
+                    "ztest": false,
+                    "zwrite": false
+                },
+                "geometry_topology": "points_list",
+                "parameters": {}
+            },
+            "face_box": {
+                "samplers": [
+                ],
+                "state": {
+                    "backfaces": false,
+                    "blend": "alpha",
+                    "colorwrite": true,
+                    "ztest": false,
+                    "zwrite": false
+                },
+                "geometry_topology": "lines_list",
+                "parameters": {}
+            }
+        }
+    },
+    "entities": {
+        "camera": {
+            "components": {
+                "mesh_instance": {
+                    "materials": ["$builtin$materials/copy_pixels.0"],
+                    "mesh": "$builtin$meshes/fs_tri"
+                }
+            },
+            "layer": "camera"
+        },
+        "face_box": {
+            "components": {
+                "mesh_instance": {
+                    "materials": ["face_box"],
+                    "mesh": "$builtin$meshes/face_box.stream:0"
+                }
+            },
+            "layer": "camera"
+        },
+        "face_tracker0": {
+            "components": {
+                "face_tracker" : {
+                    "face": {
+                        "index": 0,
+                        "entity_name" : "face0",
+                        "mesh" : "$builtin$meshes/wireframe.stream:0",
+                        "materials": ["wireframe"],
+                        "layer": "wireframe"
+                    }
+                }
+            }
+        },
+        "landmarks0": {
+            "components": {
+                "mesh_instance": {
+                    "materials": ["landmarks"],
+                    "mesh": "$builtin$meshes/landmarks.stream:0"
+                }
+            },
+            "layer": "landmarks"
+        }
+    },
+    "hierarchy": {
+        "face_tracker0": ["landmarks0"],
+        "root": [
+            "camera",
+            "face_box",
+            "face_tracker0"
+        ]
+    },
+    "render_list": {
+        "default": [
+            {
+                "layer": "camera",
+                "render_target": "EffectRT"
+            },
+            {
+                "layer": "wireframe",
+                "render_target": "EffectRT"
+            },
+            {
+                "layer": "landmarks",
+                "render_target": "EffectRT"
+            }
+        ]
+    },
+    "render_targets": {
+        "EffectRT": [
+            "effect_color"
+        ]
+    },
+    "scene": "DebugFRX"
+}

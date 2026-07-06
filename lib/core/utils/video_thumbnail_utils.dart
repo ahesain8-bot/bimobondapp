@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/ffmpeg_kit_binding.dart';
 import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
-import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 class VideoThumbnailUtils {
   VideoThumbnailUtils._();
@@ -28,14 +28,27 @@ class VideoThumbnailUtils {
       final tempDir = await getTemporaryDirectory();
       final outputPath =
           '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final success = await _extractThumbnail(
+
+      final thumbPath = await _extractWithVideoThumbnail(
         videoSource: videoFile.path,
         outputPath: outputPath,
         timeMs: timeMs,
         maxHeight: maxHeight,
         quality: quality,
       );
-      if (!success) return null;
+      if (thumbPath != null) {
+        final thumbFile = File(thumbPath);
+        if (await thumbFile.exists()) return thumbFile;
+      }
+
+      final ffmpegOk = await _extractWithFfmpeg(
+        videoSource: videoFile.path,
+        outputPath: outputPath,
+        timeMs: timeMs,
+        maxHeight: maxHeight,
+        quality: quality,
+      );
+      if (!ffmpegOk) return null;
       final thumbFile = File(outputPath);
       if (!await thumbFile.exists()) return null;
       return thumbFile;
@@ -55,6 +68,19 @@ class VideoThumbnailUtils {
     final source = videoSource.trim();
     if (source.isEmpty) return null;
 
+    try {
+      final data = await VideoThumbnail.thumbnailData(
+        video: source,
+        imageFormat: ImageFormat.JPEG,
+        maxHeight: maxHeight,
+        timeMs: timeMs,
+        quality: quality.clamp(1, 100),
+      );
+      if (data != null && data.isNotEmpty) return data;
+    } catch (e) {
+      debugPrint('video_thumbnail package failed: $e');
+    }
+
     File? tempOutput;
     try {
       final tempDir = await getTemporaryDirectory();
@@ -62,7 +88,7 @@ class VideoThumbnailUtils {
           '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
       tempOutput = File(outputPath);
 
-      final success = await _extractThumbnail(
+      final success = await _extractWithFfmpeg(
         videoSource: source,
         outputPath: outputPath,
         timeMs: timeMs,
@@ -79,7 +105,29 @@ class VideoThumbnailUtils {
     }
   }
 
-  static Future<bool> _extractThumbnail({
+  static Future<String?> _extractWithVideoThumbnail({
+    required String videoSource,
+    required String outputPath,
+    required int timeMs,
+    required int maxHeight,
+    required int quality,
+  }) async {
+    try {
+      return await VideoThumbnail.thumbnailFile(
+        video: videoSource,
+        thumbnailPath: outputPath,
+        imageFormat: ImageFormat.JPEG,
+        maxHeight: maxHeight,
+        timeMs: timeMs,
+        quality: quality.clamp(1, 100),
+      );
+    } catch (e) {
+      debugPrint('video_thumbnail package failed: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> _extractWithFfmpeg({
     required String videoSource,
     required String outputPath,
     required int timeMs,

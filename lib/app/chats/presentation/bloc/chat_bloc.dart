@@ -14,6 +14,8 @@ import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart'
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_state.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_send_content.dart';
+import 'package:bimobondapp/core/utils/media_upload_prep.dart';
+import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
@@ -311,19 +313,30 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       return;
     }
 
-    final uploadResult = await uploadMediaUseCase(file);
-    await uploadResult.fold(
-      (failure) async {
-        emit(ChatFailure(failure.message));
-      },
-      (mediaUrl) async {
-        if (mediaUrl.trim().isEmpty) {
-          emit(ChatFailure('Upload did not return a media URL.'));
-          return;
-        }
-        await sendWithMediaUrl(mediaUrl);
-      },
-    );
+    File? compressedTemp;
+    try {
+      final prepared = await MediaUploadPrep.prepareChatUpload(
+        file,
+        event.messageType,
+      );
+      if (prepared.path != file.path) compressedTemp = prepared;
+
+      final uploadResult = await uploadMediaUseCase(prepared);
+      await uploadResult.fold(
+        (failure) async {
+          emit(ChatFailure(failure.message));
+        },
+        (mediaUrl) async {
+          if (mediaUrl.trim().isEmpty) {
+            emit(ChatFailure('Upload did not return a media URL.'));
+            return;
+          }
+          await sendWithMediaUrl(mediaUrl);
+        },
+      );
+    } finally {
+      await VideoThumbnailUtils.deleteIfExists(compressedTemp);
+    }
   }
 
   void _emitSentMessage(

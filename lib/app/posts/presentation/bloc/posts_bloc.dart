@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/core/utils/media_upload_prep.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -157,11 +158,19 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   }
 
   Future<String> _uploadMediaFile(File file) async {
-    final result = await uploadMediaUseCase(file);
-    return result.fold(
-      (failure) => throw Exception(failure.message),
-      (url) => url,
-    );
+    File? compressedTemp;
+    try {
+      final prepared = await MediaUploadPrep.prepareForUpload(file);
+      if (prepared.path != file.path) compressedTemp = prepared;
+
+      final result = await uploadMediaUseCase(prepared);
+      return result.fold(
+        (failure) => throw Exception(failure.message),
+        (url) => url,
+      );
+    } finally {
+      await VideoThumbnailUtils.deleteIfExists(compressedTemp);
+    }
   }
 
   Future<String?> _uploadVideoThumbnail(File videoFile) async {
