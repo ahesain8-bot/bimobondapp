@@ -331,7 +331,6 @@ class _WalletBalanceHero extends StatelessWidget {
                         Expanded(
                           child: _BalanceActionButton(
                             icon: LucideIcons.plus,
-                            label: l10n.walletTopUpButton,
                             style: glass,
                             selected: selectedTab == 0,
                             onTap: onTopUp,
@@ -341,7 +340,6 @@ class _WalletBalanceHero extends StatelessWidget {
                         Expanded(
                           child: _BalanceActionButton(
                             icon: LucideIcons.store,
-                            label: l10n.coinsTabMarket,
                             style: glass,
                             selected: selectedTab == 1,
                             onTap: onMarket,
@@ -351,7 +349,6 @@ class _WalletBalanceHero extends StatelessWidget {
                         Expanded(
                           child: _BalanceActionButton(
                             icon: LucideIcons.archive,
-                            label: l10n.coinsTabVault,
                             style: glass,
                             selected: selectedTab == 2,
                             onTap: onVault,
@@ -436,14 +433,12 @@ class _WalletGlassStyle {
 class _BalanceActionButton extends StatelessWidget {
   const _BalanceActionButton({
     required this.icon,
-    required this.label,
     required this.style,
     required this.selected,
     required this.onTap,
   });
 
   final IconData icon;
-  final String label;
   final _WalletGlassStyle style;
   final bool selected;
   final VoidCallback onTap;
@@ -465,25 +460,8 @@ class _BalanceActionButton extends StatelessWidget {
               blurSigma: 12,
               backgroundColor: style.buttonFill,
               borderColor: style.buttonBorder,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 40),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 18, color: style.primaryText),
-                  const SizedBox(height: 6),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: style.primaryText,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+              child: Icon(icon, size: 20, color: style.primaryText),
             ),
             const SizedBox(height: 8),
             AnimatedContainer(

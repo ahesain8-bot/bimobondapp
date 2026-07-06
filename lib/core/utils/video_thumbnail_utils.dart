@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
 import 'package:flutter/foundation.dart';
@@ -85,6 +86,8 @@ class VideoThumbnailUtils {
     required int maxHeight,
     required int quality,
   }) async {
+    if (!await FfmpegKitSupport.isAvailable) return false;
+
     final seekSeconds = (timeMs / 1000).toStringAsFixed(3);
     final qValue = _mapQualityToFfmpegQ(quality);
     final parts = <String>[
@@ -102,9 +105,15 @@ class VideoThumbnailUtils {
     ];
     final command = parts.join(' ');
 
-    final session = await FFmpegKit.execute(command);
-    final returnCode = await session.getReturnCode();
-    return ReturnCode.isSuccess(returnCode);
+    try {
+      final session = await FFmpegKit.execute(command);
+      final returnCode = await session.getReturnCode();
+      return ReturnCode.isSuccess(returnCode);
+    } catch (e) {
+      FfmpegKitSupport.markUnavailable();
+      debugPrint('FFmpeg thumbnail extraction failed: $e');
+      return false;
+    }
   }
 
   static int _mapQualityToFfmpegQ(int quality) {

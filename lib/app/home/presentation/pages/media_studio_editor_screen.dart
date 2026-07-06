@@ -19,6 +19,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_studio_preview.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_editor.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -215,6 +216,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
           'initialSound': widget.initialSound,
         },
       );
+    } catch (e) {
+      if (!mounted) return;
+      PopupDialogs.showErrorDialog(context, '$e');
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffprobe_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
@@ -151,6 +152,11 @@ class CameraFilterCompositor {
 
   /// Applies the color matrix in one FFmpeg pass — no per-frame JPEG extraction.
   static Future<File?> _applyToVideo(File file, AwesomeFilter filter) async {
+    if (!await FfmpegKitSupport.isAvailable) {
+      debugPrint('Camera filter: FFmpeg unavailable, skipping video bake');
+      return null;
+    }
+
     final tempDir = await getTemporaryDirectory();
     final outPath =
         '${tempDir.path}/filter_${DateTime.now().millisecondsSinceEpoch}.mp4';
@@ -210,9 +216,16 @@ class CameraFilterCompositor {
   }
 
   static Future<bool> _hasAudioTrack(File file) async {
-    final session = await FFprobeKit.getMediaInformation(file.path);
-    final streams = session.getMediaInformation()?.getStreams() ?? const [];
-    return streams.any((stream) => stream.getType() == 'audio');
+    if (!await FfmpegKitSupport.isAvailable) return false;
+
+    try {
+      final session = await FFprobeKit.getMediaInformation(file.path);
+      final streams = session.getMediaInformation()?.getStreams() ?? const [];
+      return streams.any((stream) => stream.getType() == 'audio');
+    } catch (e) {
+      debugPrint('Camera filter: ffprobe failed: $e');
+      return false;
+    }
   }
 
   static Future<bool> _runFfmpeg(List<String> args) async {
@@ -227,13 +240,21 @@ class CameraFilterCompositor {
   }
 
   static Future<bool> _tryFfmpeg(List<String> args) async {
-    final session = await FFmpegKit.executeWithArguments(args);
-    final returnCode = await session.getReturnCode();
-    if (ReturnCode.isSuccess(returnCode)) return true;
+    if (!await FfmpegKitSupport.isAvailable) return false;
 
-    final logs = await session.getAllLogsAsString();
-    debugPrint('FFmpeg filter failed: $logs');
-    return false;
+    try {
+      final session = await FFmpegKit.executeWithArguments(args);
+      final returnCode = await session.getReturnCode();
+      if (ReturnCode.isSuccess(returnCode)) return true;
+
+      final logs = await session.getAllLogsAsString();
+      debugPrint('FFmpeg filter failed: $logs');
+      return false;
+    } catch (e, st) {
+      FfmpegKitSupport.markUnavailable();
+      debugPrint('FFmpeg filter error: $e\n$st');
+      return false;
+    }
   }
 
   static String _imageExtension(String path) {

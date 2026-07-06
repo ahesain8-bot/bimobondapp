@@ -139,11 +139,8 @@ class _AllChatsBodyState extends State<_AllChatsBody> {
         },
         child: BlocBuilder<InboxBloc, InboxState>(
           builder: (context, state) {
-            final inboxItems = _cachedInboxItems.isNotEmpty
-                ? _cachedInboxItems
-                : (_inboxLoadFinished
-                      ? messagesMockInboxItems(l10n)
-                      : <InboxChatItem>[]);
+            final inboxItems =
+                _inboxLoadFinished ? _cachedInboxItems : <InboxChatItem>[];
             final filtered = filterInboxChats(inboxItems, _searchQuery);
             final isLoadingChats =
                 (state is InboxLoading || state is InboxInitial) &&

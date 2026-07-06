@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
+import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
 import 'package:ffmpeg_kit_flutter_new_https/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_https/return_code.dart';
 import 'package:flutter/material.dart';
@@ -137,6 +138,12 @@ class CameraEffectCompositor {
 
     if (overlayFile == null) return null;
 
+    if (!await FfmpegKitSupport.isAvailable) {
+      debugPrint('Camera effect: FFmpeg unavailable, skipping video bake');
+      await VideoThumbnailUtils.deleteIfExists(overlayFile);
+      return null;
+    }
+
     final tempDir = await getTemporaryDirectory();
     final outPath =
         '${tempDir.path}/effect_${DateTime.now().millisecondsSinceEpoch}.mp4';
@@ -153,10 +160,17 @@ class CameraEffectCompositor {
       _quote(outPath),
     ].join(' ');
 
-    final session = await FFmpegKit.execute(command);
-    await VideoThumbnailUtils.deleteIfExists(overlayFile);
-    final returnCode = await session.getReturnCode();
-    if (!ReturnCode.isSuccess(returnCode)) return null;
+    try {
+      final session = await FFmpegKit.execute(command);
+      await VideoThumbnailUtils.deleteIfExists(overlayFile);
+      final returnCode = await session.getReturnCode();
+      if (!ReturnCode.isSuccess(returnCode)) return null;
+    } catch (e, st) {
+      FfmpegKitSupport.markUnavailable();
+      debugPrint('Camera effect FFmpeg error: $e\n$st');
+      await VideoThumbnailUtils.deleteIfExists(overlayFile);
+      return null;
+    }
 
     final outFile = File(outPath);
     if (!await outFile.exists()) return null;

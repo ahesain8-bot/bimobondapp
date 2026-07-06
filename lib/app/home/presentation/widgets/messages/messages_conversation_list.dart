@@ -13,11 +13,13 @@ class MessagesConversationList extends StatelessWidget {
   const MessagesConversationList({
     required this.items,
     this.scrollable = false,
+    this.inboxEmpty = false,
     super.key,
   });
 
   final List<InboxChatItem> items;
   final bool scrollable;
+  final bool inboxEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -31,13 +33,17 @@ class MessagesConversationList extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search_off_rounded,
+              inboxEmpty
+                  ? Icons.chat_bubble_outline_rounded
+                  : Icons.search_off_rounded,
               size: 48,
               color: theme.dividerColor.withValues(alpha: 0.2),
             ),
             const SizedBox(height: 12),
             Text(
-              l10n.messagesNoResults,
+              inboxEmpty
+                  ? l10n.messagesInboxNoMessagesYet
+                  : l10n.messagesNoResults,
               style: TextStyle(
                 color: theme.textTheme.bodyMedium?.color?.withValues(
                   alpha: 0.4,

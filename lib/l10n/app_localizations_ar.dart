@@ -1406,7 +1406,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesNoResults => 'لا توجد نتائج';
 
   @override
-  String get messagesInboxNoMessagesYet => 'لا توجد رسائل بعد';
+  String get messagesInboxNoMessagesYet => 'لا توجد محادثات متاحة';
 
   @override
   String get messagesInboxYouPrefix => 'أنت';

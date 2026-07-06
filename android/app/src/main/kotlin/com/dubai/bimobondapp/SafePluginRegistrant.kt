@@ -5,15 +5,31 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 
 /**
- * Registers plugins that come after ffmpeg_kit in [io.flutter.plugins.GeneratedPluginRegistrant].
+ * Registers Flutter plugins one-by-one so a single failing plugin (notably FFmpegKit
+ * on 16 KB page-size devices) does not abort registration for Firebase and others.
  *
- * FFmpegKit can throw [Error] (not [Exception]) on 16 KB page-size emulators during native
- * library load, which aborts the generated registrant before Firebase and other plugins load.
+ * Update this list when [io.flutter.plugins.GeneratedPluginRegistrant] changes
+ * after `flutter pub get`.
  */
-object RemainingPluginRegistrant {
-    private const val TAG = "RemainingPluginRegistrant"
+object SafePluginRegistrant {
+    private const val TAG = "SafePluginRegistrant"
 
     fun registerWith(flutterEngine: FlutterEngine) {
+        safeAdd(flutterEngine, "camerawesome") {
+            com.apparence.camerawesome.cameraX.CameraAwesomeX()
+        }
+        safeAdd(flutterEngine, "cloud_firestore") {
+            io.flutter.plugins.firebase.firestore.FlutterFirebaseFirestorePlugin()
+        }
+        safeAdd(flutterEngine, "cloud_functions") {
+            io.flutter.plugins.firebase.functions.FlutterFirebaseFunctionsPlugin()
+        }
+        safeAdd(flutterEngine, "device_info_plus") {
+            dev.fluttercommunity.plus.device_info.DeviceInfoPlusPlugin()
+        }
+        safeAdd(flutterEngine, "ffmpeg_kit_flutter_new_https") {
+            com.antonkarpenko.ffmpegkit.FFmpegKitFlutterPlugin()
+        }
         safeAdd(flutterEngine, "file_selector_android") {
             dev.flutter.packages.file_selector_android.FileSelectorAndroidPlugin()
         }

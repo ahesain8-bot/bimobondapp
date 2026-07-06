@@ -377,11 +377,8 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
           ],
           child: BlocBuilder<InboxBloc, InboxState>(
             builder: (context, state) {
-              final inboxItems = _cachedInboxItems.isNotEmpty
-                  ? _cachedInboxItems
-                  : (_inboxLoadFinished
-                        ? messagesMockInboxItems(l10n)
-                        : <InboxChatItem>[]);
+              final inboxItems =
+                  _inboxLoadFinished ? _cachedInboxItems : <InboxChatItem>[];
               final recentPreview = inboxItems
                   .take(MessagesLayoutConstants.recentMessagesPreviewCount)
                   .toList();
@@ -499,7 +496,10 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                     if (isLoadingChats)
                       const MessagesChatListSkeleton()
                     else
-                      MessagesConversationList(items: recentPreview),
+                      MessagesConversationList(
+                        items: recentPreview,
+                        inboxEmpty: true,
+                      ),
                     if (!isLoadingChats) ...[
                       const SizedBox(height: 24),
                       Padding(

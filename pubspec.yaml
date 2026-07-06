@@ -72,7 +72,7 @@ dependencies:
   geolocator: ^14.0.1
   geocoding: ^4.0.0
   flutter_contacts: ^1.1.9+2
-  ffmpeg_kit_flutter_new_https: 2.1.0
+  ffmpeg_kit_flutter_new_https: ^2.3.2
   flutter_local_notifications: ^22.0.0
   camerawesome: ^2.5.0
   image: ^4.5.4
