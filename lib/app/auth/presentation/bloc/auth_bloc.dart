@@ -4,7 +4,6 @@ import 'package:bimobondapp/app/auth/domain/usecases/login_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_up_with_email_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/verify_phone_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_phone_usecase.dart';
-import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_facebook_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_google_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/get_profile_usecase.dart';
@@ -21,7 +20,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignUpWithEmailUseCase signUpWithEmailUseCase;
   final VerifyPhoneUseCase verifyPhoneUseCase;
   final SignInWithPhoneUseCase signInWithPhoneUseCase;
-  final SignInWithFacebookUseCase signInWithFacebookUseCase;
   final SignInWithGoogleUseCase signInWithGoogleUseCase;
   final UpdateProfileUseCase updateProfileUseCase;
   final GetProfileUseCase getProfileUseCase;
@@ -32,7 +30,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required this.signUpWithEmailUseCase,
     required this.verifyPhoneUseCase,
     required this.signInWithPhoneUseCase,
-    required this.signInWithFacebookUseCase,
     required this.signInWithGoogleUseCase,
     required this.updateProfileUseCase,
     required this.getProfileUseCase,
@@ -43,7 +40,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<PhoneCodeSentEvent>(_onPhoneCodeSent);
     on<PhoneAuthFailedEvent>(_onPhoneAuthFailed);
     on<SubmitOtpEvent>(_onSubmitOtp);
-    on<FacebookLoginRequestedEvent>(_onFacebookLoginRequested);
     on<GoogleLoginRequestedEvent>(_onGoogleLoginRequested);
     on<UpdateProfileRequestedEvent>(_onUpdateProfileRequested);
     on<FetchProfileEvent>(_onFetchProfile);
@@ -172,18 +168,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           messageKey: 'invalidOtpCode',
         ),
       ),
-      (user) => emit(AuthSuccess(user: user)),
-    );
-  }
-
-  Future<void> _onFacebookLoginRequested(
-    FacebookLoginRequestedEvent event,
-    Emitter<AuthState> emit,
-  ) async {
-    emit(AuthLoading());
-    final result = await signInWithFacebookUseCase();
-    result.fold(
-      (failure) => emit(AuthFailure(message: failure.message)),
       (user) => emit(AuthSuccess(user: user)),
     );
   }

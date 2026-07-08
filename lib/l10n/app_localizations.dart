@@ -497,12 +497,6 @@ abstract class AppLocalizations {
   /// **'Invalid OTP code'**
   String get invalidOtpCode;
 
-  /// No description provided for @facebookLoginFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Facebook login failed'**
-  String get facebookLoginFailed;
-
   /// No description provided for @googleLoginFailed.
   ///
   /// In en, this message translates to:

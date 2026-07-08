@@ -73,7 +73,6 @@
   "loginFailed": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
   "verificationFailed": "فشل التحقق",
   "invalidOtpCode": "رمز OTP غير صحيح",
-  "facebookLoginFailed": "فشل تسجيل الدخول عبر فيسبوك",
   "googleLoginFailed": "فشل تسجيل الدخول عبر جوجل",
   "googleLoginSheetTitle": "تسجيل الدخول عبر جوجل",
   "googleLoginSheetSubtitle": "استخدم حساب جوجل لتسجيل الدخول بسرعة وأمان.",

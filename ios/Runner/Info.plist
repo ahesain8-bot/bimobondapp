@@ -67,21 +67,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 
-	<key>CFBundleURLTypes</key>
-	<array>
-	  <dict>
-	  <key>CFBundleURLSchemes</key>
-	  <array>
-	    <string>fbYOUR_APP_ID</string>
-	  </array>
-	  </dict>
-	</array>
-	<key>FacebookAppID</key>
-	<string>972315768828668</string>
-	<key>FacebookClientToken</key>
-	<string>c63780c784abbee2ec7ff75c346efb9c</string>
-	<key>FacebookDisplayName</key>
-	<string>Bimo Bond</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access to record voice messages in chat.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -94,10 +79,5 @@
 	<string>This app needs photo library access to send images and videos in chat.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to record posts, stories, and chat media.</string>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-	  <string>fbapi</string>
-	  <string>fb-messenger-share-api</string>
-	</array>
 </dict>
 </plist>

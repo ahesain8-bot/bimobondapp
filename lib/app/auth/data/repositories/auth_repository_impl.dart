@@ -262,10 +262,4 @@ class AuthRepositoryImpl implements AuthRepository {
     await localDataSource.clearAuthData();
     await FirebaseAuth.instance.signOut();
   }
-
-  @override
-  Future<Either<Failure, UserEntity>> signInWithFacebook() {
-    // TODO: implement signInWithFacebook
-    throw UnimplementedError();
-  }
 }

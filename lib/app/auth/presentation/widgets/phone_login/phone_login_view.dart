@@ -58,7 +58,7 @@ class PhoneLoginView extends StatelessWidget {
                   children: [
                     PhoneLoginToolbar(isArabic: isArabic, isDark: isDark),
                     const SizedBox(height: AppSizes.p8),
-                    const PhoneLoginHero(),
+                    // const PhoneLoginHero(),
                     const SizedBox(height: AppSizes.p24),
                     CustomText(
                       l10n.phoneLoginTitle,

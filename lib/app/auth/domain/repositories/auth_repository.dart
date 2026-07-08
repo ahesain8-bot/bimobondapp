@@ -29,8 +29,6 @@ abstract class AuthRepository {
     required String smsCode,
   });
 
-  Future<Either<Failure, UserEntity>> signInWithFacebook();
-
   Future<Either<Failure, UserEntity>> signInWithGoogle();
 
   Future<Either<Failure, String>> uploadAvatar(File file);

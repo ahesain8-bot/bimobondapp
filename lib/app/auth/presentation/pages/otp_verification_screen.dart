@@ -52,8 +52,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         return l10n.verificationFailed;
       case 'invalidOtpCode':
         return l10n.invalidOtpCode;
-      case 'facebookLoginFailed':
-        return l10n.facebookLoginFailed;
       case 'googleLoginFailed':
         return l10n.googleLoginFailed;
       case 'updateProfileFailed':

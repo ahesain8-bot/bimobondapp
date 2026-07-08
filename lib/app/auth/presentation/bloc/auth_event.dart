@@ -58,13 +58,6 @@ class SubmitOtpEvent extends AuthEvent {
   List<Object> get props => [verificationId, smsCode];
 }
 
-class FacebookLoginRequestedEvent extends AuthEvent {
-  const FacebookLoginRequestedEvent();
-
-  @override
-  List<Object> get props => [];
-}
-
 class GoogleLoginRequestedEvent extends AuthEvent {
   const GoogleLoginRequestedEvent();
 

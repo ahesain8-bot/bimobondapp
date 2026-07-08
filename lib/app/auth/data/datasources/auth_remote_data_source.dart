@@ -9,7 +9,6 @@ import 'package:bimobondapp/core/utils/api_constants.dart';
 import 'package:bimobondapp/core/utils/device_utility.dart';
 import 'package:bimobondapp/core/utils/firebase_auth_constants.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 abstract class AuthRemoteDataSource {
@@ -19,7 +18,6 @@ abstract class AuthRemoteDataSource {
     required String email,
     required String password,
   });
-  Future<UserModel> signInWithFacebook();
   Future<UserModel> signInWithGoogle();
   Future<void> verifyPhoneNumber({
     required String phoneNumber,
@@ -98,7 +96,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       final idToken = googleUser.authentication.idToken;
       if (idToken == null || idToken.isEmpty) {
-        throw ServerException(message: 'Google sign-in failed: missing ID token');
+        throw ServerException(
+          message: 'Google sign-in failed: missing ID token',
+        );
       }
 
       final userCredential = await FirebaseAuth.instance.signInWithCredential(
@@ -111,32 +111,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw DioHandler.handle(e);
     }
   }
-
-  @override
-  Future<UserModel> signInWithFacebook() => _execute(() async {
-    final LoginResult loginResult = await FacebookAuth.instance.login();
-
-    if (loginResult.status == LoginStatus.cancelled) {
-      throw ServerException(message: 'Facebook login cancelled');
-    }
-
-    if (loginResult.status != LoginStatus.success) {
-      throw ServerException(
-        message: _facebookLoginMessage(
-          loginResult.message ?? 'Facebook login failed',
-        ),
-      );
-    }
-
-    final OAuthCredential credential = FacebookAuthProvider.credential(
-      loginResult.accessToken!.tokenString,
-    );
-
-    final userCredential = await FirebaseAuth.instance.signInWithCredential(
-      credential,
-    );
-    return _handleFirebaseUserAndBackendLogin(userCredential);
-  });
 
   @override
   Future<void> verifyPhoneNumber({
@@ -365,14 +339,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
     throw ServerException(message: 'Forgot password failed');
   });
-
-  String _facebookLoginMessage(String raw) {
-    final lower = raw.toLowerCase();
-    if (lower.contains('api access blocked')) {
-      return 'Facebook login is blocked for this app. Check Meta Developer Console: app status, tester roles, and Facebook Login settings.';
-    }
-    return raw;
-  }
 
   String _googleSignInMessage(GoogleSignInException error) {
     switch (error.code) {

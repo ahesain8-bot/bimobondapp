@@ -73,7 +73,6 @@
   "loginFailed": "Login failed. Please try again.",
   "verificationFailed": "Verification failed",
   "invalidOtpCode": "Invalid OTP code",
-  "facebookLoginFailed": "Facebook login failed",
   "googleLoginFailed": "Google login failed",
   "googleLoginSheetTitle": "Sign in with Google",
   "googleLoginSheetSubtitle": "Use your Google account to sign in quickly and securely.",

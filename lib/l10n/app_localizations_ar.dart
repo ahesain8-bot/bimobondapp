@@ -212,9 +212,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get invalidOtpCode => 'رمز OTP غير صحيح';
 
   @override
-  String get facebookLoginFailed => 'فشل تسجيل الدخول عبر فيسبوك';
-
-  @override
   String get googleLoginFailed => 'فشل تسجيل الدخول عبر جوجل';
 
   @override

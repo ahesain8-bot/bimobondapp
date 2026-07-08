@@ -212,9 +212,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invalidOtpCode => 'Invalid OTP code';
 
   @override
-  String get facebookLoginFailed => 'Facebook login failed';
-
-  @override
   String get googleLoginFailed => 'Google login failed';
 
   @override

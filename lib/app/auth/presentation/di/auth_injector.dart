@@ -7,7 +7,6 @@ import 'package:bimobondapp/app/auth/domain/usecases/login_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_up_with_email_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/verify_phone_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_phone_usecase.dart';
-import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_facebook_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_google_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/forgot_password_usecase.dart';
@@ -84,7 +83,6 @@ Future<void> initAuth() async {
   sl.registerLazySingleton(() => SignUpWithEmailUseCase(sl()));
   sl.registerLazySingleton(() => VerifyPhoneUseCase(sl()));
   sl.registerLazySingleton(() => SignInWithPhoneUseCase(sl()));
-  sl.registerLazySingleton(() => SignInWithFacebookUseCase(sl()));
   sl.registerLazySingleton(() => SignInWithGoogleUseCase(sl()));
   sl.registerLazySingleton(() => UpdateProfileUseCase(sl()));
   sl.registerLazySingleton(() => GetProfileUseCase(sl()));
@@ -100,7 +98,6 @@ Future<void> initAuth() async {
       signUpWithEmailUseCase: sl(),
       verifyPhoneUseCase: sl(),
       signInWithPhoneUseCase: sl(),
-      signInWithFacebookUseCase: sl(),
       signInWithGoogleUseCase: sl(),
       updateProfileUseCase: sl(),
       getProfileUseCase: sl(),

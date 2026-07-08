@@ -6,7 +6,7 @@ import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:face_detection_tflite/face_detection_tflite.dart' as fdt;
 import 'package:flutter/material.dart';
 
-/// On-device face detection backed by MediaPipe TFLite models.
+/// On-device face detection using the slim front-camera TFLite model.
 class CameraFaceDetection {
   CameraFaceDetection._();
 
@@ -49,11 +49,10 @@ class CameraFaceDetection {
     bool live = false,
   }) async {
     final detector = live ? await _live() : await _static();
+    // Slim TFLite package only ships the front detector (fast keypoints).
     final result = await detector.detectFaces(
       bytes,
-      mode: live
-          ? fdt.FaceDetectionMode.fast
-          : fdt.FaceDetectionMode.standard,
+      mode: fdt.FaceDetectionMode.fast,
     );
     return result.faces.map(_convert).toList(growable: false);
   }
