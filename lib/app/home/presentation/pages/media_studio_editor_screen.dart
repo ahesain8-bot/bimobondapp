@@ -19,6 +19,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_studio_preview.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_editor.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +50,8 @@ class MediaStudioEditorScreen extends StatefulWidget {
       _MediaStudioEditorScreenState();
 }
 
-class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen> {
+class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
+    with FeedPlaybackBlocker {
   late List<MediaItemEditState> _states;
   late int _currentIndex;
 

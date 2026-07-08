@@ -129,7 +129,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
 
     final OAuthCredential credential = FacebookAuthProvider.credential(
-      loginResult.accessToken!.token,
+      loginResult.accessToken!.tokenString,
     );
 
     final userCredential = await FirebaseAuth.instance.signInWithCredential(

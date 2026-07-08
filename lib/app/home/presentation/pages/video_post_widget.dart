@@ -24,6 +24,7 @@ import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/tag_parser.dart';
 import 'package:bimobondapp/core/widgets/tagged_text.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -43,6 +44,8 @@ class VideoPostWidget extends StatefulWidget {
   final FeedItemEntity? feedItem;
   final double? bottomPadding;
   final bool isActive;
+  /// When false, playback ignores [FeedPlaybackGate] (e.g. profile posts viewer).
+  final bool respectFeedPlaybackGate;
   final bool openCommentsOnLoad;
   final String? highlightCommentId;
 
@@ -52,6 +55,7 @@ class VideoPostWidget extends StatefulWidget {
     this.feedItem,
     this.bottomPadding,
     this.isActive = true,
+    this.respectFeedPlaybackGate = true,
     this.openCommentsOnLoad = false,
     this.highlightCommentId,
   });
@@ -97,9 +101,16 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   bool _isFollowLoading = false;
   bool _followStatusResolved = false;
 
+  bool get _playbackActive =>
+      widget.isActive &&
+      (!widget.respectFeedPlaybackGate || FeedPlaybackGate.instance.allowed);
+
   @override
   void initState() {
     super.initState();
+    if (widget.respectFeedPlaybackGate) {
+      FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
+    }
     _isLiked = widget.post.isLiked;
     _likeCount = widget.post.likeCount;
     _isSaved = widget.post.isSaved;
@@ -128,13 +139,15 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           CurvedAnimation(parent: _likeAnimController, curve: Curves.easeInOut),
         );
 
-    if (widget.isActive) {
+    if (_playbackActive) {
       _resolveFollowStatusIfNeeded();
       _recordViewIfNeeded();
       unawaited(SoundAudioPreview.stop());
-      unawaited(_syncPostSoundPlayback().then((_) {
-        if (mounted) _syncMusicDiscAnimation();
-      }));
+      unawaited(
+        _syncPostSoundPlayback().then((_) {
+          if (mounted) _syncMusicDiscAnimation();
+        }),
+      );
     }
 
     if (widget.openCommentsOnLoad) {
@@ -142,6 +155,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         if (mounted) _showComments();
       });
     }
+  }
+
+  void _onFeedPlaybackGateChanged() {
+    if (!_playbackActive) {
+      unawaited(_pausePostSound());
+      _syncMusicDiscAnimation();
+    } else if (widget.isActive) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_playbackActive) return;
+        unawaited(
+          _syncPostSoundPlayback().then((_) {
+            if (mounted) _syncMusicDiscAnimation();
+          }),
+        );
+      });
+    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -165,17 +195,25 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       _isFollowLoading = false;
     }
 
-    if (widget.isActive && !oldWidget.isActive) {
+    if (_playbackActive && !oldWidget.isActive) {
       _resolveFollowStatusIfNeeded();
       _recordViewIfNeeded();
       unawaited(SoundAudioPreview.stop());
-      unawaited(_syncPostSoundPlayback().then((_) {
-        if (mounted) _syncMusicDiscAnimation();
-      }));
+      unawaited(
+        _syncPostSoundPlayback().then((_) {
+          if (mounted) _syncMusicDiscAnimation();
+        }),
+      );
     } else if (!widget.isActive && oldWidget.isActive) {
       unawaited(_stopPostSound());
       _syncMusicDiscAnimation();
-    } else if (widget.isActive &&
+    } else if (widget.respectFeedPlaybackGate &&
+        !FeedPlaybackGate.instance.allowed &&
+        oldWidget.isActive &&
+        widget.isActive) {
+      unawaited(_pausePostSound());
+      _syncMusicDiscAnimation();
+    } else if (_playbackActive &&
         (widget.post.id != oldWidget.post.id ||
             widget.post.sound != oldWidget.post.sound)) {
       unawaited(_syncPostSoundPlayback());
@@ -183,7 +221,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   void _recordViewIfNeeded() {
-    if (!widget.isActive || widget.post.isStory) return;
+    if (!_playbackActive || widget.post.isStory) return;
     PostViewRecorder.recordIfNeeded(
       postId: widget.post.id,
       isOwner: _isPostOwner(),
@@ -495,7 +533,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   void _syncMusicDiscAnimation() {
-    if (!widget.isActive || !_isPostPlaybackActive()) {
+    if (!_playbackActive || !_isPostPlaybackActive()) {
       if (_musicController.isAnimating) _musicController.stop();
       return;
     }
@@ -541,6 +579,16 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         widget.post.type == 'VIDEO';
   }
 
+  Future<void> _pausePostSound() async {
+    final controller = _postSoundController;
+    if (controller == null) return;
+    try {
+      if (!controller.value.isInitialized) return;
+      await controller.pause();
+    } catch (_) {}
+    _syncMusicDiscAnimation();
+  }
+
   Future<void> _stopPostSound() async {
     final controller = _postSoundController;
     final listener = _postSoundListener;
@@ -558,7 +606,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   Future<void> _syncPostSoundPlayback() async {
-    if (!widget.isActive || _isSlideVideo(_currentPage)) {
+    if (!_playbackActive || _isSlideVideo(_currentPage)) {
       await _stopPostSound();
       return;
     }
@@ -604,7 +652,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       await controller.setLooping(true);
       await controller.setVolume(1);
       if (!mounted ||
-          !widget.isActive ||
+          !_playbackActive ||
           _isSlideVideo(_currentPage) ||
           _postSoundController != controller) {
         await controller.dispose();
@@ -637,7 +685,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final isVideo =
         MediaUtils.isVideo(mediaUrl, mediaType: media.mediaType) ||
         widget.post.type == 'VIDEO';
-    final isActiveSlide = widget.isActive && _currentPage == index;
+    final isActiveSlide = _playbackActive && _currentPage == index;
     final videoController = _videoPlayerControllers.putIfAbsent(
       index,
       CustomVideoPlayerController.new,
@@ -648,6 +696,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             url: mediaUrl,
             posterUrl: MediaUtils.resolveVideoPosterUrl(widget.post),
             isActive: isActiveSlide,
+            respectFeedPlaybackGate: widget.respectFeedPlaybackGate,
             controller: videoController,
             onPlaybackChanged: _syncMusicDiscAnimation,
           )
@@ -694,6 +743,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   @override
   void dispose() {
+    FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
     unawaited(_stopPostSound());
     _musicController.dispose();
     _likeAnimController.dispose();

@@ -1,6 +1,6 @@
 {
-    "name": "bimobondapp",
-    "short_name": "bimobondapp",
+    "name": "Bimo Bond",
+    "short_name": "Bimo Bond",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

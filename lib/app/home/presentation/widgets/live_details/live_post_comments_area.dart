@@ -55,7 +55,6 @@ class LivePostCommentsArea extends StatelessWidget {
         blendMode: BlendMode.dstIn,
         child: ListView.builder(
           controller: scrollController,
-          reverse: true,
           physics: const BouncingScrollPhysics(),
           padding: LiveDetailsLayoutConstants.screenHorizontalPadding,
           itemCount: comments.length,

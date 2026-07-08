@@ -51,5 +51,6 @@ dependencies {
 
     // FlutterFire plugins supply Firebase SDK versions.
     implementation("com.google.android.gms:play-services-auth:21.5.1")
+    implementation("com.google.android.gms:play-services-maps:19.2.0")
     implementation("com.facebook.android:facebook-android-sdk:latest.release")
 }

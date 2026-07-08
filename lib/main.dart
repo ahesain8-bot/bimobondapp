@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/utils/google_maps_bootstrap.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'dart:async';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -46,6 +47,7 @@ Future<void> _preloadCameraStudioCatalog() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await configureGoogleMaps();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

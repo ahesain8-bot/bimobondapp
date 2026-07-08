@@ -1,22 +1,16 @@
 import 'dart:async';
 
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_mlkit_utils.dart';
-
-export 'camera_mlkit_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_analysis_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detection.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-/// Runs ML Kit face detection on CamerAwesome analysis frames.
+export 'camera_analysis_utils.dart';
+
+/// Runs on-device face detection on CamerAwesome analysis frames.
 class CameraFaceDetectorService {
-  CameraFaceDetectorService() {
-    _detector = FaceDetector(
-      options: CameraFaceEffectMapper.liveDetectorOptions(),
-    );
-  }
+  CameraFaceDetectorService();
 
-  late final FaceDetector _detector;
   final _controller = StreamController<CameraFaceDetectionFrame>.broadcast();
   bool _busy = false;
 
@@ -27,8 +21,7 @@ class CameraFaceDetectorService {
     _busy = true;
 
     try {
-      final inputImage = image.toInputImage();
-      final faces = await _detector.processImage(inputImage);
+      final faces = await CameraFaceDetection.detectFromAnalysisImage(image);
       if (!_controller.isClosed) {
         _controller.add(CameraFaceDetectionFrame(faces: faces, image: image));
       }
@@ -41,6 +34,6 @@ class CameraFaceDetectorService {
 
   Future<void> dispose() async {
     await _controller.close();
-    await _detector.close();
+    await CameraFaceDetection.dispose();
   }
 }

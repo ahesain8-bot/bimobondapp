@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
+import 'package:bimobondapp/core/services/device_location_service.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:file_selector/file_selector.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -64,24 +64,8 @@ class ChatAttachmentPicker {
   }
 
   static Future<ChatAttachmentDraft?> pickCurrentLocation() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return null;
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      return null;
-    }
-
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 15),
-      ),
-    );
+    final position = await DeviceLocationService.getCurrentPosition();
+    if (position == null) return null;
 
     final payload = ChatLocationPayload(
       latitude: position.latitude,

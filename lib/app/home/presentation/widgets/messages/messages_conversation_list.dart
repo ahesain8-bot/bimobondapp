@@ -3,7 +3,6 @@ import 'package:bimobondapp/app/chats/presentation/bloc/inbox_event.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
-import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,11 +12,15 @@ class MessagesConversationList extends StatelessWidget {
   const MessagesConversationList({
     required this.items,
     this.scrollable = false,
+    this.emptyMessage,
+    this.emptyIcon,
     super.key,
   });
 
   final List<InboxChatItem> items;
   final bool scrollable;
+  final String? emptyMessage;
+  final IconData? emptyIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -31,13 +34,13 @@ class MessagesConversationList extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search_off_rounded,
+              emptyIcon ?? Icons.search_off_rounded,
               size: 48,
               color: theme.dividerColor.withValues(alpha: 0.2),
             ),
             const SizedBox(height: 12),
             Text(
-              l10n.messagesNoResults,
+              emptyMessage ?? l10n.messagesNoResults,
               style: TextStyle(
                 color: theme.textTheme.bodyMedium?.color?.withValues(
                   alpha: 0.4,

@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,7 @@ class StoryFlow {
 
   static Future<void> start(BuildContext context) async {
     if (!_ensureLoggedIn(context)) return;
+    FeedPlaybackGate.instance.setBlocked(true);
     context.pushNamed(
       'add_post_camera',
       extra: const {'isStory': true},

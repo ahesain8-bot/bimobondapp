@@ -23,6 +23,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_sheets.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -48,7 +49,8 @@ class AddPostCameraScreen extends StatefulWidget {
   State<AddPostCameraScreen> createState() => _AddPostCameraScreenState();
 }
 
-class _AddPostCameraScreenState extends State<AddPostCameraScreen> {
+class _AddPostCameraScreenState extends State<AddPostCameraScreen>
+    with FeedPlaybackBlocker {
   CameraState? _cameraState;
   bool _pendingVideoStart = false;
   bool _returnToPhotoAfterVideo = false;

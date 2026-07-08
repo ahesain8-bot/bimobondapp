@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 /// Paints camera effects directly in image / overlay pixel coordinates.
 class CameraEffectImagePainter {
@@ -12,7 +12,7 @@ class CameraEffectImagePainter {
   static void paintAr(
     Canvas canvas,
     Size size,
-    List<Face> faces,
+    List<CameraDetectedFace> faces,
     CameraEffectDefinition effect,
   ) {
     for (final face in faces) {
@@ -31,20 +31,10 @@ class CameraEffectImagePainter {
     }
   }
 
-  static ScreenFace _faceToScreen(Face face) {
-    final box = face.boundingBox;
-    final landmarks = <FaceLandmarkType, Offset>{};
-    for (final entry in face.landmarks.entries) {
-      final landmark = entry.value;
-      if (landmark == null) continue;
-      landmarks[entry.key] = Offset(
-        landmark.position.x.toDouble(),
-        landmark.position.y.toDouble(),
-      );
-    }
+  static ScreenFace _faceToScreen(CameraDetectedFace face) {
     return ScreenFace(
-      boundingBox: Rect.fromLTRB(box.left, box.top, box.right, box.bottom),
-      landmarks: landmarks,
+      boundingBox: face.boundingBox,
+      landmarks: Map<CameraFaceLandmarkType, Offset>.from(face.landmarks),
     );
   }
 
@@ -77,7 +67,7 @@ class CameraEffectImagePainter {
         _drawOnScreenLandmark(
           canvas,
           face,
-          FaceLandmarkType.noseBase,
+          CameraFaceLandmarkType.noseBase,
           '👃',
           face.boundingBox.width * 0.18,
         );
@@ -85,14 +75,14 @@ class CameraEffectImagePainter {
         _drawOnScreenLandmark(
           canvas,
           face,
-          FaceLandmarkType.leftEye,
+          CameraFaceLandmarkType.leftEye,
           '❤️',
           face.boundingBox.width * 0.22,
         );
         _drawOnScreenLandmark(
           canvas,
           face,
-          FaceLandmarkType.rightEye,
+          CameraFaceLandmarkType.rightEye,
           '❤️',
           face.boundingBox.width * 0.22,
         );
@@ -153,8 +143,8 @@ class CameraEffectImagePainter {
   }
 
   static void _drawSunglassesScreen(Canvas canvas, ScreenFace face) {
-    final leftEye = face.landmarks[FaceLandmarkType.leftEye];
-    final rightEye = face.landmarks[FaceLandmarkType.rightEye];
+    final leftEye = face.landmarks[CameraFaceLandmarkType.leftEye];
+    final rightEye = face.landmarks[CameraFaceLandmarkType.rightEye];
     if (leftEye == null || rightEye == null) {
       _drawAboveScreenFace(
         canvas,
@@ -177,7 +167,7 @@ class CameraEffectImagePainter {
   static void _drawOnScreenLandmark(
     Canvas canvas,
     ScreenFace face,
-    FaceLandmarkType type,
+    CameraFaceLandmarkType type,
     String emoji,
     double size,
   ) {

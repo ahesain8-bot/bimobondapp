@@ -52,6 +52,7 @@ class LiveMediaBackground extends StatelessWidget {
         url: url,
         posterUrl: posterUrl,
         isActive: isActive && currentIndex == index,
+        respectFeedPlaybackGate: false,
       );
     }
 

@@ -1,6 +1,6 @@
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 /// Face geometry mapped into the coordinate space where effects are painted.
 class ScreenFace {
@@ -10,7 +10,7 @@ class ScreenFace {
   });
 
   final Rect boundingBox;
-  final Map<FaceLandmarkType, Offset> landmarks;
+  final Map<CameraFaceLandmarkType, Offset> landmarks;
 }
 
 class CameraFaceEffectMapper {
@@ -18,37 +18,25 @@ class CameraFaceEffectMapper {
 
   static const liveAnalysisWidth = 400;
 
-  static FaceDetectorOptions liveDetectorOptions() {
-    return FaceDetectorOptions(
-      enableLandmarks: true,
-      performanceMode: FaceDetectorMode.fast,
-      minFaceSize: 0.12,
-    );
-  }
-
-  static FaceDetectorOptions staticDetectorOptions() {
-    return FaceDetectorOptions(
-      enableLandmarks: true,
-      performanceMode: FaceDetectorMode.accurate,
-      minFaceSize: 0.08,
-    );
-  }
-
-  /// Maps ML Kit face coordinates from analysis frames onto the camera preview.
+  /// Maps face coordinates from analysis frames onto the camera preview.
   static List<ScreenFace> mapForLivePreview({
-    required List<Face> faces,
+    required List<CameraDetectedFace> faces,
     required AnalysisPreview preview,
     required AnalysisImage image,
   }) {
-    return faces.map((face) => _mapWithPoint(
-          face,
-          (point) => preview.convertFromImage(point, image),
-        )).toList(growable: false);
+    return faces
+        .map(
+          (face) => _mapWithPoint(
+            face,
+            (point) => preview.convertFromImage(point, image),
+          ),
+        )
+        .toList(growable: false);
   }
 
   /// Maps file-based detection coords through [fit] into the editor frame.
   static List<ScreenFace> mapForBoxFit({
-    required List<Face> faces,
+    required List<CameraDetectedFace> faces,
     required Size imageSize,
     required Size canvasSize,
     BoxFit fit = BoxFit.cover,
@@ -75,7 +63,7 @@ class CameraFaceEffectMapper {
 
   /// Maps file-based detection coords through [BoxFit.cover] into the editor frame.
   static List<ScreenFace> mapForCoverFit({
-    required List<Face> faces,
+    required List<CameraDetectedFace> faces,
     required Size imageSize,
     required Size canvasSize,
   }) {
@@ -88,23 +76,16 @@ class CameraFaceEffectMapper {
   }
 
   static ScreenFace _mapWithPoint(
-    Face face,
+    CameraDetectedFace face,
     Offset Function(Offset point) mapPoint,
   ) {
     final box = face.boundingBox;
-    final topLeft = mapPoint(Offset(box.left, box.top));
-    final bottomRight = mapPoint(Offset(box.right, box.bottom));
+    final topLeft = mapPoint(box.topLeft);
+    final bottomRight = mapPoint(box.bottomRight);
 
-    final landmarks = <FaceLandmarkType, Offset>{};
+    final landmarks = <CameraFaceLandmarkType, Offset>{};
     for (final entry in face.landmarks.entries) {
-      final landmark = entry.value;
-      if (landmark == null) continue;
-      landmarks[entry.key] = mapPoint(
-        Offset(
-          landmark.position.x.toDouble(),
-          landmark.position.y.toDouble(),
-        ),
-      );
+      landmarks[entry.key] = mapPoint(entry.value);
     }
 
     return ScreenFace(

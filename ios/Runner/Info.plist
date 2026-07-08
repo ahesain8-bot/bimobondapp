@@ -86,6 +86,8 @@
 	<string>This app needs microphone access to record voice messages in chat.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app uses your location to personalize your experience and improve nearby features.</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyC4CoGuenT6EzeS__F-ibMR8o56dB4xVb8</string>
 	<key>NSContactsUsageDescription</key>
 	<string>This app needs contacts access to share contacts in chat.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

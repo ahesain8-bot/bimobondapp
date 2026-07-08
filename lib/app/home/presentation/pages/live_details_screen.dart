@@ -39,6 +39,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_deta
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_media_background.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_mock_chat_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_post_comments_area.dart';
+import 'package:bimobondapp/core/utils/comment_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_page_indicator.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
@@ -166,7 +167,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (postId != null) {
       _commentsBloc = di.sl<CommentsBloc>();
       _commentsBloc!.add(
-        FetchCommentsRequested(postId: postId, isRefresh: true),
+        FetchCommentsRequested(
+          postId: postId,
+          isRefresh: true,
+          sort: 'oldest',
+        ),
       );
     }
 
@@ -278,11 +283,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     setState(() {
       _postComments.add(comment);
-      _postComments.sort((a, b) {
-        final aTime = DateTime.tryParse(a.createdAt) ?? DateTime(1970);
-        final bTime = DateTime.tryParse(b.createdAt) ?? DateTime(1970);
-        return aTime.compareTo(bTime);
-      });
+      _postComments
+        ..clear()
+        ..addAll(sortCommentsOldest(_postComments));
     });
     _scrollChatToBottom();
   }
@@ -363,7 +366,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final postId = widget.post?.id;
     if (postId == null) return;
     _commentsBloc?.add(
-      FetchCommentsRequested(postId: postId, isRefresh: true),
+      FetchCommentsRequested(
+        postId: postId,
+        isRefresh: true,
+        sort: 'oldest',
+      ),
     );
   }
 
@@ -529,13 +536,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       byId.putIfAbsent(comment.id, () => comment);
     }
 
-    final merged = byId.values.toList();
-    merged.sort((a, b) {
-      final aTime = DateTime.tryParse(a.createdAt) ?? DateTime(1970);
-      final bTime = DateTime.tryParse(b.createdAt) ?? DateTime(1970);
-      return aTime.compareTo(bTime);
-    });
-    return merged;
+    return sortCommentsOldest(byId.values.toList());
   }
 
   void _onCommentsState(CommentsState state) {
@@ -560,7 +561,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_chatScrollController.hasClients) {
         _chatScrollController.animateTo(
-          0,
+          _chatScrollController.position.maxScrollExtent,
           duration: LiveDetailsLayoutConstants.uiHideDuration,
           curve: Curves.easeOut,
         );
@@ -647,7 +648,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final postId = widget.post?.id;
     if (postId != null) {
       _commentsBloc?.add(
-        FetchCommentsRequested(postId: postId, isRefresh: true),
+        FetchCommentsRequested(
+          postId: postId,
+          isRefresh: true,
+          sort: 'oldest',
+        ),
       );
     }
     context.read<PostsBloc>().add(

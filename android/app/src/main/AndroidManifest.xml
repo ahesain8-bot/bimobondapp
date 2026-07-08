@@ -23,6 +23,10 @@
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
 
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyC4CoGuenT6EzeS__F-ibMR8o56dB4xVb8" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -6,12 +6,13 @@ import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/geo_place_resolver.dart';
+import 'package:bimobondapp/core/utils/google_maps_constants.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
-import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Interactive map for geo-targeting: tap to pick center, default is user location.
@@ -37,27 +38,34 @@ class PromoteRadiusMapPreview extends StatefulWidget {
 }
 
 class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
 
   LatLng? _userLocation;
   LatLng? _center;
-  bool _loading = true;
   bool _requestingLocation = false;
   bool _resolvingPlace = false;
   bool _mapReady = false;
+  bool _mountMap = false;
+  bool _locationUnavailable = false;
   GeoPlaceInfo? _placeInfo;
   Timer? _placeDebounce;
   int _placeRequestId = 0;
 
-  LatLng? get _selectedCenter => _center ?? _userLocation;
+  LatLng get _fallbackCenter => const LatLng(
+    GoogleMapsConstants.fallbackLatitude,
+    GoogleMapsConstants.fallbackLongitude,
+  );
+
+  LatLng get _selectedCenter => _center ?? _userLocation ?? _fallbackCenter;
 
   @override
   void initState() {
     super.initState();
     _syncCenterFromWidget(fallbackToUser: false);
-    if (_center != null) {
-      _loading = false;
-    }
+    _center ??= _fallbackCenter;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _mountMap = true);
+    });
     unawaited(_bootstrap());
   }
 
@@ -78,9 +86,7 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     if (!mounted) return;
     _syncCenterFromWidget(fallbackToUser: true);
     _schedulePlaceLookup(_selectedCenter);
-    if (_selectedCenter != null) {
-      _scheduleCameraFit();
-    }
+    _scheduleCameraFit();
   }
 
   @override
@@ -92,7 +98,7 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     final radiusChanged = oldWidget.radiusKm != widget.radiusKm;
     final detectChanged = oldWidget.detectLocation != widget.detectLocation;
 
-    if (detectChanged && widget.detectLocation && !_loading) {
+    if (detectChanged && widget.detectLocation) {
       unawaited(_resolveLocation(requestIfMissing: true));
     }
 
@@ -122,7 +128,7 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
   @override
   void dispose() {
     _placeDebounce?.cancel();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -156,10 +162,9 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
   }
 
   Future<void> _resolveLocation({bool requestIfMissing = true}) async {
-    setState(() {
-      _loading = true;
-      _requestingLocation = requestIfMissing;
-    });
+    if (!requestIfMissing) return;
+
+    setState(() => _requestingLocation = true);
 
     final store = sl<UserLocationStore>();
     if (store.viewerCoordinates != null) {
@@ -171,10 +176,9 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     }
 
     if (!requestIfMissing) {
-      setState(() {
-        _loading = false;
-        _requestingLocation = false;
-      });
+      _applyFallbackCenter(
+        notifyParent: widget.latitude == null && widget.longitude == null,
+      );
       return;
     }
 
@@ -189,17 +193,31 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
       return;
     }
 
+    _applyFallbackCenter(
+      notifyParent: widget.latitude == null && widget.longitude == null,
+    );
+  }
+
+  void _applyFallbackCenter({required bool notifyParent}) {
+    final fallback = _fallbackCenter;
+    final shouldNotify = notifyParent && _center == null;
     setState(() {
-      _loading = false;
       _requestingLocation = false;
+      _locationUnavailable = _userLocation == null;
+      _center ??= fallback;
     });
+    if (shouldNotify) {
+      widget.onCenterChanged(fallback);
+    }
+    _schedulePlaceLookup(_selectedCenter);
+    _scheduleCameraFit();
   }
 
   void _applyUserLocation(LatLng location, {required bool notifyParent}) {
     setState(() {
       _userLocation = location;
-      _loading = false;
       _requestingLocation = false;
+      _locationUnavailable = false;
       if (_center == null || notifyParent) {
         _center = location;
       }
@@ -211,7 +229,7 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     _scheduleCameraFit();
   }
 
-  void _onMapTap(TapPosition _, LatLng point) {
+  void _onMapTap(LatLng point) {
     _setCenter(point, notifyParent: true);
   }
 
@@ -227,33 +245,80 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
   bool get _isAtUserLocation {
     final userLocation = _userLocation;
     final center = _selectedCenter;
-    if (userLocation == null || center == null) return true;
+    if (userLocation == null) return true;
     return (userLocation.latitude - center.latitude).abs() < 0.00001 &&
         (userLocation.longitude - center.longitude).abs() < 0.00001;
   }
 
-  void _fitToRadius() {
+  Future<void> _fitToRadius() async {
+    final controller = _mapController;
     final center = _selectedCenter;
-    if (center == null || !_mapReady) return;
+    if (controller == null || !_mapReady) return;
 
     final km = widget.radiusKm.toDouble().clamp(1, 500);
     final latDelta = km / 111.0;
     final lngDelta = km / (111.0 * math.cos(center.latitude * math.pi / 180));
 
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: LatLngBounds(
-          LatLng(center.latitude - latDelta, center.longitude - lngDelta),
-          LatLng(center.latitude + latDelta, center.longitude + lngDelta),
-        ),
-        padding: const EdgeInsets.all(28),
+    final bounds = LatLngBounds(
+      southwest: LatLng(
+        center.latitude - latDelta,
+        center.longitude - lngDelta,
+      ),
+      northeast: LatLng(
+        center.latitude + latDelta,
+        center.longitude + lngDelta,
       ),
     );
+
+    try {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 28),
+      );
+    } catch (_) {}
   }
 
-  void _onMapReady() {
+  void _onMapReady(GoogleMapController controller) {
+    _mapController = controller;
     _mapReady = true;
     _fitToRadius();
+  }
+
+  Set<Circle> _buildCircles(ColorScheme scheme, LatLng center) {
+    return {
+      Circle(
+        circleId: const CircleId('promote_radius'),
+        center: center,
+        radius: widget.radiusKm * 1000,
+        fillColor: scheme.primary.withValues(alpha: 0.18),
+        strokeColor: scheme.primary,
+        strokeWidth: 2,
+      ),
+    };
+  }
+
+  Set<Marker> _buildMarkers(ColorScheme scheme, LatLng center) {
+    final markers = <Marker>{
+      Marker(
+        markerId: const MarkerId('promote_center'),
+        position: center,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+      ),
+    };
+
+    final userLocation = _userLocation;
+    if (userLocation != null && !_isAtUserLocation) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('promote_user'),
+          position: userLocation,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueOrange,
+          ),
+        ),
+      );
+    }
+
+    return markers;
   }
 
   @override
@@ -272,18 +337,16 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
           ),
         ),
         const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          child: SizedBox(
-            height: 196,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                border: Border.all(color: scheme.outlineVariant),
-                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              ),
-              child: _buildMapBody(context, l10n, scheme),
+        SizedBox(
+          height: 196,
+          width: double.infinity,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              border: Border.all(color: scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
             ),
+            child: _buildMapBody(context, l10n, scheme),
           ),
         ),
         const SizedBox(height: 8),
@@ -379,123 +442,56 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     AppLocalizations l10n,
     ColorScheme scheme,
   ) {
-    if (_loading) {
-      return const SkeletonWidget(height: double.infinity, borderRadius: 0);
-    }
-
     final center = _selectedCenter;
-    if (center == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                LucideIcons.mapPinOff,
-                size: 28,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.chatLocationPermissionDenied,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _requestingLocation
-                    ? null
-                    : () => _resolveLocation(requestIfMissing: true),
-                child: _requestingLocation
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CustomLoadingWidget(size: 18),
-                      )
-                    : Text(l10n.notificationsRetry),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final usingFallback = _locationUnavailable;
 
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: center,
-        initialZoom: 10,
-        onMapReady: _onMapReady,
-        onTap: _onMapTap,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-        ),
-      ),
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.dubai.bimobondapp',
-        ),
-        CircleLayer(
-          circles: [
-            CircleMarker(
-              point: center,
-              radius: widget.radiusKm * 1000,
-              useRadiusInMeter: true,
-              color: scheme.primary.withValues(alpha: 0.18),
-              borderColor: scheme.primary,
-              borderStrokeWidth: 2,
-            ),
-          ],
-        ),
-        if (_userLocation != null && !_isAtUserLocation)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: _userLocation!,
-                width: 14,
-                height: 14,
-                alignment: Alignment.center,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: scheme.secondary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
+        if (!_mountMap)
+          const Center(child: CustomLoadingWidget(size: 28))
+        else
+          GoogleMap(
+            mapType: MapType.normal,
+            initialCameraPosition: CameraPosition(target: center, zoom: 11),
+            onMapCreated: _onMapReady,
+            onTap: _onMapTap,
+            circles: _buildCircles(scheme, center),
+            markers: _buildMarkers(scheme, center),
+            myLocationEnabled: _userLocation != null,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
+            liteModeEnabled: false,
+            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+              Factory<OneSequenceGestureRecognizer>(
+                () => EagerGestureRecognizer(),
               ),
-            ],
+            },
           ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: center,
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: scheme.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  LucideIcons.mapPin,
-                  size: 16,
-                  color: scheme.onPrimary,
+        if (usingFallback)
+          Positioned(
+            top: 8,
+            left: 8,
+            right: 8,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text(
+                  l10n.chatLocationPermissionDenied,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        if (_requestingLocation)
+          const Center(child: CustomLoadingWidget(size: 28)),
       ],
     );
   }

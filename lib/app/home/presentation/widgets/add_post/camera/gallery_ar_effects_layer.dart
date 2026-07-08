@@ -2,12 +2,13 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detection.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// AR effect preview for gallery images and videos (first-frame for video).
@@ -32,7 +33,7 @@ class GalleryArEffectsLayer extends StatefulWidget {
 }
 
 class _GalleryArEffectsLayerState extends State<GalleryArEffectsLayer> {
-  List<Face> _faces = const [];
+  List<CameraDetectedFace> _faces = const [];
   Size _faceCoordSize = Size.zero;
 
   @override
@@ -94,12 +95,10 @@ class _GalleryArEffectsLayerState extends State<GalleryArEffectsLayer> {
       frame.image.dispose();
     }
 
-    final detector = FaceDetector(
-      options: CameraFaceEffectMapper.staticDetectorOptions(),
-    );
     try {
-      final faces = await detector.processImage(
-        InputImage.fromFilePath(sourcePath),
+      final faces = await CameraFaceDetection.detectFromFilepath(
+        sourcePath,
+        accurate: true,
       );
       if (!mounted) return;
       setState(() {
@@ -107,7 +106,6 @@ class _GalleryArEffectsLayerState extends State<GalleryArEffectsLayer> {
         _faceCoordSize = coordSize;
       });
     } finally {
-      await detector.close();
       await VideoThumbnailUtils.deleteIfExists(tempFrame);
       await VideoThumbnailUtils.deleteIfExists(tempNormalized);
     }
@@ -144,7 +142,7 @@ class _GalleryArEffectsPainter extends CustomPainter {
   });
 
   final CameraEffectDefinition effect;
-  final List<Face> faces;
+  final List<CameraDetectedFace> faces;
   final Size mediaSize;
   final Size faceCoordSize;
   final BoxFit previewFit;

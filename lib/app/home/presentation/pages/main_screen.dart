@@ -13,6 +13,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_bottom_nav.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -58,6 +59,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _openAddPostCamera() {
+    FeedPlaybackGate.instance.setBlocked(true);
     context.pushNamed('add_post_camera');
   }
 
@@ -80,22 +82,22 @@ class _MainScreenState extends State<MainScreen> {
         final isLoggedIn = state is AuthSuccess;
         final isHome = _currentIndex == 0;
 
+        if (_currentIndex >= (isLoggedIn ? 5 : 2)) {
+          _currentIndex = 0;
+        }
+
         final pages = isLoggedIn
             ? [
-                HomeFeedScreen(isTabActive: _currentIndex == 0),
+                HomeFeedScreen(isTabActive: isHome),
                 AuctionsScreen(isTabActive: _currentIndex == 1),
                 const SizedBox.shrink(),
                 MessagesScreen(isTabActive: _currentIndex == 3),
                 ProfileScreen(isTabActive: _currentIndex == 4),
               ]
             : [
-                HomeFeedScreen(isTabActive: _currentIndex == 0),
+                HomeFeedScreen(isTabActive: isHome),
                 const ProfileTab(),
               ];
-
-        if (_currentIndex >= pages.length) {
-          _currentIndex = 0;
-        }
 
         return MultiBlocListener(
           listeners: [

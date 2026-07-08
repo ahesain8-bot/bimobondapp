@@ -1,4 +1,5 @@
-import 'package:geocoding/geocoding.dart';
+import 'package:bimobondapp/core/utils/google_maps_constants.dart';
+import 'package:dio/dio.dart';
 
 class GeoPlaceInfo {
   const GeoPlaceInfo({
@@ -18,6 +19,13 @@ class GeoPlaceInfo {
 
 class GeoPlaceResolver {
   GeoPlaceResolver._();
+
+  static final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
 
   static String? usableApiField(String? value) {
     if (value == null) return null;
@@ -49,36 +57,43 @@ class GeoPlaceResolver {
     required double longitude,
   }) async {
     try {
-      final placemarks = await placemarkFromCoordinates(latitude, longitude);
-      if (placemarks.isEmpty) return null;
-
-      final placemark = placemarks.first;
-      final city = _firstNonEmpty([
-        placemark.locality,
-        placemark.subLocality,
-        placemark.subAdministrativeArea,
-      ]);
-      final region = _firstNonEmpty([
-        placemark.administrativeArea,
-        placemark.subAdministrativeArea,
-      ]);
-      final country = placemark.country?.trim();
-      final continent = _continentForPlacemark(
-        placemark,
-        latitude: latitude,
-        longitude: longitude,
+      final response = await _dio.get<Map<String, dynamic>>(
+        'https://maps.googleapis.com/maps/api/geocode/json',
+        queryParameters: {
+          'latlng': '$latitude,$longitude',
+          'key': GoogleMapsConstants.mapsApiKey,
+        },
       );
 
-      if (city == null &&
-          region == null &&
-          (country == null || country.isEmpty)) {
-        return null;
-      }
+      final data = response.data;
+      if (data == null || data['status'] != 'OK') return null;
+
+      final results = data['results'] as List<dynamic>?;
+      if (results == null || results.isEmpty) return null;
+
+      final first = results.first;
+      if (first is! Map<String, dynamic>) return null;
+
+      final components = first['address_components'] as List<dynamic>? ?? [];
+      final city = _componentValue(
+        components,
+        const ['locality', 'postal_town', 'sublocality', 'administrative_area_level_2'],
+      );
+      final region = _componentValue(
+        components,
+        const ['administrative_area_level_1'],
+      );
+      final country = _componentValue(components, const ['country']);
+      final isoCountryCode = _componentShortName(components, const ['country']);
+      final continent = continentFromIsoCountryCode(isoCountryCode) ??
+          continentFromCoordinates(latitude, longitude);
+
+      if (city == null && region == null && country == null) return null;
 
       return GeoAddress(
         city: city,
         region: region,
-        country: (country != null && country.isNotEmpty) ? country : null,
+        country: country,
         continent: continent,
       );
     } catch (_) {
@@ -86,14 +101,40 @@ class GeoPlaceResolver {
     }
   }
 
-  static String? _continentForPlacemark(
-    Placemark placemark, {
-    required double latitude,
-    required double longitude,
-  }) {
-    final fromIso = continentFromIsoCountryCode(placemark.isoCountryCode);
-    if (fromIso != null) return fromIso;
-    return continentFromCoordinates(latitude, longitude);
+  static String? _componentValue(
+    List<dynamic> components,
+    List<String> types,
+  ) {
+    for (final type in types) {
+      for (final component in components) {
+        if (component is! Map<String, dynamic>) continue;
+        final componentTypes = component['types'] as List<dynamic>? ?? [];
+        if (!componentTypes.contains(type)) continue;
+        final longName = component['long_name'] as String?;
+        if (longName != null && longName.trim().isNotEmpty) {
+          return longName.trim();
+        }
+      }
+    }
+    return null;
+  }
+
+  static String? _componentShortName(
+    List<dynamic> components,
+    List<String> types,
+  ) {
+    for (final type in types) {
+      for (final component in components) {
+        if (component is! Map<String, dynamic>) continue;
+        final componentTypes = component['types'] as List<dynamic>? ?? [];
+        if (!componentTypes.contains(type)) continue;
+        final shortName = component['short_name'] as String?;
+        if (shortName != null && shortName.trim().isNotEmpty) {
+          return shortName.trim();
+        }
+      }
+    }
+    return null;
   }
 
   static String? continentFromIsoCountryCode(String? isoCountryCode) {
@@ -136,13 +177,6 @@ class GeoPlaceResolver {
     }
     if (longitude >= 110 && latitude >= -50 && latitude <= 10) {
       return 'Oceania';
-    }
-    return null;
-  }
-
-  static String? _firstNonEmpty(List<String?> values) {
-    for (final value in values) {
-      if (value != null && value.trim().isNotEmpty) return value.trim();
     }
     return null;
   }

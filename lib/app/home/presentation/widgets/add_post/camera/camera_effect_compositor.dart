@@ -3,15 +3,13 @@ import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detection.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
+import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
-import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -61,7 +59,7 @@ class CameraEffectCompositor {
     final size = Size(width.toDouble(), height.toDouble());
 
     File? tempDetectFile;
-    List<Face> faces;
+    List<CameraDetectedFace> faces;
     if (normalized != null) {
       final tempDir = await getTemporaryDirectory();
       final detectFile = File(
@@ -123,7 +121,7 @@ class CameraEffectCompositor {
     final videoHeight = controller.value.size.height.ceil().clamp(1, 4096);
     await controller.dispose();
 
-    List<Face> faces = [];
+    List<CameraDetectedFace> faces = [];
     int? faceFrameWidth;
     int? faceFrameHeight;
     if (effect.requiresFaceDetection) {
@@ -156,50 +154,25 @@ class CameraEffectCompositor {
 
     if (overlayFile == null) return null;
 
-    if (!await FfmpegKitSupport.isAvailable) {
-      debugPrint('Camera effect: FFmpeg unavailable, skipping video bake');
-      await VideoThumbnailUtils.deleteIfExists(overlayFile);
-      return null;
-    }
-
-    final tempDir = await getTemporaryDirectory();
-    final outPath =
-        '${tempDir.path}/effect_${DateTime.now().millisecondsSinceEpoch}.mp4';
-    final command = [
-      '-i',
-      _quote(file.path),
-      '-i',
-      _quote(overlayFile.path),
-      '-filter_complex',
-      '[1:v]format=rgba[ov];[0:v][ov]overlay=0:0:format=auto',
-      '-c:a',
-      'copy',
-      '-y',
-      _quote(outPath),
-    ].join(' ');
-
     try {
-      final session = await FFmpegKit.execute(command);
+      final output = await NativeVideoProcessor.overlayImage(
+        input: file,
+        overlayPng: overlayFile,
+      );
       await VideoThumbnailUtils.deleteIfExists(overlayFile);
-      final returnCode = await session.getReturnCode();
-      if (!ReturnCode.isSuccess(returnCode)) return null;
+      return output;
     } catch (e, st) {
-      FfmpegKitSupport.markUnavailable();
-      debugPrint('Camera effect FFmpeg error: $e\n$st');
+      debugPrint('Camera effect native overlay error: $e\n$st');
       await VideoThumbnailUtils.deleteIfExists(overlayFile);
       return null;
     }
-
-    final outFile = File(outPath);
-    if (!await outFile.exists()) return null;
-    return outFile;
   }
 
   static Future<File?> _renderOverlayPng({
     required int width,
     required int height,
     required CameraEffectDefinition effect,
-    required List<Face> faces,
+    required List<CameraDetectedFace> faces,
     int? faceCoordWidth,
     int? faceCoordHeight,
   }) async {
@@ -244,20 +217,11 @@ class CameraEffectCompositor {
     return file;
   }
 
-  static Future<List<Face>> _detectFaces(
+  static Future<List<CameraDetectedFace>> _detectFaces(
     String path,
     CameraEffectDefinition effect,
   ) async {
     if (!effect.requiresFaceDetection) return const [];
-    final detector = FaceDetector(
-      options: CameraFaceEffectMapper.staticDetectorOptions(),
-    );
-    try {
-      return await detector.processImage(InputImage.fromFilePath(path));
-    } finally {
-      await detector.close();
-    }
+    return CameraFaceDetection.detectFromFilepath(path, accurate: true);
   }
-
-  static String _quote(String value) => '"${value.replaceAll('"', r'\"')}"';
 }

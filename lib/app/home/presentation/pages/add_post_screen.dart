@@ -32,6 +32,7 @@ import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flo
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_sheets.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -57,7 +58,7 @@ class AddPostScreen extends StatefulWidget {
   State<AddPostScreen> createState() => _AddPostScreenState();
 }
 
-class _AddPostScreenState extends State<AddPostScreen> {
+class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker {
   static const int _maxFiles = 5;
 
   late List<File> _selectedFiles;

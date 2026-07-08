@@ -377,11 +377,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
           ],
           child: BlocBuilder<InboxBloc, InboxState>(
             builder: (context, state) {
-              final inboxItems = _cachedInboxItems.isNotEmpty
-                  ? _cachedInboxItems
-                  : (_inboxLoadFinished
-                        ? messagesMockInboxItems(l10n)
-                        : <InboxChatItem>[]);
+              final inboxItems = _cachedInboxItems;
               final recentPreview = inboxItems
                   .take(MessagesLayoutConstants.recentMessagesPreviewCount)
                   .toList();
@@ -474,32 +470,37 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                                     letterSpacing: -0.5,
                                   ),
                                 ),
-                                InkWell(
-                                  onTap: () => context.pushNamed('all_chats'),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 2,
-                                    ),
-                                    child: Text(
-                                      l10n.messagesSeeAll,
-                                      style: TextStyle(
-                                        color: primaryColor,
-                                        fontSize: MessagesLayoutConstants
-                                            .sectionLinkFontSize,
-                                        fontWeight: FontWeight.w700,
+                                if (recentPreview.isNotEmpty)
+                                  InkWell(
+                                    onTap: () => context.pushNamed('all_chats'),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      child: Text(
+                                        l10n.messagesSeeAll,
+                                        style: TextStyle(
+                                          color: primaryColor,
+                                          fontSize: MessagesLayoutConstants
+                                              .sectionLinkFontSize,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
                               ],
                             ),
                     ),
                     if (isLoadingChats)
                       const MessagesChatListSkeleton()
                     else
-                      MessagesConversationList(items: recentPreview),
+                      MessagesConversationList(
+                        items: recentPreview,
+                        emptyMessage: l10n.messagesInboxNoMessagesYet,
+                        emptyIcon: Icons.chat_bubble_outline_rounded,
+                      ),
                     if (!isLoadingChats) ...[
                       const SizedBox(height: 24),
                       Padding(

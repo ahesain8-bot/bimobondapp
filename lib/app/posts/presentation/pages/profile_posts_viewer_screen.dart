@@ -269,6 +269,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
               key: ValueKey(post.id),
               post: post,
               isActive: index == _currentIndex,
+              respectFeedPlaybackGate: false,
               bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
             );
           },

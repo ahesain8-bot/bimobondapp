@@ -4,10 +4,7 @@ import 'dart:ui' as ui;
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
-import 'package:bimobondapp/core/utils/ffmpeg_kit_support.dart';
-import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/ffprobe_kit.dart';
-import 'package:ffmpeg_kit_flutter_new/return_code.dart';
+import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
@@ -154,111 +151,13 @@ class CameraFilterCompositor {
     return outFile;
   }
 
-  /// Applies the color matrix in one FFmpeg pass — no per-frame JPEG extraction.
+  /// Applies the color matrix using native video processing.
   static Future<File?> _applyToVideo(File file, AwesomeFilter filter) async {
-    if (!await FfmpegKitSupport.isAvailable) {
-      debugPrint('Camera filter: FFmpeg unavailable, skipping video bake');
-      return null;
-    }
-
-    final tempDir = await getTemporaryDirectory();
-    final outPath =
-        '${tempDir.path}/filter_${DateTime.now().millisecondsSinceEpoch}.mp4';
-    final matrixFilter = _colorMatrixVideoFilter(filter.matrix);
-    final hasAudio = await _hasAudioTrack(file);
-
-    final args = <String>[
-      '-i',
-      file.path,
-      '-t',
-      '$_maxVideoFilterSeconds',
-      '-vf',
-      matrixFilter,
-      '-c:v',
-      'libx264',
-      '-pix_fmt',
-      'yuv420p',
-      '-preset',
-      'veryfast',
-      '-crf',
-      '23',
-      if (hasAudio) ...['-c:a', 'copy'],
-      '-y',
-      outPath,
-    ];
-
-    final ok = await _runFfmpeg(args);
-    if (!ok) return null;
-
-    final outFile = File(outPath);
-    return await outFile.exists() ? outFile : null;
-  }
-
-  /// Maps Flutter's 4×5 [ColorFilter.matrix] to FFmpeg `geq` (same math as preview).
-  static String _colorMatrixVideoFilter(List<double> matrix) {
-    String channel(int row) {
-      final o = matrix[row + 4];
-      final offset = o.abs() < 0.0001 ? '' : '+${_formatCoeff(o)}';
-      return "clip(${_formatCoeff(matrix[row])}*r(X,Y)"
-          '+${_formatCoeff(matrix[row + 1])}*g(X,Y)'
-          '+${_formatCoeff(matrix[row + 2])}*b(X,Y)'
-          '+${_formatCoeff(matrix[row + 3])}*a(X,Y)'
-          '$offset,0,255)';
-    }
-
-    return "geq=r='${channel(0)}':g='${channel(5)}':b='${channel(10)}':"
-        "a='${channel(15)}'";
-  }
-
-  static String _formatCoeff(double value) {
-    if (value == 0) return '0';
-    if (value == value.roundToDouble()) return value.round().toString();
-    return value
-        .toStringAsFixed(6)
-        .replaceAll(RegExp(r'0+$'), '')
-        .replaceAll(RegExp(r'\.$'), '');
-  }
-
-  static Future<bool> _hasAudioTrack(File file) async {
-    if (!await FfmpegKitSupport.isAvailable) return false;
-
-    try {
-      final session = await FFprobeKit.getMediaInformation(file.path);
-      final streams = session.getMediaInformation()?.getStreams() ?? const [];
-      return streams.any((stream) => stream.getType() == 'audio');
-    } catch (e) {
-      debugPrint('Camera filter: ffprobe failed: $e');
-      return false;
-    }
-  }
-
-  static Future<bool> _runFfmpeg(List<String> args) async {
-    if (await _tryFfmpeg(args)) return true;
-
-    if (args.contains('libx264')) {
-      final fallback = [...args];
-      fallback[fallback.indexOf('libx264')] = 'mpeg4';
-      return _tryFfmpeg(fallback);
-    }
-    return false;
-  }
-
-  static Future<bool> _tryFfmpeg(List<String> args) async {
-    if (!await FfmpegKitSupport.isAvailable) return false;
-
-    try {
-      final session = await FFmpegKit.executeWithArguments(args);
-      final returnCode = await session.getReturnCode();
-      if (ReturnCode.isSuccess(returnCode)) return true;
-
-      final logs = await session.getAllLogsAsString();
-      debugPrint('FFmpeg filter failed: $logs');
-      return false;
-    } catch (e, st) {
-      FfmpegKitSupport.markUnavailable();
-      debugPrint('FFmpeg filter error: $e\n$st');
-      return false;
-    }
+    return NativeVideoProcessor.applyColorMatrix(
+      input: file,
+      matrix: filter.matrix,
+      maxDuration: const Duration(seconds: _maxVideoFilterSeconds),
+    );
   }
 
   static String _imageExtension(String path) {

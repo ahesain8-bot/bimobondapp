@@ -134,28 +134,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, UserEntity>> signInWithFacebook() async {
-    try {
-      final userModel = await remoteDataSource.signInWithFacebook();
-
-      if (userModel.authToken != null || userModel.deviceToken != null) {
-        await localDataSource.saveTokens(
-          authToken: userModel.authToken ?? '',
-          deviceToken: userModel.deviceToken ?? '',
-        );
-      }
-
-      await localDataSource.saveUser(userModel);
-
-      return Right(userModel);
-    } on AppException catch (e) {
-      return Left(FailureMapper.from(e));
-    } catch (e) {
-      return Left(FailureMapper.from(e));
-    }
-  }
-
-  @override
   Future<Either<Failure, UserEntity>> signInWithGoogle() async {
     try {
       final userModel = await remoteDataSource.signInWithGoogle();
@@ -283,5 +261,11 @@ class AuthRepositoryImpl implements AuthRepository {
     }
     await localDataSource.clearAuthData();
     await FirebaseAuth.instance.signOut();
+  }
+
+  @override
+  Future<Either<Failure, UserEntity>> signInWithFacebook() {
+    // TODO: implement signInWithFacebook
+    throw UnimplementedError();
   }
 }

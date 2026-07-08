@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bimobondapp/app/home/presentation/pages/main_screen.dart';
@@ -57,6 +58,7 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
+    observers: [FeedPlaybackNavigatorObserver.instance],
     routes: [
       GoRoute(
         path: '/splash',
