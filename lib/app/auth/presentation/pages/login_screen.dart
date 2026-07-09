@@ -27,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _hasLoggedIn = false;
   bool _isSubmitting = false;
+  bool _showEmailForm = false;
 
   @override
   void dispose() {
@@ -62,6 +63,11 @@ class _LoginScreenState extends State<LoginScreen> {
     context.read<AuthBloc>().add(const GoogleLoginRequestedEvent());
   }
 
+  Future<void> _onApplePressed() async {
+    final l10n = AppLocalizations.of(context)!;
+    PopupDialogs.showErrorDialog(context, l10n.settingsComingSoon);
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LocaleCubit, Locale>(
@@ -92,15 +98,19 @@ class _LoginScreenState extends State<LoginScreen> {
           },
           builder: (context, state) {
             return LoginView(
-              formKey: _formKey,
               l10n: l10n,
               isArabic: isArabic,
               isDark: isDark,
+              showEmailForm: _showEmailForm,
+              formKey: _formKey,
               emailController: emailController,
               passwordController: passwordController,
               isLoading: _isSubmitting || state is AuthLoading,
+              onEmailMethodPressed: () => setState(() => _showEmailForm = true),
+              onBackFromEmailPressed: () => setState(() => _showEmailForm = false),
               onLoginPressed: _onLoginPressed,
               onGooglePressed: _onGooglePressed,
+              onApplePressed: _onApplePressed,
             );
           },
         );

@@ -18,6 +18,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginTitle => 'Login';
 
   @override
+  String get loginScreenTitle => 'Log in to BimoBond';
+
+  @override
+  String get loginWithPhone => 'Use phone number';
+
+  @override
+  String get loginWithEmailUsername => 'Use email or username';
+
+  @override
+  String get loginEmailUsernameHint => 'Email or username';
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get continueWithApple => 'Continue with Apple';
+
+  @override
   String get signInSubtitle => 'Sign in to continue';
 
   @override

@@ -113,6 +113,42 @@ abstract class AppLocalizations {
   /// **'Login'**
   String get loginTitle;
 
+  /// No description provided for @loginScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to BimoBond'**
+  String get loginScreenTitle;
+
+  /// No description provided for @loginWithPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Use phone number'**
+  String get loginWithPhone;
+
+  /// No description provided for @loginWithEmailUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Use email or username'**
+  String get loginWithEmailUsername;
+
+  /// No description provided for @loginEmailUsernameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or username'**
+  String get loginEmailUsernameHint;
+
+  /// No description provided for @continueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get continueWithGoogle;
+
+  /// No description provided for @continueWithApple.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Apple'**
+  String get continueWithApple;
+
   /// No description provided for @signInSubtitle.
   ///
   /// In en, this message translates to:

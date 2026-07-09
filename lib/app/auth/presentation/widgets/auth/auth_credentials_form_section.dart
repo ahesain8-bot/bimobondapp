@@ -27,22 +27,25 @@ class AuthCredentialsFormSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LiquidGlassAuthTextField(
           controller: emailController,
-          hintText: l10n.emailLabel,
-          icon: Icons.email_outlined,
-          keyboardType: TextInputType.emailAddress,
+          hintText: l10n.loginEmailUsernameHint,
+          icon: Icons.alternate_email_outlined,
+          keyboardType: TextInputType.text,
           validator: (value) {
-            if (value == null || value.isEmpty) {
+            if (value == null || value.trim().isEmpty) {
               return l10n.emailRequired;
             }
-            final emailRegex = RegExp(
-              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-            );
-            if (!emailRegex.hasMatch(value)) {
-              return l10n.invalidEmail;
+            final trimmed = value.trim();
+            if (trimmed.contains('@')) {
+              final emailRegex = RegExp(
+                r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+              );
+              if (!emailRegex.hasMatch(trimmed)) {
+                return l10n.invalidEmail;
+              }
             }
             return null;
           },

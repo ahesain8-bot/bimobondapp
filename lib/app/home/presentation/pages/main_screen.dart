@@ -94,10 +94,7 @@ class _MainScreenState extends State<MainScreen> {
                 MessagesScreen(isTabActive: _currentIndex == 3),
                 ProfileScreen(isTabActive: _currentIndex == 4),
               ]
-            : [
-                HomeFeedScreen(isTabActive: isHome),
-                const ProfileTab(),
-              ];
+            : [HomeFeedScreen(isTabActive: isHome), const ProfileTab()];
 
         return MultiBlocListener(
           listeners: [

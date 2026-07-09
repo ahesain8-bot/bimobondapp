@@ -18,6 +18,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginTitle => 'تسجيل الدخول';
 
   @override
+  String get loginScreenTitle => 'تسجيل الدخول إلى بيموبوند';
+
+  @override
+  String get loginWithPhone => 'استخدام رقم الجوال';
+
+  @override
+  String get loginWithEmailUsername => 'استخدام البريد الإلكتروني أو اسم المستخدم';
+
+  @override
+  String get loginEmailUsernameHint => 'البريد الإلكتروني أو اسم المستخدم';
+
+  @override
+  String get continueWithGoogle => 'المتابعة باستخدام Google';
+
+  @override
+  String get continueWithApple => 'المتابعة باستخدام Apple';
+
+  @override
   String get signInSubtitle => 'تسجيل الدخول للمتابعة';
 
   @override
