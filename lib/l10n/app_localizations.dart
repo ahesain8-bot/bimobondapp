@@ -4805,6 +4805,54 @@ abstract class AppLocalizations {
   /// **'LIVE'**
   String get cameraModeLive;
 
+  /// No description provided for @cameraModeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get cameraModeText;
+
+  /// No description provided for @cameraAddSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sound'**
+  String get cameraAddSound;
+
+  /// No description provided for @cameraLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Layout'**
+  String get cameraLayout;
+
+  /// No description provided for @cameraAspectRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Ratio'**
+  String get cameraAspectRatio;
+
+  /// No description provided for @cameraTabPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Post'**
+  String get cameraTabPost;
+
+  /// No description provided for @cameraTabCreative.
+  ///
+  /// In en, this message translates to:
+  /// **'Creative'**
+  String get cameraTabCreative;
+
+  /// No description provided for @cameraDuration10m.
+  ///
+  /// In en, this message translates to:
+  /// **'10m'**
+  String get cameraDuration10m;
+
+  /// No description provided for @cameraZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom'**
+  String get cameraZoom;
+
   /// No description provided for @cameraGoLive.
   ///
   /// In en, this message translates to:

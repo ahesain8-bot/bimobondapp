@@ -74,18 +74,18 @@ class CameraStudioSheets {
   static void showEffectsPicker(
     BuildContext context, {
     required AppLocalizations l10n,
-    required CameraEffectId? selectedEffect,
-    required ValueChanged<CameraEffectId?> onSelected,
+    required String? selectedEffectSlug,
+    required ValueChanged<String?> onSelected,
   }) {
     GlassBottomSheet.showContent(
       context,
       title: l10n.cameraEffects,
       child: CameraEffectsPickerStrip(
         effects: CameraEffectsCatalog.trending,
-        selected: selectedEffect,
+        selected: selectedEffectSlug,
         labelBuilder: (effect) => CameraEffectsCatalog.label(l10n, effect),
         onSelected: (effect) {
-          onSelected(effect.isNone ? null : effect.id);
+          onSelected(effect.isNone ? null : effect.slug);
           Navigator.pop(context);
         },
       ),

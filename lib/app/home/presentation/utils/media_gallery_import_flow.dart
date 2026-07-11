@@ -81,6 +81,10 @@ class MediaGalleryImportFlow {
       'type': resolvePostType(edited.files),
       'isStory': isStory,
       'initialSound': initialSound,
+      if (edited.filterName != null) 'filterName': edited.filterName,
+      'filterCategory': edited.filterCategory.name,
+      if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
+      'beautyEnabled': edited.beautyEnabled,
     };
 
     if (replaceRoute) {

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:flutter/foundation.dart';
@@ -95,8 +96,9 @@ class CameraFilterCompositor {
   /// Renders [filter.preview] onto image bytes — matches [ColorFiltered] preview.
   static Future<Uint8List?> bakeMatrixFilter(
     Uint8List bytes,
-    AwesomeFilter filter,
-  ) async {
+    AwesomeFilter filter, {
+    List<double>? colorMatrix,
+  }) async {
     if (!isActiveFilter(filter)) return bytes;
 
     final normalized = CameraCaptureUtils.normalizeImageBytes(bytes);
@@ -108,7 +110,8 @@ class CameraFilterCompositor {
     final width = source.width;
     final height = source.height;
 
-    final paint = ui.Paint()..colorFilter = filter.preview;
+    final paint = ui.Paint()
+      ..colorFilter = colorFilterFor(filter, colorMatrix: colorMatrix);
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     canvas.drawImage(source, ui.Offset.zero, paint);
@@ -135,8 +138,13 @@ class CameraFilterCompositor {
   }
 
   static Future<File?> _applyToImage(File file, AwesomeFilter filter) async {
+    final preset = CameraFilterCatalog.presetForName(filter.name);
     final bytes = await file.readAsBytes();
-    final filtered = await bakeMatrixFilter(bytes, filter);
+    final filtered = await bakeMatrixFilter(
+      bytes,
+      filter,
+      colorMatrix: preset?.colorMatrix,
+    );
     if (filtered == null) {
       debugPrint('Camera filter: matrix bake failed (${file.path})');
       return null;
@@ -153,9 +161,11 @@ class CameraFilterCompositor {
 
   /// Applies the color matrix using native video processing.
   static Future<File?> _applyToVideo(File file, AwesomeFilter filter) async {
+    final preset = CameraFilterCatalog.presetForName(filter.name);
+    final matrix = preset?.colorMatrix ?? filter.matrix;
     return NativeVideoProcessor.applyColorMatrix(
       input: file,
-      matrix: filter.matrix,
+      matrix: matrix,
       maxDuration: const Duration(seconds: _maxVideoFilterSeconds),
     );
   }
@@ -165,5 +175,24 @@ class CameraFilterCompositor {
     if (lower.endsWith('.png')) return 'png';
     if (lower.endsWith('.webp')) return 'webp';
     return 'jpg';
+  }
+
+  static ui.ColorFilter colorFilterFor(
+    AwesomeFilter filter, {
+    List<double>? colorMatrix,
+  }) {
+    if (colorMatrix != null && colorMatrix.length >= 20) {
+      return ui.ColorFilter.matrix(_flutterMatrixFromApi(colorMatrix));
+    }
+    return filter.preview;
+  }
+
+  static List<double> _flutterMatrixFromApi(List<double> matrix) {
+    return [
+      matrix[0], matrix[1], matrix[2], matrix[3], matrix[4] * 255,
+      matrix[5], matrix[6], matrix[7], matrix[8], matrix[9] * 255,
+      matrix[10], matrix[11], matrix[12], matrix[13], matrix[14] * 255,
+      matrix[15], matrix[16], matrix[17], matrix[18], matrix[19] * 255,
+    ];
   }
 }

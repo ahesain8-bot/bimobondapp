@@ -1,13 +1,18 @@
 import 'dart:math' as math;
 
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_placement.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
 import 'package:flutter/material.dart';
 
-/// Paints camera effects directly in image / overlay pixel coordinates.
+/// Paints camera effects using API placement metadata from `/camera-studio/catalog`.
 class CameraEffectImagePainter {
   CameraEffectImagePainter._();
+
+  static Future<void> preloadAsset(String? url) =>
+      CameraEffectAssetLoader.preload(url);
 
   static void paintAr(
     Canvas canvas,
@@ -20,7 +25,6 @@ class CameraEffectImagePainter {
     }
   }
 
-  /// Paints AR effects using coordinates already mapped to the target canvas.
   static void paintArScreenSpace(
     Canvas canvas,
     List<ScreenFace> faces,
@@ -43,54 +47,209 @@ class CameraEffectImagePainter {
     ScreenFace face,
     CameraEffectDefinition effect,
   ) {
-    switch (effect.id) {
-      case CameraEffectId.crown:
-        _drawAboveScreenFace(
-          canvas,
-          face,
-          emoji: '👑',
-          scale: 1.1,
-          yOffset: -0.55,
-        );
-      case CameraEffectId.bunny:
-        _drawBunnyEarsScreen(canvas, face);
-      case CameraEffectId.sunglasses:
-        _drawSunglassesScreen(canvas, face);
-      case CameraEffectId.dog:
-        _drawAboveScreenFace(
-          canvas,
-          face,
-          emoji: '🐶',
-          scale: 0.95,
-          yOffset: -0.15,
-        );
-        _drawOnScreenLandmark(
-          canvas,
-          face,
-          CameraFaceLandmarkType.noseBase,
-          '👃',
-          face.boundingBox.width * 0.18,
-        );
-      case CameraEffectId.hearts:
-        _drawOnScreenLandmark(
-          canvas,
-          face,
-          CameraFaceLandmarkType.leftEye,
-          '❤️',
-          face.boundingBox.width * 0.22,
-        );
-        _drawOnScreenLandmark(
-          canvas,
-          face,
-          CameraFaceLandmarkType.rightEye,
-          '❤️',
-          face.boundingBox.width * 0.22,
-        );
-      case CameraEffectId.none:
-      case CameraEffectId.sparkle:
-      case CameraEffectId.neon:
-      case CameraEffectId.glitch:
+    if (effect.isNone) return;
+
+    final placement = _resolvePlacement(face, effect.placement);
+    final anchor = placement.anchorType;
+    if (anchor == null || anchor == CameraEffectAnchorType.screen) return;
+
+    switch (anchor) {
+      case CameraEffectAnchorType.onFace:
+        _paintOnFace(canvas, face, effect, placement);
+      case CameraEffectAnchorType.coverFace:
+        _paintCoverFace(canvas, face, effect, placement);
+      case CameraEffectAnchorType.aboveFace:
+        _paintAboveFace(canvas, face, effect, placement);
+      case CameraEffectAnchorType.dualAboveFace:
+        _paintDualAboveFace(canvas, face, effect, placement);
+      case CameraEffectAnchorType.betweenLandmarks:
+        _paintBetweenLandmarks(canvas, face, effect, placement);
+      case CameraEffectAnchorType.onLandmark:
+        _paintOnLandmark(canvas, face, effect, placement, all: false);
+      case CameraEffectAnchorType.onLandmarks:
+        _paintOnLandmark(canvas, face, effect, placement, all: true);
+      case CameraEffectAnchorType.screen:
         break;
+    }
+  }
+
+  static CameraEffectPlacement _resolvePlacement(
+    ScreenFace face,
+    CameraEffectPlacement placement,
+  ) {
+    final needsLandmarks =
+        placement.anchorType == CameraEffectAnchorType.betweenLandmarks ||
+        placement.anchorType == CameraEffectAnchorType.onLandmark ||
+        placement.anchorType == CameraEffectAnchorType.onLandmarks;
+
+    if (!needsLandmarks) return placement;
+
+    final keys = placement.anchorLandmarks.isNotEmpty
+        ? placement.anchorLandmarks
+        : _defaultLandmarksFor(placement.anchorType);
+    final missing = keys.any((key) => !face.landmarks.containsKey(key));
+    if (!missing) return placement;
+
+    final fallback = placement.fallbackAnchorType;
+    if (fallback == null) return placement;
+
+    return placement.copyWith(
+      anchorType: fallback,
+      scaleFactor: placement.fallbackScaleFactor ?? placement.scaleFactor,
+      offsetX: placement.offsetX,
+      offsetY: placement.fallbackOffsetY ?? placement.offsetY,
+    );
+  }
+
+  static List<CameraFaceLandmarkType> _defaultLandmarksFor(
+    CameraEffectAnchorType? anchor,
+  ) {
+    return switch (anchor) {
+      CameraEffectAnchorType.betweenLandmarks => const [
+          CameraFaceLandmarkType.leftEye,
+          CameraFaceLandmarkType.rightEye,
+        ],
+      CameraEffectAnchorType.onLandmark ||
+      CameraEffectAnchorType.onLandmarks =>
+        const [CameraFaceLandmarkType.noseBase],
+      _ => const [],
+    };
+  }
+
+  static void _paintOnFace(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+    CameraEffectPlacement placement,
+  ) {
+    final box = face.boundingBox;
+    final scale = placement.scaleFactor ?? 1;
+    final offsetX = (placement.offsetX ?? 0) * box.width;
+    final offsetY = (placement.offsetY ?? 0) * box.height;
+    final center = box.center + Offset(offsetX, offsetY);
+    final size = _faceStickerSize(box.width, scale, effect.hasAsset);
+    _drawSticker(canvas, effect, center, size);
+  }
+
+  static void _paintCoverFace(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+    CameraEffectPlacement placement,
+  ) {
+    final box = face.boundingBox;
+    final scale = placement.scaleFactor ?? 1;
+    final offsetX = (placement.offsetX ?? 0) * box.width;
+    final offsetY = (placement.offsetY ?? 0) * box.height;
+    final center = box.center + Offset(offsetX, offsetY);
+    final rect = Rect.fromCenter(
+      center: center,
+      width: box.width * scale,
+      height: box.height * scale,
+    );
+    _drawStickerInRect(canvas, effect, rect, fit: BoxFit.cover);
+  }
+
+  static void _paintAboveFace(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+    CameraEffectPlacement placement,
+  ) {
+    final box = face.boundingBox;
+    final scale = placement.scaleFactor ?? 1;
+    final offsetX = (placement.offsetX ?? 0) * box.width;
+    final offsetY = placement.offsetY ?? -0.55;
+    final center = Offset(
+      box.center.dx + offsetX,
+      box.top + box.height * offsetY,
+    );
+    final size = _faceStickerSize(box.width, scale, effect.hasAsset);
+    _drawSticker(canvas, effect, center, size);
+  }
+
+  static void _paintDualAboveFace(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+    CameraEffectPlacement placement,
+  ) {
+    final box = face.boundingBox;
+    final scale = placement.scaleFactor ?? 0.35;
+    final offsetX = placement.offsetX ?? 0.22;
+    final offsetY = placement.offsetY ?? -0.15;
+    final size = box.width * scale;
+    final y = box.top + box.height * offsetY;
+    final left = Offset(box.left + box.width * offsetX, y);
+    final right = Offset(box.right - box.width * offsetX, y);
+    _drawSticker(canvas, effect, left, size);
+    _drawSticker(canvas, effect, right, size);
+  }
+
+  static void _paintBetweenLandmarks(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+    CameraEffectPlacement placement,
+  ) {
+    final keys = placement.anchorLandmarks.length >= 2
+        ? placement.anchorLandmarks.take(2).toList()
+        : const [
+            CameraFaceLandmarkType.leftEye,
+            CameraFaceLandmarkType.rightEye,
+          ];
+    final first = face.landmarks[keys[0]];
+    final second = face.landmarks[keys[1]];
+    if (first == null || second == null) {
+      final fallback = placement.fallbackAnchorType == CameraEffectAnchorType.onFace
+          ? placement.copyWith(
+              anchorType: CameraEffectAnchorType.onFace,
+              offsetY: placement.fallbackOffsetY ?? -0.2,
+              scaleFactor: placement.fallbackScaleFactor ?? placement.scaleFactor,
+            )
+          : placement;
+      _paintOnFace(canvas, face, effect, fallback);
+      return;
+    }
+
+    final center = Offset(
+      (first.dx + second.dx) / 2 + (placement.offsetX ?? 0) * eyeSpan,
+      (first.dy + second.dy) / 2 + (placement.offsetY ?? 0) * eyeSpan,
+    );
+    final eyeSpan = (second.dx - first.dx).abs();
+    final width = eyeSpan * (placement.scaleFactor ?? 2.2);
+
+    if (effect.hasAsset) {
+      final rect = Rect.fromCenter(
+        center: center,
+        width: width,
+        height: width * 0.42,
+      );
+      _drawStickerInRect(canvas, effect, rect, fit: BoxFit.contain);
+      return;
+    }
+
+    _drawSticker(canvas, effect, center, width);
+  }
+
+  static void _paintOnLandmark(
+    Canvas canvas,
+    ScreenFace face,
+    CameraEffectDefinition effect,
+    CameraEffectPlacement placement, {
+    required bool all,
+  }) {
+    final keys = placement.anchorLandmarks.isNotEmpty
+        ? placement.anchorLandmarks
+        : const [CameraFaceLandmarkType.noseBase];
+    final targets = all ? keys : [keys.first];
+    final landmarkSize = placement.landmarkSize ?? 0.2;
+    final size = face.boundingBox.width * landmarkSize;
+
+    for (final key in targets) {
+      final point = face.landmarks[key];
+      if (point == null) continue;
+      _drawSticker(canvas, effect, point, size);
     }
   }
 
@@ -100,80 +259,60 @@ class CameraEffectImagePainter {
     CameraEffectDefinition effect, {
     double progress = 0.35,
   }) {
-    switch (effect.id) {
-      case CameraEffectId.sparkle:
+    if (effect.hasAsset) {
+      _drawStickerInRect(
+        canvas,
+        effect,
+        Offset.zero & size,
+        fit: BoxFit.cover,
+      );
+      return;
+    }
+
+    switch (effect.slug) {
+      case 'sparkle':
         _paintSparkle(canvas, size, progress);
-      case CameraEffectId.neon:
+      case 'neon':
         _paintNeon(canvas, size, progress);
-      case CameraEffectId.glitch:
+      case 'glitch':
         _paintGlitch(canvas, size, progress);
       default:
         break;
     }
   }
 
-  static void _drawAboveScreenFace(
+  static double _faceStickerSize(
+    double faceWidth,
+    double scaleFactor,
+    bool hasAsset,
+  ) {
+    // EFFECTS_API: emoji ≈ face.width × scaleFactor × 0.45; assets are proportional.
+    if (hasAsset) return faceWidth * scaleFactor;
+    return faceWidth * scaleFactor * 0.45;
+  }
+
+  static void _drawSticker(
     Canvas canvas,
-    ScreenFace face, {
-    required String emoji,
-    required double scale,
-    required double yOffset,
-  }) {
-    final box = face.boundingBox;
-    final center = Offset(
-      box.center.dx,
-      box.top + box.height * yOffset,
-    );
-    _drawEmoji(canvas, emoji, center, box.width * scale * 0.45);
-  }
-
-  static void _drawBunnyEarsScreen(Canvas canvas, ScreenFace face) {
-    final box = face.boundingBox;
-    final left = Offset(
-      box.left + box.width * 0.22,
-      box.top - box.height * 0.15,
-    );
-    final right = Offset(
-      box.right - box.width * 0.22,
-      box.top - box.height * 0.15,
-    );
-    final size = box.width * 0.35;
-    _drawEmoji(canvas, '🐰', left, size);
-    _drawEmoji(canvas, '🐰', right, size);
-  }
-
-  static void _drawSunglassesScreen(Canvas canvas, ScreenFace face) {
-    final leftEye = face.landmarks[CameraFaceLandmarkType.leftEye];
-    final rightEye = face.landmarks[CameraFaceLandmarkType.rightEye];
-    if (leftEye == null || rightEye == null) {
-      _drawAboveScreenFace(
-        canvas,
-        face,
-        emoji: '😎',
-        scale: 1.0,
-        yOffset: 0.35,
-      );
-      return;
-    }
-
-    final center = Offset(
-      (leftEye.dx + rightEye.dx) / 2,
-      (leftEye.dy + rightEye.dy) / 2,
-    );
-    final width = (rightEye.dx - leftEye.dx).abs() * 2.2;
-    _drawEmoji(canvas, '😎', center, width);
-  }
-
-  static void _drawOnScreenLandmark(
-    Canvas canvas,
-    ScreenFace face,
-    CameraFaceLandmarkType type,
-    String emoji,
+    CameraEffectDefinition effect,
+    Offset center,
     double size,
   ) {
-    final point = face.landmarks[type];
-    if (point == null) return;
-    _drawEmoji(canvas, emoji, point, size);
+    final rect = Rect.fromCenter(center: center, width: size, height: size);
+    _drawStickerInRect(canvas, effect, rect, fit: BoxFit.contain);
+  }
+
+  static void _drawStickerInRect(
+    Canvas canvas,
+    CameraEffectDefinition effect,
+    Rect rect, {
+    required BoxFit fit,
+  }) {
+    final image = CameraEffectAssetLoader.image(effect.assetUrl);
+    if (image != null) {
+      paintImage(canvas: canvas, rect: rect, image: image, fit: fit);
+      return;
+    }
+    _drawEmoji(canvas, effect.emoji, rect.center, rect.shortestSide * 0.9);
   }
 
   static void _drawEmoji(Canvas canvas, String emoji, Offset center, double size) {

@@ -12,6 +12,7 @@ class CameraFilterPreset {
     this.previewColor,
     this.slug,
     this.isOriginal = false,
+    this.colorMatrix,
   });
 
   final AwesomeFilter filter;
@@ -21,6 +22,7 @@ class CameraFilterPreset {
   final Color? previewColor;
   final String? slug;
   final bool isOriginal;
+  final List<double>? colorMatrix;
 
   bool get hasThumbnail => thumbnailUrl != null && thumbnailUrl!.isNotEmpty;
 

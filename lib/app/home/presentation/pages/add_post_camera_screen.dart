@@ -11,6 +11,7 @@ import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dar
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_editor.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_app_loading.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_compositor.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_compositor.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
@@ -24,6 +25,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -54,7 +56,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   CameraState? _cameraState;
   bool _pendingVideoStart = false;
   bool _returnToPhotoAfterVideo = false;
-  bool _showFilters = true;
+  bool _showFilters = false;
   bool _catalogLoading = true;
   bool _filtersReady = false;
   bool _beautyEnabled = false;
@@ -73,7 +75,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   double _selectedZoom = CameraStudioConstants.zoomSteps[1].value;
   int _selectedDuration = CameraStudioConstants.durationOptions.first;
   double _selectedSpeed = CameraStudioConstants.speedOptions[1];
-  CameraEffectId? _selectedEffect;
+  String? _selectedEffectSlug;
   CameraStudioMode _studioMode = CameraStudioMode.video;
   SoundEntity? _selectedSound;
   File? _storyCapturedFile;
@@ -82,6 +84,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   Type? _lastCameraStateType;
   String? _appliedFilterId;
   bool _isFrontCamera = false;
+  int _workspaceTabIndex = 0;
 
   @override
   void initState() {
@@ -101,12 +104,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _selectedDuration = CameraStudioConstants.durationOptions.first;
       _studioMode = CameraStudioMode.photo;
     }
-    _faceDetectorService = CameraFaceDetectorService();
+    _faceDetectorService = CameraFaceDetectorService(isFrontCamera: _isFrontCamera);
     unawaited(_loadCatalog());
   }
 
   Future<void> _loadCatalog() async {
-    await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded();
+    await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded(
+      forceRefresh: true,
+    );
     if (!mounted) return;
     final categories = CameraFilterCatalog.filterCategories;
     setState(() {
@@ -178,7 +183,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   MediaEditorSeed get _captureEditSeed => MediaEditorSeed(
     filterName: _activeFilterName,
-    effect: _selectedEffect,
+    effectSlug: _selectedEffectSlug,
     beautyEnabled: _beautyEnabled,
     filterCategory: _filterCategory,
   );
@@ -241,6 +246,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         'type': MediaGalleryImportFlow.resolvePostType(edited.files),
         'isStory': false,
         'initialSound': _selectedSound,
+        if (edited.filterName != null) 'filterName': edited.filterName,
+        'filterCategory': edited.filterCategory.name,
+        if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
+        'beautyEnabled': edited.beautyEnabled,
       },
     );
   }
@@ -299,7 +308,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final captureFilter = _effectiveCaptureFilter();
     final hasFilter = captureFilter.id != AwesomeFilter.None.id;
     final hasEffect =
-        _selectedEffect != null && _selectedEffect != CameraEffectId.none;
+        _selectedEffectSlug != null && _selectedEffectSlug != 'none';
     var file = File(path);
     final isVideo = capture.isVideo;
 
@@ -324,7 +333,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           if (hasEffect) {
             file = await CameraEffectCompositor.applyIfNeeded(
               input: file,
-              effectId: _selectedEffect,
+              effectSlug: _selectedEffectSlug,
               isVideo: isVideo,
             );
           }
@@ -525,7 +534,18 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Future<void> _flipCamera() async {
     await _cameraState?.switchCameraSensor();
-    if (mounted) setState(() => _isFrontCamera = !_isFrontCamera);
+    if (mounted) {
+      setState(() => _isFrontCamera = !_isFrontCamera);
+      _faceDetectorService.isFrontCamera = _isFrontCamera;
+    }
+  }
+
+  void _selectEffect(String? slug) {
+    setState(() => _selectedEffectSlug = slug);
+    final effect = slug == null ? null : CameraEffectsCatalog.bySlug(slug);
+    if (effect?.hasAsset == true) {
+      unawaited(CameraEffectAssetLoader.preload(effect!.assetUrl));
+    }
   }
 
   void _toggleFlash() {
@@ -545,12 +565,28 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     });
   }
 
-  String _studioModeLabel(AppLocalizations l10n, CameraStudioMode mode) {
-    return switch (mode) {
-      CameraStudioMode.photo => l10n.cameraModePhoto,
-      CameraStudioMode.video => l10n.cameraModeVideo,
-      CameraStudioMode.live => l10n.cameraModeLive,
-    };
+  void _onDurationSelected(int seconds) {
+    setState(() => _selectedDuration = seconds);
+  }
+
+  void _clearFilter() {
+    unawaited(_applyFilter(CameraFilterCatalog.original));
+  }
+
+  void _showComingSoon(String message) {
+    PopupDialogs.showErrorDialog(context, message);
+  }
+
+  void _onWorkspaceTabSelected(int index) {
+    setState(() => _workspaceTabIndex = index);
+    if (index == 1) {
+      CameraStudioSheets.showEffectsPicker(
+        context,
+        l10n: AppLocalizations.of(context)!,
+        selectedEffectSlug: _selectedEffectSlug,
+        onSelected: (slug) => _selectEffect(slug),
+      );
+    }
   }
 
   void _onStudioModeSelected(CameraStudioMode mode) {
@@ -667,7 +703,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                   filters: filters,
                   filterCategorySlug: _filterCategorySlug,
                   selectedFilter: _selectedFilter,
-                  selectedZoom: _selectedZoom,
                   selectedDuration: _selectedDuration,
                   selectedSpeed: _selectedSpeed,
                   studioMode: _studioMode,
@@ -678,25 +713,19 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                   isBusy: _isBusy || _isProcessingCapture,
                   recordSeconds: _recordSeconds,
                   countdownValue: _countdownValue,
-                  selectedEffect: _selectedEffect,
+                  selectedEffectSlug: _selectedEffectSlug,
+                  workspaceTabIndex: _workspaceTabIndex,
                   onClose: () => context.pop(),
-                  onDurationTap: () => CameraStudioSheets.showDurationPicker(
-                    context,
-                    l10n: l10n,
-                    selectedDuration: _selectedDuration,
-                    onSelected: (seconds) =>
-                        setState(() => _selectedDuration = seconds),
-                  ),
                   onFilterCategorySelected: _onFilterCategorySelected,
                   onFilterSelected: _applyFilter,
-                  onZoomSelected: _applyZoom,
+                  onClearFilter: _clearFilter,
+                  onDurationSelected: _onDurationSelected,
                   onStudioModeSelected: _onStudioModeSelected,
                   onEffectsTap: () => CameraStudioSheets.showEffectsPicker(
                     context,
                     l10n: l10n,
-                    selectedEffect: _selectedEffect,
-                    onSelected: (effect) =>
-                        setState(() => _selectedEffect = effect),
+                    selectedEffectSlug: _selectedEffectSlug,
+                    onSelected: _selectEffect,
                   ),
                   onUploadTap: () => CameraStudioSheets.pickFromLibrary(
                     context,
@@ -722,16 +751,29 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                   onTimerToggle: () =>
                       setState(() => _timerEnabled = !_timerEnabled),
                   onMusicTap: _pickSound,
+                  onLayoutTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+                  onAspectRatioTap: () =>
+                      _showComingSoon(l10n.cameraLiveComingSoon),
+                  onZoomTap: () {
+                    final steps = CameraStudioConstants.zoomSteps;
+                    var currentIndex = steps.indexWhere(
+                      (step) => (_selectedZoom - step.value).abs() < 0.12,
+                    );
+                    if (currentIndex < 0) currentIndex = 0;
+                    final next = steps[(currentIndex + 1) % steps.length];
+                    unawaited(_applyZoom(next.value));
+                  },
+                  onTextModeTap: () =>
+                      _showComingSoon(l10n.cameraLiveComingSoon),
+                  onWorkspaceTabSelected: _onWorkspaceTabSelected,
                   soundLabel: _studioMode == CameraStudioMode.live
                       ? l10n.cameraLiveTitleHint
-                      : (_selectedSound?.name ?? l10n.cameraOriginalSound),
+                      : (_selectedSound?.name ?? l10n.cameraAddSound),
                   onLongPressStart: (_) => _startRecordingWithOptionalTimer(),
                   onLongPressEnd: (_) {
                     if (_isRecording) _stopRecording();
                   },
                   filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
-                  studioModeLabelBuilder: (mode) =>
-                      _studioModeLabel(l10n, mode),
                 );
               },
             ),
@@ -746,7 +788,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   Future<void> _onImageForAnalysis(AnalysisImage image) async {
-    if (!CameraEffectsCatalog.needsFaceDetection(_selectedEffect)) return;
+    if (!CameraEffectsCatalog.needsFaceDetection(_selectedEffectSlug)) return;
     await _faceDetectorService.analyze(image);
   }
 }

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_temp_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detection.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
@@ -20,15 +21,16 @@ class CameraEffectCompositor {
 
   static Future<File> applyIfNeeded({
     required File input,
-    required CameraEffectId? effectId,
+    required String? effectSlug,
     required bool isVideo,
   }) async {
-    final effect = effectId == null
-        ? null
-        : CameraEffectsCatalog.byId(effectId);
+    final effect = effectSlug == null ? null : CameraEffectsCatalog.bySlug(effectSlug);
     if (effect == null || effect.isNone) return input;
 
     try {
+      if (effect.hasAsset) {
+        await CameraEffectAssetLoader.preload(effect.assetUrl);
+      }
       final File? result;
       if (isVideo) {
         result = await _applyToVideo(input, effect);

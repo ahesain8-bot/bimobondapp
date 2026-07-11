@@ -59,7 +59,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   CameraFilterCategory _filterCategory = CameraFilterCategory.trending;
   String _filterCategorySlug = 'trending';
   AwesomeFilter _selectedFilter = AwesomeFilter.None;
-  CameraEffectId? _selectedEffect;
+  String? _selectedEffectSlug;
   bool _beautyEnabled = false;
   bool _showFilters = true;
   bool _filtersReady = false;
@@ -74,7 +74,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   }
 
   CameraEffectDefinition? get _activeEffect =>
-      CameraEffectsCatalog.byId(_selectedEffect);
+      CameraEffectsCatalog.bySlug(_selectedEffectSlug);
 
   @override
   void initState() {
@@ -111,21 +111,21 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   void _applyStateToUi(MediaItemEditState state) {
     _selectedFilter = state.filter;
-    _selectedEffect = state.effect;
+    _selectedEffectSlug = state.effectSlug;
     _beautyEnabled = state.beautyEnabled;
     _filterCategory = state.filterCategory;
     _filterCategorySlug = state.filterCategory.name;
   }
 
   void _saveUiToCurrentState() {
-    final effect =
-        _selectedEffect == null || _selectedEffect == CameraEffectId.none
+    final effectSlug =
+        _selectedEffectSlug == null || _selectedEffectSlug == 'none'
         ? null
-        : _selectedEffect;
+        : _selectedEffectSlug;
     _states[_currentIndex] = MediaItemEditState(
       item: _states[_currentIndex].item,
       filter: _selectedFilter,
-      effect: effect,
+      effectSlug: effectSlug,
       beautyEnabled: _beautyEnabled,
       filterCategory: _filterCategory,
     );
@@ -152,7 +152,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       final filter = state.effectiveFilter;
       final hasFilter = CameraFilterCompositor.isActiveFilter(filter);
       final hasEffect =
-          state.effect != null && state.effect != CameraEffectId.none;
+          state.effectSlug != null && state.effectSlug != 'none';
 
       if (hasFilter) {
         file = await CameraFilterCompositor.applyIfNeeded(
@@ -164,7 +164,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       if (hasEffect) {
         file = await CameraEffectCompositor.applyIfNeeded(
           input: file,
-          effectId: state.effect,
+          effectSlug: state.effectSlug,
           isVideo: isVideo,
         );
       }
@@ -188,6 +188,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             files: files,
             filterName: primaryFilterNameFromStates(_states),
             filterCategory: primaryFilterCategoryFromStates(_states),
+            effectSlug: primaryEffectSlugFromStates(_states),
+            beautyEnabled: _states.any((s) => s.beautyEnabled),
           ),
         );
         return;
@@ -216,6 +218,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           'type': type,
           'isStory': false,
           'initialSound': widget.initialSound,
+          'filterName': primaryFilterNameFromStates(_states),
+          'filterCategory': primaryFilterCategoryFromStates(_states).name,
+          'effectSlug': primaryEffectSlugFromStates(_states),
+          'beautyEnabled': _states.any((s) => s.beautyEnabled),
         },
       );
     } finally {
@@ -237,9 +243,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     });
   }
 
-  void _selectEffect(CameraEffectId? effect) {
+  void _selectEffect(String? slug) {
     setState(() {
-      _selectedEffect = effect;
+      _selectedEffectSlug = slug;
       _saveUiToCurrentState();
     });
   }
@@ -262,7 +268,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           MediaStudioPreview(
             key: ValueKey(
               '${currentItem.file.path}-$_currentIndex-'
-              '${_effectiveFilter.name}-${_selectedEffect?.name}',
+              '${_effectiveFilter.name}-$_selectedEffectSlug',
             ),
             file: currentItem.file,
             isVideo: currentItem.isVideo,
@@ -345,14 +351,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                         icon: LucideIcons.sparkles,
                         label: l10n.cameraEffects,
                         active:
-                            _selectedEffect != null &&
-                            _selectedEffect != CameraEffectId.none,
+                            _selectedEffectSlug != null &&
+                            _selectedEffectSlug != 'none',
                         onTap: _isProcessing
                             ? null
                             : () => CameraStudioSheets.showEffectsPicker(
                                 context,
                                 l10n: l10n,
-                                selectedEffect: _selectedEffect,
+                                selectedEffectSlug: _selectedEffectSlug,
                                 onSelected: _selectEffect,
                               ),
                       ),

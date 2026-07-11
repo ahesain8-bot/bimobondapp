@@ -40,6 +40,10 @@ class CreatePostUseCase implements UseCase<PostEntity, CreatePostParams> {
       soundId: params.soundId,
       originalPostId: params.originalPostId,
       media: params.media,
+      filterName: params.filterName,
+      filterCategory: params.filterCategory,
+      effectSlug: params.effectSlug,
+      beautyEnabled: params.beautyEnabled,
     );
   }
 }
@@ -70,6 +74,10 @@ class CreatePostParams extends Equatable {
   final String? soundId;
   final String? originalPostId;
   final List<PostMediaEntity>? media;
+  final String? filterName;
+  final String? filterCategory;
+  final String? effectSlug;
+  final bool? beautyEnabled;
 
   const CreatePostParams({
     this.type,
@@ -97,6 +105,10 @@ class CreatePostParams extends Equatable {
     this.soundId,
     this.originalPostId,
     this.media,
+    this.filterName,
+    this.filterCategory,
+    this.effectSlug,
+    this.beautyEnabled,
   });
 
   @override
@@ -126,5 +138,9 @@ class CreatePostParams extends Equatable {
     soundId,
     originalPostId,
     media,
+    filterName,
+    filterCategory,
+    effectSlug,
+    beautyEnabled,
   ];
 }

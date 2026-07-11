@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_compositor.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 
 /// Per-item filter/effect choices in the media studio editor.
@@ -11,14 +10,14 @@ class MediaItemEditState {
   MediaItemEditState({
     required this.item,
     AwesomeFilter? filter,
-    this.effect,
+    this.effectSlug,
     this.beautyEnabled = false,
     this.filterCategory = CameraFilterCategory.trending,
   }) : filter = filter ?? AwesomeFilter.None;
 
   final GalleryMediaItem item;
   final AwesomeFilter filter;
-  final CameraEffectId? effect;
+  final String? effectSlug;
   final bool beautyEnabled;
   final CameraFilterCategory filterCategory;
 
@@ -33,14 +32,14 @@ class MediaItemEditState {
 
   MediaItemEditState copyWith({
     AwesomeFilter? filter,
-    CameraEffectId? effect,
+    String? effectSlug,
     bool? beautyEnabled,
     CameraFilterCategory? filterCategory,
   }) {
     return MediaItemEditState(
       item: item,
       filter: filter ?? this.filter,
-      effect: effect,
+      effectSlug: effectSlug,
       beautyEnabled: beautyEnabled ?? this.beautyEnabled,
       filterCategory: filterCategory ?? this.filterCategory,
     );
@@ -59,7 +58,7 @@ class MediaItemEditState {
       filter: seed.filterName != null
           ? CameraFilterCatalog.filterByName(seed.filterName!)
           : null,
-      effect: seed.effect,
+      effectSlug: seed.effectSlug,
       beautyEnabled: seed.beautyEnabled,
       filterCategory: seed.filterCategory,
     );
@@ -88,48 +87,59 @@ CameraFilterCategory primaryFilterCategoryFromStates(
   return CameraFilterCategory.trending;
 }
 
+String? primaryEffectSlugFromStates(List<MediaItemEditState> states) {
+  for (final state in states) {
+    final slug = state.effectSlug;
+    if (slug != null && slug.isNotEmpty && slug != 'none') return slug;
+  }
+  return null;
+}
+
 /// Export result from the media studio editor.
 class MediaStudioExportResult {
   const MediaStudioExportResult({
     required this.files,
     this.filterName,
     this.filterCategory = CameraFilterCategory.trending,
+    this.effectSlug,
+    this.beautyEnabled = false,
   });
 
   final List<File> files;
   final String? filterName;
   final CameraFilterCategory filterCategory;
+  final String? effectSlug;
+  final bool beautyEnabled;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.
 class MediaEditorSeed {
   const MediaEditorSeed({
     this.filterName,
-    this.effect,
+    this.effectSlug,
     this.beautyEnabled = false,
     this.filterCategory = CameraFilterCategory.trending,
   });
 
   final String? filterName;
-  final CameraEffectId? effect;
+  final String? effectSlug;
   final bool beautyEnabled;
   final CameraFilterCategory filterCategory;
 
   Map<String, dynamic> toExtra() => {
     if (filterName != null) 'filterName': filterName,
-    if (effect != null) 'effect': effect!.name,
+    if (effectSlug != null) 'effectSlug': effectSlug,
     'beautyEnabled': beautyEnabled,
     'filterCategory': filterCategory.name,
   };
 
   static MediaEditorSeed? fromExtra(Object? raw) {
     if (raw is! Map<String, dynamic>) return null;
-    final effectName = raw['effect'] as String?;
+    final legacyEffect = raw['effect'] as String?;
+    final effectSlug = raw['effectSlug'] as String? ?? legacyEffect;
     return MediaEditorSeed(
       filterName: raw['filterName'] as String?,
-      effect: effectName == null
-          ? null
-          : CameraEffectId.values.asNameMap()[effectName],
+      effectSlug: effectSlug,
       beautyEnabled: raw['beautyEnabled'] as bool? ?? false,
       filterCategory:
           CameraFilterCategory.values.asNameMap()[raw['filterCategory']

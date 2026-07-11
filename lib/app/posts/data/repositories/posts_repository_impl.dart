@@ -227,6 +227,10 @@ class PostsRepositoryImpl implements PostsRepository {
     String? soundId,
     String? originalPostId,
     List<PostMediaEntity>? media,
+    String? filterName,
+    String? filterCategory,
+    String? effectSlug,
+    bool? beautyEnabled,
   }) async {
     try {
       final postData = {
@@ -258,6 +262,10 @@ class PostsRepositoryImpl implements PostsRepository {
           'media': media
               .map((e) => PostMediaModel.fromEntity(e).toJson())
               .toList(),
+        if (filterName != null) 'filterName': filterName,
+        if (filterCategory != null) 'filterCategory': filterCategory,
+        if (effectSlug != null && effectSlug != 'none') 'effectSlug': effectSlug,
+        if (beautyEnabled != null) 'beautyEnabled': beautyEnabled,
       };
 
       final postModel = await remoteDataSource.createPost(postData);

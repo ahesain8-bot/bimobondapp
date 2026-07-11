@@ -186,7 +186,9 @@ class CameraFilterCatalog {
     if (!hasCatalog) return const [];
     for (final category in _sortedFilterCategories) {
       if (category.slug == slug) {
-        return category.filters.map(presetFromEntity).toList(growable: false);
+        final filters = List<CameraFilterEntity>.from(category.filters)
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        return filters.map(presetFromEntity).toList(growable: false);
       }
     }
     return const [];
@@ -215,6 +217,7 @@ class CameraFilterCatalog {
       previewColor: parsePreviewColorHex(entity.previewColorHex),
       slug: entity.slug,
       isOriginal: entity.isOriginal,
+      colorMatrix: entity.colorMatrix,
     );
   }
 

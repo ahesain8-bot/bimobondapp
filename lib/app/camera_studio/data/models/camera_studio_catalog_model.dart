@@ -45,6 +45,8 @@ class CameraStudioCatalogModel extends CameraStudioCatalogEntity {
                           'thumbnailUrl': filter.thumbnailUrl,
                         if (filter.previewColorHex != null)
                           'previewColorHex': filter.previewColorHex,
+                        if (filter.colorMatrix != null)
+                          'colorMatrix': filter.colorMatrix,
                         'isOriginal': filter.isOriginal,
                         'isBeautyDefault': filter.isBeautyDefault,
                         'sortOrder': filter.sortOrder,
@@ -67,10 +69,27 @@ class CameraStudioCatalogModel extends CameraStudioCatalogEntity {
                         'slug': effect.slug,
                         'effectType': effect.effectType,
                         if (effect.emoji != null) 'emoji': effect.emoji,
+                        if (effect.assetUrl != null) 'assetUrl': effect.assetUrl,
                         'previewColorHex': effect.previewColorHex,
                         'labelKey': effect.labelKey,
                         'requiresFaceDetection': effect.requiresFaceDetection,
                         'isScreenEffect': effect.isScreenEffect,
+                        if (effect.anchorType != null)
+                          'anchorType': effect.anchorType,
+                        if (effect.anchorLandmarks.isNotEmpty)
+                          'anchorLandmarks': effect.anchorLandmarks,
+                        if (effect.scaleFactor != null)
+                          'scaleFactor': effect.scaleFactor,
+                        if (effect.offsetX != null) 'offsetX': effect.offsetX,
+                        if (effect.offsetY != null) 'offsetY': effect.offsetY,
+                        if (effect.landmarkSize != null)
+                          'landmarkSize': effect.landmarkSize,
+                        if (effect.fallbackAnchorType != null)
+                          'fallbackAnchorType': effect.fallbackAnchorType,
+                        if (effect.fallbackOffsetY != null)
+                          'fallbackOffsetY': effect.fallbackOffsetY,
+                        if (effect.fallbackScaleFactor != null)
+                          'fallbackScaleFactor': effect.fallbackScaleFactor,
                         'sortOrder': effect.sortOrder,
                       },
                     )
@@ -161,6 +180,48 @@ class CameraStudioCatalogModel extends CameraStudioCatalogEntity {
       );
     }
 
+    CameraEffectEntity effect(
+      String slug,
+      String effectType, {
+      String? emoji,
+      String? assetUrl,
+      required String previewColorHex,
+      required String labelKey,
+      bool requiresFaceDetection = false,
+      bool isScreenEffect = false,
+      String? anchorType,
+      List<String> anchorLandmarks = const [],
+      double? scaleFactor,
+      double? offsetX,
+      double? offsetY,
+      double? landmarkSize,
+      String? fallbackAnchorType,
+      double? fallbackOffsetY,
+      double? fallbackScaleFactor,
+      int sortOrder = 0,
+    }) {
+      return CameraEffectEntity(
+        slug: slug,
+        effectType: effectType,
+        emoji: emoji,
+        assetUrl: assetUrl,
+        previewColorHex: previewColorHex,
+        labelKey: labelKey,
+        requiresFaceDetection: requiresFaceDetection,
+        isScreenEffect: isScreenEffect,
+        anchorType: anchorType,
+        anchorLandmarks: anchorLandmarks,
+        scaleFactor: scaleFactor,
+        offsetX: offsetX,
+        offsetY: offsetY,
+        landmarkSize: landmarkSize,
+        fallbackAnchorType: fallbackAnchorType,
+        fallbackOffsetY: fallbackOffsetY,
+        fallbackScaleFactor: fallbackScaleFactor,
+        sortOrder: sortOrder,
+      );
+    }
+
     return CameraStudioCatalogModel(
       version: 'bundled',
       filterCategories: [
@@ -220,76 +281,106 @@ class CameraStudioCatalogModel extends CameraStudioCatalogEntity {
           labelKey: 'cameraCategoryTrending',
           sortOrder: 0,
           effects: [
-            const CameraEffectEntity(
-              slug: 'none',
-              effectType: 'face_ar',
+            effect(
+              'none',
+              'face_ar',
               emoji: '○',
               previewColorHex: '#555555',
               labelKey: 'cameraFilterOriginal',
             ),
-            const CameraEffectEntity(
-              slug: 'crown',
-              effectType: 'face_ar',
+            effect(
+              'crown',
+              'face_ar',
               emoji: '👑',
               previewColorHex: '#FFD700',
               labelKey: 'cameraEffectCrown',
               requiresFaceDetection: true,
+              anchorType: 'above_face',
+              scaleFactor: 1.1,
+              offsetY: -0.55,
+              sortOrder: 1,
             ),
-            const CameraEffectEntity(
-              slug: 'bunny',
-              effectType: 'face_ar',
+            effect(
+              'bunny',
+              'face_ar',
               emoji: '🐰',
               previewColorHex: '#F8BBD0',
               labelKey: 'cameraEffectBunny',
               requiresFaceDetection: true,
+              anchorType: 'dual_above_face',
+              scaleFactor: 0.35,
+              offsetX: 0.22,
+              offsetY: -0.15,
+              sortOrder: 2,
             ),
-            const CameraEffectEntity(
-              slug: 'sunglasses',
-              effectType: 'face_ar',
+            effect(
+              'sunglasses',
+              'face_ar',
               emoji: '😎',
+              assetUrl: 'assets/images/sunglasses.png',
               previewColorHex: '#37474F',
               labelKey: 'cameraEffectSunglasses',
               requiresFaceDetection: true,
+              anchorType: 'between_landmarks',
+              anchorLandmarks: ['leftEye', 'rightEye'],
+              scaleFactor: 2.5,
+              offsetY: -0.06,
+              fallbackAnchorType: 'on_face',
+              fallbackOffsetY: -0.2,
+              fallbackScaleFactor: 1,
+              sortOrder: 3,
             ),
-            const CameraEffectEntity(
-              slug: 'dog',
-              effectType: 'face_ar',
+            effect(
+              'dog',
+              'face_ar',
               emoji: '🐶',
               previewColorHex: '#8D6E63',
               labelKey: 'cameraEffectDog',
               requiresFaceDetection: true,
+              anchorType: 'cover_face',
+              scaleFactor: 1,
+              sortOrder: 4,
             ),
-            const CameraEffectEntity(
-              slug: 'hearts',
-              effectType: 'face_ar',
+            effect(
+              'hearts',
+              'face_ar',
               emoji: '💕',
               previewColorHex: '#E91E63',
               labelKey: 'cameraEffectHearts',
               requiresFaceDetection: true,
+              anchorType: 'on_face',
+              scaleFactor: 1,
+              sortOrder: 5,
             ),
-            const CameraEffectEntity(
-              slug: 'sparkle',
-              effectType: 'screen_overlay',
+            effect(
+              'sparkle',
+              'screen_overlay',
               emoji: '✨',
               previewColorHex: '#CE93D8',
               labelKey: 'cameraEffectSparkle',
               isScreenEffect: true,
+              anchorType: 'screen',
+              sortOrder: 6,
             ),
-            const CameraEffectEntity(
-              slug: 'neon',
-              effectType: 'screen_overlay',
+            effect(
+              'neon',
+              'screen_overlay',
               emoji: '💜',
               previewColorHex: '#7C4DFF',
               labelKey: 'cameraEffectNeon',
               isScreenEffect: true,
+              anchorType: 'screen',
+              sortOrder: 7,
             ),
-            const CameraEffectEntity(
-              slug: 'glitch',
-              effectType: 'screen_overlay',
+            effect(
+              'glitch',
+              'screen_overlay',
               emoji: '⚡',
               previewColorHex: '#00E5FF',
               labelKey: 'cameraEffectGlitch',
               isScreenEffect: true,
+              anchorType: 'screen',
+              sortOrder: 8,
             ),
           ],
         ),
@@ -341,6 +432,7 @@ class CameraFilterModel extends CameraFilterEntity {
     super.isOriginal,
     super.isBeautyDefault,
     super.sortOrder,
+    super.colorMatrix,
   });
 
   factory CameraFilterModel.fromJson(Map<String, dynamic> json) {
@@ -356,6 +448,7 @@ class CameraFilterModel extends CameraFilterEntity {
       isOriginal: json['isOriginal'] == true,
       isBeautyDefault: json['isBeautyDefault'] == true,
       sortOrder: _readInt(json['sortOrder']),
+      colorMatrix: _readColorMatrix(json['colorMatrix']),
     );
   }
 }
@@ -396,26 +489,65 @@ class CameraEffectModel extends CameraEffectEntity {
     required super.slug,
     required super.effectType,
     super.emoji,
+    super.assetUrl,
     required super.previewColorHex,
     required super.labelKey,
     super.requiresFaceDetection,
     super.isScreenEffect,
+    super.anchorType,
+    super.anchorLandmarks,
+    super.scaleFactor,
+    super.offsetX,
+    super.offsetY,
+    super.landmarkSize,
+    super.fallbackAnchorType,
+    super.fallbackOffsetY,
+    super.fallbackScaleFactor,
     super.sortOrder,
   });
 
   factory CameraEffectModel.fromJson(Map<String, dynamic> json) {
+    final landmarksRaw = json['anchorLandmarks'];
+    final landmarks = landmarksRaw is List
+        ? landmarksRaw.map((e) => e.toString()).toList(growable: false)
+        : const <String>[];
+
     return CameraEffectModel(
       id: json['id']?.toString(),
       slug: json['slug']?.toString() ?? '',
       effectType: json['effectType']?.toString() ?? 'face_ar',
       emoji: json['emoji']?.toString(),
+      assetUrl: json['assetUrl']?.toString(),
       previewColorHex: json['previewColorHex']?.toString() ?? '#7A7A7A',
       labelKey: json['labelKey']?.toString() ?? '',
       requiresFaceDetection: json['requiresFaceDetection'] == true,
-      isScreenEffect: json['isScreenEffect'] == true,
+      isScreenEffect:
+          json['isScreenEffect'] == true ||
+          (json['effectType']?.toString().toLowerCase() == 'screen_overlay'),
+      anchorType: json['anchorType']?.toString(),
+      anchorLandmarks: landmarks,
+      scaleFactor: _readDouble(json['scaleFactor']),
+      offsetX: _readDouble(json['offsetX']),
+      offsetY: _readDouble(json['offsetY']),
+      landmarkSize: _readDouble(json['landmarkSize']),
+      fallbackAnchorType: json['fallbackAnchorType']?.toString(),
+      fallbackOffsetY: _readDouble(json['fallbackOffsetY']),
+      fallbackScaleFactor: _readDouble(json['fallbackScaleFactor']),
       sortOrder: _readInt(json['sortOrder']),
     );
   }
+}
+
+double? _readDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
+List<double>? _readColorMatrix(dynamic raw) {
+  if (raw is! List) return null;
+  final values = raw.whereType<num>().map((value) => value.toDouble()).toList();
+  return values.length >= 20 ? values : null;
 }
 
 int _readInt(dynamic value) {
