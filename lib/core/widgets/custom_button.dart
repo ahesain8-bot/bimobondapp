@@ -22,7 +22,7 @@ class CustomButton extends StatelessWidget {
 
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: AppSizes.buttonHeightMd,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -40,7 +40,7 @@ class CustomButton extends StatelessWidget {
           ),
         ),
         child: isLoading
-            ? const CustomLoadingWidget(size: 40)
+            ? const CustomLoadingWidget(size: 32)
             : Text(
                 text,
                 style: const TextStyle(

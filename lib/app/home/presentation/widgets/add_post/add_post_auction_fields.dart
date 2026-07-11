@@ -239,7 +239,7 @@ class _AuctionFormHeader extends StatelessWidget {
         children: [
           Container(
             width: 44,
-            height: 44,
+            height: AppSizes.buttonHeightSm,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [colorScheme.primary, colorScheme.secondary],

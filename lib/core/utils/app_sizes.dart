@@ -12,6 +12,16 @@ class AppSizes {
   static const double p32 = 32.0;
   static const double p48 = 48.0;
 
+  // Button heights
+  static const double buttonHeightLg = 46;
+  static const double buttonHeightMd = 44;
+  static const double buttonHeightSm = 40;
+  static const double buttonHeightXs = 36;
+
+  /// Shared height for auth inputs, method buttons, and primary actions.
+  static const double authControlHeight = buttonHeightSm;
+  static const double authControlFontSize = 15;
+
   // Border Radius
   static const double radiusSm = 8.0;
   static const double radiusMd = 12.0;

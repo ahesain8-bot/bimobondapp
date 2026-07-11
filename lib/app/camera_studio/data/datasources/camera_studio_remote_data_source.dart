@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 
 abstract class CameraStudioRemoteDataSource {
   Future<CameraStudioCatalogModel> getCatalog();
+  Future<Map<String, dynamic>> getEffectPlacementSchema();
 }
 
 class CameraStudioRemoteDataSourceImpl implements CameraStudioRemoteDataSource {
@@ -40,6 +41,27 @@ class CameraStudioRemoteDataSourceImpl implements CameraStudioRemoteDataSource {
         message:
             _extractErrorMessage(response.data) ??
             'Failed to load camera studio catalog',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getEffectPlacementSchema() async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.cameraStudioEffectPlacementSchema,
+      );
+      if (response.statusCode == 200) {
+        final body = response.data;
+        if (body is Map<String, dynamic>) return body;
+        if (body is Map) return Map<String, dynamic>.from(body);
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ??
+            'Failed to load effect placement schema',
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);

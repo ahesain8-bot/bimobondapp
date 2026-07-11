@@ -9,16 +9,16 @@ import 'package:go_router/go_router.dart';
 class LoginMethodsButtons extends StatelessWidget {
   const LoginMethodsButtons({
     required this.l10n,
-    required this.onEmailUsernamePressed,
     required this.onGooglePressed,
     required this.onApplePressed,
+    this.emailRouteName = 'email_login',
     super.key,
   });
 
   final AppLocalizations l10n;
-  final VoidCallback onEmailUsernamePressed;
   final VoidCallback onGooglePressed;
   final VoidCallback onApplePressed;
+  final String emailRouteName;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +49,7 @@ class LoginMethodsButtons extends StatelessWidget {
           label: l10n.loginWithEmailUsername,
           backgroundColor: buttonColor,
           borderColor: borderColor,
-          onPressed: onEmailUsernamePressed,
+          onPressed: () => context.pushNamed(emailRouteName),
           icon: Icon(Icons.alternate_email_rounded, size: 22, color: onSurface),
         ),
         const SizedBox(height: AppSizes.p12),
@@ -91,7 +91,7 @@ class _LoginMethodButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 48,
+      height: AppSizes.authControlHeight,
       width: double.infinity,
       child: OutlinedButton(
         onPressed: onPressed,
@@ -111,7 +111,7 @@ class _LoginMethodButton extends StatelessWidget {
             CustomText(
               label,
               fontSize: 15,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               textAlign: TextAlign.center,
             ),
           ],

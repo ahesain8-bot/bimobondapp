@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/pages/sound_detail_screen.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:flutter/material.dart';
 
 /// Opens the TikTok-style sound page above modals (e.g. the sound picker sheet).
@@ -10,22 +11,28 @@ Future<SoundEntity?> openSoundDetail(
   required String soundId,
   bool pickMode = false,
   SoundEntity? preview,
-}) {
-  if (soundId.isEmpty) return Future.value(null);
+}) async {
+  if (soundId.isEmpty) return null;
 
   final navigatorContext =
       AppRouter.rootNavigatorKey.currentContext ?? context;
 
-  return Navigator.of(navigatorContext, rootNavigator: true).push<SoundEntity>(
-    MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => SoundDetailScreen(
-        soundId: soundId,
-        pickMode: pickMode,
-        previewSound: preview,
+  FeedPlaybackGate.instance.setBlocked(true);
+  try {
+    return await Navigator.of(navigatorContext, rootNavigator: true)
+        .push<SoundEntity>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => SoundDetailScreen(
+          soundId: soundId,
+          pickMode: pickMode,
+          previewSound: preview,
+        ),
       ),
-    ),
-  );
+    );
+  } finally {
+    FeedPlaybackGate.instance.syncFromRouter();
+  }
 }
 
 /// Pops a sound detail page opened via [openSoundDetail].

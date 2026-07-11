@@ -20,6 +20,8 @@ class AppAssets {
       '$iconsPath/mobile-phone-svgrepo-com (1).svg';
   static const String googleIcon = '$iconsPath/google-color-svgrepo-com.svg';
   static const String chatNavIcon = '$iconsPath/chat_icon.png';
+  static const String feedSearchIcon = '$iconsPath/feed_search.svg';
+  static const String feedLiveIcon = '$iconsPath/feed_live.svg';
 
   static const String shareMessengerIcon = '$iconsPath/share_messenger.svg';
   static const String shareFacebookIcon = '$iconsPath/share_facebook.svg';

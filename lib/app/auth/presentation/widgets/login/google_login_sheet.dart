@@ -84,7 +84,7 @@ class _GoogleLoginSheetBody extends StatelessWidget {
               onTap: () => Navigator.pop(context, true),
               borderRadius: BorderRadius.circular(AppSizes.radiusLg),
               child: SizedBox(
-                height: 52,
+                height: AppSizes.buttonHeightMd,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -119,7 +119,7 @@ class _GoogleLoginSheetBody extends StatelessWidget {
               onTap: () => Navigator.pop(context, false),
               borderRadius: BorderRadius.circular(AppSizes.radiusLg),
               child: SizedBox(
-                height: 48,
+                height: AppSizes.buttonHeightSm,
                 child: Center(
                   child: Text(
                     l10n.cancel,

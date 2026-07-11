@@ -1263,7 +1263,7 @@ class PromotePostScreenSkeleton extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: SkeletonWidget(
-                height: 50,
+                height: AppSizes.buttonHeightMd,
                 borderRadius: AppSizes.radiusMd,
               ),
             ),
@@ -1309,7 +1309,7 @@ class PromoteBottomBar extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: SizedBox(
             width: double.infinity,
-            height: 50,
+            height: AppSizes.buttonHeightMd,
             child: FilledButton(
               onPressed: isLoading ? null : onPressed,
               style: FilledButton.styleFrom(

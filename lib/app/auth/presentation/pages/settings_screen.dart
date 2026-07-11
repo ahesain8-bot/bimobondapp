@@ -64,6 +64,11 @@ class SettingsScreen extends StatelessWidget {
                 title: l10n.walletTitle,
                 onTap: () => context.pushNamed('wallet'),
               ),
+              _SettingsTile(
+                icon: LucideIcons.circleDollarSign,
+                title: l10n.balanceTitle,
+                onTap: () => context.pushNamed('balance'),
+              ),
             ],
           ),
           const SizedBox(height: SettingsLayoutConstants.groupSpacing),

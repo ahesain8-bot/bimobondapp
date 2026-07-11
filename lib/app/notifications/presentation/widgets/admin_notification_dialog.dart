@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:bimobondapp/app/notifications/domain/entities/notification_entity.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_display_text.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -119,7 +120,7 @@ class _GlassNotificationDialog extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               child: const SizedBox(
                 width: 58,
-                height: 58,
+                height: AppSizes.buttonHeightLg,
                 child: Icon(
                   LucideIcons.bell,
                   color: _textColor,

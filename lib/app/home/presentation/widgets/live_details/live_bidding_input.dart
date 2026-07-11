@@ -67,7 +67,7 @@ class LiveBiddingInput extends StatelessWidget {
                 GestureDetector(
                   onTap: onGift,
                   child: Container(
-                    height: 48,
+                    height: AppSizes.buttonHeightSm,
                     width: 48,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
@@ -111,7 +111,7 @@ class LiveBiddingInput extends StatelessWidget {
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                       child: Container(
-                        height: 48,
+                        height: AppSizes.buttonHeightSm,
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(30),
@@ -176,7 +176,7 @@ class LiveBiddingInput extends StatelessWidget {
                 child: Opacity(
                   opacity: enabled ? 1 : 0.45,
                   child: Container(
-                    height: 48,
+                    height: AppSizes.buttonHeightSm,
                     width: 48,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

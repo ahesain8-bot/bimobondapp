@@ -93,7 +93,7 @@ class ForgotPasswordView extends StatelessWidget {
                           : CustomText(
                               l10n.forgotPasswordButton,
                               color: Colors.white,
-                              fontSize: 19,
+                              fontSize: AppSizes.authControlFontSize,
                               fontWeight: FontWeight.bold,
                             ),
                     ),

@@ -50,7 +50,7 @@ class AddPostPublishBar extends StatelessWidget {
           ),
           child: SizedBox(
             width: double.infinity,
-            height: 52,
+            height: AppSizes.buttonHeightMd,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: isLoading

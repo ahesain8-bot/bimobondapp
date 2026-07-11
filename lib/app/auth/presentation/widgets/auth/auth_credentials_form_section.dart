@@ -32,7 +32,6 @@ class AuthCredentialsFormSection extends StatelessWidget {
         LiquidGlassAuthTextField(
           controller: emailController,
           hintText: l10n.loginEmailUsernameHint,
-          icon: Icons.alternate_email_outlined,
           keyboardType: TextInputType.text,
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
@@ -89,6 +88,13 @@ class AuthCredentialsFormSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSizes.p16),
+        CustomText(
+          l10n.emailLoginUsageNote,
+          variant: TextVariant.secondary,
+          fontSize: 12,
+          textAlign: TextAlign.start,
+        ),
+        const SizedBox(height: AppSizes.p16),
         LiquidGlassAuthPrimaryButton(
           onPressed: isLoading ? null : onSubmit,
           enabled: !isLoading,
@@ -97,7 +103,7 @@ class AuthCredentialsFormSection extends StatelessWidget {
               : CustomText(
                   submitLabel,
                   color: Colors.white,
-                  fontSize: 19,
+                  fontSize: AppSizes.authControlFontSize,
                   fontWeight: FontWeight.bold,
                 ),
         ),

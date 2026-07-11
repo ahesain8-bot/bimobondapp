@@ -12,6 +12,7 @@ class HomeLayoutConstants {
   static const double navItemBottomPadding = 4;
 
   static const double liveIconSize = 28;
+  static const double feedTopBarHeight = 44;
   static const double feedTopTabsTopPadding = 16;
   static const double feedOverlayHorizontalPadding = 8;
 

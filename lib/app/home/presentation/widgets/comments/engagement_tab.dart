@@ -10,7 +10,7 @@ class EngagementTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tab(
-      height: 48,
+      height: AppSizes.buttonHeightSm,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.p8,

@@ -77,7 +77,7 @@ class _RepostSheetBodyState extends State<_RepostSheetBody> {
                       children: [
                         Container(
                           width: 44,
-                          height: 44,
+                          height: AppSizes.buttonHeightSm,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: const Color(0xFF2ECC71).withValues(alpha: 0.18),

@@ -1,6 +1,4 @@
-import 'package:bimobondapp/app/auth/presentation/widgets/phone_login/phone_login_hero.dart';
-import 'package:bimobondapp/app/auth/presentation/widgets/phone_login/phone_login_toolbar.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/phone_login/phone_login_toolbar.dart';import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_auth_widgets.dart';
@@ -86,6 +84,14 @@ class PhoneLoginView extends StatelessWidget {
                       },
                     ),
                     const SizedBox(height: AppSizes.p24),
+                    CustomText(
+                      l10n.phoneLoginUsageNote,
+                      variant: TextVariant.secondary,
+                      fontSize: 12,
+                      textAlign: TextAlign.start,
+                    ),
+                    const SizedBox(height: AppSizes.p16),
+
                     LiquidGlassAuthPrimaryButton(
                       onPressed: isLoading ? null : onContinuePressed,
                       enabled: !isLoading,
@@ -94,29 +100,9 @@ class PhoneLoginView extends StatelessWidget {
                           : CustomText(
                               l10n.continueAction,
                               color: Colors.white,
-                              fontSize: 19,
+                              fontSize: AppSizes.authControlFontSize,
                               fontWeight: FontWeight.bold,
                             ),
-                    ),
-                    const SizedBox(height: AppSizes.p24),
-                    Center(
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          CustomText(
-                            l10n.termsAndConditionsPart1,
-                            variant: TextVariant.secondary,
-                            fontSize: 12,
-                            textAlign: TextAlign.center,
-                          ),
-                          CustomText(
-                            l10n.termsAndConditionsPart2,
-                            color: theme.colorScheme.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ],
-                      ),
                     ),
                     const SizedBox(height: AppSizes.p24),
                   ],

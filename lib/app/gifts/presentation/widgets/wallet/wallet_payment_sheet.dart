@@ -205,7 +205,7 @@ class _WalletPaymentSheetState extends State<WalletPaymentSheet> {
               const SizedBox(height: AppSizes.p20),
               WalletGlassPrimaryButton(
                 enabled: !_processing,
-                height: 46,
+                height: AppSizes.buttonHeightSm,
                 onPressed: _processing ? null : _submit,
                 child: _processing
                     ? Row(

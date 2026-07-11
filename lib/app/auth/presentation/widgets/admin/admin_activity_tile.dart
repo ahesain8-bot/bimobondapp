@@ -113,7 +113,7 @@ class _AdminActivityTypeAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 48,
-      height: 48,
+      height: AppSizes.buttonHeightSm,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -156,7 +156,7 @@ class _AdminActivityTrailing extends StatelessWidget {
         child: SafeNetworkImage(
           imageUrl: thumbnailUrl!,
           width: 52,
-          height: 52,
+          height: AppSizes.buttonHeightMd,
           fit: BoxFit.cover,
           errorIcon: Icons.image_outlined,
         ),

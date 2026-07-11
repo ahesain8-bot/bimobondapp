@@ -74,7 +74,7 @@ class FaceDetector {
     await _ensureTFLiteLoaded();
     try {
       _detector = await FaceDetection.create(
-        FaceDetectionModel.frontCamera,
+        model,
         options: options,
         useIsolate: true,
       );
@@ -85,7 +85,10 @@ class FaceDetector {
     }
   }
 
-  Future<List<Detection>> _detectDetections(Uint8List imageBytes) async {
+  Future<List<Detection>> _detectDetections(
+    Uint8List imageBytes, {
+    RectF? roi,
+  }) async {
     final d = _detector;
     if (d == null) {
       throw StateError(
@@ -94,7 +97,7 @@ class FaceDetector {
     }
 
     final decodedInfo = await _decodeImageOffUi(imageBytes);
-    final dets = await d.call(imageBytes);
+    final dets = await d.call(imageBytes, roi: roi);
     if (dets.isEmpty) return dets;
 
     final imgW = decodedInfo.width.toDouble();
@@ -114,6 +117,7 @@ class FaceDetector {
   Future<PipelineResult> detectFaces(
     Uint8List imageBytes, {
     FaceDetectionMode mode = FaceDetectionMode.fast,
+    RectF? roi,
   }) async {
     // Mesh / iris modes are unsupported in this slim package; always use
     // detector keypoints (equivalent to FaceDetectionMode.fast).
@@ -122,7 +126,7 @@ class FaceDetector {
       decodedInfo.width.toDouble(),
       decodedInfo.height.toDouble(),
     );
-    final dets = await _detectDetections(imageBytes);
+    final dets = await _detectDetections(imageBytes, roi: roi);
 
     final faces = dets
         .map(

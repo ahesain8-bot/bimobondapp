@@ -1,4 +1,6 @@
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_tool_icons.dart';
 import 'package:flutter/material.dart';
 
 class CameraEffectChip extends StatelessWidget {
@@ -21,13 +23,14 @@ class CameraEffectChip extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children: [
-          Container(
-            width: 64,
-            height: 64,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: selected ? 66 : 60,
+            height: selected ? 66 : 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? Colors.redAccent : Colors.white24,
+                color: selected ? Colors.white : Colors.white24,
                 width: selected ? 2.5 : 1,
               ),
               gradient: RadialGradient(
@@ -36,15 +39,19 @@ class CameraEffectChip extends StatelessWidget {
                   effect.previewColor.withValues(alpha: 0.35),
                 ],
               ),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
+            clipBehavior: Clip.antiAlias,
             alignment: Alignment.center,
-            child: Text(
-              effect.emoji,
-              style: TextStyle(
-                fontSize: effect.isNone ? 20 : 28,
-                color: effect.isNone ? Colors.white54 : null,
-              ),
-            ),
+            child: _EffectChipIcon(effect: effect),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -54,15 +61,51 @@ class CameraEffectChip extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: CameraToolIcons.labelStyle.copyWith(
                 color: selected ? Colors.white : Colors.white70,
-                fontSize: 11,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EffectChipIcon extends StatelessWidget {
+  const _EffectChipIcon({required this.effect});
+
+  final CameraEffectDefinition effect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (effect.isNone) {
+      return const Icon(Icons.block, color: Colors.white54, size: 22);
+    }
+
+    if (effect.hasAsset) {
+      return CameraEffectAssetLoader.preview(
+        raw: effect.assetUrl,
+        emojiFallback: effect.emoji,
+        size: 64,
+      );
+    }
+
+    return _EmojiFallback(effect: effect);
+  }
+}
+
+class _EmojiFallback extends StatelessWidget {
+  const _EmojiFallback({required this.effect});
+
+  final CameraEffectDefinition effect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      effect.emoji,
+      style: const TextStyle(fontSize: 28),
     );
   }
 }
@@ -77,7 +120,7 @@ class CameraEffectsPickerStrip extends StatelessWidget {
   });
 
   final List<CameraEffectDefinition> effects;
-  final CameraEffectId? selected;
+  final String? selected;
   final String Function(CameraEffectDefinition effect) labelBuilder;
   final ValueChanged<CameraEffectDefinition> onSelected;
 
@@ -95,7 +138,7 @@ class CameraEffectsPickerStrip extends StatelessWidget {
           return CameraEffectChip(
             effect: effect,
             label: labelBuilder(effect),
-            selected: selected == effect.id,
+            selected: selected == effect.slug,
             onTap: () => onSelected(effect),
           );
         },
@@ -142,17 +185,29 @@ class CameraRecordingBadge extends StatelessWidget {
       right: 0,
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.85),
+            color: Colors.black.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFE2C55),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: CameraToolIcons.labelStyle.copyWith(fontSize: 13),
+              ),
+            ],
           ),
         ),
       ),

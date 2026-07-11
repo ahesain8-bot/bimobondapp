@@ -19,6 +19,7 @@ import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dar
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -66,17 +67,22 @@ class VideoPostWidget extends StatefulWidget {
 
 class _VideoPostWidgetState extends State<VideoPostWidget>
     with TickerProviderStateMixin {
-  static const double _actionButtonSize = 40;
-  static const double _actionIconSize = 21;
-  static const double _actionLabelSize = 11;
-  static const double _actionSpacing = 14;
-  static const double _actionColumnInset = 10;
-  static const double _contentActionGap = 16;
+  static const double _actionIconSize = 35;
+  static const double _actionLabelSize = 12;
+  static const double _actionSpacing = 20;
+  static const double _actionHitWidth = 48;
+  static const double _actionColumnInset = 8;
+  static const double _contentActionGap = 12;
   static const double _contentActionSidePadding =
-      _actionColumnInset + _actionButtonSize + _contentActionGap;
+      _actionColumnInset + _actionHitWidth + _contentActionGap;
   static const double _contentEdgeInset = 16;
-  static const double _profileAvatarRadius = 20;
-  static const double _musicDiscSize = 38;
+  static const double _profileAvatarRadius = 24;
+  static const double _musicDiscSize = 40;
+  static const Color _tikTokLikeRed = Color(0xFFFE2C55);
+  static const Color _tikTokSaveYellow = Color(0xFFFACC15);
+  static const List<Shadow> _actionTextShadow = [
+    Shadow(color: Color(0x99000000), blurRadius: 6, offset: Offset(0, 1)),
+  ];
 
   int _currentPage = 0;
   late AnimationController _musicController;
@@ -485,15 +491,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       isOwner: _isPostOwner(),
       onEdit: _isPostOwner() ? _openEditPost : null,
       onPromote: _isPostOwner() && widget.post.canBePromoted
-          ? () => context.pushNamed('promote_post', extra: widget.post)
+          ? () => context.pushFromFeed('promote_post', extra: widget.post)
           : null,
       onDelete: _isPostOwner() ? _confirmDeletePost : null,
+      onRepost: _isPostOwner() ? null : _handleRepostTap,
+      isReposted: _isReposted,
     );
   }
 
   Future<void> _openEditPost() async {
     if (!_checkAuth() || !_isPostOwner()) return;
-    await context.pushNamed<PostEntity>('edit_post', extra: widget.post);
+    await context.pushFromFeed<PostEntity>('edit_post', extra: widget.post);
   }
 
   void _confirmDeletePost() {
@@ -881,51 +889,27 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   : CrossAxisAlignment.start,
               children: [
                 _buildProfileAvatar(post.user?.avatarUrl, theme),
-                const SizedBox(height: 18),
-                _buildLikeButton(theme),
+                const SizedBox(height: 22),
+                _buildLikeButton(),
                 const SizedBox(height: _actionSpacing),
-                _buildActionButton(
-                  icon: LucideIcons.messageCircle,
-                  label: '',
+                _buildTikTokAction(
+                  icon: LucideIcons.messageCircleMore400,
+                  label: _formatCount(widget.post.commentCount),
                   color: Colors.white,
                   onTap: _showComments,
                 ),
                 const SizedBox(height: _actionSpacing),
-
-                if (!_isPostOwner()) ...[
-                  const SizedBox(height: _actionSpacing),
-                  _buildActionButton(
-                    icon: LucideIcons.repeat2,
-                    label: _formatCount(_repostCount),
-                    color: _isReposted ? const Color(0xFF2ECC71) : Colors.white,
-                    activeBackgroundColor: _isReposted
-                        ? const Color(0xFF2ECC71).withValues(alpha: 0.22)
-                        : null,
-                    activeBorderColor: _isReposted
-                        ? const Color(0xFF2ECC71).withValues(alpha: 0.65)
-                        : null,
-                    onTap: _handleRepostTap,
-                  ),
-                ],
-                const SizedBox(height: _actionSpacing),
-                _buildActionButton(
-                  icon: _isSaved ? Icons.bookmark : LucideIcons.bookmark,
+                _buildTikTokAction(
+                  icon: Icons.bookmark,
                   label: _formatCount(_saveCount),
-                  color: _isSaved ? Colors.amberAccent : Colors.white,
-                  activeBackgroundColor: _isSaved
-                      ? Colors.amberAccent.withValues(alpha: 0.22)
-                      : null,
-                  activeBorderColor: _isSaved
-                      ? Colors.amberAccent.withValues(alpha: 0.65)
-                      : null,
+                  color: _isSaved ? _tikTokSaveYellow : Colors.white,
                   onTap: _handleSave,
                 ),
                 const SizedBox(height: _actionSpacing),
                 _buildMusicDisc(theme, post),
                 const SizedBox(height: _actionSpacing),
-                _buildActionButton(
-                  icon: LucideIcons.ellipsis,
-                  label: '',
+                _buildTikTokAction(
+                  icon: Icons.more_horiz,
                   color: Colors.white,
                   onTap: _showMoreOptions,
                 ),
@@ -1140,101 +1124,66 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     );
   }
 
-  Widget _buildLikeButton(ThemeData theme) {
-    return GestureDetector(
+  Widget _buildLikeButton() {
+    return _buildTikTokAction(
+      icon: Icons.favorite,
+      label: _formatCount(_likeCount),
+      color: _isLiked ? _tikTokLikeRed : Colors.white,
       onTap: _handleLike,
-      child: Column(
-        children: [
-          ScaleTransition(
-            scale: _likeScaleAnim,
-            child: Container(
-              width: _actionButtonSize,
-              height: _actionButtonSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isLiked
-                    ? Colors.red.withValues(alpha: 0.25)
-                    : Colors.white.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: _isLiked
-                      ? Colors.red.withValues(alpha: 0.6)
-                      : Colors.white.withValues(alpha: 0.2),
-                ),
-                boxShadow: _isLiked
-                    ? [
-                        BoxShadow(
-                          color: Colors.red.withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Icon(
-                _isLiked ? Icons.favorite : LucideIcons.heart,
-                color: _isLiked ? Colors.red : Colors.white,
-                size: _actionIconSize,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _formatCount(_likeCount),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: _actionLabelSize,
-              fontWeight: FontWeight.w700,
-              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-            ),
-          ),
-        ],
+      iconWidget: ScaleTransition(
+        scale: _likeScaleAnim,
+        child: Icon(
+          Icons.favorite,
+          color: _isLiked ? _tikTokLikeRed : Colors.white,
+          size: _actionIconSize,
+          shadows: _actionTextShadow,
+        ),
       ),
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildTikTokAction({
     required IconData icon,
-    required String label,
+    String? label,
     required Color color,
     VoidCallback? onTap,
-    Color? activeBackgroundColor,
-    Color? activeBorderColor,
+    Widget? iconWidget,
   }) {
-    final isActive = activeBackgroundColor != null;
-
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: _actionButtonSize,
-            height: _actionButtonSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isActive
-                  ? activeBackgroundColor
-                  : Colors.white.withValues(alpha: 0.1),
-              border: Border.all(
-                color: isActive
-                    ? (activeBorderColor ?? Colors.white.withValues(alpha: 0.2))
-                    : Colors.white.withValues(alpha: 0.2),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: _actionHitWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: _actionIconSize + 2,
+              child: Center(
+                child:
+                    iconWidget ??
+                    Icon(
+                      icon,
+                      color: color,
+                      size: _actionIconSize,
+                      shadows: _actionTextShadow,
+                    ),
               ),
             ),
-            child: Icon(icon, color: color, size: _actionIconSize),
-          ),
-          if (label.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: _actionLabelSize,
-                fontWeight: FontWeight.w700,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+            if (label != null && label.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: _actionLabelSize,
+                  fontWeight: FontWeight.w600,
+                  shadows: _actionTextShadow,
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

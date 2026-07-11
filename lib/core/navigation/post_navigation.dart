@@ -1,11 +1,11 @@
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
+import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 /// Route extra for [post_detail] (supports opening the comments sheet).
 class PostOpenArgs {
@@ -64,7 +64,7 @@ void openStoryViewer(BuildContext context, PostEntity post) {
     return;
   }
 
-  context.pushNamed(
+  context.pushFromFeed(
     'stories_viewer',
     extra: {
       'stories': stories,
@@ -86,10 +86,10 @@ void openPost(
   );
 
   if (post.isAuctionable) {
-    context.pushNamed('live_details', extra: {'post': post});
+    context.pushFromFeed('live_details', extra: {'post': post});
     return;
   }
-  context.pushNamed('post_detail', extra: args);
+  context.pushFromFeed('post_detail', extra: args);
 }
 
 /// Loads a full post by id, then navigates to post detail.

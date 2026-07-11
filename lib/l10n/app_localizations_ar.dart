@@ -72,6 +72,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get signUpTitle => 'إنشاء حساب';
 
   @override
+  String get signUpScreenTitle => 'إنشاء حساب في بيموبوند';
+
+  @override
   String get signUpSubtitle => 'أدخل بياناتك لإنشاء حساب جديد';
 
   @override
@@ -114,6 +117,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get phoneLoginSubtitle => 'أدخل رقم جوالك لتلقي رمز التحقق';
 
   @override
+  String get phoneLoginUsageNote => 'قد يُستخدم رقم جوالك للتواصل مع أشخاص قد تعرفهم وتحسين الإعلانات والمزيد حسب إعداداتك.';
+
+  @override
+  String get emailLoginUsageNote => 'قد يُستخدم بريدك الإلكتروني للتواصل مع أشخاص قد تعرفهم وتحسين الإعلانات والمزيد حسب إعداداتك.';
+
+  @override
   String get phoneHint => '+20 123 456 7890';
 
   @override
@@ -121,6 +130,18 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get termsAndConditionsPart2 => 'الشروط والأحكام';
+
+  @override
+  String get loginLegalNotePart1 => 'بالمتابعة، أنت توافق على ';
+
+  @override
+  String get loginTermsOfService => 'شروط الخدمة';
+
+  @override
+  String get loginLegalNotePart2 => ' وتؤكد أنك قرأت ';
+
+  @override
+  String get loginPrivacyPolicy => 'سياسة الخصوصية';
 
   @override
   String get verifyPhoneTitle => 'التحقق من الجوال';
@@ -197,6 +218,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get passwordTooShort => 'يجب أن تكون كلمة المرور 6 أحرف على الأقل';
 
   @override
+  String get passwordSignUpTooShort => 'يجب أن تكون كلمة المرور 8 أحرف على الأقل';
+
+  @override
+  String get passwordTooLong => 'يجب ألا تتجاوز كلمة المرور 20 حرفاً';
+
+  @override
   String get passwordsDoNotMatch => 'كلمتا المرور غير متطابقتين';
 
   @override
@@ -270,6 +297,51 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get signUpWithEmailPassword => 'إنشاء حساب بالبريد الإلكتروني وكلمة المرور';
+
+  @override
+  String get signUpEmailStepTitle => 'ما هو بريدك الإلكتروني؟';
+
+  @override
+  String get signUpNameStepTitle => 'ما هو اسمك؟';
+
+  @override
+  String get signUpPasswordStepTitle => 'أنشئ كلمة مرور';
+
+  @override
+  String get nextAction => 'التالي';
+
+  @override
+  String get passwordStrengthLabel => 'قوة كلمة المرور';
+
+  @override
+  String get passwordStrengthWeak => 'ضعيفة';
+
+  @override
+  String get passwordStrengthFair => 'متوسطة';
+
+  @override
+  String get passwordStrengthGood => 'جيدة';
+
+  @override
+  String get passwordStrengthStrong => 'قوية';
+
+  @override
+  String get passwordStrengthHint => 'يجب أن تتكون كلمة المرور من 8 إلى 20 حرفاً وتتضمن مزيجاً من الأحرف والأرقام والرموز.';
+
+  @override
+  String get passwordReqLength => 'من 8 إلى 20 حرفاً';
+
+  @override
+  String get passwordReqLetter => 'حرف واحد';
+
+  @override
+  String get passwordReqNumber => 'رقم واحد';
+
+  @override
+  String get passwordReqSpecialChar => 'رمز خاص واحد (مثل ! @ # \$ % & *)';
+
+  @override
+  String get passwordRequirementsNotMet => 'يجب أن تستوفي كلمة المرور جميع المتطلبات';
 
   @override
   String get following => 'متابعة';
@@ -2087,6 +2159,214 @@ class AppLocalizationsAr extends AppLocalizations {
   String get walletAccountingAdmin => 'تعديل الرصيد';
 
   @override
+  String get balanceTitle => 'الرصيد';
+
+  @override
+  String get balanceDefaultUserName => 'المستخدم';
+
+  @override
+  String balanceUserTitle(String name) {
+    return 'رصيد $name';
+  }
+
+  @override
+  String get balanceEstimatedBalance => 'الرصيد التقديري';
+
+  @override
+  String get balanceView => 'عرض';
+
+  @override
+  String get balanceGet => 'احصل';
+
+  @override
+  String get balanceScheduledPayouts => 'المدفوعات المجدولة';
+
+  @override
+  String get balanceViewFullSchedule => 'عرض الجدول الكامل >';
+
+  @override
+  String get balanceSetupPaymentsBanner => 'لاستلام المدفوعات من برنامج مكافآت المبدعين، قم بإعداد المدفوعات.';
+
+  @override
+  String get balanceSetup => 'إعداد';
+
+  @override
+  String get balanceSetupRequired => 'الإعداد مطلوب';
+
+  @override
+  String get balancePastPayouts => 'المدفوعات السابقة >';
+
+  @override
+  String get balanceTransactions => 'المعاملات';
+
+  @override
+  String balanceTransactionPreview(String title, String amount) {
+    return '$title: $amount >';
+  }
+
+  @override
+  String get balanceFirstCoinOfferTitle => 'عرض أول شراء للعملات';
+
+  @override
+  String get balanceFirstCoinOfferSubtitle => 'احصل على عملات إضافية وهدية متحركة بخصم 99% من أول عملية شراء';
+
+  @override
+  String get balanceGetNow => 'احصل الآن ←';
+
+  @override
+  String get balanceMonetization => 'تحقيق الدخل';
+
+  @override
+  String get balanceViewMore => 'عرض المزيد >';
+
+  @override
+  String get balanceMonetizationLive => 'LIVE';
+
+  @override
+  String get balanceMonetizationActivities => 'الأنشطة';
+
+  @override
+  String get balanceServices => 'الخدمات';
+
+  @override
+  String get balancePaymentMethods => 'طرق الدفع';
+
+  @override
+  String get balanceRequired => 'مطلوب';
+
+  @override
+  String get balanceTaxInformation => 'المعلومات الضريبية';
+
+  @override
+  String get balanceIdentityVerification => 'التحقق من الهوية';
+
+  @override
+  String get balanceMonetizationCenter => 'مركز تحقيق الدخل';
+
+  @override
+  String get balanceExplore => 'استكشف >';
+
+  @override
+  String get balanceProgramCreatorRewards => 'برنامج مكافآت المبدعين';
+
+  @override
+  String get balanceProgramTiktokGo => 'مكافآت TikTok GO';
+
+  @override
+  String get balanceProgramSeries => 'Series';
+
+  @override
+  String get balanceSetupPaymentsTitle => 'إعداد المدفوعات';
+
+  @override
+  String get balanceSetupPaymentsMessage => 'تأكد من دقة معلوماتك لاستلام المدفوعات في الوقت المحدد. يمكنك تغييرها في أي وقت.';
+
+  @override
+  String get balancePayoutMethodTitle => 'طريقة الدفع';
+
+  @override
+  String get balancePayoutMethodSubtitle => 'اختر مكان استلام المدفوعات.';
+
+  @override
+  String get balanceTaxInfoTitle => 'المعلومات الضريبية';
+
+  @override
+  String get balanceTaxInfoSubtitle => 'مطلوبة لأغراض الامتثال.';
+
+  @override
+  String get balanceIdentityTitle => 'التحقق من الهوية';
+
+  @override
+  String get balanceIdentitySubtitle => 'جهّز هويتك.';
+
+  @override
+  String get balanceAddPayoutMethod => 'إضافة طريقة دفع';
+
+  @override
+  String get balanceCountryRegion => 'البلد / المنطقة';
+
+  @override
+  String get balanceCountryRegionNote => 'يمكنك التسجيل في بلد أو منطقة واحدة فقط. تأكد من اختيارك.';
+
+  @override
+  String get balanceChoosePayoutMethod => 'اختر طريقة الدفع';
+
+  @override
+  String get balancePayoutZaloPay => 'ZaloPay (VND)';
+
+  @override
+  String get balancePayoutZaloPayDetails => 'رسوم الخدمة 1.5% | الحد الأدنى للسحب 2 USD | يصل خلال يوم عمل واحد';
+
+  @override
+  String get balancePayoutBank => 'تحويل بنكي (VND)';
+
+  @override
+  String get balancePayoutBankDetails => 'رسوم الخدمة 2.9 USD | الحد الأدنى للسحب 8 USD | يصل خلال 3-5 أيام عمل';
+
+  @override
+  String get balancePayoutPayPal => 'PayPal (USD)';
+
+  @override
+  String get balancePayoutPayPalDetails => 'رسوم الخدمة 1.5% + 0.1 USD | الحد الأدنى للسحب 1 USD | يصل خلال يوم عمل واحد';
+
+  @override
+  String get balanceTransactionHistory => 'سجل المعاملات';
+
+  @override
+  String get balanceTransactionDetails => 'تفاصيل المعاملة';
+
+  @override
+  String get balanceTransactionNotFound => 'المعاملة غير موجودة';
+
+  @override
+  String get balanceNoTransactions => 'لا توجد معاملات بعد';
+
+  @override
+  String get balanceTabAll => 'الكل';
+
+  @override
+  String get balanceTabRevenue => 'الإيرادات';
+
+  @override
+  String get balanceTabExpense => 'المصروفات';
+
+  @override
+  String get balanceTabPayout => 'المدفوعات';
+
+  @override
+  String get balanceTabRefund => 'الاسترداد';
+
+  @override
+  String get balanceDetailStatus => 'الحالة';
+
+  @override
+  String get balanceStatusCompleted => 'مكتمل';
+
+  @override
+  String get balanceDetailType => 'النوع';
+
+  @override
+  String get balanceDetailActivityType => 'نوع النشاط';
+
+  @override
+  String get balanceDetailPaymentMethod => 'طريقة الدفع';
+
+  @override
+  String get balanceDetailCreated => 'تاريخ الإنشاء';
+
+  @override
+  String get balanceDetailUpdated => 'تاريخ التحديث';
+
+  @override
+  String get balanceDetailTransactionId => 'معرف المعاملة';
+
+  @override
+  String get balanceCopied => 'تم النسخ';
+
+  @override
+  String get balanceNeedHelp => 'هل تحتاج مساعدة؟ >';
+
+  @override
   String get deleteChatTitle => 'حذف المحادثة';
 
   @override
@@ -2221,6 +2501,30 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraModeLive => 'مباشر';
+
+  @override
+  String get cameraModeText => 'نص';
+
+  @override
+  String get cameraAddSound => 'إضافة صوت';
+
+  @override
+  String get cameraLayout => 'التخطيط';
+
+  @override
+  String get cameraAspectRatio => 'النسبة';
+
+  @override
+  String get cameraTabPost => 'منشور';
+
+  @override
+  String get cameraTabCreative => 'الإبداع';
+
+  @override
+  String get cameraDuration10m => '10 د';
+
+  @override
+  String get cameraZoom => 'تكبير';
 
   @override
   String get cameraGoLive => 'بدء البث';
@@ -2681,4 +2985,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String soundUseCountMillions(String count) {
     return '$count مليون فيديو';
   }
+
+  @override
+  String get interestSelectionTitle => 'اختر اهتماماتك';
+
+  @override
+  String get interestSelectionSubtitle => 'اختر بعض الفئات حتى نُخصّص تجربتك.';
+
+  @override
+  String get interestSelectionSkip => 'تخطي';
+
+  @override
+  String get interestSelectionContinue => 'متابعة';
+
+  @override
+  String interestSelectionMinHint(int count) {
+    return 'اختر $count اهتمامات على الأقل';
+  }
+
+  @override
+  String get retry => 'حاول مرة أخرى';
 }
