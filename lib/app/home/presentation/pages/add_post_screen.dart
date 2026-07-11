@@ -47,12 +47,20 @@ class AddPostScreen extends StatefulWidget {
     this.initialType,
     this.isStory = false,
     this.initialSound,
+    this.initialFilterName,
+    this.initialFilterCategory,
+    this.initialEffectSlug,
+    this.initialBeautyEnabled = false,
   });
 
   final List<File>? initialFiles;
   final String? initialType;
   final bool isStory;
   final SoundEntity? initialSound;
+  final String? initialFilterName;
+  final String? initialFilterCategory;
+  final String? initialEffectSlug;
+  final bool initialBeautyEnabled;
 
   @override
   State<AddPostScreen> createState() => _AddPostScreenState();
@@ -331,6 +339,10 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
         auction: widget.isStory ? null : auction,
         files: _selectedFiles,
         soundId: _selectedSound?.id,
+        filterName: widget.initialFilterName,
+        filterCategory: widget.initialFilterCategory,
+        effectSlug: widget.initialEffectSlug,
+        beautyEnabled: widget.initialBeautyEnabled ? true : null,
       ),
     );
   }

@@ -61,7 +61,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         _loadImageSize();
       }
     } else if (oldWidget.filter.name != widget.filter.name ||
-        oldWidget.effect?.id != widget.effect?.id) {
+        oldWidget.effect?.slug != widget.effect?.slug) {
       setState(() {});
     }
   }

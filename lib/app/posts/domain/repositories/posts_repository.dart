@@ -42,6 +42,10 @@ abstract class PostsRepository {
     String? soundId,
     String? originalPostId,
     List<PostMediaEntity>? media,
+    String? filterName,
+    String? filterCategory,
+    String? effectSlug,
+    bool? beautyEnabled,
   });
 
   Future<Either<Failure, HashtagsPageEntity>> getHashtags({

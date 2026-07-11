@@ -9,10 +9,16 @@ export 'camera_analysis_utils.dart';
 
 /// Runs on-device face detection on CamerAwesome analysis frames.
 class CameraFaceDetectorService {
-  CameraFaceDetectorService();
+  CameraFaceDetectorService({bool isFrontCamera = false})
+      : _isFrontCamera = isFrontCamera;
 
   final _controller = StreamController<CameraFaceDetectionFrame>.broadcast();
   bool _busy = false;
+  bool _isFrontCamera;
+
+  bool get isFrontCamera => _isFrontCamera;
+
+  set isFrontCamera(bool value) => _isFrontCamera = value;
 
   Stream<CameraFaceDetectionFrame> get stream => _controller.stream;
 
@@ -21,7 +27,10 @@ class CameraFaceDetectorService {
     _busy = true;
 
     try {
-      final faces = await CameraFaceDetection.detectFromAnalysisImage(image);
+      final faces = await CameraFaceDetection.detectFromAnalysisImage(
+        image,
+        isFrontCamera: _isFrontCamera,
+      );
       if (!_controller.isClosed) {
         _controller.add(CameraFaceDetectionFrame(faces: faces, image: image));
       }

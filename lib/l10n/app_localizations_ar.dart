@@ -2223,6 +2223,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraModeLive => 'مباشر';
 
   @override
+  String get cameraModeText => 'نص';
+
+  @override
+  String get cameraAddSound => 'إضافة صوت';
+
+  @override
+  String get cameraLayout => 'التخطيط';
+
+  @override
+  String get cameraAspectRatio => 'النسبة';
+
+  @override
+  String get cameraTabPost => 'منشور';
+
+  @override
+  String get cameraTabCreative => 'الإبداع';
+
+  @override
+  String get cameraDuration10m => '10 د';
+
+  @override
+  String get cameraZoom => 'تكبير';
+
+  @override
   String get cameraGoLive => 'بدء البث';
 
   @override

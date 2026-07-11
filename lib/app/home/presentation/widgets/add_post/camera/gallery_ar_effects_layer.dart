@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_image_painter.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detection.dart';
@@ -39,6 +41,9 @@ class _GalleryArEffectsLayerState extends State<GalleryArEffectsLayer> {
   @override
   void initState() {
     super.initState();
+    if (widget.effect.hasAsset) {
+      unawaited(CameraEffectAssetLoader.preload(widget.effect.assetUrl));
+    }
     _detectFaces();
   }
 
@@ -46,7 +51,7 @@ class _GalleryArEffectsLayerState extends State<GalleryArEffectsLayer> {
   void didUpdateWidget(GalleryArEffectsLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.file.path != widget.file.path ||
-        oldWidget.effect.id != widget.effect.id) {
+        oldWidget.effect.slug != widget.effect.slug) {
       _detectFaces();
     }
   }

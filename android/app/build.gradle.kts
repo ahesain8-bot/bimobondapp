@@ -31,10 +31,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Modern phones only — drops armeabi-v7a + x86_64 from fat APKs.
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
+        // Leave abiFilters empty so `flutter build apk --split-per-abi` can
+        // emit armeabi-v7a / arm64-v8a / x86_64 outputs without conflict.
     }
 
     buildTypes {

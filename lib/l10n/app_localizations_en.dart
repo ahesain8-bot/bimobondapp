@@ -2223,6 +2223,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraModeLive => 'LIVE';
 
   @override
+  String get cameraModeText => 'Text';
+
+  @override
+  String get cameraAddSound => 'Add sound';
+
+  @override
+  String get cameraLayout => 'Layout';
+
+  @override
+  String get cameraAspectRatio => 'Ratio';
+
+  @override
+  String get cameraTabPost => 'Post';
+
+  @override
+  String get cameraTabCreative => 'Creative';
+
+  @override
+  String get cameraDuration10m => '10m';
+
+  @override
+  String get cameraZoom => 'Zoom';
+
+  @override
   String get cameraGoLive => 'Go LIVE';
 
   @override

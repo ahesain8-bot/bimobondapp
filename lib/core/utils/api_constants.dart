@@ -68,6 +68,8 @@ class ApiConstants {
   static const String auctionsPricingPreview = '/auctions/pricing/preview';
 
   static const String cameraStudioCatalog = '/camera-studio/catalog';
+  static const String cameraStudioEffectPlacementSchema =
+      '/camera-studio/effect-placement/schema';
 
   static String get cameraStudioCatalogUrl => '$baseUrl$cameraStudioCatalog';
 

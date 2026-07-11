@@ -39,6 +39,7 @@ import 'package:bimobondapp/app/wallets/presentation/pages/coins_hub_screen.dart
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/camera_effect_test_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/posts_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/ended_auctions_screen.dart';
 import 'package:bimobondapp/app/promotions/presentation/pages/promote_post_screen.dart';
@@ -206,6 +207,11 @@ class AppRouter {
         builder: (context, state) => const LivesScreen(),
       ),
       GoRoute(
+        path: '/effect-test',
+        name: 'effect_test',
+        builder: (context, state) => const CameraEffectTestScreen(),
+      ),
+      GoRoute(
         path: '/posts-search',
         name: 'posts_search',
         builder: (context, state) => const PostsSearchScreen(),
@@ -360,6 +366,10 @@ class AppRouter {
             initialType: extra?['type'] as String?,
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
+            initialFilterName: extra?['filterName'] as String?,
+            initialFilterCategory: extra?['filterCategory'] as String?,
+            initialEffectSlug: extra?['effectSlug'] as String?,
+            initialBeautyEnabled: extra?['beautyEnabled'] as bool? ?? false,
           );
         },
       ),

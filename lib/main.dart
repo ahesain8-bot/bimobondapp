@@ -61,7 +61,7 @@ void main() async {
   await gifts_di.initGifts();
   await auctions_di.initAuctions();
   await camera_studio_di.initCameraStudio();
-  unawaited(_preloadCameraStudioCatalog());
+  await _preloadCameraStudioCatalog();
   await chats_di.initChats();
   await notifications_di.initNotifications();
   runApp(const MyApp());

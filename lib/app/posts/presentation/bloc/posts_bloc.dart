@@ -239,6 +239,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           auction: event.isAuctionable ? auction : null,
           media: mediaEntities,
           soundId: event.soundId,
+          filterName: event.filterName,
+          filterCategory: event.filterCategory,
+          effectSlug: event.effectSlug,
+          beautyEnabled: event.beautyEnabled,
         ),
       );
 
