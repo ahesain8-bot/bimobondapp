@@ -659,7 +659,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                 opacity: selected != null && !_busy ? 1 : 0.5,
                 child: Container(
                   width: double.infinity,
-                  height: 50,
+                  height: AppSizes.buttonHeightMd,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: selected != null

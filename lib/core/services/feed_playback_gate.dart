@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Coordinates pausing the home feed when another screen covers it.
@@ -12,6 +11,7 @@ class FeedPlaybackGate extends ChangeNotifier {
   static final FeedPlaybackGate instance = FeedPlaybackGate._();
 
   bool _blocked = false;
+  int _modalOverlayCount = 0;
 
   bool get allowed => !_blocked;
 
@@ -29,9 +29,43 @@ class FeedPlaybackGate extends ChangeNotifier {
     });
   }
 
-  void syncFromNavigator() {
+  /// Call when a modal overlay (e.g. bottom sheet) opens above the feed.
+  void pushModalOverlay() {
+    _modalOverlayCount++;
+    syncFromRouter();
+  }
+
+  /// Call when a modal overlay closes.
+  void popModalOverlay() {
+    if (_modalOverlayCount > 0) {
+      _modalOverlayCount--;
+    }
+    syncFromRouter();
+  }
+
+  @Deprecated('Use syncFromRouter')
+  void syncFromNavigator() => syncFromRouter();
+
+  void syncFromRouter() {
+    setBlocked(_shouldBlockFeed());
+  }
+
+  bool _shouldBlockFeed() {
+    if (_modalOverlayCount > 0) return true;
+
+    final router = AppRouter.router;
+    final matches = router.routerDelegate.currentConfiguration.matches;
+    if (matches.length > 1) return true;
+
+    if (matches.isNotEmpty) {
+      final topLocation = matches.last.matchedLocation;
+      if (topLocation != '/' && topLocation != '/splash') {
+        return true;
+      }
+    }
+
     final navigator = AppRouter.rootNavigatorKey.currentState;
-    setBlocked(navigator?.canPop() ?? false);
+    return navigator?.canPop() ?? false;
   }
 }
 
@@ -42,6 +76,12 @@ mixin FeedPlaybackBlocker<T extends StatefulWidget> on State<T> {
     super.initState();
     FeedPlaybackGate.instance.setBlocked(true);
   }
+
+  @override
+  void dispose() {
+    FeedPlaybackGate.instance.syncFromRouter();
+    super.dispose();
+  }
 }
 
 class FeedPlaybackNavigatorObserver extends NavigatorObserver {
@@ -50,7 +90,7 @@ class FeedPlaybackNavigatorObserver extends NavigatorObserver {
 
   void _sync() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      FeedPlaybackGate.instance.syncFromNavigator();
+      FeedPlaybackGate.instance.syncFromRouter();
     });
   }
 

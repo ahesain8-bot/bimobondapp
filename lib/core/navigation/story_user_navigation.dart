@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
 import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
+import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -47,7 +48,7 @@ Future<bool?> openUserActiveStoriesOrProfile(
   final stories =
       auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(userId);
   if (stories.isNotEmpty) {
-    await context.pushNamed(
+    await context.pushFromFeed(
       'stories_viewer',
       extra: {
         'stories': stories,
@@ -91,7 +92,7 @@ Future<bool?> openUserStoryOrProfile(
   if (userHasUnseenActiveStories(userId)) {
     final stories =
         auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(userId);
-    await context.pushNamed(
+    await context.pushFromFeed(
       'stories_viewer',
       extra: {
         'stories': stories,
@@ -119,7 +120,7 @@ Future<void> openUserActiveStories(BuildContext context, String userId) async {
   final stories = auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(id);
   if (stories.isEmpty) return;
 
-  await context.pushNamed(
+  await context.pushFromFeed(
     'stories_viewer',
     extra: {
       'stories': stories,

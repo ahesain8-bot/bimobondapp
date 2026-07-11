@@ -19,7 +19,7 @@ class SocialIconButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppSizes.radiusLg),
       child: Container(
         width: 54,
-        height: 54,
+        height: AppSizes.buttonHeightMd,
         decoration: BoxDecoration(
           border: Border.all(
             color: isDark ? Colors.white24 : Colors.black26,

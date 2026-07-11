@@ -99,7 +99,7 @@ class SignUpFormSection extends StatelessWidget {
               : CustomText(
                   l10n.continueAction,
                   color: Colors.white,
-                  fontSize: 19,
+                  fontSize: AppSizes.authControlFontSize,
                   fontWeight: FontWeight.bold,
                 ),
         ),

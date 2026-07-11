@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -26,7 +27,7 @@ Future<bool?> openUserProfile(
     }
   }
 
-  return context.pushNamed<bool>(
+  return context.pushFromFeed<bool>(
     'user_profile',
     extra: {
       'userId': userId,

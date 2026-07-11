@@ -221,6 +221,12 @@ abstract class AppLocalizations {
   /// **'Create Account'**
   String get signUpTitle;
 
+  /// No description provided for @signUpScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign up to BimoBond'**
+  String get signUpScreenTitle;
+
   /// No description provided for @signUpSubtitle.
   ///
   /// In en, this message translates to:
@@ -305,6 +311,18 @@ abstract class AppLocalizations {
   /// **'Enter your phone number to receive a verification code'**
   String get phoneLoginSubtitle;
 
+  /// No description provided for @phoneLoginUsageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone number may be used to connect you to people you may know, improve ads, and more depending on your settings.'**
+  String get phoneLoginUsageNote;
+
+  /// No description provided for @emailLoginUsageNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your email may be used to connect you to people you may know, improve ads, and more depending on your settings.'**
+  String get emailLoginUsageNote;
+
   /// No description provided for @phoneHint.
   ///
   /// In en, this message translates to:
@@ -322,6 +340,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Terms & Conditions'**
   String get termsAndConditionsPart2;
+
+  /// No description provided for @loginLegalNotePart1.
+  ///
+  /// In en, this message translates to:
+  /// **'By continuing, you agree to our '**
+  String get loginLegalNotePart1;
+
+  /// No description provided for @loginTermsOfService.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get loginTermsOfService;
+
+  /// No description provided for @loginLegalNotePart2.
+  ///
+  /// In en, this message translates to:
+  /// **' and confirm that you have read our '**
+  String get loginLegalNotePart2;
+
+  /// No description provided for @loginPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get loginPrivacyPolicy;
 
   /// No description provided for @verifyPhoneTitle.
   ///
@@ -466,6 +508,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password must be at least 6 characters'**
   String get passwordTooShort;
+
+  /// No description provided for @passwordSignUpTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters'**
+  String get passwordSignUpTooShort;
+
+  /// No description provided for @passwordTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at most 20 characters'**
+  String get passwordTooLong;
 
   /// No description provided for @passwordsDoNotMatch.
   ///
@@ -616,6 +670,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign up with Email and Password'**
   String get signUpWithEmailPassword;
+
+  /// No description provided for @signUpEmailStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your email?'**
+  String get signUpEmailStepTitle;
+
+  /// No description provided for @signUpNameStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your name?'**
+  String get signUpNameStepTitle;
+
+  /// No description provided for @signUpPasswordStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a password'**
+  String get signUpPasswordStepTitle;
+
+  /// No description provided for @nextAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get nextAction;
+
+  /// No description provided for @passwordStrengthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password strength'**
+  String get passwordStrengthLabel;
+
+  /// No description provided for @passwordStrengthWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak'**
+  String get passwordStrengthWeak;
+
+  /// No description provided for @passwordStrengthFair.
+  ///
+  /// In en, this message translates to:
+  /// **'Fair'**
+  String get passwordStrengthFair;
+
+  /// No description provided for @passwordStrengthGood.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get passwordStrengthGood;
+
+  /// No description provided for @passwordStrengthStrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong'**
+  String get passwordStrengthStrong;
+
+  /// No description provided for @passwordStrengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password must have 8 to 20 characters and include a mix of letters, numbers, and symbols.'**
+  String get passwordStrengthHint;
+
+  /// No description provided for @passwordReqLength.
+  ///
+  /// In en, this message translates to:
+  /// **'8 to 20 characters'**
+  String get passwordReqLength;
+
+  /// No description provided for @passwordReqLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'1 letter'**
+  String get passwordReqLetter;
+
+  /// No description provided for @passwordReqNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'1 number'**
+  String get passwordReqNumber;
+
+  /// No description provided for @passwordReqSpecialChar.
+  ///
+  /// In en, this message translates to:
+  /// **'1 special character (e.g. ! @ # \$ % & *)'**
+  String get passwordReqSpecialChar;
+
+  /// No description provided for @passwordRequirementsNotMet.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must meet all requirements'**
+  String get passwordRequirementsNotMet;
 
   /// No description provided for @following.
   ///
@@ -3989,6 +4133,414 @@ abstract class AppLocalizations {
   /// **'Balance adjustment'**
   String get walletAccountingAdmin;
 
+  /// No description provided for @balanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get balanceTitle;
+
+  /// No description provided for @balanceDefaultUserName.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get balanceDefaultUserName;
+
+  /// No description provided for @balanceUserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}\'s balance'**
+  String balanceUserTitle(String name);
+
+  /// No description provided for @balanceEstimatedBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated balance'**
+  String get balanceEstimatedBalance;
+
+  /// No description provided for @balanceView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get balanceView;
+
+  /// No description provided for @balanceGet.
+  ///
+  /// In en, this message translates to:
+  /// **'Get'**
+  String get balanceGet;
+
+  /// No description provided for @balanceScheduledPayouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled payouts'**
+  String get balanceScheduledPayouts;
+
+  /// No description provided for @balanceViewFullSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'View full schedule >'**
+  String get balanceViewFullSchedule;
+
+  /// No description provided for @balanceSetupPaymentsBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'To receive payouts from Creator Rewards Program, set up payments.'**
+  String get balanceSetupPaymentsBanner;
+
+  /// No description provided for @balanceSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up'**
+  String get balanceSetup;
+
+  /// No description provided for @balanceSetupRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup required'**
+  String get balanceSetupRequired;
+
+  /// No description provided for @balancePastPayouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Past payouts >'**
+  String get balancePastPayouts;
+
+  /// No description provided for @balanceTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get balanceTransactions;
+
+  /// No description provided for @balanceTransactionPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'{title}: {amount} >'**
+  String balanceTransactionPreview(String title, String amount);
+
+  /// No description provided for @balanceFirstCoinOfferTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'First Coin purchase offer'**
+  String get balanceFirstCoinOfferTitle;
+
+  /// No description provided for @balanceFirstCoinOfferSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get bonus Coins and a 99% off animated Gift from your first purchase'**
+  String get balanceFirstCoinOfferSubtitle;
+
+  /// No description provided for @balanceGetNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Get now →'**
+  String get balanceGetNow;
+
+  /// No description provided for @balanceMonetization.
+  ///
+  /// In en, this message translates to:
+  /// **'Monetization'**
+  String get balanceMonetization;
+
+  /// No description provided for @balanceViewMore.
+  ///
+  /// In en, this message translates to:
+  /// **'View more >'**
+  String get balanceViewMore;
+
+  /// No description provided for @balanceMonetizationLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get balanceMonetizationLive;
+
+  /// No description provided for @balanceMonetizationActivities.
+  ///
+  /// In en, this message translates to:
+  /// **'Activities'**
+  String get balanceMonetizationActivities;
+
+  /// No description provided for @balanceServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get balanceServices;
+
+  /// No description provided for @balancePaymentMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment methods'**
+  String get balancePaymentMethods;
+
+  /// No description provided for @balanceRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get balanceRequired;
+
+  /// No description provided for @balanceTaxInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax information'**
+  String get balanceTaxInformation;
+
+  /// No description provided for @balanceIdentityVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity verification'**
+  String get balanceIdentityVerification;
+
+  /// No description provided for @balanceMonetizationCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Monetization Center'**
+  String get balanceMonetizationCenter;
+
+  /// No description provided for @balanceExplore.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore >'**
+  String get balanceExplore;
+
+  /// No description provided for @balanceProgramCreatorRewards.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator Rewards Program'**
+  String get balanceProgramCreatorRewards;
+
+  /// No description provided for @balanceProgramTiktokGo.
+  ///
+  /// In en, this message translates to:
+  /// **'TikTok GO rewards'**
+  String get balanceProgramTiktokGo;
+
+  /// No description provided for @balanceProgramSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Series'**
+  String get balanceProgramSeries;
+
+  /// No description provided for @balanceSetupPaymentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up payments'**
+  String get balanceSetupPaymentsTitle;
+
+  /// No description provided for @balanceSetupPaymentsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure your information is accurate to receive payouts on time. You can change this at any time.'**
+  String get balanceSetupPaymentsMessage;
+
+  /// No description provided for @balancePayoutMethodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout method'**
+  String get balancePayoutMethodTitle;
+
+  /// No description provided for @balancePayoutMethodSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select where to receive payouts.'**
+  String get balancePayoutMethodSubtitle;
+
+  /// No description provided for @balanceTaxInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax information'**
+  String get balanceTaxInfoTitle;
+
+  /// No description provided for @balanceTaxInfoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Required for compliance purposes.'**
+  String get balanceTaxInfoSubtitle;
+
+  /// No description provided for @balanceIdentityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity verification'**
+  String get balanceIdentityTitle;
+
+  /// No description provided for @balanceIdentitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get your ID ready.'**
+  String get balanceIdentitySubtitle;
+
+  /// No description provided for @balanceAddPayoutMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payout method'**
+  String get balanceAddPayoutMethod;
+
+  /// No description provided for @balanceCountryRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Country / region'**
+  String get balanceCountryRegion;
+
+  /// No description provided for @balanceCountryRegionNote.
+  ///
+  /// In en, this message translates to:
+  /// **'You can only register for one country or region. Make sure your selection is correct.'**
+  String get balanceCountryRegionNote;
+
+  /// No description provided for @balanceChoosePayoutMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose payout method'**
+  String get balanceChoosePayoutMethod;
+
+  /// No description provided for @balancePayoutZaloPay.
+  ///
+  /// In en, this message translates to:
+  /// **'ZaloPay (VND)'**
+  String get balancePayoutZaloPay;
+
+  /// No description provided for @balancePayoutZaloPayDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Service fee 1.5% | Min. withdrawal 2 USD | Arrives in 1 business day'**
+  String get balancePayoutZaloPayDetails;
+
+  /// No description provided for @balancePayoutBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank transfer (VND)'**
+  String get balancePayoutBank;
+
+  /// No description provided for @balancePayoutBankDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Service fee 2.9 USD | Min. withdrawal 8 USD | Arrives in 3-5 business days'**
+  String get balancePayoutBankDetails;
+
+  /// No description provided for @balancePayoutPayPal.
+  ///
+  /// In en, this message translates to:
+  /// **'PayPal (USD)'**
+  String get balancePayoutPayPal;
+
+  /// No description provided for @balancePayoutPayPalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Service fee 1.5% + 0.1 USD | Min. withdrawal 1 USD | Arrives in 1 business day'**
+  String get balancePayoutPayPalDetails;
+
+  /// No description provided for @balanceTransactionHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction history'**
+  String get balanceTransactionHistory;
+
+  /// No description provided for @balanceTransactionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction details'**
+  String get balanceTransactionDetails;
+
+  /// No description provided for @balanceTransactionNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction not found'**
+  String get balanceTransactionNotFound;
+
+  /// No description provided for @balanceNoTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'No transactions yet'**
+  String get balanceNoTransactions;
+
+  /// No description provided for @balanceTabAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get balanceTabAll;
+
+  /// No description provided for @balanceTabRevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Revenue'**
+  String get balanceTabRevenue;
+
+  /// No description provided for @balanceTabExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense'**
+  String get balanceTabExpense;
+
+  /// No description provided for @balanceTabPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout'**
+  String get balanceTabPayout;
+
+  /// No description provided for @balanceTabRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get balanceTabRefund;
+
+  /// No description provided for @balanceDetailStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get balanceDetailStatus;
+
+  /// No description provided for @balanceStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get balanceStatusCompleted;
+
+  /// No description provided for @balanceDetailType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get balanceDetailType;
+
+  /// No description provided for @balanceDetailActivityType.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity type'**
+  String get balanceDetailActivityType;
+
+  /// No description provided for @balanceDetailPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get balanceDetailPaymentMethod;
+
+  /// No description provided for @balanceDetailCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get balanceDetailCreated;
+
+  /// No description provided for @balanceDetailUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get balanceDetailUpdated;
+
+  /// No description provided for @balanceDetailTransactionId.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction ID'**
+  String get balanceDetailTransactionId;
+
+  /// No description provided for @balanceCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get balanceCopied;
+
+  /// No description provided for @balanceNeedHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Need help? >'**
+  String get balanceNeedHelp;
+
   /// No description provided for @deleteChatTitle.
   ///
   /// In en, this message translates to:
@@ -5116,6 +5668,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count}M videos'**
   String soundUseCountMillions(String count);
+
+  /// No description provided for @interestSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your interests'**
+  String get interestSelectionTitle;
+
+  /// No description provided for @interestSelectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a few categories so we can personalize your experience.'**
+  String get interestSelectionSubtitle;
+
+  /// No description provided for @interestSelectionSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get interestSelectionSkip;
+
+  /// No description provided for @interestSelectionContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get interestSelectionContinue;
+
+  /// No description provided for @interestSelectionMinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least {count} interests'**
+  String interestSelectionMinHint(int count);
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

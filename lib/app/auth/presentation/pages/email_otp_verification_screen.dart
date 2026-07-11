@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
@@ -107,8 +108,7 @@ class _EmailOtpVerificationScreenState
             PopupDialogs.showErrorDialog(context, message);
           } else if (state is AuthSuccess) {
             _isSubmitting = false;
-            // After successful registration, navigate to home
-            context.goNamed('home');
+            navigateAfterSignUp(context);
           }
         },
         child: SafeArea(

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 /// Shared sizing so Follow / Follow back / Following look identical on user cards.
 class ProfileFollowButtonSizes {
-  static const double listHeight = 34;
+  static const double listHeight = 30;
   static const double listWidth = 92;
   static const double listFontSize = 12;
 }
@@ -27,7 +27,7 @@ class ProfileFollowButton extends StatelessWidget {
     this.isFollowedBy = false,
     this.onPressed,
     this.width,
-    this.height = 40,
+    this.height = AppSizes.buttonHeightSm,
     this.fontSize = 14,
     super.key,
   });

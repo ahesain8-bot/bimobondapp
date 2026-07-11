@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_tab.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
 import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/core/services/app_location_service.dart';
@@ -15,9 +16,9 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 class HomeFeedScreen extends StatefulWidget {
   final bool isTabActive;
@@ -36,6 +37,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   bool _isLoadingMore = false;
   int _currentPostIndex = 0;
   bool _awaitingInitialFeed = true;
+  HomeFeedTab _selectedFeedTab = HomeFeedTab.forYou;
   Completer<void>? _pullRefreshCompleter;
   final FeedVideoProgressNotifier _feedVideoProgress =
       FeedVideoProgressNotifier();
@@ -91,11 +93,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         limit: HomeLayoutConstants.feedPageSize,
         isRefresh: refresh,
         isStory: false,
-        sort: 'RANKED',
+        sort: _selectedFeedTab.feedSort,
         latitude: viewerLocation?.latitude,
         longitude: viewerLocation?.longitude,
       ),
     );
+  }
+
+  void _onFeedTabChanged(HomeFeedTab tab) {
+    if (_selectedFeedTab == tab) return;
+    setState(() => _selectedFeedTab = tab);
   }
 
   void _loadMorePosts() {
@@ -315,9 +322,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   feedItems: _feedItems,
                   currentPostIndex: _currentPostIndex,
                   isTabActive: widget.isTabActive,
+                  selectedFeedTab: _selectedFeedTab,
+                  onFeedTabChanged: _onFeedTabChanged,
                   onPageChanged: _onFeedPageChanged,
-                  onLiveTap: () => context.pushNamed('lives'),
-                  onSearchTap: () => context.pushNamed('posts_search'),
+                  onLiveTap: () => context.pushFromFeed('lives'),
+                  onSearchTap: () => context.pushFromFeed('posts_search'),
                 ),
               ),
             );

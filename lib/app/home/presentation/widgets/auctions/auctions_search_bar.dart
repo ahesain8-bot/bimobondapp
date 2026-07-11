@@ -79,7 +79,7 @@ class _FilterButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSizes.radiusLg),
         child: Container(
           width: 48,
-          height: 48,
+          height: AppSizes.buttonHeightSm,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSizes.radiusLg),

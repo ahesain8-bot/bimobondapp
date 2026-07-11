@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/camera_studio/domain/entities/camera_studio_cata
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_preset.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
 
@@ -94,7 +95,7 @@ class CameraFilterStrip extends StatelessWidget {
               children: [
                 Container(
                   width: 58,
-                  height: 58,
+                  height: AppSizes.buttonHeightLg,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(

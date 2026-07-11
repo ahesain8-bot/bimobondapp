@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:flutter/material.dart';
@@ -16,17 +17,22 @@ class GlassBottomSheet {
     required WidgetBuilder builder,
     bool isScrollControlled = false,
     Color? barrierColor,
-  }) {
-    return showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: isScrollControlled,
-      backgroundColor: Colors.transparent,
-      barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.55),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(_radius)),
-      ),
-      builder: builder,
-    );
+  }) async {
+    FeedPlaybackGate.instance.pushModalOverlay();
+    try {
+      return await showModalBottomSheet<T>(
+        context: context,
+        isScrollControlled: isScrollControlled,
+        backgroundColor: Colors.transparent,
+        barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.55),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(_radius)),
+        ),
+        builder: builder,
+      );
+    } finally {
+      FeedPlaybackGate.instance.popModalOverlay();
+    }
   }
 
   static Future<T?> showActions<T>(

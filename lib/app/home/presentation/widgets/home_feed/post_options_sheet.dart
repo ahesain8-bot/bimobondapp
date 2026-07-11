@@ -39,6 +39,8 @@ class PostOptionsSheet {
     VoidCallback? onEdit,
     VoidCallback? onPromote,
     VoidCallback? onDelete,
+    VoidCallback? onRepost,
+    bool isReposted = false,
   }) {
     return GlassBottomSheet.showContent<void>(
       context,
@@ -49,6 +51,8 @@ class PostOptionsSheet {
         onEdit: onEdit,
         onPromote: onPromote,
         onDelete: onDelete,
+        onRepost: onRepost,
+        isReposted: isReposted,
       ),
     );
   }
@@ -61,6 +65,8 @@ class _PostOptionsSheetContent extends StatefulWidget {
     this.onEdit,
     this.onPromote,
     this.onDelete,
+    this.onRepost,
+    this.isReposted = false,
   });
 
   final PostEntity post;
@@ -68,6 +74,8 @@ class _PostOptionsSheetContent extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onPromote;
   final VoidCallback? onDelete;
+  final VoidCallback? onRepost;
+  final bool isReposted;
 
   @override
   State<_PostOptionsSheetContent> createState() =>
@@ -211,6 +219,13 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         color: const Color(0xFFEC4899),
         onTap: actions.addToStory,
       ),
+      if (!widget.isOwner && widget.onRepost != null)
+        _PostOptionItem(
+          icon: LucideIcons.repeat2,
+          label: widget.isReposted ? l10n.repostUndo : l10n.repostAction,
+          color: const Color(0xFF2ECC71),
+          onTap: widget.onRepost!,
+        ),
       _PostOptionItem(
         icon: LucideIcons.film,
         label: l10n.postOptionShareAsGif,

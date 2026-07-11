@@ -1,7 +1,8 @@
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_top_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_bar.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_overlay_controls.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_page_view.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_tab.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,8 @@ class HomeFeedStack extends StatelessWidget {
     required this.feedItems,
     required this.currentPostIndex,
     required this.isTabActive,
+    required this.selectedFeedTab,
+    required this.onFeedTabChanged,
     required this.onPageChanged,
     required this.onLiveTap,
     required this.onSearchTap,
@@ -21,6 +24,8 @@ class HomeFeedStack extends StatelessWidget {
   final List<FeedItemEntity> feedItems;
   final int currentPostIndex;
   final bool isTabActive;
+  final HomeFeedTab selectedFeedTab;
+  final ValueChanged<HomeFeedTab> onFeedTabChanged;
   final ValueChanged<int> onPageChanged;
   final VoidCallback onLiveTap;
   final VoidCallback onSearchTap;
@@ -43,9 +48,16 @@ class HomeFeedStack extends StatelessWidget {
           onPageChanged: onPageChanged,
         ),
         if (!isAuctionPost)
-          FeedOverlayControls(
-            onLiveTap: onLiveTap,
-            onSearchTap: onSearchTap,
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: FeedTopBar(
+              selectedTab: selectedFeedTab,
+              onTabChanged: onFeedTabChanged,
+              onLiveTap: onLiveTap,
+              onSearchTap: onSearchTap,
+            ),
           ),
         if (showVideoProgress)
           Positioned(

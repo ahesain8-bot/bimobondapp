@@ -72,6 +72,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signUpTitle => 'Create Account';
 
   @override
+  String get signUpScreenTitle => 'Sign up to BimoBond';
+
+  @override
   String get signUpSubtitle => 'Enter your details to create a new account';
 
   @override
@@ -114,6 +117,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneLoginSubtitle => 'Enter your phone number to receive a verification code';
 
   @override
+  String get phoneLoginUsageNote => 'Your phone number may be used to connect you to people you may know, improve ads, and more depending on your settings.';
+
+  @override
+  String get emailLoginUsageNote => 'Your email may be used to connect you to people you may know, improve ads, and more depending on your settings.';
+
+  @override
   String get phoneHint => '+20 123 456 7890';
 
   @override
@@ -121,6 +130,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get termsAndConditionsPart2 => 'Terms & Conditions';
+
+  @override
+  String get loginLegalNotePart1 => 'By continuing, you agree to our ';
+
+  @override
+  String get loginTermsOfService => 'Terms of Service';
+
+  @override
+  String get loginLegalNotePart2 => ' and confirm that you have read our ';
+
+  @override
+  String get loginPrivacyPolicy => 'Privacy Policy';
 
   @override
   String get verifyPhoneTitle => 'Verify Phone';
@@ -197,6 +218,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordTooShort => 'Password must be at least 6 characters';
 
   @override
+  String get passwordSignUpTooShort => 'Password must be at least 8 characters';
+
+  @override
+  String get passwordTooLong => 'Password must be at most 20 characters';
+
+  @override
   String get passwordsDoNotMatch => 'Passwords do not match';
 
   @override
@@ -270,6 +297,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signUpWithEmailPassword => 'Sign up with Email and Password';
+
+  @override
+  String get signUpEmailStepTitle => 'What\'s your email?';
+
+  @override
+  String get signUpNameStepTitle => 'What\'s your name?';
+
+  @override
+  String get signUpPasswordStepTitle => 'Create a password';
+
+  @override
+  String get nextAction => 'Next';
+
+  @override
+  String get passwordStrengthLabel => 'Password strength';
+
+  @override
+  String get passwordStrengthWeak => 'Weak';
+
+  @override
+  String get passwordStrengthFair => 'Fair';
+
+  @override
+  String get passwordStrengthGood => 'Good';
+
+  @override
+  String get passwordStrengthStrong => 'Strong';
+
+  @override
+  String get passwordStrengthHint => 'Your password must have 8 to 20 characters and include a mix of letters, numbers, and symbols.';
+
+  @override
+  String get passwordReqLength => '8 to 20 characters';
+
+  @override
+  String get passwordReqLetter => '1 letter';
+
+  @override
+  String get passwordReqNumber => '1 number';
+
+  @override
+  String get passwordReqSpecialChar => '1 special character (e.g. ! @ # \$ % & *)';
+
+  @override
+  String get passwordRequirementsNotMet => 'Password must meet all requirements';
 
   @override
   String get following => 'Following';
@@ -2087,6 +2159,214 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletAccountingAdmin => 'Balance adjustment';
 
   @override
+  String get balanceTitle => 'Balance';
+
+  @override
+  String get balanceDefaultUserName => 'User';
+
+  @override
+  String balanceUserTitle(String name) {
+    return '$name\'s balance';
+  }
+
+  @override
+  String get balanceEstimatedBalance => 'Estimated balance';
+
+  @override
+  String get balanceView => 'View';
+
+  @override
+  String get balanceGet => 'Get';
+
+  @override
+  String get balanceScheduledPayouts => 'Scheduled payouts';
+
+  @override
+  String get balanceViewFullSchedule => 'View full schedule >';
+
+  @override
+  String get balanceSetupPaymentsBanner => 'To receive payouts from Creator Rewards Program, set up payments.';
+
+  @override
+  String get balanceSetup => 'Set up';
+
+  @override
+  String get balanceSetupRequired => 'Setup required';
+
+  @override
+  String get balancePastPayouts => 'Past payouts >';
+
+  @override
+  String get balanceTransactions => 'Transactions';
+
+  @override
+  String balanceTransactionPreview(String title, String amount) {
+    return '$title: $amount >';
+  }
+
+  @override
+  String get balanceFirstCoinOfferTitle => 'First Coin purchase offer';
+
+  @override
+  String get balanceFirstCoinOfferSubtitle => 'Get bonus Coins and a 99% off animated Gift from your first purchase';
+
+  @override
+  String get balanceGetNow => 'Get now →';
+
+  @override
+  String get balanceMonetization => 'Monetization';
+
+  @override
+  String get balanceViewMore => 'View more >';
+
+  @override
+  String get balanceMonetizationLive => 'LIVE';
+
+  @override
+  String get balanceMonetizationActivities => 'Activities';
+
+  @override
+  String get balanceServices => 'Services';
+
+  @override
+  String get balancePaymentMethods => 'Payment methods';
+
+  @override
+  String get balanceRequired => 'Required';
+
+  @override
+  String get balanceTaxInformation => 'Tax information';
+
+  @override
+  String get balanceIdentityVerification => 'Identity verification';
+
+  @override
+  String get balanceMonetizationCenter => 'Monetization Center';
+
+  @override
+  String get balanceExplore => 'Explore >';
+
+  @override
+  String get balanceProgramCreatorRewards => 'Creator Rewards Program';
+
+  @override
+  String get balanceProgramTiktokGo => 'TikTok GO rewards';
+
+  @override
+  String get balanceProgramSeries => 'Series';
+
+  @override
+  String get balanceSetupPaymentsTitle => 'Set up payments';
+
+  @override
+  String get balanceSetupPaymentsMessage => 'Ensure your information is accurate to receive payouts on time. You can change this at any time.';
+
+  @override
+  String get balancePayoutMethodTitle => 'Payout method';
+
+  @override
+  String get balancePayoutMethodSubtitle => 'Select where to receive payouts.';
+
+  @override
+  String get balanceTaxInfoTitle => 'Tax information';
+
+  @override
+  String get balanceTaxInfoSubtitle => 'Required for compliance purposes.';
+
+  @override
+  String get balanceIdentityTitle => 'Identity verification';
+
+  @override
+  String get balanceIdentitySubtitle => 'Get your ID ready.';
+
+  @override
+  String get balanceAddPayoutMethod => 'Add payout method';
+
+  @override
+  String get balanceCountryRegion => 'Country / region';
+
+  @override
+  String get balanceCountryRegionNote => 'You can only register for one country or region. Make sure your selection is correct.';
+
+  @override
+  String get balanceChoosePayoutMethod => 'Choose payout method';
+
+  @override
+  String get balancePayoutZaloPay => 'ZaloPay (VND)';
+
+  @override
+  String get balancePayoutZaloPayDetails => 'Service fee 1.5% | Min. withdrawal 2 USD | Arrives in 1 business day';
+
+  @override
+  String get balancePayoutBank => 'Bank transfer (VND)';
+
+  @override
+  String get balancePayoutBankDetails => 'Service fee 2.9 USD | Min. withdrawal 8 USD | Arrives in 3-5 business days';
+
+  @override
+  String get balancePayoutPayPal => 'PayPal (USD)';
+
+  @override
+  String get balancePayoutPayPalDetails => 'Service fee 1.5% + 0.1 USD | Min. withdrawal 1 USD | Arrives in 1 business day';
+
+  @override
+  String get balanceTransactionHistory => 'Transaction history';
+
+  @override
+  String get balanceTransactionDetails => 'Transaction details';
+
+  @override
+  String get balanceTransactionNotFound => 'Transaction not found';
+
+  @override
+  String get balanceNoTransactions => 'No transactions yet';
+
+  @override
+  String get balanceTabAll => 'All';
+
+  @override
+  String get balanceTabRevenue => 'Revenue';
+
+  @override
+  String get balanceTabExpense => 'Expense';
+
+  @override
+  String get balanceTabPayout => 'Payout';
+
+  @override
+  String get balanceTabRefund => 'Refund';
+
+  @override
+  String get balanceDetailStatus => 'Status';
+
+  @override
+  String get balanceStatusCompleted => 'Completed';
+
+  @override
+  String get balanceDetailType => 'Type';
+
+  @override
+  String get balanceDetailActivityType => 'Activity type';
+
+  @override
+  String get balanceDetailPaymentMethod => 'Payment method';
+
+  @override
+  String get balanceDetailCreated => 'Created';
+
+  @override
+  String get balanceDetailUpdated => 'Updated';
+
+  @override
+  String get balanceDetailTransactionId => 'Transaction ID';
+
+  @override
+  String get balanceCopied => 'Copied to clipboard';
+
+  @override
+  String get balanceNeedHelp => 'Need help? >';
+
+  @override
   String get deleteChatTitle => 'Delete chat';
 
   @override
@@ -2681,4 +2961,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String soundUseCountMillions(String count) {
     return '${count}M videos';
   }
+
+  @override
+  String get interestSelectionTitle => 'Choose your interests';
+
+  @override
+  String get interestSelectionSubtitle => 'Pick a few categories so we can personalize your experience.';
+
+  @override
+  String get interestSelectionSkip => 'Skip';
+
+  @override
+  String get interestSelectionContinue => 'Continue';
+
+  @override
+  String interestSelectionMinHint(int count) {
+    return 'Select at least $count interests';
+  }
+
+  @override
+  String get retry => 'Try again';
 }

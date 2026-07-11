@@ -10,7 +10,7 @@ class SignUpLoginFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -24,7 +24,7 @@ class SignUpLoginFooter extends StatelessWidget {
           onTap: () => context.pop(),
           child: CustomText(
             l10n.loginTitle,
-            color: secondaryColor,
+            color: primaryColor,
             fontSize: 15,
             fontWeight: FontWeight.bold,
           ),

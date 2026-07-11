@@ -13,11 +13,13 @@ class PhoneLoginToolbar extends StatelessWidget {
   const PhoneLoginToolbar({
     required this.isArabic,
     required this.isDark,
+    this.onBackPressed,
     super.key,
   });
 
   final bool isArabic;
   final bool isDark;
+  final VoidCallback? onBackPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +29,7 @@ class PhoneLoginToolbar extends StatelessWidget {
     return Row(
       children: [
         TextButton.icon(
-          onPressed: () => context.pop(),
+          onPressed: onBackPressed ?? () => context.pop(),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             minimumSize: Size.zero,

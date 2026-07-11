@@ -21,36 +21,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-
   bool _hasLoggedIn = false;
   bool _isSubmitting = false;
-  bool _showEmailForm = false;
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
-  void _onLoginPressed() {
-    FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _hasLoggedIn = true;
-      _isSubmitting = true;
-    });
-    context.read<AuthBloc>().add(
-      LoginSubmittedEvent(
-        name: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      ),
-    );
-  }
 
   Future<void> _onGooglePressed() async {
     final proceed = await GoogleLoginSheet.show(context);
@@ -101,14 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
               l10n: l10n,
               isArabic: isArabic,
               isDark: isDark,
-              showEmailForm: _showEmailForm,
-              formKey: _formKey,
-              emailController: emailController,
-              passwordController: passwordController,
-              isLoading: _isSubmitting || state is AuthLoading,
-              onEmailMethodPressed: () => setState(() => _showEmailForm = true),
-              onBackFromEmailPressed: () => setState(() => _showEmailForm = false),
-              onLoginPressed: _onLoginPressed,
               onGooglePressed: _onGooglePressed,
               onApplePressed: _onApplePressed,
             );

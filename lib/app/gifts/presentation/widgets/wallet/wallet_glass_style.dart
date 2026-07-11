@@ -1,4 +1,5 @@
 import 'package:bimobondapp/core/theme/app_theme.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -150,7 +151,7 @@ class WalletGlassPrimaryButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.enabled = true,
-    this.height = 48,
+    this.height = AppSizes.buttonHeightSm,
     super.key,
   });
 

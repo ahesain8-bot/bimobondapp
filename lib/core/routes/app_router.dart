@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bimobondapp/app/home/presentation/pages/main_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/login_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/email_login_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/email_signup_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/interest_selection_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/phone_login_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/signup_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/otp_verification_screen.dart';
@@ -36,6 +39,10 @@ import 'package:bimobondapp/app/social/presentation/pages/my_followers_screen.da
 import 'package:bimobondapp/app/social/presentation/pages/user_likes_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_mentions_screen.dart';
 import 'package:bimobondapp/app/wallets/presentation/pages/coins_hub_screen.dart';
+import 'package:bimobondapp/app/wallets/presentation/pages/balance_screen.dart';
+import 'package:bimobondapp/app/wallets/presentation/pages/balance_transactions_screen.dart';
+import 'package:bimobondapp/app/wallets/presentation/pages/balance_transaction_detail_screen.dart';
+import 'package:bimobondapp/app/wallets/presentation/pages/add_payout_method_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
@@ -55,11 +62,14 @@ class AppRouter {
   static final GlobalKey<NavigatorState> rootNavigatorKey =
       GlobalKey<NavigatorState>();
 
-  static final GoRouter router = GoRouter(
-    navigatorKey: rootNavigatorKey,
-    initialLocation: '/splash',
-    observers: [FeedPlaybackNavigatorObserver.instance],
-    routes: [
+  static final GoRouter router = _createRouter();
+
+  static GoRouter _createRouter() {
+    final router = GoRouter(
+      navigatorKey: rootNavigatorKey,
+      initialLocation: '/splash',
+      observers: [FeedPlaybackNavigatorObserver.instance],
+      routes: [
       GoRoute(
         path: '/splash',
         name: 'splash',
@@ -88,6 +98,24 @@ class AppRouter {
         path: '/phone-login',
         name: 'phone_login',
         builder: (context, state) => const PhoneLoginScreen(),
+      ),
+      GoRoute(
+        path: '/email-login',
+        name: 'email_login',
+        builder: (context, state) => const EmailLoginScreen(),
+      ),
+      GoRoute(
+        path: '/email-signup',
+        name: 'email_signup',
+        builder: (context, state) => const EmailSignUpScreen(),
+      ),
+      GoRoute(
+        path: '/interest-selection',
+        name: 'interest_selection',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'];
+          return InterestSelectionScreen(pendingVerificationEmail: email);
+        },
       ),
       GoRoute(
         path: '/signup',
@@ -152,6 +180,38 @@ class AppRouter {
           final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
           return CoinsHubScreen(initialTab: tab);
         },
+      ),
+      GoRoute(
+        path: '/settings/balance',
+        name: 'balance',
+        builder: (context, state) => const BalanceScreen(),
+      ),
+      GoRoute(
+        path: '/settings/balance/transactions',
+        name: 'balance_transactions',
+        builder: (context, state) {
+          final tabName = state.uri.queryParameters['tab'] ?? 'all';
+          final tabIndex = switch (tabName) {
+            'revenue' => 1,
+            'expense' => 2,
+            'payout' => 3,
+            'refund' => 4,
+            _ => 0,
+          };
+          return BalanceTransactionsScreen(initialTab: tabIndex);
+        },
+      ),
+      GoRoute(
+        path: '/settings/balance/transactions/:id',
+        name: 'balance_transaction_detail',
+        builder: (context, state) => BalanceTransactionDetailScreen(
+          transactionId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/settings/balance/payout/add',
+        name: 'add_payout_method',
+        builder: (context, state) => const AddPayoutMethodScreen(),
       ),
       GoRoute(
         path: '/settings/admin-activity',
@@ -436,5 +496,10 @@ class AppRouter {
         },
       ),
     ],
-  );
+    );
+    router.routerDelegate.addListener(
+      FeedPlaybackGate.instance.syncFromRouter,
+    );
+    return router;
+  }
 }

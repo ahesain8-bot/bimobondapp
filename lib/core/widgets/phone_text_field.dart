@@ -4,7 +4,6 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_auth_widgets.dart';
-import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -185,35 +184,32 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              LiquidGlassSurface(
-                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-                backgroundColor: style.glassFill,
-                borderColor: field.hasError
-                    ? AppTheme.errorAccent.withValues(alpha: 0.55)
-                    : style.glassBorder,
+              AuthFieldContainer(
+                hasError: field.hasError,
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     InkWell(
                       onTap: _showCountryPicker,
                       borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(AppSizes.radiusLg),
+                        left: Radius.circular(AppSizes.radiusSm),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSizes.p12,
-                          vertical: AppSizes.p16,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               _flagForCode(_selectedCountryCode),
-                              style: const TextStyle(fontSize: 20),
+                              style: const TextStyle(fontSize: 18),
                             ),
                             const SizedBox(width: AppSizes.p6),
                             CustomText(
                               _selectedCountryCode,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppSizes.authControlFontSize,
                               color: style.textColor,
                             ),
                             Icon(
@@ -227,29 +223,23 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                     ),
                     Container(
                       width: 1,
-                      height: 28,
-                      color: style.glassBorder,
+                      height: 24,
+                      color: style.fieldDivider,
                     ),
                     Expanded(
                       child: TextField(
                         controller: widget.controller,
                         keyboardType: TextInputType.phone,
+                        textAlignVertical: TextAlignVertical.center,
                         onChanged: (value) {
                           field.didChange(value);
                           if (field.hasError) field.validate();
                         },
-                        style: TextStyle(color: style.textColor, fontSize: 16),
+                        style: authFieldTextStyle(style),
                         cursorColor: AppTheme.primaryColor,
-                        decoration: InputDecoration(
+                        decoration: authFieldDecoration(
+                          style: style,
                           hintText: widget.hintText ?? l10n.phoneHint,
-                          hintStyle: TextStyle(color: style.hintColor),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSizes.p12,
-                            vertical: AppSizes.p16,
-                          ),
                         ),
                       ),
                     ),

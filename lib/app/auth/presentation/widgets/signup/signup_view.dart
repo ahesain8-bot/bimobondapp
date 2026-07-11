@@ -1,81 +1,73 @@
-import 'package:bimobondapp/app/auth/presentation/widgets/signup/signup_form_section.dart';
-import 'package:bimobondapp/app/auth/presentation/widgets/auth/auth_screen_header.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/login/login_methods_buttons.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/login/login_toolbar.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/signup/signup_login_footer.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class SignUpView extends StatelessWidget {
   const SignUpView({
-    required this.formKey,
     required this.l10n,
     required this.isArabic,
     required this.isDark,
-    required this.fullNameController,
-    required this.emailController,
-    required this.passwordController,
-    required this.confirmPasswordController,
-    required this.isLoading,
-    required this.onSignUpPressed,
+    required this.onGooglePressed,
+    required this.onApplePressed,
     super.key,
   });
 
-  final GlobalKey<FormState> formKey;
   final AppLocalizations l10n;
   final bool isArabic;
   final bool isDark;
-  final TextEditingController fullNameController;
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final TextEditingController confirmPasswordController;
-  final bool isLoading;
-  final VoidCallback onSignUpPressed;
+  final VoidCallback onGooglePressed;
+  final VoidCallback onApplePressed;
 
   @override
   Widget build(BuildContext context) {
     final textDirection = isArabic ? TextDirection.rtl : TextDirection.ltr;
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final backgroundColor = Theme.of(context).colorScheme.surface;
 
     return Directionality(
       textDirection: textDirection,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         child: Scaffold(
-          backgroundColor: scaffoldColor,
+          backgroundColor: backgroundColor,
           body: SafeArea(
-            child: SingleChildScrollView(
+            child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSizes.p24,
                 vertical: AppSizes.p12,
               ),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LoginToolbar(isArabic: isArabic, isDark: isDark),
-                    const SizedBox(height: AppSizes.p8),
-                    AuthScreenHeader(
-                      title: l10n.signUpTitle,
-                      subtitle: l10n.signUpSubtitle,
+              child: Column(
+                children: [
+                  LoginToolbar(isArabic: isArabic, isDark: isDark),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: AppSizes.p32),
+                        CustomText(
+                          l10n.signUpScreenTitle,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          textAlign: TextAlign.start,
+                        ),
+                        const SizedBox(height: AppSizes.p48),
+                        LoginMethodsButtons(
+                          l10n: l10n,
+                          emailRouteName: 'email_signup',
+                          onGooglePressed: onGooglePressed,
+                          onApplePressed: onApplePressed,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppSizes.p26),
-                    SignUpFormSection(
-                      l10n: l10n,
-                      fullNameController: fullNameController,
-                      emailController: emailController,
-                      passwordController: passwordController,
-                      confirmPasswordController: confirmPasswordController,
-                      isLoading: isLoading,
-                      onSignUpPressed: onSignUpPressed,
-                    ),
-                    const SizedBox(height: AppSizes.p32),
-                    SignUpLoginFooter(l10n: l10n),
-                    const SizedBox(height: AppSizes.p24),
-                  ],
-                ),
+                  ),
+                  SignUpLoginFooter(l10n: l10n),
+                  const SizedBox(height: AppSizes.p16),
+                ],
               ),
             ),
           ),

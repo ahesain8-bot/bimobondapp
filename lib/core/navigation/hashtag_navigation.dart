@@ -1,5 +1,5 @@
+import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 /// Opens the hashtag feed for [tagName] (with or without `#` prefix).
 void openHashtagFeed(BuildContext context, String tagName) {
@@ -10,7 +10,7 @@ void openHashtagFeed(BuildContext context, String tagName) {
   normalized = normalized.toLowerCase();
   if (normalized.isEmpty) return;
 
-  context.pushNamed(
+  context.pushFromFeed(
     'hashtag_feed',
     queryParameters: {'name': normalized},
   );

@@ -1,3 +1,5 @@
+import 'package:bimobondapp/app/auth/presentation/widgets/auth/auth_legal_note.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -10,24 +12,31 @@ class LoginSignUpFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        CustomText(
-          l10n.dontHaveAccount,
-          variant: TextVariant.secondary,
-          fontSize: 15,
-        ),
-        GestureDetector(
-          onTap: () => context.pushNamed('signup'),
-          child: CustomText(
-            l10n.signUp,
-            color: secondaryColor,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
+        AuthLegalNote(l10n: l10n),
+        const SizedBox(height: AppSizes.p16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CustomText(
+              l10n.dontHaveAccount,
+              variant: TextVariant.secondary,
+              fontSize: 15,
+            ),
+            GestureDetector(
+              onTap: () => context.pushNamed('signup'),
+              child: CustomText(
+                l10n.signUp,
+                color: primaryColor,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ],
     );

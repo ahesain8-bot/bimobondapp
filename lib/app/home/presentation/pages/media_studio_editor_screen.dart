@@ -20,6 +20,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_editor.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -405,7 +406,7 @@ class _ToolChip extends StatelessWidget {
         children: [
           Container(
             width: 48,
-            height: 48,
+            height: AppSizes.buttonHeightSm,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: active ? Colors.white24 : Colors.white12,
