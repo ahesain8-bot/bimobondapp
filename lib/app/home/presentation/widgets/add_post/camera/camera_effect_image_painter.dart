@@ -212,11 +212,11 @@ class CameraEffectImagePainter {
       return;
     }
 
+    final eyeSpan = (second.dx - first.dx).abs();
     final center = Offset(
       (first.dx + second.dx) / 2 + (placement.offsetX ?? 0) * eyeSpan,
       (first.dy + second.dy) / 2 + (placement.offsetY ?? 0) * eyeSpan,
     );
-    final eyeSpan = (second.dx - first.dx).abs();
     final width = eyeSpan * (placement.scaleFactor ?? 2.2);
 
     if (effect.hasAsset) {
