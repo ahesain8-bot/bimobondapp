@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
+import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -26,6 +27,7 @@ import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/tag_parser.dart';
 import 'package:bimobondapp/core/widgets/tagged_text.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/widgets/blurred_icon_badge.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -49,6 +51,8 @@ class VideoPostWidget extends StatefulWidget {
   final bool respectFeedPlaybackGate;
   final bool openCommentsOnLoad;
   final String? highlightCommentId;
+  /// Extra top offset for carousel badge when a feed top bar overlays the post.
+  final double? feedTopBarClearance;
 
   const VideoPostWidget({
     super.key,
@@ -59,6 +63,7 @@ class VideoPostWidget extends StatefulWidget {
     this.respectFeedPlaybackGate = true,
     this.openCommentsOnLoad = false,
     this.highlightCommentId,
+    this.feedTopBarClearance,
   });
 
   @override
@@ -731,10 +736,11 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           children: [
             child,
             if (isActiveSlide && !isPlaying)
-              Icon(
-                LucideIcons.play,
-                size: 80,
-                color: Colors.white.withValues(alpha: 0.5),
+              BlurredIconBadge(
+                icon: LucideIcons.play,
+                diameter: 88,
+                iconSize: 44,
+                iconColor: Colors.white.withValues(alpha: 0.85),
               ),
           ],
         ),
@@ -872,7 +878,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           // ── Media Count Badge ─────────────────────────────────────────────
           if (_displayMedia.length > 1)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 16,
+              top:
+                  MediaQuery.of(context).padding.top +
+                  (widget.feedTopBarClearance ??
+                      HomeLayoutConstants.feedTopTabsTopPadding),
               left: 0,
               right: 0,
               child: Center(child: _buildMediaCountBadge(_displayMedia.length)),
@@ -1209,7 +1218,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(LucideIcons.music, color: Colors.white70, size: 12),
+            BlurredIconBadge(
+              icon: LucideIcons.music,
+              diameter: 24,
+              iconSize: 12,
+              iconColor: Colors.white.withValues(alpha: 0.9),
+              blurSigma: 10,
+            ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -1265,13 +1280,28 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             ),
           ],
         ),
-        child: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: const BoxDecoration(
-            color: Colors.black,
-            shape: BoxShape.circle,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: ClipOval(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: const Icon(
+                  LucideIcons.music,
+                  color: Colors.white70,
+                  size: 12,
+                ),
+              ),
+            ),
           ),
-          child: const Icon(LucideIcons.music, color: Colors.white54, size: 12),
         ),
       ),
     );

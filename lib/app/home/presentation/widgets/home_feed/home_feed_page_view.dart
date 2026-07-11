@@ -47,6 +47,9 @@ class HomeFeedPageView extends StatelessWidget {
           feedItem: item,
           isActive: isTabActive && index == currentPostIndex,
           bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
+          feedTopBarClearance:
+              HomeLayoutConstants.feedTopBarHeight +
+              HomeLayoutConstants.feedTopBarBottomGap,
         );
       },
     );

@@ -14,6 +14,8 @@ class HomeLayoutConstants {
   static const double liveIconSize = 28;
   static const double feedTopBarHeight = 44;
   static const double feedTopTabsTopPadding = 16;
+  /// Gap between the feed top bar (Following / For You) and overlay content.
+  static const double feedTopBarBottomGap = 12;
   static const double feedOverlayHorizontalPadding = 8;
 
   static const double addButtonWidth = 48;

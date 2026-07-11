@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_p
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
+import 'package:bimobondapp/core/widgets/blurred_icon_badge.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/foundation.dart';
@@ -615,20 +616,23 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      _playbackMuted
+                  GestureDetector(
+                    onTap: _toggleMute,
+                    child: BlurredIconBadge(
+                      icon: _playbackMuted
                           ? LucideIcons.volumeX
                           : LucideIcons.volume2,
-                      color: Colors.white.withValues(alpha: 0.8),
-                      size: 24,
+                      diameter: 40,
+                      iconSize: 22,
+                      iconColor: Colors.white.withValues(alpha: 0.9),
                     ),
-                    onPressed: _toggleMute,
                   ),
-                  Icon(
-                    LucideIcons.play,
-                    size: 80,
-                    color: Colors.white.withValues(alpha: 0.5),
+                  const SizedBox(height: 12),
+                  BlurredIconBadge(
+                    icon: LucideIcons.play,
+                    diameter: 88,
+                    iconSize: 44,
+                    iconColor: Colors.white.withValues(alpha: 0.85),
                   ),
                 ],
               ),
