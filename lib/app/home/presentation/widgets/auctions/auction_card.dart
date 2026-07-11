@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_item.
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_status_badge.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_display_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -231,12 +232,7 @@ class AuctionCard extends StatelessWidget {
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
-                                      Icon(
-                                        LucideIcons.coins,
-                                        size: 13,
-                                        color: theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.65),
-                                      ),
+                                      const AppCoinIcon(size: 13),
                                       const SizedBox(width: 4),
                                       Text(
                                         _formatBidderSpend(locale),
@@ -273,14 +269,10 @@ class AuctionCard extends StatelessWidget {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
-                                      Icon(
-                                        LucideIcons.gift,
-                                        size: 13,
-                                        color: theme.primaryColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatHostEarnings(l10n, locale),
+                                      AppCoinAmount(
+                                        iconSize: 13,
+                                        spacing: 4,
+                                        text: _formatHostEarnings(l10n, locale),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,

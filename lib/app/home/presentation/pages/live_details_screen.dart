@@ -966,6 +966,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                           topBidLabel: l10n.liveTopBid,
                           bidAmountText: _formatHighestBid(l10n),
                           showGiftIcon: _usesGiftTotal,
+                          showCoinIcon: widget.post?.auction != null,
                           targetPrice: targetPrice,
                           targetPriceLabel: _auctionTargetPriceLabel(l10n),
                           isFinished: _isAuctionFinished,

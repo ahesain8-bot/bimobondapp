@@ -1,7 +1,7 @@
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class CoinAmountChip extends StatelessWidget {
   const CoinAmountChip({
@@ -38,24 +38,15 @@ class CoinAmountChip extends StatelessWidget {
           color: colorScheme.primary.withValues(alpha: 0.35),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            LucideIcons.coins,
-            size: compact ? 14 : 16,
-            color: colorScheme.primary,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            compact ? digits : '$digits ${l10n.coinsUnit}',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: compact ? 11 : 12,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        ],
+      child: AppCoinAmount(
+        iconSize: compact ? 14 : 16,
+        spacing: 4,
+        text: compact ? digits : '$digits ${l10n.coinsUnit}',
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: compact ? 11 : 12,
+          color: colorScheme.onSurface,
+        ),
       ),
     );
   }

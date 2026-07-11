@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/gifts/presentation/widgets/wallet/wallet_coin_pa
 import 'package:bimobondapp/app/gifts/presentation/widgets/wallet/wallet_glass_style.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
@@ -49,11 +50,7 @@ class WalletPackageCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          LucideIcons.coins,
-                          color: AppTheme.primaryColor,
-                          size: 16,
-                        ),
+                        const AppCoinIcon(size: 16),
                         const SizedBox(width: AppSizes.p6),
                         CustomText(
                           '${package.coins}',

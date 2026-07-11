@@ -296,10 +296,11 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
           CompactHighestBid(
             topBidLabel: l10n.liveTopBid,
             bidAmountText: _formatHighestBid(l10n, locale),
+            showGiftIcon: true,
+            showCoinIcon: true,
             targetPrice: bidderSpend?.round(),
             targetPriceLabel: targetPriceLabel,
             isFinished: isAuctionFinished,
-            showGiftIcon: true,
             popAnimation: const AlwaysStoppedAnimation(1),
             theme: theme,
             margin: const EdgeInsets.symmetric(horizontal: AppSizes.p16),

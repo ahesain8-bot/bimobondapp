@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_top_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_tab.dart';
@@ -94,6 +95,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         isRefresh: refresh,
         isStory: false,
         sort: _selectedFeedTab.feedSort,
+        privacyStatus: _selectedFeedTab.feedPrivacyStatus.value,
         latitude: viewerLocation?.latitude,
         longitude: viewerLocation?.longitude,
       ),
@@ -102,7 +104,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
   void _onFeedTabChanged(HomeFeedTab tab) {
     if (_selectedFeedTab == tab) return;
-    setState(() => _selectedFeedTab = tab);
+    setState(() {
+      _selectedFeedTab = tab;
+      _currentPostIndex = 0;
+      _awaitingInitialFeed = true;
+    });
+    _feedVideoProgress.reset();
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    _fetchFeed(refresh: true);
   }
 
   void _loadMorePosts() {
@@ -259,6 +270,26 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
+  Widget _withPersistentTopBar(Widget child) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        child,
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: FeedTopBar(
+            selectedTab: _selectedFeedTab,
+            onTabChanged: _onFeedTabChanged,
+            onLiveTap: () => context.pushFromFeed('lives'),
+            onSearchTap: () => context.pushFromFeed('posts_search'),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final feedOverlay = FeedOverlayTheme.of(context);
@@ -304,29 +335,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             }
 
             if (isLoadingFirstFeed) {
-              return wrapRefresh(const FeedSkeleton());
+              return _withPersistentTopBar(wrapRefresh(const FeedSkeleton()));
             }
 
             if (_feedItems.isEmpty) {
-              return wrapRefresh(const FeedEmptyState());
+              return _withPersistentTopBar(wrapRefresh(const FeedEmptyState()));
             }
 
-            return RefreshIndicator(
-              onRefresh: _onPullToRefresh,
-              displacement: HomeLayoutConstants.tabRefreshDisplacement,
-              color: theme.colorScheme.primary,
-              child: FeedVideoProgressScope(
-                notifier: _feedVideoProgress,
-                child: HomeFeedStack(
-                  pageController: _pageController,
-                  feedItems: _feedItems,
-                  currentPostIndex: _currentPostIndex,
-                  isTabActive: widget.isTabActive,
-                  selectedFeedTab: _selectedFeedTab,
-                  onFeedTabChanged: _onFeedTabChanged,
-                  onPageChanged: _onFeedPageChanged,
-                  onLiveTap: () => context.pushFromFeed('lives'),
-                  onSearchTap: () => context.pushFromFeed('posts_search'),
+            return _withPersistentTopBar(
+              RefreshIndicator(
+                onRefresh: _onPullToRefresh,
+                displacement: HomeLayoutConstants.tabRefreshDisplacement,
+                color: theme.colorScheme.primary,
+                child: FeedVideoProgressScope(
+                  notifier: _feedVideoProgress,
+                  child: HomeFeedStack(
+                    pageController: _pageController,
+                    feedItems: _feedItems,
+                    currentPostIndex: _currentPostIndex,
+                    isTabActive: widget.isTabActive,
+                    onPageChanged: _onFeedPageChanged,
+                  ),
                 ),
               ),
             );

@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/wallets/presentation/widgets/balance_setup_payme
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/money_format_utils.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -304,32 +305,14 @@ class _BalanceMainCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Row(
-                    children: [
-                      Text(
-                        coinsLabel,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        LucideIcons.circle,
-                        size: 14,
-                        color: Color(0xFFFACC15),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        coinsAmount,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
+                  child: AppCoinAmount(
+                    iconSize: 14,
+                    text: '$coinsAmount $coinsLabel',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
                 GestureDetector(
@@ -807,7 +790,7 @@ class _MonetizationCenterBanner extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(LucideIcons.coins, color: Color(0xFFFACC15), size: 36),
+              const AppCoinIcon(size: 36),
             ],
           ),
         ),

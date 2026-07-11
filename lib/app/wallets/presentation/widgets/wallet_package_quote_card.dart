@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/wallets/domain/entities/wallet_entity.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/money_format_utils.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -71,11 +72,7 @@ class WalletPackageQuoteCard extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(
-                    LucideIcons.coins,
-                    size: 16,
-                    color: AppTheme.primaryColor,
-                  ),
+                  const AppCoinIcon(size: 16),
                   const SizedBox(width: AppSizes.p6),
                   Expanded(
                     child: Text(
@@ -93,8 +90,9 @@ class WalletPackageQuoteCard extends StatelessWidget {
               ),
               if (package.bonusCoins > 0) ...[
                 const SizedBox(height: 2),
-                Text(
-                  '+${package.bonusCoins} ${l10n.coinsUnit}',
+                AppCoinAmount(
+                  iconSize: 12,
+                  text: '+${package.bonusCoins} ${l10n.coinsUnit}',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.secondary,
                     fontSize: 11,
@@ -171,8 +169,9 @@ class WalletPackageQuoteChip extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                '${package.coinAmount} ${l10n.coinsUnit}',
+              AppCoinAmount(
+                iconSize: 14,
+                text: '${package.coinAmount} ${l10n.coinsUnit}',
                 style: TextStyle(
                   color: glass.primaryText,
                   fontSize: 13,

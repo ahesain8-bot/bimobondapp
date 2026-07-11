@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
@@ -266,8 +267,9 @@ class _AuctionGiftsSummaryBar extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: AppSizes.p4),
-          Text(
-            summary,
+          AppCoinAmount(
+            iconSize: 14,
+            text: summary,
             style: const TextStyle(
               color: LiveDetailsLayoutConstants.giftCommentGold,
               fontWeight: FontWeight.w800,
@@ -373,8 +375,10 @@ class _AuctionGiftTransactionTile extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            contributionLabel(localizedContribution),
+          AppCoinAmount(
+            iconSize: 12,
+            spacing: 3,
+            text: contributionLabel(localizedContribution),
             style: const TextStyle(
               color: LiveDetailsLayoutConstants.giftCommentGold,
               fontWeight: FontWeight.w900,

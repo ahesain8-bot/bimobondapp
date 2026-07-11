@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -13,6 +14,7 @@ class CompactHighestBid extends StatelessWidget {
     this.targetPriceLabel,
     this.isFinished = false,
     this.showGiftIcon = false,
+    this.showCoinIcon = false,
     required this.popAnimation,
     required this.theme,
     this.margin = LiveDetailsLayoutConstants.screenHorizontalPadding,
@@ -24,6 +26,7 @@ class CompactHighestBid extends StatelessWidget {
   final String? targetPriceLabel;
   final bool isFinished;
   final bool showGiftIcon;
+  final bool showCoinIcon;
   final Animation<double> popAnimation;
   final ThemeData theme;
   final EdgeInsetsGeometry margin;
@@ -113,15 +116,27 @@ class CompactHighestBid extends StatelessWidget {
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            Text(
-                              bidAmountText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
+                            showCoinIcon
+                                ? AppCoinAmount(
+                                    iconSize: 14,
+                                    spacing: 4,
+                                    text: bidAmountText,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  )
+                                : Text(
+                                    bidAmountText,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                           ],
                         ),
                       ],
@@ -155,18 +170,33 @@ class CompactHighestBid extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            targetPriceLabel!,
-                            style: TextStyle(
-                              color: isFinished
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.9),
-                              fontSize: 12,
-                              fontWeight: isFinished
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                            ),
-                          ),
+                          showCoinIcon
+                              ? AppCoinAmount(
+                                  iconSize: 11,
+                                  spacing: 3,
+                                  text: targetPriceLabel!,
+                                  style: TextStyle(
+                                    color: isFinished
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 12,
+                                    fontWeight: isFinished
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                  ),
+                                )
+                              : Text(
+                                  targetPriceLabel!,
+                                  style: TextStyle(
+                                    color: isFinished
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 12,
+                                    fontWeight: isFinished
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                  ),
+                                ),
                         ],
                       ),
                     ),

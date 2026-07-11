@@ -106,11 +106,10 @@ class CameraEffectImagePainter {
   ) {
     return switch (anchor) {
       CameraEffectAnchorType.betweenLandmarks => const [
-          CameraFaceLandmarkType.leftEye,
-          CameraFaceLandmarkType.rightEye,
-        ],
-      CameraEffectAnchorType.onLandmark ||
-      CameraEffectAnchorType.onLandmarks =>
+        CameraFaceLandmarkType.leftEye,
+        CameraFaceLandmarkType.rightEye,
+      ],
+      CameraEffectAnchorType.onLandmark || CameraEffectAnchorType.onLandmarks =>
         const [CameraFaceLandmarkType.noseBase],
       _ => const [],
     };
@@ -201,11 +200,13 @@ class CameraEffectImagePainter {
     final first = face.landmarks[keys[0]];
     final second = face.landmarks[keys[1]];
     if (first == null || second == null) {
-      final fallback = placement.fallbackAnchorType == CameraEffectAnchorType.onFace
+      final fallback =
+          placement.fallbackAnchorType == CameraEffectAnchorType.onFace
           ? placement.copyWith(
               anchorType: CameraEffectAnchorType.onFace,
               offsetY: placement.fallbackOffsetY ?? -0.2,
-              scaleFactor: placement.fallbackScaleFactor ?? placement.scaleFactor,
+              scaleFactor:
+                  placement.fallbackScaleFactor ?? placement.scaleFactor,
             )
           : placement;
       _paintOnFace(canvas, face, effect, fallback);
@@ -260,12 +261,7 @@ class CameraEffectImagePainter {
     double progress = 0.35,
   }) {
     if (effect.hasAsset) {
-      _drawStickerInRect(
-        canvas,
-        effect,
-        Offset.zero & size,
-        fit: BoxFit.cover,
-      );
+      _drawStickerInRect(canvas, effect, Offset.zero & size, fit: BoxFit.cover);
       return;
     }
 
@@ -315,7 +311,12 @@ class CameraEffectImagePainter {
     _drawEmoji(canvas, effect.emoji, rect.center, rect.shortestSide * 0.9);
   }
 
-  static void _drawEmoji(Canvas canvas, String emoji, Offset center, double size) {
+  static void _drawEmoji(
+    Canvas canvas,
+    String emoji,
+    Offset center,
+    double size,
+  ) {
     final painter = TextPainter(
       text: TextSpan(
         text: emoji,

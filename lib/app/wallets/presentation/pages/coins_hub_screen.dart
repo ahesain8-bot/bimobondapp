@@ -31,6 +31,7 @@ import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/money_format_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -300,6 +301,8 @@ class _WalletBalanceHero extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.baseline,
                             textBaseline: TextBaseline.alphabetic,
                             children: [
+                              const AppCoinIcon(size: 28),
+                              const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
                                   balanceText,
@@ -438,6 +441,8 @@ class _BalanceActionButton extends StatelessWidget {
     required this.onTap,
   });
 
+  static const double _buttonSize = 48;
+
   final IconData icon;
   final _WalletGlassStyle style;
   final bool selected;
@@ -460,23 +465,29 @@ class _BalanceActionButton extends StatelessWidget {
               blurSigma: 12,
               backgroundColor: style.buttonFill,
               borderColor: style.buttonBorder,
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-              child: Icon(icon, size: 20, color: style.primaryText),
-            ),
-            const SizedBox(height: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected ? dotColor : Colors.transparent,
+              padding: EdgeInsets.zero,
+              child: SizedBox(
+                width: double.infinity,
+                height: _buttonSize,
+                child: Center(
+                  child: Icon(icon, size: 20, color: style.primaryText),
+                ),
               ),
             ),
-          ],
+              const SizedBox(height: 8),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? dotColor : Colors.transparent,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
     );
   }
 }
@@ -923,10 +934,11 @@ class _LedgerEntryTile extends StatelessWidget {
                   .withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              _ledgerIcon(entry.type),
-              color: isCredit ? colorScheme.primary : colorScheme.error,
-              size: 18,
+            child: Center(
+              child: _LedgerLeadingIcon(
+                type: entry.type,
+                color: isCredit ? colorScheme.primary : colorScheme.error,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -950,28 +962,42 @@ class _LedgerEntryTile extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '${isCredit ? '+' : '-'}${entry.amountCoins}',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: isCredit ? colorScheme.primary : colorScheme.error,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppCoinAmount(
+                iconSize: 14,
+                text: '${isCredit ? '+' : '-'}${entry.amountCoins}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isCredit ? colorScheme.primary : colorScheme.error,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+}
 
-  IconData _ledgerIcon(String type) {
+class _LedgerLeadingIcon extends StatelessWidget {
+  const _LedgerLeadingIcon({required this.type, required this.color});
+
+  final String type;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     switch (type) {
       case 'GIFT_PURCHASE':
-        return LucideIcons.gift;
+        return Icon(LucideIcons.gift, color: color, size: 18);
       case 'GIFT_RECEIVED':
-        return LucideIcons.heart;
+        return Icon(LucideIcons.heart, color: color, size: 18);
       case 'AD_PROMOTION_PURCHASE':
-        return LucideIcons.megaphone;
+        return Icon(LucideIcons.megaphone, color: color, size: 18);
       default:
-        return LucideIcons.coins;
+        return AppCoinIcon(size: 18, color: color);
     }
   }
 }
@@ -1158,8 +1184,9 @@ class _MarketGiftTile extends StatelessWidget {
                   fontSize: 12,
                 ),
               ),
-              Text(
-                '${gift.priceCoinsLabel(locale)} ${l10n.coinsUnit}',
+              AppCoinAmount(
+                iconSize: 12,
+                text: '${gift.priceCoinsLabel(locale)} ${l10n.coinsUnit}',
                 style: TextStyle(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w700,

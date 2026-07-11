@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/auth/presentation/widgets/onboarding/interest_category_chip.dart';
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
+import 'package:bimobondapp/app/categories/presentation/utils/category_icons.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -124,6 +125,7 @@ class InterestSelectionView extends StatelessWidget {
                               for (final category in categories)
                                 InterestCategoryChip(
                                   label: category.name,
+                                  icon: categoryIconForSlug(category.slug),
                                   isSelected: selectedCategoryIds.contains(
                                     category.id,
                                   ),

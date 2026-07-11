@@ -9,6 +9,7 @@ import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -800,14 +801,14 @@ class _GiftPriceChip extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSizes.p4),
-                    child: Text(
-                      priceText,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
+                    child: AppCoinAmount(
+                      iconSize: compact ? 12 : 14,
+                      spacing: 4,
+                      text: priceText,
                       style: TextStyle(
                         color: emphasized
                             ? LiveDetailsLayoutConstants.giftCommentGoldText
-                            : Colors.amberAccent,
+                            : AppCoinColors.icon,
                         fontSize: priceFontSize,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.4,
@@ -885,16 +886,12 @@ class _CoinBalanceChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.monetization_on_rounded,
-            color: Colors.amber,
-            size: 16,
-          ),
+          const AppCoinIcon(size: 16),
           const SizedBox(width: AppSizes.p4),
           Text(
             label,
             style: const TextStyle(
-              color: Colors.amberAccent,
+              color: AppCoinColors.icon,
               fontWeight: FontWeight.bold,
               fontSize: 14,
             ),

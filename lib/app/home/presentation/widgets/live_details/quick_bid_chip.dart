@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -45,11 +46,7 @@ class QuickBidChip extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.monetization_on_rounded,
-                  color: Colors.amber,
-                  size: 16,
-                ),
+                const AppCoinIcon(size: 16),
                 const SizedBox(width: AppSizes.p4),
                 Text(
                   label,

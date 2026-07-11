@@ -4,6 +4,7 @@ import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/money_format_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -181,18 +182,14 @@ class _TransactionList extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (tx.amountCoins != null) ...[
-                        Text(
-                          LocaleFormatUtils.localizeDigits(
+                        AppCoinAmount(
+                          iconSize: 10,
+                          spacing: 2,
+                          text: LocaleFormatUtils.localizeDigits(
                             tx.amountCoins.toString(),
                             locale,
                           ),
                           style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          LucideIcons.circle,
-                          size: 10,
-                          color: Color(0xFFFACC15),
                         ),
                         const SizedBox(width: 8),
                       ],

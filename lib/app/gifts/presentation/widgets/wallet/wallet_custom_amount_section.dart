@@ -7,6 +7,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/money_format_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -133,10 +134,13 @@ class WalletCustomAmountSection extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
-                    prefixIcon: Icon(
-                      LucideIcons.coins,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 20,
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(left: 12, right: 4),
+                      child: AppCoinIcon(size: 20),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
                     ),
                     suffixText: l10n.coinsUnit,
                     suffixStyle: TextStyle(
@@ -195,6 +199,7 @@ class WalletCustomAmountSection extends StatelessWidget {
                           ? l10n.walletCustomCoinsValue(coinsLabel)
                           : '—',
                       glass: glass,
+                      showCoinIcon: receiveCoins > 0,
                     ),
                   ),
                   const SizedBox(width: AppSizes.p10),
@@ -226,12 +231,14 @@ class _QuoteTile extends StatelessWidget {
     required this.value,
     required this.glass,
     this.emphasized = false,
+    this.showCoinIcon = false,
   });
 
   final String label;
   final String value;
   final WalletGlassStyle glass;
   final bool emphasized;
+  final bool showCoinIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -254,18 +261,30 @@ class _QuoteTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: emphasized
-                  ? Theme.of(context).colorScheme.primary
-                  : glass.primaryText,
-              fontSize: emphasized ? 15 : 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          showCoinIcon
+              ? AppCoinAmount(
+                  iconSize: 14,
+                  text: value,
+                  style: TextStyle(
+                    color: emphasized
+                        ? Theme.of(context).colorScheme.primary
+                        : glass.primaryText,
+                    fontSize: emphasized ? 15 : 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                )
+              : Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: emphasized
+                        ? Theme.of(context).colorScheme.primary
+                        : glass.primaryText,
+                    fontSize: emphasized ? 15 : 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
         ],
       ),
     );
