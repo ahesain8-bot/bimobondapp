@@ -265,6 +265,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
   final bool isRefresh;
   final int? profileLoadKey;
   final String? privacyStatus;
+  final String? from;
   final double? latitude;
   final double? longitude;
   final double? radiusKm;
@@ -285,6 +286,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
     this.isRefresh = false,
     this.profileLoadKey,
     this.privacyStatus,
+    this.from,
     this.latitude,
     this.longitude,
     this.radiusKm,
@@ -307,6 +309,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
     isRefresh,
     profileLoadKey,
     privacyStatus,
+    from,
     latitude,
     longitude,
     radiusKm,

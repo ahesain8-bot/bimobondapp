@@ -32,5 +32,5 @@ class AppAssets {
   static const String shareSmsIcon = '$iconsPath/share_sms.svg';
   static const String shareCopyLinkIcon = '$iconsPath/share_copy_link.svg';
   static const String shareMoreIcon = '$iconsPath/share_more.svg';
-  static const String coinStackIcon = '$iconsPath/coin_stack.svg';
+  static const String coinsStackIcon = '$iconsPath/coins_stack.svg';
 }

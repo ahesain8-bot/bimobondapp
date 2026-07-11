@@ -71,6 +71,7 @@ abstract class PostsRepository {
     FeedContentType? contentType,
     FeedAuctionQuery? auctionQuery,
     String? privacyStatus,
+    String? from,
     double? latitude,
     double? longitude,
     double? radiusKm,

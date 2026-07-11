@@ -934,11 +934,9 @@ class _LedgerEntryTile extends StatelessWidget {
                   .withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(
-              child: _LedgerLeadingIcon(
-                type: entry.type,
-                color: isCredit ? colorScheme.primary : colorScheme.error,
-              ),
+            child: _ledgerLeadingIcon(
+              type: entry.type,
+              color: isCredit ? colorScheme.primary : colorScheme.error,
             ),
           ),
           const SizedBox(width: 12),
@@ -979,25 +977,28 @@ class _LedgerEntryTile extends StatelessWidget {
       ),
     );
   }
-}
 
-class _LedgerLeadingIcon extends StatelessWidget {
-  const _LedgerLeadingIcon({required this.type, required this.color});
-
-  final String type;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _ledgerLeadingIcon({required String type, required Color color}) {
     switch (type) {
       case 'GIFT_PURCHASE':
-        return Icon(LucideIcons.gift, color: color, size: 18);
       case 'GIFT_RECEIVED':
-        return Icon(LucideIcons.heart, color: color, size: 18);
       case 'AD_PROMOTION_PURCHASE':
-        return Icon(LucideIcons.megaphone, color: color, size: 18);
+        return Icon(_ledgerIcon(type), color: color, size: 18);
       default:
-        return AppCoinIcon(size: 18, color: color);
+        return const Center(child: AppCoinIcon(size: 18));
+    }
+  }
+
+  IconData _ledgerIcon(String type) {
+    switch (type) {
+      case 'GIFT_PURCHASE':
+        return LucideIcons.gift;
+      case 'GIFT_RECEIVED':
+        return LucideIcons.heart;
+      case 'AD_PROMOTION_PURCHASE':
+        return LucideIcons.megaphone;
+      default:
+        return LucideIcons.circleDollarSign;
     }
   }
 }

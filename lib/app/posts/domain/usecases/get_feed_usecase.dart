@@ -29,6 +29,7 @@ class GetFeedUseCase implements UseCase<List<FeedItemEntity>, GetFeedParams> {
       contentType: params.contentType,
       auctionQuery: params.auctionQuery,
       privacyStatus: params.privacyStatus,
+      from: params.from,
       latitude: params.latitude,
       longitude: params.longitude,
       radiusKm: params.radiusKm,
@@ -53,6 +54,7 @@ class GetFeedParams extends Equatable {
     this.contentType,
     this.auctionQuery,
     this.privacyStatus,
+    this.from,
     this.latitude,
     this.longitude,
     this.radiusKm,
@@ -73,6 +75,7 @@ class GetFeedParams extends Equatable {
   final FeedContentType? contentType;
   final FeedAuctionQuery? auctionQuery;
   final String? privacyStatus;
+  final String? from;
   final double? latitude;
   final double? longitude;
   final double? radiusKm;
@@ -94,6 +97,7 @@ class GetFeedParams extends Equatable {
     contentType,
     auctionQuery,
     privacyStatus,
+    from,
     latitude,
     longitude,
     radiusKm,

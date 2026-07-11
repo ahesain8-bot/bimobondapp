@@ -25,8 +25,10 @@ class MediaStudioEditorStrip extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
 
     return SizedBox(
-      height: _thumbSize + 8,
-      child: ListView.separated(
+      height: _thumbSize + 16,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: items.length,
@@ -69,6 +71,7 @@ class MediaStudioEditorStrip extends StatelessWidget {
             ),
           );
         },
+        ),
       ),
     );
   }

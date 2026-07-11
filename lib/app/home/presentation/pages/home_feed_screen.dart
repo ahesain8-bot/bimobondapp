@@ -95,7 +95,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         isRefresh: refresh,
         isStory: false,
         sort: _selectedFeedTab.feedSort,
-        privacyStatus: _selectedFeedTab.feedPrivacyStatus.value,
+        from: _selectedFeedTab.feedFrom,
         latitude: viewerLocation?.latitude,
         longitude: viewerLocation?.longitude,
       ),

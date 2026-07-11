@@ -1,5 +1,3 @@
-import 'package:bimobondapp/app/posts/domain/entities/post_privacy_status.dart';
-
 enum HomeFeedTab {
   following,
   forYou,
@@ -8,13 +6,14 @@ enum HomeFeedTab {
 extension HomeFeedTabX on HomeFeedTab {
   String? get feedSort => 'RANKED';
 
-  /// For You shows public posts; Following shows friends-only posts.
-  PostPrivacyStatus get feedPrivacyStatus {
+  /// Following feed uses `GET /posts/feed?from=FRIEND`.
+  /// For You (public) omits `from`.
+  String? get feedFrom {
     switch (this) {
       case HomeFeedTab.forYou:
-        return PostPrivacyStatus.public;
+        return null;
       case HomeFeedTab.following:
-        return PostPrivacyStatus.friends;
+        return 'FRIEND';
     }
   }
 }

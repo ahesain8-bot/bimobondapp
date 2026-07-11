@@ -18,7 +18,7 @@ class AppCoinIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SvgPicture.asset(
-      AppAssets.coinStackIcon,
+      AppAssets.coinsStackIcon,
       width: size,
       height: size,
       colorFilter: ColorFilter.mode(
@@ -35,18 +35,18 @@ class AppCoinAmount extends StatelessWidget {
     required this.text,
     super.key,
     this.iconSize = 16,
+    this.iconColor,
     this.style,
     this.spacing = 4,
     this.mainAxisSize = MainAxisSize.min,
-    this.iconColor,
   });
 
   final String text;
   final double iconSize;
+  final Color? iconColor;
   final TextStyle? style;
   final double spacing;
   final MainAxisSize mainAxisSize;
-  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {

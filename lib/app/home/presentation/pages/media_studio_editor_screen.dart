@@ -314,12 +314,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                   ),
                 ),
                 const Spacer(),
-                MediaStudioEditorStrip(
-                  items: _states.map((s) => s.item).toList(growable: false),
-                  selectedIndex: _currentIndex,
-                  onSelected: _selectIndex,
-                ),
-                if (widget.items.length > 1) const SizedBox(height: 10),
+                if (widget.items.length > 1) ...[
+                  MediaStudioEditorStrip(
+                    items: _states.map((s) => s.item).toList(growable: false),
+                    selectedIndex: _currentIndex,
+                    onSelected: _selectIndex,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 if (_showFilters && _filtersReady) ...[
                   CameraFilterCategoryTabs(
                     categories: CameraFilterCatalog.filterCategories,

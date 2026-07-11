@@ -278,6 +278,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         isStory: event.isStory,
         contentType: event.contentType,
         privacyStatus: event.privacyStatus,
+        from: event.from,
         latitude: event.latitude,
         longitude: event.longitude,
         radiusKm: event.radiusKm,
