@@ -282,10 +282,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (_postComments.any((existing) => existing.id == comment.id)) return;
 
     setState(() {
-      _postComments.add(comment);
+      // Sort a copy first — clearing `_postComments` before sort wiped the
+      // new comment (gifts looked fine because they refetch the list).
+      final updated = sortCommentsOldest([..._postComments, comment]);
       _postComments
         ..clear()
-        ..addAll(sortCommentsOldest(_postComments));
+        ..addAll(updated);
     });
     _scrollChatToBottom();
   }
