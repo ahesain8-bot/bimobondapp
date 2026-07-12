@@ -279,6 +279,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       postId: post.id,
       isOwner: _isOwner(post),
       watchedDuration: _kStorySegmentDuration.inSeconds,
+      checkStoryHistory: true,
     );
     if (!mounted || serverCount == null) return;
 

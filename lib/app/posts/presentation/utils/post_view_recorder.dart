@@ -3,13 +3,16 @@ import 'package:bimobondapp/app/posts/domain/usecases/record_post_view_usecase.d
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
 
-/// Records at most one POST /posts/:id/view per post id (session + persisted for stories).
+/// Records at most one successful POST /posts/:id/view per post id per session.
+///
+/// Story screens can also skip ids already persisted in [ViewedStoriesStore].
 class PostViewRecorder {
   PostViewRecorder._();
 
   static final Set<String> _recordedIds = {};
+  static final Set<String> _inFlightIds = {};
 
-  static bool _wasViewedBefore(String postId) {
+  static bool _wasStoryViewedBefore(String postId) {
     try {
       return auth_di.sl<ViewedStoriesStore>().isViewed(postId);
     } catch (_) {
@@ -22,21 +25,33 @@ class PostViewRecorder {
     required String postId,
     bool isOwner = false,
     int? watchedDuration,
+    bool checkStoryHistory = false,
   }) async {
     if (isOwner ||
         postId.isEmpty ||
-        _wasViewedBefore(postId) ||
-        _recordedIds.contains(postId)) {
+        _recordedIds.contains(postId) ||
+        _inFlightIds.contains(postId)) {
       return null;
     }
-    _recordedIds.add(postId);
+    if (checkStoryHistory && _wasStoryViewedBefore(postId)) {
+      return null;
+    }
 
-    final result = await posts_di.sl<RecordPostViewUseCase>()(
-      RecordPostViewParams(
-        postId: postId,
-        watchedDuration: watchedDuration,
-      ),
-    );
-    return result.fold((_) => null, (count) => count);
+    _inFlightIds.add(postId);
+    try {
+      final result = await posts_di.sl<RecordPostViewUseCase>()(
+        RecordPostViewParams(
+          postId: postId,
+          watchedDuration: watchedDuration,
+        ),
+      );
+
+      return result.fold((_) => null, (count) {
+        _recordedIds.add(postId);
+        return count;
+      });
+    } finally {
+      _inFlightIds.remove(postId);
+    }
   }
 }

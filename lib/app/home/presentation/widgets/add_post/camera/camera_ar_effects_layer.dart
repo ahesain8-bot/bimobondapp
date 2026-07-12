@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_detector_service.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_effect_mapper.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_face_landmark_debug_painter.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
 
@@ -50,32 +51,35 @@ class _CameraArEffectsLayerState extends State<CameraArEffectsLayer> {
   Widget build(BuildContext context) {
     if (!widget.effect.requiresFaceDetection) return const SizedBox.shrink();
 
+    // Same pattern as CamerAwesome face-detection example:
+    // full-bleed paint + convertFromImage + Android canvas transform.
+    // Force LTR so Arabic RTL does not mirror overlay coordinates.
     return IgnorePointer(
-      child: StreamBuilder<SensorConfig>(
-        stream: widget.cameraState.sensorConfig$,
-        builder: (context, sensorSnapshot) {
-          if (!sensorSnapshot.hasData) return const SizedBox.shrink();
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: StreamBuilder<SensorConfig>(
+          stream: widget.cameraState.sensorConfig$,
+          builder: (context, sensorSnapshot) {
+            if (!sensorSnapshot.hasData) return const SizedBox.shrink();
 
-          return StreamBuilder<CameraFaceDetectionFrame>(
-            stream: widget.faceStream,
-            builder: (context, frameSnapshot) {
-              if (!frameSnapshot.hasData) return const SizedBox.shrink();
+            return StreamBuilder<CameraFaceDetectionFrame>(
+              stream: widget.faceStream,
+              builder: (context, frameSnapshot) {
+                if (!frameSnapshot.hasData) return const SizedBox.shrink();
 
-              final frame = frameSnapshot.data!;
-              final transform = frame.image.getCanvasTransformation(widget.preview);
+                final frame = frameSnapshot.data!;
 
-              return CustomPaint(
-                painter: CameraArEffectsPainter(
-                  effect: widget.effect,
-                  frame: frame,
-                  preview: widget.preview,
-                  canvasTransformation: transform,
-                ),
-                size: Size.infinite,
-              );
-            },
-          );
-        },
+                return CustomPaint(
+                  painter: CameraArEffectsPainter(
+                    effect: widget.effect,
+                    frame: frame,
+                    preview: widget.preview,
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -86,33 +90,28 @@ class CameraArEffectsPainter extends CustomPainter {
     required this.effect,
     required this.frame,
     required this.preview,
-    this.canvasTransformation,
   });
 
   final CameraEffectDefinition effect;
   final CameraFaceDetectionFrame frame;
   final AnalysisPreview preview;
-  final CanvasTransformation? canvasTransformation;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (frame.faces.isEmpty) return;
 
-    if (canvasTransformation != null) {
-      canvas.save();
-      canvas.applyTransformation(canvasTransformation!, size);
-    }
-
+    // ML Kit coords are already upright (rotation in InputImageMetadata).
+    // BoxFit.cover + front X-mirror only — do not rotate points again.
     final mapped = CameraFaceEffectMapper.mapForLivePreview(
       faces: frame.faces,
       preview: preview,
       image: frame.image,
+      detectionSize: frame.detectionSize,
+      canvasSize: size,
+      mirrorFrontCamera: frame.isFrontCamera,
     );
     CameraEffectImagePainter.paintArScreenSpace(canvas, mapped, effect);
-
-    if (canvasTransformation != null) {
-      canvas.restore();
-    }
+    CameraFaceLandmarkDebugPainter.paint(canvas, mapped);
   }
 
   @override

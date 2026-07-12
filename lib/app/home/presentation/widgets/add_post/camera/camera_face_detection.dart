@@ -4,68 +4,81 @@ import 'dart:typed_data';
 
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_detected_face.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_mlkit_utils.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:face_detection_tflite/face_detection_tflite.dart' as fdt;
 import 'package:flutter/material.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 
-/// On-device face detection using the slim front-camera TFLite model.
+/// On-device face detection.
+///
+/// Live camera frames use **Google ML Kit** (accurate landmarks + rotation).
+/// Still photos use ML Kit when possible, with TFLite as a fallback.
 class CameraFaceDetection {
   CameraFaceDetection._();
 
-  static fdt.FaceDetector? _liveDetector;
-  static fdt.FaceDetector? _liveBackDetector;
-  static fdt.FaceDetector? _staticDetector;
-  static fdt.FaceDetector? _accurateDetector;
+  static FaceDetector? _mlKitLive;
+  static FaceDetector? _mlKitStill;
+  static fdt.FaceDetector? _tfliteFallback;
 
-  static Future<fdt.FaceDetector> _live({required bool isFrontCamera}) async {
-    if (isFrontCamera) {
-      if (_liveDetector != null) return _liveDetector!;
-      final detector = fdt.FaceDetector();
-      await detector.initialize(model: fdt.FaceDetectionModel.frontCamera);
-      _liveDetector = detector;
-      return detector;
-    }
+  static FaceDetectorOptions get _liveOptions => FaceDetectorOptions(
+        enableLandmarks: true,
+        enableContours: false,
+        enableClassification: false,
+        performanceMode: FaceDetectorMode.accurate,
+        minFaceSize: 0.12,
+      );
 
-    if (_liveBackDetector != null) return _liveBackDetector!;
-    final detector = fdt.FaceDetector();
-    await detector.initialize(model: fdt.FaceDetectionModel.backCamera);
-    _liveBackDetector = detector;
-    return detector;
+  static FaceDetectorOptions get _stillOptions => FaceDetectorOptions(
+        enableLandmarks: true,
+        enableContours: false,
+        enableClassification: false,
+        performanceMode: FaceDetectorMode.accurate,
+        minFaceSize: 0.08,
+      );
+
+  static Future<FaceDetector> _liveMlKit() async {
+    _mlKitLive ??= FaceDetector(options: _liveOptions);
+    return _mlKitLive!;
   }
 
-  static Future<fdt.FaceDetector> _static() async {
-    if (_staticDetector != null) return _staticDetector!;
-    final detector = fdt.FaceDetector();
-    await detector.initialize(model: fdt.FaceDetectionModel.frontCamera);
-    _staticDetector = detector;
-    return detector;
+  static Future<FaceDetector> _stillMlKit() async {
+    _mlKitStill ??= FaceDetector(options: _stillOptions);
+    return _mlKitStill!;
   }
 
-  /// Photo-oriented detector — same model, but without selfie horizontal flip.
-  static Future<fdt.FaceDetector> _accurate() async {
-    if (_accurateDetector != null) return _accurateDetector!;
+  static Future<fdt.FaceDetector> _tflite() async {
+    if (_tfliteFallback != null) return _tfliteFallback!;
     final detector = fdt.FaceDetector();
     await detector.initialize(model: fdt.FaceDetectionModel.backCamera);
-    _accurateDetector = detector;
+    _tfliteFallback = detector;
     return detector;
   }
 
   static Future<void> dispose() async {
-    _liveDetector?.dispose();
-    _liveBackDetector?.dispose();
-    _staticDetector?.dispose();
-    _accurateDetector?.dispose();
-    _liveDetector = null;
-    _liveBackDetector = null;
-    _staticDetector = null;
-    _accurateDetector = null;
+    await _mlKitLive?.close();
+    await _mlKitStill?.close();
+    _mlKitLive = null;
+    _mlKitStill = null;
+    _tfliteFallback?.dispose();
+    _tfliteFallback = null;
   }
 
   static Future<List<CameraDetectedFace>> detectFromFilepath(
     String path, {
     bool accurate = true,
   }) async {
+    try {
+      final detector = await _stillMlKit();
+      final faces = await detector.processImage(InputImage.fromFilePath(path));
+      final converted = faces.map(_convertMlKit).toList(growable: false);
+      if (converted.isNotEmpty) return converted;
+    } catch (e, st) {
+      debugPrint('ML Kit still detection failed, TFLite fallback: $e\n$st');
+    }
+
     final bytes = await File(path).readAsBytes();
     if (accurate) {
       final result = await detectAccurateFromBytes(bytes);
@@ -79,17 +92,22 @@ class CameraFaceDetection {
     bool live = false,
     bool isFrontCamera = true,
   }) async {
-    final detector = live
-        ? await _live(isFrontCamera: isFrontCamera)
-        : await _static();
+    try {
+      final faces = await _detectMlKitFromJpegBytes(bytes);
+      if (faces.isNotEmpty) return faces;
+    } catch (e, st) {
+      debugPrint('ML Kit bytes detection failed, TFLite fallback: $e\n$st');
+    }
+
+    final detector = await _tflite();
     final result = await detector.detectFaces(
       bytes,
       mode: fdt.FaceDetectionMode.fast,
     );
-    return result.faces.map(_convert).toList(growable: false);
+    return result.faces.map(_convertTflite).toList(growable: false);
   }
 
-  /// Best-effort detection for still photos: EXIF fix, no mirror flip, ROI refine.
+  /// Best-effort detection for still photos: EXIF fix + ML Kit / TFLite refine.
   static Future<CameraFaceDetectionResult> detectAccurateFromBytes(
     Uint8List bytes,
   ) async {
@@ -108,9 +126,22 @@ class CameraFaceDetection {
       decoded.height.toDouble(),
     );
 
+    try {
+      final faces = await _detectMlKitFromJpegBytes(displayBytes);
+      if (faces.isNotEmpty) {
+        return CameraFaceDetectionResult(
+          faces: faces,
+          imageBytes: displayBytes,
+          imageSize: originalSize,
+        );
+      }
+    } catch (e, st) {
+      debugPrint('ML Kit accurate detection failed: $e\n$st');
+    }
+
+    // TFLite fallback with optional resize.
     var detectionBytes = displayBytes;
     var detectionSize = originalSize;
-
     final resizedBytes = _normalizeDetectionSize(decoded);
     if (resizedBytes != null) {
       detectionBytes = resizedBytes;
@@ -123,11 +154,13 @@ class CameraFaceDetection {
       }
     }
 
-    var faces = await _detectPhotoFaces(detectionBytes);
+    final detector = await _tflite();
+    var pipeline = await detector.detectFaces(detectionBytes);
+    var faces = pipeline.faces.map(_convertTflite).toList(growable: false);
     if (faces.isEmpty && detectionBytes != displayBytes) {
-      detectionBytes = displayBytes;
+      pipeline = await detector.detectFaces(displayBytes);
+      faces = pipeline.faces.map(_convertTflite).toList(growable: false);
       detectionSize = originalSize;
-      faces = await _detectPhotoFaces(detectionBytes);
     }
 
     if (faces.isEmpty) {
@@ -137,16 +170,6 @@ class CameraFaceDetection {
         imageSize: originalSize,
       );
     }
-
-    final primary = _pickPrimaryFace(faces);
-    final detector = await _accurate();
-    final refined = await _refineFace(
-      detector: detector,
-      bytes: detectionBytes,
-      face: primary,
-      imageSize: detectionSize,
-    );
-    faces = [refined ?? primary];
 
     final scaleX = originalSize.width / detectionSize.width;
     final scaleY = originalSize.height / detectionSize.height;
@@ -183,44 +206,83 @@ class CameraFaceDetection {
     return bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
   }
 
-  static Future<List<CameraDetectedFace>> _detectPhotoFaces(
-    Uint8List bytes,
-  ) async {
-    final detector = await _accurate();
-    final pipeline = await detector.detectFaces(bytes);
-    return pipeline.faces.map(_convert).toList(growable: false);
+  /// Live detection via ML Kit on the **native** NV21/BGRA buffer.
+  ///
+  /// Avoids CamerAwesome `toJpeg` — its Android Rect uses width/height as
+  /// right/bottom, which often encodes only a top-left slice (landmarks stuck
+  /// in the corner). Coordinates stay in analysis-buffer space; the mapper
+  /// rotates them upright for [BoxFit.cover].
+  static Future<CameraLiveFaceDetectionResult> detectLiveFromAnalysisImage(
+    AnalysisImage image, {
+    bool isFrontCamera = true,
+  }) async {
+    try {
+      final inputImage = await _analysisToInputImage(image);
+      if (inputImage == null) {
+        return const CameraLiveFaceDetectionResult(
+          faces: [],
+          detectionSize: Size.zero,
+        );
+      }
+
+      final detector = await _liveMlKit();
+      final faces = await detector.processImage(inputImage);
+      return CameraLiveFaceDetectionResult(
+        faces: faces.map(_convertMlKit).toList(growable: false),
+        detectionSize: image.uprightSize,
+      );
+    } catch (e, st) {
+      debugPrint('Live ML Kit face detection failed: $e\n$st');
+      return const CameraLiveFaceDetectionResult(
+        faces: [],
+        detectionSize: Size.zero,
+      );
+    }
+  }
+
+  static Future<InputImage?> _analysisToInputImage(AnalysisImage image) async {
+    final direct = image.toInputImage();
+    if (direct != null) return direct;
+
+    final nv21 = await image.when<Future<Nv21Image?>>(
+      yuv420: (frame) => frame.toNv21(),
+      nv21: (frame) async => frame,
+      bgra8888: (_) async => null,
+      jpeg: (_) async => null,
+    );
+    return nv21?.toInputImage();
   }
 
   static Future<List<CameraDetectedFace>> detectFromAnalysisImage(
     AnalysisImage image, {
     bool isFrontCamera = true,
   }) async {
-    try {
-      final jpegBytes = await _analysisImageToJpegBytes(image);
-      if (jpegBytes == null) return const [];
-      return detectFromBytes(
-        jpegBytes,
-        live: true,
-        isFrontCamera: isFrontCamera,
-      );
-    } catch (e, st) {
-      debugPrint('Live face detection failed: $e\n$st');
-      return const [];
-    }
+    final result = await detectLiveFromAnalysisImage(
+      image,
+      isFrontCamera: isFrontCamera,
+    );
+    return result.faces;
   }
 
-  static Future<Uint8List?> _analysisImageToJpegBytes(
-    AnalysisImage image,
-  ) async {
-    return image.when<Future<Uint8List?>>(
-      jpeg: (frame) async => frame.bytes,
-      nv21: (frame) async => (await frame.toJpeg(quality: 80)).bytes,
-      bgra8888: (frame) async => (await frame.toJpeg(quality: 80)).bytes,
-      yuv420: (frame) async {
-        final nv21 = await frame.toNv21();
-        return (await nv21.toJpeg(quality: 80)).bytes;
-      },
+  static Future<List<CameraDetectedFace>> _detectMlKitFromJpegBytes(
+    Uint8List bytes, {
+    bool live = false,
+  }) async {
+    final dir = await getTemporaryDirectory();
+    final file = File(
+      '${dir.path}/face_detect_${DateTime.now().microsecondsSinceEpoch}.jpg',
     );
+    try {
+      await file.writeAsBytes(bytes, flush: true);
+      final detector = live ? await _liveMlKit() : await _stillMlKit();
+      final faces =
+          await detector.processImage(InputImage.fromFilePath(file.path));
+      return faces.map(_convertMlKit).toList(growable: false);
+    } finally {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
   }
 
   static Uint8List? _normalizeDetectionSize(img.Image decoded) {
@@ -240,51 +302,61 @@ class CameraFaceDetection {
     return Uint8List.fromList(img.encodePng(resized));
   }
 
-  static CameraDetectedFace _pickPrimaryFace(List<CameraDetectedFace> faces) {
-    return faces.reduce((a, b) {
-      final areaA = a.boundingBox.width * a.boundingBox.height;
-      final areaB = b.boundingBox.width * b.boundingBox.height;
-      return areaA >= areaB ? a : b;
-    });
-  }
+  static CameraDetectedFace _convertMlKit(Face face) {
+    Offset? landmark(FaceLandmarkType type) {
+      final lm = face.landmarks[type];
+      if (lm == null) return null;
+      return Offset(lm.position.x.toDouble(), lm.position.y.toDouble());
+    }
 
-  static Future<CameraDetectedFace?> _refineFace({
-    required fdt.FaceDetector detector,
-    required Uint8List bytes,
-    required CameraDetectedFace face,
-    required Size imageSize,
-  }) async {
-    final w = imageSize.width;
-    final h = imageSize.height;
-    if (w <= 0 || h <= 0) return null;
+    Offset? mouth() {
+      final bottom = landmark(FaceLandmarkType.bottomMouth);
+      if (bottom != null) return bottom;
+      final left = landmark(FaceLandmarkType.leftMouth);
+      final right = landmark(FaceLandmarkType.rightMouth);
+      if (left != null && right != null) {
+        return Offset((left.dx + right.dx) / 2, (left.dy + right.dy) / 2);
+      }
+      return left ?? right;
+    }
 
+    final landmarks = <CameraFaceLandmarkType, Offset>{};
+    final leftEye = landmark(FaceLandmarkType.leftEye);
+    final rightEye = landmark(FaceLandmarkType.rightEye);
+    final nose = landmark(FaceLandmarkType.noseBase);
+    final mouthPoint = mouth();
+    final leftEar = landmark(FaceLandmarkType.leftEar);
+    final rightEar = landmark(FaceLandmarkType.rightEar);
+
+    if (leftEye != null) landmarks[CameraFaceLandmarkType.leftEye] = leftEye;
+    if (rightEye != null) landmarks[CameraFaceLandmarkType.rightEye] = rightEye;
+    if (nose != null) landmarks[CameraFaceLandmarkType.noseBase] = nose;
+    if (mouthPoint != null) landmarks[CameraFaceLandmarkType.mouth] = mouthPoint;
+    if (leftEar != null) landmarks[CameraFaceLandmarkType.leftEar] = leftEar;
+    if (rightEar != null) landmarks[CameraFaceLandmarkType.rightEar] = rightEar;
+
+    // If ears are missing, estimate from eyes + face width.
     final box = face.boundingBox;
-    final roi = fdt.RectF(
-      box.left / w,
-      box.top / h,
-      box.right / w,
-      box.bottom / h,
-    ).expand(0.45);
+    if (leftEar == null && leftEye != null) {
+      landmarks[CameraFaceLandmarkType.leftEar] = Offset(
+        box.left + box.width * 0.05,
+        leftEye.dy,
+      );
+    }
+    if (rightEar == null && rightEye != null) {
+      landmarks[CameraFaceLandmarkType.rightEar] = Offset(
+        box.right - box.width * 0.05,
+        rightEye.dy,
+      );
+    }
 
-    final clamped = fdt.RectF(
-      roi.xmin.clamp(0.0, 1.0),
-      roi.ymin.clamp(0.0, 1.0),
-      roi.xmax.clamp(0.0, 1.0),
-      roi.ymax.clamp(0.0, 1.0),
+    return CameraDetectedFace(
+      boundingBox: box,
+      landmarks: landmarks,
     );
-
-    if (clamped.w <= 0.05 || clamped.h <= 0.05) return null;
-
-    final refined = await detector.detectFaces(bytes, roi: clamped);
-    if (refined.faces.isEmpty) return null;
-
-    final best = refined.faces.reduce(
-      (a, b) => a.detection.score >= b.detection.score ? a : b,
-    );
-    return _convert(best);
   }
 
-  static CameraDetectedFace _convert(fdt.FaceResult face) {
+  static CameraDetectedFace _convertTflite(fdt.FaceResult face) {
     final det = face.detection;
     final width = face.originalSize.width;
     final height = face.originalSize.height;
@@ -325,4 +397,14 @@ class CameraFaceDetectionResult {
   final List<CameraDetectedFace> faces;
   final Uint8List imageBytes;
   final Size imageSize;
+}
+
+class CameraLiveFaceDetectionResult {
+  const CameraLiveFaceDetectionResult({
+    required this.faces,
+    required this.detectionSize,
+  });
+
+  final List<CameraDetectedFace> faces;
+  final Size detectionSize;
 }

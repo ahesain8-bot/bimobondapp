@@ -90,17 +90,18 @@ class CameraEffectPlacement {
 class CameraEffectPlacementDefaults {
   CameraEffectPlacementDefaults._();
 
-  /// Eye-anchored placement; must not be replaced by API `on_face` + positive offsetY.
+  /// Eye-anchored sunglasses — matches corrected backend
+  /// `defaultsBySlug.sunglasses` (between eyes, not on_face + offsetY 0.12).
   static const CameraEffectPlacement sunglasses = CameraEffectPlacement(
     anchorType: CameraEffectAnchorType.betweenLandmarks,
     anchorLandmarks: [
       CameraFaceLandmarkType.leftEye,
       CameraFaceLandmarkType.rightEye,
     ],
-    scaleFactor: 2.5,
-    offsetY: -0.06,
+    scaleFactor: 2.2,
+    offsetY: -0.05,
     fallbackAnchorType: CameraEffectAnchorType.onFace,
-    fallbackOffsetY: -0.2,
+    fallbackOffsetY: -0.18,
     fallbackScaleFactor: 1,
   );
 
@@ -123,7 +124,7 @@ class CameraEffectPlacementDefaults {
     ),
     'hearts': const CameraEffectPlacement(
       anchorType: CameraEffectAnchorType.onFace,
-      scaleFactor: 1,
+      scaleFactor: 0.45,
       offsetY: 0,
     ),
     'sparkle': const CameraEffectPlacement(
@@ -140,35 +141,36 @@ class CameraEffectPlacementDefaults {
   static void applyRemoteDefaults(Map<String, dynamic> defaultsBySlug) {
     for (final entry in defaultsBySlug.entries) {
       final slug = entry.key;
-      if (slug == 'sunglasses') continue;
       final raw = entry.value;
       if (raw is! Map) continue;
       final map = Map<String, dynamic>.from(raw);
       final resolved = _fromJsonMap(map);
       if (resolved.anchorType == null) continue;
       final existing = bySlug[slug];
+      // Remote/dashboard schema wins; local seeds only fill missing fields.
       bySlug[slug] = existing == null
           ? resolved
-          : _mergePlacement(existing, resolved);
+          : _mergePlacement(resolved, existing);
     }
   }
 
   static CameraEffectPlacement resolve(CameraEffectEntity entity) {
-    // Sunglasses must anchor between eyes; API `on_face` + positive offsetY sits on the mouth.
-    if (entity.slug == 'sunglasses') {
-      return sunglasses;
-    }
-
     final fromEntity = _fromEntity(entity);
     final defaults = bySlug[entity.slug];
 
-    // Seeded defaults win over API entity fields for known slugs.
-    if (defaults?.anchorType != null) {
-      return _mergePlacement(defaults!, fromEntity);
+    // Catalog/API entity wins; seeded defaults fill missing fields only.
+    // Exception: legacy sunglasses `on_face` + positive offsetY sits on the
+    // mouth — promote to eye landmarks when the API still sends that preset.
+    if (entity.slug == 'sunglasses' && _isLegacySunglassesOnFace(fromEntity)) {
+      return _mergePlacement(sunglasses, fromEntity);
     }
 
     if (fromEntity.anchorType != null) {
-      return fromEntity;
+      return _mergePlacement(fromEntity, defaults);
+    }
+
+    if (defaults?.anchorType != null) {
+      return defaults!;
     }
 
     if (entity.isScreenEffect) {
@@ -180,25 +182,32 @@ class CameraEffectPlacementDefaults {
     return defaults ?? const CameraEffectPlacement();
   }
 
+  static bool _isLegacySunglassesOnFace(CameraEffectPlacement placement) {
+    if (placement.anchorType != CameraEffectAnchorType.onFace) return false;
+    final offsetY = placement.offsetY ?? 0;
+    return offsetY >= 0;
+  }
+
+  /// [primary] wins for every non-null field; [fallback] fills gaps.
   static CameraEffectPlacement _mergePlacement(
     CameraEffectPlacement primary,
-    CameraEffectPlacement? defaults,
+    CameraEffectPlacement? fallback,
   ) {
-    if (defaults == null) return primary;
+    if (fallback == null) return primary;
     return CameraEffectPlacement(
-      anchorType: primary.anchorType ?? defaults.anchorType,
+      anchorType: primary.anchorType ?? fallback.anchorType,
       anchorLandmarks: primary.anchorLandmarks.isNotEmpty
           ? primary.anchorLandmarks
-          : defaults.anchorLandmarks,
-      scaleFactor: primary.scaleFactor ?? defaults.scaleFactor,
-      offsetX: primary.offsetX ?? defaults.offsetX,
-      offsetY: primary.offsetY ?? defaults.offsetY,
-      landmarkSize: primary.landmarkSize ?? defaults.landmarkSize,
+          : fallback.anchorLandmarks,
+      scaleFactor: primary.scaleFactor ?? fallback.scaleFactor,
+      offsetX: primary.offsetX ?? fallback.offsetX,
+      offsetY: primary.offsetY ?? fallback.offsetY,
+      landmarkSize: primary.landmarkSize ?? fallback.landmarkSize,
       fallbackAnchorType:
-          primary.fallbackAnchorType ?? defaults.fallbackAnchorType,
-      fallbackOffsetY: primary.fallbackOffsetY ?? defaults.fallbackOffsetY,
+          primary.fallbackAnchorType ?? fallback.fallbackAnchorType,
+      fallbackOffsetY: primary.fallbackOffsetY ?? fallback.fallbackOffsetY,
       fallbackScaleFactor:
-          primary.fallbackScaleFactor ?? defaults.fallbackScaleFactor,
+          primary.fallbackScaleFactor ?? fallback.fallbackScaleFactor,
     );
   }
 

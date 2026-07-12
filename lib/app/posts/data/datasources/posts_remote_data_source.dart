@@ -485,7 +485,7 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       final response = await apiClient.dio.post(
         ApiConstants.recordPostView(postId),
         data: body.isEmpty ? null : body,
-        options: Options(headers: await _optionalAuthHeaders()),
+        options: Options(headers: await _requiredAuthHeaders()),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

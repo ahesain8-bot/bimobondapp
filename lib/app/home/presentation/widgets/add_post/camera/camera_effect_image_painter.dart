@@ -121,7 +121,7 @@ class CameraEffectImagePainter {
     CameraEffectDefinition effect,
     CameraEffectPlacement placement,
   ) {
-    final box = face.boundingBox;
+    final box = _visualFaceBox(face);
     final scale = placement.scaleFactor ?? 1;
     final offsetX = (placement.offsetX ?? 0) * box.width;
     final offsetY = (placement.offsetY ?? 0) * box.height;
@@ -130,13 +130,18 @@ class CameraEffectImagePainter {
     _drawSticker(canvas, effect, center, size);
   }
 
+  /// BlazeFace boxes are tighter than the visible face; inflate so cover
+  /// masks actually reach forehead / cheeks / chin at scaleFactor 1.0.
+  static const double _coverFaceBoxPaddingX = 1.18;
+  static const double _coverFaceBoxPaddingY = 1.32;
+
   static void _paintCoverFace(
     Canvas canvas,
     ScreenFace face,
     CameraEffectDefinition effect,
     CameraEffectPlacement placement,
   ) {
-    final box = face.boundingBox;
+    final box = _visualFaceBox(face);
     final scale = placement.scaleFactor ?? 1;
     final offsetX = (placement.offsetX ?? 0) * box.width;
     final offsetY = (placement.offsetY ?? 0) * box.height;
@@ -146,7 +151,23 @@ class CameraEffectImagePainter {
       width: box.width * scale,
       height: box.height * scale,
     );
-    _drawStickerInRect(canvas, effect, rect, fit: BoxFit.cover);
+    _drawStickerInRect(canvas, effect, rect, fit: BoxFit.fill);
+  }
+
+  /// Expands the detector box using landmarks + padding so masks match the
+  /// visual face better than the raw TFLite rectangle.
+  static Rect _visualFaceBox(ScreenFace face) {
+    var box = face.boundingBox;
+    for (final point in face.landmarks.values) {
+      box = box.expandToInclude(
+        Rect.fromCenter(center: point, width: 1, height: 1),
+      );
+    }
+    return Rect.fromCenter(
+      center: box.center,
+      width: box.width * _coverFaceBoxPaddingX,
+      height: box.height * _coverFaceBoxPaddingY,
+    );
   }
 
   static void _paintAboveFace(
@@ -155,7 +176,7 @@ class CameraEffectImagePainter {
     CameraEffectDefinition effect,
     CameraEffectPlacement placement,
   ) {
-    final box = face.boundingBox;
+    final box = _visualFaceBox(face);
     final scale = placement.scaleFactor ?? 1;
     final offsetX = (placement.offsetX ?? 0) * box.width;
     final offsetY = placement.offsetY ?? -0.55;
@@ -173,16 +194,31 @@ class CameraEffectImagePainter {
     CameraEffectDefinition effect,
     CameraEffectPlacement placement,
   ) {
-    final box = face.boundingBox;
+    final box = _visualFaceBox(face);
     final scale = placement.scaleFactor ?? 0.35;
     final offsetX = placement.offsetX ?? 0.22;
     final offsetY = placement.offsetY ?? -0.15;
     final size = box.width * scale;
-    final y = box.top + box.height * offsetY;
-    final left = Offset(box.left + box.width * offsetX, y);
-    final right = Offset(box.right - box.width * offsetX, y);
+
+    // Prefer ear/temple landmarks so left/right track the face, not only the box.
+    final leftEar = face.landmarks[CameraFaceLandmarkType.leftEar];
+    final rightEar = face.landmarks[CameraFaceLandmarkType.rightEar];
+
+    final Offset left;
+    final Offset right;
+    if (leftEar != null && rightEar != null) {
+      final lift = box.height * ((offsetY < 0 ? -offsetY : 0.15) + 0.08);
+      left = Offset(leftEar.dx, leftEar.dy - lift);
+      right = Offset(rightEar.dx, rightEar.dy - lift);
+    } else {
+      final y = box.top + box.height * offsetY;
+      left = Offset(box.left + box.width * offsetX, y);
+      right = Offset(box.right - box.width * offsetX, y);
+    }
+
     _drawSticker(canvas, effect, left, size);
-    _drawSticker(canvas, effect, right, size);
+    // Mirror the right copy so ear/bunny assets face outward.
+    _drawSticker(canvas, effect, right, size, mirrorX: true);
   }
 
   static void _paintBetweenLandmarks(
@@ -199,38 +235,59 @@ class CameraEffectImagePainter {
           ];
     final first = face.landmarks[keys[0]];
     final second = face.landmarks[keys[1]];
+    final box = _visualFaceBox(face);
+    final faceW = box.width.clamp(1.0, double.infinity);
+
     if (first == null || second == null) {
-      final fallback =
-          placement.fallbackAnchorType == CameraEffectAnchorType.onFace
-          ? placement.copyWith(
-              anchorType: CameraEffectAnchorType.onFace,
-              offsetY: placement.fallbackOffsetY ?? -0.2,
-              scaleFactor:
-                  placement.fallbackScaleFactor ?? placement.scaleFactor,
-            )
-          : placement;
-      _paintOnFace(canvas, face, effect, fallback);
-      return;
-    }
-
-    final eyeSpan = (second.dx - first.dx).abs();
-    final center = Offset(
-      (first.dx + second.dx) / 2 + (placement.offsetX ?? 0) * eyeSpan,
-      (first.dy + second.dy) / 2 + (placement.offsetY ?? 0) * eyeSpan,
-    );
-    final width = eyeSpan * (placement.scaleFactor ?? 2.2);
-
-    if (effect.hasAsset) {
-      final rect = Rect.fromCenter(
-        center: center,
-        width: width,
-        height: width * 0.42,
+      _paintOnFace(
+        canvas,
+        face,
+        effect,
+        placement.copyWith(
+          anchorType: CameraEffectAnchorType.onFace,
+          offsetY: placement.fallbackOffsetY ?? -0.18,
+          scaleFactor: placement.fallbackScaleFactor ?? 1.15,
+        ),
       );
-      _drawStickerInRect(canvas, effect, rect, fit: BoxFit.contain);
       return;
     }
 
-    _drawSticker(canvas, effect, center, width);
+    final eyeSpan = (second - first).distance;
+    final eyeMid = Offset((first.dx + second.dx) / 2, (first.dy + second.dy) / 2);
+
+    // After preview mapping, eye X-span often collapses. Prefer face-box width
+    // for size, and face-center X when the eye span is unreliable.
+    final spanReliable = eyeSpan >= faceW * 0.28;
+    final center = Offset(
+      (spanReliable ? eyeMid.dx : box.center.dx) +
+          (placement.offsetX ?? 0) * faceW,
+      eyeMid.dy + (placement.offsetY ?? 0) * faceW,
+    );
+
+    // scaleFactor on between_landmarks is historically "× eye span" (~2.2).
+    // Convert to face-width sizing so glasses stay large on the face.
+    final rawScale = placement.scaleFactor ?? 2.2;
+    final width = rawScale > 1.5 ? faceW * (rawScale / 2.0) : faceW * rawScale;
+    final height = effect.hasAsset ? width * 0.42 : width;
+    final angle = spanReliable
+        ? math.atan2(second.dy - first.dy, second.dx - first.dx)
+        : 0.0;
+
+    final rect = Rect.fromCenter(
+      center: Offset.zero,
+      width: width,
+      height: height,
+    );
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(angle);
+    if (effect.hasAsset) {
+      _drawStickerInRect(canvas, effect, rect, fit: BoxFit.contain);
+    } else {
+      _drawSticker(canvas, effect, Offset.zero, width);
+    }
+    canvas.restore();
   }
 
   static void _paintOnLandmark(
@@ -245,12 +302,42 @@ class CameraEffectImagePainter {
         : const [CameraFaceLandmarkType.noseBase];
     final targets = all ? keys : [keys.first];
     final landmarkSize = placement.landmarkSize ?? 0.2;
-    final size = face.boundingBox.width * landmarkSize;
+    final box = _visualFaceBox(face);
+    final size = box.width * landmarkSize;
+    final offsetX = (placement.offsetX ?? 0) * box.width;
+    final offsetY = (placement.offsetY ?? 0) * box.height;
+    final faceCenter = box.center;
 
+    var drewAny = false;
     for (final key in targets) {
-      final point = face.landmarks[key];
+      var point = face.landmarks[key];
       if (point == null) continue;
-      _drawSticker(canvas, effect, point, size);
+      drewAny = true;
+
+      // Tragion sits near the temple/eye corner — push outward so dashboard
+      // "left ear" / "right ear" stickers land on the ear, not the cheek/nose.
+      if (key == CameraFaceLandmarkType.leftEar ||
+          key == CameraFaceLandmarkType.rightEar) {
+        final outward = point.dx <= faceCenter.dx ? -1.0 : 1.0;
+        point += Offset(box.width * 0.28 * outward, -box.height * 0.02);
+      }
+
+      final mirror =
+          all &&
+          (key == CameraFaceLandmarkType.rightEar ||
+              key == CameraFaceLandmarkType.rightEye);
+      _drawSticker(
+        canvas,
+        effect,
+        point + Offset(offsetX, offsetY),
+        size,
+        mirrorX: mirror,
+      );
+    }
+
+    // If landmark keys were missing (common for ears), fall back to dual box.
+    if (!drewAny && all && targets.length >= 2) {
+      _paintDualAboveFace(canvas, face, effect, placement);
     }
   }
 
@@ -291,10 +378,21 @@ class CameraEffectImagePainter {
     Canvas canvas,
     CameraEffectDefinition effect,
     Offset center,
-    double size,
-  ) {
+    double size, {
+    bool mirrorX = false,
+  }) {
     final rect = Rect.fromCenter(center: center, width: size, height: size);
+    if (!mirrorX) {
+      _drawStickerInRect(canvas, effect, rect, fit: BoxFit.contain);
+      return;
+    }
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(-1, 1);
+    canvas.translate(-center.dx, -center.dy);
     _drawStickerInRect(canvas, effect, rect, fit: BoxFit.contain);
+    canvas.restore();
   }
 
   static void _drawStickerInRect(

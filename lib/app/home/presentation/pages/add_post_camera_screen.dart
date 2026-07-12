@@ -678,7 +678,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               ),
               filter: _effectiveCaptureFilter(),
               filters: CameraFilterCatalog.gpuFiltersForCamera,
-              previewFit: CameraPreviewFit.contain,
+              previewFit: CameraPreviewFit.cover,
               onMediaCaptureEvent: _onMediaCapture,
               onImageForAnalysis: _onImageForAnalysis,
               imageAnalysisConfig: AnalysisConfig(
