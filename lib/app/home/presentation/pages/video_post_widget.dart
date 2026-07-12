@@ -173,6 +173,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       unawaited(_pausePostSound());
       _syncMusicDiscAnimation();
     } else if (widget.isActive) {
+      // Gate may open while this page was already active — still count the view.
+      _recordViewIfNeeded();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_playbackActive) return;
         unawaited(
