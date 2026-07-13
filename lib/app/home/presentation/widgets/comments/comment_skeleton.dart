@@ -1,12 +1,52 @@
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
+
+class _CommentSkeletonBox extends StatelessWidget {
+  const _CommentSkeletonBox({
+    this.height,
+    this.width,
+    this.borderRadius = 8,
+  }) : shape = BoxShape.rectangle;
+
+  const _CommentSkeletonBox.circular({required double size})
+    : height = size,
+      width = size,
+      borderRadius = size / 2,
+      shape = BoxShape.circle;
+
+  final double? height;
+  final double? width;
+  final double borderRadius;
+  final BoxShape shape;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06);
+    final highlight =
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12);
+
+    return Shimmer.fromColors(
+      baseColor: base,
+      highlightColor: highlight,
+      child: Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          color: base,
+          shape: shape,
+          borderRadius: shape == BoxShape.circle
+              ? null
+              : BorderRadius.circular(borderRadius),
+        ),
+      ),
+    );
+  }
+}
 
 class CommentSkeletonRow extends StatelessWidget {
   const CommentSkeletonRow({this.isReply = false, super.key});
-
-  static const _tone = LiquidGlassSkeletonTone.light;
 
   final bool isReply;
 
@@ -19,34 +59,34 @@ class CommentSkeletonRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LiquidGlassSkeletonBox.circular(size: avatarSize, tone: _tone),
+        _CommentSkeletonBox.circular(size: avatarSize),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LiquidGlassSkeletonBox(
-                height: 14,
-                width: isReply ? 110 : 140,
-                tone: _tone,
+              _CommentSkeletonBox(
+                height: 13,
+                width: isReply ? 90 : 110,
+                borderRadius: 4,
               ),
               const SizedBox(height: 8),
-              const LiquidGlassSkeletonBox(
-                height: 15,
+              const _CommentSkeletonBox(
+                height: 14,
                 width: double.infinity,
-                tone: _tone,
+                borderRadius: 4,
               ),
               const SizedBox(height: 4),
-              LiquidGlassSkeletonBox(
-                height: 15,
-                width: isReply ? 160 : 220,
-                tone: _tone,
-              ),
-              const SizedBox(height: 12),
-              LiquidGlassSkeletonBox(
+              _CommentSkeletonBox(
                 height: 14,
-                width: isReply ? 72 : 100,
-                tone: _tone,
+                width: isReply ? 140 : 200,
+                borderRadius: 4,
+              ),
+              const SizedBox(height: 10),
+              _CommentSkeletonBox(
+                height: 12,
+                width: isReply ? 64 : 88,
+                borderRadius: 4,
               ),
             ],
           ),

@@ -38,6 +38,7 @@ class UserEntity extends Equatable {
   final String? updatedAt;
   final bool? isNewUser;
   final bool? isProfileIncomplete;
+  final bool? needsInterests;
   final String? authToken;
   final String? deviceToken;
 
@@ -79,6 +80,7 @@ class UserEntity extends Equatable {
     this.updatedAt,
     this.isNewUser,
     this.isProfileIncomplete,
+    this.needsInterests,
     this.authToken,
     this.deviceToken,
   });
@@ -122,6 +124,7 @@ class UserEntity extends Equatable {
     updatedAt,
     isNewUser,
     isProfileIncomplete,
+    needsInterests,
     authToken,
     deviceToken,
   ];

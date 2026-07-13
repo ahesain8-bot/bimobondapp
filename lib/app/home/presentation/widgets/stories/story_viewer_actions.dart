@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,9 @@ class StoryViewerBottomActions extends StatelessWidget {
           child: Icon(
             isLiked ? Icons.favorite : LucideIcons.heart,
             size: 22,
-            color: isLiked ? Colors.red : Colors.white.withValues(alpha: 0.9),
+            color: isLiked
+                ? AppTheme.primaryColor
+                : Colors.white.withValues(alpha: 0.9),
           ),
         ),
         if (onMessage != null) ...[
@@ -74,7 +77,7 @@ class StoryViewerBottomActions extends StatelessWidget {
   }
 }
 
-/// Tappable viewer count for story owner (opens likes/views sheet).
+/// TikTok-style owner views entry (bottom-left text + chevron).
 class StoryViewerViewersChip extends StatelessWidget {
   const StoryViewerViewersChip({
     required this.viewCount,
@@ -91,46 +94,25 @@ class StoryViewerViewersChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p12,
-          vertical: AppSizes.p8,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-        ),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSizes.p4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               LucideIcons.chevronUp,
-              size: 16,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-            const SizedBox(width: AppSizes.p4),
-            Icon(
-              LucideIcons.eye,
               size: 18,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: Colors.white.withValues(alpha: 0.95),
             ),
-            const SizedBox(width: AppSizes.p6),
+            const SizedBox(width: 4),
             Text(
-              formatCompactCount(viewCount),
+              '${formatCompactCount(viewCount)} $label',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: AppSizes.p4),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                letterSpacing: 0.1,
               ),
             ),
           ],

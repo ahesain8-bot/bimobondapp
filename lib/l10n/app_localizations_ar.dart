@@ -668,6 +668,54 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postsSearchHint => 'ابحث في المنشورات...';
 
   @override
+  String get searchAction => 'بحث';
+
+  @override
+  String get searchHistorySeeMore => 'عرض المزيد';
+
+  @override
+  String get searchHistorySeeLess => 'عرض أقل';
+
+  @override
+  String get searchHistoryClear => 'مسح';
+
+  @override
+  String get searchHistoryEmpty => 'لا توجد عمليات بحث حديثة';
+
+  @override
+  String get searchSeeAll => 'عرض الكل';
+
+  @override
+  String get searchSeeLess => 'عرض أقل';
+
+  @override
+  String get searchYouMayLike => 'قد يعجبك';
+
+  @override
+  String get searchNoResults => 'لا توجد منشورات';
+
+  @override
+  String get searchTabTop => 'الأعلى';
+
+  @override
+  String get searchTabUsers => 'المستخدمون';
+
+  @override
+  String get searchTabVideos => 'الفيديوهات';
+
+  @override
+  String get searchTabLive => 'مباشر';
+
+  @override
+  String get searchTabSounds => 'الأصوات';
+
+  @override
+  String get searchTabPlaces => 'الأماكن';
+
+  @override
+  String get searchComingSoon => 'قريبًا';
+
+  @override
   String get auctionsFiltersTitle => 'تصفية';
 
   @override
@@ -1047,6 +1095,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addLocationLabel => 'إضافة موقع';
+
+  @override
+  String get selectCity => 'اختر المدينة';
+
+  @override
+  String get selectCityHint => 'ابحث عن المدن';
+
+  @override
+  String get selectCountryHint => 'ابحث عن الدول';
+
+  @override
+  String get locationSearchHint => 'ابحث عن الدول أو المدن';
+
+  @override
+  String get clearLocation => 'مسح الموقع';
 
   @override
   String get everyoneLabel => 'الجميع';
@@ -1439,6 +1502,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesInboxTitle => 'البريد الوارد';
 
   @override
+  String get messagesNewChatTitle => 'محادثة جديدة';
+
+  @override
+  String get messagesNewChatSearchHint => 'بحث';
+
+  @override
+  String get closeAction => 'إغلاق';
+
+  @override
+  String get chatSendMessageHint => 'أرسل رسالة...';
+
+  @override
+  String get chatActiveYesterday => 'نشط أمس';
+
+  @override
   String get messagesSwitchAccount => 'تغيير الحساب';
 
   @override
@@ -1472,6 +1550,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesActivityActivities => 'أنشطة';
 
   @override
+  String get messagesActivityTitle => 'النشاط';
+
+  @override
+  String get messagesNewFollowers => 'متابعون جدد';
+
+  @override
   String get messagesActivityComments => 'تعليقات';
 
   @override
@@ -1479,6 +1563,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get messagesActivityNotifications => 'إشعارات';
+
+  @override
+  String get activityTabLikes => 'إعجابات';
+
+  @override
+  String get activityAllCaughtUp => 'أنت على اطلاع بكل شيء';
+
+  @override
+  String get activityClearNotificationsMessage => 'هل تريد إزالة جميع الإشعارات المقروءة من نشاطك؟';
+
+  @override
+  String get activityOpenCommentsSubtitle => 'عرض التعليقات على منشوراتك';
+
+  @override
+  String get activityInboxSubtitle => 'إعجابات وتعليقات والمزيد';
 
   @override
   String get messagesRecentMessages => 'الرسائل الأخيرة';
@@ -3002,6 +3101,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String interestSelectionMinHint(int count) {
     return 'اختر $count اهتمامات على الأقل';
   }
+
+  @override
+  String interestSelectionCountHint(int selected, int min) {
+    return '$selected/$min مهتم';
+  }
+
+  @override
+  String get interestSelectionNotInterestedHint => 'اضغط مرة أخرى لتحديد غير مهتم (اختياري).';
+
+  @override
+  String get interestSelectionNotInterestedLegend => 'غير مهتم';
+
+  @override
+  String get interestSelectionInterestedLegend => 'مهتم';
+
+  @override
+  String get interestSelectionSave => 'حفظ';
+
+  @override
+  String get settingsInterests => 'الاهتمامات';
 
   @override
   String get retry => 'حاول مرة أخرى';

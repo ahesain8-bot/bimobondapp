@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
     as auth_di;
+import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
 import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -59,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthSuccess) {
-      context.goNamed('home');
+      navigateAfterAuth(context, user: authState.user);
     } else {
       context.goNamed(
         'home',

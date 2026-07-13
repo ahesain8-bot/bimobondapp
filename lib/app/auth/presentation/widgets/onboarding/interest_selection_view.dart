@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/categories/presentation/utils/category_icons.dar
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_auth_widgets.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -15,39 +16,66 @@ class InterestSelectionView extends StatelessWidget {
     required this.isArabic,
     required this.isDark,
     required this.categories,
-    required this.selectedCategoryIds,
+    required this.interestedIds,
+    required this.notInterestedIds,
     required this.isLoadingCategories,
     required this.isSaving,
     required this.errorMessage,
-    required this.onCategoryToggled,
+    required this.showSkip,
+    required this.isEditMode,
+    required this.onCategoryCycled,
     required this.onRetryPressed,
     required this.onSkipPressed,
     required this.onContinuePressed,
+    this.onBackPressed,
     super.key,
   });
 
   static const int minSelectionCount = 3;
+  static const int maxInterestedCount = 20;
+  static const int maxNotInterestedCount = 20;
 
   final AppLocalizations l10n;
   final bool isArabic;
   final bool isDark;
   final List<CategoryEntity> categories;
-  final Set<String> selectedCategoryIds;
+  final Set<String> interestedIds;
+  final Set<String> notInterestedIds;
   final bool isLoadingCategories;
   final bool isSaving;
   final String? errorMessage;
-  final ValueChanged<String> onCategoryToggled;
+  final bool showSkip;
+  final bool isEditMode;
+  final ValueChanged<String> onCategoryCycled;
   final VoidCallback onRetryPressed;
   final VoidCallback onSkipPressed;
   final VoidCallback onContinuePressed;
+  final VoidCallback? onBackPressed;
 
-  bool get _canContinue =>
-      selectedCategoryIds.length >= minSelectionCount && !isSaving;
+  bool get _canContinue {
+    final interestedCount = interestedIds.length;
+    return interestedCount >= minSelectionCount &&
+        interestedCount <= maxInterestedCount &&
+        notInterestedIds.length <= maxNotInterestedCount &&
+        !isSaving;
+  }
+
+  InterestChipPreference _preferenceFor(String categoryId) {
+    if (interestedIds.contains(categoryId)) {
+      return InterestChipPreference.interested;
+    }
+    if (notInterestedIds.contains(categoryId)) {
+      return InterestChipPreference.notInterested;
+    }
+    return InterestChipPreference.none;
+  }
 
   @override
   Widget build(BuildContext context) {
     final textDirection = isArabic ? TextDirection.rtl : TextDirection.ltr;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final primary = Theme.of(context).colorScheme.primary;
+    final error = Theme.of(context).colorScheme.error;
 
     return Directionality(
       textDirection: textDirection,
@@ -66,16 +94,26 @@ class InterestSelectionView extends StatelessWidget {
                     AppSizes.p16,
                     0,
                   ),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: TextButton(
-                      onPressed: isSaving ? null : onSkipPressed,
-                      child: CustomText(
-                        l10n.interestSelectionSkip,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  child: Row(
+                    children: [
+                      if (isEditMode && onBackPressed != null)
+                        IconButton(
+                          onPressed: isSaving ? null : onBackPressed,
+                          icon: const DirectionalBackIcon(),
+                        )
+                      else
+                        const SizedBox(width: 48),
+                      const Spacer(),
+                      if (showSkip)
+                        TextButton(
+                          onPressed: isSaving ? null : onSkipPressed,
+                          child: CustomText(
+                            l10n.interestSelectionSkip,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -103,10 +141,35 @@ class InterestSelectionView extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSizes.p8),
                         CustomText(
-                          l10n.interestSelectionMinHint(minSelectionCount),
+                          l10n.interestSelectionCountHint(
+                            interestedIds.length,
+                            minSelectionCount,
+                          ),
                           variant: TextVariant.secondary,
                           fontSize: 14,
                           textAlign: TextAlign.start,
+                        ),
+                        const SizedBox(height: AppSizes.p4),
+                        CustomText(
+                          l10n.interestSelectionNotInterestedHint,
+                          variant: TextVariant.secondary,
+                          fontSize: 13,
+                          textAlign: TextAlign.start,
+                        ),
+                        const SizedBox(height: AppSizes.p16),
+                        Wrap(
+                          spacing: AppSizes.p16,
+                          runSpacing: AppSizes.p8,
+                          children: [
+                            _LegendItem(
+                              color: primary,
+                              label: l10n.interestSelectionInterestedLegend,
+                            ),
+                            _LegendItem(
+                              color: error,
+                              label: l10n.interestSelectionNotInterestedLegend,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: AppSizes.p24),
                         if (isLoadingCategories)
@@ -126,10 +189,8 @@ class InterestSelectionView extends StatelessWidget {
                                 InterestCategoryChip(
                                   label: category.name,
                                   icon: categoryIconForSlug(category.slug),
-                                  isSelected: selectedCategoryIds.contains(
-                                    category.id,
-                                  ),
-                                  onTap: () => onCategoryToggled(category.id),
+                                  preference: _preferenceFor(category.id),
+                                  onTap: () => onCategoryCycled(category.id),
                                 ),
                             ],
                           ),
@@ -157,7 +218,9 @@ class InterestSelectionView extends StatelessWidget {
                             ),
                           )
                         : CustomText(
-                            l10n.interestSelectionContinue,
+                            isEditMode
+                                ? l10n.interestSelectionSave
+                                : l10n.interestSelectionContinue,
                             color: Colors.white,
                             fontSize: AppSizes.authControlFontSize,
                             fontWeight: FontWeight.bold,
@@ -169,6 +232,36 @@ class InterestSelectionView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: AppSizes.p6),
+        CustomText(
+          label,
+          fontSize: 13,
+          variant: TextVariant.secondary,
+        ),
+      ],
     );
   }
 }

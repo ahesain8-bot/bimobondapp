@@ -26,6 +26,14 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
   final Color sentBubbleGradientStart;
   final Color sentBubbleGradientEnd;
   final List<Color> moreMenuIconColors;
+  /// TikTok-style inbox search field fill.
+  final Color inboxSearchFill;
+  /// Secondary / muted text on inbox & chat headers.
+  final Color inboxSecondaryText;
+  /// Trailing chevron / icons on inbox rows.
+  final Color inboxChevron;
+  /// Composer send button when idle (no text).
+  final Color sendIdleFill;
 
   const ChatTheme({
     required this.activeStatus,
@@ -49,6 +57,10 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     required this.sentBubbleGradientStart,
     required this.sentBubbleGradientEnd,
     required this.moreMenuIconColors,
+    required this.inboxSearchFill,
+    required this.inboxSecondaryText,
+    required this.inboxChevron,
+    required this.sendIdleFill,
   });
 
   static ChatTheme forBrightness(Brightness brightness, ColorScheme scheme) {
@@ -83,8 +95,8 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
               alpha: ChatLayoutConstants.patternOpacityLight,
             ),
       chatBackgroundColor: isDark
-          ? const Color(0xFF1E1619)
-          : const Color(0xFFFBEBF1),
+          ? const Color(0xFF121212)
+          : Colors.white,
       sentBubbleGradientStart: scheme.primary.withValues(
         alpha: ChatLayoutConstants.sentBubbleOpacity,
       ),
@@ -101,6 +113,14 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
         Color(0xFFE91E63),
         Color(0xFF3F51B5),
       ],
+      inboxSearchFill: isDark
+          ? const Color(0xFF2C2C2C)
+          : const Color(0xFFF1F1F2),
+      inboxSecondaryText: scheme.onSurface.withValues(alpha: 0.45),
+      inboxChevron: scheme.onSurface.withValues(alpha: 0.28),
+      sendIdleFill: isDark
+          ? scheme.onSurface.withValues(alpha: 0.2)
+          : const Color(0xFFE8E8E8),
     );
   }
 
@@ -131,6 +151,10 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     Color? sentBubbleGradientStart,
     Color? sentBubbleGradientEnd,
     List<Color>? moreMenuIconColors,
+    Color? inboxSearchFill,
+    Color? inboxSecondaryText,
+    Color? inboxChevron,
+    Color? sendIdleFill,
   }) {
     return ChatTheme(
       activeStatus: activeStatus ?? this.activeStatus,
@@ -159,6 +183,10 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       sentBubbleGradientEnd:
           sentBubbleGradientEnd ?? this.sentBubbleGradientEnd,
       moreMenuIconColors: moreMenuIconColors ?? this.moreMenuIconColors,
+      inboxSearchFill: inboxSearchFill ?? this.inboxSearchFill,
+      inboxSecondaryText: inboxSecondaryText ?? this.inboxSecondaryText,
+      inboxChevron: inboxChevron ?? this.inboxChevron,
+      sendIdleFill: sendIdleFill ?? this.sendIdleFill,
     );
   }
 
@@ -227,6 +255,11 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
         t,
       )!,
       moreMenuIconColors: other.moreMenuIconColors,
+      inboxSearchFill: Color.lerp(inboxSearchFill, other.inboxSearchFill, t)!,
+      inboxSecondaryText:
+          Color.lerp(inboxSecondaryText, other.inboxSecondaryText, t)!,
+      inboxChevron: Color.lerp(inboxChevron, other.inboxChevron, t)!,
+      sendIdleFill: Color.lerp(sendIdleFill, other.sendIdleFill, t)!,
     );
   }
 }

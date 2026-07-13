@@ -18,7 +18,14 @@ class ProfileIconTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    // TikTok order: Posts · Private · Reposts · Saved · Liked
+    final tabs = <(int index, IconData icon)>[
+      (ProfileLayoutConstants.postsTabIndex, LucideIcons.layoutGrid),
+      (ProfileLayoutConstants.onlyMeTabIndex, LucideIcons.lock),
+      (ProfileLayoutConstants.repostsTabIndex, LucideIcons.repeat2),
+      (ProfileLayoutConstants.savedTabIndex, LucideIcons.bookmark),
+      (ProfileLayoutConstants.likedTabIndex, LucideIcons.heart),
+    ];
 
     return ColoredBox(
       color: backgroundColor,
@@ -28,48 +35,20 @@ class ProfileIconTabBar extends StatelessWidget {
             height: ProfileLayoutConstants.iconTabBarHeight,
             child: Row(
               children: [
-                _ProfileIconTab(
-                  isSelected: selectedIndex == 0,
-                  icon: LucideIcons.layoutGrid,
-                  colorScheme: colorScheme,
-                  theme: theme,
-                  onTap: () => onSelected(0),
-                ),
-                _ProfileIconTab(
-                  isSelected: selectedIndex == ProfileLayoutConstants.repostsTabIndex,
-                  icon: LucideIcons.repeat2,
-                  colorScheme: colorScheme,
-                  theme: theme,
-                  onTap: () => onSelected(ProfileLayoutConstants.repostsTabIndex),
-                ),
-                _ProfileIconTab(
-                  isSelected: selectedIndex == ProfileLayoutConstants.onlyMeTabIndex,
-                  icon: LucideIcons.lock,
-                  colorScheme: colorScheme,
-                  theme: theme,
-                  onTap: () => onSelected(ProfileLayoutConstants.onlyMeTabIndex),
-                ),
-                _ProfileIconTab(
-                  isSelected: selectedIndex == ProfileLayoutConstants.likedTabIndex,
-                  icon: LucideIcons.heart,
-                  colorScheme: colorScheme,
-                  theme: theme,
-                  onTap: () => onSelected(ProfileLayoutConstants.likedTabIndex),
-                ),
-                _ProfileIconTab(
-                  isSelected: selectedIndex == ProfileLayoutConstants.savedTabIndex,
-                  icon: LucideIcons.bookmark,
-                  colorScheme: colorScheme,
-                  theme: theme,
-                  onTap: () => onSelected(ProfileLayoutConstants.savedTabIndex),
-                ),
+                for (final tab in tabs)
+                  _ProfileIconTab(
+                    isSelected: selectedIndex == tab.$1,
+                    icon: tab.$2,
+                    theme: theme,
+                    onTap: () => onSelected(tab.$1),
+                  ),
               ],
             ),
           ),
           Divider(
             height: 1,
-            thickness: 1,
-            color: theme.dividerColor.withValues(alpha: 0.15),
+            thickness: 0.5,
+            color: theme.dividerColor.withValues(alpha: 0.2),
           ),
         ],
       ),
@@ -89,7 +68,6 @@ class ProfileUserPostsTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return ColoredBox(
       color: backgroundColor,
@@ -105,14 +83,14 @@ class ProfileUserPostsTabBar extends StatelessWidget {
                   Icon(
                     LucideIcons.layoutGrid,
                     size: ProfileLayoutConstants.iconTabSize,
-                    color: colorScheme.primary,
+                    color: theme.colorScheme.onSurface,
                   ),
                   const SizedBox(height: AppSizes.p6),
                   Container(
                     height: ProfileLayoutConstants.iconTabIndicatorHeight,
                     width: ProfileLayoutConstants.iconTabIndicatorWidth,
                     decoration: BoxDecoration(
-                      color: colorScheme.primary,
+                      color: theme.colorScheme.onSurface,
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -122,8 +100,8 @@ class ProfileUserPostsTabBar extends StatelessWidget {
           ),
           Divider(
             height: 1,
-            thickness: 1,
-            color: theme.dividerColor.withValues(alpha: 0.15),
+            thickness: 0.5,
+            color: theme.dividerColor.withValues(alpha: 0.2),
           ),
         ],
       ),
@@ -135,19 +113,20 @@ class _ProfileIconTab extends StatelessWidget {
   const _ProfileIconTab({
     required this.isSelected,
     required this.icon,
-    required this.colorScheme,
     required this.theme,
     required this.onTap,
   });
 
   final bool isSelected;
   final IconData icon;
-  final ColorScheme colorScheme;
   final ThemeData theme;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final active = theme.colorScheme.onSurface;
+    final inactive = theme.colorScheme.onSurface.withValues(alpha: 0.35);
+
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -157,9 +136,7 @@ class _ProfileIconTab extends StatelessWidget {
             Icon(
               icon,
               size: ProfileLayoutConstants.iconTabSize,
-              color: isSelected
-                  ? colorScheme.primary
-                  : theme.iconTheme.color?.withValues(alpha: 0.45),
+              color: isSelected ? active : inactive,
             ),
             const SizedBox(height: AppSizes.p6),
             AnimatedContainer(
@@ -169,7 +146,7 @@ class _ProfileIconTab extends StatelessWidget {
                   ? ProfileLayoutConstants.iconTabIndicatorWidth
                   : 0,
               decoration: BoxDecoration(
-                color: colorScheme.primary,
+                color: active,
                 borderRadius: BorderRadius.circular(1),
               ),
             ),

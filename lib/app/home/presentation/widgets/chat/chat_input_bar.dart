@@ -134,9 +134,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.transparent,
-      ),
+      decoration: const BoxDecoration(color: Colors.transparent),
       padding: EdgeInsets.fromLTRB(
         ChatLayoutConstants.inputBarHorizontalPadding,
         ChatLayoutConstants.inputBarTopPadding,
@@ -156,153 +154,125 @@ class _ChatInputBarState extends State<ChatInputBar> {
             textDirection: TextDirection.ltr,
             child: Row(
               children: [
-                // Left action button: Trash can (if locked) OR Mic/Send button (if holding/idle)
-                (widget.isRecording && _isLocked)
-                    ? GestureDetector(
-                        onTap: () {
-                          widget.onRecordingCancel?.call();
-                        },
-                        child: Container(
-                          width: ChatLayoutConstants.inputActionSize,
-                          height: ChatLayoutConstants.inputActionSize,
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
+                if (widget.isRecording) ...[
+                  (widget.isRecording && _isLocked)
+                      ? GestureDetector(
+                          onTap: () {
+                            widget.onRecordingCancel?.call();
+                          },
+                          child: Container(
+                            width: ChatLayoutConstants.inputActionSize,
+                            height: ChatLayoutConstants.inputActionSize,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              LucideIcons.trash2,
+                              color: Colors.red,
+                              size: 20,
+                            ),
                           ),
-                          child: const Icon(
-                            LucideIcons.trash2,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                        ),
-                      )
-                    : Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          if (widget.isRecording && !_isLocked)
-                            Positioned(
-                              bottom: 64 +
-                                  math.max(-40.0, math.min(0.0, _dragY)),
-                              child: Opacity(
-                                opacity:
-                                    (1.0 + (_dragY / 60.0)).clamp(0.2, 1.0),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 12,
+                        )
+                      : Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            if (!_isLocked)
+                              Positioned(
+                                bottom:
+                                    64 + math.max(-40.0, math.min(0.0, _dragY)),
+                                child: Opacity(
+                                  opacity: (1.0 + (_dragY / 60.0)).clamp(
+                                    0.2,
+                                    1.0,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: theme.cardColor,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.15),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        LucideIcons.chevronUp,
-                                        color: primary,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Icon(
-                                        LucideIcons.lock,
-                                        color: primary,
-                                        size: 16,
-                                      ),
-                                    ],
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.cardColor,
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          LucideIcons.chevronUp,
+                                          color: primary,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Icon(
+                                          LucideIcons.lock,
+                                          color: primary,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          GestureDetector(
-                            key: const ValueKey('mic_gesture_detector'),
-                            onTap: widget.hasText
-                                ? widget.onSend
-                                : () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          isArabic
-                                              ? "اضغط مطولاً لتسجيل رسالة صوتية"
-                                              : "Hold to record a voice message",
-                                        ),
-                                        duration: const Duration(seconds: 1),
-                                      ),
-                                    );
-                                  },
-                            onLongPressStart: widget.hasText
-                                ? null
-                                : (_) {
-                                    widget.onRecordingStart();
-                                  },
-                            onLongPressMoveUpdate: widget.hasText
-                                ? null
-                                : (details) {
-                                    final dy = details.localOffsetFromOrigin.dy;
-                                    final dx = details.localOffsetFromOrigin.dx;
-                                    setState(() {
-                                      _dragX = dx;
-                                      _dragY = dy;
-                                    });
+                            GestureDetector(
+                              key: const ValueKey('mic_gesture_detector'),
+                              onLongPressMoveUpdate: (details) {
+                                final dy = details.localOffsetFromOrigin.dy;
+                                final dx = details.localOffsetFromOrigin.dx;
+                                setState(() {
+                                  _dragX = dx;
+                                  _dragY = dy;
+                                });
 
-                                    if (dy < -60 && !_isLocked) {
-                                      setState(() {
-                                        _isLocked = true;
-                                      });
-                                    }
+                                if (dy < -60 && !_isLocked) {
+                                  setState(() => _isLocked = true);
+                                }
 
-                                    if (dx.abs() > 80 && !_isLocked) {
-                                      widget.onRecordingCancel?.call();
-                                    }
-                                  },
-                            onLongPressEnd: widget.hasText
-                                ? null
-                                : (details) {
-                                    if (!_isLocked) {
-                                      widget.onRecordingEnd();
-                                    }
-                                  },
-                            onLongPressCancel: widget.hasText
-                                ? null
-                                : () {
-                                    if (!_isLocked) {
-                                      widget.onRecordingCancel?.call();
-                                    }
-                                  },
-                            child: Container(
-                              width: ChatLayoutConstants.inputActionSize,
-                              height: ChatLayoutConstants.inputActionSize,
-                              decoration: BoxDecoration(
-                                color: primary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                widget.hasText
-                                    ? LucideIcons.send
-                                    : LucideIcons.mic,
-                                color: theme.colorScheme.onPrimary,
-                                size: widget.hasText
-                                    ? ChatLayoutConstants.inputSendIconSize
-                                    : ChatLayoutConstants.inputMicIconSize,
+                                if (dx.abs() > 80 && !_isLocked) {
+                                  widget.onRecordingCancel?.call();
+                                }
+                              },
+                              onLongPressEnd: (_) {
+                                if (!_isLocked) widget.onRecordingEnd();
+                              },
+                              onLongPressCancel: () {
+                                if (!_isLocked) {
+                                  widget.onRecordingCancel?.call();
+                                }
+                              },
+                              child: Container(
+                                width: ChatLayoutConstants.inputActionSize,
+                                height: ChatLayoutConstants.inputActionSize,
+                                decoration: BoxDecoration(
+                                  color: primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  LucideIcons.mic,
+                                  color: theme.colorScheme.onPrimary,
+                                  size: ChatLayoutConstants.inputMicIconSize,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                const SizedBox(width: AppSizes.p8),
-                // Middle widget: Capsule containing either the TextField or the recording info
+                          ],
+                        ),
+                  const SizedBox(width: AppSizes.p8),
+                ],
                 Expanded(
                   child: Container(
-                    height: widget.isRecording ? ChatLayoutConstants.inputFieldHeight : null,
+                    height: widget.isRecording
+                        ? ChatLayoutConstants.inputFieldHeight
+                        : null,
                     constraints: widget.isRecording
                         ? null
                         : const BoxConstraints(
@@ -345,8 +315,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                   child: Transform.translate(
                                     offset: Offset(math.max(0.0, _dragX), 0.0),
                                     child: Opacity(
-                                      opacity: (1.0 - (_dragX / 80.0))
-                                          .clamp(0.0, 1.0),
+                                      opacity: (1.0 - (_dragX / 80.0)).clamp(
+                                        0.0,
+                                        1.0,
+                                      ),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.end,
@@ -357,8 +329,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                                 : "Slide to cancel",
                                             style: theme.textTheme.bodyMedium
                                                 ?.copyWith(
-                                              color: theme.hintColor,
-                                            ),
+                                                  color: theme.hintColor,
+                                                ),
                                           ),
                                           const SizedBox(width: 8),
                                           Icon(
@@ -401,11 +373,49 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           )
                         : Row(
                             children: [
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: TextField(
+                                  controller: widget.controller,
+                                  onSubmitted: (_) => widget.onSend(),
+                                  onChanged: (value) => widget.onTextChanged
+                                      ?.call(value.isNotEmpty),
+                                  textDirection: isArabic
+                                      ? TextDirection.rtl
+                                      : TextDirection.ltr,
+                                  textAlign: TextAlign.start,
+                                  minLines: 1,
+                                  maxLines: 3,
+                                  maxLength: 100,
+                                  keyboardType: TextInputType.multiline,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontSize:
+                                        ChatLayoutConstants.inputFieldFontSize,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: l10n.chatSendMessageHint,
+                                    hintTextDirection: isArabic
+                                        ? TextDirection.rtl
+                                        : TextDirection.ltr,
+                                    counterText: '',
+                                    hintStyle: theme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                          color: chatTheme.inboxSecondaryText,
+                                          fontSize: ChatLayoutConstants
+                                              .inputHintFontSize,
+                                        ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
                               IconButton(
                                 icon: Icon(
                                   LucideIcons.smile,
-                                  color: primary,
+                                  color: chatTheme.inboxSecondaryText,
                                   size: 22,
                                 ),
                                 onPressed: widget.onEmojiPicker,
@@ -416,42 +426,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Expanded(
-                                child: TextField(
-                                  controller: widget.controller,
-                                  onSubmitted: (_) => widget.onSend(),
-                                  onChanged: (value) => widget.onTextChanged
-                                      ?.call(value.isNotEmpty),
-                                  textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-                                  textAlign: TextAlign.start,
-                                  minLines: 1,
-                                  maxLines: 3,
-                                  maxLength: 100,
-                                  keyboardType: TextInputType.multiline,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontSize: ChatLayoutConstants
-                                        .inputFieldFontSize,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: l10n.chatAddComment,
-                                    hintTextDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-                                    counterText: "",
-                                    hintStyle: theme.textTheme.bodyMedium
-                                        ?.copyWith(
-                                      color: theme.hintColor.withValues(
-                                        alpha:
-                                            ChatLayoutConstants.inputHintAlpha,
-                                      ),
-                                      fontSize: ChatLayoutConstants
-                                          .inputHintFontSize,
-                                    ),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
                             ],
                           ),
                   ),
@@ -479,53 +453,41 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   ),
                 ] else if (!widget.isRecording) ...[
                   const SizedBox(width: AppSizes.p8),
-                  _ChatInputActionButton(
-                    color: primary,
-                    onTap: widget.onMoreMenu,
-                    icon: LucideIcons.plus,
-                    iconSize: 24,
+                  GestureDetector(
+                    onTap: widget.hasText ? widget.onSend : widget.onMoreMenu,
+                    onLongPressStart: widget.hasText
+                        ? null
+                        : (_) => widget.onRecordingStart(),
+                    onLongPressEnd: widget.hasText
+                        ? null
+                        : (_) {
+                            if (!_isLocked) widget.onRecordingEnd();
+                          },
+                    child: Container(
+                      width: ChatLayoutConstants.inputActionSize,
+                      height: ChatLayoutConstants.inputActionSize,
+                      decoration: BoxDecoration(
+                        color: widget.hasText
+                            ? primary
+                            : chatTheme.sendIdleFill,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        LucideIcons.sendHorizonal,
+                        color: widget.hasText
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.45,
+                              ),
+                        size: ChatLayoutConstants.inputSendIconSize,
+                      ),
+                    ),
                   ),
                 ],
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ChatInputActionButton extends StatelessWidget {
-  const _ChatInputActionButton({
-    required this.color,
-    required this.icon,
-    required this.iconSize,
-    this.onTap,
-  });
-
-  final Color color;
-  final IconData icon;
-  final double iconSize;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: ChatLayoutConstants.inputActionSize,
-        height: ChatLayoutConstants.inputActionSize,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: theme.colorScheme.onPrimary,
-          size: iconSize,
-        ),
       ),
     );
   }

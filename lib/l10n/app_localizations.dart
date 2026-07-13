@@ -1373,6 +1373,102 @@ abstract class AppLocalizations {
   /// **'Search posts...'**
   String get postsSearchHint;
 
+  /// No description provided for @searchAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchAction;
+
+  /// No description provided for @searchHistorySeeMore.
+  ///
+  /// In en, this message translates to:
+  /// **'See more'**
+  String get searchHistorySeeMore;
+
+  /// No description provided for @searchHistorySeeLess.
+  ///
+  /// In en, this message translates to:
+  /// **'See less'**
+  String get searchHistorySeeLess;
+
+  /// No description provided for @searchHistoryClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get searchHistoryClear;
+
+  /// No description provided for @searchHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent searches'**
+  String get searchHistoryEmpty;
+
+  /// No description provided for @searchSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get searchSeeAll;
+
+  /// No description provided for @searchSeeLess.
+  ///
+  /// In en, this message translates to:
+  /// **'See less'**
+  String get searchSeeLess;
+
+  /// No description provided for @searchYouMayLike.
+  ///
+  /// In en, this message translates to:
+  /// **'You may like'**
+  String get searchYouMayLike;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No posts found'**
+  String get searchNoResults;
+
+  /// No description provided for @searchTabTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get searchTabTop;
+
+  /// No description provided for @searchTabUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Users'**
+  String get searchTabUsers;
+
+  /// No description provided for @searchTabVideos.
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get searchTabVideos;
+
+  /// No description provided for @searchTabLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get searchTabLive;
+
+  /// No description provided for @searchTabSounds.
+  ///
+  /// In en, this message translates to:
+  /// **'Sounds'**
+  String get searchTabSounds;
+
+  /// No description provided for @searchTabPlaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Places'**
+  String get searchTabPlaces;
+
+  /// No description provided for @searchComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get searchComingSoon;
+
   /// No description provided for @auctionsFiltersTitle.
   ///
   /// In en, this message translates to:
@@ -2062,6 +2158,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add location'**
   String get addLocationLabel;
+
+  /// No description provided for @selectCity.
+  ///
+  /// In en, this message translates to:
+  /// **'Select city'**
+  String get selectCity;
+
+  /// No description provided for @selectCityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search cities'**
+  String get selectCityHint;
+
+  /// No description provided for @selectCountryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search countries'**
+  String get selectCountryHint;
+
+  /// No description provided for @locationSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search countries or cities'**
+  String get locationSearchHint;
+
+  /// No description provided for @clearLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear location'**
+  String get clearLocation;
 
   /// No description provided for @everyoneLabel.
   ///
@@ -2807,6 +2933,36 @@ abstract class AppLocalizations {
   /// **'Inbox'**
   String get messagesInboxTitle;
 
+  /// No description provided for @messagesNewChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get messagesNewChatTitle;
+
+  /// No description provided for @messagesNewChatSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get messagesNewChatSearchHint;
+
+  /// No description provided for @closeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeAction;
+
+  /// No description provided for @chatSendMessageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a message...'**
+  String get chatSendMessageHint;
+
+  /// No description provided for @chatActiveYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Active yesterday'**
+  String get chatActiveYesterday;
+
   /// No description provided for @messagesSwitchAccount.
   ///
   /// In en, this message translates to:
@@ -2873,6 +3029,18 @@ abstract class AppLocalizations {
   /// **'Activities'**
   String get messagesActivityActivities;
 
+  /// No description provided for @messagesActivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get messagesActivityTitle;
+
+  /// No description provided for @messagesNewFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'New followers'**
+  String get messagesNewFollowers;
+
   /// No description provided for @messagesActivityComments.
   ///
   /// In en, this message translates to:
@@ -2890,6 +3058,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Notifications'**
   String get messagesActivityNotifications;
+
+  /// No description provided for @activityTabLikes.
+  ///
+  /// In en, this message translates to:
+  /// **'Likes'**
+  String get activityTabLikes;
+
+  /// No description provided for @activityAllCaughtUp.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up'**
+  String get activityAllCaughtUp;
+
+  /// No description provided for @activityClearNotificationsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove all read notifications from your activity feed?'**
+  String get activityClearNotificationsMessage;
+
+  /// No description provided for @activityOpenCommentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'See comments on your posts'**
+  String get activityOpenCommentsSubtitle;
+
+  /// No description provided for @activityInboxSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Likes, comments and more'**
+  String get activityInboxSubtitle;
 
   /// No description provided for @messagesRecentMessages.
   ///
@@ -5746,6 +5944,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select at least {count} interests'**
   String interestSelectionMinHint(int count);
+
+  /// No description provided for @interestSelectionCountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{min} interested'**
+  String interestSelectionCountHint(int selected, int min);
+
+  /// No description provided for @interestSelectionNotInterestedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap again to mark as not interested (optional).'**
+  String get interestSelectionNotInterestedHint;
+
+  /// No description provided for @interestSelectionNotInterestedLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Not interested'**
+  String get interestSelectionNotInterestedLegend;
+
+  /// No description provided for @interestSelectionInterestedLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Interested'**
+  String get interestSelectionInterestedLegend;
+
+  /// No description provided for @interestSelectionSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get interestSelectionSave;
+
+  /// No description provided for @settingsInterests.
+  ///
+  /// In en, this message translates to:
+  /// **'Interests'**
+  String get settingsInterests;
 
   /// No description provided for @retry.
   ///

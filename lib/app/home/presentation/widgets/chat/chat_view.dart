@@ -28,6 +28,7 @@ class ChatView extends StatefulWidget {
     required this.imageUrl,
     required this.currentUserId,
     this.peerUserId,
+    this.openCamera = false,
     super.key,
   });
 
@@ -36,6 +37,7 @@ class ChatView extends StatefulWidget {
   final String imageUrl;
   final String currentUserId;
   final String? peerUserId;
+  final bool openCamera;
 
   @override
   State<ChatView> createState() => _ChatViewState();
@@ -49,11 +51,19 @@ class _ChatViewState extends State<ChatView> {
   Map<String, dynamic>? _replyTo;
   final ChatVoiceRecorder _voiceRecorder = ChatVoiceRecorder();
   Future<void>? _startRecordingFuture;
+  bool _didRequestCamera = false;
 
   @override
   void initState() {
     super.initState();
     _messageController.addListener(() => setState(() {}));
+    if (widget.openCamera) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didRequestCamera) return;
+        _didRequestCamera = true;
+        _pickAndSend(ChatAttachmentPicker.pickFromCamera);
+      });
+    }
   }
 
   @override

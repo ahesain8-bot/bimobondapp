@@ -41,6 +41,7 @@ class UserModel extends UserEntity {
     super.updatedAt,
     super.isNewUser,
     super.isProfileIncomplete,
+    super.needsInterests,
     super.authToken,
     super.deviceToken,
   });
@@ -166,6 +167,7 @@ class UserModel extends UserEntity {
       updatedAt: json['updatedAt'],
       isNewUser: json['isNewUser'] ?? false,
       isProfileIncomplete: json['isProfileIncomplete'] ?? false,
+      needsInterests: json['needsInterests'] ?? false,
       authToken: json['token'] ?? json['authToken'],
       deviceToken: json['deviceToken'],
     );
@@ -217,6 +219,7 @@ class UserModel extends UserEntity {
       'updatedAt': updatedAt,
       'isNewUser': isNewUser,
       'isProfileIncomplete': isProfileIncomplete,
+      'needsInterests': needsInterests,
       'authToken': authToken,
       'deviceToken': deviceToken,
     };

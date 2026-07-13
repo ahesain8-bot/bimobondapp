@@ -133,27 +133,199 @@ class GlassBottomSheet {
     builder,
     double initialChildSize = 0.72,
     double minChildSize = 0.45,
-    double maxChildSize = 0.92,
+    double maxChildSize = 0.95,
     bool adaptTheme = false,
+    bool lightSurface = false,
     String? title,
     bool showHandle = true,
   }) {
+    final snapSizes = <double>[
+      if (initialChildSize > minChildSize + 0.01 &&
+          initialChildSize < maxChildSize - 0.01)
+        initialChildSize,
+    ];
+
     return open<T>(
       context,
       isScrollControlled: true,
-      builder: (ctx) => DraggableScrollableSheet(
+      builder: (ctx) => _DraggableSheetHost(
         initialChildSize: initialChildSize,
         minChildSize: minChildSize,
         maxChildSize: maxChildSize,
+        snapSizes: snapSizes,
+        adaptTheme: adaptTheme,
+        lightSurface: lightSurface,
+        title: title,
+        showHandle: showHandle,
+        builder: builder,
+      ),
+    );
+  }
+}
+
+/// Provides [DraggableScrollableController] so the handle/header can drag
+/// the sheet without going through the list scrollable.
+class DraggableSheetExtent extends InheritedWidget {
+  const DraggableSheetExtent({
+    required this.controller,
+    required this.minChildSize,
+    required this.maxChildSize,
+    required this.snapSizes,
+    required super.child,
+    super.key,
+  });
+
+  final DraggableScrollableController controller;
+  final double minChildSize;
+  final double maxChildSize;
+  final List<double> snapSizes;
+
+  static DraggableSheetExtent? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<DraggableSheetExtent>();
+  }
+
+  @override
+  bool updateShouldNotify(DraggableSheetExtent oldWidget) {
+    return controller != oldWidget.controller ||
+        minChildSize != oldWidget.minChildSize ||
+        maxChildSize != oldWidget.maxChildSize;
+  }
+}
+
+/// Drag vertically on [child] to resize the parent [DraggableScrollableSheet].
+class DraggableSheetDragRegion extends StatelessWidget {
+  const DraggableSheetDragRegion({required this.child, super.key});
+
+  final Widget child;
+
+  void _onUpdate(BuildContext context, DragUpdateDetails details) {
+    final extent = DraggableSheetExtent.maybeOf(context);
+    if (extent == null || !extent.controller.isAttached) return;
+    final height = MediaQuery.sizeOf(context).height;
+    if (height <= 0) return;
+    final next = (extent.controller.size - details.delta.dy / height).clamp(
+      extent.minChildSize,
+      extent.maxChildSize,
+    );
+    extent.controller.jumpTo(next);
+  }
+
+  void _onEnd(BuildContext context, DragEndDetails details) {
+    final extent = DraggableSheetExtent.maybeOf(context);
+    if (extent == null || !extent.controller.isAttached) return;
+
+    final targets = <double>[
+      extent.minChildSize,
+      ...extent.snapSizes,
+      extent.maxChildSize,
+    ]..sort();
+
+    final current = extent.controller.size;
+    var nearest = targets.first;
+    var best = (current - nearest).abs();
+    for (final t in targets.skip(1)) {
+      final d = (current - t).abs();
+      if (d < best) {
+        best = d;
+        nearest = t;
+      }
+    }
+
+    // Fling up / down bias toward expand or collapse.
+    final vy = details.primaryVelocity ?? 0;
+    if (vy < -400) {
+      nearest = targets.last;
+    } else if (vy > 400) {
+      nearest = targets.first;
+    }
+
+    extent.controller.animateTo(
+      nearest,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragUpdate: (d) => _onUpdate(context, d),
+      onVerticalDragEnd: (d) => _onEnd(context, d),
+      child: child,
+    );
+  }
+}
+
+class _DraggableSheetHost extends StatefulWidget {
+  const _DraggableSheetHost({
+    required this.builder,
+    required this.initialChildSize,
+    required this.minChildSize,
+    required this.maxChildSize,
+    required this.snapSizes,
+    required this.adaptTheme,
+    required this.lightSurface,
+    required this.showHandle,
+    this.title,
+  });
+
+  final Widget Function(BuildContext context, ScrollController controller)
+  builder;
+  final double initialChildSize;
+  final double minChildSize;
+  final double maxChildSize;
+  final List<double> snapSizes;
+  final bool adaptTheme;
+  final bool lightSurface;
+  final bool showHandle;
+  final String? title;
+
+  @override
+  State<_DraggableSheetHost> createState() => _DraggableSheetHostState();
+}
+
+class _DraggableSheetHostState extends State<_DraggableSheetHost> {
+  late final DraggableScrollableController _sheetController;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheetController = DraggableScrollableController();
+  }
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableSheetExtent(
+      controller: _sheetController,
+      minChildSize: widget.minChildSize,
+      maxChildSize: widget.maxChildSize,
+      snapSizes: widget.snapSizes,
+      child: DraggableScrollableSheet(
+        controller: _sheetController,
+        initialChildSize: widget.initialChildSize,
+        minChildSize: widget.minChildSize,
+        maxChildSize: widget.maxChildSize,
         expand: false,
+        snap: true,
+        snapSizes: widget.snapSizes,
         builder: (context, scrollController) {
           Widget body = GlassBottomSheetShell(
             expand: true,
-            showHandle: showHandle,
-            title: title,
-            child: builder(context, scrollController),
+            showHandle: widget.showHandle,
+            title: widget.title,
+            lightSurface: widget.lightSurface,
+            child: widget.builder(context, scrollController),
           );
-          if (adaptTheme) {
+          if (widget.lightSurface) {
+            // Keep current app theme (white in light, dark surface in dark).
+          } else if (widget.adaptTheme) {
             body = GlassBottomSheetTheme.wrap(context, body);
           }
           return body;
@@ -172,6 +344,7 @@ class GlassBottomSheetShell extends StatelessWidget {
     this.scrollable = false,
     this.showHandle = true,
     this.expand = false,
+    this.lightSurface = false,
     super.key,
   }) : assert(children != null || child != null);
 
@@ -181,6 +354,7 @@ class GlassBottomSheetShell extends StatelessWidget {
   final bool scrollable;
   final bool showHandle;
   final bool expand;
+  final bool lightSurface;
 
   static Future<T?> show<T>(
     BuildContext context, {
@@ -223,6 +397,7 @@ class GlassBottomSheetShell extends StatelessWidget {
       expand: expand,
       showHandle: showHandle,
       title: title,
+      lightSurface: lightSurface,
       child: content,
     );
   }
@@ -235,6 +410,7 @@ class GlassBottomSheetFrame extends StatelessWidget {
     this.title,
     this.showHandle = true,
     this.expand = false,
+    this.lightSurface = false,
     super.key,
   });
 
@@ -242,19 +418,40 @@ class GlassBottomSheetFrame extends StatelessWidget {
   final String? title;
   final bool showHandle;
   final bool expand;
+  final bool lightSurface;
 
-  static Widget handle({double width = 40, double height = 4}) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(2),
-      ),
+  static Widget handle({
+    double width = 40,
+    double height = 4,
+    bool lightSurface = false,
+  }) {
+    return Builder(
+      builder: (context) {
+        final onSurface = Theme.of(context).colorScheme.onSurface;
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: lightSurface
+                ? onSurface.withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      },
     );
   }
 
-  static BoxDecoration decoration() {
+  static BoxDecoration decoration({bool lightSurface = false}) {
+    if (lightSurface) {
+      // Prefer [build] path which reads theme; this is a fallback.
+      return const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0x14000000)),
+        ),
+      );
+    }
     return BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
@@ -272,48 +469,77 @@ class GlassBottomSheetFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: DecoratedBox(
-          decoration: decoration(),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-              children: [
-                if (showHandle) ...[
-                  const SizedBox(height: 12),
-                  handle(),
-                ],
-                if (title != null) ...[
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        title!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final bg = lightSurface
+        ? (theme.scaffoldBackgroundColor == Colors.transparent
+              ? surface
+              : theme.scaffoldBackgroundColor)
+        : null;
+
+    final shell = DecoratedBox(
+      decoration: lightSurface
+          ? BoxDecoration(
+              color: bg ?? surface,
+              border: Border(
+                top: BorderSide(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                ),
+              ),
+            )
+          : decoration(),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            if (showHandle)
+              DraggableSheetDragRegion(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    handle(lightSurface: lightSurface),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            if (title != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    title!,
+                    style: TextStyle(
+                      color: lightSurface
+                          ? theme.colorScheme.onSurface
+                          : Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                ] else if (showHandle)
-                  const SizedBox(height: 16),
-                child,
-                if (!expand) const SizedBox(height: AppSizes.p8),
-              ],
-            ),
-          ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            child,
+            if (!expand) const SizedBox(height: AppSizes.p8),
+          ],
         ),
       ),
+    );
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: lightSurface
+          ? shell
+          : BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: shell,
+            ),
     );
   }
 }
@@ -364,6 +590,11 @@ class GlassBottomSheetTheme {
       data: adapt(Theme.of(context)),
       child: child,
     );
+  }
+
+  /// Kept for callers that still force a light overlay; prefer app theme surface.
+  static Widget wrapLight(BuildContext context, Widget child) {
+    return child;
   }
 }
 

@@ -14,12 +14,14 @@ class ChatScreen extends StatelessWidget {
     required this.username,
     required this.imageUrl,
     this.peerUserId,
+    this.openCamera = false,
   });
 
   final String chatId;
   final String username;
   final String imageUrl;
   final String? peerUserId;
+  final bool openCamera;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,7 @@ class ChatScreen extends StatelessWidget {
         imageUrl: imageUrl,
         currentUserId: currentUserId,
         peerUserId: peerUserId,
+        openCamera: openCamera,
       ),
     );
   }

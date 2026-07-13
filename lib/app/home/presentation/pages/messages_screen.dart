@@ -10,10 +10,9 @@ import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
     as chats_di;
 import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart';
 import 'package:bimobondapp/app/social/domain/usecases/get_my_mentions_usecase.dart';
+import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
-import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.dart';
-import 'package:bimobondapp/app/social/presentation/utils/suggestion_follow_toggle.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/inbox_chat_helper.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_grouping.dart';
@@ -23,12 +22,11 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_activity_section.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_conversation_list.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_inbox_action_tile.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_inbox_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_mentions_strip.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_search_bar.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_suggestions_strip.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
     as notifications_di;
 import 'package:bimobondapp/app/notifications/presentation/services/notification_unread_badge.dart';
@@ -73,9 +71,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _loadTabData() {
-    _inboxBloc
-      ..add(const InboxLoadRequested(refresh: true))
-      ..add(const InboxSuggestionsLoadRequested());
+    _inboxBloc.add(const InboxLoadRequested(refresh: true));
   }
 
   @override
@@ -104,12 +100,12 @@ class _MessagesScreenBody extends StatefulWidget {
 
 class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
   List<UserMentionEntity> _mentions = [];
-  List<UserSuggestionEntity> _suggestions = [];
   List<InboxChatItem> _cachedInboxItems = [];
   bool _inboxLoadFinished = false;
+  bool _isRefreshing = false;
   bool _isLoadingMentions = false;
   bool _mentionsLoaded = false;
-  final Set<String> _followLoadingIds = {};
+  String? _lastFollowerName;
   List<StoryUserGroup> _storyGroups = [];
   StoryUserGroup? _myStoryGroup;
   late final ViewedStoriesStore _viewedStoriesStore;
@@ -122,6 +118,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     _bindViewedStoriesUser();
     if (widget.isTabActive) {
       _loadRecentMentions();
+      _loadLastFollower();
       _loadStories();
     }
   }
@@ -139,6 +136,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     super.didUpdateWidget(oldWidget);
     if (widget.isTabActive && !oldWidget.isTabActive) {
       _loadRecentMentions();
+      _loadLastFollower();
       _loadStories();
       notifications_di.sl<NotificationUnreadBadge>().refresh();
     }
@@ -211,6 +209,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
   }
 
   Future<void> _onRefresh() async {
+    setState(() => _isRefreshing = true);
     final bloc = context.read<InboxBloc>();
     final priorGeneration = switch (bloc.state) {
       InboxLoadSuccess(:final loadGeneration) => loadGeneration,
@@ -218,8 +217,8 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
       _ => 0,
     };
     bloc.add(const InboxLoadRequested(refresh: true));
-    bloc.add(const InboxSuggestionsLoadRequested());
     unawaited(_loadRecentMentions(refresh: true));
+    unawaited(_loadLastFollower());
     _loadStories();
     try {
       await bloc.stream
@@ -231,6 +230,8 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
           .timeout(HomeLayoutConstants.tabRefreshTimeout);
     } catch (_) {
       // Timeout — dismiss refresh indicator.
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -248,6 +249,30 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
       onConfirm: () => context.pushNamed('login'),
     );
     return false;
+  }
+
+  Future<void> _loadLastFollower() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      if (mounted) setState(() => _lastFollowerName = null);
+      return;
+    }
+
+    final result = await social_di.sl<GetFollowersUseCase>()(
+      GetUserListParams(userId, page: 1, limit: 1),
+    );
+
+    if (!mounted) return;
+
+    result.fold(
+      (_) {},
+      (page) {
+        final follower = page.users.isNotEmpty ? page.users.first : null;
+        setState(() {
+          _lastFollowerName = follower?.displayName;
+        });
+      },
+    );
   }
 
   Future<void> _loadRecentMentions({bool refresh = false}) async {
@@ -294,38 +319,6 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     );
   }
 
-  Future<void> _toggleSuggestionFollow(int index) async {
-    if (!_ensureLoggedIn()) return;
-
-    final suggestion = _suggestions[index];
-    if (_followLoadingIds.contains(suggestion.id)) return;
-
-    await toggleSuggestionFollow(
-      context: context,
-      suggestion: suggestion,
-      onLoadingChanged: (userId, {required isLoading}) {
-        setState(() {
-          if (isLoading) {
-            _followLoadingIds.add(userId);
-          } else {
-            _followLoadingIds.remove(userId);
-          }
-        });
-      },
-      onUpdate: (updated) {
-        setState(() => _suggestions[index] = updated);
-      },
-    );
-  }
-
-  void _onSuggestionFollowStateChanged(int index, bool isFollowing) {
-    setState(() {
-      _suggestions[index] = _suggestions[index].copyWith(
-        isFollowing: isFollowing,
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -335,7 +328,14 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: HomeTabAppBar(title: l10n.navChat, showBottomDivider: false),
+      appBar: MessagesInboxAppBar(
+        onComposeTap: () {
+          if (!_ensureLoggedIn()) return;
+          context.pushNamed('new_chat');
+        },
+        onSearchTap: () => context.pushNamed('chat_search'),
+        onTitleTap: () => context.pushNamed('all_chats'),
+      ),
       body: SafeArea(
         top: false,
         child: MultiBlocListener(
@@ -361,32 +361,24 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
               listenWhen: (previous, current) =>
                   current is InboxLoadSuccess || current is InboxFailure,
               listener: (context, state) {
-            setState(() => _inboxLoadFinished = true);
-            if (state is InboxLoadSuccess) {
-              setState(() {
-                _cachedInboxItems = state.chats
-                    .map((c) => inboxChatItemFromEntity(c, userId, l10n))
-                    .toList();
-                _suggestions = state.suggestions
-                    .map(UserSuggestionEntity.from)
-                    .toList(growable: true);
-              });
-            }
+                setState(() => _inboxLoadFinished = true);
+                if (state is InboxLoadSuccess) {
+                  setState(() {
+                    _cachedInboxItems = state.chats
+                        .map((c) => inboxChatItemFromEntity(c, userId, l10n))
+                        .toList();
+                  });
+                }
               },
             ),
           ],
           child: BlocBuilder<InboxBloc, InboxState>(
             builder: (context, state) {
               final inboxItems = _cachedInboxItems;
-              final recentPreview = inboxItems
-                  .take(MessagesLayoutConstants.recentMessagesPreviewCount)
-                  .toList();
-              final isLoadingChats =
+              final isInitialLoading =
                   (state is InboxLoading || state is InboxInitial) &&
                   !_inboxLoadFinished;
-              final isLoadingSuggestions = state is InboxLoadSuccess
-                  ? !state.suggestionsLoaded
-                  : !_inboxLoadFinished;
+              final showInboxSkeleton = isInitialLoading || _isRefreshing;
               return RefreshIndicator(
                 onRefresh: _onRefresh,
                 edgeOffset: MessagesLayoutConstants.refreshEdgeOffset,
@@ -396,10 +388,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                     parent: BouncingScrollPhysics(),
                   ),
                   children: [
-                    MessagesSearchBar.launcher(
-                      onTap: () => context.pushNamed('chat_search'),
-                    ),
-                    if (state is InboxFailure)
+                    if (state is InboxFailure && !showInboxSkeleton)
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Text(
@@ -408,7 +397,9 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                    if (!isLoadingChats)
+                    if (showInboxSkeleton)
+                      const MessagesInboxSkeleton()
+                    else ...[
                       MessagesActiveUsersBar(
                         storyGroups: _storyGroups,
                         myStoryGroup: _myStoryGroup,
@@ -419,120 +410,61 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                           group.stories,
                         ),
                       ),
-                    if (!isLoadingChats) ...[
                       ListenableBuilder(
-                        listenable: notifications_di.sl<NotificationUnreadBadge>(),
+                        listenable:
+                            notifications_di.sl<NotificationUnreadBadge>(),
                         builder: (context, _) {
-                          return MessagesActivitySection(
-                            hasUnreadNotifications: notifications_di
-                                .sl<NotificationUnreadBadge>()
-                                .hasUnread,
-                            onActivityTap: (type) {
-                              switch (type) {
-                                case MessagesActivityType.followers:
-                                  context.pushNamed('my_followers');
-                                case MessagesActivityType.comments:
-                                  context.pushNamed('user_comments');
-                                case MessagesActivityType.activities:
-                                  context.pushNamed('user_likes');
-                                case MessagesActivityType.mentions:
-                                  context.pushNamed('user_mentions');
-                                case MessagesActivityType.notifications:
-                                  context
-                                      .pushNamed('notifications')
-                                      .then((_) => notifications_di
-                                          .sl<NotificationUnreadBadge>()
-                                          .refresh());
-                              }
-                            },
+                          final badge = notifications_di
+                              .sl<NotificationUnreadBadge>();
+                          return Column(
+                            children: [
+                              MessagesInboxActionTile(
+                                icon: LucideIcons.users,
+                                iconBackground: MessagesLayoutConstants
+                                    .activityFollowersColor,
+                                title: l10n.messagesNewFollowers,
+                                subtitle: _lastFollowerName == null
+                                    ? null
+                                    : l10n.notificationBodyNewFollower(
+                                        _lastFollowerName!,
+                                      ),
+                                onTap: () {
+                                  context.pushNamed('my_followers').then((_) {
+                                    if (mounted) _loadLastFollower();
+                                  });
+                                },
+                              ),
+                              MessagesInboxActionTile(
+                                icon: LucideIcons.heart,
+                                iconBackground:
+                                    MessagesLayoutConstants.activityLikesColor,
+                                title: l10n.messagesActivityTitle,
+                                subtitle: l10n.activityInboxSubtitle,
+                                badgeCount:
+                                    badge.count > 0 ? badge.count : null,
+                                showChevron: false,
+                                onTap: () {
+                                  context.pushNamed('activity').then(
+                                    (_) => badge.refresh(),
+                                  );
+                                },
+                              ),
+                            ],
                           );
                         },
                       ),
-                    ],
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal:
-                            MessagesLayoutConstants.sectionHorizontalPadding,
-                        vertical: 8,
-                      ),
-                      child: isLoadingChats
-                          ? const SkeletonWidget(height: 18, width: 160)
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  l10n.messagesRecentMessages,
-                                  style: TextStyle(
-                                    color: theme.textTheme.bodyLarge?.color,
-                                    fontSize: MessagesLayoutConstants
-                                        .sectionHeaderFontSize,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                if (recentPreview.isNotEmpty)
-                                  InkWell(
-                                    onTap: () => context.pushNamed('all_chats'),
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 2,
-                                      ),
-                                      child: Text(
-                                        l10n.messagesSeeAll,
-                                        style: TextStyle(
-                                          color: primaryColor,
-                                          fontSize: MessagesLayoutConstants
-                                              .sectionLinkFontSize,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                    ),
-                    if (isLoadingChats)
-                      const MessagesChatListSkeleton()
-                    else
                       MessagesConversationList(
-                        items: recentPreview,
+                        items: inboxItems,
                         emptyMessage: l10n.messagesInboxNoMessagesYet,
                         emptyIcon: Icons.chat_bubble_outline_rounded,
                       ),
-                    if (!isLoadingChats) ...[
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: MessagesLayoutConstants.horizontalPadding,
-                        ),
-                        child: Divider(
-                          height: 1,
-                          color: theme.dividerColor.withValues(
-                            alpha: MessagesLayoutConstants.dividerAlpha,
-                          ),
-                        ),
-                      ),
-                      if (isLoadingSuggestions)
-                        const MessagesSuggestionsStripSkeleton()
-                      else if (_suggestions.isNotEmpty)
-                        MessagesSuggestionsStrip(
-                          suggestions: _suggestions,
-                          loadingUserIds: _followLoadingIds,
-                          onFollowToggle: _toggleSuggestionFollow,
-                          onFollowStateChanged: _onSuggestionFollowStateChanged,
-                          onSeeAll: () =>
-                              context.pushNamed('follow_suggestions'),
-                        ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       if (_isLoadingMentions && !_mentionsLoaded)
                         const MessagesMentionsStripSkeleton()
                       else if (_mentions.isNotEmpty)
                         MessagesMentionsStrip(
                           mentions: _mentions,
-                          onSeeAll: () =>
-                              context.pushNamed('user_mentions'),
+                          onSeeAll: () => context.pushNamed('user_mentions'),
                         ),
                     ],
                     const SizedBox(

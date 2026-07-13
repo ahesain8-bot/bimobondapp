@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/categories/presentation/di/categories_injector.d
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_auction_fields.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_category_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_chevron_icon.dart';
+import 'package:bimobondapp/app/home/presentation/pages/add_post_location_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_widgets.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_privacy_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_publish_bar.dart';
@@ -16,6 +17,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_tag_
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -89,6 +91,7 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
   late DateTime _auctionStartDate;
   late DateTime _auctionEndDate;
   SoundEntity? _selectedSound;
+  AddPostLocationSelection? _selectedLocation;
 
   @override
   void initState() {
@@ -343,8 +346,48 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
         filterCategory: widget.initialFilterCategory,
         effectSlug: widget.initialEffectSlug,
         beautyEnabled: widget.initialBeautyEnabled ? true : null,
+        location: _buildLocationInput(),
       ),
     );
+  }
+
+  PostInlineLocationInput? _buildLocationInput() {
+    final selection = _selectedLocation;
+    if (selection == null) return null;
+    final city = selection.city;
+    final lat = city.latitude;
+    final lng = city.longitude;
+    if (lat == null || lng == null) {
+      return PostInlineLocationInput(
+        name: city.name,
+        latitude: 0,
+        longitude: 0,
+        city: city.name,
+        countryCode: selection.country.code,
+        placeId: city.id.toString(),
+      );
+    }
+    return PostInlineLocationInput(
+      name: city.name,
+      latitude: lat,
+      longitude: lng,
+      city: city.name,
+      countryCode: selection.country.code,
+      placeId: city.id.toString(),
+    );
+  }
+
+  Future<void> _showLocationPicker() async {
+    final picked = await AddPostLocationSearchScreen.open(
+      context,
+      initial: _selectedLocation,
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _selectedLocation = picked);
+  }
+
+  void _clearLocation() {
+    setState(() => _selectedLocation = null);
   }
 
   Future<void> _showSoundPicker() async {
@@ -618,8 +661,39 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
           AddPostSettingItem(
             icon: LucideIcons.mapPin,
             title: l10n.addLocationLabel,
-            trailing: const AddPostChevronIcon(),
-            onTap: () {},
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_selectedLocation != null) ...[
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: Text(
+                      _selectedLocation!.displayLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _clearLocation,
+                    tooltip: l10n.clearLocation,
+                    icon: const Icon(LucideIcons.x, size: 16),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+                const AddPostChevronIcon(),
+              ],
+            ),
+            onTap: _showLocationPicker,
             showDivider: false,
           ),
         ],

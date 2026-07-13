@@ -14,14 +14,21 @@ class AppAssets {
   static const String emailVerification =
       '$imagesPath/email-address-computer-icons-symbol-email-box-gmail-e0844720a9dd1602e9d85f02387f558c.png';
 
-  static const String homeIcon = '$iconsPath/home-angle-svgrepo-com.svg';
-  static const String profileIcon = '$iconsPath/person-fill-svgrepo-com.svg';
+  static const String homeIcon = '$iconsPath/home_outline.svg';
+  static const String homeIconFilled = '$iconsPath/home-alt-svgrepo-com.svg';
+  static const String profileIcon = '$iconsPath/profile-svgrepo-com.svg';
+  static const String profileIconFilled = '$iconsPath/profile_filled.svg';
+  static const String auctionNavIcon = '$iconsPath/auction_outline.svg';
+  static const String auctionNavIconFilled = '$iconsPath/auction_filled.svg';
   static const String mobileIcon =
       '$iconsPath/mobile-phone-svgrepo-com (1).svg';
   static const String googleIcon = '$iconsPath/google-color-svgrepo-com.svg';
-  static const String chatNavIcon = '$iconsPath/chat_icon.png';
+  static const String chatNavIcon = '$iconsPath/message-pending-svgrepo-com.svg';
+  static const String chatNavIconFilled = '$iconsPath/chat_filled.svg';
   static const String feedSearchIcon = '$iconsPath/feed_search.svg';
-  static const String feedLiveIcon = '$iconsPath/feed_live.svg';
+  static const String feedLiveIcon = '$iconsPath/live-svgrepo-com.svg';
+  static const String commentIcon = '$iconsPath/comment-3-svgrepo-com.svg';
+  static const String shareArrowIcon = '$iconsPath/share-arrow-svgrepo-com.svg';
 
   static const String shareMessengerIcon = '$iconsPath/share_messenger.svg';
   static const String shareFacebookIcon = '$iconsPath/share_facebook.svg';

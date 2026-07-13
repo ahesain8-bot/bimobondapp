@@ -668,6 +668,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postsSearchHint => 'Search posts...';
 
   @override
+  String get searchAction => 'Search';
+
+  @override
+  String get searchHistorySeeMore => 'See more';
+
+  @override
+  String get searchHistorySeeLess => 'See less';
+
+  @override
+  String get searchHistoryClear => 'Clear';
+
+  @override
+  String get searchHistoryEmpty => 'No recent searches';
+
+  @override
+  String get searchSeeAll => 'See all';
+
+  @override
+  String get searchSeeLess => 'See less';
+
+  @override
+  String get searchYouMayLike => 'You may like';
+
+  @override
+  String get searchNoResults => 'No posts found';
+
+  @override
+  String get searchTabTop => 'Top';
+
+  @override
+  String get searchTabUsers => 'Users';
+
+  @override
+  String get searchTabVideos => 'Videos';
+
+  @override
+  String get searchTabLive => 'LIVE';
+
+  @override
+  String get searchTabSounds => 'Sounds';
+
+  @override
+  String get searchTabPlaces => 'Places';
+
+  @override
+  String get searchComingSoon => 'Coming soon';
+
+  @override
   String get auctionsFiltersTitle => 'Filters';
 
   @override
@@ -1047,6 +1095,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addLocationLabel => 'Add location';
+
+  @override
+  String get selectCity => 'Select city';
+
+  @override
+  String get selectCityHint => 'Search cities';
+
+  @override
+  String get selectCountryHint => 'Search countries';
+
+  @override
+  String get locationSearchHint => 'Search countries or cities';
+
+  @override
+  String get clearLocation => 'Clear location';
 
   @override
   String get everyoneLabel => 'Everyone';
@@ -1439,6 +1502,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesInboxTitle => 'Inbox';
 
   @override
+  String get messagesNewChatTitle => 'New chat';
+
+  @override
+  String get messagesNewChatSearchHint => 'Search';
+
+  @override
+  String get closeAction => 'Close';
+
+  @override
+  String get chatSendMessageHint => 'Send a message...';
+
+  @override
+  String get chatActiveYesterday => 'Active yesterday';
+
+  @override
   String get messagesSwitchAccount => 'Switch Account';
 
   @override
@@ -1472,6 +1550,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesActivityActivities => 'Activities';
 
   @override
+  String get messagesActivityTitle => 'Activity';
+
+  @override
+  String get messagesNewFollowers => 'New followers';
+
+  @override
   String get messagesActivityComments => 'Comments';
 
   @override
@@ -1479,6 +1563,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messagesActivityNotifications => 'Notifications';
+
+  @override
+  String get activityTabLikes => 'Likes';
+
+  @override
+  String get activityAllCaughtUp => 'You\'re all caught up';
+
+  @override
+  String get activityClearNotificationsMessage => 'Remove all read notifications from your activity feed?';
+
+  @override
+  String get activityOpenCommentsSubtitle => 'See comments on your posts';
+
+  @override
+  String get activityInboxSubtitle => 'Likes, comments and more';
 
   @override
   String get messagesRecentMessages => 'Recent Messages';
@@ -3002,6 +3101,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String interestSelectionMinHint(int count) {
     return 'Select at least $count interests';
   }
+
+  @override
+  String interestSelectionCountHint(int selected, int min) {
+    return '$selected/$min interested';
+  }
+
+  @override
+  String get interestSelectionNotInterestedHint => 'Tap again to mark as not interested (optional).';
+
+  @override
+  String get interestSelectionNotInterestedLegend => 'Not interested';
+
+  @override
+  String get interestSelectionInterestedLegend => 'Interested';
+
+  @override
+  String get interestSelectionSave => 'Save';
+
+  @override
+  String get settingsInterests => 'Interests';
 
   @override
   String get retry => 'Try again';

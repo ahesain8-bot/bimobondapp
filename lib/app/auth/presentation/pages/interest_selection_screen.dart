@@ -1,12 +1,15 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
-import 'package:bimobondapp/app/auth/presentation/utils/auth_message_localizer.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/onboarding/interest_selection_view.dart';
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
 import 'package:bimobondapp/app/categories/domain/usecases/get_categories_usecase.dart';
 import 'package:bimobondapp/app/categories/presentation/di/categories_injector.dart'
     as categories_di;
+import 'package:bimobondapp/app/interests/domain/usecases/get_my_interests_usecase.dart';
+import 'package:bimobondapp/app/interests/domain/usecases/set_my_interests_usecase.dart';
+import 'package:bimobondapp/app/interests/presentation/di/interests_injector.dart'
+    as interests_di;
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -16,16 +19,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 class InterestSelectionScreen extends StatefulWidget {
-  const InterestSelectionScreen({this.pendingVerificationEmail, super.key});
+  const InterestSelectionScreen({
+    this.pendingVerificationEmail,
+    this.isEditMode = false,
+    super.key,
+  });
 
   final String? pendingVerificationEmail;
+  final bool isEditMode;
 
   @override
-  State<InterestSelectionScreen> createState() => _InterestSelectionScreenState();
+  State<InterestSelectionScreen> createState() =>
+      _InterestSelectionScreenState();
 }
 
 class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
-  final Set<String> _selectedCategoryIds = {};
+  final Set<String> _interestedIds = {};
+  final Set<String> _notInterestedIds = {};
   List<CategoryEntity> _categories = [];
   bool _isLoadingCategories = true;
   bool _isSaving = false;
@@ -34,37 +44,93 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    _loadInitialData();
   }
 
-  Future<void> _loadCategories() async {
+  Future<void> _loadInitialData() async {
     setState(() {
       _isLoadingCategories = true;
       _errorMessage = null;
     });
 
-    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final categoriesResult =
+        await categories_di.sl<GetCategoriesUseCase>()(NoParams());
 
     if (!mounted) return;
 
-    result.fold(
-      (failure) => setState(() {
-        _isLoadingCategories = false;
-        _errorMessage = failure.message;
-      }),
-      (categories) => setState(() {
-        _isLoadingCategories = false;
+    final failureMessage = categoriesResult.fold(
+      (failure) => failure.message,
+      (categories) {
         _categories = categories;
-      }),
+        return null;
+      },
     );
+
+    if (failureMessage != null) {
+      setState(() {
+        _isLoadingCategories = false;
+        _errorMessage = failureMessage;
+      });
+      return;
+    }
+
+    if (widget.isEditMode) {
+      final interestsResult =
+          await interests_di.sl<GetMyInterestsUseCase>()(NoParams());
+
+      if (!mounted) return;
+
+      interestsResult.fold(
+        (failure) {
+          // Categories loaded; allow picking even if preload fails.
+          setState(() {
+            _isLoadingCategories = false;
+            _errorMessage = null;
+          });
+          PopupDialogs.showErrorDialog(context, failure.message);
+        },
+        (result) {
+          _interestedIds
+            ..clear()
+            ..addAll(result.interests.map((e) => e.categoryId));
+          _notInterestedIds
+            ..clear()
+            ..addAll(result.notInterests.map((e) => e.categoryId));
+          setState(() {
+            _isLoadingCategories = false;
+            _errorMessage = null;
+          });
+        },
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoadingCategories = false;
+      _errorMessage = null;
+    });
   }
 
-  void _toggleCategory(String categoryId) {
+  bool get _canSkip {
+    if (widget.isEditMode) return false;
+    final authState = context.read<AuthBloc>().state;
+    return authState is AuthSuccess && authState.user.needsInterests != true;
+  }
+
+  void _cycleCategory(String categoryId) {
     setState(() {
-      if (_selectedCategoryIds.contains(categoryId)) {
-        _selectedCategoryIds.remove(categoryId);
+      if (_interestedIds.contains(categoryId)) {
+        _interestedIds.remove(categoryId);
+        if (_notInterestedIds.length <
+            InterestSelectionView.maxNotInterestedCount) {
+          _notInterestedIds.add(categoryId);
+        }
+      } else if (_notInterestedIds.contains(categoryId)) {
+        _notInterestedIds.remove(categoryId);
       } else {
-        _selectedCategoryIds.add(categoryId);
+        if (_interestedIds.length < InterestSelectionView.maxInterestedCount) {
+          _interestedIds.add(categoryId);
+        }
       }
     });
   }
@@ -86,16 +152,50 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
     _navigateNext();
   }
 
-  void _onContinuePressed() {
-    if (_selectedCategoryIds.length < InterestSelectionView.minSelectionCount) {
+  void _onBackPressed() {
+    if (context.canPop()) {
+      context.pop();
+    }
+  }
+
+  Future<void> _onContinuePressed() async {
+    if (_interestedIds.length < InterestSelectionView.minSelectionCount ||
+        _interestedIds.length > InterestSelectionView.maxInterestedCount ||
+        _notInterestedIds.length > InterestSelectionView.maxNotInterestedCount) {
       return;
     }
 
     setState(() => _isSaving = true);
-    context.read<AuthBloc>().add(
-      UpdateProfileRequestedEvent({
-        'categoryIds': _selectedCategoryIds.toList(growable: false),
-      }),
+
+    final result = await interests_di.sl<SetMyInterestsUseCase>()(
+      SetMyInterestsParams(
+        categoryIds: _interestedIds.toList(growable: false),
+        notInterestedCategoryIds: _notInterestedIds.isEmpty
+            ? null
+            : _notInterestedIds.toList(growable: false),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await result.fold(
+      (failure) async {
+        setState(() => _isSaving = false);
+        PopupDialogs.showErrorDialog(context, failure.message);
+      },
+      (_) async {
+        context.read<AuthBloc>().add(const FetchProfileEvent());
+        setState(() => _isSaving = false);
+        if (widget.isEditMode) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.goNamed('home');
+          }
+        } else {
+          _navigateNext();
+        }
+      },
     );
   }
 
@@ -107,37 +207,23 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
         final isArabic = locale.languageCode == 'ar';
         final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        return BlocListener<AuthBloc, AuthState>(
-          listenWhen: (previous, current) =>
-              current is AuthSuccess || current is AuthFailure,
-          listener: (context, state) {
-            if (!_isSaving) return;
-
-            if (state is AuthSuccess) {
-              setState(() => _isSaving = false);
-              _navigateNext();
-            } else if (state is AuthFailure) {
-              setState(() => _isSaving = false);
-              final message = state.messageKey != null
-                  ? localizeAuthMessage(l10n, state.messageKey!)
-                  : state.message;
-              PopupDialogs.showErrorDialog(context, message);
-            }
-          },
-          child: InterestSelectionView(
-            l10n: l10n,
-            isArabic: isArabic,
-            isDark: isDark,
-            categories: _categories,
-            selectedCategoryIds: _selectedCategoryIds,
-            isLoadingCategories: _isLoadingCategories,
-            isSaving: _isSaving,
-            errorMessage: _errorMessage,
-            onCategoryToggled: _toggleCategory,
-            onRetryPressed: _loadCategories,
-            onSkipPressed: _onSkipPressed,
-            onContinuePressed: _onContinuePressed,
-          ),
+        return InterestSelectionView(
+          l10n: l10n,
+          isArabic: isArabic,
+          isDark: isDark,
+          categories: _categories,
+          interestedIds: _interestedIds,
+          notInterestedIds: _notInterestedIds,
+          isLoadingCategories: _isLoadingCategories,
+          isSaving: _isSaving,
+          errorMessage: _errorMessage,
+          showSkip: _canSkip,
+          isEditMode: widget.isEditMode,
+          onCategoryCycled: _cycleCategory,
+          onRetryPressed: _loadInitialData,
+          onSkipPressed: _onSkipPressed,
+          onContinuePressed: _onContinuePressed,
+          onBackPressed: widget.isEditMode ? _onBackPressed : null,
         );
       },
     );

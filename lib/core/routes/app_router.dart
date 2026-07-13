@@ -19,6 +19,7 @@ import 'package:bimobondapp/app/auth/presentation/pages/settings_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_wallpaper_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/change_avatar_screen.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/home/presentation/pages/activity_screen.dart';
 import 'package:bimobondapp/app/notifications/presentation/pages/notifications_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/post_detail_screen.dart';
 import 'package:bimobondapp/app/posts/presentation/pages/profile_posts_viewer_screen.dart';
@@ -33,6 +34,7 @@ import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_scre
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
+import 'package:bimobondapp/app/home/presentation/pages/new_chat_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/follow_suggestions_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_comments_screen.dart';
 import 'package:bimobondapp/app/social/presentation/pages/my_followers_screen.dart';
@@ -115,7 +117,11 @@ class AppRouter {
         name: 'interest_selection',
         builder: (context, state) {
           final email = state.uri.queryParameters['email'];
-          return InterestSelectionScreen(pendingVerificationEmail: email);
+          final mode = state.uri.queryParameters['mode'];
+          return InterestSelectionScreen(
+            pendingVerificationEmail: email,
+            isEditMode: mode == 'edit',
+          );
         },
       ),
       GoRoute(
@@ -233,6 +239,11 @@ class AppRouter {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
+        path: '/activity',
+        name: 'activity',
+        builder: (context, state) => const ActivityScreen(),
+      ),
+      GoRoute(
         path: '/post-detail',
         name: 'post_detail',
         builder: (context, state) {
@@ -299,6 +310,7 @@ class AppRouter {
             username: extra?['username'] as String? ?? 'User',
             imageUrl: extra?['imageUrl'] as String? ?? '',
             peerUserId: extra?['peerUserId'] as String?,
+            openCamera: extra?['openCamera'] as bool? ?? false,
           );
         },
       ),
@@ -312,6 +324,11 @@ class AppRouter {
         name: 'chat_search',
         builder: (context, state) =>
             const AllChatsScreen(autofocusSearch: true),
+      ),
+      GoRoute(
+        path: '/new-chat',
+        name: 'new_chat',
+        builder: (context, state) => const NewChatScreen(),
       ),
       GoRoute(
         path: '/follow-suggestions',

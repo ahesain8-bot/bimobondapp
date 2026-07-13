@@ -1,5 +1,8 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/chats/domain/usecases/create_or_get_chat_usecase.dart';
+import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
+    as chats_di;
 import 'package:bimobondapp/app/home/presentation/utils/story_l10n_format.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_likes_usecase.dart';
@@ -11,9 +14,11 @@ import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_til
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 enum PostEngagementUserListKind { likes, views }
 
@@ -25,6 +30,8 @@ class PostEngagementUsersTab extends StatefulWidget {
     required this.kind,
     this.hideFollowForViewers = false,
     this.hideFollowButton = false,
+    this.showMessageButton = false,
+    this.showLikedHeart = false,
   });
 
   final String postId;
@@ -36,17 +43,26 @@ class PostEngagementUsersTab extends StatefulWidget {
   /// Explicit flag to hide the follow button entirely.
   final bool hideFollowButton;
 
+  /// TikTok-style Message trailing action on each row.
+  final bool showMessageButton;
+
+  /// Instagram-style: show a heart on viewers who also liked the story.
+  final bool showLikedHeart;
+
   @override
   State<PostEngagementUsersTab> createState() => _PostEngagementUsersTabState();
 }
 
 class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
   static const int _pageSize = 20;
+  static const int _likedIdsPageSize = 100;
 
   final ScrollController _scrollController = ScrollController();
   final List<SocialUserEntity> _likedUsers = [];
   final List<PostViewEntity> _views = [];
+  final Set<String> _likedViewerIds = {};
   final Set<String> _followLoadingIds = {};
+  final Set<String> _messageLoadingIds = {};
 
   int _page = 1;
   bool _hasReachedMax = false;
@@ -167,9 +183,42 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
     });
 
     if (_isViews) {
+      if (refresh && widget.showLikedHeart) {
+        await _loadLikedViewerIds();
+      }
       await _loadViews(refresh: refresh, loadMore: loadMore);
     } else {
       await _loadLikes(refresh: refresh, loadMore: loadMore);
+    }
+  }
+
+  Future<void> _loadLikedViewerIds() async {
+    _likedViewerIds.clear();
+    var page = 1;
+    var hasMore = true;
+
+    while (hasMore && page <= 5) {
+      final result = await posts_di.sl<GetPostLikesUseCase>()(
+        GetPostLikesParams(
+          postId: widget.postId,
+          page: page,
+          limit: _likedIdsPageSize,
+        ),
+      );
+
+      final continuePaging = result.fold(
+        (_) => false,
+        (likesPage) {
+          for (final user in likesPage.users) {
+            if (user.id.isNotEmpty) _likedViewerIds.add(user.id);
+          }
+          return likesPage.users.length >= _likedIdsPageSize;
+        },
+      );
+
+      if (!continuePaging) break;
+      page++;
+      hasMore = continuePaging;
     }
   }
 
@@ -247,11 +296,34 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
             incoming.where((v) => !existing.contains(_viewDedupeKey(v))),
           );
         }
+        if (widget.showLikedHeart) {
+          _sortViewsLikedFirst();
+        }
         if (!loadMore || page.views.isNotEmpty) {
           _page++;
         }
       }),
     );
+  }
+
+  void _sortViewsLikedFirst() {
+    if (_likedViewerIds.isEmpty) return;
+    _views.sort((a, b) {
+      final aLiked = _viewerLiked(a);
+      final bLiked = _viewerLiked(b);
+      if (aLiked == bLiked) return 0;
+      return aLiked ? -1 : 1;
+    });
+  }
+
+  String _viewerId(PostViewEntity view) {
+    if (view.userId.isNotEmpty) return view.userId;
+    return view.user?.id ?? '';
+  }
+
+  bool _viewerLiked(PostViewEntity view) {
+    final id = _viewerId(view);
+    return id.isNotEmpty && _likedViewerIds.contains(id);
   }
 
   String _viewDedupeKey(PostViewEntity view) {
@@ -288,13 +360,39 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
     required int index,
     String? subtitle,
     bool disableProfileTap = false,
+    bool likedStory = false,
   }) {
-    final hideFollow = widget.hideFollowButton || (_isViews && widget.hideFollowForViewers);
+    final hideFollow =
+        widget.hideFollowButton || (_isViews && widget.hideFollowForViewers);
+    final showMessage = widget.showMessageButton && !_isSelfUser(user);
+    final showHeart = widget.showLikedHeart && likedStory;
+
+    Widget? trailing;
+    if (showMessage || showHeart) {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showMessage)
+            _MessageTrailingButton(
+              isLoading: _messageLoadingIds.contains(user.id),
+              onPressed: () => _openMessage(user),
+            ),
+          if (showHeart) ...[
+            if (showMessage) const SizedBox(width: 10),
+            const Icon(
+              Icons.favorite,
+              color: Color(0xFFE1306C),
+              size: 22,
+            ),
+          ],
+        ],
+      );
+    }
 
     return SocialUserListTile(
       user: user,
       isSelf: _isSelfUser(user),
-      hideFollowButton: hideFollow,
+      hideFollowButton: hideFollow || showMessage || showHeart,
       isFollowLoading: _followLoadingIds.contains(user.id),
       onTap: disableProfileTap ? () {} : null,
       onFollowTap: hideFollow ? null : () => _toggleFollowForUser(index, user),
@@ -317,6 +415,40 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
         });
       },
       subtitleOverride: subtitle,
+      trailingOverride: trailing,
+    );
+  }
+
+  Future<void> _openMessage(SocialUserEntity user) async {
+    if (_messageLoadingIds.contains(user.id) || user.id.isEmpty) return;
+    setState(() => _messageLoadingIds.add(user.id));
+
+    final result = await chats_di.sl<CreateOrGetChatUseCase>()(
+      CreateOrGetChatParams(participantIds: [user.id]),
+    );
+
+    if (!mounted) return;
+    setState(() => _messageLoadingIds.remove(user.id));
+
+    await result.fold(
+      (failure) async {
+        PopupDialogs.showErrorDialog(context, failure.message);
+      },
+      (chat) async {
+        final displayName = user.fullName?.trim().isNotEmpty == true
+            ? user.fullName!.trim()
+            : user.username ?? user.displayName;
+        await context.pushNamed(
+          'chat',
+          extra: {
+            'chatId': chat.id,
+            'username': displayName,
+            if (user.avatarUrl != null && user.avatarUrl!.isNotEmpty)
+              'imageUrl': user.avatarUrl,
+            'peerUserId': user.id,
+          },
+        );
+      },
     );
   }
 
@@ -324,6 +456,9 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final skeletonTone = theme.brightness == Brightness.dark
+        ? LiquidGlassSkeletonTone.standard
+        : LiquidGlassSkeletonTone.light;
 
     if (_isLoading) {
       return ListView.builder(
@@ -332,15 +467,15 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
           vertical: AppSizes.p12,
         ),
         itemCount: 15,
-        itemBuilder: (context, index) => const Padding(
-          padding: EdgeInsets.only(bottom: AppSizes.p16),
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSizes.p16),
           child: Row(
             children: [
               LiquidGlassSkeletonBox.circular(
                 size: 44,
-                tone: LiquidGlassSkeletonTone.light,
+                tone: skeletonTone,
               ),
-              SizedBox(width: AppSizes.p12),
+              const SizedBox(width: AppSizes.p12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,13 +483,13 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
                     LiquidGlassSkeletonBox(
                       height: 14,
                       width: 120,
-                      tone: LiquidGlassSkeletonTone.light,
+                      tone: skeletonTone,
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     LiquidGlassSkeletonBox(
                       height: 12,
                       width: 80,
-                      tone: LiquidGlassSkeletonTone.light,
+                      tone: skeletonTone,
                     ),
                   ],
                 ),
@@ -362,7 +497,7 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
               LiquidGlassSkeletonBox(
                 height: 32,
                 width: 72,
-                tone: LiquidGlassSkeletonTone.light,
+                tone: skeletonTone,
               ),
             ],
           ),
@@ -409,8 +544,8 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
       },
       itemBuilder: (context, index) {
         if (showFooter && index == _itemCount) {
-          return const Padding(
-            padding: EdgeInsets.only(
+          return Padding(
+            padding: const EdgeInsets.only(
               top: AppSizes.p8,
               bottom: AppSizes.p16,
             ),
@@ -418,9 +553,9 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
               children: [
                 LiquidGlassSkeletonBox.circular(
                   size: 44,
-                  tone: LiquidGlassSkeletonTone.light,
+                  tone: skeletonTone,
                 ),
-                SizedBox(width: AppSizes.p12),
+                const SizedBox(width: AppSizes.p12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,13 +563,13 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
                       LiquidGlassSkeletonBox(
                         height: 14,
                         width: 120,
-                        tone: LiquidGlassSkeletonTone.light,
+                        tone: skeletonTone,
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       LiquidGlassSkeletonBox(
                         height: 12,
                         width: 80,
-                        tone: LiquidGlassSkeletonTone.light,
+                        tone: skeletonTone,
                       ),
                     ],
                   ),
@@ -442,7 +577,7 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
                 LiquidGlassSkeletonBox(
                   height: 32,
                   width: 72,
-                  tone: LiquidGlassSkeletonTone.light,
+                  tone: skeletonTone,
                 ),
               ],
             ),
@@ -456,6 +591,7 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
             index: index,
             subtitle: _viewTimeSubtitle(view, l10n),
             disableProfileTap: !view.hasViewerProfile,
+            likedStory: _viewerLiked(view),
           );
         }
 
@@ -465,6 +601,53 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
           subtitle: _likeTimeSubtitle(_likedUsers[index], l10n),
         );
       },
+    );
+  }
+}
+
+class _MessageTrailingButton extends StatelessWidget {
+  const _MessageTrailingButton({
+    required this.onPressed,
+    this.isLoading = false,
+  });
+
+  final VoidCallback onPressed;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      height: 34,
+      child: OutlinedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: theme.colorScheme.onSurface,
+          side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.35)),
+          backgroundColor: theme.colorScheme.surface,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          minimumSize: const Size(0, 34),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: isLoading
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                l10n.profileMessageButton,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+      ),
     );
   }
 }

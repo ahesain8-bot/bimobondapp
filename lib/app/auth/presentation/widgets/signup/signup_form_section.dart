@@ -4,7 +4,6 @@ import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_auth_widgets.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class SignUpFormSection extends StatelessWidget {
   const SignUpFormSection({
@@ -34,7 +33,6 @@ class SignUpFormSection extends StatelessWidget {
         LiquidGlassAuthTextField(
           controller: fullNameController,
           hintText: l10n.fullNameLabel,
-          icon: LucideIcons.user,
           keyboardType: TextInputType.name,
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
@@ -43,11 +41,10 @@ class SignUpFormSection extends StatelessWidget {
             return null;
           },
         ),
-        const SizedBox(height: AppSizes.p16),
+        const SizedBox(height: AppSizes.p20),
         LiquidGlassAuthTextField(
           controller: emailController,
           hintText: l10n.emailLabel,
-          icon: Icons.email_outlined,
           keyboardType: TextInputType.emailAddress,
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -62,7 +59,7 @@ class SignUpFormSection extends StatelessWidget {
             return null;
           },
         ),
-        const SizedBox(height: AppSizes.p16),
+        const SizedBox(height: AppSizes.p20),
         LiquidGlassAuthPasswordField(
           controller: passwordController,
           hintText: l10n.passwordLabel,
@@ -76,7 +73,7 @@ class SignUpFormSection extends StatelessWidget {
             return null;
           },
         ),
-        const SizedBox(height: AppSizes.p16),
+        const SizedBox(height: AppSizes.p20),
         LiquidGlassAuthPasswordField(
           controller: confirmPasswordController,
           hintText: l10n.confirmPasswordLabel,

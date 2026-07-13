@@ -54,7 +54,8 @@ class MessagesLayoutConstants {
 
   static const double sectionHeaderFontSize = 18;
   static const double sectionLinkFontSize = 13;
-  static const double conversationAvatarRadius = 28;
+  /// Same radius as [StoryProfileAvatar] default used on chat rows.
+  static const double conversationAvatarRadius = 24;
   static const double conversationTileRadius = 20;
   static const double conversationUnreadAlpha = 0.03;
   static const double conversationUnreadDotSize = 8;
@@ -63,6 +64,25 @@ class MessagesLayoutConstants {
   static const int recentMentionsPreviewCount = 5;
   static const int chatListSkeletonItemCount = 15;
   static const double chatListSkeletonTileHeight = 72;
+  static const double inboxActionTileSkeletonHeight = 64;
+
+  /// How many chat-row skeletons fit in the remaining viewport.
+  static int visibleChatSkeletonCount(
+    BuildContext context, {
+    double reservedAbove = 0,
+  }) {
+    final size = MediaQuery.sizeOf(context);
+    final padding = MediaQuery.paddingOf(context);
+    final available = size.height -
+        padding.top -
+        padding.bottom -
+        appBarHeight -
+        reservedAbove -
+        bottomSpacer;
+    final tileExtent = chatListSkeletonTileHeight + AppSizes.p8;
+    if (available <= 0 || tileExtent <= 0) return 4;
+    return (available / tileExtent).floor().clamp(3, 10);
+  }
 
   static const double glassButtonAlpha = 0.08;
   static const double dividerAlpha = 0.05;

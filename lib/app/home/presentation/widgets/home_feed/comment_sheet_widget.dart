@@ -5,7 +5,6 @@ import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_item.
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_skeleton.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/engagement_sheet_header.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_engagement_users_tab.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_event.dart';
@@ -14,10 +13,10 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as di;
 import 'package:bimobondapp/app/posts/presentation/utils/comment_thread_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/comment_sort.dart';
 import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -25,14 +24,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 class CommentSheetWidget extends StatefulWidget {
-  final String postId;
-  final String postOwnerId;
-  final int postLikeCount;
-  final int postCommentCount;
-  final int postViewCount;
-  final bool isPostOwner;
-  final int initialTabIndex;
-
   const CommentSheetWidget({
     super.key,
     required this.postId,
@@ -41,21 +32,27 @@ class CommentSheetWidget extends StatefulWidget {
     this.postCommentCount = 0,
     this.postViewCount = 0,
     this.isPostOwner = false,
-    this.initialTabIndex = 1,
+    this.initialTabIndex = 0,
+    required this.sheetScrollController,
   });
 
-  int get _tabCount => isPostOwner ? 3 : 1;
+  final String postId;
+  final String postOwnerId;
+  final int postLikeCount;
+  final int postCommentCount;
+  final int postViewCount;
+  final bool isPostOwner;
+  final int initialTabIndex;
+  final ScrollController sheetScrollController;
 
-  /// Tab index for comments when the post owner sees Likes / Comments / Views.
-  static const int ownerCommentsTabIndex = 1;
+  /// Comments | Likes for everyone; Views added for post owner.
+  int get _tabCount => isPostOwner ? 3 : 2;
 
-  /// Tab index for views when the post owner sees Likes / Comments / Views.
+  static const int commentsTabIndex = 0;
+  static const int likesTabIndex = 1;
   static const int ownerViewsTabIndex = 2;
 
-  /// Tab index for likes when the post owner sees Likes / Comments / Views.
-  static const int ownerLikesTabIndex = 0;
-
-  /// Engagement sheet: owner sees Likes / Comments / Views; others Comments only.
+  /// Engagement sheet: Comments / Likes (+ Views for owner).
   static Future<void> show(
     BuildContext context, {
     required String postId,
@@ -64,15 +61,15 @@ class CommentSheetWidget extends StatefulWidget {
     required int commentCount,
     required int viewCount,
     required bool isPostOwner,
-    int initialTabIndex = 1,
+    int initialTabIndex = 0,
   }) {
-    final maxIndex = isPostOwner ? 2 : 0;
+    final maxIndex = isPostOwner ? 2 : 1;
     return GlassBottomSheet.showDraggable<void>(
       context,
       initialChildSize: 0.72,
       minChildSize: 0.45,
-      maxChildSize: 0.92,
-      adaptTheme: true,
+      maxChildSize: 0.95,
+      lightSurface: true,
       builder: (context, scrollController) => CommentSheetWidget(
         postId: postId,
         postOwnerId: postOwnerId,
@@ -81,6 +78,7 @@ class CommentSheetWidget extends StatefulWidget {
         postViewCount: viewCount,
         isPostOwner: isPostOwner,
         initialTabIndex: initialTabIndex.clamp(0, maxIndex),
+        sheetScrollController: scrollController,
       ),
     );
   }
@@ -99,13 +97,14 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   CommentsLoadSuccess? _lastLoadedState;
   int _commentsPage = 1;
   bool _isLoadingMoreComments = false;
-  final ScrollController _commentsScrollController = ScrollController();
   String? _replyingToCommentId;
   String? _replyingToThreadRootId;
   String? _replyingToUsername;
   final Set<String> _expandedReplyIds = {};
   late int _headerCommentCount;
   String _commentSort = 'newest';
+
+  ScrollController get _sheetScrollController => widget.sheetScrollController;
 
   void _applyCommentSort(String sort) {
     if (_commentSort == sort) return;
@@ -142,7 +141,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
     );
     _tabController.addListener(_onTabIndexChanged);
     _commentController.addListener(_onCommentChanged);
-    _commentsScrollController.addListener(_onCommentsScroll);
+    _sheetScrollController.addListener(_onCommentsScroll);
   }
 
   void _onTabIndexChanged() {
@@ -151,16 +150,15 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   }
 
   bool get _showCommentSort =>
-      !widget.isPostOwner ||
-      _tabController.index == CommentSheetWidget.ownerCommentsTabIndex;
+      _tabController.index == CommentSheetWidget.commentsTabIndex;
 
   void _onCommentsScroll() {
-    if (!_commentsScrollController.hasClients) return;
+    if (!_sheetScrollController.hasClients) return;
     final loaded = _lastLoadedState;
     if (loaded == null || loaded.hasReachedMax || _isLoadingMoreComments) {
       return;
     }
-    final position = _commentsScrollController.position;
+    final position = _sheetScrollController.position;
     if (position.pixels >= position.maxScrollExtent - 120) {
       _loadMoreComments();
     }
@@ -195,10 +193,9 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
     _commentController.removeListener(_onCommentChanged);
     _tabController.removeListener(_onTabIndexChanged);
     _tabController.dispose();
-    _commentsScrollController.removeListener(_onCommentsScroll);
+    _sheetScrollController.removeListener(_onCommentsScroll);
     _commentController.dispose();
     _commentFocusNode.dispose();
-    _commentsScrollController.dispose();
     super.dispose();
   }
 
@@ -268,26 +265,6 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
     return null;
   }
 
-  Widget _buildCommentInputAvatar() {
-    final authState = context.watch<AuthBloc>().state;
-    if (authState is! AuthSuccess) {
-      return const LiquidGlassSkeletonBox.circular(
-        size: 40,
-        tone: LiquidGlassSkeletonTone.light,
-      );
-    }
-
-    final user = authState.user;
-    return StoryProfileAvatar(
-      userId: user.id,
-      imageUrl: user.avatarUrl,
-      radius: 20,
-      fallbackText: user.username ?? user.fullName ?? 'User',
-      username: user.username,
-      fullName: user.fullName,
-    );
-  }
-
   bool _canDelete(CommentEntity comment) {
     final userId = _currentUserId;
     if (userId == null) return false;
@@ -336,11 +313,12 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final theme = Theme.of(context);
 
     return BlocProvider.value(
       value: _commentsBloc,
       child: Material(
-        color: Colors.transparent,
+        color: theme.colorScheme.surface,
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
@@ -353,16 +331,12 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
               viewCount: widget.postViewCount,
               commentSort: _commentSort,
               onCommentSortChanged: _applyCommentSort,
+              onClose: () => Navigator.of(context).maybePop(),
             ),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  if (widget.isPostOwner)
-                    PostEngagementUsersTab(
-                      postId: widget.postId,
-                      kind: PostEngagementUserListKind.likes,
-                    ),
                   Column(
                     children: [
                       Expanded(
@@ -404,6 +378,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
                             if (displayState is CommentsLoading) {
                               return ListView.builder(
+                                controller: _sheetScrollController,
                                 itemCount: 15,
                                 padding: const EdgeInsets.fromLTRB(
                                   AppSizes.p16,
@@ -421,18 +396,34 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                             }
                             if (displayState is CommentsLoadSuccess) {
                               if (displayState.comments.isEmpty) {
-                                return Center(
-                                  child: CustomText(l10n.noCommentsYet),
+                                return ListView(
+                                  controller: _sheetScrollController,
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.sizeOf(context).height *
+                                          0.35,
+                                      child: Center(
+                                        child: CustomText(l10n.noCommentsYet),
+                                      ),
+                                    ),
+                                  ],
                                 );
                               }
+                              final sortedComments = sortCommentsByKey(
+                                displayState.comments,
+                                _commentSort,
+                              );
                               final showLoadMoreFooter =
                                   _isLoadingMoreComments &&
                                   !displayState.hasReachedMax;
 
                               return ListView.builder(
-                                controller: _commentsScrollController,
+                                controller: _sheetScrollController,
+                                physics: const AlwaysScrollableScrollPhysics(),
                                 itemCount:
-                                    displayState.comments.length +
+                                    sortedComments.length +
                                     (showLoadMoreFooter ? 1 : 0),
                                 padding: const EdgeInsets.fromLTRB(
                                   AppSizes.p16,
@@ -442,14 +433,14 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                                 ),
                                 itemBuilder: (context, index) {
                                   if (showLoadMoreFooter &&
-                                      index == displayState.comments.length) {
+                                      index == sortedComments.length) {
                                     return const Padding(
                                       padding: EdgeInsets.only(bottom: 20),
                                       child: CommentSkeletonRow(),
                                     );
                                   }
 
-                                  final comment = displayState.comments[index];
+                                  final comment = sortedComments[index];
                                   final loadedReplies =
                                       displayState.repliesByParentId[comment
                                           .id] ??
@@ -521,9 +512,12 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                         commentFocusNode: _commentFocusNode,
                         onSendComment: _onSendComment,
                         showPostButton: _showPostButton,
-                        inputAvatar: _buildCommentInputAvatar(),
                       ),
                     ],
+                  ),
+                  PostEngagementUsersTab(
+                    postId: widget.postId,
+                    kind: PostEngagementUserListKind.likes,
                   ),
                   if (widget.isPostOwner)
                     PostEngagementUsersTab(

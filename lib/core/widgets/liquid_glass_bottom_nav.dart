@@ -5,19 +5,23 @@ import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
 import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// One tab in [LiquidGlassBottomNav].
 class LiquidGlassBottomNavItem {
   const LiquidGlassBottomNavItem({
     this.icon,
+    this.selectedIcon,
     this.assetPath,
+    this.selectedAssetPath,
     required this.label,
     required this.index,
   }) : assert(icon != null || assetPath != null);
 
   final IconData? icon;
+  final IconData? selectedIcon;
   final String? assetPath;
+  final String? selectedAssetPath;
   final String label;
   final int index;
 }
@@ -32,22 +36,26 @@ abstract final class LiquidGlassBottomNavItems {
   }) {
     return [
       LiquidGlassBottomNavItem(
-        icon: LucideIcons.house,
+        assetPath: AppAssets.homeIcon,
+        selectedAssetPath: AppAssets.homeIconFilled,
         label: homeLabel,
         index: 0,
       ),
       LiquidGlassBottomNavItem(
-        icon: LucideIcons.gavel,
+        assetPath: AppAssets.auctionNavIcon,
+        selectedAssetPath: AppAssets.auctionNavIconFilled,
         label: auctionsLabel,
         index: 1,
       ),
       LiquidGlassBottomNavItem(
         assetPath: AppAssets.chatNavIcon,
+        selectedAssetPath: AppAssets.chatNavIconFilled,
         label: chatLabel,
         index: 3,
       ),
       LiquidGlassBottomNavItem(
-        icon: LucideIcons.user,
+        assetPath: AppAssets.profileIcon,
+        selectedAssetPath: AppAssets.profileIconFilled,
         label: profileLabel,
         index: 4,
       ),
@@ -60,12 +68,14 @@ abstract final class LiquidGlassBottomNavItems {
   }) {
     return [
       LiquidGlassBottomNavItem(
-        icon: LucideIcons.house,
+        assetPath: AppAssets.homeIcon,
+        selectedAssetPath: AppAssets.homeIconFilled,
         label: homeLabel,
         index: 0,
       ),
       LiquidGlassBottomNavItem(
-        icon: LucideIcons.user,
+        assetPath: AppAssets.profileIcon,
+        selectedAssetPath: AppAssets.profileIconFilled,
         label: profileLabel,
         index: 1,
       ),
@@ -132,7 +142,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
             ],
           ),
           child: Icon(
-            LucideIcons.plus,
+            Icons.add,
             color: theme.colorScheme.onPrimary,
             size: HomeLayoutConstants.addButtonIconSize,
           ),
@@ -212,7 +222,9 @@ class LiquidGlassBottomNav extends StatelessWidget {
       children.add(
         _LiquidGlassBottomNavTile(
           icon: item.icon,
+          selectedIcon: item.selectedIcon,
           assetPath: item.assetPath,
+          selectedAssetPath: item.selectedAssetPath,
           label: item.label,
           isSelected: currentIndex == item.index,
           selectedColor: selectedColor,
@@ -233,7 +245,9 @@ class LiquidGlassBottomNav extends StatelessWidget {
 class _LiquidGlassBottomNavTile extends StatelessWidget {
   const _LiquidGlassBottomNavTile({
     this.icon,
+    this.selectedIcon,
     this.assetPath,
+    this.selectedAssetPath,
     required this.label,
     required this.isSelected,
     required this.selectedColor,
@@ -242,7 +256,9 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
   });
 
   final IconData? icon;
+  final IconData? selectedIcon;
   final String? assetPath;
+  final String? selectedAssetPath;
   final String label;
   final bool isSelected;
   final Color selectedColor;
@@ -254,21 +270,31 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected ? selectedColor : unselectedColor;
 
+    final size = HomeLayoutConstants.navIconSize;
+    final resolvedAsset = isSelected
+        ? (selectedAssetPath ?? assetPath)
+        : assetPath;
+    final resolvedIcon = isSelected ? (selectedIcon ?? icon) : icon;
+
     final Widget iconWidget;
-    if (assetPath != null) {
-      iconWidget = Image.asset(
-        assetPath!,
-        width: HomeLayoutConstants.navIconSize,
-        height: HomeLayoutConstants.navIconSize,
-        color: color,
-        colorBlendMode: BlendMode.srcIn,
-      );
+    if (resolvedAsset != null) {
+      final isSvg = resolvedAsset.toLowerCase().endsWith('.svg');
+      iconWidget = isSvg
+          ? SvgPicture.asset(
+              resolvedAsset,
+              width: size,
+              height: size,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            )
+          : Image.asset(
+              resolvedAsset,
+              width: size,
+              height: size,
+              color: color,
+              colorBlendMode: BlendMode.srcIn,
+            );
     } else {
-      iconWidget = Icon(
-        icon!,
-        color: color,
-        size: HomeLayoutConstants.navIconSize,
-      );
+      iconWidget = Icon(resolvedIcon!, color: color, size: size);
     }
 
     return GestureDetector(

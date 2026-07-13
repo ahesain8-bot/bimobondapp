@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_location_chip.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -35,6 +37,7 @@ import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_options_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -433,8 +436,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     );
   }
 
-  void _showComments({int initialTabIndex = 1}) {
-    final isOwner = _isPostOwner();
+  void _showComments({int initialTabIndex = 0}) {
     CommentSheetWidget.show(
       context,
       postId: widget.post.id,
@@ -442,8 +444,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       likeCount: _likeCount,
       commentCount: widget.post.commentCount,
       viewCount: widget.post.viewCount,
-      isPostOwner: isOwner,
-      initialTabIndex: isOwner ? initialTabIndex : 0,
+      isPostOwner: _isPostOwner(),
+      initialTabIndex: initialTabIndex,
     );
   }
 
@@ -908,6 +910,15 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   label: _formatCount(widget.post.commentCount),
                   color: Colors.white,
                   onTap: _showComments,
+                  iconWidget: SvgPicture.asset(
+                    AppAssets.commentIcon,
+                    width: _actionIconSize,
+                    height: _actionIconSize,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: _actionSpacing),
                 _buildTikTokAction(
@@ -921,6 +932,15 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                   icon: LucideIcons.forward400,
                   color: Colors.white,
                   onTap: _showMoreOptions,
+                  iconWidget: SvgPicture.asset(
+                    AppAssets.shareArrowIcon,
+                    width: _actionIconSize,
+                    height: _actionIconSize,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcIn,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: _actionSpacing),
                 _buildMusicDisc(theme, post),
@@ -960,6 +980,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
                         feedItem: widget.feedItem,
                         repostQuote: _repostQuote,
                       ),
+                      if (post.location != null &&
+                          post.location!.hasDisplayLabel)
+                        PostLocationChip(location: post.location!),
                       if (post.isPromoted || post.isAd) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(

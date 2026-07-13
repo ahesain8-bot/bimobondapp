@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:flutter/material.dart';
 
 /// True when [url] is a non-empty http(s) URL that is not a video file.
@@ -195,9 +194,10 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     final w = widget.width;
     final h = widget.height;
     if (w != null && h != null && w.isFinite && h.isFinite) {
-      return ((w < h ? w : h) * 0.55).clamp(20.0, 48.0);
+      // Instagram-style: small fixed spinner relative to the tile.
+      return ((w < h ? w : h) * 0.22).clamp(18.0, 28.0);
     }
-    return 48;
+    return 24;
   }
 
   Widget _wrapSized(Widget child) {
@@ -211,6 +211,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     return SizedBox.expand(child: child);
   }
 
+  /// Instagram-style fixed circular spinner centered on a muted fill.
   Widget _loadingPlaceholder(ThemeData theme) {
     if (!widget.showLoadingIndicator && widget.blankOnError) {
       return _wrapSized(_blackBox());
@@ -218,13 +219,26 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
 
     final background = widget.blankOnError
         ? Colors.black
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2);
+        : theme.brightness == Brightness.light
+            ? const Color(0xFFF0F0F0)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35);
+    final spinnerSize = _effectiveLoadingSize;
+    final spinnerColor = theme.brightness == Brightness.light
+        ? const Color(0xFFB0B0B0)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.35);
 
     return _wrapSized(
       ColoredBox(
         color: background,
         child: Center(
-          child: CustomLoadingWidget(size: _effectiveLoadingSize),
+          child: SizedBox(
+            width: spinnerSize,
+            height: spinnerSize,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: spinnerColor,
+            ),
+          ),
         ),
       ),
     );

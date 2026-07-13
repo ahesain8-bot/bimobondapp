@@ -34,12 +34,15 @@ class CommentRow extends StatelessWidget {
   final AppLocalizations l10n;
   final bool isReply;
 
+  static const _likedRed = Color(0xFFFF2D55);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userId = comment.user.id;
-    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.45);
-    final actionColor = theme.colorScheme.onSurface.withValues(alpha: 0.55);
+    final onSurface = theme.colorScheme.onSurface;
+    final muted = onSurface.withValues(alpha: 0.45);
+    final actionColor = onSurface.withValues(alpha: 0.55);
     final avatarRadius = isReply
         ? CommentLayout.replyAvatarRadius
         : CommentLayout.avatarRadius;
@@ -47,6 +50,11 @@ class CommentRow extends StatelessWidget {
       DateTime.tryParse(comment.createdAt),
       l10n,
     );
+    final displayName = comment.user.username?.trim().isNotEmpty == true
+        ? comment.user.username!.trim()
+        : (comment.user.fullName?.trim().isNotEmpty == true
+              ? comment.user.fullName!.trim()
+              : 'user');
 
     void openProfile() {
       if (userId.isEmpty) return;
@@ -88,49 +96,29 @@ class CommentRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: GestureDetector(
-                      onTap: openProfile,
-                      behavior: HitTestBehavior.opaque,
-                      child: Text(
-                        comment.user.fullName?.trim().isNotEmpty == true
-                            ? comment.user.fullName!.trim()
-                            : (comment.user.username ?? 'user'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.onSurface,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
+              GestureDetector(
+                onTap: openProfile,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                    height: 1.2,
                   ),
-                  if (timeLabel.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Text(
-                      timeLabel,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: muted,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               if (comment.isGift)
                 Text(
                   localizedGiftCommentText(l10n, comment),
                   style: TextStyle(
                     fontSize: 15,
                     height: 1.35,
-                    color: theme.colorScheme.onSurface,
+                    color: onSurface,
                   ),
                 )
               else
@@ -139,64 +127,47 @@ class CommentRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 15,
                     height: 1.35,
-                    color: theme.colorScheme.onSurface,
+                    color: onSurface,
                   ),
                   mentionUserIds: MentionRefUtils.usernameToUserIdMap(
                     comment.content,
                     comment.mentions,
                   ),
                 ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: toggleLike,
-                    behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          comment.isLiked
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          size: 17,
-                          color: comment.isLiked ? Colors.red : actionColor,
-                        ),
-                        if (comment.likeCount > 0) ...[
-                          const SizedBox(width: 5),
-                          Text(
-                            formatCompactCount(comment.likeCount),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: actionColor,
-                            ),
-                          ),
-                        ],
-                      ],
+                  if (timeLabel.isNotEmpty) ...[
+                    Text(
+                      timeLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: muted,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 20),
+                    const SizedBox(width: 12),
+                  ],
                   GestureDetector(
                     onTap: onReply != null ? handleReply : null,
                     behavior: HitTestBehavior.opaque,
                     child: Text(
                       l10n.replyAction,
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: actionColor,
                       ),
                     ),
                   ),
                   if (canDelete && onDelete != null) ...[
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 12),
                     GestureDetector(
                       onTap: onDelete,
                       behavior: HitTestBehavior.opaque,
                       child: Icon(
                         LucideIcons.trash2,
-                        size: 15,
+                        size: 14,
                         color: actionColor,
                       ),
                     ),
@@ -205,6 +176,42 @@ class CommentRow extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        const SizedBox(width: 6),
+        Column(
+          children: [
+            GestureDetector(
+              onTap: toggleLike,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Column(
+                  children: [
+                    Icon(
+                      comment.isLiked
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 18,
+                      color: comment.isLiked ? _likedRed : muted,
+                    ),
+                    if (comment.likeCount > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        formatCompactCount(comment.likeCount),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: comment.isLiked ? _likedRed : muted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Icon(LucideIcons.thumbsDown, size: 16, color: muted),
+          ],
         ),
       ],
     );
