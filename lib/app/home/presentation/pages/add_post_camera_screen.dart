@@ -8,6 +8,7 @@ import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_inje
     as camera_studio_di;
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
+import 'package:bimobondapp/app/home/presentation/utils/camera_studio_permissions.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
@@ -68,6 +69,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _isBusy = false;
   bool _isProcessingCapture = false;
   int _recordSeconds = 0;
+  final List<String> _videoSegments = [];
+  bool _holdPressed = false;
   Timer? _recordTimer;
   Timer? _countdownTimer;
   int? _countdownValue;
@@ -122,6 +125,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.warmup();
       ArCameraBridge.setFilter(ArFilterCatalog.items[_arFilterIndex].id);
     }
+    unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
     unawaited(_loadCatalog());
   }
 
@@ -150,6 +154,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void dispose() {
     _recordTimer?.cancel();
     _countdownTimer?.cancel();
+    for (final path in _videoSegments) {
+      try {
+        File(path).deleteSync();
+      } catch (_) {}
+    }
+    _videoSegments.clear();
     unawaited(_faceDetectorService.dispose());
     super.dispose();
   }
@@ -198,12 +208,30 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     return filter.name;
   }
 
-  MediaEditorSeed get _captureEditSeed => MediaEditorSeed(
-    filterName: _activeFilterName,
-    effectSlug: _selectedEffectSlug,
-    beautyEnabled: _beautyEnabled,
-    filterCategory: _filterCategory,
-  );
+  MediaEditorSeed get _captureEditSeed {
+    if (_useNativeArFilters) {
+      final arId = ArFilterCatalog.items[_arFilterIndex].id;
+      final category = ArFilterCatalog.isColorFilter(arId)
+          ? _arColorCategoryId
+          : 'portrait';
+      return MediaEditorSeed(
+        arFilterId: arId,
+        arColorCategoryId: category,
+        arFilterIntensity: _arFilterIntensity,
+        beautyEnabled: arId == 'whitening',
+        alreadyBaked: true,
+        effectSlug: ArFilterCatalog.isColorFilter(arId) || arId == 'none'
+            ? null
+            : arId,
+      );
+    }
+    return MediaEditorSeed(
+      filterName: _activeFilterName,
+      effectSlug: _selectedEffectSlug,
+      beautyEnabled: _beautyEnabled,
+      filterCategory: _filterCategory,
+    );
+  }
 
   Future<void> _reapplySelectedFilter() async {
     final state = _cameraState;
@@ -370,6 +398,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       return;
     }
 
+    // Multi-clip video: each hold/release is a segment — Next merges & edits.
+    if (isVideo) {
+      setState(() {
+        _videoSegments.add(file.path);
+        _isBusy = false;
+        _isRecording = false;
+      });
+      return;
+    }
+
     if (_isBusy) {
       setState(() => _isBusy = false);
     }
@@ -402,7 +440,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           await videoState.startRecording();
           _appliedFilterId = null;
           await _reapplySelectedFilter();
-          _startRecordTimer();
+          _startRecordTimer(resume: _videoSegments.isNotEmpty);
         });
       },
       onPhotoMode: (_) {},
@@ -413,22 +451,22 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
   }
 
-  void _startRecordTimer() {
+  void _startRecordTimer({bool resume = false}) {
     _recordTimer?.cancel();
     setState(() {
       _isRecording = true;
-      _recordSeconds = 0;
+      if (!resume) _recordSeconds = 0;
     });
     _recordTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
+      if (!mounted || !_isRecording) return;
       setState(() => _recordSeconds += 1);
       if (_recordSeconds >= _selectedDuration) {
-        _stopRecording();
+        unawaited(_pauseRecordingSegment(autoFinish: true));
       }
     });
   }
 
-  Future<void> _stopRecording() async {
+  Future<void> _pauseRecordingSegment({bool autoFinish = false}) async {
     _recordTimer?.cancel();
     if (!_isRecording) return;
 
@@ -441,23 +479,20 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       try {
         final path = await ArCameraBridge.stopRecording();
         if (!mounted) return;
-        setState(() {
-          _isBusy = false;
-          _recordSeconds = 0;
-        });
-        if (path == null) return;
-        await _openCapturedMediaEditor(File(path), type: 'VIDEO');
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _isBusy = false;
-            _recordSeconds = 0;
-          });
+        if (path != null && path.isNotEmpty) {
+          _videoSegments.add(path);
         }
+        setState(() => _isBusy = false);
+        if (autoFinish && _videoSegments.isNotEmpty) {
+          await _finishMultiClipVideo();
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isBusy = false);
       }
       return;
     }
 
+    // CamerAwesome: stop write; file arrives via onMediaCapture as a segment.
     await _cameraState?.when(
       onVideoRecordingMode: (state) => state.stopRecording(),
       onPhotoMode: (_) async {},
@@ -466,10 +501,109 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       onPreviewMode: (_) async {},
       onAnalysisOnlyMode: (_) async {},
     );
+    if (mounted) setState(() => _isBusy = false);
+  }
 
-    if (mounted) {
-      setState(() => _recordSeconds = 0);
+  Future<void> _finishMultiClipVideo() async {
+    // Allow Next even if a pause is still settling.
+    if (_isRecording) {
+      await _pauseRecordingSegment();
     }
+    if (!mounted) return;
+
+    // After release, stopRecording / media callback may still be finishing.
+    var waited = 0;
+    while (mounted && waited < 100) {
+      if (!_isBusy && _videoSegments.isNotEmpty) break;
+      await Future.delayed(const Duration(milliseconds: 50));
+      waited++;
+    }
+    if (!mounted) return;
+
+    if (_videoSegments.isEmpty) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.cameraCaptureError('no_video'))),
+      );
+      return;
+    }
+    if (_isBusy) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.cameraCaptureError('busy'))),
+      );
+      return;
+    }
+
+    setState(() => _isBusy = true);
+    final segments = List<String>.from(_videoSegments);
+    try {
+      String? path;
+      if (segments.length == 1) {
+        path = segments.first;
+      } else if (_useNativeArFilters) {
+        try {
+          path = await ArCameraBridge.mergeVideoSegments(segments);
+        } catch (_) {
+          path = null;
+        }
+      }
+      path ??= segments.last;
+
+      final file = File(path);
+      if (!await file.exists() || await file.length() == 0) {
+        throw StateError('empty_video');
+      }
+
+      _videoSegments.clear();
+      if (!mounted) return;
+      setState(() {
+        _isBusy = false;
+        _recordSeconds = 0;
+      });
+
+      if (widget.isStory) {
+        setState(() {
+          _storyCapturedFile = file;
+          _storyCapturedType = 'VIDEO';
+        });
+        for (final old in segments) {
+          if (old != path) {
+            try {
+              File(old).deleteSync();
+            } catch (_) {}
+          }
+        }
+        return;
+      }
+
+      await _openCapturedMediaEditor(file, type: 'VIDEO');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isBusy = false);
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.cameraCaptureError(e.toString()))),
+      );
+    }
+  }
+
+  void _discardVideoDraft() {
+    _recordTimer?.cancel();
+    for (final path in _videoSegments) {
+      try {
+        File(path).deleteSync();
+      } catch (_) {}
+    }
+    _videoSegments.clear();
+    if (_isRecording && _useNativeArFilters) {
+      unawaited(ArCameraBridge.stopRecording().catchError((_) => null));
+    }
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+      _isBusy = false;
+    });
   }
 
   Future<void> _capturePhoto() async {
@@ -481,17 +615,31 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         final path = await ArCameraBridge.takePhoto();
         if (!mounted) return;
         setState(() => _isBusy = false);
-        if (path == null) return;
+        if (path == null || path.isEmpty) {
+          final l10n = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.cameraCaptureError('no_frame'))),
+          );
+          return;
+        }
+        final file = await CameraCaptureUtils.normalizeCapturedImage(File(path));
+        if (!mounted) return;
         if (widget.isStory) {
           setState(() {
-            _storyCapturedFile = File(path);
+            _storyCapturedFile = file;
             _storyCapturedType = 'IMAGE';
           });
           return;
         }
-        await _openCapturedMediaEditor(File(path), type: 'IMAGE');
-      } catch (_) {
-        if (mounted) setState(() => _isBusy = false);
+        await _openCapturedMediaEditor(file, type: 'IMAGE');
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isBusy = false);
+          final l10n = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.cameraCaptureError(e.toString()))),
+          );
+        }
       }
       return;
     }
@@ -510,6 +658,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Future<void> _beginVideoRecording() async {
     if (_isBusy || _isRecording) return;
+    if (_recordSeconds >= _selectedDuration) return;
 
     if (_useNativeArFilters) {
       setState(() => _isBusy = true);
@@ -517,7 +666,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         await ArCameraBridge.startRecording();
         if (!mounted) return;
         setState(() => _isBusy = false);
-        _startRecordTimer();
+        _startRecordTimer(resume: _videoSegments.isNotEmpty);
       } catch (_) {
         if (mounted) setState(() => _isBusy = false);
       }
@@ -539,7 +688,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         await videoState.startRecording();
         _appliedFilterId = null;
         await _reapplySelectedFilter();
-        _startRecordTimer();
+        _startRecordTimer(resume: _videoSegments.isNotEmpty);
       },
       onVideoRecordingMode: (_) async {},
       onPreparingCamera: (_) async {},
@@ -599,6 +748,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         if (_countdownValue == null || _countdownValue! <= 1) {
           timer.cancel();
           setState(() => _countdownValue = null);
+          if (!_holdPressed) return;
           _beginVideoRecording();
         } else {
           setState(() => _countdownValue = _countdownValue! - 1);
@@ -707,6 +857,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_isRecording) return;
     if (widget.isStory && mode == CameraStudioMode.live) return;
 
+    if (mode == CameraStudioMode.photo && _videoSegments.isNotEmpty) {
+      _discardVideoDraft();
+    }
+
     setState(() => _studioMode = mode);
 
     _cameraState?.when(
@@ -732,15 +886,42 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _onRecordTap() {
+    if (_studioMode == CameraStudioMode.live) return;
+
+    // Photo: tap to shoot. Video: hold to record (tap ignored except Next).
     if (_studioMode == CameraStudioMode.photo) {
-      _capturePhoto();
+      if (_isRecording) {
+        unawaited(_pauseRecordingSegment());
+      } else {
+        _capturePhoto();
+      }
+    }
+  }
+
+  void _onRecordHoldStart() {
+    if (_studioMode == CameraStudioMode.photo ||
+        _studioMode == CameraStudioMode.live) {
       return;
     }
+    if (_isBusy || _isRecording) return;
+    if (_recordSeconds >= _selectedDuration) return;
+    _holdPressed = true;
+    _startRecordingWithOptionalTimer();
+  }
 
+  void _onRecordHoldEnd() {
+    if (_studioMode == CameraStudioMode.photo ||
+        _studioMode == CameraStudioMode.live) {
+      return;
+    }
+    _holdPressed = false;
+    if (_countdownValue != null) {
+      _countdownTimer?.cancel();
+      setState(() => _countdownValue = null);
+      return;
+    }
     if (_isRecording) {
-      _stopRecording();
-    } else {
-      _startRecordingWithOptionalTimer();
+      unawaited(_pauseRecordingSegment());
     }
   }
 
@@ -827,6 +1008,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           isRecording: _isRecording,
           isBusy: _isBusy || _isProcessingCapture,
           recordSeconds: _recordSeconds,
+          hasDraftClips: _videoSegments.isNotEmpty,
+          onFinishRecording: () {
+            unawaited(_finishMultiClipVideo());
+          },
+          onDiscardDraft: _discardVideoDraft,
           countdownValue: _countdownValue,
           selectedEffectSlug: null,
           workspaceTabIndex: _workspaceTabIndex,
@@ -838,6 +1024,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           onStudioModeSelected: (mode) {
             if (_isRecording) return;
             if (widget.isStory && mode == CameraStudioMode.live) return;
+            if (mode == CameraStudioMode.photo && _videoSegments.isNotEmpty) {
+              _discardVideoDraft();
+            }
             setState(() => _studioMode = mode);
           },
           // OLD effects picker — disabled on native AR (carousel replaces it).
@@ -892,10 +1081,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           soundLabel: _studioMode == CameraStudioMode.live
               ? l10n.cameraLiveTitleHint
               : (_selectedSound?.name ?? l10n.cameraAddSound),
-          onLongPressStart: (_) => _startRecordingWithOptionalTimer(),
-          onLongPressEnd: (_) {
-            if (_isRecording) _stopRecording();
-          },
+          // TikTok: hold to record, release to pause, Next to finish.
+          onLongPressStart: (_) => _onRecordHoldStart(),
+          onLongPressEnd: (_) => _onRecordHoldEnd(),
           filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
         ),
       ],
@@ -959,6 +1147,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             isRecording: _isRecording,
             isBusy: _isBusy || _isProcessingCapture,
             recordSeconds: _recordSeconds,
+            hasDraftClips: _videoSegments.isNotEmpty,
+            onFinishRecording: () {
+              unawaited(_finishMultiClipVideo());
+            },
+            onDiscardDraft: _discardVideoDraft,
             countdownValue: _countdownValue,
             selectedEffectSlug: _selectedEffectSlug,
             workspaceTabIndex: _workspaceTabIndex,
@@ -1013,10 +1206,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             soundLabel: _studioMode == CameraStudioMode.live
                 ? l10n.cameraLiveTitleHint
                 : (_selectedSound?.name ?? l10n.cameraAddSound),
-            onLongPressStart: (_) => _startRecordingWithOptionalTimer(),
-            onLongPressEnd: (_) {
-              if (_isRecording) _stopRecording();
-            },
+            onLongPressStart: (_) => _onRecordHoldStart(),
+            onLongPressEnd: (_) => _onRecordHoldEnd(),
             filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
           );
         },

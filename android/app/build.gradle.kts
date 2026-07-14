@@ -48,6 +48,13 @@ android {
             )
         }
     }
+
+    packaging {
+        jniLibs {
+            // Keep MediaPipe .so extractable on devices where compressed JNI fails.
+            useLegacyPackaging = true
+        }
+    }
 }
 
 flutter {
@@ -66,8 +73,10 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
-    // MediaPipe Face Landmarker (468-point mesh) — Phase 2
-    implementation("com.google.mediapipe:tasks-vision:0.10.20")
+    // MediaPipe Face Landmarker (468-point mesh)
+    // 0.10.29+ restores missing ABI / 16KB page native libs (fixes
+    // UnsatisfiedLinkError: libmediapipe_tasks_vision_jni.so not found).
+    implementation("com.google.mediapipe:tasks-vision:0.10.29")
 
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.core:core-ktx:1.15.0")

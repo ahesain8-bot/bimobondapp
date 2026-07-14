@@ -172,10 +172,12 @@ class CameraRecordingBadge extends StatelessWidget {
     super.key,
     required this.label,
     required this.topPadding,
+    this.onTap,
   });
 
   final String label;
   final double topPadding;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -184,30 +186,34 @@ class CameraRecordingBadge extends StatelessWidget {
       left: 0,
       right: 0,
       child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFE2C55),
-                  shape: BoxShape.circle,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFE2C55),
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: CameraToolIcons.labelStyle.copyWith(fontSize: 13),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: CameraToolIcons.labelStyle.copyWith(fontSize: 13),
+                ),
+              ],
+            ),
           ),
         ),
       ),

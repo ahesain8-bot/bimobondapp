@@ -294,12 +294,18 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final url = animationUrl?.trim();
     if (url == null || url.isEmpty || !mounted) return;
 
-    final dedupeKey = '$url|${giftName ?? ''}|${senderName ?? ''}';
+    final dedupeKey = '${giftName ?? ''}|${senderName ?? ''}';
     final now = DateTime.now();
     final lastAt = _lastGiftPlayedAt;
+    // Ignore socket+local doubles even when URLs differ slightly.
     if (_lastGiftPlayedKey == dedupeKey &&
         lastAt != null &&
-        now.difference(lastAt) < const Duration(seconds: 2)) {
+        now.difference(lastAt) < const Duration(seconds: 3)) {
+      return;
+    }
+    if (lastAt != null &&
+        now.difference(lastAt) < const Duration(milliseconds: 800)) {
+      // Hard throttle: at most one overlay every 800ms.
       return;
     }
     _lastGiftPlayedKey = dedupeKey;

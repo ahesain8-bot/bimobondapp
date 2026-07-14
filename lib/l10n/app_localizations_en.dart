@@ -1497,12 +1497,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionAdmin => 'Admin';
 
   @override
-  String get settingsSectionDeveloper => 'Developer';
-
-  @override
-  String get settingsArCameraTest => 'AR Camera Test';
-
-  @override
   String get settingsAdminActivity => 'User activity';
 
   @override
@@ -2773,6 +2767,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraEffectGlitch => 'Glitch';
+
+  @override
+  String get cameraEffectGlasses => 'Glasses';
+
+  @override
+  String get cameraEffectMoustache => 'Moustache';
+
+  @override
+  String get cameraEffectBigEyes => 'Big Eyes';
+
+  @override
+  String get cameraEffectBigLips => 'Big Lips';
+
+  @override
+  String get cameraEffectNose => 'Nose';
+
+  @override
+  String get cameraFilterPure => 'Pure';
+
+  @override
+  String get cameraFilterBright => 'Bright';
+
+  @override
+  String get cameraFilterClean => 'Clean';
+
+  @override
+  String get cameraFilterSoft => 'Soft';
+
+  @override
+  String get cameraFilterSunset => 'Sunset';
+
+  @override
+  String get cameraCategoryLife => 'Life';
+
+  @override
+  String get mediaEditorShare => 'Share';
+
+  @override
+  String get mediaEditorText => 'Text';
+
+  @override
+  String get mediaEditorStickers => 'Stickers';
+
+  @override
+  String get mediaEditorCrop => 'Crop';
+
+  @override
+  String get mediaEditorEdit => 'Edit';
+
+  @override
+  String get mediaEditorMore => 'More';
+
+  @override
+  String get mediaEditorComingSoon => 'Coming soon';
 
   @override
   String get promotePostTitle => 'Promote post';

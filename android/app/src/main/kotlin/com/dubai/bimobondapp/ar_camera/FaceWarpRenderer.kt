@@ -126,9 +126,75 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         GLES20.glDisableVertexAttribArray(aPosition)
         GLES20.glDisableVertexAttribArray(aTexCoord)
+
+        if (captureEnabled) {
+            captureFrontBuffer()
+        }
+    }
+
+    @Volatile
+    var captureEnabled: Boolean = false
+
+    private val captureLock = Any()
+    private var lastCapturedFrame: Bitmap? = null
+
+    fun peekLastCapturedFrame(): Bitmap? = synchronized(captureLock) { lastCapturedFrame }
+
+    fun copyLastCapturedFrame(): Bitmap? = synchronized(captureLock) {
+        val frame = lastCapturedFrame
+        if (frame == null || frame.isRecycled) return null
+        return try {
+            frame.copy(Bitmap.Config.ARGB_8888, false)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun captureFrontBuffer() {
+        val viewport = IntArray(4)
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, viewport, 0)
+        val w = viewport[2]
+        val h = viewport[3]
+        if (w <= 1 || h <= 1) return
+
+        val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
+        GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
+        buf.rewind()
+
+        val pixels = IntArray(w * h)
+        val row = ByteArray(w * 4)
+        for (y in 0 until h) {
+            buf.position((h - 1 - y) * w * 4)
+            buf.get(row)
+            var x = 0
+            while (x < w) {
+                val i = x * 4
+                val r = row[i].toInt() and 0xFF
+                val g = row[i + 1].toInt() and 0xFF
+                val b = row[i + 2].toInt() and 0xFF
+                val a = row[i + 3].toInt() and 0xFF
+                pixels[y * w + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
+                x++
+            }
+        }
+
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
+        synchronized(captureLock) {
+            val previous = lastCapturedFrame
+            lastCapturedFrame = bitmap
+            if (previous != null && !previous.isRecycled) {
+                previous.recycle()
+            }
+        }
     }
 
     fun release() {
+        captureEnabled = false
+        synchronized(captureLock) {
+            lastCapturedFrame?.recycle()
+            lastCapturedFrame = null
+        }
         pendingBitmap?.recycle()
         pendingBitmap = null
         if (textureId != 0) {

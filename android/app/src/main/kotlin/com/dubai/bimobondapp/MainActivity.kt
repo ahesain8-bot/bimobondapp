@@ -48,7 +48,9 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "takePhoto" -> {
+                        val replied = java.util.concurrent.atomic.AtomicBoolean(false)
                         ArCameraController.takePhoto { path, error ->
+                            if (!replied.compareAndSet(false, true)) return@takePhoto
                             if (path != null) {
                                 result.success(path)
                             } else {
@@ -71,6 +73,18 @@ class MainActivity : FlutterActivity() {
                                 result.success(path)
                             } else {
                                 result.error("record_stop_failed", error ?: "unknown", null)
+                            }
+                        }
+                    }
+                    "mergeVideoSegments" -> {
+                        val paths = call.argument<List<*>>("paths")
+                            ?.mapNotNull { it?.toString() }
+                            .orEmpty()
+                        ArCameraController.mergeVideoSegments(paths) { path, error ->
+                            if (path != null) {
+                                result.success(path)
+                            } else {
+                                result.error("merge_failed", error ?: "unknown", null)
                             }
                         }
                     }

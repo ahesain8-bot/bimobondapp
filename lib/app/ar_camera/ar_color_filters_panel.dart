@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_l10n.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -182,6 +184,7 @@ class _CategoryRow extends StatelessWidget {
               itemBuilder: (context, index) {
                 final category = ArFilterCatalog.colorCategories[index];
                 final selected = category.id == selectedCategoryId;
+                final l10n = AppLocalizations.of(context)!;
                 return GestureDetector(
                   onTap: () => onCategorySelected(category.id),
                   behavior: HitTestBehavior.opaque,
@@ -189,7 +192,7 @@ class _CategoryRow extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        category.label,
+                        arFilterCategoryLabel(l10n, category),
                         style: TextStyle(
                           color: selected
                               ? Colors.white
@@ -234,6 +237,7 @@ class _FilterThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -260,7 +264,7 @@ class _FilterThumb extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              item.label,
+              arFilterLabel(l10n, item),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

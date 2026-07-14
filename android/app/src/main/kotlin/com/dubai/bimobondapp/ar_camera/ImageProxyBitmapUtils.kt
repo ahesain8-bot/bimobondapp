@@ -1,6 +1,7 @@
 package com.dubai.bimobondapp.ar_camera
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import androidx.camera.core.ImageProxy
@@ -9,9 +10,19 @@ object ImageProxyBitmapUtils {
 
     fun toBitmap(imageProxy: ImageProxy): Bitmap? {
         return when (imageProxy.format) {
+            ImageFormat.JPEG -> jpegToBitmap(imageProxy)
             ImageFormat.YUV_420_888 -> yuv420888ToBitmap(imageProxy)
             else -> rgbaToBitmap(imageProxy)
         }
+    }
+
+    private fun jpegToBitmap(imageProxy: ImageProxy): Bitmap? {
+        if (imageProxy.planes.isEmpty()) return null
+        val buffer = imageProxy.planes[0].buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.rewind()
+        buffer.get(bytes)
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
     }
 
     private fun rgbaToBitmap(imageProxy: ImageProxy): Bitmap? {
@@ -149,6 +160,17 @@ object ImageProxyBitmapUtils {
             preScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
         }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
+    /** Upright selfie bitmap matching the mirrored front-camera preview. */
+    fun toUprightMirroredSelfie(imageProxy: ImageProxy): Bitmap? {
+        val raw = toBitmap(imageProxy) ?: return null
+        val rotation = imageProxy.imageInfo.rotationDegrees
+        val oriented = rotate(raw, rotation)
+        if (oriented !== raw) raw.recycle()
+        val mirrored = mirrorHorizontally(oriented)
+        if (mirrored !== oriented) oriented.recycle()
+        return mirrored
     }
 
     fun scaleToMaxDimension(bitmap: Bitmap, maxDimension: Int, filter: Boolean = false): Bitmap {

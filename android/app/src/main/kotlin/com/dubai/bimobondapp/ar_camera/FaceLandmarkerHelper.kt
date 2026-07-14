@@ -20,11 +20,15 @@ class FaceLandmarkerHelper(context: Context) {
     fun setup() {
         if (faceLandmarker != null) return
         // Try GPU first for lower latency, fall back to CPU.
+        // LinkageError (missing .so) must not escape — callers catch Throwable too.
         faceLandmarker = try {
             createLandmarker(Delegate.GPU)
         } catch (e: Exception) {
             Log.w(TAG, "GPU delegate unavailable, falling back to CPU", e)
             createLandmarker(Delegate.CPU)
+        } catch (e: LinkageError) {
+            Log.e(TAG, "MediaPipe native library missing", e)
+            throw e
         }
     }
 

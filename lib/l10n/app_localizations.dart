@@ -2927,18 +2927,6 @@ abstract class AppLocalizations {
   /// **'Admin'**
   String get settingsSectionAdmin;
 
-  /// No description provided for @settingsSectionDeveloper.
-  ///
-  /// In en, this message translates to:
-  /// **'Developer'**
-  String get settingsSectionDeveloper;
-
-  /// No description provided for @settingsArCameraTest.
-  ///
-  /// In en, this message translates to:
-  /// **'AR Camera Test'**
-  String get settingsArCameraTest;
-
   /// No description provided for @settingsAdminActivity.
   ///
   /// In en, this message translates to:
@@ -5326,6 +5314,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Glitch'**
   String get cameraEffectGlitch;
+
+  /// No description provided for @cameraEffectGlasses.
+  ///
+  /// In en, this message translates to:
+  /// **'Glasses'**
+  String get cameraEffectGlasses;
+
+  /// No description provided for @cameraEffectMoustache.
+  ///
+  /// In en, this message translates to:
+  /// **'Moustache'**
+  String get cameraEffectMoustache;
+
+  /// No description provided for @cameraEffectBigEyes.
+  ///
+  /// In en, this message translates to:
+  /// **'Big Eyes'**
+  String get cameraEffectBigEyes;
+
+  /// No description provided for @cameraEffectBigLips.
+  ///
+  /// In en, this message translates to:
+  /// **'Big Lips'**
+  String get cameraEffectBigLips;
+
+  /// No description provided for @cameraEffectNose.
+  ///
+  /// In en, this message translates to:
+  /// **'Nose'**
+  String get cameraEffectNose;
+
+  /// No description provided for @cameraFilterPure.
+  ///
+  /// In en, this message translates to:
+  /// **'Pure'**
+  String get cameraFilterPure;
+
+  /// No description provided for @cameraFilterBright.
+  ///
+  /// In en, this message translates to:
+  /// **'Bright'**
+  String get cameraFilterBright;
+
+  /// No description provided for @cameraFilterClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean'**
+  String get cameraFilterClean;
+
+  /// No description provided for @cameraFilterSoft.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft'**
+  String get cameraFilterSoft;
+
+  /// No description provided for @cameraFilterSunset.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunset'**
+  String get cameraFilterSunset;
+
+  /// No description provided for @cameraCategoryLife.
+  ///
+  /// In en, this message translates to:
+  /// **'Life'**
+  String get cameraCategoryLife;
+
+  /// No description provided for @mediaEditorShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get mediaEditorShare;
+
+  /// No description provided for @mediaEditorText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get mediaEditorText;
+
+  /// No description provided for @mediaEditorStickers.
+  ///
+  /// In en, this message translates to:
+  /// **'Stickers'**
+  String get mediaEditorStickers;
+
+  /// No description provided for @mediaEditorCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Crop'**
+  String get mediaEditorCrop;
+
+  /// No description provided for @mediaEditorEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get mediaEditorEdit;
+
+  /// No description provided for @mediaEditorMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get mediaEditorMore;
+
+  /// No description provided for @mediaEditorComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get mediaEditorComingSoon;
 
   /// No description provided for @promotePostTitle.
   ///

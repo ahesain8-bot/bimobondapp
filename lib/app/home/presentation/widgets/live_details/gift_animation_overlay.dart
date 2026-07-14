@@ -4,11 +4,15 @@ import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart'
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:lottie/lottie.dart';
 import 'package:video_player/video_player.dart';
 
 /// TikTok-style gift overlay — prefers preloaded Lottie for instant playback.
+///
+/// Important: never wrap [VideoPlayer] in `saveLayer` / [BlendMode.screen].
+/// That combination hard-crashes many Android GPUs when a second texture
+/// (live feed + gift MP4) is blended.
 class GiftAnimationOverlay extends StatefulWidget {
   const GiftAnimationOverlay({
     required this.animationUrl,
@@ -24,6 +28,8 @@ class GiftAnimationOverlay extends StatefulWidget {
   final String? senderName;
   final String? giftName;
   final VoidCallback? onCompleted;
+
+  static OverlayEntry? _activeEntry;
 
   /// Inserts above the current route (after the gift sheet is closed).
   static Future<void> show(
@@ -44,12 +50,24 @@ class GiftAnimationOverlay extends StatefulWidget {
     final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return Future.value();
 
+    // Only one gift animation at a time — avoids dual VideoPlayers / crash.
+    _dismissActive();
+
     final completer = Completer<void>();
     late OverlayEntry entry;
 
     void remove() {
-      if (entry.mounted) entry.remove();
-      if (!completer.isCompleted) completer.complete();
+      if (identical(_activeEntry, entry)) {
+        _activeEntry = null;
+      }
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (entry.mounted) {
+          try {
+            entry.remove();
+          } catch (_) {}
+        }
+        if (!completer.isCompleted) completer.complete();
+      });
     }
 
     entry = OverlayEntry(
@@ -64,8 +82,20 @@ class GiftAnimationOverlay extends StatefulWidget {
       ),
     );
 
+    _activeEntry = entry;
     overlay.insert(entry);
     return completer.future;
+  }
+
+  static void _dismissActive() {
+    final active = _activeEntry;
+    _activeEntry = null;
+    if (active == null) return;
+    if (active.mounted) {
+      try {
+        active.remove();
+      } catch (_) {}
+    }
   }
 
   @override
@@ -82,6 +112,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   LottieComposition? _composition;
   bool _finished = false;
   bool _lottieFailed = false;
+  bool _videoFailed = false;
   late final _GiftMediaKind _kind;
 
   @override
@@ -122,8 +153,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   }
 
   Future<void> _playLottie() async {
-    final composition =
-        await GiftLottieCache.instance.load(widget.animationUrl);
+    final composition = await GiftLottieCache.instance.load(
+      widget.animationUrl,
+    );
     if (!mounted) return;
 
     if (composition == null) {
@@ -146,21 +178,26 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   }
 
   Future<void> _initVideo() async {
+    VideoPlayerController? controller;
     try {
-      final controller = VideoPlayerController.networkUrl(
+      controller = VideoPlayerController.networkUrl(
         Uri.parse(widget.animationUrl),
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
       _videoController = controller;
       await controller.initialize();
-      if (!mounted) return;
+      if (!mounted) {
+        await controller.dispose();
+        _videoController = null;
+        return;
+      }
       await controller.setLooping(false);
       await controller.setVolume(1);
       setState(() {});
       await controller.play();
 
       void onTick() {
-        final value = controller.value;
+        final value = controller!.value;
         if (!value.isInitialized || value.duration == Duration.zero) return;
         if (value.position >=
             value.duration - const Duration(milliseconds: 80)) {
@@ -172,10 +209,17 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       controller.addListener(onTick);
       final d = controller.value.duration;
       final timeout = d > Duration.zero ? d : const Duration(seconds: 3);
-      Future<void>.delayed(timeout + const Duration(milliseconds: 400), _finish);
+      Future<void>.delayed(
+        timeout + const Duration(milliseconds: 400),
+        _finish,
+      );
     } catch (_) {
+      try {
+        await controller?.dispose();
+      } catch (_) {}
+      _videoController = null;
       if (!mounted) return;
-      setState(() {});
+      setState(() => _videoFailed = true);
       Future<void>.delayed(const Duration(milliseconds: 1600), _finish);
     }
   }
@@ -183,13 +227,32 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   void _finish() {
     if (_finished) return;
     _finished = true;
+
+    // Tear down video texture before removing the overlay entry.
+    final video = _videoController;
+    _videoController = null;
+    if (video != null) {
+      unawaited(() async {
+        try {
+          await video.pause();
+        } catch (_) {}
+        try {
+          await video.dispose();
+        } catch (_) {}
+        widget.onCompleted?.call();
+      }());
+      return;
+    }
+
     widget.onCompleted?.call();
   }
 
   @override
   void dispose() {
     _lottieController?.dispose();
-    _videoController?.dispose();
+    final video = _videoController;
+    _videoController = null;
+    video?.dispose();
     _entranceController.dispose();
     super.dispose();
   }
@@ -279,7 +342,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         final composition = _composition;
         final controller = _lottieController;
         if (composition != null && controller != null) {
-          return _tikTokGiftBlend(
+          // Lottie is software-painted — screen blend is GPU-safe here.
+          return _lottieScreenBlend(
             Lottie(
               composition: composition,
               controller: controller,
@@ -288,51 +352,52 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
             ),
           );
         }
-        // Keep clear while Lottie loads so the thumbnail doesn't flash behind.
-        if (_lottieFailed) return _tikTokGiftBlend(_fallbackVisual());
+        if (_lottieFailed) return _fallbackVisual();
         return const SizedBox.shrink();
       case _GiftMediaKind.video:
+        // Never wrap VideoPlayer in blend/saveLayer — that crashes Android.
+        if (_videoFailed) return _fallbackVisual();
         final controller = _videoController;
         if (controller == null || !controller.value.isInitialized) {
           return const SizedBox.shrink();
         }
-        return _tikTokGiftBlend(
-          _knockOutBlackBackground(
-            FittedBox(
-              fit: BoxFit.contain,
-              child: SizedBox(
-                width: controller.value.size.width,
-                height: controller.value.size.height,
-                child: VideoPlayer(controller),
-              ),
-            ),
+        return FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
           ),
         );
       case _GiftMediaKind.image:
-        return _tikTokGiftBlend(
-          _knockOutBlackBackground(
-            _fallbackVisual(url: widget.animationUrl),
-          ),
-        );
+        return _fallbackVisual(url: widget.animationUrl);
     }
   }
 
-  /// Screen-blend so black pixels don't cover the live feed (TikTok gift look).
-  Widget _tikTokGiftBlend(Widget child) {
-    return _BlendMask(
-      blendMode: BlendMode.screen,
-      child: child,
-    );
-  }
-
-  /// Extra keying for MP4/images that bake a solid black plate.
-  Widget _knockOutBlackBackground(Widget child) {
+  /// Soft screen-style look for Lottie only (no Texture / VideoPlayer).
+  Widget _lottieScreenBlend(Widget child) {
     return ColorFiltered(
       colorFilter: const ColorFilter.matrix(<double>[
-        1, 0, 0, 0, 0,
-        0, 1, 0, 0, 0,
-        0, 0, 1, 0, 0,
-        0.33, 0.33, 0.33, 0, -0.05,
+        1.15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1.15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1.15,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
       ]),
       child: child,
     );
@@ -349,50 +414,5 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       );
     }
     return const Icon(Icons.card_giftcard, size: 120, color: Colors.white);
-  }
-}
-
-/// Paints [child] with [blendMode] so it composites over the live feed.
-class _BlendMask extends SingleChildRenderObjectWidget {
-  const _BlendMask({
-    required this.blendMode,
-    required Widget child,
-  }) : super(child: child);
-
-  final BlendMode blendMode;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) {
-    return _RenderBlendMask(blendMode);
-  }
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    covariant _RenderBlendMask renderObject,
-  ) {
-    renderObject.blendMode = blendMode;
-  }
-}
-
-class _RenderBlendMask extends RenderProxyBox {
-  _RenderBlendMask(this._blendMode);
-
-  BlendMode _blendMode;
-
-  set blendMode(BlendMode value) {
-    if (_blendMode == value) return;
-    _blendMode = value;
-    markNeedsPaint();
-  }
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    context.canvas.saveLayer(
-      offset & size,
-      Paint()..blendMode = _blendMode,
-    );
-    super.paint(context, offset);
-    context.canvas.restore();
   }
 }

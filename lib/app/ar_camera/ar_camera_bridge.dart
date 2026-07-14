@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_constants.dart';
 
@@ -28,7 +30,9 @@ class ArCameraBridge {
   }
 
   static Future<String?> takePhoto() async {
-    final path = await _channel.invokeMethod<String>('takePhoto');
+    final path = await _channel
+        .invokeMethod<String>('takePhoto')
+        .timeout(const Duration(seconds: 10));
     return path;
   }
 
@@ -38,6 +42,15 @@ class ArCameraBridge {
 
   static Future<String?> stopRecording() async {
     final path = await _channel.invokeMethod<String>('stopRecording');
+    return path;
+  }
+
+  static Future<String?> mergeVideoSegments(List<String> paths) async {
+    if (paths.isEmpty) return null;
+    if (paths.length == 1) return paths.first;
+    final path = await _channel.invokeMethod<String>('mergeVideoSegments', {
+      'paths': paths,
+    });
     return path;
   }
 }

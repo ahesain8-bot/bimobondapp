@@ -120,6 +120,8 @@ object ArCameraBridge {
             useShader -> {
                 gl?.ensureGlInitialized()
                 gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
+                // Keep GPU readback on for face-warp so photo/video can bake the effect.
+                gl?.setCaptureEnabled(type.isDistortion())
 
                 val alreadyOnGl =
                     gl != null &&
@@ -150,6 +152,7 @@ object ArCameraBridge {
 
             usePngUnderlay -> {
                 awaitFirstGlFrame = false
+                gl?.setCaptureEnabled(false)
                 gl?.visibility = View.GONE
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 preview?.visibility = View.INVISIBLE
@@ -159,6 +162,7 @@ object ArCameraBridge {
             else -> {
                 // Original — Preview only.
                 awaitFirstGlFrame = false
+                gl?.setCaptureEnabled(false)
                 gl?.visibility = View.GONE
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 preview?.visibility = View.VISIBLE

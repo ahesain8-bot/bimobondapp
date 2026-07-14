@@ -16,10 +16,11 @@ object FaceLandmarkerHolder {
 
     private val warmupStarted = AtomicBoolean(false)
     private val ready = AtomicBoolean(false)
+    private val unavailable = AtomicBoolean(false)
     private var warmupExecutor: ExecutorService? = null
 
     fun warmup(context: Context) {
-        if (ready.get()) return
+        if (ready.get() || unavailable.get()) return
         if (!warmupStarted.compareAndSet(false, true)) return
 
         val appContext = context.applicationContext
@@ -34,20 +35,28 @@ object FaceLandmarkerHolder {
                 helper = instance
                 ready.set(true)
                 Log.i(TAG, "Face landmarker ready")
-            } catch (e: Exception) {
-                Log.e(TAG, "Face landmarker warmup failed", e)
+            } catch (t: Throwable) {
+                // UnsatisfiedLinkError / LinkageError are Errors, not Exceptions —
+                // catching only Exception crashes the whole process.
+                Log.e(TAG, "Face landmarker warmup failed; AR face effects disabled", t)
+                unavailable.set(true)
                 warmupStarted.set(false)
+                helper = null
+                ready.set(false)
             }
         }
     }
 
     fun get(): FaceLandmarkerHelper? = helper
 
+    fun isAvailable(): Boolean = ready.get() && helper != null
+
     fun release() {
         helper?.close()
         helper = null
         ready.set(false)
         warmupStarted.set(false)
+        unavailable.set(false)
         warmupExecutor?.shutdownNow()
         warmupExecutor = null
     }

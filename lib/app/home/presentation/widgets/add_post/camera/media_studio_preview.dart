@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_ar_effects_layer.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
@@ -16,14 +18,24 @@ class MediaStudioPreview extends StatefulWidget {
     super.key,
     required this.file,
     required this.isVideo,
-    required this.filter,
+    this.filter,
     this.effect,
+    this.arFilterId = 'none',
+    this.arFilterIntensity = 1.0,
+    this.applyArColorPreview = true,
   });
 
   final File file;
   final bool isVideo;
-  final AwesomeFilter filter;
+  final AwesomeFilter? filter;
   final CameraEffectDefinition? effect;
+
+  /// AR color grade id from [ArFilterCatalog] (`whitening`, `warm`, …).
+  final String arFilterId;
+  final double arFilterIntensity;
+
+  /// False when pixels already include the baked AR grade.
+  final bool applyArColorPreview;
 
   @override
   State<MediaStudioPreview> createState() => _MediaStudioPreviewState();
@@ -60,7 +72,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       } else {
         _loadImageSize();
       }
-    } else if (oldWidget.filter.name != widget.filter.name ||
+    } else if (oldWidget.filter?.name != widget.filter?.name &&
         oldWidget.effect?.slug != widget.effect?.slug) {
       setState(() {});
     }
@@ -166,7 +178,17 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final hasFilter = widget.filter.name != AwesomeFilter.None.name;
+    final hasAwesomeFilter =
+        widget.filter != null && widget.filter!.name != AwesomeFilter.None.name;
+    final arColorId = ArFilterCatalog.isColorFilter(widget.arFilterId)
+        ? widget.arFilterId
+        : null;
+    final arColorFilter = widget.applyArColorPreview
+        ? ArColorFilterMatrix.preview(
+            arColorId,
+            intensity: widget.arFilterIntensity,
+          )
+        : null;
     final activeEffect = widget.effect;
 
     Widget media;
@@ -183,12 +205,15 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       } else {
         media = ColoredBox(
           color: Colors.black,
-          child: FittedBox(
-            fit: BoxFit.contain,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              clipBehavior: Clip.hardEdge,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
             ),
           ),
         );
@@ -198,10 +223,10 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         color: Colors.black,
         child: Image.file(
           widget.file,
-          fit: BoxFit.contain,
+          fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          errorBuilder: (_, __, ___) => const ColoredBox(
+          errorBuilder: (_, _, _) => const ColoredBox(
             color: Colors.black,
             child: Center(
               child: Icon(LucideIcons.imageOff, color: Colors.white38),
@@ -211,8 +236,10 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       );
     }
 
-    if (hasFilter) {
-      media = ColorFiltered(colorFilter: widget.filter.preview, child: media);
+    if (arColorFilter != null) {
+      media = ColorFiltered(colorFilter: arColorFilter, child: media);
+    } else if (hasAwesomeFilter) {
+      media = ColorFiltered(colorFilter: widget.filter!.preview, child: media);
     }
 
     return Stack(
@@ -222,13 +249,13 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         if (activeEffect != null &&
             activeEffect.requiresFaceDetection &&
             _mediaSize != Size.zero)
-                GalleryArEffectsLayer(
-                  file: widget.file,
-                  isVideo: _treatAsVideo,
-                  effect: activeEffect,
-                  mediaSize: _mediaSize,
-                  previewFit: BoxFit.contain,
-                ),
+          GalleryArEffectsLayer(
+            file: widget.file,
+            isVideo: _treatAsVideo,
+            effect: activeEffect,
+            mediaSize: _mediaSize,
+            previewFit: BoxFit.cover,
+          ),
         if (activeEffect != null && activeEffect.isScreenEffect)
           CameraScreenEffectsLayer(effect: activeEffect),
       ],

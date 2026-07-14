@@ -54,6 +54,19 @@ class FaceWarpGlView @JvmOverloads constructor(
         requestRender()
     }
 
+    fun setCaptureEnabled(enabled: Boolean) {
+        ensureGlInitialized()
+        queueEvent {
+            renderer.captureEnabled = enabled
+        }
+    }
+
+    /** Thread-safe copy of the last GPU-filtered frame (null if none yet). */
+    fun copyLastFilteredFrame(): Bitmap? {
+        if (!glInitialized) return null
+        return renderer.copyLastCapturedFrame()
+    }
+
     fun releaseGl() {
         if (!glInitialized) return
         queueEvent {

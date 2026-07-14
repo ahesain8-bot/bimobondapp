@@ -36,6 +36,9 @@ class CameraStudioOverlay extends StatelessWidget {
     required this.isBusy,
     required this.recordSeconds,
     required this.countdownValue,
+    this.hasDraftClips = false,
+    this.onFinishRecording,
+    this.onDiscardDraft,
     this.cameraState,
     this.preview,
     this.faceStream,
@@ -92,6 +95,9 @@ class CameraStudioOverlay extends StatelessWidget {
   final bool isBusy;
   final int recordSeconds;
   final int? countdownValue;
+  final bool hasDraftClips;
+  final VoidCallback? onFinishRecording;
+  final VoidCallback? onDiscardDraft;
   final CameraState? cameraState;
   final AnalysisPreview? preview;
   final Stream<CameraFaceDetectionFrame>? faceStream;
@@ -213,33 +219,44 @@ class CameraStudioOverlay extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(height: 4),
-                        Stack(
-                          alignment: Alignment.bottomCenter,
-                          children: [
-                            ArFilterCarousel(
-                              items: ArFilterCatalog.effectItems,
-                              selectedIndex: ArFilterCatalog.effectCarouselIndex(
-                                selectedArFilterId,
-                              ),
-                              onSelected: (index) {
-                                final id =
-                                    ArFilterCatalog.effectItems[index].id;
-                                onArFilterSelected!(
-                                  ArFilterCatalog.indexOfId(id),
-                                );
-                              },
-                              isRecording: isRecording,
-                              isBusy: isBusy,
-                              recordProgress: selectedDuration == 0
-                                  ? 0
-                                  : recordSeconds / selectedDuration,
-                              isPhotoMode: isPhotoMode,
-                              onShutterTap: onRecordTap,
-                              onHoldStart: onLongPressStart,
-                              onHoldEnd: onLongPressEnd,
+                        if (hasDraftClips &&
+                            !isRecording &&
+                            onFinishRecording != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Row(
+                              children: [
+                                const Spacer(),
+                                _DraftNextButton(
+                                  label: l10n.nextAction,
+                                  onTap: onFinishRecording!,
+                                  onDiscard: onDiscardDraft,
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
+                        const SizedBox(height: 4),
+                        ArFilterCarousel(
+                          items: ArFilterCatalog.effectItems,
+                          selectedIndex: ArFilterCatalog.effectCarouselIndex(
+                            selectedArFilterId,
+                          ),
+                          onSelected: (index) {
+                            final id =
+                                ArFilterCatalog.effectItems[index].id;
+                            onArFilterSelected!(
+                              ArFilterCatalog.indexOfId(id),
+                            );
+                          },
+                          isRecording: isRecording,
+                          isBusy: isBusy,
+                          recordProgress: selectedDuration == 0
+                              ? 0
+                              : recordSeconds / selectedDuration,
+                          isPhotoMode: isPhotoMode,
+                          onShutterTap: onRecordTap,
+                          onHoldStart: onLongPressStart,
+                          onHoldEnd: onLongPressEnd,
                         ),
                         const SizedBox(height: 6),
                         _BottomWorkspaceRow(
@@ -260,6 +277,22 @@ class CameraStudioOverlay extends StatelessWidget {
                 else if (!useNativeArFilters || isLiveMode) ...[
                   if (!isLiveMode) ...[
                     const SizedBox(height: 10),
+                    if (hasDraftClips &&
+                        !isRecording &&
+                        onFinishRecording != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Row(
+                          children: [
+                            const Spacer(),
+                            _DraftNextButton(
+                              label: l10n.nextAction,
+                              onTap: onFinishRecording!,
+                              onDiscard: onDiscardDraft,
+                            ),
+                          ],
+                        ),
+                      ),
                     CameraCaptureControls(
                       isLiveMode: isLiveMode,
                       isPhotoMode: isPhotoMode,
@@ -319,6 +352,7 @@ class CameraStudioOverlay extends StatelessWidget {
         ),
         Positioned.fill(
           child: Align(
+            // Edge follows language: left in RTL, right in LTR.
             alignment: isRtl ? Alignment.centerLeft : Alignment.centerRight,
             child: Padding(
               padding: EdgeInsets.only(
@@ -411,10 +445,11 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
           ),
         ],
-        if (isRecording)
+        if (isRecording || hasDraftClips)
           CameraRecordingBadge(
             topPadding: topPadding,
             label: '${l10n.cameraRecording} ${recordSeconds}s',
+            onTap: hasDraftClips && !isRecording ? onFinishRecording : null,
           ),
       ],
     );
@@ -507,6 +542,71 @@ class _BottomWorkspaceRow extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _DraftNextButton extends StatelessWidget {
+  const _DraftNextButton({
+    required this.label,
+    required this.onTap,
+    this.onDiscard,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback? onDiscard;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (onDiscard != null) ...[
+          GestureDetector(
+            onTap: onDiscard,
+            child: Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsetsDirectional.only(end: 10),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24),
+              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 20),
+            ),
+          ),
+        ],
+        GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFE2C55),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black45,
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

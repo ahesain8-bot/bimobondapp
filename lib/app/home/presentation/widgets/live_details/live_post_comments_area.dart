@@ -44,9 +44,8 @@ class LivePostCommentsArea extends StatelessWidget {
             Colors.transparent,
             Colors.black,
             Colors.black,
-            Colors.transparent,
           ],
-          stops: [0.0, 0.1, 0.9, 1.0],
+          stops: [0.0, 0.12, 1.0],
         ).createShader(bounds),
         blendMode: BlendMode.dstIn,
         child: ListView.builder(

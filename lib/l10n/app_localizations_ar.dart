@@ -1497,12 +1497,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSectionAdmin => 'المسؤول';
 
   @override
-  String get settingsSectionDeveloper => 'المطور';
-
-  @override
-  String get settingsArCameraTest => 'اختبار كاميرا الواقع المعزز';
-
-  @override
   String get settingsAdminActivity => 'نشاط المستخدم';
 
   @override
@@ -2773,6 +2767,60 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraEffectGlitch => 'تشويش';
+
+  @override
+  String get cameraEffectGlasses => 'نظارات';
+
+  @override
+  String get cameraEffectMoustache => 'شارب';
+
+  @override
+  String get cameraEffectBigEyes => 'عيون كبيرة';
+
+  @override
+  String get cameraEffectBigLips => 'شفاه كبيرة';
+
+  @override
+  String get cameraEffectNose => 'أنف';
+
+  @override
+  String get cameraFilterPure => 'نقي';
+
+  @override
+  String get cameraFilterBright => 'ساطع';
+
+  @override
+  String get cameraFilterClean => 'نظيف';
+
+  @override
+  String get cameraFilterSoft => 'ناعم';
+
+  @override
+  String get cameraFilterSunset => 'غروب';
+
+  @override
+  String get cameraCategoryLife => 'حياة';
+
+  @override
+  String get mediaEditorShare => 'مشاركة';
+
+  @override
+  String get mediaEditorText => 'نص';
+
+  @override
+  String get mediaEditorStickers => 'ملصقات';
+
+  @override
+  String get mediaEditorCrop => 'قص';
+
+  @override
+  String get mediaEditorEdit => 'تحرير';
+
+  @override
+  String get mediaEditorMore => 'المزيد';
+
+  @override
+  String get mediaEditorComingSoon => 'قريباً';
 
   @override
   String get promotePostTitle => 'ترويج المنشور';

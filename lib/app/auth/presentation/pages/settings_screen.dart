@@ -1,4 +1,3 @@
-import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
@@ -10,7 +9,6 @@ import 'package:bimobondapp/core/utils/user_roles.dart';
 import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -24,14 +22,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    if (kDebugMode) {
-      ArCameraBridge.warmup();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -201,22 +191,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
-          if (kDebugMode) ...[
-            const SizedBox(height: SettingsLayoutConstants.groupSpacing),
-            _SettingsSectionTitle(title: l10n.settingsSectionDeveloper),
-            _SettingsGroup(
-              children: [
-                _SettingsTile(
-                  icon: LucideIcons.camera,
-                  title: l10n.settingsArCameraTest,
-                  onTap: () {
-                    ArCameraBridge.warmup();
-                    context.pushNamed('ar_camera_test');
-                  },
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: SettingsLayoutConstants.logoutTopSpacing),
           _SettingsGroup(
             children: [

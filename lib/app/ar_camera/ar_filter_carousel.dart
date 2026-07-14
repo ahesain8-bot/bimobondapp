@@ -1,4 +1,6 @@
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_l10n.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -168,6 +170,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     final sidePadding = (screenWidth - ArFilterCarousel.itemStride) / 2;
     final visual = _visualIndex;
     final visualItem = _filters[visual];
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -182,7 +185,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
               return FadeTransition(opacity: animation, child: child);
             },
             child: Text(
-              visualItem.isOriginal ? '' : visualItem.label,
+              visualItem.isOriginal ? '' : arFilterLabel(l10n, visualItem),
               key: ValueKey(visualItem.id),
               style: const TextStyle(
                 color: Colors.white,
