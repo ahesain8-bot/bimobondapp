@@ -138,9 +138,13 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   }
 
   _GiftMediaKind _detectKind(String url) {
+    final lower = url.toLowerCase().split('?').first.trim();
+    // Explicit .lottie / .json before video heuristics.
+    if (lower.endsWith('.lottie') || lower.endsWith('.json')) {
+      return _GiftMediaKind.lottie;
+    }
     if (GiftLottieCache.looksLikeVideoUrl(url)) return _GiftMediaKind.video;
     if (GiftLottieCache.looksLikeLottieUrl(url)) return _GiftMediaKind.lottie;
-    final lower = url.toLowerCase().split('?').first;
     if (lower.endsWith('.png') ||
         lower.endsWith('.jpg') ||
         lower.endsWith('.jpeg') ||
