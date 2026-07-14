@@ -708,6 +708,8 @@
   "settingsComingSoon": "Coming soon",
   "settingsChatWallpaper": "Chat wallpaper",
   "settingsSectionAdmin": "Admin",
+  "settingsSectionDeveloper": "Developer",
+  "settingsArCameraTest": "AR Camera Test",
   "settingsAdminActivity": "User activity",
   "adminActivityTitle": "Activity",
   "adminActivityEmpty": "No activity yet",

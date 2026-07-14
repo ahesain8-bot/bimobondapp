@@ -1386,6 +1386,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSectionAdmin => 'المسؤول';
 
   @override
+  String get settingsSectionDeveloper => 'المطور';
+
+  @override
+  String get settingsArCameraTest => 'اختبار كاميرا الواقع المعزز';
+
+  @override
   String get settingsAdminActivity => 'نشاط المستخدم';
 
   @override

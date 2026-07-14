@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
+import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
-import 'package:bimobondapp/app/home/presentation/utils/camera_studio_permissions.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
@@ -28,6 +30,7 @@ import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -85,6 +88,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   String? _appliedFilterId;
   bool _isFrontCamera = false;
   int _workspaceTabIndex = 0;
+  int _arFilterIndex = 0;
+  String _arColorCategoryId = 'portrait';
+  double _arFilterIntensity = 1.0;
+  double _arSwipeDrag = 0;
+
+  /// Android uses native MediaPipe/GPU AR stack from `ar_camera`.
+  /// iOS keeps CamerAwesome until native port.
+  bool get _useNativeArFilters =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   @override
   void initState() {
@@ -105,6 +117,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _studioMode = CameraStudioMode.photo;
     }
     _faceDetectorService = CameraFaceDetectorService(isFrontCamera: _isFrontCamera);
+    if (_useNativeArFilters) {
+      _isFrontCamera = true;
+      ArCameraBridge.warmup();
+      ArCameraBridge.setFilter(ArFilterCatalog.items[_arFilterIndex].id);
+    }
     unawaited(_loadCatalog());
   }
 
@@ -420,6 +437,27 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _isBusy = true;
     });
 
+    if (_useNativeArFilters) {
+      try {
+        final path = await ArCameraBridge.stopRecording();
+        if (!mounted) return;
+        setState(() {
+          _isBusy = false;
+          _recordSeconds = 0;
+        });
+        if (path == null) return;
+        await _openCapturedMediaEditor(File(path), type: 'VIDEO');
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _isBusy = false;
+            _recordSeconds = 0;
+          });
+        }
+      }
+      return;
+    }
+
     await _cameraState?.when(
       onVideoRecordingMode: (state) => state.stopRecording(),
       onPhotoMode: (_) async {},
@@ -437,6 +475,27 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   Future<void> _capturePhoto() async {
     if (_isBusy || _isProcessingCapture || _isRecording) return;
 
+    if (_useNativeArFilters) {
+      setState(() => _isBusy = true);
+      try {
+        final path = await ArCameraBridge.takePhoto();
+        if (!mounted) return;
+        setState(() => _isBusy = false);
+        if (path == null) return;
+        if (widget.isStory) {
+          setState(() {
+            _storyCapturedFile = File(path);
+            _storyCapturedType = 'IMAGE';
+          });
+          return;
+        }
+        await _openCapturedMediaEditor(File(path), type: 'IMAGE');
+      } catch (_) {
+        if (mounted) setState(() => _isBusy = false);
+      }
+      return;
+    }
+
     await _cameraState?.when(
       onPhotoMode: (state) => state.takePhoto(),
       onVideoMode: (state) {
@@ -451,6 +510,19 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Future<void> _beginVideoRecording() async {
     if (_isBusy || _isRecording) return;
+
+    if (_useNativeArFilters) {
+      setState(() => _isBusy = true);
+      try {
+        await ArCameraBridge.startRecording();
+        if (!mounted) return;
+        setState(() => _isBusy = false);
+        _startRecordTimer();
+      } catch (_) {
+        if (mounted) setState(() => _isBusy = false);
+      }
+      return;
+    }
 
     final state = _cameraState;
     if (state == null) return;
@@ -474,6 +546,48 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       onPreviewMode: (_) async {},
       onAnalysisOnlyMode: (_) async {},
     );
+  }
+
+  void _onArFilterSelected(int index) {
+    final clamped = index.clamp(0, ArFilterCatalog.items.length - 1);
+    final id = ArFilterCatalog.items[clamped].id;
+    final intensity =
+        ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
+    if (clamped == _arFilterIndex) {
+      ArCameraBridge.setFilter(id, intensity: intensity);
+      return;
+    }
+    setState(() => _arFilterIndex = clamped);
+    ArCameraBridge.setFilter(id, intensity: intensity);
+  }
+
+  void _onArColorCategorySelected(String categoryId) {
+    if (categoryId == _arColorCategoryId) return;
+    setState(() => _arColorCategoryId = categoryId);
+  }
+
+  void _onArFilterIntensityChanged(double value) {
+    setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
+    ArCameraBridge.setFilterIntensity(_arFilterIntensity);
+  }
+
+  void _onArPreviewSwipeEnd(DragEndDetails details) {
+    if (!_useNativeArFilters || _isRecording || _showFilters) return;
+    final currentId = ArFilterCatalog.items[_arFilterIndex].id;
+    final current = ArFilterCatalog.effectCarouselIndex(currentId);
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity < -80 || _arSwipeDrag < -36) {
+      final next = (current + 1).clamp(0, ArFilterCatalog.effectItems.length - 1);
+      _onArFilterSelected(
+        ArFilterCatalog.indexOfId(ArFilterCatalog.effectItems[next].id),
+      );
+    } else if (velocity > 80 || _arSwipeDrag > 36) {
+      final prev = (current - 1).clamp(0, ArFilterCatalog.effectItems.length - 1);
+      _onArFilterSelected(
+        ArFilterCatalog.indexOfId(ArFilterCatalog.effectItems[prev].id),
+      );
+    }
+    _arSwipeDrag = 0;
   }
 
   void _startRecordingWithOptionalTimer() {
@@ -647,7 +761,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
     final filters = CameraFilterCatalog.forCategorySlug(_filterCategorySlug);
 
-    if (_catalogLoading) {
+    if (_catalogLoading && !_useNativeArFilters) {
       return Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: CameraAppLoading(message: l10n.cameraStarting)),
@@ -659,130 +773,253 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          KeyedSubtree(
-            key: ValueKey(CameraFilterCatalog.activeCatalog.version),
-            child: CameraAwesomeBuilder.custom(
-              saveConfig: SaveConfig.photoAndVideo(
-                initialCaptureMode: widget.isStory
-                    ? CaptureMode.photo
-                    : (_studioMode == CameraStudioMode.video
-                          ? CaptureMode.video
-                          : CaptureMode.photo),
-                mirrorFrontCamera: true,
-              ),
-              sensorConfig: SensorConfig.single(
-                sensor: Sensor.position(SensorPosition.back),
-                flashMode: FlashMode.none,
-                zoom: _selectedZoom,
-                aspectRatio: CameraAspectRatios.ratio_16_9,
-              ),
-              filter: _effectiveCaptureFilter(),
-              filters: CameraFilterCatalog.gpuFiltersForCamera,
-              previewFit: CameraPreviewFit.cover,
-              onMediaCaptureEvent: _onMediaCapture,
-              onImageForAnalysis: _onImageForAnalysis,
-              imageAnalysisConfig: AnalysisConfig(
-                androidOptions: AndroidAnalysisOptions.nv21(
-                  width: CameraFaceEffectMapper.liveAnalysisWidth,
-                ),
-                maxFramesPerSecond: 8,
-              ),
-              progressIndicator: CameraAppLoading(message: l10n.cameraStarting),
-              builder: (state, preview) {
-                _cameraState = state;
-                _ensureInitialFilterApplied(state);
-                _handlePendingVideoStart(state);
-
-                return CameraStudioOverlay(
-                  l10n: l10n,
-                  isStoryMode: widget.isStory,
-                  showGalleryUpload: !widget.returnMediaOnDone,
-                  cameraState: state,
-                  preview: preview,
-                  faceStream: _faceDetectorService.stream,
-                  filters: filters,
-                  filterCategorySlug: _filterCategorySlug,
-                  selectedFilter: _selectedFilter,
-                  selectedDuration: _selectedDuration,
-                  selectedSpeed: _selectedSpeed,
-                  studioMode: _studioMode,
-                  showFilters: _showFilters && _filtersReady,
-                  beautyEnabled: _beautyEnabled,
-                  timerEnabled: _timerEnabled,
-                  isRecording: _isRecording,
-                  isBusy: _isBusy || _isProcessingCapture,
-                  recordSeconds: _recordSeconds,
-                  countdownValue: _countdownValue,
-                  selectedEffectSlug: _selectedEffectSlug,
-                  workspaceTabIndex: _workspaceTabIndex,
-                  onClose: () => context.pop(),
-                  onFilterCategorySelected: _onFilterCategorySelected,
-                  onFilterSelected: _applyFilter,
-                  onClearFilter: _clearFilter,
-                  onDurationSelected: _onDurationSelected,
-                  onStudioModeSelected: _onStudioModeSelected,
-                  onEffectsTap: () => CameraStudioSheets.showEffectsPicker(
-                    context,
-                    l10n: l10n,
-                    selectedEffectSlug: _selectedEffectSlug,
-                    onSelected: _selectEffect,
-                  ),
-                  onUploadTap: () => CameraStudioSheets.pickFromLibrary(
-                    context,
-                    l10n: l10n,
-                    limit: widget.isStory ? 1 : 5,
-                    chooseMediaType: true,
-                    onPicked: _importFromGallery,
-                  ),
-                  onGoLiveTap: () =>
-                      CameraStudioSheets.showLiveSetup(context, l10n: l10n),
-                  onRecordTap: _onRecordTap,
-                  onFlip: _flipCamera,
-                  onFlash: _toggleFlash,
-                  onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
-                    context,
-                    selectedSpeed: _selectedSpeed,
-                    onSelected: (speed) =>
-                        setState(() => _selectedSpeed = speed),
-                  ),
-                  onBeautyTap: () => _applyBeauty(!_beautyEnabled),
-                  onFiltersToggle: () =>
-                      setState(() => _showFilters = !_showFilters),
-                  onTimerToggle: () =>
-                      setState(() => _timerEnabled = !_timerEnabled),
-                  onMusicTap: _pickSound,
-                  onLayoutTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
-                  onAspectRatioTap: () =>
-                      _showComingSoon(l10n.cameraLiveComingSoon),
-                  onZoomTap: () {
-                    final steps = CameraStudioConstants.zoomSteps;
-                    var currentIndex = steps.indexWhere(
-                      (step) => (_selectedZoom - step.value).abs() < 0.12,
-                    );
-                    if (currentIndex < 0) currentIndex = 0;
-                    final next = steps[(currentIndex + 1) % steps.length];
-                    unawaited(_applyZoom(next.value));
-                  },
-                  onTextModeTap: () =>
-                      _showComingSoon(l10n.cameraLiveComingSoon),
-                  onWorkspaceTabSelected: _onWorkspaceTabSelected,
-                  soundLabel: _studioMode == CameraStudioMode.live
-                      ? l10n.cameraLiveTitleHint
-                      : (_selectedSound?.name ?? l10n.cameraAddSound),
-                  onLongPressStart: (_) => _startRecordingWithOptionalTimer(),
-                  onLongPressEnd: (_) {
-                    if (_isRecording) _stopRecording();
-                  },
-                  filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
-                );
-              },
-            ),
-          ),
+          if (_useNativeArFilters)
+            _buildNativeArCameraBody(l10n, filters)
+          else
+            _buildCamerAwesomeBody(l10n, filters),
           if (_isProcessingCapture)
             CameraAppLoading(message: l10n.promoteProcessing),
           if (_isBusy && !_isProcessingCapture)
             CameraAppLoading(message: l10n.cameraStarting),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNativeArCameraBody(
+    AppLocalizations l10n,
+    List<CameraFilterPreset> filters,
+  ) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragUpdate: (details) {
+              _arSwipeDrag += details.delta.dx;
+            },
+            onHorizontalDragEnd: _onArPreviewSwipeEnd,
+            child: const ArCameraPreview(),
+          ),
+        ),
+        CameraStudioOverlay(
+          l10n: l10n,
+          isStoryMode: widget.isStory,
+          showGalleryUpload: !widget.returnMediaOnDone,
+          useNativeArFilters: true,
+          arFilterIndex: _arFilterIndex,
+          onArFilterSelected: _onArFilterSelected,
+          arColorCategoryId: _arColorCategoryId,
+          onArColorCategorySelected: _onArColorCategorySelected,
+          arFilterIntensity: _arFilterIntensity,
+          onArFilterIntensityChanged: _onArFilterIntensityChanged,
+          filters: filters,
+          filterCategorySlug: _filterCategorySlug,
+          selectedFilter: _selectedFilter,
+          selectedDuration: _selectedDuration,
+          selectedSpeed: _selectedSpeed,
+          studioMode: _studioMode,
+          showFilters: _showFilters,
+          beautyEnabled: _beautyEnabled ||
+              ArFilterCatalog.items[_arFilterIndex].id == 'whitening',
+          timerEnabled: _timerEnabled,
+          isRecording: _isRecording,
+          isBusy: _isBusy || _isProcessingCapture,
+          recordSeconds: _recordSeconds,
+          countdownValue: _countdownValue,
+          selectedEffectSlug: null,
+          workspaceTabIndex: _workspaceTabIndex,
+          onClose: () => context.pop(),
+          onFilterCategorySelected: _onFilterCategorySelected,
+          onFilterSelected: _applyFilter,
+          onClearFilter: _clearFilter,
+          onDurationSelected: _onDurationSelected,
+          onStudioModeSelected: (mode) {
+            if (_isRecording) return;
+            if (widget.isStory && mode == CameraStudioMode.live) return;
+            setState(() => _studioMode = mode);
+          },
+          // OLD effects picker — disabled on native AR (carousel replaces it).
+          onEffectsTap: () {},
+          onUploadTap: () => CameraStudioSheets.pickFromLibrary(
+            context,
+            l10n: l10n,
+            limit: widget.isStory ? 1 : 5,
+            chooseMediaType: true,
+            onPicked: _importFromGallery,
+          ),
+          onGoLiveTap: () =>
+              CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+          onRecordTap: _onRecordTap,
+          onFlip: () {},
+          onFlash: () {},
+          onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
+            context,
+            selectedSpeed: _selectedSpeed,
+            onSelected: (speed) => setState(() => _selectedSpeed = speed),
+          ),
+          onBeautyTap: () {
+            // Map side beauty toggle to native Pure (whitening) color filter.
+            if (ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
+              _onArFilterSelected(0);
+            } else {
+              _onArFilterSelected(ArFilterCatalog.indexOfId('whitening'));
+              setState(() {
+                _arColorCategoryId = 'portrait';
+                _showFilters = true;
+              });
+            }
+          },
+          onFiltersToggle: () {
+            final next = !_showFilters;
+            setState(() => _showFilters = next);
+            if (next) {
+              // Warm GL under preview so first filter pick doesn't black-flash.
+              unawaited(ArCameraBridge.prepareShaderPipeline());
+            }
+          },
+          onTimerToggle: () => setState(() => _timerEnabled = !_timerEnabled),
+          onMusicTap: _pickSound,
+          onLayoutTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+          onAspectRatioTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+          onZoomTap: () {},
+          onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+          onWorkspaceTabSelected: (index) {
+            setState(() => _workspaceTabIndex = index);
+            // Creative tab old effects sheet commented out on native AR.
+          },
+          soundLabel: _studioMode == CameraStudioMode.live
+              ? l10n.cameraLiveTitleHint
+              : (_selectedSound?.name ?? l10n.cameraAddSound),
+          onLongPressStart: (_) => _startRecordingWithOptionalTimer(),
+          onLongPressEnd: (_) {
+            if (_isRecording) _stopRecording();
+          },
+          filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCamerAwesomeBody(
+    AppLocalizations l10n,
+    List<CameraFilterPreset> filters,
+  ) {
+    return KeyedSubtree(
+      key: ValueKey(CameraFilterCatalog.activeCatalog.version),
+      child: CameraAwesomeBuilder.custom(
+        saveConfig: SaveConfig.photoAndVideo(
+          initialCaptureMode: widget.isStory
+              ? CaptureMode.photo
+              : (_studioMode == CameraStudioMode.video
+                    ? CaptureMode.video
+                    : CaptureMode.photo),
+          mirrorFrontCamera: true,
+        ),
+        sensorConfig: SensorConfig.single(
+          sensor: Sensor.position(SensorPosition.back),
+          flashMode: FlashMode.none,
+          zoom: _selectedZoom,
+          aspectRatio: CameraAspectRatios.ratio_16_9,
+        ),
+        filter: _effectiveCaptureFilter(),
+        filters: CameraFilterCatalog.gpuFiltersForCamera,
+        previewFit: CameraPreviewFit.cover,
+        onMediaCaptureEvent: _onMediaCapture,
+        onImageForAnalysis: _onImageForAnalysis,
+        imageAnalysisConfig: AnalysisConfig(
+          androidOptions: AndroidAnalysisOptions.nv21(
+            width: CameraFaceEffectMapper.liveAnalysisWidth,
+          ),
+          maxFramesPerSecond: 8,
+        ),
+        progressIndicator: CameraAppLoading(message: l10n.cameraStarting),
+        builder: (state, preview) {
+          _cameraState = state;
+          _ensureInitialFilterApplied(state);
+          _handlePendingVideoStart(state);
+
+          return CameraStudioOverlay(
+            l10n: l10n,
+            isStoryMode: widget.isStory,
+            showGalleryUpload: !widget.returnMediaOnDone,
+            cameraState: state,
+            preview: preview,
+            faceStream: _faceDetectorService.stream,
+            filters: filters,
+            filterCategorySlug: _filterCategorySlug,
+            selectedFilter: _selectedFilter,
+            selectedDuration: _selectedDuration,
+            selectedSpeed: _selectedSpeed,
+            studioMode: _studioMode,
+            showFilters: _showFilters && _filtersReady,
+            beautyEnabled: _beautyEnabled,
+            timerEnabled: _timerEnabled,
+            isRecording: _isRecording,
+            isBusy: _isBusy || _isProcessingCapture,
+            recordSeconds: _recordSeconds,
+            countdownValue: _countdownValue,
+            selectedEffectSlug: _selectedEffectSlug,
+            workspaceTabIndex: _workspaceTabIndex,
+            onClose: () => context.pop(),
+            onFilterCategorySelected: _onFilterCategorySelected,
+            onFilterSelected: _applyFilter,
+            onClearFilter: _clearFilter,
+            onDurationSelected: _onDurationSelected,
+            onStudioModeSelected: _onStudioModeSelected,
+            onEffectsTap: () => CameraStudioSheets.showEffectsPicker(
+              context,
+              l10n: l10n,
+              selectedEffectSlug: _selectedEffectSlug,
+              onSelected: _selectEffect,
+            ),
+            onUploadTap: () => CameraStudioSheets.pickFromLibrary(
+              context,
+              l10n: l10n,
+              limit: widget.isStory ? 1 : 5,
+              chooseMediaType: true,
+              onPicked: _importFromGallery,
+            ),
+            onGoLiveTap: () =>
+                CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+            onRecordTap: _onRecordTap,
+            onFlip: _flipCamera,
+            onFlash: _toggleFlash,
+            onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
+              context,
+              selectedSpeed: _selectedSpeed,
+              onSelected: (speed) => setState(() => _selectedSpeed = speed),
+            ),
+            onBeautyTap: () => _applyBeauty(!_beautyEnabled),
+            onFiltersToggle: () => setState(() => _showFilters = !_showFilters),
+            onTimerToggle: () =>
+                setState(() => _timerEnabled = !_timerEnabled),
+            onMusicTap: _pickSound,
+            onLayoutTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+            onAspectRatioTap: () =>
+                _showComingSoon(l10n.cameraLiveComingSoon),
+            onZoomTap: () {
+              final steps = CameraStudioConstants.zoomSteps;
+              var currentIndex = steps.indexWhere(
+                (step) => (_selectedZoom - step.value).abs() < 0.12,
+              );
+              if (currentIndex < 0) currentIndex = 0;
+              final next = steps[(currentIndex + 1) % steps.length];
+              unawaited(_applyZoom(next.value));
+            },
+            onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+            onWorkspaceTabSelected: _onWorkspaceTabSelected,
+            soundLabel: _studioMode == CameraStudioMode.live
+                ? l10n.cameraLiveTitleHint
+                : (_selectedSound?.name ?? l10n.cameraAddSound),
+            onLongPressStart: (_) => _startRecordingWithOptionalTimer(),
+            onLongPressEnd: (_) {
+              if (_isRecording) _stopRecording();
+            },
+            filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
+          );
+        },
       ),
     );
   }

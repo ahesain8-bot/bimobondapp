@@ -59,6 +59,8 @@ import 'package:bimobondapp/app/auth/presentation/pages/user_profile_screen.dart
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'dart:io';
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_test_screen.dart';
+
 class AppRouter {
   static final GlobalKey<NavigatorState> rootNavigatorKey =
       GlobalKey<NavigatorState>();
@@ -504,6 +506,11 @@ class AppRouter {
             type: extra['type'] as UserConnectionType,
           );
         },
+      ),
+      GoRoute(
+        path: '/ar-camera-test',
+        name: 'ar_camera_test',
+        builder: (context, state) => const ArCameraTestScreen(),
       ),
     ],
     );

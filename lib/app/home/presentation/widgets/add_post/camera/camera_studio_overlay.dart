@@ -1,3 +1,8 @@
+import 'dart:ui';
+
+import 'package:bimobondapp/app/ar_camera/ar_color_filters_panel.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_carousel.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_ar_effects_layer.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_bottom_controls.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
@@ -8,6 +13,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_overlays.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_side_toolbar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_mode.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_tool_icons.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_top_bar.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -30,9 +36,9 @@ class CameraStudioOverlay extends StatelessWidget {
     required this.isBusy,
     required this.recordSeconds,
     required this.countdownValue,
-    required this.cameraState,
-    required this.preview,
-    required this.faceStream,
+    this.cameraState,
+    this.preview,
+    this.faceStream,
     required this.selectedEffectSlug,
     required this.onClose,
     required this.onFilterCategorySelected,
@@ -63,6 +69,13 @@ class CameraStudioOverlay extends StatelessWidget {
     this.onLongPressStart,
     this.onLongPressEnd,
     required this.filterLabelBuilder,
+    this.useNativeArFilters = false,
+    this.arFilterIndex = 0,
+    this.onArFilterSelected,
+    this.arColorCategoryId = 'portrait',
+    this.onArColorCategorySelected,
+    this.arFilterIntensity = 1.0,
+    this.onArFilterIntensityChanged,
   });
 
   final AppLocalizations l10n;
@@ -79,9 +92,9 @@ class CameraStudioOverlay extends StatelessWidget {
   final bool isBusy;
   final int recordSeconds;
   final int? countdownValue;
-  final CameraState cameraState;
-  final AnalysisPreview preview;
-  final Stream<CameraFaceDetectionFrame> faceStream;
+  final CameraState? cameraState;
+  final AnalysisPreview? preview;
+  final Stream<CameraFaceDetectionFrame>? faceStream;
   final String? selectedEffectSlug;
   final VoidCallback onClose;
   final ValueChanged<String> onFilterCategorySelected;
@@ -112,32 +125,53 @@ class CameraStudioOverlay extends StatelessWidget {
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
   final String Function(CameraFilterPreset preset) filterLabelBuilder;
+  final bool useNativeArFilters;
+  final int arFilterIndex;
+  final ValueChanged<int>? onArFilterSelected;
+  final String arColorCategoryId;
+  final ValueChanged<String>? onArColorCategorySelected;
+  final double arFilterIntensity;
+  final ValueChanged<double>? onArFilterIntensityChanged;
 
   bool get isLiveMode => studioMode == CameraStudioMode.live;
   bool get isPhotoMode => studioMode == CameraStudioMode.photo;
-  bool get isVideoMode => studioMode == CameraStudioMode.video;
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final activeEffect = CameraEffectsCatalog.bySlug(selectedEffectSlug);
+    final showLegacyFiltersPanel =
+        showFilters && !useNativeArFilters && !isLiveMode;
+    final showArColorFiltersPanel =
+        showFilters && useNativeArFilters && !isLiveMode;
+    final selectedArFilterId = ArFilterCatalog
+        .items[arFilterIndex.clamp(0, ArFilterCatalog.items.length - 1)].id;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (activeEffect != null && activeEffect.requiresFaceDetection)
+        // OLD CamerAwesome / TFLite face stickers — kept for iOS / fallback.
+        if (!useNativeArFilters &&
+            activeEffect != null &&
+            activeEffect.requiresFaceDetection &&
+            cameraState != null &&
+            preview != null &&
+            faceStream != null)
           CameraArEffectsLayer(
-            cameraState: cameraState,
-            preview: preview,
-            faceStream: faceStream,
+            cameraState: cameraState!,
+            preview: preview!,
+            faceStream: faceStream!,
             effect: activeEffect,
           ),
-        if (activeEffect != null && activeEffect.isScreenEffect)
+        if (!useNativeArFilters &&
+            activeEffect != null &&
+            activeEffect.isScreenEffect)
           CameraScreenEffectsLayer(effect: activeEffect),
         if (countdownValue != null)
           CameraCountdownOverlay(value: countdownValue!),
         SafeArea(
+          bottom: !(useNativeArFilters && !isLiveMode),
           child: Column(
             children: [
               CameraTopBar(
@@ -149,7 +183,7 @@ class CameraStudioOverlay extends StatelessWidget {
                 isLiveMode: isLiveMode,
               ),
               const Spacer(),
-              if (!showFilters) ...[
+              if (!showLegacyFiltersPanel) ...[
                 if (!isLiveMode)
                   CameraModeDurationBar(
                     studioMode: studioMode,
@@ -170,37 +204,114 @@ class CameraStudioOverlay extends StatelessWidget {
                         onStudioModeSelected(CameraStudioMode.live),
                     onTextSelected: onTextModeTap,
                   ),
-                const SizedBox(height: 10),
-                CameraCaptureControls(
-                  isLiveMode: isLiveMode,
-                  isPhotoMode: isPhotoMode,
-                  isRecording: isRecording,
-                  isBusy: isBusy,
-                  recordProgress: selectedDuration == 0
-                      ? 0
-                      : recordSeconds / selectedDuration,
-                  effectsLabel: l10n.cameraEffects,
-                  uploadLabel: isStoryMode
-                      ? l10n.importFromLibrary
-                      : l10n.uploadFromLibrary,
-                  goLiveLabel: l10n.cameraGoLive,
-                  selectedEffect: activeEffect,
-                  onEffectsTap: onEffectsTap,
-                  onUploadTap: onUploadTap,
-                  onGoLiveTap: onGoLiveTap,
-                  onRecordTap: onRecordTap,
-                  showUpload: showGalleryUpload,
-                  onLongPressStart: onLongPressStart,
-                  onLongPressEnd: onLongPressEnd,
-                ),
-                const SizedBox(height: 6),
-                CameraWorkspaceTabs(
-                  postLabel: l10n.cameraTabPost,
-                  creativeLabel: l10n.cameraTabCreative,
-                  selectedIndex: workspaceTabIndex,
-                  onSelected: onWorkspaceTabSelected,
-                ),
-                const SizedBox(height: 6),
+                if (useNativeArFilters &&
+                    !isLiveMode &&
+                    onArFilterSelected != null &&
+                    !showArColorFiltersPanel)
+                  _BottomFrostPanel(
+                    bottomInset: MediaQuery.paddingOf(context).bottom,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 4),
+                        Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            ArFilterCarousel(
+                              items: ArFilterCatalog.effectItems,
+                              selectedIndex: ArFilterCatalog.effectCarouselIndex(
+                                selectedArFilterId,
+                              ),
+                              onSelected: (index) {
+                                final id =
+                                    ArFilterCatalog.effectItems[index].id;
+                                onArFilterSelected!(
+                                  ArFilterCatalog.indexOfId(id),
+                                );
+                              },
+                              isRecording: isRecording,
+                              isBusy: isBusy,
+                              recordProgress: selectedDuration == 0
+                                  ? 0
+                                  : recordSeconds / selectedDuration,
+                              isPhotoMode: isPhotoMode,
+                              onShutterTap: onRecordTap,
+                              onHoldStart: onLongPressStart,
+                              onHoldEnd: onLongPressEnd,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        _BottomWorkspaceRow(
+                          showGallery: showGalleryUpload,
+                          onUploadTap: onUploadTap,
+                          uploadLabel: isStoryMode
+                              ? l10n.importFromLibrary
+                              : l10n.uploadFromLibrary,
+                          postLabel: l10n.cameraTabPost,
+                          creativeLabel: l10n.cameraTabCreative,
+                          workspaceTabIndex: workspaceTabIndex,
+                          onWorkspaceTabSelected: onWorkspaceTabSelected,
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                    ),
+                  )
+                else if (!useNativeArFilters || isLiveMode) ...[
+                  if (!isLiveMode) ...[
+                    const SizedBox(height: 10),
+                    CameraCaptureControls(
+                      isLiveMode: isLiveMode,
+                      isPhotoMode: isPhotoMode,
+                      isRecording: isRecording,
+                      isBusy: isBusy,
+                      recordProgress: selectedDuration == 0
+                          ? 0
+                          : recordSeconds / selectedDuration,
+                      effectsLabel: l10n.cameraEffects,
+                      uploadLabel: isStoryMode
+                          ? l10n.importFromLibrary
+                          : l10n.uploadFromLibrary,
+                      goLiveLabel: l10n.cameraGoLive,
+                      selectedEffect: activeEffect,
+                      onEffectsTap: onEffectsTap,
+                      onUploadTap: onUploadTap,
+                      onGoLiveTap: onGoLiveTap,
+                      onRecordTap: onRecordTap,
+                      showUpload: showGalleryUpload,
+                      showEffectsTool: true,
+                      onLongPressStart: onLongPressStart,
+                      onLongPressEnd: onLongPressEnd,
+                    ),
+                  ],
+                  if (isLiveMode) ...[
+                    const SizedBox(height: 10),
+                    CameraCaptureControls(
+                      isLiveMode: true,
+                      isPhotoMode: false,
+                      isRecording: false,
+                      isBusy: isBusy,
+                      recordProgress: 0,
+                      effectsLabel: l10n.cameraEffects,
+                      uploadLabel: l10n.uploadFromLibrary,
+                      goLiveLabel: l10n.cameraGoLive,
+                      onEffectsTap: onEffectsTap,
+                      onUploadTap: onUploadTap,
+                      onGoLiveTap: onGoLiveTap,
+                      onRecordTap: onRecordTap,
+                      showUpload: false,
+                      showEffectsTool: false,
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  CameraWorkspaceTabs(
+                    postLabel: l10n.cameraTabPost,
+                    creativeLabel: l10n.cameraTabCreative,
+                    selectedIndex: workspaceTabIndex,
+                    onSelected: onWorkspaceTabSelected,
+                  ),
+                  const SizedBox(height: 6),
+                ],
               ] else
                 const SizedBox(height: 180),
             ],
@@ -214,7 +325,9 @@ class CameraStudioOverlay extends StatelessWidget {
                 left: isRtl ? 10 : 0,
                 right: isRtl ? 0 : 10,
                 top: topPadding + 52,
-                bottom: showFilters ? 240 : 168,
+                bottom: showLegacyFiltersPanel || showArColorFiltersPanel
+                    ? 220
+                    : (useNativeArFilters ? 228 : 168),
               ),
               child: CameraSideToolbar(
                 iconOnStartEdge: isRtl,
@@ -244,7 +357,8 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
           ),
         ),
-        if (showFilters && !isLiveMode) ...[
+        // OLD CamerAwesome color-filter sheet — skipped when native AR carousel is on.
+        if (showLegacyFiltersPanel) ...[
           Positioned.fill(
             child: CameraFiltersScrim(onDismiss: onFiltersToggle),
           ),
@@ -266,12 +380,133 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
           ),
         ],
+        // Native AR — TikTok-style Filters sheet (color / white grades only).
+        // No dim scrim — live preview stays bright so filter changes are visible.
+        if (showArColorFiltersPanel &&
+            onArFilterSelected != null &&
+            onArColorCategorySelected != null) ...[
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: onFiltersToggle,
+              behavior: HitTestBehavior.opaque,
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: GestureDetector(
+              onTap: () {}, // absorb taps so sheet itself doesn't dismiss
+              child: ArColorFiltersPanel(
+                selectedFilterId: selectedArFilterId,
+                selectedCategoryId: arColorCategoryId,
+                intensity: arFilterIntensity,
+                onCategorySelected: onArColorCategorySelected!,
+                onFilterSelected: (id) =>
+                    onArFilterSelected!(ArFilterCatalog.indexOfId(id)),
+                onIntensityChanged: onArFilterIntensityChanged ?? (_) {},
+                onClear: () => onArFilterSelected!(0),
+              ),
+            ),
+          ),
+        ],
         if (isRecording)
           CameraRecordingBadge(
             topPadding: topPadding,
             label: '${l10n.cameraRecording} ${recordSeconds}s',
           ),
       ],
+    );
+  }
+}
+
+/// Soft light wash from the AR carousel through the home-indicator edge.
+class _BottomFrostPanel extends StatelessWidget {
+  const _BottomFrostPanel({
+    required this.child,
+    required this.bottomInset,
+  });
+
+  final Widget child;
+  final double bottomInset;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.07),
+                const Color(0xFFF2F2F2).withValues(alpha: 0.11),
+                const Color(0xFFF2F2F2).withValues(alpha: 0.14),
+              ],
+              stops: const [0.0, 0.18, 0.55, 1.0],
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// TikTok-style bottom row: gallery/upload on the left, Post | Creative centered.
+class _BottomWorkspaceRow extends StatelessWidget {
+  const _BottomWorkspaceRow({
+    required this.showGallery,
+    required this.onUploadTap,
+    required this.uploadLabel,
+    required this.postLabel,
+    required this.creativeLabel,
+    required this.workspaceTabIndex,
+    required this.onWorkspaceTabSelected,
+  });
+
+  final bool showGallery;
+  final VoidCallback onUploadTap;
+  final String uploadLabel;
+  final String postLabel;
+  final String creativeLabel;
+  final int workspaceTabIndex;
+  final ValueChanged<int> onWorkspaceTabSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CameraWorkspaceTabs(
+            postLabel: postLabel,
+            creativeLabel: creativeLabel,
+            selectedIndex: workspaceTabIndex,
+            onSelected: onWorkspaceTabSelected,
+          ),
+          if (showGallery)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 14),
+                child: CameraGalleryTool(
+                  onTap: onUploadTap,
+                  label: uploadLabel,
+                  compact: true,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

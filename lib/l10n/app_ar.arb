@@ -708,6 +708,8 @@
   "settingsComingSoon": "قريباً",
   "settingsChatWallpaper": "خلفية المحادثة",
   "settingsSectionAdmin": "المسؤول",
+  "settingsSectionDeveloper": "المطور",
+  "settingsArCameraTest": "اختبار كاميرا الواقع المعزز",
   "settingsAdminActivity": "نشاط المستخدم",
   "adminActivityTitle": "النشاط",
   "adminActivityEmpty": "لا يوجد نشاط بعد",
