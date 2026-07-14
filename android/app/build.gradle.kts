@@ -60,4 +60,16 @@ dependencies {
     // FlutterFire plugins supply Firebase SDK versions.
     implementation("com.google.android.gms:play-services-auth:21.5.1")
     implementation("com.google.android.gms:play-services-maps:19.2.0")
+
+    // filters camera dependencies
+    implementation("androidx.camera:camera-core:1.4.1")
+    implementation("androidx.camera:camera-camera2:1.4.1")
+    implementation("androidx.camera:camera-lifecycle:1.4.1")
+    implementation("androidx.camera:camera-view:1.4.1")
+    // MediaPipe Face Landmarker (468-point mesh) — Phase 2
+    implementation("com.google.mediapipe:tasks-vision:0.10.20")
+
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("com.google.guava:guava:33.3.1-android")
 }

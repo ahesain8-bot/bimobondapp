@@ -2927,6 +2927,18 @@ abstract class AppLocalizations {
   /// **'Admin'**
   String get settingsSectionAdmin;
 
+  /// No description provided for @settingsSectionDeveloper.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer'**
+  String get settingsSectionDeveloper;
+
+  /// No description provided for @settingsArCameraTest.
+  ///
+  /// In en, this message translates to:
+  /// **'AR Camera Test'**
+  String get settingsArCameraTest;
+
   /// No description provided for @settingsAdminActivity.
   ///
   /// In en, this message translates to:

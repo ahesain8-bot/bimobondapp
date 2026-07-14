@@ -319,40 +319,52 @@ class CameraGalleryTool extends StatelessWidget {
     required this.onTap,
     required this.label,
     this.icon = Icons.photo_library_rounded,
+    this.compact = false,
   });
 
   final VoidCallback onTap;
   final String label;
   final IconData icon;
+  /// Bottom bar style: small square only (no caption under it).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final size = compact ? 36.0 : 48.0;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
+      child: compact
+          ? Container(
+              width: size,
+              height: size,
               decoration: CameraToolIcons.squareDecoration(),
               alignment: Alignment.center,
-              child: Icon(icon, color: Colors.white, size: 22),
+              child: Icon(icon, color: Colors.white, size: 18),
+            )
+          : SizedBox(
+              width: 72,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: size,
+                    height: size,
+                    decoration: CameraToolIcons.squareDecoration(),
+                    alignment: Alignment.center,
+                    child: Icon(icon, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    label,
+                    style: CameraToolIcons.labelStyle,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              style: CameraToolIcons.labelStyle,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

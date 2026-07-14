@@ -1497,6 +1497,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionAdmin => 'Admin';
 
   @override
+  String get settingsSectionDeveloper => 'Developer';
+
+  @override
+  String get settingsArCameraTest => 'AR Camera Test';
+
+  @override
   String get settingsAdminActivity => 'User activity';
 
   @override

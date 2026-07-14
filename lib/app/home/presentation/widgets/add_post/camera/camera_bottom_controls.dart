@@ -475,6 +475,7 @@ class CameraCaptureControls extends StatelessWidget {
     this.selectedEffect,
     this.onLongPressStart,
     this.onLongPressEnd,
+    this.showEffectsTool = true,
   });
 
   final bool isLiveMode;
@@ -493,6 +494,7 @@ class CameraCaptureControls extends StatelessWidget {
   final CameraEffectDefinition? selectedEffect;
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
+  final bool showEffectsTool;
 
   @override
   Widget build(BuildContext context) {
@@ -511,14 +513,17 @@ class CameraCaptureControls extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          CameraEffectsTool(
-            onTap: onEffectsTap,
-            label: effectsLabel,
-            emoji: selectedEffect?.emoji,
-            assetUrl: selectedEffect?.assetUrl,
-            previewColor: selectedEffect?.previewColor,
-            hasSelection: hasEffect,
-          ),
+          if (showEffectsTool)
+            CameraEffectsTool(
+              onTap: onEffectsTap,
+              label: effectsLabel,
+              emoji: selectedEffect?.emoji,
+              assetUrl: selectedEffect?.assetUrl,
+              previewColor: selectedEffect?.previewColor,
+              hasSelection: hasEffect,
+            )
+          else
+            const SizedBox(width: 72),
           Expanded(
             child: Center(
               child: CameraRecordButton(

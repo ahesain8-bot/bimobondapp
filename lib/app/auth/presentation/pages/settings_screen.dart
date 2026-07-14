@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
@@ -9,13 +10,27 @@ import 'package:bimobondapp/core/utils/user_roles.dart';
 import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (kDebugMode) {
+      ArCameraBridge.warmup();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +201,22 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+          if (kDebugMode) ...[
+            const SizedBox(height: SettingsLayoutConstants.groupSpacing),
+            _SettingsSectionTitle(title: l10n.settingsSectionDeveloper),
+            _SettingsGroup(
+              children: [
+                _SettingsTile(
+                  icon: LucideIcons.camera,
+                  title: l10n.settingsArCameraTest,
+                  onTap: () {
+                    ArCameraBridge.warmup();
+                    context.pushNamed('ar_camera_test');
+                  },
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: SettingsLayoutConstants.logoutTopSpacing),
           _SettingsGroup(
             children: [
