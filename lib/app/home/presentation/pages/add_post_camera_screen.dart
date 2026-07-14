@@ -8,6 +8,7 @@ import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_inje
     as camera_studio_di;
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
+import 'package:bimobondapp/app/home/presentation/utils/camera_studio_permissions.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
@@ -514,6 +515,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_useNativeArFilters) {
       setState(() => _isBusy = true);
       try {
+        // Native AR records mic in parallel — ensure permission every time.
+        await CameraStudioPermissions.ensureMicrophone();
         await ArCameraBridge.startRecording();
         if (!mounted) return;
         setState(() => _isBusy = false);
