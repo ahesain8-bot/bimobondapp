@@ -53,4 +53,10 @@ class ArCameraBridge {
     });
     return path;
   }
+
+  /// Toggles front ↔ back. Returns whether the active camera is front.
+  static Future<bool> flipCamera() async {
+    final isFront = await _channel.invokeMethod<bool>('flipCamera');
+    return isFront ?? true;
+  }
 }

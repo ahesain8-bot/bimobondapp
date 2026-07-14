@@ -302,20 +302,19 @@ class FaceOverlayView @JvmOverloads constructor(
         }
 
         return when (mappingMode) {
-            // Photo/video frame is already mirrored and matches image aspect — map 1:1.
+            // Capture compose: frame matches analysis orientation for the active camera.
             MappingMode.MIRRORED_BITMAP -> {
                 val sx = viewW / imageWidth
                 val sy = viewH / imageHeight
-                floatArrayOf((imageWidth - x) * sx, y * sy)
+                val mx = if (isFrontCamera) (imageWidth - x) * sx else x * sx
+                floatArrayOf(mx, y * sy)
             }
-            // Live view: FILL_CENTER. With underlay (mirrored analysis frame), map in mirrored space.
-            // Without underlay, PreviewView front-camera path mirrors X.
+            // Live view: FILL_CENTER. Front selfie underlay/preview is mirrored on X.
             MappingMode.LIVE_VIEW -> {
                 val scale = max(viewW / imageWidth, viewH / imageHeight)
                 val offsetX = (viewW - imageWidth * scale) / 2f
                 val offsetY = (viewH - imageHeight * scale) / 2f
-                val mappedX = if (underlayFrame != null || isFrontCamera) {
-                    // Equivalent: flip for mirrored underlay / front PreviewView.
+                val mappedX = if (isFrontCamera) {
                     (imageWidth - x) * scale + offsetX
                 } else {
                     x * scale + offsetX

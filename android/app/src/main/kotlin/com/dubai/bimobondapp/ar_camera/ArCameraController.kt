@@ -111,6 +111,36 @@ object ArCameraController {
         }
     }
 
+    /** Toggle front ↔ back camera. No-op while recording. */
+    fun flipCamera(onResult: ((Boolean) -> Unit)? = null) {
+        if (recording || videoRecorder.isRecording()) {
+            onResult?.invoke(false)
+            return
+        }
+        val activity = ArCameraBridge.hostActivity
+        val lifecycleOwner = ArCameraBridge.lifecycleOwner
+        val previewView = ArCameraBridge.previewView
+        val faceOverlay = ArCameraBridge.faceOverlay
+        if (activity == null || lifecycleOwner == null || previewView == null || faceOverlay == null) {
+            onResult?.invoke(false)
+            return
+        }
+
+        ArCameraBridge.isFrontCamera = !ArCameraBridge.isFrontCamera
+        frameCounter = 0
+        cachedWarpParams = FaceWarpParams.INACTIVE
+        cachedSnapshot = null
+        FaceLandmarkSmoother.reset()
+        convertingFrame.set(false)
+        faceOverlay.resetForNonPngFilter()
+
+        activity.runOnUiThread {
+            bindCamera(lifecycleOwner, previewView, faceOverlay)
+            ArCameraBridge.applyCurrentFilter()
+            onResult?.invoke(true)
+        }
+    }
+
     fun onFilterChanged() {
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
@@ -602,10 +632,15 @@ object ArCameraController {
             imageCapture = capture
 
             cameraProvider.unbindAll()
+            val selector = if (ArCameraBridge.isFrontCamera) {
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            } else {
+                CameraSelector.DEFAULT_BACK_CAMERA
+            }
             try {
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
+                    selector,
                     preview,
                     imageAnalysis,
                     capture,
@@ -616,7 +651,7 @@ object ArCameraController {
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
-                        CameraSelector.DEFAULT_FRONT_CAMERA,
+                        selector,
                         preview,
                         capture,
                     )
@@ -626,7 +661,7 @@ object ArCameraController {
                         cameraProvider.unbindAll()
                         cameraProvider.bindToLifecycle(
                             lifecycleOwner,
-                            CameraSelector.DEFAULT_FRONT_CAMERA,
+                            selector,
                             preview,
                             imageAnalysis,
                         )
@@ -712,10 +747,15 @@ object ArCameraController {
             }
 
             val activeSnapshot = cachedSnapshot
+            val front = ArCameraBridge.isFrontCamera
 
             when {
                 filter.useShader() -> {
-                    display = ImageProxyBitmapUtils.mirrorHorizontally(oriented)
+                    display = if (front) {
+                        ImageProxyBitmapUtils.mirrorHorizontally(oriented)
+                    } else {
+                        oriented
+                    }
                     if (display !== oriented) {
                         oriented.recycle()
                         oriented = null
@@ -772,34 +812,39 @@ object ArCameraController {
                 }
 
                 else -> {
-                    val mirrored = ImageProxyBitmapUtils.mirrorHorizontally(oriented)
-                    if (mirrored !== oriented) {
+                    val displayBmp = if (front) {
+                        ImageProxyBitmapUtils.mirrorHorizontally(oriented)
+                    } else {
+                        oriented
+                    }
+                    if (displayBmp !== oriented) {
                         oriented.recycle()
                         oriented = null
                     }
-                    retainCaptureFrame(mirrored)
+                    retainCaptureFrame(displayBmp)
 
                     if (filter.isPngOverlay()) {
-                        // Same mirrored frame landmarks come from — locks glasses/dog to the face.
+                        // Same display frame landmarks come from — locks glasses/dog to the face.
                         val underlay = try {
                             ImageProxyBitmapUtils.scaleToMaxDimension(
-                                mirrored,
+                                displayBmp,
                                 CAPTURE_MAX_EDGE,
                                 filter = true,
                             ).let { scaled ->
-                                if (scaled !== mirrored) {
+                                if (scaled !== displayBmp) {
                                     scaled
                                 } else {
-                                    mirrored.copy(Bitmap.Config.ARGB_8888, false)
+                                    displayBmp.copy(Bitmap.Config.ARGB_8888, false)
                                 }
                             }
                         } catch (_: Exception) {
                             null
                         }
                         val snapshots = activeSnapshot?.let { listOf(it) } ?: emptyList()
-                        val landmarkW = activeSnapshot?.imageWidth ?: mirrored.width
-                        val landmarkH = activeSnapshot?.imageHeight ?: mirrored.height
+                        val landmarkW = activeSnapshot?.imageWidth ?: displayBmp.width
+                        val landmarkH = activeSnapshot?.imageHeight ?: displayBmp.height
                         val expectedFilter = filter
+                        val expectedFront = front
                         activity.runOnUiThread {
                             // Drop late frames after user swiped back to Original / another filter.
                             if (ArCameraBridge.currentFilter != expectedFilter) {
@@ -813,13 +858,13 @@ object ArCameraController {
                                 snapshots,
                                 landmarkW,
                                 landmarkH,
-                                isFrontCamera = true,
+                                isFrontCamera = expectedFront,
                             )
                         }
                     }
 
-                    if (mirrored !== lastCaptureBitmap) {
-                        mirrored.recycle()
+                    if (displayBmp !== lastCaptureBitmap) {
+                        displayBmp.recycle()
                     }
                     maybeCaptureRecordingFrame()
                 }

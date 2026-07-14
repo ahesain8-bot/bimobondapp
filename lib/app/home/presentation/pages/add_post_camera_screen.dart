@@ -663,6 +663,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_useNativeArFilters) {
       setState(() => _isBusy = true);
       try {
+        // Native AR records mic in parallel — ensure permission every time.
+        await CameraStudioPermissions.ensureMicrophone();
         await ArCameraBridge.startRecording();
         if (!mounted) return;
         setState(() => _isBusy = false);
@@ -797,6 +799,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   Future<void> _flipCamera() async {
+    if (_useNativeArFilters) {
+      if (_isRecording || _isBusy) return;
+      try {
+        final isFront = await ArCameraBridge.flipCamera();
+        if (!mounted) return;
+        setState(() => _isFrontCamera = isFront);
+        _faceDetectorService.isFrontCamera = isFront;
+      } catch (_) {}
+      return;
+    }
     await _cameraState?.switchCameraSensor();
     if (mounted) {
       setState(() => _isFrontCamera = !_isFrontCamera);
@@ -1041,7 +1053,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           onGoLiveTap: () =>
               CameraStudioSheets.showLiveSetup(context, l10n: l10n),
           onRecordTap: _onRecordTap,
-          onFlip: () {},
+          onFlip: _flipCamera,
           onFlash: () {},
           onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
             context,

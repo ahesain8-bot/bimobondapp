@@ -83,7 +83,13 @@ object FaceWarpParamsBuilder {
         val faceHeight = snapshot?.boundingBox?.height()?.coerceAtLeast(1f) ?: 1f
 
         fun map(x: Float, y: Float): FloatArray =
-            FaceCoordinateMapper.toWarpUv(x, y, imageWidth, imageHeight)
+            FaceCoordinateMapper.toWarpUv(
+                x,
+                y,
+                imageWidth,
+                imageHeight,
+                isFrontCamera = ArCameraBridge.isFrontCamera,
+            )
 
         fun radius(radiusPx: Float): Float =
             FaceCoordinateMapper.toWarpRadiusX(radiusPx, imageWidth)
@@ -229,8 +235,20 @@ object FaceWarpParamsBuilder {
 
         val padX = (maxX - minX) * 0.10f
         val padY = (maxY - minY) * 0.18f
-        val a = FaceCoordinateMapper.toWarpUv(minX - padX, minY - padY, imageWidth, imageHeight)
-        val b = FaceCoordinateMapper.toWarpUv(maxX + padX, maxY + padY, imageWidth, imageHeight)
+        val a = FaceCoordinateMapper.toWarpUv(
+            minX - padX,
+            minY - padY,
+            imageWidth,
+            imageHeight,
+            isFrontCamera = ArCameraBridge.isFrontCamera,
+        )
+        val b = FaceCoordinateMapper.toWarpUv(
+            maxX + padX,
+            maxY + padY,
+            imageWidth,
+            imageHeight,
+            isFrontCamera = ArCameraBridge.isFrontCamera,
+        )
 
         return floatArrayOf(
             minOf(a[0], b[0]),

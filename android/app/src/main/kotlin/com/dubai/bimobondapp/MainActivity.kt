@@ -88,6 +88,15 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "flipCamera" -> {
+                        ArCameraController.flipCamera { ok ->
+                            if (ok) {
+                                result.success(ArCameraBridge.isFrontCamera)
+                            } else {
+                                result.error("flip_failed", "cannot_flip", null)
+                            }
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

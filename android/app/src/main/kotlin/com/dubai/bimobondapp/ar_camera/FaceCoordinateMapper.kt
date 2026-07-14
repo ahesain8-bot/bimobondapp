@@ -102,21 +102,22 @@ object FaceCoordinateMapper {
     }
 
     /**
-     * Converts image-space landmark coordinates (from the un-mirrored oriented bitmap)
-     * to raw texture UV coordinates matching the mirrored display bitmap.
-     *
-     * The GPU shader's centerCrop() maps screen UV → texture UV, so warp uniforms
-     * (bulge centres, nose rect) must be in **raw texture UV space** (0..1).
-     * Landmarks are detected on the un-mirrored image, but the texture uploaded to
-     * the GPU is the horizontally-mirrored display bitmap, so we invert X here.
+     * Converts image-space landmark coordinates to texture UV for the GPU upload.
+     * Front camera uploads a horizontally-mirrored bitmap (invert X).
+     * Back camera uploads the oriented bitmap as-is.
      */
     fun toWarpUv(
         x: Float,
         y: Float,
         imageWidth: Int,
         imageHeight: Int,
+        isFrontCamera: Boolean = true,
     ): FloatArray {
-        val u = (1f - x / imageWidth).coerceIn(0f, 1f)
+        val u = if (isFrontCamera) {
+            (1f - x / imageWidth).coerceIn(0f, 1f)
+        } else {
+            (x / imageWidth).coerceIn(0f, 1f)
+        }
         val v = (y / imageHeight.toFloat()).coerceIn(0f, 1f)
         return floatArrayOf(u, v)
     }

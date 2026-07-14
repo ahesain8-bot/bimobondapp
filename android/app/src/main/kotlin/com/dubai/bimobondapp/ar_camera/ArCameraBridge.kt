@@ -29,6 +29,10 @@ object ArCameraBridge {
     @Volatile
     var warpViewHeight: Int = 0
 
+    /** Front selfie camera when true; rear camera when false. */
+    @Volatile
+    var isFrontCamera: Boolean = true
+
     /**
      * True while we wait for the first GL filtered frame before covering the live Preview.
      * Avoids black flash — GLSurfaceView alpha tricks are unreliable on many OEM devices.
@@ -199,5 +203,6 @@ object ArCameraBridge {
         awaitFirstGlFrame = false
         warpViewWidth = 0
         warpViewHeight = 0
+        isFrontCamera = true
     }
 }
