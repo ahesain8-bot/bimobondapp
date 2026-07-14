@@ -20,11 +20,18 @@ abstract class ChatsRepository {
 
   Future<Either<Failure, ChatMessageEntity>> sendMessage({
     required String chatId,
-    required String content,
+    String content = '',
     String type = 'TEXT',
     String? mediaUrl,
     String? replyToId,
     String? sharedPostId,
+    String? sharedProfileId,
+    Map<String, dynamic>? payload,
+  });
+
+  Future<Either<Failure, ChatMessageEntity>> votePoll({
+    required String messageId,
+    required int optionIndex,
   });
 
   Future<Either<Failure, void>> markMessageRead(String messageId);

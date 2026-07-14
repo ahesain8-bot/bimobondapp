@@ -8,26 +8,32 @@ import 'package:bimobondapp/app/home/presentation/widgets/posts_search/search_po
 import 'package:bimobondapp/app/home/presentation/widgets/posts_search/search_results_tabs.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/posts_search/search_trends_section.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
-import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
-import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
-    as posts_di;
 import 'package:bimobondapp/app/search/domain/entities/search_history_entity.dart';
+import 'package:bimobondapp/app/search/domain/entities/search_result_entity.dart';
 import 'package:bimobondapp/app/search/domain/entities/search_trend_entity.dart';
 import 'package:bimobondapp/app/search/domain/usecases/add_search_history_usecase.dart';
 import 'package:bimobondapp/app/search/domain/usecases/clear_search_history_usecase.dart';
 import 'package:bimobondapp/app/search/domain/usecases/delete_search_history_usecase.dart';
 import 'package:bimobondapp/app/search/domain/usecases/get_search_history_usecase.dart';
 import 'package:bimobondapp/app/search/domain/usecases/get_search_trends_usecase.dart';
+import 'package:bimobondapp/app/search/domain/usecases/search_usecase.dart';
 import 'package:bimobondapp/app/search/presentation/di/search_injector.dart'
     as search_di;
+import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
+import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/navigation/sound_navigation.dart';
+import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class PostsSearchScreen extends StatefulWidget {
   const PostsSearchScreen({super.key});
@@ -37,14 +43,13 @@ class PostsSearchScreen extends StatefulWidget {
 }
 
 class _PostsSearchScreenState extends State<PostsSearchScreen> {
-  static const _pageSize = 30;
+  static const _pageSize = 20;
   static const _historyFetchLimit = 10;
   static const _historyCollapsedCount = 3;
   static const _trendsCollapsedCount = 5;
   static const _trendsFetchLimit = 10;
   static const _resultsCrossAxisCount = 2;
   static const _resultsSpacing = 8.0;
-  /// Cover + caption + meta row (TikTok search card).
   static const _resultsAspectRatio = 0.58;
 
   final TextEditingController _searchController = TextEditingController();
@@ -53,11 +58,15 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
 
   String _activeQuery = '';
   bool _showResults = false;
-  SearchResultsTab _resultsTab = SearchResultsTab.videos;
+  SearchResultsTab _resultsTab = SearchResultsTab.top;
 
   final List<PostEntity> _posts = [];
-  bool _isLoadingPosts = false;
-  bool _isLoadingMorePosts = false;
+  final List<SocialUserEntity> _users = [];
+  final List<SoundEntity> _sounds = [];
+  final List<SearchHashtagEntity> _hashtags = [];
+
+  bool _isLoadingResults = false;
+  bool _isLoadingMore = false;
   bool _hasReachedMax = false;
   int _page = 1;
 
@@ -72,6 +81,29 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
   bool get _isAuthenticated {
     final auth = context.read<AuthBloc>().state;
     return auth is AuthSuccess;
+  }
+
+  String? get _currentUserId {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is AuthSuccess) return auth.user.id;
+    return null;
+  }
+
+  SearchApiTab? get _apiTab {
+    switch (_resultsTab) {
+      case SearchResultsTab.top:
+        return SearchApiTab.best;
+      case SearchResultsTab.videos:
+        return SearchApiTab.posts;
+      case SearchResultsTab.users:
+        return SearchApiTab.users;
+      case SearchResultsTab.sounds:
+        return SearchApiTab.sounds;
+      case SearchResultsTab.places:
+        return SearchApiTab.hashtags;
+      case SearchResultsTab.live:
+        return null;
+    }
   }
 
   bool get _showsPostGrid =>
@@ -98,13 +130,16 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
   }
 
   void _onScroll() {
-    if (!_showResults || _isLoadingPosts || _isLoadingMorePosts || _hasReachedMax) {
+    if (!_showResults || _isLoadingResults || _isLoadingMore || _hasReachedMax) {
+      return;
+    }
+    if (_resultsTab == SearchResultsTab.live || _apiTab == SearchApiTab.best) {
       return;
     }
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - 200) {
-      unawaited(_loadPosts());
+      unawaited(_loadResults());
     }
   }
 
@@ -120,7 +155,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     setState(() => _isLoadingHistory = true);
     final result = await search_di.sl<GetSearchHistoryUseCase>()(
       const GetSearchHistoryParams(
-        category: SearchHistoryCategory.posts,
+        category: SearchHistoryCategory.all,
         page: 1,
         limit: _historyFetchLimit,
       ),
@@ -149,7 +184,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     setState(() => _isLoadingTrends = true);
     final result = await search_di.sl<GetSearchTrendsUseCase>()(
       const GetSearchTrendsParams(
-        category: SearchHistoryCategory.posts,
+        category: SearchHistoryCategory.all,
         limit: _trendsFetchLimit,
       ),
     );
@@ -170,7 +205,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     await search_di.sl<AddSearchHistoryUseCase>()(
       AddSearchHistoryParams(
         query: query,
-        category: SearchHistoryCategory.posts,
+        category: SearchHistoryCategory.all,
       ),
     );
     if (!mounted) return;
@@ -187,7 +222,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
   Future<void> _clearHistory() async {
     setState(() => _history.clear());
     await search_di.sl<ClearSearchHistoryUseCase>()(
-      const ClearSearchHistoryParams(category: SearchHistoryCategory.posts),
+      const ClearSearchHistoryParams(category: SearchHistoryCategory.all),
     );
   }
 
@@ -196,8 +231,11 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     setState(() {
       _activeQuery = '';
       _showResults = false;
-      _resultsTab = SearchResultsTab.videos;
+      _resultsTab = SearchResultsTab.top;
       _posts.clear();
+      _users.clear();
+      _sounds.clear();
+      _hashtags.clear();
       _hasReachedMax = false;
       _page = 1;
     });
@@ -237,34 +275,58 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
       _activeQuery = next;
       _showResults = true;
     });
-    await _loadPosts(refresh: true);
+    await _loadResults(refresh: true);
     if (saveHistory) {
       unawaited(_saveHistory(next));
     }
   }
 
-  Future<void> _loadPosts({bool refresh = false}) async {
+  Future<void> _onTabChanged(SearchResultsTab tab) async {
+    if (_resultsTab == tab) return;
+    setState(() => _resultsTab = tab);
     if (!_showResults || _activeQuery.isEmpty) return;
+    await _loadResults(refresh: true);
+  }
+
+  Future<void> _loadResults({bool refresh = false}) async {
+    if (!_showResults || _activeQuery.isEmpty) return;
+    final apiTab = _apiTab;
+    if (apiTab == null) {
+      setState(() {
+        _isLoadingResults = false;
+        _isLoadingMore = false;
+        _posts.clear();
+        _users.clear();
+        _sounds.clear();
+        _hashtags.clear();
+      });
+      return;
+    }
 
     if (refresh) {
-      if (_isLoadingPosts) return;
+      if (_isLoadingResults) return;
       setState(() {
-        _isLoadingPosts = true;
+        _isLoadingResults = true;
         _hasReachedMax = false;
         _page = 1;
         _posts.clear();
+        _users.clear();
+        _sounds.clear();
+        _hashtags.clear();
       });
     } else {
-      if (_isLoadingMorePosts || _hasReachedMax) return;
-      setState(() => _isLoadingMorePosts = true);
+      if (_isLoadingMore || _hasReachedMax) return;
+      setState(() => _isLoadingMore = true);
     }
 
-    final result = await posts_di.sl<GetFeedUseCase>()(
-      GetFeedParams(
-        page: refresh ? 1 : _page,
-        limit: _pageSize,
-        search: _activeQuery,
-        isStory: false,
+    final page = refresh ? 1 : _page;
+    final limit = apiTab == SearchApiTab.best ? 5 : _pageSize;
+    final result = await search_di.sl<SearchUseCase>()(
+      SearchParams(
+        q: _activeQuery,
+        tab: apiTab,
+        page: page,
+        limit: limit,
       ),
     );
 
@@ -273,26 +335,65 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     result.fold(
       (_) {
         setState(() {
-          _isLoadingPosts = false;
-          _isLoadingMorePosts = false;
+          _isLoadingResults = false;
+          _isLoadingMore = false;
         });
       },
-      (items) {
-        final posts = items.map((item) => item.post).toList();
+      (payload) {
         setState(() {
           if (refresh) {
             _posts
               ..clear()
-              ..addAll(posts);
+              ..addAll(payload.posts);
+            _users
+              ..clear()
+              ..addAll(payload.users);
+            _sounds
+              ..clear()
+              ..addAll(payload.sounds);
+            _hashtags
+              ..clear()
+              ..addAll(payload.hashtags);
             _page = 2;
           } else {
-            final existingIds = _posts.map((p) => p.id).toSet();
-            _posts.addAll(posts.where((p) => !existingIds.contains(p.id)));
+            final postIds = _posts.map((p) => p.id).toSet();
+            _posts.addAll(payload.posts.where((p) => !postIds.contains(p.id)));
+            final userIds = _users.map((u) => u.id).toSet();
+            _users.addAll(payload.users.where((u) => !userIds.contains(u.id)));
+            final soundIds = _sounds.map((s) => s.id).toSet();
+            _sounds
+                .addAll(payload.sounds.where((s) => !soundIds.contains(s.id)));
+            final tagNames = _hashtags.map((h) => h.name).toSet();
+            _hashtags.addAll(
+              payload.hashtags.where((h) => !tagNames.contains(h.name)),
+            );
             _page++;
           }
-          _hasReachedMax = posts.length < _pageSize;
-          _isLoadingPosts = false;
-          _isLoadingMorePosts = false;
+
+          final meta = switch (apiTab) {
+            SearchApiTab.best => null,
+            SearchApiTab.posts => payload.postsMeta,
+            SearchApiTab.users => payload.usersMeta,
+            SearchApiTab.sounds => payload.soundsMeta,
+            SearchApiTab.hashtags => payload.hashtagsMeta,
+          };
+          if (apiTab == SearchApiTab.best) {
+            _hasReachedMax = true;
+          } else if (meta != null) {
+            _hasReachedMax = !meta.hasMore;
+          } else {
+            final added = switch (apiTab) {
+              SearchApiTab.posts => payload.posts.length,
+              SearchApiTab.users => payload.users.length,
+              SearchApiTab.sounds => payload.sounds.length,
+              SearchApiTab.hashtags => payload.hashtags.length,
+              SearchApiTab.best => 0,
+            };
+            _hasReachedMax = added < _pageSize;
+          }
+
+          _isLoadingResults = false;
+          _isLoadingMore = false;
         });
       },
     );
@@ -326,9 +427,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
             if (_showResults)
               SearchResultsTabs(
                 selected: _resultsTab,
-                onChanged: (tab) {
-                  setState(() => _resultsTab = tab);
-                },
+                onChanged: (tab) => unawaited(_onTabChanged(tab)),
               ),
             Expanded(
               child: _showResults
@@ -397,19 +496,52 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
   }
 
   Widget _buildResults(AppLocalizations l10n, ThemeData theme) {
-    if (!_showsPostGrid) {
-      return Center(
+    if (_resultsTab == SearchResultsTab.live) {
+      return _comingSoon(l10n, theme);
+    }
+    if (_showsPostGrid) return _buildPostGrid(l10n, theme);
+    if (_resultsTab == SearchResultsTab.users) {
+      return _buildUserList(l10n, theme);
+    }
+    if (_resultsTab == SearchResultsTab.sounds) {
+      return _buildSoundList(l10n, theme);
+    }
+    if (_resultsTab == SearchResultsTab.places) {
+      return _buildHashtagList(l10n, theme);
+    }
+    return _comingSoon(l10n, theme);
+  }
+
+  Widget _comingSoon(AppLocalizations l10n, ThemeData theme) {
+    return Center(
+      child: Text(
+        l10n.searchComingSoon,
+        style: TextStyle(
+          fontSize: 15,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+
+  Widget _empty(AppLocalizations l10n, ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSizes.p24),
         child: Text(
-          l10n.searchComingSoon,
+          l10n.searchNoResults,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 15,
             color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    if (_isLoadingPosts && _posts.isEmpty) {
+  Widget _buildPostGrid(AppLocalizations l10n, ThemeData theme) {
+    if (_isLoadingResults && _posts.isEmpty) {
       return GridView.builder(
         padding: const EdgeInsets.fromLTRB(
           AppSizes.p12,
@@ -437,24 +569,10 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
       );
     }
 
-    if (_posts.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p24),
-          child: Text(
-            l10n.searchNoResults,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
-            ),
-          ),
-        ),
-      );
-    }
+    if (_posts.isEmpty) return _empty(l10n, theme);
 
     return RefreshIndicator(
-      onRefresh: () => _loadPosts(refresh: true),
+      onRefresh: () => _loadResults(refresh: true),
       color: theme.primaryColor,
       child: CustomScrollView(
         controller: _scrollController,
@@ -488,7 +606,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
               ),
             ),
           ),
-          if (_isLoadingMorePosts)
+          if (_isLoadingMore)
             const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
@@ -496,6 +614,148 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUserList(AppLocalizations l10n, ThemeData theme) {
+    if (_isLoadingResults && _users.isEmpty) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (_users.isEmpty) return _empty(l10n, theme);
+
+    return RefreshIndicator(
+      onRefresh: () => _loadResults(refresh: true),
+      child: ListView.builder(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        itemCount: _users.length + (_isLoadingMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= _users.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final user = _users[index];
+          return SocialUserListTile(
+            user: user,
+            isSelf: user.id == _currentUserId,
+            hideFollowButton: true,
+            onTap: () => openUserActiveStoriesOrProfile(
+              context,
+              userId: user.id,
+              username: user.username,
+              fullName: user.fullName,
+              avatarUrl: user.avatarUrl,
+              isFollowing: user.isFollowing,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSoundList(AppLocalizations l10n, ThemeData theme) {
+    if (_isLoadingResults && _sounds.isEmpty) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (_sounds.isEmpty) return _empty(l10n, theme);
+
+    return RefreshIndicator(
+      onRefresh: () => _loadResults(refresh: true),
+      child: ListView.separated(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        itemCount: _sounds.length + (_isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          if (index >= _sounds.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final sound = _sounds[index];
+          return ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: sound.resolvedCoverUrl != null
+                    ? SafeNetworkImage(
+                        imageUrl: sound.resolvedCoverUrl!,
+                        fit: BoxFit.cover,
+                      )
+                    : ColoredBox(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: const Icon(LucideIcons.music),
+                      ),
+              ),
+            ),
+            title: Text(
+              sound.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              sound.author,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onTap: () => unawaited(
+              openSoundDetail(
+                context,
+                soundId: sound.id,
+                preview: sound,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHashtagList(AppLocalizations l10n, ThemeData theme) {
+    if (_isLoadingResults && _hashtags.isEmpty) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (_hashtags.isEmpty) return _empty(l10n, theme);
+
+    return RefreshIndicator(
+      onRefresh: () => _loadResults(refresh: true),
+      child: ListView.separated(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        itemCount: _hashtags.length + (_isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          if (index >= _hashtags.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final tag = _hashtags[index];
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              child: const Icon(LucideIcons.hash, size: 20),
+            ),
+            title: Text(tag.displayName),
+            subtitle: tag.postCount > 0
+                ? Text(l10n.hashtagPostCount(tag.postCount))
+                : null,
+            onTap: () => openHashtagFeed(context, tag.name),
+          );
+        },
       ),
     );
   }

@@ -188,7 +188,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           SendMessageParams(
             chatId: chat.id,
             content: l10n.messagesInboxLastShare,
-            type: 'SHARE',
+            type: 'POST_SHARE',
             sharedPostId: widget.post.id,
           ),
         );

@@ -19,6 +19,7 @@ class ChatMessageList extends StatelessWidget {
     required this.isRtl,
     required this.onReactionPicker,
     required this.onReplyTo,
+    this.onPollVote,
     super.key,
   });
 
@@ -34,6 +35,7 @@ class ChatMessageList extends StatelessWidget {
   final bool isRtl;
   final void Function(Map<String, dynamic> msg) onReactionPicker;
   final void Function(Map<String, dynamic> msg) onReplyTo;
+  final void Function(String messageId, int optionIndex)? onPollVote;
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +80,7 @@ class ChatMessageList extends StatelessWidget {
               : null,
           onLongPress: () => onReactionPicker(msg),
           onSwipeReply: () => onReplyTo(msg),
+          onPollVote: onPollVote,
           isRtl: isRtl,
         );
       },

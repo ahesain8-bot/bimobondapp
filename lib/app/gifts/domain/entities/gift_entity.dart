@@ -10,6 +10,8 @@ class GiftEntity extends Equatable {
     required this.icon,
     required this.priceCoins,
     this.imageUrl,
+    this.thumbnailUrl,
+    this.animationUrl,
   });
 
   final String id;
@@ -17,6 +19,11 @@ class GiftEntity extends Equatable {
   final String icon;
   final int priceCoins;
   final String? imageUrl;
+  final String? thumbnailUrl;
+  final String? animationUrl;
+
+  String? get displayImageUrl =>
+      thumbnailUrl ?? imageUrl ?? (hasNetworkIcon ? icon : null);
 
   bool get hasNetworkIcon {
     final clean = icon.trim();
@@ -35,7 +42,8 @@ class GiftEntity extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, icon, priceCoins, imageUrl];
+  List<Object?> get props =>
+      [id, name, icon, priceCoins, imageUrl, thumbnailUrl, animationUrl];
 }
 
 class GiftInventoryItemEntity extends Equatable {

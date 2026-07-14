@@ -8,6 +8,7 @@ import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/gift_comment_l10n.dart';
 import 'package:bimobondapp/core/utils/tag_parser.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/tagged_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -112,16 +113,37 @@ class CommentRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
-              if (comment.isGift)
-                Text(
-                  localizedGiftCommentText(l10n, comment),
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.35,
-                    color: onSurface,
-                  ),
-                )
-              else
+              if (comment.isGift) ...[
+                Builder(
+                  builder: (context) {
+                    final giftImage = giftCommentImageUrl(comment);
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            localizedGiftCommentText(l10n, comment),
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.35,
+                              color: onSurface,
+                            ),
+                          ),
+                        ),
+                        if (giftImage != null) ...[
+                          const SizedBox(width: 8),
+                          SafeNetworkImage(
+                            imageUrl: giftImage,
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.contain,
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ] else
                 TaggedText(
                   text: comment.content,
                   style: TextStyle(

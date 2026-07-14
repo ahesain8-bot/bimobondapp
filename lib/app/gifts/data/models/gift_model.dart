@@ -7,6 +7,8 @@ class GiftModel extends GiftEntity {
     required super.icon,
     required super.priceCoins,
     super.imageUrl,
+    super.thumbnailUrl,
+    super.animationUrl,
   });
 
   factory GiftModel.fromJson(Map<String, dynamic> json) {
@@ -14,19 +16,23 @@ class GiftModel extends GiftEntity {
     final name = (json['name'] ?? json['title'] ?? json['label'] ?? '')
         .toString();
 
-    String? imageUrl;
-    for (final key in ['imageUrl', 'image', 'thumbnailUrl', 'thumbnail']) {
+    String? thumbnailUrl;
+    for (final key in ['thumbnailUrl', 'thumbnail', 'imageUrl', 'image']) {
       final value = json[key];
       if (value is String && value.isNotEmpty) {
-        imageUrl = value;
+        thumbnailUrl = value;
         break;
       }
     }
 
+    final animationUrl = (json['animationUrl'] ?? json['animation_url'])
+        ?.toString()
+        .trim();
+
     var icon = (json['icon'] ?? json['emoji'] ?? json['symbol'] ?? '')
         .toString();
-    if (icon.isEmpty && imageUrl != null) {
-      icon = imageUrl;
+    if (icon.isEmpty && thumbnailUrl != null) {
+      icon = thumbnailUrl;
     }
     if (icon.isEmpty) {
       icon = '🎁';
@@ -46,7 +52,10 @@ class GiftModel extends GiftEntity {
       name: name.isEmpty ? 'Gift' : name,
       icon: icon,
       priceCoins: priceCoins,
-      imageUrl: imageUrl,
+      imageUrl: thumbnailUrl,
+      thumbnailUrl: thumbnailUrl,
+      animationUrl:
+          animationUrl != null && animationUrl.isNotEmpty ? animationUrl : null,
     );
   }
 

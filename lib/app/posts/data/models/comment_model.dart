@@ -15,6 +15,8 @@ class CommentModel extends CommentEntity {
     super.isGift,
     super.giftName,
     super.giftIcon,
+    super.giftThumbnailUrl,
+    super.giftAnimationUrl,
     required super.createdAt,
     required super.updatedAt,
     super.mentions = const [],
@@ -26,7 +28,13 @@ class CommentModel extends CommentEntity {
       final value = gift[key]?.toString().trim();
       if (value != null && value.isNotEmpty) return value;
     }
-    final directKey = key == 'name' ? 'giftName' : 'giftIcon';
+    final directKey = switch (key) {
+      'name' => 'giftName',
+      'icon' => 'giftIcon',
+      'thumbnailUrl' => 'giftThumbnailUrl',
+      'animationUrl' => 'giftAnimationUrl',
+      _ => key,
+    };
     final direct = json[directKey]?.toString().trim();
     if (direct != null && direct.isNotEmpty) return direct;
     return null;
@@ -46,6 +54,15 @@ class CommentModel extends CommentEntity {
     }
 
     final now = DateTime.now().toUtc().toIso8601String();
+    final thumbnail = _giftField(json, 'thumbnailUrl') ??
+        _giftField(json, 'imageUrl');
+    final iconRaw = _giftField(json, 'icon');
+    final iconIsUrl =
+        iconRaw != null &&
+        (iconRaw.startsWith('http://') ||
+            iconRaw.startsWith('https://') ||
+            iconRaw.startsWith('/') ||
+            iconRaw.contains('uploads/'));
 
     return CommentModel(
       id: json['id']?.toString() ?? '',
@@ -66,7 +83,9 @@ class CommentModel extends CommentEntity {
           ? json['isGift']
           : json['isGift']?.toString().toLowerCase() == 'true',
       giftName: _giftField(json, 'name'),
-      giftIcon: _giftField(json, 'icon'),
+      giftIcon: iconIsUrl ? null : iconRaw,
+      giftThumbnailUrl: thumbnail ?? (iconIsUrl ? iconRaw : null),
+      giftAnimationUrl: _giftField(json, 'animationUrl'),
       createdAt: json['createdAt']?.toString() ?? now,
       updatedAt: json['updatedAt']?.toString() ?? now,
       mentions: MentionRefModel.listFromJson(json['mentions']),

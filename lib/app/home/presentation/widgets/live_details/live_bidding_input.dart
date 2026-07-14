@@ -77,14 +77,6 @@ class LiveBiddingInput extends StatelessWidget {
                       ),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF3366).withValues(alpha: 0.5),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
                     ),
                     child: const Icon(
                       LucideIcons.gift,
@@ -96,29 +88,19 @@ class LiveBiddingInput extends StatelessWidget {
                 const SizedBox(width: AppSizes.p12),
               ],
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(30),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
-                        height: AppSizes.buttonHeightSm,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.15),
-                          ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      height: AppSizes.buttonHeightSm,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
                         ),
+                      ),
                         child: Row(
                           children: [
                             IconButton(
@@ -169,7 +151,6 @@ class LiveBiddingInput extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
               const SizedBox(width: AppSizes.p12),
               GestureDetector(
                 onTap: enabled ? onSend : null,
@@ -189,16 +170,6 @@ class LiveBiddingInput extends StatelessWidget {
                       ),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.5,
-                          ),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
                     ),
                     child: const Icon(
                       LucideIcons.send,

@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/chats/domain/entities/chat_message_entity.dart';
+import 'package:bimobondapp/app/chats/domain/entities/chat_poll_entity.dart';
 import 'package:bimobondapp/app/chats/domain/entities/shared_post_snapshot.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 
@@ -13,6 +14,8 @@ class ChatMessageModel extends ChatMessageEntity {
     super.replyToId,
     super.sharedPostId,
     super.sharedPost,
+    super.payload,
+    super.poll,
     super.createdAt,
     super.readByUserIds,
     super.reactions,
@@ -41,7 +44,10 @@ class ChatMessageModel extends ChatMessageEntity {
       case 'GIFT':
         return ChatMessageType.gift;
       case 'SHARE':
+      case 'POST_SHARE':
         return ChatMessageType.share;
+      case 'POLL':
+        return ChatMessageType.poll;
       default:
         return ChatMessageType.unknown;
     }
@@ -50,6 +56,25 @@ class ChatMessageModel extends ChatMessageEntity {
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
+  }
+
+  static Map<String, dynamic>? _parsePayload(dynamic raw) {
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  static ChatPollEntity? _parsePoll(
+    dynamic raw,
+    Map<String, dynamic>? payload,
+  ) {
+    if (raw is Map) {
+      return ChatPollEntity.fromJson(Map<String, dynamic>.from(raw));
+    }
+    if (payload == null) return null;
+    final question = payload['question']?.toString();
+    final options = payload['options'];
+    if (question == null || question.isEmpty || options is! List) return null;
+    return ChatPollEntity.fromJson(payload);
   }
 
   static List<ChatMessageReactionEntity> _parseReactions(
@@ -163,7 +188,6 @@ class ChatMessageModel extends ChatMessageEntity {
   static bool _looksLikeEmoji(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return false;
-    // Emoji keys from grouped reaction maps (e.g. "❤️": 2).
     return trimmed.length <= 8 && !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(trimmed);
   }
 
@@ -194,13 +218,15 @@ class ChatMessageModel extends ChatMessageEntity {
   static String? _resolveMediaUrl(
     Map<String, dynamic> json,
     ChatMessageType type,
+    Map<String, dynamic>? payload,
   ) {
     final media = json['mediaUrl'] ??
         json['media_url'] ??
         json['audioUrl'] ??
         json['audio_url'] ??
         (json['media'] is Map ? (json['media'] as Map)['url'] : null) ??
-        (json['attachment'] is Map ? (json['attachment'] as Map)['url'] : null);
+        (json['attachment'] is Map ? (json['attachment'] as Map)['url'] : null) ??
+        payload?['url'];
     if (media != null) {
       return MediaUtils.resolveAbsoluteUrl(media.toString());
     }
@@ -236,6 +262,9 @@ class ChatMessageModel extends ChatMessageEntity {
       );
     }
 
+    final payload = _parsePayload(json['payload']);
+    final poll = _parsePoll(json['poll'], payload);
+
     final sharedPostId =
         (json['sharedPostId'] ?? json['shared_post_id'])?.toString() ??
         sharedPost?.postId;
@@ -247,10 +276,12 @@ class ChatMessageModel extends ChatMessageEntity {
           .toString(),
       type: type,
       content: (json['content'] ?? json['text'] ?? json['message'])?.toString(),
-      mediaUrl: _resolveMediaUrl(json, type),
+      mediaUrl: _resolveMediaUrl(json, type, payload),
       replyToId: (json['replyToId'] ?? json['reply_to_id'])?.toString(),
       sharedPostId: sharedPostId,
       sharedPost: sharedPost,
+      payload: payload,
+      poll: poll,
       createdAt: _parseDate(json['createdAt'] ?? json['created_at']),
       readByUserIds: _parseReadBy(json['readBy'] ?? json['read_by']),
       reactions: _parseReactions(json),

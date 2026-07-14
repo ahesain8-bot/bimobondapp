@@ -133,6 +133,8 @@ class ChatLayoutConstants {
   static const double locationMessageWidth = 220;
   static const double fileMessageWidth = 220;
   static const double contactMessageWidth = 220;
+  static const double giftMessageWidth = 160;
+  static const double pollMessageWidth = 240;
   static const double chatVideoMessageWidth = 220;
   static const double chatVideoMessageHeight = 160;
 

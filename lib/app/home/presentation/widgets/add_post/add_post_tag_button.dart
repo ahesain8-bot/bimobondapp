@@ -17,32 +17,31 @@ class AddPostTagButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final fill = isDark ? const Color(0xFF2A2A2D) : const Color(0xFFF1F1F2);
+    final onSurface = theme.colorScheme.onSurface;
 
     return Material(
-      color: isDark
-          ? const Color(0xFF2A2A2D)
-          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      color: fill,
       borderRadius: BorderRadius.circular(AppSizes.radiusCircular),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppSizes.radiusCircular),
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.p12,
-            vertical: AppSizes.p8,
+            horizontal: 14,
+            vertical: 9,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 15, color: colorScheme.primary),
-              const SizedBox(width: AppSizes.p6),
+              Icon(icon, size: 15, color: onSurface.withValues(alpha: 0.85)),
+              const SizedBox(width: 6),
               CustomText(
                 label,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
+                color: onSurface,
               ),
             ],
           ),

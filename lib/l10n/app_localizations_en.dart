@@ -1076,16 +1076,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get describePostHint => 'Describe your post… use @username and #tag in the text';
 
   @override
+  String get addDescriptionHint => 'Add description...';
+
+  @override
   String get hashtagsLabel => 'Hashtags';
 
   @override
-  String get mentionsLabel => 'Mentions';
+  String get mentionsLabel => 'Mention';
 
   @override
-  String get whoCanWatchLabel => 'Who can watch this post';
+  String get whoCanWatchLabel => 'Who can view this post';
 
   @override
   String get allowCommentsLabel => 'Allow comments';
+
+  @override
+  String get allowReuseLabel => 'Allow reuse of content';
+
+  @override
+  String get allowReuseSubtitle => 'Duet, Stitch, stickers, and add to Story';
+
+  @override
+  String get videoPrivacySection => 'Video privacy';
+
+  @override
+  String get advancedSettings => 'Advanced settings';
+
+  @override
+  String get addPostSettingsTitle => 'Settings';
+
+  @override
+  String get everyoneCanViewPost => 'Everyone can view this post';
+
+  @override
+  String get friendsCanViewPost => 'Friends can view this post';
+
+  @override
+  String get onlyYouCanViewPost => 'Only you can view this post';
+
+  @override
+  String get friendsPrivacySubtitle => 'Followers you follow back';
+
+  @override
+  String get draftsLabel => 'Drafts';
+
+  @override
+  String get moreOptionsLabel => 'More options';
+
+  @override
+  String get previewLabel => 'Preview';
+
+  @override
+  String get editCoverLabel => 'Edit cover';
+
+  @override
+  String get locationLabelShort => 'Location';
+
+  @override
+  String get addPostDraftsComingSoon => 'Drafts coming soon';
 
   @override
   String get allowDuetLabel => 'Allow Duet';
@@ -1828,6 +1876,68 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMorePoll => 'Poll';
+
+  @override
+  String get chatGiftSheetTitle => 'Send a gift';
+
+  @override
+  String get chatGiftSheetSubtitle => 'Choose a gift from your inventory';
+
+  @override
+  String get chatGiftInventoryEmpty => 'You don\'t own any gifts yet. Buy gifts in your wallet first.';
+
+  @override
+  String get chatGiftSentLabel => 'Gift sent';
+
+  @override
+  String get chatMessageContact => 'Contact';
+
+  @override
+  String get chatPollSheetTitle => 'Create a poll';
+
+  @override
+  String get chatPollQuestionHint => 'Ask a question';
+
+  @override
+  String get chatPollOptionsLabel => 'Options';
+
+  @override
+  String chatPollOptionHint(int index) {
+    return 'Option $index';
+  }
+
+  @override
+  String get chatPollAddOption => 'Add option';
+
+  @override
+  String get chatPollAllowMultiple => 'Allow multiple answers';
+
+  @override
+  String get chatPollSend => 'Send poll';
+
+  @override
+  String get chatPollQuestionRequired => 'Enter a question for your poll.';
+
+  @override
+  String get chatPollOptionsRequired => 'Add at least two options.';
+
+  @override
+  String get chatPollEnded => 'Poll ended';
+
+  @override
+  String chatPollVotesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count votes',
+      one: '1 vote',
+      zero: 'No votes yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messagesInboxLastPoll => 'Poll';
 
   @override
   String get chatLastMessage1 => 'Can I know the final price?';

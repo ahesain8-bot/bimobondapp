@@ -2117,6 +2117,12 @@ abstract class AppLocalizations {
   /// **'Describe your post… use @username and #tag in the text'**
   String get describePostHint;
 
+  /// No description provided for @addDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add description...'**
+  String get addDescriptionHint;
+
   /// No description provided for @hashtagsLabel.
   ///
   /// In en, this message translates to:
@@ -2126,13 +2132,13 @@ abstract class AppLocalizations {
   /// No description provided for @mentionsLabel.
   ///
   /// In en, this message translates to:
-  /// **'Mentions'**
+  /// **'Mention'**
   String get mentionsLabel;
 
   /// No description provided for @whoCanWatchLabel.
   ///
   /// In en, this message translates to:
-  /// **'Who can watch this post'**
+  /// **'Who can view this post'**
   String get whoCanWatchLabel;
 
   /// No description provided for @allowCommentsLabel.
@@ -2140,6 +2146,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow comments'**
   String get allowCommentsLabel;
+
+  /// No description provided for @allowReuseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow reuse of content'**
+  String get allowReuseLabel;
+
+  /// No description provided for @allowReuseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Duet, Stitch, stickers, and add to Story'**
+  String get allowReuseSubtitle;
+
+  /// No description provided for @videoPrivacySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Video privacy'**
+  String get videoPrivacySection;
+
+  /// No description provided for @advancedSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced settings'**
+  String get advancedSettings;
+
+  /// No description provided for @addPostSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get addPostSettingsTitle;
+
+  /// No description provided for @everyoneCanViewPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone can view this post'**
+  String get everyoneCanViewPost;
+
+  /// No description provided for @friendsCanViewPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends can view this post'**
+  String get friendsCanViewPost;
+
+  /// No description provided for @onlyYouCanViewPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you can view this post'**
+  String get onlyYouCanViewPost;
+
+  /// No description provided for @friendsPrivacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Followers you follow back'**
+  String get friendsPrivacySubtitle;
+
+  /// No description provided for @draftsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafts'**
+  String get draftsLabel;
+
+  /// No description provided for @moreOptionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get moreOptionsLabel;
+
+  /// No description provided for @previewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get previewLabel;
+
+  /// No description provided for @editCoverLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit cover'**
+  String get editCoverLabel;
+
+  /// No description provided for @locationLabelShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get locationLabelShort;
+
+  /// No description provided for @addPostDraftsComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafts coming soon'**
+  String get addPostDraftsComingSoon;
 
   /// No description provided for @allowDuetLabel.
   ///
@@ -3568,6 +3664,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Poll'**
   String get chatMorePoll;
+
+  /// No description provided for @chatGiftSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a gift'**
+  String get chatGiftSheetTitle;
+
+  /// No description provided for @chatGiftSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a gift from your inventory'**
+  String get chatGiftSheetSubtitle;
+
+  /// No description provided for @chatGiftInventoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t own any gifts yet. Buy gifts in your wallet first.'**
+  String get chatGiftInventoryEmpty;
+
+  /// No description provided for @chatGiftSentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift sent'**
+  String get chatGiftSentLabel;
+
+  /// No description provided for @chatMessageContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact'**
+  String get chatMessageContact;
+
+  /// No description provided for @chatPollSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a poll'**
+  String get chatPollSheetTitle;
+
+  /// No description provided for @chatPollQuestionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a question'**
+  String get chatPollQuestionHint;
+
+  /// No description provided for @chatPollOptionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get chatPollOptionsLabel;
+
+  /// No description provided for @chatPollOptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Option {index}'**
+  String chatPollOptionHint(int index);
+
+  /// No description provided for @chatPollAddOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Add option'**
+  String get chatPollAddOption;
+
+  /// No description provided for @chatPollAllowMultiple.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow multiple answers'**
+  String get chatPollAllowMultiple;
+
+  /// No description provided for @chatPollSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send poll'**
+  String get chatPollSend;
+
+  /// No description provided for @chatPollQuestionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a question for your poll.'**
+  String get chatPollQuestionRequired;
+
+  /// No description provided for @chatPollOptionsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least two options.'**
+  String get chatPollOptionsRequired;
+
+  /// No description provided for @chatPollEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Poll ended'**
+  String get chatPollEnded;
+
+  /// No description provided for @chatPollVotesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No votes yet} =1{1 vote} other{{count} votes}}'**
+  String chatPollVotesCount(int count);
+
+  /// No description provided for @messagesInboxLastPoll.
+  ///
+  /// In en, this message translates to:
+  /// **'Poll'**
+  String get messagesInboxLastPoll;
 
   /// No description provided for @chatLastMessage1.
   ///

@@ -11,6 +11,7 @@ import 'package:bimobondapp/app/chats/domain/usecases/delete_chat_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/mark_message_read_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/react_to_message_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/send_message_usecase.dart';
+import 'package:bimobondapp/app/chats/domain/usecases/vote_poll_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_bloc.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/inbox_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -33,6 +34,7 @@ Future<void> initChats() async {
   sl.registerLazySingleton(() => GetFriendsUseCase(sl()));
   sl.registerLazySingleton(() => GetChatMessagesUseCase(sl()));
   sl.registerLazySingleton(() => SendMessageUseCase(sl()));
+  sl.registerLazySingleton(() => VotePollUseCase(sl()));
   sl.registerLazySingleton(() => MarkMessageReadUseCase(sl()));
   sl.registerLazySingleton(() => ReactToMessageUseCase(sl()));
   sl.registerLazySingleton(() => DeleteMessageUseCase(sl()));
@@ -50,6 +52,7 @@ Future<void> initChats() async {
     () => ChatBloc(
       getChatMessagesUseCase: sl(),
       sendMessageUseCase: sl(),
+      votePollUseCase: sl(),
       uploadMediaUseCase: sl(),
       reactToMessageUseCase: sl(),
       markMessageReadUseCase: sl(),

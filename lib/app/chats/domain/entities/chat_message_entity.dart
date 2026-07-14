@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/chats/domain/entities/chat_poll_entity.dart';
 import 'package:bimobondapp/app/chats/domain/entities/shared_post_snapshot.dart';
 import 'package:equatable/equatable.dart';
 
@@ -11,6 +12,7 @@ enum ChatMessageType {
   contact,
   gift,
   share,
+  poll,
   unknown,
 }
 
@@ -38,6 +40,8 @@ class ChatMessageEntity extends Equatable {
     this.replyToId,
     this.sharedPostId,
     this.sharedPost,
+    this.payload,
+    this.poll,
     this.createdAt,
     this.readByUserIds = const [],
     this.reactions = const [],
@@ -54,6 +58,8 @@ class ChatMessageEntity extends Equatable {
   final String? replyToId;
   final String? sharedPostId;
   final SharedPostSnapshot? sharedPost;
+  final Map<String, dynamic>? payload;
+  final ChatPollEntity? poll;
   final DateTime? createdAt;
   final List<String> readByUserIds;
   final List<ChatMessageReactionEntity> reactions;
@@ -73,6 +79,8 @@ class ChatMessageEntity extends Equatable {
         replyToId,
         sharedPostId,
         sharedPost,
+        payload,
+        poll,
         createdAt,
         readByUserIds,
         reactions,

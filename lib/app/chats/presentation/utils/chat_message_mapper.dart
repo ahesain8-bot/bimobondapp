@@ -59,7 +59,13 @@ String _typeToUi(ChatMessageType type) {
       return 'file';
     case ChatMessageType.contact:
       return 'contact';
-    default:
+    case ChatMessageType.gift:
+      return 'gift';
+    case ChatMessageType.poll:
+      return 'poll';
+    case ChatMessageType.share:
+      return 'share';
+    case ChatMessageType.unknown:
       return 'text';
   }
 }
@@ -84,8 +90,20 @@ Map<String, dynamic> chatMessageToUiMap(
     replyTo = chatMessageToUiMap(message.replyPreview!, currentUserId);
   }
 
-  final location = ChatLocationPayload.tryParse(message.content);
-  final contact = ChatContactPayload.tryParse(message.content);
+  final location = ChatLocationPayload.tryParse(
+    message.content,
+    message.payload,
+  );
+  final contact = ChatContactPayload.tryParse(
+    message.content,
+    message.payload,
+  );
+  final file = ChatFilePayload.tryParse(
+    message.content,
+    message.mediaUrl,
+    message.payload,
+  );
+  final gift = ChatGiftPayload.tryParse(message.payload);
 
   return {
     'id': message.id,
@@ -94,6 +112,7 @@ Map<String, dynamic> chatMessageToUiMap(
     'text': message.isDeleted ? '' : (message.content ?? ''),
     if (message.isDeleted) 'textKey': 'deleted',
     'isDeleted': message.isDeleted,
+    if (message.payload != null) 'payload': message.payload,
     if (message.type == ChatMessageType.image &&
         message.mediaUrl != null &&
         !message.isDeleted)
@@ -109,14 +128,21 @@ Map<String, dynamic> chatMessageToUiMap(
         'mediaUrl': message.mediaUrl,
       },
     },
-    if (message.type == ChatMessageType.file && !message.isDeleted) ...{
-      'fileName': message.content ?? '',
-      if (message.mediaUrl != null) 'fileUrl': message.mediaUrl,
+    if (message.type == ChatMessageType.file &&
+        file != null &&
+        !message.isDeleted) ...{
+      'fileName': file.fileName,
+      'fileUrl': file.url,
+      'mimeType': file.mimeType,
+      if (file.sizeBytes != null) 'sizeBytes': file.sizeBytes,
+      'fileSizeLabel': formatFileSizeBytes(file.sizeBytes),
     },
     if (message.type == ChatMessageType.location &&
         location != null &&
         !message.isDeleted) ...{
       'locationLabel': location.displayLabel,
+      'locationName': location.name,
+      'locationAddress': location.address,
       'mapsUrl': location.mapsUrl,
       'latitude': location.latitude,
       'longitude': location.longitude,
@@ -126,6 +152,37 @@ Map<String, dynamic> chatMessageToUiMap(
         !message.isDeleted) ...{
       'contactName': contact.name,
       'contactPhone': contact.phone,
+      if (contact.email != null) 'contactEmail': contact.email,
+      if (contact.userId != null) 'contactUserId': contact.userId,
+      if (contact.avatarUrl != null) 'contactAvatarUrl': contact.avatarUrl,
+    },
+    if (message.type == ChatMessageType.gift &&
+        gift != null &&
+        !message.isDeleted) ...{
+      'giftId': gift.giftId,
+      if (gift.name != null) 'giftName': gift.name,
+      if (gift.thumbnailUrl != null) 'giftThumbnailUrl': gift.thumbnailUrl,
+      if (gift.animationUrl != null) 'giftAnimationUrl': gift.animationUrl,
+      if (gift.priceCoins != null) 'giftPriceCoins': gift.priceCoins,
+      'giftQuantity': gift.quantity,
+    },
+    if (message.type == ChatMessageType.poll && !message.isDeleted) ...{
+      if (message.poll != null)
+        'poll': message.poll!.toUiMap()
+      else if (message.payload != null)
+        'poll': {
+          'question': message.payload!['question']?.toString() ?? '',
+          'options': message.payload!['options'] is List
+              ? (message.payload!['options'] as List)
+                  .map((e) => e.toString())
+                  .toList()
+              : <String>[],
+          'allowMultiple': message.payload!['allowMultiple'] == true,
+          'totalVotes': 0,
+          'counts': <int>[],
+          'votes': <Map<String, dynamic>>[],
+          'hasEnded': false,
+        },
     },
     'isMe': isMe,
     'time': formatChatMessageTime(message.createdAt),

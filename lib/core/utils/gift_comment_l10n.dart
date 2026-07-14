@@ -1,21 +1,51 @@
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 
-/// Localized display text for gift comments from the API.
+/// Localized display text for gift comments (never embeds image URLs).
 String localizedGiftCommentText(AppLocalizations l10n, CommentEntity comment) {
   if (!comment.isGift) return comment.content;
 
   final giftName = _resolveGiftName(comment);
-  final giftIcon = _resolveGiftIcon(comment);
-
   if (giftName.isEmpty) {
     return l10n.liveGiftCommentGeneric;
   }
 
-  return l10n.liveGiftSent(
+  final emoji = _resolveGiftEmoji(comment);
+  final text = l10n.liveGiftSent(
     _localizeGiftName(l10n, giftName),
-    giftIcon,
+    emoji,
   );
+  return text.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// Network thumbnail for gift comments (null when only an emoji icon exists).
+String? giftCommentImageUrl(CommentEntity comment) {
+  for (final candidate in [
+    comment.giftThumbnailUrl,
+    comment.giftIcon,
+  ]) {
+    final value = candidate?.trim();
+    if (value != null && value.isNotEmpty && looksLikeGiftImageUrl(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+bool looksLikeGiftImageUrl(String value) {
+  final lower = value.trim().toLowerCase();
+  if (lower.isEmpty) return false;
+  if (lower.startsWith('http://') ||
+      lower.startsWith('https://') ||
+      lower.startsWith('/') ||
+      lower.startsWith('uploads/')) {
+    return true;
+  }
+  return lower.contains('.png') ||
+      lower.contains('.jpg') ||
+      lower.contains('.jpeg') ||
+      lower.contains('.webp') ||
+      lower.contains('.gif');
 }
 
 String _resolveGiftName(CommentEntity comment) {
@@ -24,10 +54,15 @@ String _resolveGiftName(CommentEntity comment) {
   return _parseGiftNameFromContent(comment.content);
 }
 
-String _resolveGiftIcon(CommentEntity comment) {
+/// Emoji / short symbol only — never a URL.
+String _resolveGiftEmoji(CommentEntity comment) {
   final fromField = comment.giftIcon?.trim();
-  if (fromField != null && fromField.isNotEmpty) return fromField;
-  return _parseGiftIconFromContent(comment.content) ?? '🎁';
+  if (fromField != null &&
+      fromField.isNotEmpty &&
+      !looksLikeGiftImageUrl(fromField)) {
+    return fromField;
+  }
+  return _parseGiftIconFromContent(comment.content) ?? '';
 }
 
 String _parseGiftNameFromContent(String content) {
@@ -39,6 +74,13 @@ String _parseGiftNameFromContent(String content) {
     '',
   );
 
+  // Drop trailing URLs that APIs sometimes bake into content.
+  text = text.replaceAll(
+    RegExp(r'https?:\/\/\S+', caseSensitive: false),
+    '',
+  );
+  text = text.replaceAll(RegExp(r'\/uploads\/\S+', caseSensitive: false), '');
+
   final emojiPattern = RegExp(
     r'(\p{Extended_Pictographic}|\uFE0F|\u200D)',
     unicode: true,
@@ -48,7 +90,7 @@ String _parseGiftNameFromContent(String content) {
     text = text.substring(0, iconMatch.start).trim();
   }
 
-  return text.isEmpty ? content.trim() : text;
+  return text.trim().isEmpty ? '' : text.trim();
 }
 
 String? _parseGiftIconFromContent(String content) {

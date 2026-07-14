@@ -33,106 +33,108 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    return Material(
-      color: theme.scaffoldBackgroundColor,
-      elevation: 0,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: ChatLayoutConstants.appBarHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSizes.p4),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: DirectionalBackIcon(
-                    color: onSurface,
-                    size: ChatLayoutConstants.appBarLeadingIconSize,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Material(
+        color: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: ChatLayoutConstants.appBarHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSizes.p4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: DirectionalBackIcon(
+                      color: onSurface,
+                      size: ChatLayoutConstants.appBarLeadingIconSize,
+                    ),
+                    onPressed: () => context.pop(),
                   ),
-                  onPressed: () => context.pop(),
-                ),
-                Expanded(
-                  child: InkWell(
-                    onTap: onProfileTap,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.p4,
-                        vertical: AppSizes.p4,
-                      ),
-                      child: Row(
-                        children: [
-                          StoryProfileAvatar(
-                            userId: userId,
-                            imageUrl: imageUrl,
-                            radius: ChatLayoutConstants.headerAvatarRadius,
-                            fallbackText: username,
-                            username: username,
-                            fullName: username,
-                            onTap: onProfileTap,
-                          ),
-                          const SizedBox(width: AppSizes.p10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: isRtl
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  username,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontSize:
-                                        ChatLayoutConstants.headerTitleFontSize,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: ChatLayoutConstants
-                                        .headerTitleLetterSpacing,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  isPeerActive
-                                      ? l10n.chatActiveNow
-                                      : l10n.chatActiveYesterday,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: isPeerActive
-                                        ? chatTheme.activeStatus
-                                        : chatTheme.inboxSecondaryText,
-                                    fontSize:
-                                        ChatLayoutConstants.headerStatusFontSize,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                  Expanded(
+                    child: InkWell(
+                      onTap: onProfileTap,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.p4,
+                          vertical: AppSizes.p4,
+                        ),
+                        child: Row(
+                          children: [
+                            StoryProfileAvatar(
+                              userId: userId,
+                              imageUrl: imageUrl,
+                              radius: ChatLayoutConstants.headerAvatarRadius,
+                              fallbackText: username,
+                              username: username,
+                              fullName: username,
+                              onTap: onProfileTap,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: AppSizes.p10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    username,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontSize: ChatLayoutConstants
+                                          .headerTitleFontSize,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: ChatLayoutConstants
+                                          .headerTitleLetterSpacing,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.left,
+                                  ),
+                                  Text(
+                                    isPeerActive
+                                        ? l10n.chatActiveNow
+                                        : l10n.chatActiveYesterday,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: isPeerActive
+                                          ? chatTheme.activeStatus
+                                          : chatTheme.inboxSecondaryText,
+                                      fontSize: ChatLayoutConstants
+                                          .headerStatusFontSize,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    textAlign: TextAlign.left,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    LucideIcons.flag,
-                    color: onSurface,
-                    size: ChatLayoutConstants.appBarActionIconSize,
+                  IconButton(
+                    icon: Icon(
+                      LucideIcons.flag,
+                      color: onSurface,
+                      size: ChatLayoutConstants.appBarActionIconSize,
+                    ),
+                    onPressed: () {},
                   ),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: Icon(
-                    LucideIcons.ellipsis,
-                    color: onSurface,
-                    size: ChatLayoutConstants.appBarActionIconSize,
+                  IconButton(
+                    icon: Icon(
+                      LucideIcons.ellipsis,
+                      color: onSurface,
+                      size: ChatLayoutConstants.appBarActionIconSize,
+                    ),
+                    tooltip: l10n.settingsChatWallpaper,
+                    onPressed: () =>
+                        context.pushNamed('chat_wallpaper_settings'),
                   ),
-                  tooltip: l10n.settingsChatWallpaper,
-                  onPressed: () =>
-                      context.pushNamed('chat_wallpaper_settings'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -1076,6 +1076,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get describePostHint => 'صف منشورك… استخدم @اسم_المستخدم و #وسم في النص';
 
   @override
+  String get addDescriptionHint => 'أضف وصفًا...';
+
+  @override
   String get hashtagsLabel => 'هاشتاجات';
 
   @override
@@ -1086,6 +1089,51 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get allowCommentsLabel => 'السماح بالتعليقات';
+
+  @override
+  String get allowReuseLabel => 'السماح بإعادة استخدام المحتوى';
+
+  @override
+  String get allowReuseSubtitle => 'Duet و Stitch والملصقات والإضافة إلى القصة';
+
+  @override
+  String get videoPrivacySection => 'خصوصية الفيديو';
+
+  @override
+  String get advancedSettings => 'إعدادات متقدمة';
+
+  @override
+  String get addPostSettingsTitle => 'الإعدادات';
+
+  @override
+  String get everyoneCanViewPost => 'يمكن للجميع مشاهدة هذا المنشور';
+
+  @override
+  String get friendsCanViewPost => 'يمكن للأصدقاء مشاهدة هذا المنشور';
+
+  @override
+  String get onlyYouCanViewPost => 'يمكنك أنت فقط مشاهدة هذا المنشور';
+
+  @override
+  String get friendsPrivacySubtitle => 'المتابعون الذين تتابعهم';
+
+  @override
+  String get draftsLabel => 'المسودات';
+
+  @override
+  String get moreOptionsLabel => 'المزيد من الخيارات';
+
+  @override
+  String get previewLabel => 'معاينة';
+
+  @override
+  String get editCoverLabel => 'تعديل الغلاف';
+
+  @override
+  String get locationLabelShort => 'الموقع';
+
+  @override
+  String get addPostDraftsComingSoon => 'المسودات قريبًا';
 
   @override
   String get allowDuetLabel => 'السماح بـ Duet';
@@ -1828,6 +1876,68 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chatMorePoll => 'تصويت';
+
+  @override
+  String get chatGiftSheetTitle => 'أرسل هدية';
+
+  @override
+  String get chatGiftSheetSubtitle => 'اختر هدية من مخزونك';
+
+  @override
+  String get chatGiftInventoryEmpty => 'لا تملك أي هدايا بعد. اشترِ هدايا من المحفظة أولاً.';
+
+  @override
+  String get chatGiftSentLabel => 'تم إرسال الهدية';
+
+  @override
+  String get chatMessageContact => 'جهة اتصال';
+
+  @override
+  String get chatPollSheetTitle => 'إنشاء تصويت';
+
+  @override
+  String get chatPollQuestionHint => 'اطرح سؤالاً';
+
+  @override
+  String get chatPollOptionsLabel => 'الخيارات';
+
+  @override
+  String chatPollOptionHint(int index) {
+    return 'خيار $index';
+  }
+
+  @override
+  String get chatPollAddOption => 'إضافة خيار';
+
+  @override
+  String get chatPollAllowMultiple => 'السماح باختيارات متعددة';
+
+  @override
+  String get chatPollSend => 'إرسال التصويت';
+
+  @override
+  String get chatPollQuestionRequired => 'أدخل سؤالاً للتصويت.';
+
+  @override
+  String get chatPollOptionsRequired => 'أضف خيارين على الأقل.';
+
+  @override
+  String get chatPollEnded => 'انتهى التصويت';
+
+  @override
+  String chatPollVotesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count أصوات',
+      one: 'صوت واحد',
+      zero: 'لا أصوات بعد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messagesInboxLastPoll => 'تصويت';
 
   @override
   String get chatLastMessage1 => 'هل يمكنني معرفة السعر النهائي؟';

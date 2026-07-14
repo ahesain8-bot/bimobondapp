@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
@@ -48,6 +49,7 @@ class AuctionSocketService {
   io.Socket? _socket;
   String? _joinedAuctionId;
   String? _joinedPostId;
+  bool _connecting = false;
 
   final _auctionUpdatedController =
       StreamController<AuctionUpdatedPayload>.broadcast();
@@ -66,48 +68,81 @@ class AuctionSocketService {
       _rejoinRooms();
       return;
     }
+    if (_connecting) {
+      // Wait briefly for in-flight connect.
+      for (var i = 0; i < 40 && _connecting; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (_socket?.connected == true) {
+          _rejoinRooms();
+          return;
+        }
+      }
+    }
 
-    final user = FirebaseAuth.instance.currentUser;
-    final token = user != null ? await user.getIdToken() : null;
-
-    _socket?.dispose();
-    _socket = io.io(
-      ApiConstants.baseUrl,
-      io.OptionBuilder()
-          .setTransports(['websocket'])
-          .disableAutoConnect()
-          .setAuth({'token': token})
-          .build(),
-    );
-
-    final connected = Completer<void>();
-
-    _socket!
-      ..onConnect((_) {
-        _connectionController.add(true);
-        _rejoinRooms();
-        if (!connected.isCompleted) connected.complete();
-      })
-      ..onDisconnect((_) => _connectionController.add(false))
-      ..onConnectError((_) {
-        if (!connected.isCompleted) connected.complete();
-      })
-      ..on(AuctionSocketEvent.auctionUpdated, _handleAuctionUpdated)
-      ..on(AuctionSocketEvent.newComment, _handleNewComment);
-
-    _socket!.connect();
-
+    _connecting = true;
     try {
-      await connected.future.timeout(const Duration(seconds: 10));
-    } catch (_) {
-      // Room joins are retried on reconnect via _rejoinRooms().
+      final user = FirebaseAuth.instance.currentUser;
+      final token = user != null ? await user.getIdToken() : null;
+
+      _socket?.dispose();
+      _socket = io.io(
+        ApiConstants.baseUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket'])
+            .enableForceNew()
+            .enableReconnection()
+            .disableAutoConnect()
+            .setAuth(token != null ? {'token': token} : {})
+            .setExtraHeaders(
+              token != null ? {'Authorization': 'Bearer $token'} : {},
+            )
+            .build(),
+      );
+
+      final connected = Completer<void>();
+
+      _socket!
+        ..onConnect((_) {
+          developer.log('AuctionSocket connected', name: 'AuctionSocket');
+          _connectionController.add(true);
+          _rejoinRooms();
+          if (!connected.isCompleted) connected.complete();
+        })
+        ..onReconnect((_) {
+          developer.log('AuctionSocket reconnected', name: 'AuctionSocket');
+          _connectionController.add(true);
+          _rejoinRooms();
+        })
+        ..onDisconnect((_) {
+          developer.log('AuctionSocket disconnected', name: 'AuctionSocket');
+          _connectionController.add(false);
+        })
+        ..onConnectError((err) {
+          developer.log(
+            'AuctionSocket connect error: $err',
+            name: 'AuctionSocket',
+          );
+          if (!connected.isCompleted) connected.complete();
+        })
+        ..on(AuctionSocketEvent.auctionUpdated, _handleAuctionUpdated)
+        ..on(AuctionSocketEvent.newComment, _handleNewComment);
+
+      _socket!.connect();
+
+      try {
+        await connected.future.timeout(const Duration(seconds: 12));
+      } catch (_) {
+        // Joins retry on reconnect via _rejoinRooms().
+      }
+    } finally {
+      _connecting = false;
     }
   }
 
   void joinAuction(String auctionId) {
     if (auctionId.isEmpty) return;
     _joinedAuctionId = auctionId;
-    _socket?.emit(AuctionSocketEvent.joinAuction, {'auctionId': auctionId});
+    _emitJoinAuction(auctionId);
   }
 
   void leaveAuction(String auctionId) {
@@ -115,13 +150,15 @@ class AuctionSocketService {
     if (_joinedAuctionId == auctionId) {
       _joinedAuctionId = null;
     }
-    _socket?.emit(AuctionSocketEvent.leaveAuction, {'auctionId': auctionId});
+    if (_socket?.connected == true) {
+      _socket?.emit(AuctionSocketEvent.leaveAuction, {'auctionId': auctionId});
+    }
   }
 
   void joinPost(String postId) {
     if (postId.isEmpty) return;
     _joinedPostId = postId;
-    _socket?.emit(AuctionSocketEvent.joinPost, {'postId': postId});
+    _emitJoinPost(postId);
   }
 
   void leavePost(String postId) {
@@ -129,24 +166,65 @@ class AuctionSocketService {
     if (_joinedPostId == postId) {
       _joinedPostId = null;
     }
-    _socket?.emit(AuctionSocketEvent.leavePost, {'postId': postId});
+    if (_socket?.connected == true) {
+      _socket?.emit(AuctionSocketEvent.leavePost, {'postId': postId});
+    }
+  }
+
+  /// Stores target rooms and connects (or rejoins if already online).
+  Future<void> ensureJoined({String? postId, String? auctionId}) async {
+    if (postId != null && postId.isNotEmpty) {
+      _joinedPostId = postId;
+    }
+    if (auctionId != null && auctionId.isNotEmpty) {
+      _joinedAuctionId = auctionId;
+    }
+    await connect();
+    _rejoinRooms();
+  }
+
+  void _emitJoinPost(String postId) {
+    if (_socket?.connected != true) return;
+    _socket!.emit(AuctionSocketEvent.joinPost, {'postId': postId});
+    developer.log('AuctionSocket joinPost $postId', name: 'AuctionSocket');
+  }
+
+  void _emitJoinAuction(String auctionId) {
+    if (_socket?.connected != true) return;
+    _socket!.emit(AuctionSocketEvent.joinAuction, {'auctionId': auctionId});
+    developer.log(
+      'AuctionSocket joinAuction $auctionId',
+      name: 'AuctionSocket',
+    );
   }
 
   void _rejoinRooms() {
-    final auctionId = _joinedAuctionId;
-    if (auctionId != null && auctionId.isNotEmpty) {
-      _socket?.emit(AuctionSocketEvent.joinAuction, {'auctionId': auctionId});
-    }
     final postId = _joinedPostId;
     if (postId != null && postId.isNotEmpty) {
-      _socket?.emit(AuctionSocketEvent.joinPost, {'postId': postId});
+      _emitJoinPost(postId);
+    }
+    final auctionId = _joinedAuctionId;
+    if (auctionId != null && auctionId.isNotEmpty) {
+      _emitJoinAuction(auctionId);
     }
   }
 
   void _handleNewComment(dynamic data) {
     final comment = _parseCommentPayload(data);
-    if (comment == null) return;
-    _newCommentController.add(comment);
+    if (comment == null) {
+      developer.log(
+        'AuctionSocket newComment parse failed: $data',
+        name: 'AuctionSocket',
+      );
+      return;
+    }
+    developer.log(
+      'AuctionSocket newComment ${comment.id} gift=${comment.isGift}',
+      name: 'AuctionSocket',
+    );
+    if (!_newCommentController.isClosed) {
+      _newCommentController.add(comment);
+    }
   }
 
   void _handleAuctionUpdated(dynamic data) {
@@ -154,11 +232,13 @@ class AuctionSocketService {
     if (payload == null) return;
 
     final lastComment = payload.lastComment;
-    if (lastComment != null) {
+    if (lastComment != null && !_newCommentController.isClosed) {
       _newCommentController.add(lastComment);
     }
 
-    _auctionUpdatedController.add(payload);
+    if (!_auctionUpdatedController.isClosed) {
+      _auctionUpdatedController.add(payload);
+    }
   }
 
   /// Parses `newComment` — flat comment JSON on the post room.
@@ -166,10 +246,9 @@ class AuctionSocketService {
     final map = _unwrapPayload(data);
     if (map == null) return null;
 
-    final fallbackPostId =
-        map['postId']?.toString() ?? _joinedPostId;
+    final fallbackPostId = map['postId']?.toString() ?? _joinedPostId;
 
-    for (final key in ['newComment', 'comment']) {
+    for (final key in ['newComment', 'comment', 'data']) {
       final raw = map[key];
       if (raw is! Map) continue;
       final comment = _tryParseComment(
@@ -194,8 +273,7 @@ class AuctionSocketService {
     final status = map['status']?.toString();
     final winnerId = map['winnerId']?.toString();
 
-    final fallbackPostId =
-        postId ?? map['postId']?.toString() ?? _joinedPostId;
+    final fallbackPostId = postId ?? _joinedPostId;
 
     CommentModel? lastComment;
     final lastCommentRaw = map['lastComment'];
@@ -236,6 +314,9 @@ class AuctionSocketService {
   }
 
   Map<String, dynamic>? _unwrapPayload(dynamic data) {
+    if (data is List && data.isNotEmpty) {
+      return _unwrapPayload(data.first);
+    }
     if (data is! Map) return null;
     var map = Map<String, dynamic>.from(data);
 
@@ -247,7 +328,8 @@ class AuctionSocketService {
               !map.containsKey('auctionId') &&
               !map.containsKey('lastComment') &&
               !map.containsKey('lastGift') &&
-              !map.containsKey('content'));
+              !map.containsKey('content') &&
+              !map.containsKey('id'));
       if (isEnvelope) {
         map = nestedMap;
       }
@@ -260,7 +342,10 @@ class AuctionSocketService {
     Map<String, dynamic> json, {
     String? fallbackPostId,
   }) {
-    if (!json.containsKey('id') && !json.containsKey('content')) {
+    if (!json.containsKey('id') &&
+        !json.containsKey('content') &&
+        json['isGift'] != true &&
+        json['gift'] == null) {
       return null;
     }
     try {
@@ -272,8 +357,24 @@ class AuctionSocketService {
         merged['postId'] = fallbackPostId;
       }
 
+      // Some payloads flag gifts without explicit isGift.
+      if (merged['gift'] is Map && merged['isGift'] != true) {
+        merged['isGift'] = true;
+      }
+
       final comment = CommentModel.fromJson(merged);
-      if (comment.id.isEmpty) return null;
+      if (comment.id.isEmpty) {
+        String? fallbackId = merged['giftId']?.toString();
+        final nestedGift = merged['gift'];
+        if ((fallbackId == null || fallbackId.isEmpty) && nestedGift is Map) {
+          fallbackId = nestedGift['id']?.toString();
+        }
+        if (fallbackId == null || fallbackId.isEmpty) return null;
+        return CommentModel.fromJson({
+          ...merged,
+          'id': 'gift-$fallbackId-${merged['userId'] ?? 'anon'}',
+        });
+      }
       return comment;
     } catch (_) {
       return null;
@@ -293,7 +394,9 @@ class AuctionSocketService {
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
   }
 
   void dispose() {

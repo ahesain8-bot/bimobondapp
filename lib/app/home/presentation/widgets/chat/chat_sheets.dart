@@ -60,9 +60,7 @@ class ChatSheets {
             Text(
               l10n.chatUserBio,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-              ),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
             ),
           ],
         ),
@@ -207,8 +205,6 @@ class ChatSheets {
     VoidCallback? onLocation,
     VoidCallback? onContact,
     VoidCallback? onFile,
-    VoidCallback? onGift,
-    VoidCallback? onPoll,
   }) {
     final l10n = AppLocalizations.of(context)!;
     final menuColors = ChatTheme.of(context).moreMenuIconColors;
@@ -269,20 +265,6 @@ class ChatSheets {
               color: menuColors[5],
               glassStyle: true,
               onTap: () => tap(onFile),
-            ),
-            AttachmentGridMenuItem(
-              icon: LucideIcons.gift,
-              label: l10n.chatMoreGift,
-              color: menuColors[6],
-              glassStyle: true,
-              onTap: () => tap(onGift),
-            ),
-            AttachmentGridMenuItem(
-              icon: LucideIcons.chartBar,
-              label: l10n.chatMorePoll,
-              color: menuColors[7],
-              glassStyle: true,
-              onTap: () => tap(onPoll),
             ),
           ],
         ),

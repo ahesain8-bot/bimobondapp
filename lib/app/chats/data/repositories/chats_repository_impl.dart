@@ -62,22 +62,43 @@ class ChatsRepositoryImpl implements ChatsRepository {
   @override
   Future<Either<Failure, ChatMessageEntity>> sendMessage({
     required String chatId,
-    required String content,
+    String content = '',
     String type = 'TEXT',
     String? mediaUrl,
     String? replyToId,
     String? sharedPostId,
+    String? sharedProfileId,
+    Map<String, dynamic>? payload,
   }) async {
     try {
+      final trimmed = content.trim();
       final message = await remoteDataSource.sendMessage(
         chatId: chatId,
         body: {
-          'content': content,
+          if (trimmed.isNotEmpty) 'content': trimmed,
           'type': type,
           if (mediaUrl != null) 'mediaUrl': mediaUrl,
           if (replyToId != null) 'replyToId': replyToId,
           if (sharedPostId != null) 'sharedPostId': sharedPostId,
+          if (sharedProfileId != null) 'sharedProfileId': sharedProfileId,
+          if (payload != null) 'payload': payload,
         },
+      );
+      return Right(message);
+    } catch (e) {
+      return Left(_mapException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ChatMessageEntity>> votePoll({
+    required String messageId,
+    required int optionIndex,
+  }) async {
+    try {
+      final message = await remoteDataSource.votePoll(
+        messageId: messageId,
+        optionIndex: optionIndex,
       );
       return Right(message);
     } catch (e) {
