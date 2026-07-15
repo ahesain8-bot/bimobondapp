@@ -20,6 +20,7 @@ class SocialUserListTile extends StatelessWidget {
     this.hideFollowButton = false,
     this.useActivityCard = false,
     this.showDivider = true,
+    this.trailingOverride,
     super.key,
   });
 
@@ -33,6 +34,7 @@ class SocialUserListTile extends StatelessWidget {
   final String? subtitleOverride;
   final bool useActivityCard;
   final bool showDivider;
+  final Widget? trailingOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -140,14 +142,15 @@ class SocialUserListTile extends StatelessWidget {
         ),
       ),
       subtitle: _buildSubtitle(handle, subtitleOverride),
-      trailing: showFollowButton
-          ? ProfileFollowButton.listTile(
-              isFollowing: user.isFollowing,
-              isFollowedBy: user.isFollowedBy,
-              isLoading: isFollowLoading,
-              onPressed: onFollowTap,
-            )
-          : null,
+      trailing: trailingOverride ??
+          (showFollowButton
+              ? ProfileFollowButton.listTile(
+                  isFollowing: user.isFollowing,
+                  isFollowedBy: user.isFollowedBy,
+                  isLoading: isFollowLoading,
+                  onPressed: onFollowTap,
+                )
+              : null),
     );
   }
 

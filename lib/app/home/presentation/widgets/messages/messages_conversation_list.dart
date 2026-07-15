@@ -7,6 +7,7 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class MessagesConversationList extends StatelessWidget {
   const MessagesConversationList({
@@ -53,20 +54,13 @@ class MessagesConversationList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
+    return ListView.builder(
       shrinkWrap: !scrollable,
       physics: scrollable
           ? const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics())
           : const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       itemCount: items.length,
-      separatorBuilder: (context, index) => Divider(
-        height: 1,
-        thickness: 1,
-        color: theme.brightness == Brightness.light
-            ? const Color(0xFFE4E7EC)
-            : theme.dividerColor.withValues(alpha: 0.12),
-      ),
       itemBuilder: (context, index) {
         final chat = items[index];
         bool deleteForEveryone = false;
@@ -131,12 +125,37 @@ class _ConversationTile extends StatelessWidget {
 
   final InboxChatItem chat;
 
+  Map<String, dynamic> get _chatExtra => {
+        'chatId': chat.chatId,
+        'username': chat.name,
+        if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
+          'imageUrl': chat.imageUrl,
+        if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
+      };
+
+  Future<void> _openChat(
+    BuildContext context, {
+    bool openCamera = false,
+  }) async {
+    await context.pushNamed(
+      'chat',
+      extra: {
+        ..._chatExtra,
+        if (openCamera) 'openCamera': true,
+      },
+    );
+    if (context.mounted) {
+      context.read<InboxBloc>().add(
+        const InboxLoadRequested(refresh: true),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Container(
-      // margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: chat.unread
             ? theme.colorScheme.primary.withValues(
@@ -148,23 +167,7 @@ class _ConversationTile extends StatelessWidget {
         ),
       ),
       child: ListTile(
-        onTap: () async {
-          await context.pushNamed(
-            'chat',
-            extra: {
-              'chatId': chat.chatId,
-              'username': chat.name,
-              if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
-                'imageUrl': chat.imageUrl,
-              if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
-            },
-          );
-          if (context.mounted) {
-            context.read<InboxBloc>().add(
-              const InboxLoadRequested(refresh: true),
-            );
-          }
-        },
+        onTap: () => _openChat(context),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(
@@ -185,7 +188,7 @@ class _ConversationTile extends StatelessWidget {
                 child: StoryProfileAvatar(
                   userId: chat.peerUserId,
                   imageUrl: chat.imageUrl,
-                  //   radius: MessagesLayoutConstants.conversationAvatarRadius,
+                  radius: MessagesLayoutConstants.conversationAvatarRadius,
                   fallbackText: chat.name,
                   username: chat.name,
                   fullName: chat.name,
@@ -271,6 +274,17 @@ class _ConversationTile extends StatelessWidget {
               ),
             ],
           ],
+        ),
+        trailing: IconButton(
+          onPressed: () => _openChat(context, openCamera: true),
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          icon: Icon(
+            LucideIcons.camera,
+            size: 24,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+          ),
         ),
       ),
     );

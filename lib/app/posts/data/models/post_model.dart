@@ -166,8 +166,10 @@ class PostModel extends PostEntity {
       promotion: json['promotion'] is Map<String, dynamic>
           ? PostPromotionEntity.fromJson(json['promotion'] as Map<String, dynamic>)
           : null,
-      location: json['location'] is Map<String, dynamic>
-          ? PostLocationEntity.fromJson(json['location'] as Map<String, dynamic>)
+      location: json['location'] is Map
+          ? PostLocationEntity.fromJson(
+              Map<String, dynamic>.from(json['location'] as Map),
+            )
           : null,
       sound: json['sound'] is Map<String, dynamic>
           ? PostSoundEntity.fromJson(json['sound'] as Map<String, dynamic>)

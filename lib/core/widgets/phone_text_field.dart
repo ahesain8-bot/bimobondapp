@@ -240,6 +240,11 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                         decoration: authFieldDecoration(
                           style: style,
                           hintText: widget.hintText ?? l10n.phoneHint,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSizes.p12,
+                            vertical: 14,
+                          ),
+                          showUnderline: false,
                         ),
                       ),
                     ),

@@ -103,6 +103,9 @@ class LiquidGlassSkeletonBox extends StatelessWidget {
     return Shimmer.fromColors(
       baseColor: _base,
       highlightColor: _highlight,
+      direction: Directionality.of(context) == TextDirection.rtl
+          ? ShimmerDirection.rtl
+          : ShimmerDirection.ltr,
       child: Container(
         height: height,
         width: width,

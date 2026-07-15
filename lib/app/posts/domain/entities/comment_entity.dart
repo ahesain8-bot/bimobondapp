@@ -14,6 +14,8 @@ class CommentEntity extends Equatable {
   final bool isGift;
   final String? giftName;
   final String? giftIcon;
+  final String? giftThumbnailUrl;
+  final String? giftAnimationUrl;
   final String createdAt;
   final String updatedAt;
   final List<MentionRefEntity> mentions;
@@ -30,6 +32,8 @@ class CommentEntity extends Equatable {
     this.isGift = false,
     this.giftName,
     this.giftIcon,
+    this.giftThumbnailUrl,
+    this.giftAnimationUrl,
     required this.createdAt,
     required this.updatedAt,
     this.mentions = const [],
@@ -42,6 +46,8 @@ class CommentEntity extends Equatable {
     bool? isGift,
     String? giftName,
     String? giftIcon,
+    String? giftThumbnailUrl,
+    String? giftAnimationUrl,
   }) {
     return CommentEntity(
       id: id,
@@ -55,6 +61,8 @@ class CommentEntity extends Equatable {
       isGift: isGift ?? this.isGift,
       giftName: giftName ?? this.giftName,
       giftIcon: giftIcon ?? this.giftIcon,
+      giftThumbnailUrl: giftThumbnailUrl ?? this.giftThumbnailUrl,
+      giftAnimationUrl: giftAnimationUrl ?? this.giftAnimationUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
       mentions: mentions,
@@ -74,6 +82,8 @@ class CommentEntity extends Equatable {
         isGift,
         giftName,
         giftIcon,
+        giftThumbnailUrl,
+        giftAnimationUrl,
         createdAt,
         updatedAt,
         mentions,

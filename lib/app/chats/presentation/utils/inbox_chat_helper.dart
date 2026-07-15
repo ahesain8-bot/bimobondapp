@@ -41,39 +41,63 @@ String inboxLastMessagePreview(
 
   final isMe = last.senderId.isNotEmpty && last.senderId == currentUserId;
   String body;
+  final contentPreview = last.content?.trim() ?? '';
 
-  switch (last.type) {
-    case ChatMessageType.image:
-      body = l10n.messagesInboxLastPhoto;
-      break;
-    case ChatMessageType.video:
-      body = l10n.messagesInboxLastVideo;
-      break;
-    case ChatMessageType.audio:
-      body = l10n.messagesInboxLastVoice;
-      break;
-    case ChatMessageType.location:
-      body = l10n.messagesInboxLastLocation;
-      break;
-    case ChatMessageType.file:
-      body = l10n.messagesInboxLastFile;
-      break;
-    case ChatMessageType.contact:
-      body = l10n.messagesInboxLastContact;
-      break;
-    case ChatMessageType.gift:
-      body = l10n.messagesInboxLastGift;
-      break;
-    case ChatMessageType.share:
-      body = l10n.messagesInboxLastShare;
-      break;
-    case ChatMessageType.text:
-    case ChatMessageType.unknown:
-      body = last.content?.trim() ?? '';
-      if (body.isEmpty && last.mediaUrl != null && last.mediaUrl!.isNotEmpty) {
+  if (contentPreview.isNotEmpty &&
+      last.type != ChatMessageType.image &&
+      last.type != ChatMessageType.video &&
+      last.type != ChatMessageType.audio &&
+      last.type != ChatMessageType.file) {
+    body = contentPreview;
+  } else {
+    switch (last.type) {
+      case ChatMessageType.image:
         body = l10n.messagesInboxLastPhoto;
-      }
-      break;
+        break;
+      case ChatMessageType.video:
+        body = l10n.messagesInboxLastVideo;
+        break;
+      case ChatMessageType.audio:
+        body = l10n.messagesInboxLastVoice;
+        break;
+      case ChatMessageType.location:
+        body = contentPreview.isNotEmpty
+            ? contentPreview
+            : l10n.messagesInboxLastLocation;
+        break;
+      case ChatMessageType.file:
+        body = contentPreview.isNotEmpty
+            ? contentPreview
+            : l10n.messagesInboxLastFile;
+        break;
+      case ChatMessageType.contact:
+        body = contentPreview.isNotEmpty
+            ? contentPreview
+            : l10n.messagesInboxLastContact;
+        break;
+      case ChatMessageType.gift:
+        body = contentPreview.isNotEmpty
+            ? contentPreview
+            : l10n.messagesInboxLastGift;
+        break;
+      case ChatMessageType.share:
+        body = contentPreview.isNotEmpty
+            ? contentPreview
+            : l10n.messagesInboxLastShare;
+        break;
+      case ChatMessageType.poll:
+        body = contentPreview.isNotEmpty
+            ? contentPreview
+            : l10n.messagesInboxLastPoll;
+        break;
+      case ChatMessageType.text:
+      case ChatMessageType.unknown:
+        body = contentPreview;
+        if (body.isEmpty && last.mediaUrl != null && last.mediaUrl!.isNotEmpty) {
+          body = l10n.messagesInboxLastPhoto;
+        }
+        break;
+    }
   }
 
   if (body.isEmpty) {

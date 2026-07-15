@@ -2,18 +2,10 @@ import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-String localizedAddPostPrivacyStatus(String status, AppLocalizations l10n) {
-  switch (status) {
-    case 'PUBLIC':
-      return l10n.everyoneLabel;
-    case 'FRIENDS':
-      return l10n.friendsLabel;
-    case 'PRIVATE':
-      return l10n.onlyMeLabel;
-    default:
-      return status;
-  }
-}
+export 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_settings_sheet.dart'
+    show
+        localizedAddPostPrivacyStatus,
+        localizedAddPostPrivacyRowLabel;
 
 class AddPostPrivacyPickerSheet {
   AddPostPrivacyPickerSheet._();

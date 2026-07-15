@@ -1,8 +1,8 @@
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+/// Compact TikTok-style "Edit" pill beside the display name.
 class ProfileEditPillButton extends StatelessWidget {
   const ProfileEditPillButton({required this.onPressed, super.key});
 
@@ -31,12 +31,21 @@ class ProfileEditPillButton extends StatelessWidget {
             ProfileLayoutConstants.editPillHeight / 2,
           ),
           child: SizedBox(
-            width: ProfileLayoutConstants.editPillHeight,
             height: ProfileLayoutConstants.editPillHeight,
-            child: Icon(
-              LucideIcons.userPen,
-              size: ProfileLayoutConstants.editPillIconSize,
-              color: theme.colorScheme.primary,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Center(
+                child: Text(
+                  l10n.edit,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    height: 1,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
             ),
           ),
         ),

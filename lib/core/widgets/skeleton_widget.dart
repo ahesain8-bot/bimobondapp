@@ -1,4 +1,5 @@
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
+import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/constants/notifications_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -56,6 +57,9 @@ class SkeletonWidget extends StatelessWidget {
     return Shimmer.fromColors(
       baseColor: baseColor,
       highlightColor: highlightColor,
+      direction: Directionality.of(context) == TextDirection.rtl
+          ? ShimmerDirection.rtl
+          : ShimmerDirection.ltr,
       child: Container(
         height: height,
         width: width,
@@ -76,75 +80,139 @@ class FeedSkeleton extends StatelessWidget {
 
   static const Color _background = Colors.black;
 
+  // Match [VideoPostWidget] action column layout.
+  static const double _actionColumnInset = 8;
+  static const double _actionSpacing = 20;
+  static const double _contentActionSidePadding = 68;
+  static const double _contentEdgeInset = 16;
+  static const double _profileAvatarSize = 48;
+  static const double _actionIconSize = 40;
+  static const double _musicDiscSize = 40;
+
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
+    final bottom = HomeLayoutConstants.feedPostBottomPadding;
+    // Same rule as VideoPostWidget: actions on the right in Arabic, left in English.
+    final actionsOnRight =
+        Localizations.localeOf(context).languageCode == 'ar';
+
+    return ColoredBox(
       color: _background,
       child: SizedBox.expand(
         child: Stack(
           fit: StackFit.expand,
           children: [
-            SkeletonWidget(
+            const SkeletonWidget(
               height: double.infinity,
               width: double.infinity,
               borderRadius: 0,
               onBlackBackground: true,
             ),
+            // Soft top/bottom scrim like the real post overlay.
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x66000000),
+                        Colors.transparent,
+                        Colors.transparent,
+                        Color(0xBF000000),
+                      ],
+                      stops: [0.0, 0.15, 0.6, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Side actions — same side as live posts for the current language.
             Positioned(
-              left: 16,
-              bottom: 110,
-              right: 80,
+              right: actionsOnRight ? _actionColumnInset : null,
+              left: actionsOnRight ? null : _actionColumnInset,
+              bottom: bottom + 20,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: actionsOnRight
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
-                  SkeletonWidget(
-                    height: 20,
-                    width: 120,
+                  const SkeletonWidget.circular(
+                    size: _profileAvatarSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: 8),
-                  SkeletonWidget(
-                    height: 14,
-                    width: 200,
+                  const SizedBox(height: 22),
+                  const SkeletonWidget.circular(
+                    size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: 4),
-                  SkeletonWidget(
-                    height: 14,
-                    width: 150,
+                  const SizedBox(height: _actionSpacing),
+                  const SkeletonWidget.circular(
+                    size: _actionIconSize,
+                    onBlackBackground: true,
+                  ),
+                  const SizedBox(height: _actionSpacing),
+                  const SkeletonWidget.circular(
+                    size: _actionIconSize,
+                    onBlackBackground: true,
+                  ),
+                  const SizedBox(height: _actionSpacing),
+                  const SkeletonWidget.circular(
+                    size: _actionIconSize,
+                    onBlackBackground: true,
+                  ),
+                  const SizedBox(height: _actionSpacing),
+                  const SkeletonWidget.circular(
+                    size: _musicDiscSize,
                     onBlackBackground: true,
                   ),
                 ],
               ),
             ),
+            // Caption / sound block — clears the action column on the correct side.
             Positioned(
-              right: 12,
-              bottom: 120,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 20),
-                    child: SkeletonWidget.circular(
-                      size: 45,
+              left: 0,
+              right: 0,
+              bottom: bottom,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: actionsOnRight
+                      ? _contentEdgeInset
+                      : _contentActionSidePadding,
+                  right: actionsOnRight
+                      ? _contentActionSidePadding
+                      : _contentEdgeInset,
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SkeletonWidget(
+                      height: 16,
+                      width: 140,
                       onBlackBackground: true,
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 20),
-                    child: SkeletonWidget.circular(
-                      size: 45,
+                    SizedBox(height: 10),
+                    SkeletonWidget(
+                      height: 14,
+                      width: double.infinity,
                       onBlackBackground: true,
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 20),
-                    child: SkeletonWidget.circular(
-                      size: 45,
+                    SizedBox(height: 6),
+                    SkeletonWidget(
+                      height: 14,
+                      width: 180,
                       onBlackBackground: true,
                     ),
-                  ),
-                  SkeletonWidget.circular(size: 45, onBlackBackground: true),
-                ],
+                    SizedBox(height: 10),
+                    SkeletonWidget(
+                      height: 12,
+                      width: 120,
+                      onBlackBackground: true,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -207,6 +275,8 @@ class AuctionCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
     return Material(
       color: theme.colorScheme.surface,
       borderRadius: BorderRadius.circular(AppSizes.radiusLg),
@@ -214,9 +284,34 @@ class AuctionCardSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AspectRatio(
+          AspectRatio(
             aspectRatio: 16 / 10,
-            child: SkeletonWidget(borderRadius: 0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const SkeletonWidget(borderRadius: 0),
+                Positioned.directional(
+                  textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                  top: AppSizes.p12,
+                  start: AppSizes.p12,
+                  child: const SkeletonWidget(
+                    height: 24,
+                    width: 72,
+                    borderRadius: AppSizes.radiusSm,
+                  ),
+                ),
+                Positioned.directional(
+                  textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                  bottom: AppSizes.p12,
+                  start: AppSizes.p12,
+                  child: const SkeletonWidget(
+                    height: 28,
+                    width: 110,
+                    borderRadius: AppSizes.radiusSm,
+                  ),
+                ),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -228,19 +323,15 @@ class AuctionCardSkeleton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SkeletonWidget(height: 16, width: 140),
-                    const SizedBox(height: AppSizes.p6),
-                    SkeletonWidget(
-                      height: 12,
-                      width: MediaQuery.sizeOf(context).width * 0.35,
-                    ),
+                    SkeletonWidget(height: 16, width: 160),
+                    SizedBox(height: AppSizes.p6),
+                    SkeletonWidget(height: 12, width: 220),
                   ],
                 ),
                 const SizedBox(height: AppSizes.p12),
-                // Match the new segmented stats container block
                 const SkeletonWidget(
                   height: 48,
                   borderRadius: AppSizes.radiusMd,
@@ -270,11 +361,14 @@ class AuctionsCategoryStripSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
     return SizedBox(
       height: _stripHeight,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
         scrollDirection: Axis.horizontal,
+        reverse: isRtl,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: chipCount,
         separatorBuilder: (_, _) => const SizedBox(width: AppSizes.p8),
@@ -667,6 +761,7 @@ class MessagesMentionsStripSkeleton extends StatelessWidget {
           height: MessagesLayoutConstants.mentionsStripHeight,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            reverse: Directionality.of(context) == TextDirection.rtl,
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: cardCount,
@@ -685,11 +780,11 @@ class MessagesMentionsStripSkeleton extends StatelessWidget {
                   ),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const SkeletonWidget.circular(size: 42),
-                  const SizedBox(width: 10),
-                  const Expanded(
+                  SkeletonWidget.circular(size: 42),
+                  SizedBox(width: 10),
+                  Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -700,7 +795,7 @@ class MessagesMentionsStripSkeleton extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   SkeletonWidget(
                     height: MessagesLayoutConstants.mentionPreviewSize,
                     width: MessagesLayoutConstants.mentionPreviewSize,
@@ -852,23 +947,120 @@ class MessagesSuggestionsStripSkeleton extends StatelessWidget {
 }
 
 /// Inbox chat row placeholders on the messages (الدردشة) tab.
+///
+/// By default only renders as many rows as fit on screen.
 class MessagesChatListSkeleton extends StatelessWidget {
   const MessagesChatListSkeleton({
     super.key,
-    this.itemCount = MessagesLayoutConstants.chatListSkeletonItemCount,
+    this.itemCount,
+    this.reservedAbove = 0,
   });
 
-  final int itemCount;
+  /// When null, count is derived from the visible viewport.
+  final int? itemCount;
+  final double reservedAbove;
 
   @override
   Widget build(BuildContext context) {
+    final count = itemCount ??
+        MessagesLayoutConstants.visibleChatSkeletonCount(
+          context,
+          reservedAbove: reservedAbove,
+        );
+
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: AppSizes.p12),
-      itemCount: itemCount,
+      itemCount: count,
       separatorBuilder: (_, _) => const SizedBox(height: AppSizes.p8),
       itemBuilder: (_, _) => const _MessagesChatTileSkeleton(),
+    );
+  }
+}
+
+/// Full inbox loading placeholder matching what is visible on the chats tab.
+class MessagesInboxSkeleton extends StatelessWidget {
+  const MessagesInboxSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final reservedAbove =
+        MessagesLayoutConstants.activeUsersBarHeight +
+        (MessagesLayoutConstants.inboxActionTileSkeletonHeight * 2);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: MessagesLayoutConstants.activeUsersBarHeight,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            reverse: isRtl,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(
+              horizontal: MessagesLayoutConstants.horizontalPadding,
+            ),
+            itemCount: 6,
+            separatorBuilder: (_, _) => const SizedBox(width: AppSizes.p12),
+            itemBuilder: (_, index) {
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SkeletonWidget.circular(
+                    size: MessagesLayoutConstants.activeAvatarRadius * 2,
+                  ),
+                  const SizedBox(height: AppSizes.p8),
+                  SkeletonWidget(
+                    height: 10,
+                    width: index == 0 ? 56 : 48,
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const _MessagesInboxActionTileSkeleton(),
+        const _MessagesInboxActionTileSkeleton(),
+        MessagesChatListSkeleton(reservedAbove: reservedAbove),
+      ],
+    );
+  }
+}
+
+class _MessagesInboxActionTileSkeleton extends StatelessWidget {
+  const _MessagesInboxActionTileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarSize = MessagesLayoutConstants.conversationAvatarRadius * 2;
+
+    return SizedBox(
+      height: MessagesLayoutConstants.inboxActionTileSkeletonHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: MessagesLayoutConstants.horizontalPadding,
+          vertical: 10,
+        ),
+        child: Row(
+          children: [
+            SkeletonWidget.circular(size: avatarSize),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonWidget(height: 16, width: 120),
+                  SizedBox(height: 6),
+                  SkeletonWidget(height: 12, width: 180),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -893,25 +1085,33 @@ class _MessagesChatTileSkeleton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
-                      const Expanded(
-                        child: SkeletonWidget(height: 16, width: 120),
+                      Expanded(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: SkeletonWidget(height: 16, width: 120),
+                        ),
                       ),
-                      const SizedBox(width: AppSizes.p8),
-                      const SkeletonWidget(height: 12, width: 36),
+                      SizedBox(width: AppSizes.p8),
+                      SkeletonWidget(height: 12, width: 36),
                     ],
                   ),
                   const SizedBox(height: AppSizes.p8),
-                  SkeletonWidget(
-                    height: 14,
-                    width: avatarSize + 80,
-                    borderRadius:
-                        MessagesLayoutConstants.conversationTileRadius,
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: SkeletonWidget(
+                      height: 14,
+                      width: avatarSize + 80,
+                      borderRadius:
+                          MessagesLayoutConstants.conversationTileRadius,
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: AppSizes.p8),
+            const SkeletonWidget.circular(size: 24),
           ],
         ),
       ),

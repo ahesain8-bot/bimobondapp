@@ -93,6 +93,10 @@ class _FeedTopImageButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSvg = assetPath.toLowerCase().endsWith('.svg');
+    final color = feedOverlay.overlayForeground;
+    final size = HomeLayoutConstants.liveIconSize;
+
     return IconButton(
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
@@ -102,15 +106,20 @@ class _FeedTopImageButton extends StatelessWidget {
         minHeight: 36,
       ),
       onPressed: onPressed,
-      icon: SvgPicture.asset(
-        assetPath,
-        width: HomeLayoutConstants.liveIconSize,
-        height: HomeLayoutConstants.liveIconSize,
-        colorFilter: ColorFilter.mode(
-          feedOverlay.overlayForeground,
-          BlendMode.srcIn,
-        ),
-      ),
+      icon: isSvg
+          ? SvgPicture.asset(
+              assetPath,
+              width: size,
+              height: size,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            )
+          : Image.asset(
+              assetPath,
+              width: size,
+              height: size,
+              color: color,
+              colorBlendMode: BlendMode.srcIn,
+            ),
     );
   }
 }

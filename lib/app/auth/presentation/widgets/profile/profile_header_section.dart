@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_stat_i
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -95,11 +96,9 @@ class ProfileHeaderSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSizes.p12),
-          CustomText(
-            user.bio ?? l10n.noBio,
-            fontSize: 14,
-            variant: TextVariant.secondary,
-            textAlign: TextAlign.center,
+          ProfileBioText(
+            bio: user.bio,
+            placeholder: l10n.noBio,
           ),
         ],
       ),

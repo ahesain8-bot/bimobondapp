@@ -6,16 +6,18 @@ import 'package:bimobondapp/app/categories/presentation/di/categories_injector.d
     as categories_di;
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_auction_fields.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_category_picker_sheet.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_chevron_icon.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_cover_preview.dart';
+import 'package:bimobondapp/app/home/presentation/pages/add_post_location_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_media_widgets.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_privacy_picker_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_publish_bar.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_section_card.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_setting_item.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_settings_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_tag_button.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -24,9 +26,8 @@ import 'package:bimobondapp/app/posts/presentation/widgets/hashtag_picker_sheet.
 import 'package:bimobondapp/app/social/presentation/widgets/mention_picker_sheet.dart';
 import 'package:bimobondapp/core/constants/add_post_layout_constants.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
@@ -66,7 +67,8 @@ class AddPostScreen extends StatefulWidget {
   State<AddPostScreen> createState() => _AddPostScreenState();
 }
 
-class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker {
+class _AddPostScreenState extends State<AddPostScreen>
+    with FeedPlaybackBlocker {
   static const int _maxFiles = 5;
 
   late List<File> _selectedFiles;
@@ -89,6 +91,7 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
   late DateTime _auctionStartDate;
   late DateTime _auctionEndDate;
   SoundEntity? _selectedSound;
+  AddPostLocationSelection? _selectedLocation;
 
   @override
   void initState() {
@@ -343,8 +346,48 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
         filterCategory: widget.initialFilterCategory,
         effectSlug: widget.initialEffectSlug,
         beautyEnabled: widget.initialBeautyEnabled ? true : null,
+        location: _buildLocationInput(),
       ),
     );
+  }
+
+  PostInlineLocationInput? _buildLocationInput() {
+    final selection = _selectedLocation;
+    if (selection == null) return null;
+    final city = selection.city;
+    final lat = city.latitude;
+    final lng = city.longitude;
+    if (lat == null || lng == null) {
+      return PostInlineLocationInput(
+        name: city.name,
+        latitude: 0,
+        longitude: 0,
+        city: city.name,
+        countryCode: selection.country.code,
+        placeId: city.id.toString(),
+      );
+    }
+    return PostInlineLocationInput(
+      name: city.name,
+      latitude: lat,
+      longitude: lng,
+      city: city.name,
+      countryCode: selection.country.code,
+      placeId: city.id.toString(),
+    );
+  }
+
+  Future<void> _showLocationPicker() async {
+    final picked = await AddPostLocationSearchScreen.open(
+      context,
+      initial: _selectedLocation,
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _selectedLocation = picked);
+  }
+
+  void _clearLocation() {
+    setState(() => _selectedLocation = null);
   }
 
   Future<void> _showSoundPicker() async {
@@ -421,243 +464,274 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
   }
 
   void _showPrivacyPicker() {
-    AddPostPrivacyPickerSheet.show(
+    if (widget.isStory) {
+      AddPostPrivacyPickerSheet.show(
+        context,
+        selectedStatus: _privacyStatus,
+        onSelected: (status) => setState(() => _privacyStatus = status),
+      );
+      return;
+    }
+    AddPostSettingsSheet.show(
       context,
-      selectedStatus: _privacyStatus,
-      onSelected: (status) => setState(() => _privacyStatus = status),
+      privacyStatus: _privacyStatus,
+      allowComments: _allowComments,
+      allowReuse: _allowDuets && _allowStitch,
+      onPrivacyChanged: (status) => setState(() => _privacyStatus = status),
+      onAllowCommentsChanged: (v) => setState(() => _allowComments = v),
+      onAllowReuseChanged: (v) => setState(() {
+        _allowDuets = v;
+        _allowStitch = v;
+      }),
     );
   }
 
-  Widget _composerCard(BuildContext context, AppLocalizations l10n) {
+  Widget _composerHeader(BuildContext context, AppLocalizations l10n) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final fieldFill = isDark
-        ? const Color(0xFF2A2A2D)
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
+    final coverFile = _selectedFiles.isEmpty ? null : _selectedFiles.first;
 
-    return AddPostSectionCard(
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSizes.p12),
-            decoration: BoxDecoration(
-              color: fieldFill,
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            ),
+          Expanded(
             child: MentionComposerField(
               controller: _descriptionController,
-              maxLines: widget.isStory ? 3 : 6,
+              maxLines: widget.isStory ? 4 : 7,
+              minLines: 4,
               decoration: InputDecoration(
                 hintText: widget.isStory
                     ? l10n.storyCaptionHint
-                    : l10n.describePostHint,
+                    : l10n.addDescriptionHint,
                 hintStyle: TextStyle(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.65,
-                  ),
-                  height: 1.45,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  fontSize: 15,
+                  height: 1.4,
                 ),
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
             ),
           ),
-          if (!widget.isStory) ...[
-            const SizedBox(height: AppSizes.p12),
-            Row(
-              children: [
-                AddPostTagButton(
-                  icon: LucideIcons.hash,
-                  label: l10n.hashtagsLabel,
-                  onTap: () => HashtagPickerSheet.show(
-                    context,
-                    controller: _descriptionController,
-                  ),
-                ),
-                const SizedBox(width: AppSizes.p10),
-                AddPostTagButton(
-                  icon: LucideIcons.atSign,
-                  label: l10n.mentionsLabel,
-                  onTap: () => MentionPickerSheet.show(
-                    context,
-                    controller: _descriptionController,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          const SizedBox(width: 12),
+          AddPostCoverPreview(
+            file: coverFile,
+            onAdd: widget.isStory ? _retakeStory : _showMediaPickerOptions,
+            onEdit: () {
+              if (widget.isStory) {
+                _retakeStory();
+              } else if (_selectedFiles.isNotEmpty) {
+                _editMediaAt(0);
+              } else {
+                _showMediaPickerOptions();
+              }
+            },
+          ),
         ],
       ),
     );
   }
 
-  Widget _mediaCard(AppLocalizations l10n) {
-    return AddPostSectionCard(
-      title: l10n.mediaLabel,
-      trailing: widget.isStory
-          ? null
-          : (_selectedFiles.isEmpty
-                ? null
-                : AddPostMediaCountChip(
-                    label: '${_selectedFiles.length}/$_maxFilesLimit',
-                  )),
-      child: AddPostMediaStrip(
-        files: _selectedFiles,
-        maxFiles: _maxFilesLimit,
-        allowAdd: !widget.isStory,
-        onAddTap: widget.isStory ? _retakeStory : _showMediaPickerOptions,
-        onRemoveAt: widget.isStory ? (_) => _retakeStory() : _removeFile,
-        onEditAt: widget.isStory ? null : _editMediaAt,
+  Widget _tagRow(BuildContext context, AppLocalizations l10n) {
+    if (widget.isStory) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          AddPostTagButton(
+            icon: LucideIcons.hash,
+            label: l10n.hashtagsLabel,
+            onTap: () => HashtagPickerSheet.show(
+              context,
+              controller: _descriptionController,
+            ),
+          ),
+          const SizedBox(width: 10),
+          AddPostTagButton(
+            icon: LucideIcons.atSign,
+            label: l10n.mentionsLabel,
+            onTap: () => MentionPickerSheet.show(
+              context,
+              controller: _descriptionController,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _settingsCard(BuildContext context, AppLocalizations l10n) {
+  Widget _locationChipBar(BuildContext context) {
+    final selection = _selectedLocation;
+    if (selection == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final fill = theme.brightness == Brightness.dark
+        ? const Color(0xFF2A2A2D)
+        : const Color(0xFFF1F1F2);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(52, 0, 16, 10),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Material(
+          color: fill,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            onTap: _showLocationPicker,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    selection.displayLabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: _clearLocation,
+                    child: Icon(
+                      LucideIcons.x,
+                      size: 14,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _optionsList(BuildContext context, AppLocalizations l10n) {
     final theme = Theme.of(context);
 
-    return AddPostSectionCard(
-      title: l10n.settingsSectionContent,
-      padding: const EdgeInsets.fromLTRB(
-        AppSizes.p16,
-        AppSizes.p16,
-        AppSizes.p16,
-        AppSizes.p8,
-      ),
-      child: Column(
-        children: [
-          AddPostSettingItem(
-            icon: LucideIcons.gavel,
-            title: l10n.addPostAsAuction,
-            iconColor: theme.colorScheme.secondary,
-            trailing: Switch.adaptive(
-              value: _isAuction,
-              activeTrackColor: theme.colorScheme.primary,
-              onChanged: (value) => setState(() => _isAuction = value),
-            ),
-          ),
-          AddPostSettingItem(
-            icon: LucideIcons.layoutGrid,
-            title: l10n.categoryLabel,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isLoadingCategories)
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.primary,
-                    ),
-                  )
-                else
-                  CustomText(
-                    _selectedCategory?.name ?? l10n.selectCategoryHint,
-                    variant: TextVariant.secondary,
-                    fontSize: 14,
-                  ),
-                const AddPostChevronIcon(),
-              ],
-            ),
-            onTap: _categories.isEmpty && !_isLoadingCategories
-                ? null
-                : _showCategoryPicker,
-          ),
-          AddPostSettingItem(
-            icon: LucideIcons.music,
-            title: l10n.soundLabel,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(
-                    _selectedSound?.name ?? l10n.soundNoneSelected,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                  ),
-                ),
-                if (_selectedSound != null)
-                  IconButton(
-                    onPressed: _openSoundDetail,
-                    icon: const Icon(LucideIcons.info, size: 18),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                const AddPostChevronIcon(),
-              ],
-            ),
-            onTap: _showSoundPicker,
-          ),
-          AddPostSettingItem(
-            icon: LucideIcons.lock,
-            title: l10n.whoCanWatchLabel,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomText(
-                  localizedAddPostPrivacyStatus(_privacyStatus, l10n),
+    if (widget.isStory) {
+      return AddPostSettingItem(
+        icon: LucideIcons.lock,
+        title: localizedAddPostPrivacyRowLabel(_privacyStatus, l10n),
+        onTap: _showPrivacyPicker,
+        showDivider: false,
+      );
+    }
+
+    return Column(
+      children: [
+        AddPostSettingItem(
+          icon: LucideIcons.mapPin,
+          title: l10n.locationLabelShort,
+          onTap: _showLocationPicker,
+          below: _locationChipBar(context),
+        ),
+        AddPostSettingItem(
+          icon: privacyIconForStatus(_privacyStatus),
+          title: localizedAddPostPrivacyRowLabel(_privacyStatus, l10n),
+          onTap: _showPrivacyPicker,
+        ),
+        AddPostSettingItem(
+          icon: LucideIcons.layoutGrid,
+          title: l10n.categoryLabel,
+          trailing: _isLoadingCategories
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : CustomText(
+                  _selectedCategory?.name ?? l10n.selectCategoryHint,
                   variant: TextVariant.secondary,
                   fontSize: 14,
                 ),
-                const AddPostChevronIcon(),
+          onTap: _showCategoryPicker,
+        ),
+        AddPostSettingItem(
+          icon: LucideIcons.music,
+          title: l10n.soundLabel,
+          trailing: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _selectedSound?.name ?? l10n.soundNoneSelected,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.55,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_selectedSound != null) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: _openSoundDetail,
+                    child: Icon(
+                      LucideIcons.info,
+                      size: 16,
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.45,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
-            onTap: _showPrivacyPicker,
           ),
-          AddPostSettingItem(
-            icon: LucideIcons.mapPin,
-            title: l10n.addLocationLabel,
-            trailing: const AddPostChevronIcon(),
-            onTap: () {},
-            showDivider: false,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _storyPrivacyCard(AppLocalizations l10n) {
-    return AddPostSectionCard(
-      child: AddPostSettingItem(
-        icon: LucideIcons.lock,
-        title: l10n.whoCanWatchLabel,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CustomText(
-              localizedAddPostPrivacyStatus(_privacyStatus, l10n),
-              variant: TextVariant.secondary,
-              fontSize: 14,
-            ),
-            const AddPostChevronIcon(),
-          ],
+          onTap: _showSoundPicker,
         ),
-        onTap: _showPrivacyPicker,
-        showDivider: false,
-      ),
+        AddPostSettingItem(
+          icon: LucideIcons.gavel,
+          title: l10n.addPostAsAuction,
+          showChevron: false,
+          showDivider: false,
+          trailing: Switch.adaptive(
+            value: _isAuction,
+            activeTrackColor: theme.colorScheme.primary,
+            onChanged: (value) => setState(() => _isAuction = value),
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: CustomAppBar(
-        title: widget.isStory ? l10n.addStoryTitle : l10n.addPost,
-        showBackButton: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+        ),
+        title: widget.isStory
+            ? Text(
+                l10n.addStoryTitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            : null,
+        centerTitle: true,
       ),
       body: BlocConsumer<PostsBloc, PostsState>(
         listener: (context, state) {
@@ -677,27 +751,41 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
               Expanded(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSizes.p16,
-                    AppSizes.p12,
-                    AppSizes.p16,
-                    AppSizes.p24,
-                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _composerCard(context, l10n),
-                      const SizedBox(height: AppSizes.p12),
-                      _mediaCard(l10n),
-                      if (!widget.isStory) ...[
+                      _composerHeader(context, l10n),
+                      _tagRow(context, l10n),
+                      if (!widget.isStory && _selectedFiles.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: AddPostMediaStrip(
+                            files: _selectedFiles,
+                            maxFiles: _maxFilesLimit,
+                            allowAdd: true,
+                            onAddTap: _showMediaPickerOptions,
+                            onRemoveAt: _removeFile,
+                            onEditAt: _editMediaAt,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Divider(
+                        height: 1,
+                        color: theme.dividerColor.withValues(alpha: 0.3),
+                      ),
+                      _optionsList(context, l10n),
+                      if (!widget.isStory)
                         AnimatedSize(
                           duration: const Duration(milliseconds: 280),
                           curve: Curves.easeOutCubic,
                           alignment: Alignment.topCenter,
                           child: _isAuction
                               ? Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: AppSizes.p12,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    8,
+                                    16,
+                                    16,
                                   ),
                                   child: AddPostAuctionFields(
                                     itemNameController:
@@ -716,12 +804,7 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
                                 )
                               : const SizedBox.shrink(),
                         ),
-                        const SizedBox(height: AppSizes.p12),
-                        _settingsCard(context, l10n),
-                      ] else ...[
-                        const SizedBox(height: AppSizes.p12),
-                        _storyPrivacyCard(l10n),
-                      ],
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -730,6 +813,12 @@ class _AddPostScreenState extends State<AddPostScreen> with FeedPlaybackBlocker 
                 label: widget.isStory ? l10n.shareStoryButton : l10n.postButton,
                 onPressed: _onCreatePost,
                 isLoading: state is PostsLoading,
+                showDrafts: !widget.isStory,
+                onDraftsPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.addPostDraftsComingSoon)),
+                  );
+                },
               ),
             ],
           );

@@ -19,8 +19,16 @@ class AuthGlassStyle {
   Color get fieldDivider =>
       _isDark ? const Color(0x33FFFFFF) : const Color(0x1A000000);
 
+  /// TikTok-style input underline (idle).
+  Color get underlineColor =>
+      _isDark ? const Color(0x40FFFFFF) : const Color(0xFFD0D0D0);
+
+  /// TikTok-style input underline (focused).
+  Color get underlineFocusedColor =>
+      _isDark ? Colors.white : const Color(0xFF161823);
+
   Color get hintColor =>
-      _isDark ? const Color(0x73FFFFFF) : const Color(0x73000000);
+      _isDark ? const Color(0x73FFFFFF) : const Color(0xFFA8A8A8);
 
   Color get iconColor =>
       _isDark ? const Color(0xB3FFFFFF) : const Color(0xB3000000);
@@ -35,18 +43,27 @@ class AuthGlassStyle {
 TextStyle authFieldTextStyle(AuthGlassStyle style) {
   return TextStyle(
     color: style.textColor,
-    fontSize: AppSizes.authControlFontSize,
-    fontWeight: FontWeight.w500,
-    height: 1.0,
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    height: 1.25,
   );
 }
 
 TextStyle authFieldHintStyle(AuthGlassStyle style) {
   return TextStyle(
     color: style.hintColor,
-    fontSize: AppSizes.authControlFontSize,
+    fontSize: 16,
     fontWeight: FontWeight.w400,
-    height: 1.0,
+    height: 1.25,
+  );
+}
+
+UnderlineInputBorder _authUnderline(
+  Color color, {
+  double width = 0.8,
+}) {
+  return UnderlineInputBorder(
+    borderSide: BorderSide(color: color, width: width),
   );
 }
 
@@ -57,7 +74,41 @@ InputDecoration authFieldDecoration({
   Widget? suffixIcon,
   EdgeInsetsGeometry? contentPadding,
   BoxConstraints? suffixIconConstraints,
+  bool hasError = false,
+  bool showUnderline = true,
 }) {
+  if (!showUnderline) {
+    return InputDecoration(
+      prefixIcon: prefixIcon != null
+          ? Icon(prefixIcon, color: style.iconColor, size: 20)
+          : null,
+      suffixIcon: suffixIcon,
+      suffixIconConstraints: suffixIconConstraints,
+      hintText: hintText,
+      hintStyle: authFieldHintStyle(style),
+      filled: false,
+      isDense: true,
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      errorBorder: InputBorder.none,
+      focusedErrorBorder: InputBorder.none,
+      disabledBorder: InputBorder.none,
+      contentPadding: contentPadding ??
+          const EdgeInsets.symmetric(
+            horizontal: 0,
+            vertical: 14,
+          ),
+    );
+  }
+
+  final idle = hasError
+      ? _authUnderline(AppTheme.errorAccent, width: 1.2)
+      : _authUnderline(style.underlineColor);
+  final focused = hasError
+      ? _authUnderline(AppTheme.errorAccent, width: 1.4)
+      : _authUnderline(style.underlineFocusedColor, width: 1.2);
+
   return InputDecoration(
     prefixIcon: prefixIcon != null
         ? Icon(prefixIcon, color: style.iconColor, size: 20)
@@ -66,18 +117,23 @@ InputDecoration authFieldDecoration({
     suffixIconConstraints: suffixIconConstraints,
     hintText: hintText,
     hintStyle: authFieldHintStyle(style),
-    border: InputBorder.none,
-    enabledBorder: InputBorder.none,
-    focusedBorder: InputBorder.none,
-    isCollapsed: true,
+    filled: false,
+    isDense: true,
+    border: idle,
+    enabledBorder: idle,
+    focusedBorder: focused,
+    errorBorder: _authUnderline(AppTheme.errorAccent, width: 1.2),
+    focusedErrorBorder: _authUnderline(AppTheme.errorAccent, width: 1.4),
+    disabledBorder: idle,
     contentPadding: contentPadding ??
         const EdgeInsets.symmetric(
-          horizontal: AppSizes.p16,
-          vertical: AppSizes.p12,
+          horizontal: 0,
+          vertical: 14,
         ),
   );
 }
 
+/// Thin underline container for composite auth fields (e.g. phone + country).
 class AuthFieldContainer extends StatelessWidget {
   const AuthFieldContainer({
     required this.hasError,
@@ -94,15 +150,14 @@ class AuthFieldContainer extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      height: AppSizes.authControlHeight,
+      constraints: const BoxConstraints(minHeight: 48),
       decoration: BoxDecoration(
-        color: style.fieldFill,
-        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-        border: hasError
-            ? Border.all(
-                color: AppTheme.errorAccent.withValues(alpha: 0.55),
-              )
-            : null,
+        border: Border(
+          bottom: BorderSide(
+            color: hasError ? AppTheme.errorAccent : style.underlineColor,
+            width: hasError ? 1.2 : 0.8,
+          ),
+        ),
       ),
       child: child,
     );
@@ -137,35 +192,26 @@ class LiquidGlassAuthTextField extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            AuthFieldContainer(
-              hasError: field.hasError,
-              child: TextField(
-                controller: controller,
-                keyboardType: keyboardType,
-                textAlignVertical: TextAlignVertical.center,
-                onChanged: (value) {
-                  field.didChange(value);
-                  if (field.hasError) field.validate();
-                },
-                style: authFieldTextStyle(style),
-                cursorColor: AppTheme.primaryColor,
-                decoration: authFieldDecoration(
-                  style: style,
-                  hintText: hintText,
-                  prefixIcon: icon,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: icon != null ? AppSizes.p12 : AppSizes.p16,
-                    vertical: AppSizes.p12,
-                  ),
-                ),
+            TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              textAlignVertical: TextAlignVertical.center,
+              onChanged: (value) {
+                field.didChange(value);
+                if (field.hasError) field.validate();
+              },
+              style: authFieldTextStyle(style),
+              cursorColor: AppTheme.primaryColor,
+              decoration: authFieldDecoration(
+                style: style,
+                hintText: hintText,
+                prefixIcon: icon,
+                hasError: field.hasError,
               ),
             ),
             if (field.hasError && field.errorText != null)
               Padding(
-                padding: const EdgeInsets.only(
-                  top: AppSizes.p6,
-                  left: AppSizes.p4,
-                ),
+                padding: const EdgeInsets.only(top: AppSizes.p6),
                 child: Text(
                   field.errorText!,
                   style: const TextStyle(
@@ -217,51 +263,46 @@ class _LiquidGlassAuthPasswordFieldState
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            AuthFieldContainer(
-              hasError: field.hasError,
-              child: TextField(
-                controller: widget.controller,
-                obscureText: _obscurePassword,
-                maxLength: widget.maxLength,
-                textAlignVertical: TextAlignVertical.center,
-                onChanged: (value) {
-                  field.didChange(value);
-                  if (field.hasError) field.validate();
-                },
-                style: authFieldTextStyle(style),
-                cursorColor: AppTheme.primaryColor,
-                decoration: authFieldDecoration(
-                  style: style,
-                  hintText: widget.hintText,
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    icon: Icon(
-                      _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
-                      color: style.iconColor,
-                      size: 20,
-                    ),
+            TextField(
+              controller: widget.controller,
+              obscureText: _obscurePassword,
+              maxLength: widget.maxLength,
+              textAlignVertical: TextAlignVertical.center,
+              onChanged: (value) {
+                field.didChange(value);
+                if (field.hasError) field.validate();
+              },
+              style: authFieldTextStyle(style),
+              cursorColor: AppTheme.primaryColor,
+              decoration: authFieldDecoration(
+                style: style,
+                hintText: widget.hintText,
+                hasError: field.hasError,
+                suffixIcon: IconButton(
+                  onPressed: () {
+                    setState(() => _obscurePassword = !_obscurePassword);
+                  },
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
                   ),
-                  suffixIconConstraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: AppSizes.authControlHeight,
+                  icon: Icon(
+                    _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
+                    color: style.iconColor,
+                    size: 20,
                   ),
-                ).copyWith(counterText: ''),
-              ),
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 40,
+                  minHeight: 40,
+                ),
+              ).copyWith(counterText: ''),
             ),
             if (field.hasError && field.errorText != null)
               Padding(
-                padding: const EdgeInsets.only(
-                  top: AppSizes.p6,
-                  left: AppSizes.p4,
-                ),
+                padding: const EdgeInsets.only(top: AppSizes.p6),
                 child: Text(
                   field.errorText!,
                   style: const TextStyle(

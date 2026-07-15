@@ -26,6 +26,7 @@ class ChatMessageItem extends StatelessWidget {
     required this.onLongPress,
     required this.onSwipeReply,
     required this.isRtl,
+    this.onPollVote,
     super.key,
   });
 
@@ -43,6 +44,7 @@ class ChatMessageItem extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback onSwipeReply;
   final bool isRtl;
+  final void Function(String messageId, int optionIndex)? onPollVote;
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +76,8 @@ class ChatMessageItem extends StatelessWidget {
             messageText: messageText,
             replyText: replyText,
             maxWidth: maxBubbleWidth,
+            currentUserId: currentUserId,
+            onPollVote: onPollVote,
           ),
           if (reactions.isNotEmpty)
             Positioned(
@@ -280,6 +284,8 @@ class ChatMessageBubble extends StatelessWidget {
     required this.messageText,
     required this.replyText,
     required this.maxWidth,
+    this.currentUserId,
+    this.onPollVote,
   });
 
   final Map<String, dynamic> msg;
@@ -288,6 +294,8 @@ class ChatMessageBubble extends StatelessWidget {
   final String messageText;
   final String? replyText;
   final double maxWidth;
+  final String? currentUserId;
+  final void Function(String messageId, int optionIndex)? onPollVote;
 
   @override
   Widget build(BuildContext context) {
@@ -314,12 +322,13 @@ class ChatMessageBubble extends StatelessWidget {
       ),
     );
 
-    final padding = type == 'text'
-        ? const EdgeInsets.symmetric(
+    final denseType = type == 'image' || type == 'video' || type == 'voice';
+    final padding = denseType
+        ? EdgeInsets.zero
+        : const EdgeInsets.symmetric(
             horizontal: ChatLayoutConstants.bubbleHorizontalPadding,
             vertical: ChatLayoutConstants.bubbleVerticalPadding,
-          )
-        : EdgeInsets.zero;
+          );
 
     final sharedPostId = msg['sharedPostId']?.toString();
     final sharedStory = msg['sharedStory'];
@@ -339,6 +348,8 @@ class ChatMessageBubble extends StatelessWidget {
           msg: msg,
           messageText: messageText,
           isMe: isMe,
+          currentUserId: currentUserId,
+          onPollVote: onPollVote,
         ),
       ],
     );
@@ -437,11 +448,15 @@ class ChatMessageContent extends StatelessWidget {
     required this.msg,
     required this.messageText,
     required this.isMe,
+    this.currentUserId,
+    this.onPollVote,
   });
 
   final Map<String, dynamic> msg;
   final String messageText;
   final bool isMe;
+  final String? currentUserId;
+  final void Function(String messageId, int optionIndex)? onPollVote;
 
   @override
   Widget build(BuildContext context) {
@@ -489,7 +504,12 @@ class ChatMessageContent extends StatelessWidget {
         }
         return ChatVideoMessageWidget(videoUrl: videoUrl);
       case 'location':
-        final location = ChatLocationPayload.tryParse(msg['text']?.toString()) ??
+        final location = ChatLocationPayload.tryParse(
+              msg['text']?.toString(),
+              msg['payload'] is Map
+                  ? Map<String, dynamic>.from(msg['payload'] as Map)
+                  : null,
+            ) ??
             _locationFromUiMap(msg);
         if (location == null) return const SizedBox.shrink();
         return ChatLocationMessageWidget(payload: location, isMe: isMe);
@@ -499,13 +519,49 @@ class ChatMessageContent extends StatelessWidget {
               msg['text']?.toString() ??
               '',
           fileUrl: msg['fileUrl']?.toString() ?? msg['mediaUrl']?.toString(),
+          sizeLabel: msg['fileSizeLabel']?.toString(),
           isMe: isMe,
         );
       case 'contact':
-        final contact = ChatContactPayload.tryParse(msg['text']?.toString()) ??
+        final contact = ChatContactPayload.tryParse(
+              msg['text']?.toString(),
+              msg['payload'] is Map
+                  ? Map<String, dynamic>.from(msg['payload'] as Map)
+                  : null,
+            ) ??
             _contactFromUiMap(msg);
         if (contact == null) return const SizedBox.shrink();
         return ChatContactMessageWidget(payload: contact, isMe: isMe);
+      case 'gift':
+        return ChatGiftMessageWidget(
+          isMe: isMe,
+          giftName: msg['giftName']?.toString() ?? msg['text']?.toString(),
+          thumbnailUrl: msg['giftThumbnailUrl']?.toString() ??
+              msg['giftAnimationUrl']?.toString(),
+          quantity: msg['giftQuantity'] is num
+              ? (msg['giftQuantity'] as num).toInt()
+              : 1,
+        );
+      case 'poll':
+        final poll = msg['poll'];
+        if (poll is! Map) return const SizedBox.shrink();
+        return ChatPollMessageWidget(
+          messageId: msg['id']?.toString() ?? '',
+          poll: Map<String, dynamic>.from(poll),
+          isMe: isMe,
+          currentUserId: currentUserId,
+          onVote: onPollVote,
+        );
+      case 'share':
+        return Text(
+          messageText.isNotEmpty ? messageText : 'Shared a post',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isMe
+                ? chatTheme.onSentBubble
+                : chatTheme.onReceivedBubble,
+            fontSize: ChatLayoutConstants.messageFontSize,
+          ),
+        );
       case 'voice':
         return ChatVoiceMessageWidget(
           messageId: msg['id']?.toString() ?? '',
@@ -525,15 +581,21 @@ class ChatMessageContent extends StatelessWidget {
     return ChatLocationPayload(
       latitude: lat.toDouble(),
       longitude: lng.toDouble(),
-      label: msg['locationLabel']?.toString(),
+      name: msg['locationName']?.toString() ?? msg['locationLabel']?.toString(),
+      address: msg['locationAddress']?.toString(),
     );
   }
 
   ChatContactPayload? _contactFromUiMap(Map<String, dynamic> msg) {
     final name = msg['contactName']?.toString();
-    final phone = msg['contactPhone']?.toString();
-    if (name == null || phone == null) return null;
-    return ChatContactPayload(name: name, phone: phone);
+    if (name == null || name.isEmpty) return null;
+    return ChatContactPayload(
+      name: name,
+      phone: msg['contactPhone']?.toString() ?? '',
+      email: msg['contactEmail']?.toString(),
+      userId: msg['contactUserId']?.toString(),
+      avatarUrl: msg['contactAvatarUrl']?.toString(),
+    );
   }
 }
 

@@ -50,10 +50,10 @@ class CompactHighestBid extends StatelessWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.all(AppSizes.p6),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 boxShadow: [
                   BoxShadow(
@@ -69,8 +69,8 @@ class CompactHighestBid extends StatelessWidget {
                   // Main Bid Segment
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.p16,
-                      vertical: AppSizes.p10,
+                      horizontal: AppSizes.p10,
+                      vertical: AppSizes.p8,
                     ),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -81,7 +81,7 @@ class CompactHighestBid extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
                           color: darkAccent.withValues(alpha: 0.4),
@@ -100,9 +100,9 @@ class CompactHighestBid extends StatelessWidget {
                                   ? LucideIcons.gift
                                   : LucideIcons.gavel,
                           color: Colors.white,
-                          size: 20,
+                          size: 16,
                         ),
-                        const SizedBox(width: AppSizes.p10),
+                        const SizedBox(width: AppSizes.p6),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -111,30 +111,30 @@ class CompactHighestBid extends StatelessWidget {
                               topBidLabel.toUpperCase(),
                               style: const TextStyle(
                                 color: Colors.white70,
-                                fontSize: 9,
+                                fontSize: 8,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
+                                letterSpacing: 0.4,
                               ),
                             ),
                             showCoinIcon
                                 ? AppCoinAmount(
-                                    iconSize: 14,
-                                    spacing: 4,
+                                    iconSize: 12,
+                                    spacing: 3,
                                     text: bidAmountText,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
+                                      letterSpacing: 0.3,
                                     ),
                                   )
                                 : Text(
                                     bidAmountText,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
+                                      letterSpacing: 0.3,
                                     ),
                                   ),
                           ],
@@ -142,19 +142,21 @@ class CompactHighestBid extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                   // Target Price Segment
                   if (targetPriceLabel != null) ...[
-                    const SizedBox(width: AppSizes.p8),
+                    const SizedBox(width: AppSizes.p4),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.p12,
-                        vertical: AppSizes.p10,
+                        horizontal: AppSizes.p8,
+                        vertical: AppSizes.p8,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,22 +166,22 @@ class CompactHighestBid extends StatelessWidget {
                             'TARGET',
                             style: TextStyle(
                               color: isFinished ? accentColor : Colors.white54,
-                              fontSize: 9,
+                              fontSize: 8,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.4,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 1),
                           showCoinIcon
                               ? AppCoinAmount(
-                                  iconSize: 11,
-                                  spacing: 3,
+                                  iconSize: 10,
+                                  spacing: 2,
                                   text: targetPriceLabel!,
                                   style: TextStyle(
                                     color: isFinished
                                         ? Colors.white
                                         : Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: isFinished
                                         ? FontWeight.w800
                                         : FontWeight.w600,
@@ -191,7 +193,7 @@ class CompactHighestBid extends StatelessWidget {
                                     color: isFinished
                                         ? Colors.white
                                         : Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: isFinished
                                         ? FontWeight.w800
                                         : FontWeight.w600,

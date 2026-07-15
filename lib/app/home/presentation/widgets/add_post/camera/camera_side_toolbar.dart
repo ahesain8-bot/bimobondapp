@@ -40,7 +40,7 @@ class _SideToolItem {
   final String? badge;
 }
 
-/// TikTok-style side rail (physical left in RTL, physical right in LTR).
+/// TikTok-style side rail (left in RTL, right in LTR).
 class CameraSideToolbar extends StatefulWidget {
   const CameraSideToolbar({
     super.key,

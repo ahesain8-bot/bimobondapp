@@ -668,6 +668,54 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postsSearchHint => 'ابحث في المنشورات...';
 
   @override
+  String get searchAction => 'بحث';
+
+  @override
+  String get searchHistorySeeMore => 'عرض المزيد';
+
+  @override
+  String get searchHistorySeeLess => 'عرض أقل';
+
+  @override
+  String get searchHistoryClear => 'مسح';
+
+  @override
+  String get searchHistoryEmpty => 'لا توجد عمليات بحث حديثة';
+
+  @override
+  String get searchSeeAll => 'عرض الكل';
+
+  @override
+  String get searchSeeLess => 'عرض أقل';
+
+  @override
+  String get searchYouMayLike => 'قد يعجبك';
+
+  @override
+  String get searchNoResults => 'لا توجد منشورات';
+
+  @override
+  String get searchTabTop => 'الأعلى';
+
+  @override
+  String get searchTabUsers => 'المستخدمون';
+
+  @override
+  String get searchTabVideos => 'الفيديوهات';
+
+  @override
+  String get searchTabLive => 'مباشر';
+
+  @override
+  String get searchTabSounds => 'الأصوات';
+
+  @override
+  String get searchTabPlaces => 'الأماكن';
+
+  @override
+  String get searchComingSoon => 'قريبًا';
+
+  @override
   String get auctionsFiltersTitle => 'تصفية';
 
   @override
@@ -1028,6 +1076,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get describePostHint => 'صف منشورك… استخدم @اسم_المستخدم و #وسم في النص';
 
   @override
+  String get addDescriptionHint => 'أضف وصفًا...';
+
+  @override
   String get hashtagsLabel => 'هاشتاجات';
 
   @override
@@ -1040,6 +1091,51 @@ class AppLocalizationsAr extends AppLocalizations {
   String get allowCommentsLabel => 'السماح بالتعليقات';
 
   @override
+  String get allowReuseLabel => 'السماح بإعادة استخدام المحتوى';
+
+  @override
+  String get allowReuseSubtitle => 'Duet و Stitch والملصقات والإضافة إلى القصة';
+
+  @override
+  String get videoPrivacySection => 'خصوصية الفيديو';
+
+  @override
+  String get advancedSettings => 'إعدادات متقدمة';
+
+  @override
+  String get addPostSettingsTitle => 'الإعدادات';
+
+  @override
+  String get everyoneCanViewPost => 'يمكن للجميع مشاهدة هذا المنشور';
+
+  @override
+  String get friendsCanViewPost => 'يمكن للأصدقاء مشاهدة هذا المنشور';
+
+  @override
+  String get onlyYouCanViewPost => 'يمكنك أنت فقط مشاهدة هذا المنشور';
+
+  @override
+  String get friendsPrivacySubtitle => 'المتابعون الذين تتابعهم';
+
+  @override
+  String get draftsLabel => 'المسودات';
+
+  @override
+  String get moreOptionsLabel => 'المزيد من الخيارات';
+
+  @override
+  String get previewLabel => 'معاينة';
+
+  @override
+  String get editCoverLabel => 'تعديل الغلاف';
+
+  @override
+  String get locationLabelShort => 'الموقع';
+
+  @override
+  String get addPostDraftsComingSoon => 'المسودات قريبًا';
+
+  @override
   String get allowDuetLabel => 'السماح بـ Duet';
 
   @override
@@ -1047,6 +1143,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addLocationLabel => 'إضافة موقع';
+
+  @override
+  String get selectCity => 'اختر المدينة';
+
+  @override
+  String get selectCityHint => 'ابحث عن المدن';
+
+  @override
+  String get selectCountryHint => 'ابحث عن الدول';
+
+  @override
+  String get locationSearchHint => 'ابحث عن الدول أو المدن';
+
+  @override
+  String get clearLocation => 'مسح الموقع';
 
   @override
   String get everyoneLabel => 'الجميع';
@@ -1439,6 +1550,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesInboxTitle => 'البريد الوارد';
 
   @override
+  String get messagesNewChatTitle => 'محادثة جديدة';
+
+  @override
+  String get messagesNewChatSearchHint => 'بحث';
+
+  @override
+  String get closeAction => 'إغلاق';
+
+  @override
+  String get chatSendMessageHint => 'أرسل رسالة...';
+
+  @override
+  String get chatActiveYesterday => 'نشط أمس';
+
+  @override
   String get messagesSwitchAccount => 'تغيير الحساب';
 
   @override
@@ -1472,6 +1598,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesActivityActivities => 'أنشطة';
 
   @override
+  String get messagesActivityTitle => 'النشاط';
+
+  @override
+  String get messagesNewFollowers => 'متابعون جدد';
+
+  @override
   String get messagesActivityComments => 'تعليقات';
 
   @override
@@ -1479,6 +1611,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get messagesActivityNotifications => 'إشعارات';
+
+  @override
+  String get activityTabLikes => 'إعجابات';
+
+  @override
+  String get activityAllCaughtUp => 'أنت على اطلاع بكل شيء';
+
+  @override
+  String get activityClearNotificationsMessage => 'هل تريد إزالة جميع الإشعارات المقروءة من نشاطك؟';
+
+  @override
+  String get activityOpenCommentsSubtitle => 'عرض التعليقات على منشوراتك';
+
+  @override
+  String get activityInboxSubtitle => 'إعجابات وتعليقات والمزيد';
 
   @override
   String get messagesRecentMessages => 'الرسائل الأخيرة';
@@ -1729,6 +1876,68 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chatMorePoll => 'تصويت';
+
+  @override
+  String get chatGiftSheetTitle => 'أرسل هدية';
+
+  @override
+  String get chatGiftSheetSubtitle => 'اختر هدية من مخزونك';
+
+  @override
+  String get chatGiftInventoryEmpty => 'لا تملك أي هدايا بعد. اشترِ هدايا من المحفظة أولاً.';
+
+  @override
+  String get chatGiftSentLabel => 'تم إرسال الهدية';
+
+  @override
+  String get chatMessageContact => 'جهة اتصال';
+
+  @override
+  String get chatPollSheetTitle => 'إنشاء تصويت';
+
+  @override
+  String get chatPollQuestionHint => 'اطرح سؤالاً';
+
+  @override
+  String get chatPollOptionsLabel => 'الخيارات';
+
+  @override
+  String chatPollOptionHint(int index) {
+    return 'خيار $index';
+  }
+
+  @override
+  String get chatPollAddOption => 'إضافة خيار';
+
+  @override
+  String get chatPollAllowMultiple => 'السماح باختيارات متعددة';
+
+  @override
+  String get chatPollSend => 'إرسال التصويت';
+
+  @override
+  String get chatPollQuestionRequired => 'أدخل سؤالاً للتصويت.';
+
+  @override
+  String get chatPollOptionsRequired => 'أضف خيارين على الأقل.';
+
+  @override
+  String get chatPollEnded => 'انتهى التصويت';
+
+  @override
+  String chatPollVotesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count أصوات',
+      one: 'صوت واحد',
+      zero: 'لا أصوات بعد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messagesInboxLastPoll => 'تصويت';
 
   @override
   String get chatLastMessage1 => 'هل يمكنني معرفة السعر النهائي؟';
@@ -2560,6 +2769,60 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraEffectGlitch => 'تشويش';
 
   @override
+  String get cameraEffectGlasses => 'نظارات';
+
+  @override
+  String get cameraEffectMoustache => 'شارب';
+
+  @override
+  String get cameraEffectBigEyes => 'عيون كبيرة';
+
+  @override
+  String get cameraEffectBigLips => 'شفاه كبيرة';
+
+  @override
+  String get cameraEffectNose => 'أنف';
+
+  @override
+  String get cameraFilterPure => 'نقي';
+
+  @override
+  String get cameraFilterBright => 'ساطع';
+
+  @override
+  String get cameraFilterClean => 'نظيف';
+
+  @override
+  String get cameraFilterSoft => 'ناعم';
+
+  @override
+  String get cameraFilterSunset => 'غروب';
+
+  @override
+  String get cameraCategoryLife => 'حياة';
+
+  @override
+  String get mediaEditorShare => 'مشاركة';
+
+  @override
+  String get mediaEditorText => 'نص';
+
+  @override
+  String get mediaEditorStickers => 'ملصقات';
+
+  @override
+  String get mediaEditorCrop => 'قص';
+
+  @override
+  String get mediaEditorEdit => 'تحرير';
+
+  @override
+  String get mediaEditorMore => 'المزيد';
+
+  @override
+  String get mediaEditorComingSoon => 'قريباً';
+
+  @override
   String get promotePostTitle => 'ترويج المنشور';
 
   @override
@@ -3002,6 +3265,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String interestSelectionMinHint(int count) {
     return 'اختر $count اهتمامات على الأقل';
   }
+
+  @override
+  String interestSelectionCountHint(int selected, int min) {
+    return '$selected/$min مهتم';
+  }
+
+  @override
+  String get interestSelectionNotInterestedHint => 'اضغط مرة أخرى لتحديد غير مهتم (اختياري).';
+
+  @override
+  String get interestSelectionNotInterestedLegend => 'غير مهتم';
+
+  @override
+  String get interestSelectionInterestedLegend => 'مهتم';
+
+  @override
+  String get interestSelectionSave => 'حفظ';
+
+  @override
+  String get settingsInterests => 'الاهتمامات';
 
   @override
   String get retry => 'حاول مرة أخرى';

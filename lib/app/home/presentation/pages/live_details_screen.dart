@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
@@ -33,6 +34,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sh
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_parts.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/compact_highest_bid.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/live_details/gift_animation_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_bidding_input.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_chat_message.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_details_header.dart';
@@ -89,6 +91,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   StreamSubscription<bool>? _socketConnectionSub;
   String? _joinedAuctionId;
   String? _joinedPostId;
+  String? _lastGiftPlayedKey;
+  DateTime? _lastGiftPlayedAt;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -187,7 +191,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     unawaited(_startAuctionRealtime());
   }
 
-  String? get _auctionId => widget.post?.auction?.id ?? widget.post?.id;
+  String? get _auctionId => _auctionRoomId;
 
   bool get _isAuctionPost => widget.post != null && widget.post!.isAuctionable;
 
@@ -196,13 +200,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (post == null || post.id.isEmpty) return;
 
     _auctionSocket = auctions_di.sl<AuctionSocketService>();
-    await _auctionSocket!.connect();
 
     await _auctionUpdatedSub?.cancel();
     await _newCommentSub?.cancel();
     await _socketConnectionSub?.cancel();
 
-    // Post room: newComment events (comment list).
+    // Post room: newComment events (comment list + gift comments).
     _newCommentSub = _auctionSocket!.onNewComment.listen(_onRealtimeComment);
     // Auction room: auctionUpdated with lastComment / lastGift / totals.
     _auctionUpdatedSub =
@@ -210,26 +213,33 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     _socketConnectionSub =
         _auctionSocket!.onConnectionChanged.listen((connected) {
       if (connected && mounted) {
-        _joinAuctionRooms();
+        unawaited(_ensureAuctionRoomsJoined());
       }
     });
 
-    _joinAuctionRooms();
+    await _ensureAuctionRoomsJoined();
   }
 
-  void _joinAuctionRooms() {
+  Future<void> _ensureAuctionRoomsJoined() async {
     final post = widget.post;
     final socket = _auctionSocket;
     if (post == null || socket == null || post.id.isEmpty) return;
 
-    socket.joinPost(post.id);
+    final auctionId = _auctionRoomId;
+    await socket.ensureJoined(
+      postId: post.id,
+      auctionId: auctionId,
+    );
     _joinedPostId = post.id;
+    _joinedAuctionId = auctionId;
+  }
 
-    final auctionId = _auctionId;
-    if (_isAuctionPost && auctionId != null && auctionId.isNotEmpty) {
-      socket.joinAuction(auctionId);
-      _joinedAuctionId = auctionId;
-    }
+  /// Real auction UUID when present; otherwise post id as backend fallback.
+  String? get _auctionRoomId {
+    final fromAuction = widget.post?.auction?.id?.trim();
+    if (fromAuction != null && fromAuction.isNotEmpty) return fromAuction;
+    if (_isAuctionPost) return widget.post?.id;
+    return null;
   }
 
   void _stopAuctionRealtime() {
@@ -263,7 +273,62 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     if (comment.isGift) {
       _bidPopController.forward(from: 0);
+      _playGiftAnimation(
+        animationUrl: comment.giftAnimationUrl,
+        thumbnailUrl: comment.giftThumbnailUrl ?? comment.giftIcon,
+        senderName: _displaySenderName(
+          fullName: comment.user.fullName,
+          username: comment.user.username,
+        ),
+        giftName: comment.giftName,
+      );
     }
+  }
+
+  void _playGiftAnimation({
+    String? animationUrl,
+    String? thumbnailUrl,
+    String? senderName,
+    String? giftName,
+  }) {
+    final url = animationUrl?.trim();
+    if (url == null || url.isEmpty || !mounted) return;
+
+    final dedupeKey = '${giftName ?? ''}|${senderName ?? ''}';
+    final now = DateTime.now();
+    final lastAt = _lastGiftPlayedAt;
+    // Ignore socket+local doubles even when URLs differ slightly.
+    if (_lastGiftPlayedKey == dedupeKey &&
+        lastAt != null &&
+        now.difference(lastAt) < const Duration(seconds: 3)) {
+      return;
+    }
+    if (lastAt != null &&
+        now.difference(lastAt) < const Duration(milliseconds: 800)) {
+      // Hard throttle: at most one overlay every 800ms.
+      return;
+    }
+    _lastGiftPlayedKey = dedupeKey;
+    _lastGiftPlayedAt = now;
+
+    unawaited(
+      GiftAnimationOverlay.show(
+        context,
+        animationUrl: url,
+        thumbnailUrl: thumbnailUrl,
+        senderName: senderName,
+        giftName: giftName,
+      ),
+    );
+  }
+
+  /// Prefer profile name over @username on auction gift overlays/comments.
+  String? _displaySenderName({String? fullName, String? username}) {
+    final name = fullName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final handle = username?.trim();
+    if (handle != null && handle.isNotEmpty) return handle;
+    return null;
   }
 
   bool _matchesCommentUpdate(CommentEntity comment) {
@@ -316,6 +381,24 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (payload.hasGiftActivity) {
       shouldAnimateBid = true;
       _refreshAuctionComments();
+      final gift = payload.lastGift!;
+      _playGiftAnimation(
+        animationUrl: (gift['animationUrl'] ?? gift['animation_url'])
+            ?.toString(),
+        thumbnailUrl: (gift['thumbnailUrl'] ??
+                gift['thumbnail_url'] ??
+                gift['imageUrl'])
+            ?.toString(),
+        giftName: gift['name']?.toString(),
+        senderName: _displaySenderName(
+          fullName: (gift['senderFullName'] ??
+                  gift['senderName'] ??
+                  gift['fullName'] ??
+                  gift['nameSender'])
+              ?.toString(),
+          username: (gift['senderUsername'] ?? gift['username'])?.toString(),
+        ),
+      );
     }
 
     final target = payload.targetPriceCoins ??
@@ -385,6 +468,20 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   @override
   void didUpdateWidget(LiveDetailsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final prevPostId = oldWidget.post?.id;
+    final nextPostId = widget.post?.id;
+    if (prevPostId != nextPostId && nextPostId != null) {
+      _stopAuctionRealtime();
+      unawaited(_startAuctionRealtime());
+      _commentsBloc?.add(
+        FetchCommentsRequested(
+          postId: nextPostId,
+          isRefresh: true,
+          sort: 'oldest',
+        ),
+      );
+    }
+
     final prevTotal = oldWidget.post?.auction?.currentTotalCoins;
     final nextTotal = widget.post?.auction?.currentTotalCoins;
     if (prevTotal != nextTotal) {
@@ -571,7 +668,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     });
   }
 
-  bool get _isRtl => Directionality.of(context) == TextDirection.rtl;
+  bool get _isRtl =>
+      !_isAuctionPost && Directionality.of(context) == TextDirection.rtl;
 
   String _viewersLabel(AppLocalizations l10n) {
     const count = LiveDetailsLayoutConstants.mockViewerCount;
@@ -646,7 +744,27 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     AuctionGiftsSheet.show(context, auctionId: auctionId);
   }
 
-  Future<void> _refreshAfterGift() async {
+  Future<void> _refreshAfterGift(GiftEntity gift) async {
+    // Let the gift sheet finish closing before inserting the overlay.
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
+
+    final animationUrl =
+        gift.animationUrl?.trim().isNotEmpty == true
+            ? gift.animationUrl
+            : gift.displayImageUrl;
+    final authState = context.read<AuthBloc>().state;
+    final me = authState is AuthSuccess ? authState.user : null;
+    _playGiftAnimation(
+      animationUrl: animationUrl,
+      thumbnailUrl: gift.displayImageUrl,
+      giftName: gift.name,
+      senderName: _displaySenderName(
+        fullName: me?.fullName,
+        username: me?.username,
+      ),
+    );
+
     final postId = widget.post?.id;
     if (postId != null) {
       _commentsBloc?.add(
@@ -1042,14 +1160,26 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       );
     }
 
-    if (_commentsBloc == null) return content;
+    if (_commentsBloc == null) {
+      return _wrapAuctionLtr(content);
+    }
 
-    return BlocProvider.value(
-      value: _commentsBloc!,
-      child: BlocListener<CommentsBloc, CommentsState>(
-        listener: (context, state) => _onCommentsState(state),
-        child: content,
+    return _wrapAuctionLtr(
+      BlocProvider.value(
+        value: _commentsBloc!,
+        child: BlocListener<CommentsBloc, CommentsState>(
+          listener: (context, state) => _onCommentsState(state),
+          child: content,
+        ),
       ),
+    );
+  }
+
+  Widget _wrapAuctionLtr(Widget child) {
+    if (!_isAuctionPost) return child;
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: child,
     );
   }
 }

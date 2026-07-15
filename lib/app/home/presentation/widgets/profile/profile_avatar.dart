@@ -17,51 +17,62 @@ class ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final ringColor = isDark
+        ? theme.dividerColor.withValues(alpha: 0.35)
+        : const Color(0xFFE3E3E4);
+    final scaffold = theme.brightness == Brightness.light
+        ? Colors.white
+        : theme.scaffoldBackgroundColor;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        StoryProfileAvatar(
-          userId: user.id,
-          imageUrl: user.avatarUrl,
-          fallbackText: user.username ?? user.fullName ?? 'User',
-          radius: ProfileLayoutConstants.avatarRadius,
-          backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
-          username: user.username,
-          fullName: user.fullName,
-          onTap: () => handleProfileScreenAvatarTap(
-            context,
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: ringColor, width: 1),
+          ),
+          child: StoryProfileAvatar(
             userId: user.id,
-            avatarUrl: user.avatarUrl,
+            imageUrl: user.avatarUrl,
+            fallbackText: user.username ?? user.fullName ?? 'User',
+            radius: ProfileLayoutConstants.avatarRadius,
+            backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
+            username: user.username,
+            fullName: user.fullName,
+            onTap: () => handleProfileScreenAvatarTap(
+              context,
+              userId: user.id,
+              avatarUrl: user.avatarUrl,
+            ),
           ),
         ),
         PositionedDirectional(
-          bottom: 0,
-          end: 0,
+          bottom: 2,
+          end: 2,
           child: GestureDetector(
             onTap: () => StoryFlow.start(context),
             child: Container(
-              width: 26,
-              height: 26,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: theme.primaryColor,
-                border: Border.all(
-                  color: theme.scaffoldBackgroundColor,
-                  width: 2.5,
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.secondary,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                border: Border.all(color: scaffold, width: 2.5),
               ),
-              child: const Icon(
+              child: Icon(
                 LucideIcons.plus,
-                color: Colors.white,
-                size: 14,
+                color: theme.colorScheme.onPrimary,
+                size: 16,
               ),
             ),
           ),

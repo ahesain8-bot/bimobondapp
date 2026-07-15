@@ -124,6 +124,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final String? filterCategory;
   final String? effectSlug;
   final bool? beautyEnabled;
+  final PostInlineLocationInput? location;
 
   const CreatePostWithMediaRequestedEvent({
     this.type,
@@ -143,6 +144,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     this.filterCategory,
     this.effectSlug,
     this.beautyEnabled,
+    this.location,
   });
 
   @override
@@ -164,6 +166,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     filterCategory,
     effectSlug,
     beautyEnabled,
+    location,
   ];
 }
 

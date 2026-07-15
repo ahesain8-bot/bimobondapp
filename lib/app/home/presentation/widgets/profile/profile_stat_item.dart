@@ -1,5 +1,4 @@
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:flutter/material.dart';
 
 class ProfileStatItem extends StatelessWidget {
@@ -16,18 +15,35 @@ class ProfileStatItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.onSurface.withValues(alpha: 0.5);
+
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CustomText(number, fontSize: 18, fontWeight: FontWeight.bold),
-        const SizedBox(height: AppSizes.p4),
-        CustomText(label, fontSize: 13, variant: TextVariant.secondary),
+        Text(
+          number,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: secondary,
+          ),
+        ),
       ],
     );
 
     final child = Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.p12,
+        horizontal: AppSizes.p8,
         vertical: AppSizes.p4,
       ),
       child: Center(child: content),

@@ -10,6 +10,10 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as posts_di;
 import 'package:bimobondapp/app/categories/presentation/di/categories_injector.dart'
     as categories_di;
+import 'package:bimobondapp/app/countries/presentation/di/countries_injector.dart'
+    as countries_di;
+import 'package:bimobondapp/app/interests/presentation/di/interests_injector.dart'
+    as interests_di;
 import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
     as gifts_di;
 import 'package:bimobondapp/app/wallets/presentation/di/wallets_injector.dart'
@@ -30,6 +34,8 @@ import 'package:bimobondapp/app/promotions/presentation/di/promotions_injector.d
     as promotions_di;
 import 'package:bimobondapp/app/sounds/presentation/di/sounds_injector.dart'
     as sounds_di;
+import 'package:bimobondapp/app/search/presentation/di/search_injector.dart'
+    as search_di;
 import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
     as notifications_di;
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
@@ -56,7 +62,10 @@ void main() async {
   await posts_di.initPosts();
   await promotions_di.initPromotions();
   await sounds_di.initSounds();
+  await search_di.initSearch();
   await categories_di.initCategories();
+  await countries_di.initCountries();
+  await interests_di.initInterests();
   await wallets_di.initWallets();
   await gifts_di.initGifts();
   await auctions_di.initAuctions();

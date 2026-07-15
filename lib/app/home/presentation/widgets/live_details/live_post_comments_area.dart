@@ -1,9 +1,6 @@
-import 'dart:ui';
-
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/gift_comment_l10n.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +33,6 @@ class LivePostCommentsArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
 
     return SizedBox(
       height: LiveDetailsLayoutConstants.chatAreaHeight,
@@ -48,9 +44,8 @@ class LivePostCommentsArea extends StatelessWidget {
             Colors.transparent,
             Colors.black,
             Colors.black,
-            Colors.transparent,
           ],
-          stops: [0.0, 0.1, 0.9, 1.0],
+          stops: [0.0, 0.12, 1.0],
         ).createShader(bounds),
         blendMode: BlendMode.dstIn,
         child: ListView.builder(
@@ -61,7 +56,7 @@ class LivePostCommentsArea extends StatelessWidget {
           itemBuilder: (context, index) {
             final comment = comments[index];
             return Padding(
-              padding: const EdgeInsets.only(bottom: AppSizes.p8),
+              padding: const EdgeInsets.only(bottom: 4),
               child: Align(
                 alignment: isRtl ? Alignment.centerRight : Alignment.centerLeft,
                 child: LiveCommentBubble(
@@ -70,7 +65,7 @@ class LivePostCommentsArea extends StatelessWidget {
                   avatarUrl: comment.user.avatarUrl,
                   body: _commentBody(l10n, comment),
                   isGift: comment.isGift,
-                  theme: theme,
+                  giftImageUrl: giftCommentImageUrl(comment),
                   onProfileTap: comment.user.id.isNotEmpty
                       ? () => openUserStoryOrProfile(
                             context,

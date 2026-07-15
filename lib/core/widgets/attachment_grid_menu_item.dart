@@ -10,6 +10,7 @@ class AttachmentGridMenuItem extends StatelessWidget {
     required this.color,
     this.onTap,
     this.glassStyle = false,
+    this.tikTokStyle = false,
     super.key,
   });
 
@@ -18,10 +19,59 @@ class AttachmentGridMenuItem extends StatelessWidget {
   final Color color;
   final VoidCallback? onTap;
   final bool glassStyle;
+  final bool tikTokStyle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (tikTokStyle) {
+      final size = ChatLayoutConstants.moreMenuIconSize;
+      final content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: ChatLayoutConstants.moreMenuItemIconSize,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: ChatLayoutConstants.moreMenuLabelFontSize,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
+      );
+
+      if (onTap == null) return content;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: content,
+          ),
+        ),
+      );
+    }
+
     final labelColor = glassStyle
         ? Colors.white.withValues(alpha: 0.9)
         : theme.textTheme.labelSmall?.color;

@@ -243,6 +243,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           filterCategory: event.filterCategory,
           effectSlug: event.effectSlug,
           beautyEnabled: event.beautyEnabled,
+          location: event.location,
         ),
       );
 

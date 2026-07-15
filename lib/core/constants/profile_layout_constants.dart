@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 class ProfileLayoutConstants {
   ProfileLayoutConstants._();
 
-  static const double avatarRadius = 42;
+  static const double avatarRadius = 48;
   static const double headerHorizontalPadding = 16;
-  static const double headerVerticalPadding = 14;
+  static const double headerVerticalPadding = 8;
   static const double headerMenuIconSize = 24;
 
   /// TikTok-style compact pill beside display name.
-  static const double editPillHeight = 32;
+  static const double editPillHeight = 28;
   static const double editPillIconSize = 18;
   static const double editPillGapFromName = 8;
   static const Color editPillBackgroundLight = Color(0xFFF1F1F2);

@@ -5,10 +5,10 @@ import 'package:bimobondapp/app/gifts/domain/usecases/get_gifts_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/purchase_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/send_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart' as gifts_di;
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -19,7 +19,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-typedef OnGiftSentCallback = void Function();
+typedef OnGiftSentCallback = void Function(GiftEntity gift);
 
 String shortGiftName(String name) {
   const maxLen = LiveDetailsLayoutConstants.giftNameMaxLength;
@@ -73,19 +73,6 @@ class _LiveGiftSheetBody extends StatefulWidget {
 }
 
 class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
-  static const _giftColors = [
-    Colors.redAccent,
-    Colors.brown,
-    Colors.pinkAccent,
-    Colors.red,
-    Colors.orange,
-    Colors.amber,
-    Colors.blueAccent,
-    Colors.cyanAccent,
-    Colors.purpleAccent,
-    Colors.teal,
-  ];
-
   final _getGifts = gifts_di.sl<GetGiftsUseCase>();
   final _getInventory = gifts_di.sl<GetGiftInventoryUseCase>();
   final _purchaseGift = gifts_di.sl<PurchaseGiftUseCase>();
@@ -145,12 +132,12 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
             _selectedIndex = null;
           }
         });
+        GiftLottieCache.instance.prefetch(
+          gifts.map((gift) => gift.animationUrl),
+        );
       },
     );
   }
-
-  Color _colorForIndex(int index) =>
-      _giftColors[index % _giftColors.length];
 
   GiftEntity? get _selectedGift {
     final index = _selectedIndex;
@@ -321,8 +308,10 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
         if (!mounted) return;
         setState(() => _busy = false);
-        widget.onGiftSent?.call();
-        Navigator.pop(context);
+        final onSent = widget.onGiftSent;
+        // Close gift picker first, then play TikTok-style animation on the live screen.
+        Navigator.of(context).pop();
+        onSent?.call(gift);
       },
     );
   }
@@ -339,52 +328,58 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final l10n = AppLocalizations.of(context)!;
     final selected = _selectedGift;
     final owned = selected == null ? 0 : _ownedQuantity(selected.id);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return GlassBottomSheetFrame(
-      showHandle: true,
+    return Material(
+      color: const Color(0xFF161618),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        height: MediaQuery.of(context).size.height *
-            LiveDetailsLayoutConstants.giftSheetHeightFactor,
+        height: MediaQuery.sizeOf(context).height * 0.46,
         child: Column(
           children: [
-            const SizedBox(height: AppSizes.p4),
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
             Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.p24),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Text(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
                       l10n.liveSendGift,
-                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 20,
-                        letterSpacing: 0.5,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
                       ),
                     ),
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: _loading && _isLoggedIn
-                          ? const GiftBalanceChipSkeleton()
-                          : _CoinBalanceChip(
-                              label: l10n.liveCoinsBalance(
-                                _inventory?.balanceCoins ?? 0,
-                              ),
-                            ),
+                  ),
+                  if (_loading && _isLoggedIn)
+                    const GiftBalanceChipSkeleton()
+                  else
+                    _CoinBalanceChip(
+                      coins: _inventory?.balanceCoins ?? 0,
                     ),
-                  ],
-                ),
+                ],
               ),
-              const SizedBox(height: AppSizes.p20),
-              Expanded(child: _buildGrid(l10n)),
-              if (_loading)
-                const GiftSheetFooterSkeleton()
-              else
-                _buildFooter(l10n, selected, owned),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: _buildGrid(l10n)),
+            if (_loading)
+              const GiftSheetFooterSkeleton()
+            else
+              _buildFooter(l10n, selected, owned, bottomInset),
+          ],
         ),
+      ),
     );
   }
 
@@ -395,16 +390,19 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     if (_loadError != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _loadError!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontSize: 14,
+                ),
               ),
-              const SizedBox(height: AppSizes.p16),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: _load,
                 child: Text(l10n.liveGiftRetry),
@@ -418,43 +416,33 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       return Center(
         child: Text(
           l10n.liveGiftCatalogEmpty,
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.55),
+            fontSize: 14,
+          ),
         ),
       );
     }
 
-    final crossCount = LiveDetailsLayoutConstants.giftGridCrossCount;
-    const horizontalPadding = AppSizes.p20;
-    const spacing = AppSizes.p16;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final itemWidth =
-        (screenWidth - horizontalPadding * 2 - spacing * (crossCount - 1)) /
-        crossCount;
-    final itemHeight =
-        itemWidth / LiveDetailsLayoutConstants.giftGridAspectRatio;
-
-    return SingleChildScrollView(
+    return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        runAlignment: WrapAlignment.center,
-        spacing: spacing,
-        runSpacing: spacing,
-        children: List.generate(_catalog.length, (index) {
-          final gift = _catalog[index];
-          return SizedBox(
-            width: itemWidth,
-            height: itemHeight,
-            child: _buildGiftTile(
-              l10n: l10n,
-              gift: gift,
-              index: index,
-              owned: _ownedQuantity(gift.id),
-            ),
-          );
-        }),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: 0.78,
       ),
+      itemCount: _catalog.length,
+      itemBuilder: (context, index) {
+        final gift = _catalog[index];
+        return _buildGiftTile(
+          l10n: l10n,
+          gift: gift,
+          index: index,
+          owned: _ownedQuantity(gift.id),
+        );
+      },
     );
   }
 
@@ -464,112 +452,99 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     required int index,
     required int owned,
   }) {
-    final color = _colorForIndex(index);
     final isSelected = _selectedIndex == index;
+    final locale = Localizations.localeOf(context);
 
     return GestureDetector(
-      onTap: _busy ? null : () => setState(() => _selectedIndex = index),
-      child: Transform.scale(
-        scale: isSelected ? 1.05 : 1.0,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutBack,
-          decoration: BoxDecoration(
+      onTap: _busy
+          ? null
+          : () {
+              setState(() => _selectedIndex = index);
+              GiftLottieCache.instance.prefetch([
+                _catalog[index].animationUrl,
+              ]);
+            },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
             color: isSelected
-                ? color.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(AppSizes.p16),
-            border: Border.all(
-              color: isSelected
-                  ? color.withValues(alpha: 0.8)
-                  : Colors.white.withValues(alpha: 0.1),
-              width: isSelected ? 2 : 1,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : null,
+                ? Colors.white.withValues(alpha: 0.85)
+                : Colors.transparent,
+            width: 1.5,
           ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSizes.p4,
-                  AppSizes.p4,
-                  AppSizes.p4,
-                  LiveDetailsLayoutConstants.giftTilePriceBoxHeight +
-                      AppSizes.p6,
-                ),
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _GiftIcon(
-                          gift: gift,
-                          isSelected: isSelected,
-                          size: isSelected ? 26 : 22,
-                        ),
-                        const SizedBox(height: AppSizes.p4),
-                        Text(
-                          shortGiftName(gift.name),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.clip,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: AppSizes.p4,
-                right: AppSizes.p4,
-                bottom: AppSizes.p4,
-                child: _GiftPriceChip(
-                  l10n: l10n,
-                  gift: gift,
-                  compact: true,
-                  emphasized: isSelected,
-                ),
-              ),
-              if (owned > 0)
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.85),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      l10n.liveGiftOwned(owned),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: _GiftIcon(
+                        gift: gift,
+                        isSelected: isSelected,
+                        size: isSelected ? 36 : 32,
                       ),
                     ),
                   ),
+                  Text(
+                    shortGiftName(gift.name),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(
+                        alpha: isSelected ? 0.95 : 0.7,
+                      ),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  AppCoinAmount(
+                    iconSize: 10,
+                    spacing: 2,
+                    text: gift.priceCoinsLabel(locale),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (owned > 0)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2ECC71),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'x$owned',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -579,12 +554,8 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     AppLocalizations l10n,
     GiftEntity? selected,
     int owned,
+    double bottomInset,
   ) {
-    final index = _selectedIndex;
-    final accentColor = index == null
-        ? Colors.grey.shade700
-        : _colorForIndex(index);
-
     String primaryLabel;
     VoidCallback? onPrimary;
 
@@ -607,220 +578,98 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       onPrimary = () => _purchase(selected);
     }
 
+    final canTap = selected != null && !_busy && onPrimary != null;
+
     return Container(
-      padding: const EdgeInsets.all(AppSizes.p20),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
+        color: const Color(0xFF121214),
         border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
       ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (selected != null) ...[
-              _GiftIcon(gift: selected, isSelected: true, size: 48),
-              const SizedBox(height: AppSizes.p8),
-              Text(
-                shortGiftName(selected.name),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              const SizedBox(height: AppSizes.p4),
-              _GiftPriceChip(
-                l10n: l10n,
-                gift: selected,
-                compact: false,
-                emphasized: true,
-              ),
-              const SizedBox(height: AppSizes.p12),
-            ],
-            if (selected != null && owned > 0 && !_canSend && !_busy) ...[
-              TextButton(
-                onPressed: () => _purchase(selected),
-                child: Text(
-                  l10n.liveGiftBuyMore,
-                  style: const TextStyle(color: Colors.amberAccent),
-                ),
-              ),
-              const SizedBox(height: AppSizes.p4),
-            ],
-            GestureDetector(
-              onTap: _busy || onPrimary == null ? null : onPrimary,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: selected != null && !_busy ? 1 : 0.5,
-                child: Container(
-                  width: double.infinity,
-                  height: AppSizes.buttonHeightMd,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: selected != null
-                          ? [
-                              accentColor.withValues(alpha: 0.8),
-                              accentColor,
-                            ]
-                          : [
-                              Colors.grey.shade800,
-                              Colors.grey.shade700,
-                            ],
-                    ),
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: selected != null
-                        ? [
-                            BoxShadow(
-                              color: accentColor.withValues(alpha: 0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  alignment: Alignment.center,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          primaryLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GiftPriceChip extends StatelessWidget {
-  const _GiftPriceChip({
-    required this.l10n,
-    required this.gift,
-    required this.compact,
-    required this.emphasized,
-  });
-
-  final AppLocalizations l10n;
-  final GiftEntity gift;
-  final bool compact;
-  final bool emphasized;
-
-  String _formattedAmount(Locale locale) {
-    return LocaleFormatUtils.localizeDigits(
-      gift.priceCoins.toString(),
-      locale,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final locale = Localizations.localeOf(context);
-    final amountText = _formattedAmount(locale);
-    final priceText = l10n.liveGiftPriceAmount(amountText, l10n.coinsUnit);
-    final priceFontSize = compact
-        ? LiveDetailsLayoutConstants.giftTilePriceFontSize
-        : LiveDetailsLayoutConstants.giftFooterPriceFontSize;
-    final labelFontSize = compact
-        ? LiveDetailsLayoutConstants.giftTilePriceLabelFontSize
-        : LiveDetailsLayoutConstants.giftFooterPriceLabelFontSize;
-
-    final boxHeight = compact
-        ? LiveDetailsLayoutConstants.giftTilePriceBoxHeight
-        : LiveDetailsLayoutConstants.giftFooterPriceBoxHeight;
-    final boxWidth = compact
-        ? double.infinity
-        : LiveDetailsLayoutConstants.giftFooterPriceBoxWidth;
-
-    return SizedBox(
-      width: boxWidth,
-      height: boxHeight,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: emphasized ? 0.35 : 0.25),
-          borderRadius: BorderRadius.circular(compact ? 10 : 14),
-          border: Border.all(
-            color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
-              alpha: emphasized ? 0.9 : 0.55,
-            ),
-            width: emphasized ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                vertical: compact ? 3 : AppSizes.p4,
-              ),
-              decoration: BoxDecoration(
-                color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
-                  alpha: emphasized ? 0.35 : 0.22,
-                ),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(compact ? 9 : 13),
-                ),
-              ),
-              child: Text(
-                l10n.liveGiftPriceLabel,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: LiveDetailsLayoutConstants.giftCommentGoldText,
-                  fontSize: labelFontSize,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  height: 1.1,
-                ),
-              ),
-            ),
+      child: Row(
+        children: [
+          if (selected != null) ...[
+            _GiftIcon(gift: selected, isSelected: true, size: 28),
+            const SizedBox(width: 10),
             Expanded(
-              child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSizes.p4),
-                    child: AppCoinAmount(
-                      iconSize: compact ? 12 : 14,
-                      spacing: 4,
-                      text: priceText,
-                      style: TextStyle(
-                        color: emphasized
-                            ? LiveDetailsLayoutConstants.giftCommentGoldText
-                            : AppCoinColors.icon,
-                        fontSize: priceFontSize,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.4,
-                        height: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    shortGiftName(selected.name),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  AppCoinAmount(
+                    iconSize: 11,
+                    spacing: 3,
+                    text: selected.priceCoinsLabel(
+                      Localizations.localeOf(context),
+                    ),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else
+            Expanded(
+              child: Text(
+                l10n.liveSelectGift,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          const SizedBox(width: 12),
+          SizedBox(
+            height: 40,
+            child: FilledButton(
+              onPressed: canTap ? onPrimary : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFE2C55),
+                disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
+                foregroundColor: Colors.white,
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.35),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      primaryLabel,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
                       ),
                     ),
-                  ),
-                ),
-              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -841,11 +690,13 @@ class _GiftIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconSize = size ?? (isSelected ? 32.0 : 28.0);
     final icon = gift.icon.trim();
+    final imageUrl = gift.displayImageUrl ?? icon;
     if (gift.hasNetworkIcon ||
-        icon.startsWith('http://') ||
-        icon.startsWith('https://')) {
+        imageUrl.startsWith('http://') ||
+        imageUrl.startsWith('https://') ||
+        imageUrl.startsWith('/')) {
       return SafeNetworkImage(
-        imageUrl: icon,
+        imageUrl: imageUrl,
         width: iconSize,
         height: iconSize,
         fit: BoxFit.contain,
@@ -868,32 +719,32 @@ class _GiftIcon extends StatelessWidget {
 }
 
 class _CoinBalanceChip extends StatelessWidget {
-  const _CoinBalanceChip({required this.label});
+  const _CoinBalanceChip({required this.coins});
 
-  final String label;
+  final int coins;
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    final label = LocaleFormatUtils.localizeDigits(coins.toString(), locale);
+
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.p12,
-        vertical: AppSizes.p6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const AppCoinIcon(size: 16),
-          const SizedBox(width: AppSizes.p4),
+          const AppCoinIcon(size: 14),
+          const SizedBox(width: 4),
           Text(
             label,
             style: const TextStyle(
-              color: AppCoinColors.icon,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
           ),
         ],

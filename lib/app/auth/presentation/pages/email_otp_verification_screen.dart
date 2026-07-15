@@ -108,7 +108,7 @@ class _EmailOtpVerificationScreenState
             PopupDialogs.showErrorDialog(context, message);
           } else if (state is AuthSuccess) {
             _isSubmitting = false;
-            navigateAfterSignUp(context);
+            navigateAfterAuth(context, user: state.user);
           }
         },
         child: SafeArea(

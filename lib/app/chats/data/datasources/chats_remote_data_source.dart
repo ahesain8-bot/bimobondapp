@@ -27,6 +27,11 @@ abstract class ChatsRemoteDataSource {
     required Map<String, dynamic> body,
   });
 
+  Future<ChatMessageModel> votePoll({
+    required String messageId,
+    required int optionIndex,
+  });
+
   Future<void> markMessageRead(String messageId);
 
   Future<void> reactToMessage({
@@ -191,6 +196,28 @@ class ChatsRemoteDataSourceImpl implements ChatsRemoteDataSource {
       }
       throw ServerException(
         message: _extractErrorMessage(response.data) ?? 'Failed to send message',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<ChatMessageModel> votePoll({
+    required String messageId,
+    required int optionIndex,
+  }) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiConstants.pollVote(messageId),
+        data: {'optionIndex': optionIndex},
+        options: Options(headers: await _authHeaders()),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ChatMessageModel.fromJson(_extractObject(response.data));
+      }
+      throw ServerException(
+        message: _extractErrorMessage(response.data) ?? 'Failed to vote on poll',
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);

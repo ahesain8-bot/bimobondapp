@@ -49,7 +49,7 @@ class AuthCredentialsFormSection extends StatelessWidget {
             return null;
           },
         ),
-        const SizedBox(height: AppSizes.p16),
+        const SizedBox(height: AppSizes.p20),
         LiquidGlassAuthPasswordField(
           controller: passwordController,
           hintText: l10n.passwordLabel,
@@ -65,7 +65,7 @@ class AuthCredentialsFormSection extends StatelessWidget {
         ),
         const SizedBox(height: AppSizes.p8),
         Align(
-          alignment: AlignmentDirectional.centerEnd,
+          alignment: AlignmentDirectional.centerStart,
           child: TextButton(
             onPressed: () {
               final email = emailController.text.trim();
@@ -75,15 +75,15 @@ class AuthCredentialsFormSection extends StatelessWidget {
               );
             },
             style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 0),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: CustomText(
               l10n.forgotPassword,
-              color: Theme.of(context).colorScheme.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),

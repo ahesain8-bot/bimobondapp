@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/utils/auth_message_localizer.dart';
+import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/login/google_login_sheet.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/login/login_view.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
@@ -9,7 +10,6 @@ import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
   final String language;
@@ -65,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (_hasLoggedIn) {
                 PopupDialogs.showSuccessDialog(context, l10n.loginSuccess);
               }
-              context.goNamed('home');
+              navigateAfterAuth(context, user: state.user);
             }
           },
           builder: (context, state) {

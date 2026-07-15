@@ -3,13 +3,13 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_bloc.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_event.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_state.dart';
+import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_app_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_input_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_message_list.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_pattern_background.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_playback.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_recorder.dart';
-import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
@@ -28,6 +28,7 @@ class ChatView extends StatefulWidget {
     required this.imageUrl,
     required this.currentUserId,
     this.peerUserId,
+    this.openCamera = false,
     super.key,
   });
 
@@ -36,6 +37,7 @@ class ChatView extends StatefulWidget {
   final String imageUrl;
   final String currentUserId;
   final String? peerUserId;
+  final bool openCamera;
 
   @override
   State<ChatView> createState() => _ChatViewState();
@@ -49,11 +51,19 @@ class _ChatViewState extends State<ChatView> {
   Map<String, dynamic>? _replyTo;
   final ChatVoiceRecorder _voiceRecorder = ChatVoiceRecorder();
   Future<void>? _startRecordingFuture;
+  bool _didRequestCamera = false;
 
   @override
   void initState() {
     super.initState();
     _messageController.addListener(() => setState(() {}));
+    if (widget.openCamera) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didRequestCamera) return;
+        _didRequestCamera = true;
+        _pickAndSend(ChatAttachmentPicker.pickFromCamera);
+      });
+    }
   }
 
   @override
@@ -304,19 +314,13 @@ class _ChatViewState extends State<ChatView> {
         content: draft.content,
         localFilePath: draft.filePath,
         replyToId: _replyTo?['id']?.toString(),
+        payload: draft.payload,
+        mimeType: draft.mimeType,
+        sizeBytes: draft.sizeBytes,
       ),
     );
     setState(() => _replyTo = null);
     _scrollToBottom();
-  }
-
-  void _showComingSoon() {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.chatFeatureComingSoon),
-      ),
-    );
   }
 
   void _showAttachmentFailed() {
@@ -358,6 +362,7 @@ class _ChatViewState extends State<ChatView> {
       ChatAttachmentSendRequested(
         messageType: draft.type,
         content: draft.content,
+        payload: draft.payload,
         replyToId: replyToId,
       ),
     );
@@ -385,6 +390,7 @@ class _ChatViewState extends State<ChatView> {
       ChatAttachmentSendRequested(
         messageType: draft.type,
         content: draft.content,
+        payload: draft.payload,
         replyToId: replyToId,
       ),
     );
@@ -438,8 +444,8 @@ class _ChatViewState extends State<ChatView> {
         final currentUserName = currentUser?.fullName?.trim().isNotEmpty == true
             ? currentUser!.fullName!.trim()
             : (currentUser?.username?.trim().isNotEmpty == true
-                ? currentUser!.username!.trim()
-                : 'User');
+                  ? currentUser!.username!.trim()
+                  : 'User');
         final currentUserImageUrl = currentUser?.avatarUrl?.trim() ?? '';
 
         return Scaffold(
@@ -473,6 +479,14 @@ class _ChatViewState extends State<ChatView> {
                               onReactionPicker: _showMessageActions,
                               onReplyTo: (msg) =>
                                   setState(() => _replyTo = msg),
+                              onPollVote: (messageId, optionIndex) {
+                                context.read<ChatBloc>().add(
+                                  ChatPollVoteRequested(
+                                    messageId: messageId,
+                                    optionIndex: optionIndex,
+                                  ),
+                                );
+                              },
                             ),
                     ),
                     if (state is ChatFailure)
@@ -505,8 +519,6 @@ class _ChatViewState extends State<ChatView> {
                         onContact: _sendContactAttachment,
                         onFile: () =>
                             _pickAndSend(ChatAttachmentPicker.pickFile),
-                        onGift: _showComingSoon,
-                        onPoll: _showComingSoon,
                       ),
                       onEmojiPicker: () => ChatSheets.showEmojiPicker(
                         context: context,

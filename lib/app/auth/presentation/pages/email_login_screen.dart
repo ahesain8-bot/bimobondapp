@@ -2,13 +2,13 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/utils/auth_message_localizer.dart';
+import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/email_login/email_login_view.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 class EmailLoginScreen extends StatefulWidget {
   const EmailLoginScreen({super.key});
@@ -73,7 +73,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
               if (_hasLoggedIn) {
                 PopupDialogs.showSuccessDialog(context, l10n.loginSuccess);
               }
-              context.goNamed('home');
+              navigateAfterAuth(context, user: state.user);
             }
           },
           builder: (context, state) {

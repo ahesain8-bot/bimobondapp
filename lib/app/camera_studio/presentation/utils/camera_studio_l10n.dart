@@ -27,6 +27,17 @@ String cameraStudioLabelFromKey(AppLocalizations l10n, String key) {
     'cameraEffectSparkle' => l10n.cameraEffectSparkle,
     'cameraEffectNeon' => l10n.cameraEffectNeon,
     'cameraEffectGlitch' => l10n.cameraEffectGlitch,
+    'cameraEffectGlasses' => l10n.cameraEffectGlasses,
+    'cameraEffectMoustache' => l10n.cameraEffectMoustache,
+    'cameraEffectBigEyes' => l10n.cameraEffectBigEyes,
+    'cameraEffectBigLips' => l10n.cameraEffectBigLips,
+    'cameraEffectNose' => l10n.cameraEffectNose,
+    'cameraFilterPure' => l10n.cameraFilterPure,
+    'cameraFilterBright' => l10n.cameraFilterBright,
+    'cameraFilterClean' => l10n.cameraFilterClean,
+    'cameraFilterSoft' => l10n.cameraFilterSoft,
+    'cameraFilterSunset' => l10n.cameraFilterSunset,
+    'cameraCategoryLife' => l10n.cameraCategoryLife,
     _ => key,
   };
 }

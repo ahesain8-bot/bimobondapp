@@ -1,6 +1,3 @@
-import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/liquid_glass_dropdown.dart';
-import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -9,6 +6,7 @@ class CommentSortMenu extends StatelessWidget {
   const CommentSortMenu({
     required this.sort,
     required this.onSortChanged,
+    this.iconOnly = false,
     super.key,
   });
 
@@ -16,6 +14,7 @@ class CommentSortMenu extends StatelessWidget {
 
   final String sort;
   final ValueChanged<String> onSortChanged;
+  final bool iconOnly;
 
   static String labelFor(String key, AppLocalizations l10n) {
     switch (key) {
@@ -29,22 +28,57 @@ class CommentSortMenu extends StatelessWidget {
     }
   }
 
-  Future<void> _openDropdown(BuildContext context) async {
+  Future<void> _openMenu(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     final box = context.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
 
-    final anchor = box.localToGlobal(Offset.zero) & box.size;
-    final selected = await LiquidGlassDropdownMenu.show<String>(
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    final button = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
+    final selected = await showMenu<String>(
       context: context,
-      anchor: anchor,
-      alignTrailing: true,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(button.left, button.bottom, button.width, 0),
+        Offset.zero & overlay.size,
+      ),
+      color: theme.colorScheme.surface,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+        ),
+      ),
       items: [
         for (final key in sortKeys)
-          LiquidGlassDropdownItem(
+          PopupMenuItem<String>(
             value: key,
-            label: labelFor(key, l10n),
-            isSelected: key == sort,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    labelFor(key, l10n),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: key == sort
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (key == sort)
+                  Icon(
+                    LucideIcons.check,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
           ),
       ],
     );
@@ -57,19 +91,36 @@ class CommentSortMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final isDefaultSort = sort == 'newest';
+    final muted = onSurface.withValues(alpha: 0.55);
 
     return Builder(
       builder: (triggerContext) {
+        if (iconOnly) {
+          return IconButton(
+            tooltip: labelFor(sort, l10n),
+            onPressed: () => _openMenu(triggerContext),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: Icon(
+              LucideIcons.slidersHorizontal,
+              size: 20,
+              color: isDefaultSort ? muted : onSurface,
+            ),
+          );
+        }
+
         return GestureDetector(
-          onTap: () => _openDropdown(triggerContext),
+          onTap: () => _openMenu(triggerContext),
           behavior: HitTestBehavior.opaque,
-          child: LiquidGlassSurface(
-            borderRadius: BorderRadius.circular(20),
-            blurSigma: 16,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.p10,
-              vertical: AppSizes.p6,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F1F2),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -77,26 +128,21 @@ class CommentSortMenu extends StatelessWidget {
                 Icon(
                   LucideIcons.slidersHorizontal,
                   size: 16,
-                  color: isDefaultSort
-                      ? Colors.white.withValues(alpha: 0.65)
-                      : Colors.white,
+                  color: isDefaultSort ? muted : onSurface,
                 ),
-                const SizedBox(width: AppSizes.p6),
+                const SizedBox(width: 6),
                 Text(
                   labelFor(sort, l10n),
                   style: TextStyle(
-                    color: Colors.white,
+                    color: onSurface,
                     fontSize: 13,
-                    fontWeight:
-                        isDefaultSort ? FontWeight.w500 : FontWeight.w700,
+                    fontWeight: isDefaultSort
+                        ? FontWeight.w500
+                        : FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: AppSizes.p4),
-                Icon(
-                  LucideIcons.chevronDown,
-                  size: 16,
-                  color: Colors.white.withValues(alpha: 0.75),
-                ),
+                const SizedBox(width: 4),
+                Icon(LucideIcons.chevronDown, size: 16, color: muted),
               ],
             ),
           ),

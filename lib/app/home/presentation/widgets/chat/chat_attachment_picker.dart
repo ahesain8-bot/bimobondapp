@@ -56,10 +56,20 @@ class ChatAttachmentPicker {
     final name = file.name.trim().isNotEmpty
         ? file.name
         : path.split(Platform.pathSeparator).last;
+    final mime = file.mimeType?.trim().isNotEmpty == true
+        ? file.mimeType!
+        : inferMimeTypeFromFileName(name);
+    int? sizeBytes;
+    try {
+      sizeBytes = await File(path).length();
+    } catch (_) {}
+
     return ChatAttachmentDraft(
       type: 'FILE',
       content: name,
       filePath: path,
+      mimeType: mime,
+      sizeBytes: sizeBytes,
     );
   }
 
@@ -73,7 +83,7 @@ class ChatAttachmentPicker {
     );
     return ChatAttachmentDraft(
       type: 'LOCATION',
-      content: payload.toJsonString(),
+      payload: payload.toPayloadMap(),
     );
   }
 
@@ -87,13 +97,21 @@ class ChatAttachmentPicker {
     final phone = contact.phones.isNotEmpty
         ? contact.phones.first.number.trim()
         : '';
+    final email = contact.emails.isNotEmpty
+        ? contact.emails.first.address.trim()
+        : '';
 
-    if (name.isEmpty || phone.isEmpty) return null;
+    if (name.isEmpty) return null;
+    if (phone.isEmpty && email.isEmpty) return null;
 
-    final payload = ChatContactPayload(name: name, phone: phone);
+    final payload = ChatContactPayload(
+      name: name,
+      phone: phone,
+      email: email.isEmpty ? null : email,
+    );
     return ChatAttachmentDraft(
       type: 'CONTACT',
-      content: payload.toJsonString(),
+      payload: payload.toPayloadMap(),
     );
   }
 

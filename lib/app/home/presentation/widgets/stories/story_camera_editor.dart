@@ -84,6 +84,25 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
               fit: StackFit.expand,
               children: [
                 StoryMediaPreview(file: widget.file, type: widget.type),
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x99000000),
+                            Color(0x00000000),
+                            Color(0x00000000),
+                            Color(0xA6000000),
+                          ],
+                          stops: [0.0, 0.18, 0.72, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 SafeArea(
                   child: Column(
                     children: [
@@ -105,8 +124,8 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
                             FilledButton(
                               onPressed: isPublishing ? null : _share,
                               style: FilledButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black,
+                                backgroundColor: Theme.of(context).primaryColor,
+                                foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: AppSizes.p20,
                                   vertical: AppSizes.p10,
@@ -118,6 +137,7 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
                                       height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
+                                        color: Colors.white,
                                       ),
                                     )
                                   : Text(

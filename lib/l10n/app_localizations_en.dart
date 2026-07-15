@@ -668,6 +668,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postsSearchHint => 'Search posts...';
 
   @override
+  String get searchAction => 'Search';
+
+  @override
+  String get searchHistorySeeMore => 'See more';
+
+  @override
+  String get searchHistorySeeLess => 'See less';
+
+  @override
+  String get searchHistoryClear => 'Clear';
+
+  @override
+  String get searchHistoryEmpty => 'No recent searches';
+
+  @override
+  String get searchSeeAll => 'See all';
+
+  @override
+  String get searchSeeLess => 'See less';
+
+  @override
+  String get searchYouMayLike => 'You may like';
+
+  @override
+  String get searchNoResults => 'No posts found';
+
+  @override
+  String get searchTabTop => 'Top';
+
+  @override
+  String get searchTabUsers => 'Users';
+
+  @override
+  String get searchTabVideos => 'Videos';
+
+  @override
+  String get searchTabLive => 'LIVE';
+
+  @override
+  String get searchTabSounds => 'Sounds';
+
+  @override
+  String get searchTabPlaces => 'Places';
+
+  @override
+  String get searchComingSoon => 'Coming soon';
+
+  @override
   String get auctionsFiltersTitle => 'Filters';
 
   @override
@@ -1028,16 +1076,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get describePostHint => 'Describe your post… use @username and #tag in the text';
 
   @override
+  String get addDescriptionHint => 'Add description...';
+
+  @override
   String get hashtagsLabel => 'Hashtags';
 
   @override
-  String get mentionsLabel => 'Mentions';
+  String get mentionsLabel => 'Mention';
 
   @override
-  String get whoCanWatchLabel => 'Who can watch this post';
+  String get whoCanWatchLabel => 'Who can view this post';
 
   @override
   String get allowCommentsLabel => 'Allow comments';
+
+  @override
+  String get allowReuseLabel => 'Allow reuse of content';
+
+  @override
+  String get allowReuseSubtitle => 'Duet, Stitch, stickers, and add to Story';
+
+  @override
+  String get videoPrivacySection => 'Video privacy';
+
+  @override
+  String get advancedSettings => 'Advanced settings';
+
+  @override
+  String get addPostSettingsTitle => 'Settings';
+
+  @override
+  String get everyoneCanViewPost => 'Everyone can view this post';
+
+  @override
+  String get friendsCanViewPost => 'Friends can view this post';
+
+  @override
+  String get onlyYouCanViewPost => 'Only you can view this post';
+
+  @override
+  String get friendsPrivacySubtitle => 'Followers you follow back';
+
+  @override
+  String get draftsLabel => 'Drafts';
+
+  @override
+  String get moreOptionsLabel => 'More options';
+
+  @override
+  String get previewLabel => 'Preview';
+
+  @override
+  String get editCoverLabel => 'Edit cover';
+
+  @override
+  String get locationLabelShort => 'Location';
+
+  @override
+  String get addPostDraftsComingSoon => 'Drafts coming soon';
 
   @override
   String get allowDuetLabel => 'Allow Duet';
@@ -1047,6 +1143,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addLocationLabel => 'Add location';
+
+  @override
+  String get selectCity => 'Select city';
+
+  @override
+  String get selectCityHint => 'Search cities';
+
+  @override
+  String get selectCountryHint => 'Search countries';
+
+  @override
+  String get locationSearchHint => 'Search countries or cities';
+
+  @override
+  String get clearLocation => 'Clear location';
 
   @override
   String get everyoneLabel => 'Everyone';
@@ -1439,6 +1550,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesInboxTitle => 'Inbox';
 
   @override
+  String get messagesNewChatTitle => 'New chat';
+
+  @override
+  String get messagesNewChatSearchHint => 'Search';
+
+  @override
+  String get closeAction => 'Close';
+
+  @override
+  String get chatSendMessageHint => 'Send a message...';
+
+  @override
+  String get chatActiveYesterday => 'Active yesterday';
+
+  @override
   String get messagesSwitchAccount => 'Switch Account';
 
   @override
@@ -1472,6 +1598,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesActivityActivities => 'Activities';
 
   @override
+  String get messagesActivityTitle => 'Activity';
+
+  @override
+  String get messagesNewFollowers => 'New followers';
+
+  @override
   String get messagesActivityComments => 'Comments';
 
   @override
@@ -1479,6 +1611,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messagesActivityNotifications => 'Notifications';
+
+  @override
+  String get activityTabLikes => 'Likes';
+
+  @override
+  String get activityAllCaughtUp => 'You\'re all caught up';
+
+  @override
+  String get activityClearNotificationsMessage => 'Remove all read notifications from your activity feed?';
+
+  @override
+  String get activityOpenCommentsSubtitle => 'See comments on your posts';
+
+  @override
+  String get activityInboxSubtitle => 'Likes, comments and more';
 
   @override
   String get messagesRecentMessages => 'Recent Messages';
@@ -1729,6 +1876,68 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMorePoll => 'Poll';
+
+  @override
+  String get chatGiftSheetTitle => 'Send a gift';
+
+  @override
+  String get chatGiftSheetSubtitle => 'Choose a gift from your inventory';
+
+  @override
+  String get chatGiftInventoryEmpty => 'You don\'t own any gifts yet. Buy gifts in your wallet first.';
+
+  @override
+  String get chatGiftSentLabel => 'Gift sent';
+
+  @override
+  String get chatMessageContact => 'Contact';
+
+  @override
+  String get chatPollSheetTitle => 'Create a poll';
+
+  @override
+  String get chatPollQuestionHint => 'Ask a question';
+
+  @override
+  String get chatPollOptionsLabel => 'Options';
+
+  @override
+  String chatPollOptionHint(int index) {
+    return 'Option $index';
+  }
+
+  @override
+  String get chatPollAddOption => 'Add option';
+
+  @override
+  String get chatPollAllowMultiple => 'Allow multiple answers';
+
+  @override
+  String get chatPollSend => 'Send poll';
+
+  @override
+  String get chatPollQuestionRequired => 'Enter a question for your poll.';
+
+  @override
+  String get chatPollOptionsRequired => 'Add at least two options.';
+
+  @override
+  String get chatPollEnded => 'Poll ended';
+
+  @override
+  String chatPollVotesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count votes',
+      one: '1 vote',
+      zero: 'No votes yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get messagesInboxLastPoll => 'Poll';
 
   @override
   String get chatLastMessage1 => 'Can I know the final price?';
@@ -2560,6 +2769,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraEffectGlitch => 'Glitch';
 
   @override
+  String get cameraEffectGlasses => 'Glasses';
+
+  @override
+  String get cameraEffectMoustache => 'Moustache';
+
+  @override
+  String get cameraEffectBigEyes => 'Big Eyes';
+
+  @override
+  String get cameraEffectBigLips => 'Big Lips';
+
+  @override
+  String get cameraEffectNose => 'Nose';
+
+  @override
+  String get cameraFilterPure => 'Pure';
+
+  @override
+  String get cameraFilterBright => 'Bright';
+
+  @override
+  String get cameraFilterClean => 'Clean';
+
+  @override
+  String get cameraFilterSoft => 'Soft';
+
+  @override
+  String get cameraFilterSunset => 'Sunset';
+
+  @override
+  String get cameraCategoryLife => 'Life';
+
+  @override
+  String get mediaEditorShare => 'Share';
+
+  @override
+  String get mediaEditorText => 'Text';
+
+  @override
+  String get mediaEditorStickers => 'Stickers';
+
+  @override
+  String get mediaEditorCrop => 'Crop';
+
+  @override
+  String get mediaEditorEdit => 'Edit';
+
+  @override
+  String get mediaEditorMore => 'More';
+
+  @override
+  String get mediaEditorComingSoon => 'Coming soon';
+
+  @override
   String get promotePostTitle => 'Promote post';
 
   @override
@@ -3002,6 +3265,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String interestSelectionMinHint(int count) {
     return 'Select at least $count interests';
   }
+
+  @override
+  String interestSelectionCountHint(int selected, int min) {
+    return '$selected/$min interested';
+  }
+
+  @override
+  String get interestSelectionNotInterestedHint => 'Tap again to mark as not interested (optional).';
+
+  @override
+  String get interestSelectionNotInterestedLegend => 'Not interested';
+
+  @override
+  String get interestSelectionInterestedLegend => 'Interested';
+
+  @override
+  String get interestSelectionSave => 'Save';
+
+  @override
+  String get settingsInterests => 'Interests';
 
   @override
   String get retry => 'Try again';

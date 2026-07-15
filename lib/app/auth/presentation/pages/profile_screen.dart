@@ -1,9 +1,8 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_format_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_icon_tab_bar.dart';
@@ -373,17 +372,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
             final user = authState.user;
             final theme = Theme.of(context);
-            final username = user.username ?? 'username';
-            final postsTab = _tabPosts[0];
-            final displayPostCount = resolveProfilePostsCount(
-              apiPostCount: user.postCount,
-              loadedPostsCount: postsTab.posts.length,
-              hasLoadedAllPosts:
-                  postsTab.hasReachedMax && !postsTab.isInitialLoading,
-            );
+            final screenBackground = theme.brightness == Brightness.light
+                ? Colors.white
+                : theme.scaffoldBackgroundColor;
 
             return Scaffold(
-              backgroundColor: theme.scaffoldBackgroundColor,
+              backgroundColor: screenBackground,
               body: SafeArea(
                 bottom: false,
                 child: RefreshIndicator(
@@ -396,12 +390,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                     slivers: [
                       SliverToBoxAdapter(
                         child: ProfileHeaderBar(
-                          username: '@$username',
-                          onSettings: () => _refreshProfileAfterNavigation(
-                            context.pushNamed('settings'),
+                          onAddFriends: () => _refreshProfileAfterNavigation(
+                            context.pushNamed('follow_suggestions'),
                           ),
                           onWallet: () => _refreshProfileAfterNavigation(
                             context.pushNamed('wallet'),
+                          ),
+                          onSettings: () => _refreshProfileAfterNavigation(
+                            context.pushNamed('settings'),
                           ),
                         ),
                       ),
@@ -409,7 +405,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: ProfileHeaderSection(
                           user: user,
                           l10n: l10n,
-                          postsCount: displayPostCount,
                           onEditProfile: () => _refreshProfileAfterNavigation(
                             context.pushNamed('personal_info'),
                           ),
@@ -437,7 +432,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: ProfileIconTabBar(
                           selectedIndex: _selectedTabIndex,
                           onSelected: _onTabSelected,
-                          backgroundColor: theme.scaffoldBackgroundColor,
+                          backgroundColor: screenBackground,
                         ),
                       ),
                       ProfilePostsGridSliver(

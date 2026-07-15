@@ -1,33 +1,33 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
-import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
-    as camera_studio_di;
-import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
+import 'package:bimobondapp/app/ar_camera/ar_color_filters_panel.dart';
+import 'package:bimobondapp/app/ar_camera/ar_effects_picker_sheet.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
+import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_app_loading.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_compositor.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_compositor.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_preset.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_strip.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_sheets.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_studio_editor_strip.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_studio_editor_chrome.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_studio_preview.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_editor.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
-import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
-/// Instagram-style editor for gallery photos and videos before posting.
+/// TikTok-style editor — same AR filters / effects / beauty behavior as camera.
 class MediaStudioEditorScreen extends StatefulWidget {
   const MediaStudioEditorScreen({
     super.key,
@@ -53,32 +53,44 @@ class MediaStudioEditorScreen extends StatefulWidget {
 
 class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     with FeedPlaybackBlocker {
+  static const _maxFiles = 5;
+
   late List<MediaItemEditState> _states;
   late int _currentIndex;
+  SoundEntity? _selectedSound;
 
-  CameraFilterCategory _filterCategory = CameraFilterCategory.trending;
-  String _filterCategorySlug = 'trending';
-  AwesomeFilter _selectedFilter = AwesomeFilter.None;
-  String? _selectedEffectSlug;
-  bool _beautyEnabled = false;
-  bool _showFilters = true;
-  bool _filtersReady = false;
+  String _arFilterId = 'none';
+  String _arColorCategoryId = 'portrait';
+  double _arFilterIntensity = 1.0;
+  bool _alreadyBaked = false;
+  String _bakedFilterId = 'none';
+  bool _showFilters = false;
+  bool _showEffects = false;
   bool _isProcessing = false;
 
   MediaItemEditState get _currentState => _states[_currentIndex];
 
-  AwesomeFilter get _effectiveFilter {
-    if (_selectedFilter.name != AwesomeFilter.None.name) return _selectedFilter;
-    if (_beautyEnabled) return CameraFilterCatalog.beautyFilter.filter;
-    return AwesomeFilter.None;
+  bool get _beautyEnabled => _arFilterId == 'whitening';
+
+  bool get _hasActiveEffect =>
+      _arFilterId != 'none' && !ArFilterCatalog.isColorFilter(_arFilterId);
+
+  bool get _hasActiveColorFilter => ArFilterCatalog.isColorFilter(_arFilterId);
+
+  /// Apply Flutter color preview only when grade isn't already in the pixels
+  /// or the user changed away from the baked id.
+  bool get _applyArColorPreview {
+    if (!_hasActiveColorFilter) return false;
+    if (!_alreadyBaked) return true;
+    return _arFilterId != _bakedFilterId;
   }
 
-  CameraEffectDefinition? get _activeEffect =>
-      CameraEffectsCatalog.bySlug(_selectedEffectSlug);
+  int get _maxFilesLimit => widget.isStory ? 1 : _maxFiles;
 
   @override
   void initState() {
     super.initState();
+    _selectedSound = widget.initialSound;
     _states = widget.items.map(MediaItemEditState.fromItem).toList();
     if (widget.initialEdit != null && _states.isNotEmpty) {
       _states[0] = MediaItemEditState.fromItemWithSeed(
@@ -88,46 +100,25 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
     _currentIndex = widget.initialIndex.clamp(0, widget.items.length - 1);
     _applyStateToUi(_states[_currentIndex]);
-    unawaited(_loadCatalog());
-  }
-
-  Future<void> _loadCatalog() async {
-    await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded();
-    if (!mounted) return;
-    final categories = CameraFilterCatalog.filterCategories;
-    setState(() {
-      _filtersReady = CameraFilterCatalog.hasCatalog;
-      if (categories.isNotEmpty) {
-        final slugs = categories.map((c) => c.slug).toList();
-        if (!slugs.contains(_filterCategorySlug)) {
-          _filterCategorySlug = categories.first.slug;
-        }
-        _filterCategory =
-            CameraFilterCatalog.categoryFromSlug(_filterCategorySlug) ??
-            CameraFilterCategory.trending;
-      }
-    });
   }
 
   void _applyStateToUi(MediaItemEditState state) {
-    _selectedFilter = state.filter;
-    _selectedEffectSlug = state.effectSlug;
-    _beautyEnabled = state.beautyEnabled;
-    _filterCategory = state.filterCategory;
-    _filterCategorySlug = state.filterCategory.name;
+    _arFilterId = state.arFilterId;
+    _arColorCategoryId = state.arColorCategoryId;
+    _arFilterIntensity = state.arFilterIntensity;
+    _alreadyBaked = state.alreadyBaked;
+    _bakedFilterId = state.bakedArFilterId;
   }
 
   void _saveUiToCurrentState() {
-    final effectSlug =
-        _selectedEffectSlug == null || _selectedEffectSlug == 'none'
-        ? null
-        : _selectedEffectSlug;
-    _states[_currentIndex] = MediaItemEditState(
-      item: _states[_currentIndex].item,
-      filter: _selectedFilter,
-      effectSlug: effectSlug,
+    _states[_currentIndex] = _states[_currentIndex].copyWith(
+      arFilterId: _arFilterId,
+      arColorCategoryId: _arColorCategoryId,
+      arFilterIntensity: _arFilterIntensity,
+      alreadyBaked: _alreadyBaked,
+      bakedArFilterId: _bakedFilterId,
       beautyEnabled: _beautyEnabled,
-      filterCategory: _filterCategory,
+      effectSlug: _hasActiveEffect ? _arFilterId : null,
     );
   }
 
@@ -142,39 +133,62 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     });
   }
 
+  Future<File> _exportCurrentWithColorIfNeeded(MediaItemEditState state) async {
+    final needsColorExport = ArFilterCatalog.isColorFilter(state.arFilterId) &&
+        (!state.alreadyBaked || state.arFilterId != state.bakedArFilterId);
+    if (!needsColorExport || state.isVideo) {
+      return state.sourceFile;
+    }
+    return _bakeColorFilterToFile(
+      state.sourceFile,
+      state.arFilterId,
+      state.arFilterIntensity,
+    );
+  }
+
+  Future<File> _bakeColorFilterToFile(
+    File input,
+    String filterId,
+    double intensity,
+  ) async {
+    final colorFilter = ArColorFilterMatrix.preview(
+      filterId,
+      intensity: intensity,
+    );
+    if (colorFilter == null) return input;
+
+    final bytes = await input.readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()..colorFilter = colorFilter;
+    canvas.drawImage(image, Offset.zero, paint);
+    final picture = recorder.endRecording();
+    final out = await picture.toImage(image.width, image.height);
+    image.dispose();
+    final data = await out.toByteData(format: ui.ImageByteFormat.png);
+    out.dispose();
+    if (data == null) return input;
+    final dir = await getTemporaryDirectory();
+    final file = File(
+      '${dir.path}/ar_edit_${DateTime.now().millisecondsSinceEpoch}.png',
+    );
+    await file.writeAsBytes(data.buffer.asUint8List());
+    return file;
+  }
+
   Future<List<File>> _exportAll() async {
     _saveUiToCurrentState();
     final results = <File>[];
-
     for (final state in _states) {
-      var file = state.sourceFile;
-      final isVideo = state.isVideo;
-      final filter = state.effectiveFilter;
-      final hasFilter = CameraFilterCompositor.isActiveFilter(filter);
-      final hasEffect =
-          state.effectSlug != null && state.effectSlug != 'none';
-
-      if (hasFilter) {
-        file = await CameraFilterCompositor.applyIfNeeded(
-          input: file,
-          filter: filter,
-          isVideo: isVideo,
-        );
-      }
-      if (hasEffect) {
-        file = await CameraEffectCompositor.applyIfNeeded(
-          input: file,
-          effectSlug: state.effectSlug,
-          isVideo: isVideo,
-        );
-      }
-      results.add(file);
+      results.add(await _exportCurrentWithColorIfNeeded(state));
     }
-
     return results;
   }
 
-  Future<void> _onNext() async {
+  Future<void> _finishAsPost({required bool asStory}) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
@@ -190,18 +204,20 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             filterCategory: primaryFilterCategoryFromStates(_states),
             effectSlug: primaryEffectSlugFromStates(_states),
             beautyEnabled: _states.any((s) => s.beautyEnabled),
+            arFilterId: primaryArFilterIdFromStates(_states),
           ),
         );
         return;
       }
 
-      if (widget.isStory) {
+      final goStory = asStory || widget.isStory;
+      if (goStory) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute<void>(
             builder: (context) => StoryCameraEditor(
               file: files.first,
               type: widget.items.first.type,
-              sound: widget.initialSound,
+              sound: _selectedSound,
               onRetake: () => context.pop(),
             ),
           ),
@@ -210,18 +226,18 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
 
       final type = MediaGalleryImportFlow.resolvePostType(files);
-
       context.pushReplacementNamed(
         'add_post',
         extra: {
           'files': files,
           'type': type,
           'isStory': false,
-          'initialSound': widget.initialSound,
+          'initialSound': _selectedSound,
           'filterName': primaryFilterNameFromStates(_states),
           'filterCategory': primaryFilterCategoryFromStates(_states).name,
           'effectSlug': primaryEffectSlugFromStates(_states),
           'beautyEnabled': _states.any((s) => s.beautyEnabled),
+          'arFilterId': primaryArFilterIdFromStates(_states),
         },
       );
     } finally {
@@ -229,36 +245,207 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
   }
 
-  void _applyFilter(CameraFilterPreset preset) {
-    setState(() {
-      _selectedFilter = preset.filter;
-      _saveUiToCurrentState();
-    });
-  }
+  Future<void> _onNext() => _finishAsPost(asStory: false);
+
+  Future<void> _onYourStory() => _finishAsPost(asStory: true);
 
   void _toggleBeauty() {
     setState(() {
-      _beautyEnabled = !_beautyEnabled;
+      if (_arFilterId == 'whitening') {
+        _arFilterId = 'none';
+      } else {
+        _arFilterId = 'whitening';
+        _arColorCategoryId = 'portrait';
+        _showFilters = true;
+        _showEffects = false;
+      }
       _saveUiToCurrentState();
     });
   }
 
-  void _selectEffect(String? slug) {
+  void _selectArFilter(String id) {
     setState(() {
-      _selectedEffectSlug = slug;
+      _arFilterId = id;
+      if (ArFilterCatalog.isColorFilter(id)) {
+        _showEffects = false;
+      }
       _saveUiToCurrentState();
     });
   }
 
-  String _filterLabel(AppLocalizations l10n, CameraFilterPreset preset) {
-    return preset.label(l10n: l10n, originalLabel: l10n.cameraFilterOriginal);
+  void _selectEffect(String id) {
+    setState(() {
+      _arFilterId = id;
+      _showEffects = false;
+      if (ArFilterCatalog.isColorFilter(id)) {
+        _showFilters = true;
+      }
+      _saveUiToCurrentState();
+    });
+  }
+
+  Future<void> _pickSound() async {
+    final picked = await SoundPickerSheet.show(
+      context,
+      initialSelection: _selectedSound,
+    );
+    if (!mounted) return;
+    setState(() => _selectedSound = picked);
+  }
+
+  void _clearSound() => setState(() => _selectedSound = null);
+
+  Future<void> _shareCurrent() async {
+    final file = _currentState.sourceFile;
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path)]),
+    );
+  }
+
+  void _showComingSoon(AppLocalizations l10n) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.mediaEditorComingSoon)),
+    );
+  }
+
+  Future<void> _addMedia() async {
+    final remaining = _maxFilesLimit - _states.length;
+    if (remaining <= 0) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.fieldIsRequired('Maximum $_maxFilesLimit'))),
+      );
+      return;
+    }
+    final picked = await MediaGalleryPicker.pickMixed(limit: remaining);
+    if (!mounted || picked.isEmpty) return;
+    setState(() {
+      _states.addAll(picked.map(MediaItemEditState.fromItem));
+      _currentIndex = _states.length - 1;
+      _applyStateToUi(_states[_currentIndex]);
+    });
+  }
+
+  Future<void> _openEffects(AppLocalizations l10n) async {
+    setState(() {
+      _showEffects = true;
+      _showFilters = false;
+    });
+    await ArEffectsPickerSheet.show(
+      context,
+      l10n: l10n,
+      selectedEffectId: _hasActiveEffect ? _arFilterId : 'none',
+      onSelected: _selectEffect,
+    );
+    if (mounted) setState(() => _showEffects = false);
+  }
+
+  Future<void> _showSettingsSheet(AppLocalizations l10n) async {
+    await GlassBottomSheet.showActions<void>(
+      context,
+      title: l10n.moreOptionsLabel,
+      children: [
+        GlassBottomSheetActionTile(
+          icon: LucideIcons.sparkles,
+          label: l10n.cameraBeauty,
+          subtitle: _beautyEnabled ? l10n.settingsOn : l10n.settingsOff,
+          isSelected: _beautyEnabled,
+          onTap: () {
+            Navigator.pop(context);
+            _toggleBeauty();
+          },
+        ),
+        GlassBottomSheetActionTile(
+          icon: LucideIcons.blend,
+          label: l10n.cameraFilters,
+          onTap: () {
+            Navigator.pop(context);
+            setState(() {
+              _showFilters = true;
+              _showEffects = false;
+            });
+          },
+        ),
+        GlassBottomSheetActionTile(
+          icon: LucideIcons.wandSparkles,
+          label: l10n.cameraEffects,
+          onTap: () {
+            Navigator.pop(context);
+            _openEffects(l10n);
+          },
+        ),
+      ],
+    );
+  }
+
+  List<MediaStudioSideTool> _sideTools(AppLocalizations l10n) {
+    // Same tool semantics as live camera: Beauty / Filters / Effects.
+    return [
+      MediaStudioSideTool(
+        icon: LucideIcons.share2,
+        label: l10n.mediaEditorShare,
+        onTap: _isProcessing ? () {} : _shareCurrent,
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.sparkles,
+        label: l10n.cameraBeauty,
+        active: _beautyEnabled,
+        onTap: _isProcessing ? () {} : _toggleBeauty,
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.blend,
+        label: l10n.cameraFilters,
+        active: _showFilters || _hasActiveColorFilter,
+        onTap: _isProcessing
+            ? () {}
+            : () => setState(() {
+                  _showFilters = !_showFilters;
+                  if (_showFilters) _showEffects = false;
+                }),
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.wandSparkles,
+        label: l10n.cameraEffects,
+        active: _showEffects || _hasActiveEffect,
+        onTap: _isProcessing ? () {} : () => _openEffects(l10n),
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.layoutTemplate,
+        label: l10n.cameraLayout,
+        onTap: () => _showComingSoon(l10n),
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.ratio,
+        label: l10n.cameraAspectRatio,
+        onTap: () => _showComingSoon(l10n),
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.type,
+        label: l10n.mediaEditorText,
+        useAa: true,
+        onTap: () => _showComingSoon(l10n),
+      ),
+      MediaStudioSideTool(
+        icon: LucideIcons.crop,
+        label: l10n.mediaEditorCrop,
+        onTap: () => _showComingSoon(l10n),
+      ),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final filters = CameraFilterCatalog.forCategorySlug(_filterCategorySlug);
     final currentItem = _currentState.item;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final soundLabel = _selectedSound?.name.trim().isNotEmpty == true
+        ? _selectedSound!.name
+        : l10n.cameraAddSound;
+    final authState = context.watch<AuthBloc>().state;
+    final avatarUrl =
+        authState is AuthSuccess ? authState.user.avatarUrl : null;
+    final selectedColorId =
+        _hasActiveColorFilter ? _arFilterId : 'none';
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -268,171 +455,74 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           MediaStudioPreview(
             key: ValueKey(
               '${currentItem.file.path}-$_currentIndex-'
-              '${_effectiveFilter.name}-$_selectedEffectSlug',
+              '$_arFilterId-$_arFilterIntensity-$_applyArColorPreview',
             ),
             file: currentItem.file,
             isVideo: currentItem.isVideo,
-            filter: _effectiveFilter,
-            effect: _activeEffect,
+            arFilterId: selectedColorId,
+            arFilterIntensity: _arFilterIntensity,
+            applyArColorPreview: _applyArColorPreview,
           ),
           SafeArea(
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
+                MediaStudioTopBar(
+                  soundLabel: soundLabel,
+                  onBack: _isProcessing ? () {} : () => context.pop(),
+                  onSoundTap: _isProcessing ? () {} : _pickSound,
+                  onClearSound: _selectedSound == null || _isProcessing
+                      ? null
+                      : _clearSound,
+                  onSettingsTap:
+                      _isProcessing ? () {} : () => _showSettingsSheet(l10n),
+                ),
+                Expanded(
+                  child: Stack(
                     children: [
-                      IconButton(
-                        onPressed: _isProcessing ? null : () => context.pop(),
-                        icon: const Icon(LucideIcons.x, color: Colors.white),
-                      ),
-                      if (widget.items.length > 1)
-                        Text(
-                          '${_currentIndex + 1}/${widget.items.length}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      const Spacer(),
-                      FilledButton(
-                        onPressed: _isProcessing ? null : _onNext,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                        ),
-                        child: Text(
-                          l10n.continueAction,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
+                      Positioned(
+                        top: 8,
+                        bottom: 8,
+                        right: isRtl ? null : 0,
+                        left: isRtl ? 0 : null,
+                        child: MediaStudioSideRail(tools: _sideTools(l10n)),
                       ),
                     ],
                   ),
                 ),
-                const Spacer(),
-                if (widget.items.length > 1) ...[
-                  MediaStudioEditorStrip(
-                    items: _states.map((s) => s.item).toList(growable: false),
-                    selectedIndex: _currentIndex,
-                    onSelected: _selectIndex,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (_showFilters && _filtersReady) ...[
-                  CameraFilterCategoryTabs(
-                    categories: CameraFilterCatalog.filterCategories,
-                    selectedSlug: _filterCategorySlug,
-                    labelBuilder: (category) =>
-                        CameraFilterCatalog.labelForCategory(l10n, category),
-                    onSelected: (slug) => setState(() {
-                      _filterCategorySlug = slug;
-                      _filterCategory =
-                          CameraFilterCatalog.categoryFromSlug(slug) ??
-                          CameraFilterCategory.trending;
+                if (_showFilters)
+                  ArColorFiltersPanel(
+                    selectedFilterId: selectedColorId,
+                    selectedCategoryId: _arColorCategoryId,
+                    intensity: _arFilterIntensity,
+                    onCategorySelected: (id) => setState(() {
+                      _arColorCategoryId = id;
+                      _saveUiToCurrentState();
                     }),
+                    onFilterSelected: _selectArFilter,
+                    onIntensityChanged: (value) => setState(() {
+                      _arFilterIntensity = value;
+                      _saveUiToCurrentState();
+                    }),
+                    onClear: () => _selectArFilter('none'),
                   ),
-                  const SizedBox(height: 10),
-                  CameraFilterStrip(
-                    presets: filters,
-                    selected: _selectedFilter,
-                    labelBuilder: (p) => _filterLabel(l10n, p),
-                    onSelected: _applyFilter,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _ToolChip(
-                        icon: LucideIcons.sparkles,
-                        label: l10n.cameraEffects,
-                        active:
-                            _selectedEffectSlug != null &&
-                            _selectedEffectSlug != 'none',
-                        onTap: _isProcessing
-                            ? null
-                            : () => CameraStudioSheets.showEffectsPicker(
-                                context,
-                                l10n: l10n,
-                                selectedEffectSlug: _selectedEffectSlug,
-                                onSelected: _selectEffect,
-                              ),
-                      ),
-                      _ToolChip(
-                        icon: LucideIcons.star,
-                        label: l10n.cameraBeauty,
-                        active: _beautyEnabled,
-                        onTap: _isProcessing ? null : _toggleBeauty,
-                      ),
-                      _ToolChip(
-                        icon: LucideIcons.slidersHorizontal,
-                        label: l10n.cameraFilters,
-                        active: _showFilters,
-                        onTap: _isProcessing
-                            ? null
-                            : () =>
-                                  setState(() => _showFilters = !_showFilters),
-                      ),
-                    ],
-                  ),
+                MediaStudioClipDock(
+                  items: _states.map((s) => s.item).toList(growable: false),
+                  selectedIndex: _currentIndex,
+                  onSelected: _selectIndex,
+                  onAdd: _isProcessing ? () {} : _addMedia,
+                ),
+                MediaStudioBottomActions(
+                  yourStoryLabel: l10n.messagesYourStory,
+                  nextLabel: l10n.nextAction,
+                  avatarUrl: avatarUrl,
+                  enabled: !_isProcessing,
+                  onYourStory: _onYourStory,
+                  onNext: _onNext,
                 ),
               ],
             ),
           ),
           if (_isProcessing) CameraAppLoading(message: l10n.promoteProcessing),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToolChip extends StatelessWidget {
-  const _ToolChip({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: AppSizes.buttonHeightSm,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active ? Colors.white24 : Colors.white12,
-              border: active
-                  ? Border.all(color: Colors.redAccent, width: 2)
-                  : null,
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: active ? Colors.white : Colors.white70,
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-            ),
-          ),
         ],
       ),
     );

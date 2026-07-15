@@ -2,8 +2,10 @@ import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_sort_
 import 'package:bimobondapp/app/home/presentation/widgets/comments/engagement_tab.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
+import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class EngagementSheetHeader extends StatelessWidget {
   const EngagementSheetHeader({
@@ -15,6 +17,7 @@ class EngagementSheetHeader extends StatelessWidget {
     required this.viewCount,
     required this.commentSort,
     required this.onCommentSortChanged,
+    required this.onClose,
     super.key,
   });
 
@@ -26,94 +29,89 @@ class EngagementSheetHeader extends StatelessWidget {
   final int viewCount;
   final String commentSort;
   final ValueChanged<String> onCommentSortChanged;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final onSurface = theme.colorScheme.onSurface;
+    final muted = onSurface.withValues(alpha: 0.4);
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.only(
-            start: AppSizes.p16,
-            end: AppSizes.p8,
-            top: AppSizes.p4,
-            bottom: AppSizes.p4,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (isPostOwner)
+    return DraggableSheetDragRegion(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(
+              start: AppSizes.p16,
+              end: AppSizes.p8,
+              top: 2,
+              bottom: 2,
+            ),
+            child: Row(
+              children: [
                 Expanded(
                   child: TabBar(
                     controller: tabController,
-                    isScrollable: false,
-                    tabAlignment: TabAlignment.fill,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicatorPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.p10,
-                      vertical: AppSizes.p8,
-                    ),
-                    labelPadding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.p8,
-                      vertical: AppSizes.p8,
-                    ),
-                    labelColor: theme.colorScheme.primary,
-                    unselectedLabelColor: theme.colorScheme.onSurface
-                        .withValues(alpha: 0.55),
-                    indicatorColor: theme.colorScheme.primary,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicatorWeight: 2,
+                    indicatorColor: onSurface,
                     dividerHeight: 0,
+                    labelPadding: const EdgeInsetsDirectional.only(end: 18),
+                    labelColor: onSurface,
+                    unselectedLabelColor: muted,
                     labelStyle: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 14,
+                      fontSize: 15,
                     ),
                     unselectedLabelStyle: const TextStyle(
                       fontWeight: FontWeight.w500,
-                      fontSize: 14,
+                      fontSize: 15,
                     ),
                     tabs: [
-                      EngagementTab(
-                        label: '${l10n.likes} ${formatCompactCount(likeCount)}',
-                      ),
                       EngagementTab(
                         label:
                             '${l10n.commentsTitle} ${formatCompactCount(commentCount)}',
                       ),
                       EngagementTab(
-                        label:
-                            '${l10n.viewsLabel} ${formatCompactCount(viewCount)}',
+                        label: '${l10n.likes} ${formatCompactCount(likeCount)}',
                       ),
+                      if (isPostOwner)
+                        EngagementTab(
+                          label:
+                              '${l10n.viewsLabel} ${formatCompactCount(viewCount)}',
+                        ),
                     ],
                   ),
-                )
-              else if (!showCommentSort)
-                const SizedBox.shrink()
-              else
-                Expanded(
-                  child: Text(
-                    l10n.commentsTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
-                      letterSpacing: -0.3,
-                    ),
+                ),
+                if (showCommentSort)
+                  CommentSortMenu(
+                    sort: commentSort,
+                    onSortChanged: onCommentSortChanged,
+                    iconOnly: true,
                   ),
+                IconButton(
+                  onPressed: onClose,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  icon: Icon(LucideIcons.x, size: 22, color: onSurface),
                 ),
-              if (showCommentSort)
-                CommentSortMenu(
-                  sort: commentSort,
-                  onSortChanged: onCommentSortChanged,
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Divider(
-          height: 1,
-          thickness: 1,
-          color: theme.dividerColor.withValues(alpha: 0.25),
-        ),
-      ],
+          Divider(
+            height: 1,
+            thickness: 0.5,
+            color: onSurface.withValues(alpha: 0.08),
+          ),
+        ],
+      ),
     );
   }
 }

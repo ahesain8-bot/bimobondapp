@@ -1,23 +1,27 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
-import 'package:bimobondapp/core/utils/user_roles.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_placeholder_screen.dart';
 import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
+import 'package:bimobondapp/core/utils/user_roles.dart';
+import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
-import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
-import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -26,21 +30,48 @@ class SettingsScreen extends StatelessWidget {
     final themeMode = context.watch<ThemeCubit>().state;
     final isArabic = locale.languageCode == 'ar';
     final isDark = ThemeCubit.isDarkActive(themeMode);
+    final pageBg = SettingsLayoutConstants.pageBackground(theme);
+    final onSurface = theme.colorScheme.onSurface;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: CustomAppBar(
-        title: l10n.settingsAndPrivacy,
-        showBackButton: true,
-        // backgroundColor: theme.scaffoldBackgroundColor,
-        onBackPressed: () => context.pop(),
+      backgroundColor: pageBg,
+      appBar: AppBar(
+        backgroundColor: pageBg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: Icon(
+            Directionality.of(context) == TextDirection.rtl
+                ? LucideIcons.chevronRight
+                : LucideIcons.chevronLeft,
+            color: onSurface,
+            size: 28,
+          ),
+        ),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SettingsLayoutConstants.horizontalPadding,
-          vertical: SettingsLayoutConstants.bodyVerticalPadding,
+        padding: const EdgeInsets.fromLTRB(
+          SettingsLayoutConstants.horizontalPadding,
+          SettingsLayoutConstants.bodyTopPadding,
+          SettingsLayoutConstants.horizontalPadding,
+          SettingsLayoutConstants.bottomSpacing,
         ),
         children: [
+          Text(
+            l10n.settingsAndPrivacy,
+            style: TextStyle(
+              fontSize: SettingsLayoutConstants.pageTitleFontSize,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+              height: 1.15,
+              color: onSurface,
+            ),
+          ),
+          const SizedBox(
+            height: SettingsLayoutConstants.pageTitleBottomSpacing,
+          ),
           _SettingsSectionTitle(title: l10n.settingsSectionAccount),
           _SettingsGroup(
             children: [
@@ -50,9 +81,12 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => context.pushNamed('personal_info'),
               ),
               _SettingsTile(
-                icon: LucideIcons.shield,
-                title: l10n.settingsSecurity,
-                onTap: () => _openPlaceholder(context, l10n.settingsSecurity),
+                icon: LucideIcons.heart,
+                title: l10n.settingsInterests,
+                onTap: () => context.pushNamed(
+                  'interest_selection',
+                  queryParameters: {'mode': 'edit'},
+                ),
               ),
               _SettingsTile(
                 icon: LucideIcons.lock,
@@ -60,14 +94,19 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => _openPlaceholder(context, l10n.settingsPrivacy),
               ),
               _SettingsTile(
+                icon: LucideIcons.shield,
+                title: l10n.settingsSecurity,
+                onTap: () => _openPlaceholder(context, l10n.settingsSecurity),
+              ),
+              _SettingsTile(
                 icon: LucideIcons.wallet,
-                title: l10n.walletTitle,
-                onTap: () => context.pushNamed('wallet'),
+                title: l10n.balanceTitle,
+                onTap: () => context.pushNamed('balance'),
               ),
               _SettingsTile(
                 icon: LucideIcons.circleDollarSign,
-                title: l10n.balanceTitle,
-                onTap: () => context.pushNamed('balance'),
+                title: l10n.walletTitle,
+                onTap: () => context.pushNamed('wallet'),
               ),
             ],
           ),
@@ -76,17 +115,17 @@ class SettingsScreen extends StatelessWidget {
           _SettingsGroup(
             children: [
               _SettingsTile(
+                icon: LucideIcons.bell,
+                title: l10n.settingsNotifications,
+                onTap: () => context.pushNamed('notifications'),
+              ),
+              _SettingsTile(
                 icon: LucideIcons.languages,
                 title: l10n.settingsLanguage,
                 trailingText: isArabic
                     ? l10n.settingsLanguageArabic
                     : l10n.settingsLanguageEnglish,
                 onTap: () => _showLanguageSheet(context, l10n, locale),
-              ),
-              _SettingsTile(
-                icon: LucideIcons.bell,
-                title: l10n.settingsNotifications,
-                onTap: () => context.pushNamed('notifications'),
               ),
               _SettingsTile(
                 icon: LucideIcons.moon,
@@ -155,23 +194,30 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: SettingsLayoutConstants.logoutTopSpacing),
           _SettingsGroup(
             children: [
-              ListTile(
+              InkWell(
                 onTap: () => _confirmLogout(context, l10n),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: SettingsLayoutConstants.tileVerticalPadding,
+                borderRadius: BorderRadius.circular(
+                  SettingsLayoutConstants.groupRadius,
                 ),
-                title: Center(
-                  child: CustomText(
-                    l10n.settingsLogout,
-                    color: SettingsLayoutConstants.logoutColor,
-                    fontSize: SettingsLayoutConstants.logoutFontSize,
-                    fontWeight: FontWeight.bold,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: SettingsLayoutConstants.tileHorizontalPadding,
+                  ),
+                  child: Center(
+                    child: Text(
+                      l10n.settingsLogout,
+                      style: const TextStyle(
+                        color: SettingsLayoutConstants.logoutColor,
+                        fontSize: SettingsLayoutConstants.logoutFontSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: SettingsLayoutConstants.bottomSpacing),
         ],
       ),
     );
@@ -305,13 +351,14 @@ class _SettingsSectionTitle extends StatelessWidget {
         SettingsLayoutConstants.sectionTitleHorizontalPadding,
         SettingsLayoutConstants.sectionTitleBottomPadding,
       ),
-      child: CustomText(
+      child: Text(
         title,
-        fontSize: SettingsLayoutConstants.sectionTitleFontSize,
-        fontWeight: FontWeight.w600,
-        variant: TextVariant.secondary,
-        color: theme.textTheme.bodyLarge?.color?.withValues(
-          alpha: SettingsLayoutConstants.sectionTitleColorAlpha,
+        style: TextStyle(
+          fontSize: SettingsLayoutConstants.sectionTitleFontSize,
+          fontWeight: FontWeight.w500,
+          color: theme.colorScheme.onSurface.withValues(
+            alpha: SettingsLayoutConstants.sectionTitleColorAlpha,
+          ),
         ),
       ),
     );
@@ -327,30 +374,11 @@ class _SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(
-          SettingsLayoutConstants.groupRadius,
-        ),
-        border: Border.all(
-          color: SettingsLayoutConstants.groupBorderColor(theme),
-        ),
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0)
-              Divider(
-                height: SettingsLayoutConstants.appBarDividerHeight,
-                indent: SettingsLayoutConstants.dividerIndent,
-                endIndent: SettingsLayoutConstants.dividerEndIndent,
-                color: SettingsLayoutConstants.groupDividerColor(theme),
-              ),
-            children[i],
-          ],
-        ],
-      ),
+    return Material(
+      color: SettingsLayoutConstants.cardBackground(theme),
+      borderRadius: BorderRadius.circular(SettingsLayoutConstants.groupRadius),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
     );
   }
 }
@@ -371,59 +399,49 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final onSurface = theme.colorScheme.onSurface;
 
-    return ListTile(
+    return InkWell(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: SettingsLayoutConstants.tileHorizontalPadding,
-        vertical: SettingsLayoutConstants.tileVerticalPadding,
-      ),
-      leading: Container(
-        padding: const EdgeInsets.all(
-          SettingsLayoutConstants.iconContainerPadding,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SettingsLayoutConstants.tileHorizontalPadding,
+          vertical: 14,
         ),
-        decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(
-            alpha: SettingsLayoutConstants.iconBackgroundAlpha,
-          ),
-          borderRadius: BorderRadius.circular(
-            SettingsLayoutConstants.iconContainerRadius,
-          ),
-        ),
-        child: Icon(
-          icon,
-          color: colorScheme.primary,
-          size: SettingsLayoutConstants.leadingIconSize,
-        ),
-      ),
-      title: CustomText(
-        title,
-        fontSize: SettingsLayoutConstants.itemTitleFontSize,
-        fontWeight: FontWeight.w400,
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailingText != null)
-            CustomText(
-              trailingText!,
-              fontSize: SettingsLayoutConstants.trailingFontSize,
-              variant: TextVariant.secondary,
-              color: theme.textTheme.bodyLarge?.color?.withValues(
-                alpha: SettingsLayoutConstants.trailingTextAlpha,
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: SettingsLayoutConstants.leadingIconSize,
+              color: SettingsLayoutConstants.iconColor(theme),
+            ),
+            const SizedBox(width: SettingsLayoutConstants.leadingGap),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: SettingsLayoutConstants.itemTitleFontSize,
+                  fontWeight: FontWeight.w400,
+                  color: onSurface,
+                ),
               ),
             ),
-          const SizedBox(width: SettingsLayoutConstants.chevronGap),
-          Icon(
-            isRtl ? LucideIcons.chevronLeft : LucideIcons.chevronRight,
-            color: theme.textTheme.bodyLarge?.color?.withValues(
-              alpha: SettingsLayoutConstants.chevronAlpha,
+            if (trailingText != null) ...[
+              Text(
+                trailingText!,
+                style: TextStyle(
+                  fontSize: SettingsLayoutConstants.trailingFontSize,
+                  color: SettingsLayoutConstants.trailingTextColor(theme),
+                ),
+              ),
+              const SizedBox(width: SettingsLayoutConstants.chevronGap),
+            ],
+            DirectionalChevronIcon(
+              size: SettingsLayoutConstants.chevronSize,
+              color: SettingsLayoutConstants.chevronColor(theme),
             ),
-            size: SettingsLayoutConstants.chevronSize,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

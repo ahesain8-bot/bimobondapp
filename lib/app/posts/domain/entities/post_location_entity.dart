@@ -21,6 +21,23 @@ class PostLocationEntity extends Equatable {
   final String? address;
   final String? placeId;
 
+  /// TikTok-style place label (city / name).
+  String get displayLabel {
+    final cityName = city?.trim() ?? '';
+    final placeName = name.trim();
+    if (cityName.isNotEmpty &&
+        placeName.isNotEmpty &&
+        cityName.toLowerCase() != placeName.toLowerCase()) {
+      return placeName;
+    }
+    if (placeName.isNotEmpty) return placeName;
+    if (cityName.isNotEmpty) return cityName;
+    final code = countryCode?.trim() ?? '';
+    return code;
+  }
+
+  bool get hasDisplayLabel => displayLabel.isNotEmpty;
+
   factory PostLocationEntity.fromJson(Map<String, dynamic> json) {
     return PostLocationEntity(
       id: json['id']?.toString() ?? '',

@@ -9,17 +9,20 @@ import 'package:bimobondapp/app/chats/domain/usecases/delete_message_usecase.dar
 import 'package:bimobondapp/app/chats/domain/usecases/mark_message_read_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/react_to_message_usecase.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/send_message_usecase.dart';
+import 'package:bimobondapp/app/chats/domain/usecases/vote_poll_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_event.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/bloc/chat_state.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_message_mapper.dart';
 import 'package:bimobondapp/app/chats/presentation/utils/chat_send_content.dart';
+import 'package:bimobondapp/app/home/presentation/utils/chat_attachment_payload.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ChatBloc({
     required this.getChatMessagesUseCase,
     required this.sendMessageUseCase,
+    required this.votePollUseCase,
     required this.uploadMediaUseCase,
     required this.reactToMessageUseCase,
     required this.markMessageReadUseCase,
@@ -31,6 +34,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatMessageSendRequested>(_onMessageSendRequested);
     on<ChatVoiceMessageSendRequested>(_onVoiceMessageSendRequested);
     on<ChatAttachmentSendRequested>(_onAttachmentSendRequested);
+    on<ChatPollVoteRequested>(_onPollVoteRequested);
     on<ChatMessageReactRequested>(_onMessageReactRequested);
     on<ChatMessageDeleteRequested>(_onMessageDeleteRequested);
     on<ChatTypingChanged>(_onTypingChanged);
@@ -44,6 +48,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
   final GetChatMessagesUseCase getChatMessagesUseCase;
   final SendMessageUseCase sendMessageUseCase;
+  final VotePollUseCase votePollUseCase;
   final UploadMediaUseCase uploadMediaUseCase;
   final ReactToMessageUseCase reactToMessageUseCase;
   final MarkMessageReadUseCase markMessageReadUseCase;
@@ -274,13 +279,35 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         mediaUrl: mediaUrl,
       );
 
+      Map<String, dynamic>? payload = event.payload;
+      String? outgoingMediaUrl = mediaUrl;
+
+      if (event.messageType.toUpperCase() == 'FILE' &&
+          mediaUrl != null &&
+          mediaUrl.trim().isNotEmpty) {
+        final fileName = event.content.trim().isNotEmpty
+            ? event.content.trim()
+            : (event.localFilePath?.split(RegExp(r'[/\\]')).last ?? 'file');
+        final mime = event.mimeType?.trim().isNotEmpty == true
+            ? event.mimeType!
+            : inferMimeTypeFromFileName(fileName);
+        payload = ChatFilePayload(
+          url: mediaUrl,
+          fileName: fileName,
+          mimeType: mime,
+          sizeBytes: event.sizeBytes,
+        ).toPayloadMap();
+        outgoingMediaUrl = mediaUrl;
+      }
+
       final sendResult = await sendMessageUseCase(
         SendMessageParams(
           chatId: chatId,
           content: content,
           type: event.messageType,
-          mediaUrl: mediaUrl,
+          mediaUrl: outgoingMediaUrl,
           replyToId: event.replyToId,
+          payload: payload,
         ),
       );
 
@@ -301,13 +328,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final file = File(filePath);
     if (!await file.exists()) {
       final fileName = filePath.split(RegExp(r'[/\\]')).last;
-      emit(
-        ChatFailure(
-          'ERROR: Cannot read "$fileName" '
-          '(this model does not support image input). '
-          'Inform the user.',
-        ),
-      );
+      emit(ChatFailure('Cannot read "$fileName".'));
       return;
     }
 
@@ -322,6 +343,35 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           return;
         }
         await sendWithMediaUrl(mediaUrl);
+      },
+    );
+  }
+
+  Future<void> _onPollVoteRequested(
+    ChatPollVoteRequested event,
+    Emitter<ChatState> emit,
+  ) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    if (state is! ChatLoadSuccess) return;
+    final current = state as ChatLoadSuccess;
+
+    final result = await votePollUseCase(
+      VotePollParams(
+        messageId: event.messageId,
+        optionIndex: event.optionIndex,
+      ),
+    );
+
+    result.fold(
+      (failure) => emit(ChatFailure(failure.message)),
+      (message) {
+        final ui = chatMessageToUiMap(message, userId);
+        final updated = current.messages.map((m) {
+          if (m['id'] == ui['id']) return ui;
+          return m;
+        }).toList();
+        emit(current.copyWith(messages: updated));
       },
     );
   }
@@ -416,7 +466,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     if (state is! ChatLoadSuccess) return;
     final current = state as ChatLoadSuccess;
     final id = event.raw['id'];
-    if (current.messages.any((m) => m['id'] == id)) return;
+    final existingIndex = current.messages.indexWhere((m) => m['id'] == id);
+    if (existingIndex >= 0) {
+      final updated = List<Map<String, dynamic>>.from(current.messages);
+      updated[existingIndex] = event.raw;
+      emit(current.copyWith(messages: updated));
+      return;
+    }
     emit(
       current.copyWith(
         messages: sortChatMessagesOldestFirst([...current.messages, event.raw]),

@@ -356,13 +356,18 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
   void _openStoryViewers(PostEntity post) {
     _pauseProgress();
     final e = _engagementFor(post);
+    var keepPausedForDelete = false;
     StoryInsightsSheet.show(
       context,
-      postId: post.id,
-      likeCount: e.likeCount,
+      post: post,
       viewCount: e.viewCount,
+      likeCount: e.likeCount,
+      onDelete: () {
+        keepPausedForDelete = true;
+        _confirmDelete(post);
+      },
     ).whenComplete(() {
-      if (mounted) _resumeProgress();
+      if (mounted && !keepPausedForDelete) _resumeProgress();
     });
   }
 
@@ -533,7 +538,58 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.p8,
+            AppSizes.p6,
+            AppSizes.p8,
+            AppSizes.p8,
+          ),
+          child: Row(
+            children: List.generate(_stories.length, (i) {
+              final isPast = i < _currentIndex;
+              final isActive = i == _currentIndex;
+              return Expanded(
+                child: Container(
+                  height: 2.5,
+                  margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.28),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: isPast
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        )
+                      : (isActive && progress != null && _isMediaReady
+                          ? AnimatedBuilder(
+                              animation: progress,
+                              builder: (context, child) {
+                                return Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: FractionallySizedBox(
+                                    widthFactor:
+                                        progress.value.clamp(0.0, 1.0),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : null),
+                ),
+              );
+            }),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
           child: Row(
             children: [
               Expanded(
@@ -612,43 +668,6 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSizes.p6),
-          child: Row(
-            children: List.generate(_stories.length, (i) {
-              final active = i == _currentIndex;
-              return Expanded(
-                child: Container(
-                  height: 3,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  child: active && progress != null && _isMediaReady
-                      ? AnimatedBuilder(
-                          animation: progress,
-                          builder: (context, child) {
-                            return Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: FractionallySizedBox(
-                                widthFactor: progress.value.clamp(0.0, 1.0),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : null,
-                ),
-              );
-            }),
-          ),
-        ),
       ],
     );
   }
@@ -664,19 +683,21 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       right: AppSizes.p16,
       bottom: MediaQuery.paddingOf(context).bottom + AppSizes.p16,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isOwner) ...[
             StoryViewerViewersChip(
               viewCount: e.viewCount,
-              label: l10n.viewsLabel,
+              label: l10n.viewsLabel.toLowerCase(),
               onTap: () => _openStoryViewers(post),
             ),
             const SizedBox(height: AppSizes.p10),
           ],
-          StoryCaptionDisplay(caption: caption),
-          if (caption.isNotEmpty) const SizedBox(height: AppSizes.p12),
+          if (caption.isNotEmpty) ...[
+            Center(child: StoryCaptionDisplay(caption: caption)),
+            const SizedBox(height: AppSizes.p12),
+          ],
           StoryViewerBottomActions(
             isLiked: e.isLiked,
             onLike: () => _handleLike(post),

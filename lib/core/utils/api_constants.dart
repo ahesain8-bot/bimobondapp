@@ -83,6 +83,8 @@ class ApiConstants {
       '/chats/messages/$messageId/react';
   static String deleteMessage(String messageId) =>
       '/chats/messages/$messageId/delete';
+  static String pollVote(String messageId) =>
+      '/chats/messages/$messageId/poll-vote';
 
   // Friends (mutual follows)
   static const String myFriends = '/users/me/friends';
@@ -110,4 +112,17 @@ class ApiConstants {
   static const String soundsMine = '/sounds/mine';
   static const String soundsUpload = '/sounds/upload';
   static String soundById(String id) => '/sounds/$id';
+
+  // Search history
+  static const String searchHistory = '/users/me/search-history';
+  static String searchHistoryById(String id) => '/users/me/search-history/$id';
+  static const String searchTrends = '/users/me/search-trends';
+  static const String search = '/search';
+
+  // Countries catalog (public)
+  static const String countries = '/countries';
+  static String countryCities(String code) => '/countries/$code/cities';
+
+  // User interests
+  static const String userInterests = '/users/me/interests';
 }

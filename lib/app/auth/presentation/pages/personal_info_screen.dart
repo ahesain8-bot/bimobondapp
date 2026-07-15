@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/auth/presentation/widgets/personal_info/personal
 import 'package:bimobondapp/app/auth/presentation/widgets/personal_info/personal_info_utils.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/personal_info/personal_info_view.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -110,10 +111,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         ? '$_selectedCountryCode$phoneInput'
         : null;
 
+    final bioText = _bioController.text.trim();
+    final cappedBio = bioText.length > ProfileBioText.maxLength
+        ? bioText.substring(0, ProfileBioText.maxLength)
+        : bioText;
+
     final data = <String, dynamic>{
       'fullName': _fullNameController.text.trim(),
       'username': _usernameController.text.trim(),
-      'bio': _bioController.text.trim(),
+      'bio': cappedBio,
       'gender': _selectedGender,
       'country': _selectedCountry,
       'phoneNumber': fullPhoneNumber,

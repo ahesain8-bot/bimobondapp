@@ -1,7 +1,7 @@
-/// Builds a non-empty [content] string for the chat messages API.
+/// Builds a non-empty [content] string for the chat messages API when needed.
 ///
-/// Media is uploaded first; [mediaUrl] is then sent in both `mediaUrl` and
-/// `content` when the draft has no caption (same pattern as post media URLs).
+/// Rich types (`LOCATION`, `CONTACT`, `GIFT`, `POLL`) can omit content; the API
+/// fills an inbox preview. Media types still send a caption or URL fallback.
 String buildChatMessageContent({
   required String messageType,
   required String draftContent,
@@ -15,20 +15,13 @@ String buildChatMessageContent({
     switch (messageType.toUpperCase()) {
       case 'IMAGE':
       case 'VIDEO':
-      case 'FILE':
       case 'AUDIO':
       case 'VOICE':
         return url;
     }
   }
 
-  switch (messageType.toUpperCase()) {
-    case 'LOCATION':
-    case 'CONTACT':
-      return draft;
-    default:
-      return url ?? '.';
-  }
+  return '';
 }
 
 bool chatMessageTypeRequiresUpload(String messageType) {
@@ -38,6 +31,19 @@ bool chatMessageTypeRequiresUpload(String messageType) {
     case 'FILE':
     case 'AUDIO':
     case 'VOICE':
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool chatMessageTypeUsesPayload(String messageType) {
+  switch (messageType.toUpperCase()) {
+    case 'LOCATION':
+    case 'CONTACT':
+    case 'FILE':
+    case 'GIFT':
+    case 'POLL':
       return true;
     default:
       return false;

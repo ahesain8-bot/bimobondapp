@@ -48,19 +48,45 @@ class ChatMessageSendRequested extends ChatEvent {
 class ChatAttachmentSendRequested extends ChatEvent {
   const ChatAttachmentSendRequested({
     required this.messageType,
-    required this.content,
+    this.content = '',
     this.localFilePath,
     this.replyToId,
+    this.payload,
+    this.mimeType,
+    this.sizeBytes,
   });
 
   final String messageType;
   final String content;
   final String? localFilePath;
   final String? replyToId;
+  final Map<String, dynamic>? payload;
+  final String? mimeType;
+  final int? sizeBytes;
 
   @override
-  List<Object?> get props =>
-      [messageType, content, localFilePath, replyToId];
+  List<Object?> get props => [
+        messageType,
+        content,
+        localFilePath,
+        replyToId,
+        payload,
+        mimeType,
+        sizeBytes,
+      ];
+}
+
+class ChatPollVoteRequested extends ChatEvent {
+  const ChatPollVoteRequested({
+    required this.messageId,
+    required this.optionIndex,
+  });
+
+  final String messageId;
+  final int optionIndex;
+
+  @override
+  List<Object?> get props => [messageId, optionIndex];
 }
 
 class ChatVoiceMessageSendRequested extends ChatEvent {

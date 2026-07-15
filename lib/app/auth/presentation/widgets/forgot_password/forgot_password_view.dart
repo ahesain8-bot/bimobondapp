@@ -69,7 +69,6 @@ class ForgotPasswordView extends StatelessWidget {
                     LiquidGlassAuthTextField(
                       controller: emailController,
                       hintText: l10n.emailLabel,
-                      icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) {
                         if (value == null || value.isEmpty) {

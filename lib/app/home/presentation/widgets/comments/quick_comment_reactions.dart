@@ -16,7 +16,7 @@ class QuickCommentReactions extends StatelessWidget {
     '😮',
   ];
 
-  static const double emojiSize = 18;
+  static const double emojiSize = 22;
 
   @override
   Widget build(BuildContext context) {
