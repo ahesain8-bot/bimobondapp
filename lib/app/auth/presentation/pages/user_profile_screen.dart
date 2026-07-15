@@ -34,6 +34,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -623,13 +624,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 ],
                               ),
                               const SizedBox(height: AppSizes.p12),
-                              CustomText(
-                                user?.bio?.trim().isNotEmpty == true
-                                    ? user!.bio!.trim()
-                                    : l10n.noBio,
-                                fontSize: 14,
-                                variant: TextVariant.secondary,
-                                textAlign: TextAlign.center,
+                              ProfileBioText(
+                                bio: user?.bio,
+                                placeholder: l10n.noBio,
                               ),
                             ],
                           ),

@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_format
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_stat_item.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -106,19 +107,10 @@ class ProfileHeaderSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSizes.p12),
-          GestureDetector(
+          ProfileBioText(
+            bio: bio,
+            placeholder: l10n.addBioToProfile,
             onTap: hasBio ? null : onEditProfile,
-            child: Text(
-              hasBio ? bio : l10n.addBioToProfile,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: hasBio ? theme.colorScheme.onSurface : secondary,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
-            ),
           ),
           const SizedBox(height: AppSizes.p8),
         ],

@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/auth/presentation/widgets/personal_info/personal
 import 'package:bimobondapp/app/auth/presentation/widgets/personal_info/personal_info_selection_field.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/personal_info/personal_info_utils.dart';
 import 'package:bimobondapp/core/widgets/phone_text_field.dart';
+import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
@@ -60,6 +61,7 @@ class PersonalInfoFormSection extends StatelessWidget {
           hint: l10n.addBioToProfile,
           l10n: l10n,
           maxLines: 3,
+          maxLength: ProfileBioText.maxLength,
           isRequired: false,
         ),
         PersonalInfoSelectionField(

@@ -2,6 +2,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class PersonalInfoEditField extends StatelessWidget {
@@ -12,6 +13,7 @@ class PersonalInfoEditField extends StatelessWidget {
     required this.l10n,
     this.prefix,
     this.maxLines = 1,
+    this.maxLength,
     this.isRequired = true,
     super.key,
   });
@@ -22,6 +24,7 @@ class PersonalInfoEditField extends StatelessWidget {
   final AppLocalizations l10n;
   final String? prefix;
   final int maxLines;
+  final int? maxLength;
   final bool isRequired;
 
   @override
@@ -52,6 +55,24 @@ class PersonalInfoEditField extends StatelessWidget {
             child: TextFormField(
               controller: controller,
               maxLines: maxLines,
+              maxLength: maxLength,
+              maxLengthEnforcement: maxLength != null
+                  ? MaxLengthEnforcement.enforced
+                  : null,
+              buildCounter: maxLength != null
+                  ? (
+                      context, {
+                      required currentLength,
+                      required isFocused,
+                      maxLength,
+                    }) => Text(
+                      '$currentLength/$maxLength',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.disabledColor.withValues(alpha: 0.6),
+                      ),
+                    )
+                  : null,
               style: const TextStyle(fontSize: 15),
               decoration: InputDecoration(
                 hintText: hint,
