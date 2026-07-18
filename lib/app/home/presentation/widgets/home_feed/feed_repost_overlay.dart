@@ -216,7 +216,9 @@ class FeedRepostBanner extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSizes.p4),
         child: _RepostActivityHeader(
-          repostedBy: reposters.isNotEmpty ? reposters.first : feedItem!.repostedBy,
+          repostedBy: reposters.isNotEmpty
+              ? reposters.first
+              : feedItem!.repostedBy,
           quotedReposters: quotedReposters,
           postId: post.id,
           repostCount: post.repostCount,
@@ -225,9 +227,7 @@ class FeedRepostBanner extends StatelessWidget {
       );
     }
 
-    if (post.repostCount <= 0 &&
-        reposters.isEmpty &&
-        quotedReposters.isEmpty) {
+    if (post.repostCount <= 0 && reposters.isEmpty && quotedReposters.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -424,8 +424,10 @@ class _RepostQuoteReplyCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxBubbleWidth = constraints.maxWidth.isFinite
-            ? (constraints.maxWidth - avatarSize - AppSizes.p8)
-                .clamp(0.0, double.infinity)
+            ? (constraints.maxWidth - avatarSize - AppSizes.p8).clamp(
+                0.0,
+                double.infinity,
+              )
             : double.infinity;
 
         return Row(
@@ -472,9 +474,7 @@ class _RepostQuoteReplyCard extends StatelessWidget {
                       LucideIcons.repeat2,
                       size: 13,
                       color: _repostAccent,
-                      shadows: [
-                        Shadow(color: Colors.black45, blurRadius: 4),
-                      ],
+                      shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
                     ),
                     const SizedBox(width: 6),
                     Flexible(
@@ -527,9 +527,7 @@ class _ModernGlassSurface extends StatelessWidget {
         ? BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
@@ -561,16 +559,10 @@ class _ModernGlassSurface extends StatelessWidget {
             ],
           );
 
-    final content = Padding(
-      padding: padding ?? EdgeInsets.zero,
-      child: child,
-    );
+    final content = Padding(padding: padding ?? EdgeInsets.zero, child: child);
 
     if (style == _SurfaceStyle.solidWhite) {
-      return DecoratedBox(
-        decoration: decoration,
-        child: content,
-      );
+      return DecoratedBox(decoration: decoration, child: content);
     }
 
     return ClipRRect(
@@ -580,10 +572,7 @@ class _ModernGlassSurface extends StatelessWidget {
           sigmaX: _glassBlurSigma,
           sigmaY: _glassBlurSigma,
         ),
-        child: DecoratedBox(
-          decoration: decoration,
-          child: content,
-        ),
+        child: DecoratedBox(decoration: decoration, child: content),
       ),
     );
   }

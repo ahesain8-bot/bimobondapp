@@ -22,8 +22,9 @@ class BalanceScreen extends StatefulWidget {
 }
 
 class _BalanceScreenState extends State<BalanceScreen> {
-  List<PayoutSetupStep> _payoutSteps =
-      List<PayoutSetupStep>.from(BalanceMockData.payoutSteps);
+  List<PayoutSetupStep> _payoutSteps = List<PayoutSetupStep>.from(
+    BalanceMockData.payoutSteps,
+  );
   int _payoutCarouselIndex = 0;
 
   String _displayName(AppLocalizations l10n) {
@@ -382,7 +383,9 @@ class _ScheduledPayoutCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.35)),
+              border: Border.all(
+                color: AppTheme.primaryColor.withValues(alpha: 0.35),
+              ),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -470,7 +473,10 @@ class _ProgramTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(amount, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  amount,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 if (secondaryAmount != null)
                   Text(
                     secondaryAmount!,

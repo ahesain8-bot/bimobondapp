@@ -264,12 +264,35 @@ class AppRouter {
       GoRoute(
         path: '/profile-posts',
         name: 'profile_posts_viewer',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final args = profilePostsOpenArgsFromExtra(state.extra);
-          if (args == null) {
-            return const Scaffold(body: Center(child: Text('Post not found')));
-          }
-          return ProfilePostsViewerScreen(args: args);
+          final child = args == null
+              ? const Scaffold(body: Center(child: Text('Post not found')))
+              : ProfilePostsViewerScreen(args: args);
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: child,
+            transitionDuration: const Duration(milliseconds: 380),
+            reverseTransitionDuration: const Duration(milliseconds: 280),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              final curved = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              return FadeTransition(
+                opacity: curved,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.06),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: child,
+                ),
+              );
+            },
+          );
         },
       ),
       GoRoute(

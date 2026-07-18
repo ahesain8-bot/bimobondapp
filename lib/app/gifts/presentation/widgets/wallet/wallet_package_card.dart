@@ -39,10 +39,7 @@ class WalletPackageCard extends StatelessWidget {
               blurSigma: 16,
               backgroundColor: glass.surfaceFill,
               borderColor: selected ? primaryColor : glass.surfaceBorder,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -109,11 +106,7 @@ class WalletPackageCard extends StatelessWidget {
                   backgroundColor: primaryColor,
                   borderColor: primaryColor.withValues(alpha: 0.5),
                   padding: const EdgeInsets.all(3),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 8,
-                  ),
+                  child: const Icon(Icons.check, color: Colors.white, size: 8),
                 ),
               ),
           ],

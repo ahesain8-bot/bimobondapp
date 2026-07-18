@@ -152,7 +152,8 @@ class CameraStudioOverlay extends StatelessWidget {
     final showArColorFiltersPanel =
         showFilters && useNativeArFilters && !isLiveMode;
     final selectedArFilterId = ArFilterCatalog
-        .items[arFilterIndex.clamp(0, ArFilterCatalog.items.length - 1)].id;
+        .items[arFilterIndex.clamp(0, ArFilterCatalog.items.length - 1)]
+        .id;
 
     return Stack(
       fit: StackFit.expand,
@@ -242,11 +243,8 @@ class CameraStudioOverlay extends StatelessWidget {
                             selectedArFilterId,
                           ),
                           onSelected: (index) {
-                            final id =
-                                ArFilterCatalog.effectItems[index].id;
-                            onArFilterSelected!(
-                              ArFilterCatalog.indexOfId(id),
-                            );
+                            final id = ArFilterCatalog.effectItems[index].id;
+                            onArFilterSelected!(ArFilterCatalog.indexOfId(id));
                           },
                           isRecording: isRecording,
                           isBusy: isBusy,
@@ -458,10 +456,7 @@ class CameraStudioOverlay extends StatelessWidget {
 
 /// Soft light wash from the AR carousel through the home-indicator edge.
 class _BottomFrostPanel extends StatelessWidget {
-  const _BottomFrostPanel({
-    required this.child,
-    required this.bottomInset,
-  });
+  const _BottomFrostPanel({required this.child, required this.bottomInset});
 
   final Widget child;
   final double bottomInset;

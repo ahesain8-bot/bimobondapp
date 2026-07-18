@@ -53,7 +53,8 @@ class ChatMessageItem extends StatelessWidget {
     final isDeleted = msg['isDeleted'] == true;
     final reactions = msg['reactions'] as List? ?? [];
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final maxBubbleWidth = screenWidth * ChatLayoutConstants.messageMaxWidthFactor -
+    final maxBubbleWidth =
+        screenWidth * ChatLayoutConstants.messageMaxWidthFactor -
         ChatLayoutConstants.receivedMessageAvatarRowWidth;
 
     final bubble = GestureDetector(
@@ -115,15 +116,13 @@ class ChatMessageItem extends StatelessWidget {
     final contentInset = ChatLayoutConstants.receivedMessageAvatarRowWidth;
 
     final messageColumn = Column(
-      crossAxisAlignment:
-          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isMe
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         if (isFirstInGroup && isMe)
           Padding(
-            padding: EdgeInsets.only(
-              right: contentInset,
-              bottom: AppSizes.p4,
-            ),
+            padding: EdgeInsets.only(right: contentInset, bottom: AppSizes.p4),
             child: Align(
               alignment: Alignment.centerRight,
               child: Text(
@@ -201,8 +200,8 @@ class ChatMessageItem extends StatelessWidget {
         top: isFirstInList
             ? ChatLayoutConstants.messageListTopPadding
             : isFirstInGroup
-                ? ChatLayoutConstants.messageGroupTopSpacing
-                : ChatLayoutConstants.messageItemSpacing,
+            ? ChatLayoutConstants.messageGroupTopSpacing
+            : ChatLayoutConstants.messageItemSpacing,
         bottom: ChatLayoutConstants.messageItemSpacing,
       ),
       child: messageColumn,
@@ -310,14 +309,14 @@ class ChatMessageBubble extends StatelessWidget {
         isMe
             ? ChatLayoutConstants.bubbleRadius
             : (isFirstInGroup
-                ? ChatLayoutConstants.bubbleTailRadius
-                : ChatLayoutConstants.bubbleRadius),
+                  ? ChatLayoutConstants.bubbleTailRadius
+                  : ChatLayoutConstants.bubbleRadius),
       ),
       bottomEnd: Radius.circular(
         isMe
             ? (isFirstInGroup
-                ? ChatLayoutConstants.bubbleTailRadius
-                : ChatLayoutConstants.bubbleRadius)
+                  ? ChatLayoutConstants.bubbleTailRadius
+                  : ChatLayoutConstants.bubbleRadius)
             : ChatLayoutConstants.bubbleRadius,
       ),
     );
@@ -340,8 +339,9 @@ class ChatMessageBubble extends StatelessWidget {
         if (sharedPostId != null && sharedPostId.isNotEmpty)
           ChatStoryReplyPreview(
             sharedPostId: sharedPostId,
-            sharedStory:
-                sharedStory is Map<String, dynamic> ? sharedStory : null,
+            sharedStory: sharedStory is Map<String, dynamic>
+                ? sharedStory
+                : null,
             isMe: isMe,
           ),
         ChatMessageContent(
@@ -407,9 +407,7 @@ class ChatBubbleReplyPreview extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSizes.p6),
       padding: const EdgeInsets.all(AppSizes.p8),
       decoration: BoxDecoration(
-        color: (isMe
-                ? chatTheme.replyAccent
-                : chatTheme.onReceivedBubbleMuted)
+        color: (isMe ? chatTheme.replyAccent : chatTheme.onReceivedBubbleMuted)
             .withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(
           ChatLayoutConstants.replyPreviewRadius,
@@ -470,9 +468,7 @@ class ChatMessageContent extends StatelessWidget {
         return Text(
           messageText,
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: isMe
-                ? chatTheme.onSentBubble
-                : chatTheme.onReceivedBubble,
+            color: isMe ? chatTheme.onSentBubble : chatTheme.onReceivedBubble,
             fontSize: ChatLayoutConstants.messageFontSize,
             height: ChatLayoutConstants.messageLineHeight,
             fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
@@ -487,8 +483,9 @@ class ChatMessageContent extends StatelessWidget {
               : null,
           behavior: HitTestBehavior.opaque,
           child: ClipRRect(
-            borderRadius:
-                BorderRadius.circular(ChatLayoutConstants.bubbleRadius),
+            borderRadius: BorderRadius.circular(
+              ChatLayoutConstants.bubbleRadius,
+            ),
             child: SafeNetworkImage(
               imageUrl: imageUrl,
               width: ChatLayoutConstants.imageMessageWidth,
@@ -504,7 +501,8 @@ class ChatMessageContent extends StatelessWidget {
         }
         return ChatVideoMessageWidget(videoUrl: videoUrl);
       case 'location':
-        final location = ChatLocationPayload.tryParse(
+        final location =
+            ChatLocationPayload.tryParse(
               msg['text']?.toString(),
               msg['payload'] is Map
                   ? Map<String, dynamic>.from(msg['payload'] as Map)
@@ -515,15 +513,15 @@ class ChatMessageContent extends StatelessWidget {
         return ChatLocationMessageWidget(payload: location, isMe: isMe);
       case 'file':
         return ChatFileMessageWidget(
-          fileName: msg['fileName']?.toString() ??
-              msg['text']?.toString() ??
-              '',
+          fileName:
+              msg['fileName']?.toString() ?? msg['text']?.toString() ?? '',
           fileUrl: msg['fileUrl']?.toString() ?? msg['mediaUrl']?.toString(),
           sizeLabel: msg['fileSizeLabel']?.toString(),
           isMe: isMe,
         );
       case 'contact':
-        final contact = ChatContactPayload.tryParse(
+        final contact =
+            ChatContactPayload.tryParse(
               msg['text']?.toString(),
               msg['payload'] is Map
                   ? Map<String, dynamic>.from(msg['payload'] as Map)
@@ -536,7 +534,8 @@ class ChatMessageContent extends StatelessWidget {
         return ChatGiftMessageWidget(
           isMe: isMe,
           giftName: msg['giftName']?.toString() ?? msg['text']?.toString(),
-          thumbnailUrl: msg['giftThumbnailUrl']?.toString() ??
+          thumbnailUrl:
+              msg['giftThumbnailUrl']?.toString() ??
               msg['giftAnimationUrl']?.toString(),
           quantity: msg['giftQuantity'] is num
               ? (msg['giftQuantity'] as num).toInt()
@@ -556,9 +555,7 @@ class ChatMessageContent extends StatelessWidget {
         return Text(
           messageText.isNotEmpty ? messageText : 'Shared a post',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: isMe
-                ? chatTheme.onSentBubble
-                : chatTheme.onReceivedBubble,
+            color: isMe ? chatTheme.onSentBubble : chatTheme.onReceivedBubble,
             fontSize: ChatLayoutConstants.messageFontSize,
           ),
         );
@@ -623,8 +620,9 @@ class ChatMessageFooter extends StatelessWidget {
           vertical: ChatLayoutConstants.footerVerticalPadding,
         ),
         child: Row(
-          mainAxisAlignment:
-              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
           children: [
             Text(
               time,

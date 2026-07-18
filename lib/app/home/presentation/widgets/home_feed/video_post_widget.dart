@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_caption_tags.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_hashtag_chips.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_location_chip.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
@@ -14,8 +16,14 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/comments/quick_comment_reactions.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_options_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_quick_share_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/repost_sheet.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/add_comment_usecase.dart';
+import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
+    as posts_di;
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
@@ -23,11 +31,8 @@ import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/feed_navigation.dart';
-import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
-import 'package:bimobondapp/core/utils/tag_parser.dart';
-import 'package:bimobondapp/core/widgets/tagged_text.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/widgets/blurred_icon_badge.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
@@ -37,8 +42,8 @@ import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_options_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -50,12 +55,23 @@ class VideoPostWidget extends StatefulWidget {
   final FeedItemEntity? feedItem;
   final double? bottomPadding;
   final bool isActive;
+
   /// When false, playback ignores [FeedPlaybackGate] (e.g. profile posts viewer).
   final bool respectFeedPlaybackGate;
   final bool openCommentsOnLoad;
   final String? highlightCommentId;
+
   /// Extra top offset for carousel badge when a feed top bar overlays the post.
   final double? feedTopBarClearance;
+
+  /// TikTok-style slide-up + fade for actions/caption when opening from profile.
+  final bool animateChromeEntrance;
+
+  /// Vertical [PageController] used to dim interaction icons mid-swipe.
+  final PageController? pageController;
+
+  /// Index of this post in [pageController] (required when [pageController] is set).
+  final int? pageIndex;
 
   const VideoPostWidget({
     super.key,
@@ -67,6 +83,9 @@ class VideoPostWidget extends StatefulWidget {
     this.openCommentsOnLoad = false,
     this.highlightCommentId,
     this.feedTopBarClearance,
+    this.animateChromeEntrance = false,
+    this.pageController,
+    this.pageIndex,
   });
 
   @override
@@ -96,14 +115,27 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   late AnimationController _musicController;
   late AnimationController _likeAnimController;
   late Animation<double> _likeScaleAnim;
+  AnimationController? _chromeEntranceController;
+  Animation<double>? _chromeActionsRise;
+  Animation<double>? _chromeCaptionRise;
+  Animation<double>? _chromeFade;
+  Animation<double>? _likeRise;
+  Animation<double>? _commentRise;
+  bool _chromeEntrancePlayed = false;
+  bool _chromeEntranceScheduled = false;
+  Animation<double>? _routeAnimation;
+  AnimationStatusListener? _routeStatusListener;
   final CarouselSliderController _carouselCtrl = CarouselSliderController();
   final Map<int, CustomVideoPlayerController> _videoPlayerControllers = {};
+  final GlobalKey _commentActionKey = GlobalKey();
+  final GlobalKey _shareActionKey = GlobalKey();
   VideoPlayerController? _postSoundController;
   VoidCallback? _postSoundListener;
 
   // Local state for optimistic UI
   late bool _isLiked;
   late int _likeCount;
+  late int _commentCount;
   late bool _isSaved;
   late int _saveCount;
   late bool _isReposted;
@@ -127,6 +159,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     }
     _isLiked = widget.post.isLiked;
     _likeCount = widget.post.likeCount;
+    _commentCount = widget.post.commentCount;
     _isSaved = widget.post.isSaved;
     _saveCount = widget.post.saveCount;
     _isReposted = widget.post.isReposted;
@@ -152,6 +185,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         ]).animate(
           CurvedAnimation(parent: _likeAnimController, curve: Curves.easeInOut),
         );
+
+    if (widget.animateChromeEntrance) {
+      _setupChromeEntranceAnimation();
+    }
 
     if (_playbackActive) {
       _resolveFollowStatusIfNeeded();
@@ -198,6 +235,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         widget.feedItem != oldWidget.feedItem) {
       _isLiked = widget.post.isLiked;
       _likeCount = widget.post.likeCount;
+      _commentCount = widget.post.commentCount;
       _isSaved = widget.post.isSaved;
       _saveCount = widget.post.saveCount;
       _isReposted = widget.post.isReposted;
@@ -212,6 +250,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     }
 
     if (_playbackActive && !oldWidget.isActive) {
+      _playChromeEntranceNow();
       _resolveFollowStatusIfNeeded();
       _recordViewIfNeeded();
       unawaited(SoundAudioPreview.stop());
@@ -323,6 +362,17 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       _isSaved ? _saveCount++ : _saveCount--;
     });
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
+  }
+
+  void _showQuickShare() {
+    if (!_checkAuth()) return;
+    unawaited(
+      PostQuickShareBar.showNear(
+        context,
+        anchorKey: _shareActionKey,
+        post: widget.post,
+      ),
+    );
   }
 
   void _handleRepostTap() {
@@ -437,16 +487,130 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   void _showComments({int initialTabIndex = 0}) {
-    CommentSheetWidget.show(
+    unawaited(_openComments(initialTabIndex: initialTabIndex));
+  }
+
+  Future<void> _openComments({int initialTabIndex = 0}) async {
+    final latestCount = await CommentSheetWidget.show(
       context,
       postId: widget.post.id,
       postOwnerId: widget.post.userId,
       likeCount: _likeCount,
-      commentCount: widget.post.commentCount,
+      commentCount: _commentCount,
       viewCount: widget.post.viewCount,
       isPostOwner: _isPostOwner(),
       initialTabIndex: initialTabIndex,
     );
+    if (!mounted || latestCount == null) return;
+    setState(() => _commentCount = latestCount);
+  }
+
+  Future<void> _showQuickCommentReactions() async {
+    if (!_checkAuth()) return;
+
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final commentBox =
+        _commentActionKey.currentContext?.findRenderObject() as RenderBox?;
+    if (overlayBox == null || commentBox == null || !commentBox.hasSize) {
+      return;
+    }
+
+    final commentOffset = commentBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final commentCenter = Offset(
+      commentOffset.dx + commentBox.size.width / 2,
+      commentOffset.dy + commentBox.size.height / 2,
+    );
+    final screenSize = overlayBox.size;
+    const bubbleGap = 10.0;
+    const estimatedBubbleWidth = 292.0;
+    const estimatedBubbleHeight = 52.0;
+
+    var left = commentOffset.dx - estimatedBubbleWidth - bubbleGap;
+    left = left.clamp(8.0, screenSize.width - estimatedBubbleWidth - 8);
+    var top = commentCenter.dy - estimatedBubbleHeight / 2;
+    top = top.clamp(8.0, screenSize.height - estimatedBubbleHeight - 8);
+
+    final emoji = await showGeneralDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'quick-comment-reactions',
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
+        return Stack(
+          children: [
+            Positioned(
+              left: left,
+              top: top,
+              child: FadeTransition(
+                opacity: curved,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.75, end: 1).animate(curved),
+                  alignment: Alignment.centerRight,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: 0.88),
+                    borderRadius: BorderRadius.circular(22),
+                    elevation: 8,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final reaction in QuickCommentReactions.emojis)
+                            InkWell(
+                              onTap: () => Navigator.of(context).pop(reaction),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  reaction,
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    height: 1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) =>
+          child,
+    );
+
+    if (!mounted || emoji == null || emoji.isEmpty) return;
+    _postQuickCommentReaction(emoji);
+  }
+
+  void _postQuickCommentReaction(String emoji) {
+    unawaited(
+      posts_di.sl<AddCommentUsecase>()(
+        AddCommentParams(postId: widget.post.id, content: emoji),
+      ),
+    );
+    setState(() => _commentCount++);
+    HapticFeedback.lightImpact();
   }
 
   bool _isPostOwner() {
@@ -479,7 +643,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       context,
       userId: userId,
       username: widget.post.user?.username,
-      fullName: widget.post.user?.username,
+      fullName: widget.post.user?.fullName,
       avatarUrl: widget.post.user?.avatarUrl,
       isFollowing: _isFollowing,
     );
@@ -716,6 +880,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             respectFeedPlaybackGate: widget.respectFeedPlaybackGate,
             controller: videoController,
             onPlaybackChanged: _syncMusicDiscAnimation,
+            onLongPress: _showMoreOptions,
           )
         : mediaUrl.isEmpty
         ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)
@@ -727,27 +892,31 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             errorIcon: LucideIcons.imageOff,
           );
 
-    if (!isVideo &&
-        isActiveSlide &&
-        (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false)) {
-      final isPlaying = isActiveSlide && _isPostPlaybackActive();
+    if (!isVideo) {
       child = GestureDetector(
-        onTap: () => unawaited(_togglePostPlayback()),
+        onTap: isActiveSlide &&
+                (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false)
+            ? () => unawaited(_togglePostPlayback())
+            : null,
+        onLongPress: _showMoreOptions,
         behavior: HitTestBehavior.opaque,
-        child: Stack(
-          fit: StackFit.expand,
-          alignment: Alignment.center,
-          children: [
-            child,
-            if (isActiveSlide && !isPlaying)
-              BlurredIconBadge(
-                icon: LucideIcons.play,
-                diameter: 88,
-                iconSize: 44,
-                iconColor: Colors.white.withValues(alpha: 0.85),
-              ),
-          ],
-        ),
+        child: isActiveSlide &&
+                (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false)
+            ? Stack(
+                fit: StackFit.expand,
+                alignment: Alignment.center,
+                children: [
+                  child,
+                  if (!_isPostPlaybackActive())
+                    BlurredIconBadge(
+                      icon: LucideIcons.play,
+                      diameter: 88,
+                      iconSize: 44,
+                      iconColor: Colors.white.withValues(alpha: 0.85),
+                    ),
+                ],
+              )
+            : child,
       );
     }
 
@@ -762,10 +931,185 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   @override
   void dispose() {
     FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
+    _detachRouteListener();
     unawaited(_stopPostSound());
+    _chromeEntranceController?.dispose();
     _musicController.dispose();
     _likeAnimController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.animateChromeEntrance) {
+      _scheduleChromeAfterRoute();
+    }
+  }
+
+  void _setupChromeEntranceAnimation() {
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 950),
+    );
+    _chromeEntranceController = controller;
+
+    // Rise from well below so the motion is obvious (TikTok-style).
+    _chromeActionsRise = Tween<double>(begin: 260, end: 0).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
+      ),
+    );
+    _likeRise = Tween<double>(begin: 90, end: 0).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: const Interval(0.08, 0.88, curve: Curves.easeOutCubic),
+      ),
+    );
+    _commentRise = Tween<double>(begin: 110, end: 0).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: const Interval(0.16, 0.95, curve: Curves.easeOutCubic),
+      ),
+    );
+    _chromeCaptionRise = Tween<double>(begin: 140, end: 0).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: const Interval(0.12, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+    _chromeFade = CurvedAnimation(
+      parent: controller,
+      curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
+    );
+  }
+
+  void _detachRouteListener() {
+    final anim = _routeAnimation;
+    final listener = _routeStatusListener;
+    if (anim != null && listener != null) {
+      anim.removeStatusListener(listener);
+    }
+    _routeAnimation = null;
+    _routeStatusListener = null;
+  }
+
+  /// Wait until the profile route finishes opening, then rise likes/comments.
+  void _scheduleChromeAfterRoute() {
+    if (!widget.animateChromeEntrance || _chromeEntrancePlayed) return;
+    if (!widget.isActive) return;
+    if (_chromeEntranceController == null) return;
+
+    final routeAnim = ModalRoute.of(context)?.animation;
+
+    void play() {
+      if (!mounted || _chromeEntrancePlayed || !widget.isActive) return;
+      _chromeEntrancePlayed = true;
+      _detachRouteListener();
+      // Beat after the route paint so the rise is clearly visible.
+      Future<void>.delayed(const Duration(milliseconds: 60), () {
+        if (!mounted) return;
+        _chromeEntranceController?.forward(from: 0);
+      });
+    }
+
+    if (routeAnim == null || routeAnim.status == AnimationStatus.completed) {
+      if (_chromeEntranceScheduled) return;
+      _chromeEntranceScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 280), play);
+      });
+      return;
+    }
+
+    if (_routeAnimation == routeAnim && _routeStatusListener != null) return;
+
+    _detachRouteListener();
+    _chromeEntranceScheduled = true;
+    _routeAnimation = routeAnim;
+    void listener(AnimationStatus status) {
+      if (status == AnimationStatus.completed) play();
+    }
+
+    _routeStatusListener = listener;
+    routeAnim.addStatusListener(listener);
+  }
+
+  void _playChromeEntranceNow() {
+    if (!widget.animateChromeEntrance || _chromeEntrancePlayed) return;
+    if (!widget.isActive) return;
+    final controller = _chromeEntranceController;
+    if (controller == null) return;
+    _chromeEntrancePlayed = true;
+    _detachRouteListener();
+    controller.forward(from: 0);
+  }
+
+  Widget _riseFade({required Animation<double>? rise, required Widget child}) {
+    final controller = _chromeEntranceController;
+    final fade = _chromeFade;
+    if (controller == null || rise == null || fade == null) return child;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: fade.value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, rise.value),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+
+  Widget _wrapActionsEntrance(Widget child) =>
+      _riseFade(rise: _chromeActionsRise, child: child);
+
+  Widget _wrapCaptionEntrance(Widget child) =>
+      _riseFade(rise: _chromeCaptionRise, child: child);
+
+  /// TikTok-style: dim interaction icons while swiping between Reels.
+  Widget _wrapTransitionDim(Widget child) {
+    final controller = widget.pageController;
+    final index = widget.pageIndex;
+    if (controller == null || index == null) return child;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _pageTransitionOpacity(controller, index),
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
+
+  static double _pageTransitionOpacity(PageController controller, int index) {
+    if (!controller.hasClients) return 1.0;
+    final page = controller.page;
+    if (page == null) return 1.0;
+    final distance = (page - index).abs().clamp(0.0, 1.0);
+    // Bright when settled; strongly dimmed mid-swipe for focus on the video.
+    final dimmed = Curves.easeInCubic.transform(distance);
+    return (1.0 - dimmed * 0.85).clamp(0.15, 1.0);
+  }
+
+  Widget _wrapEngagementRise(Animation<double>? rise, Widget child) {
+    final controller = _chromeEntranceController;
+    if (controller == null || rise == null) return child;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Transform.translate(offset: Offset(0, rise.value), child: child);
+      },
+      child: child,
+    );
   }
 
   @override
@@ -829,13 +1173,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     PostEntity post,
     ThemeData theme,
   ) {
-    final actionsOnRight = Localizations.localeOf(context).languageCode == 'ar';
+    // Floating comments: left. Avatar/actions: right.
 
     return Container(
       height: size.height,
       width: size.width,
       color: Colors.black,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           // ── Media Carousel ───────────────────────────────────────────────
           CarouselSlider.builder(
@@ -891,60 +1236,72 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
               child: Center(child: _buildMediaCountBadge(_displayMedia.length)),
             ),
 
-          // ── Side action column (right in Arabic, left in English) ────────
+          // ── Side actions: always physical right ─────────────────────────
           Positioned(
-            right: actionsOnRight ? _actionColumnInset : null,
-            left: actionsOnRight ? null : _actionColumnInset,
+            right: _actionColumnInset,
             bottom: bottom + 20,
-            child: Column(
-              crossAxisAlignment: actionsOnRight
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
-              children: [
-                _buildProfileAvatar(post.user?.avatarUrl, theme),
-                const SizedBox(height: 22),
-                _buildLikeButton(),
-                const SizedBox(height: _actionSpacing),
-                _buildTikTokAction(
-                  icon: LucideIcons.messageCircleMore400,
-                  label: _formatCount(widget.post.commentCount),
-                  color: Colors.white,
-                  onTap: _showComments,
-                  iconWidget: SvgPicture.asset(
-                    AppAssets.commentIcon,
-                    width: _actionIconSize,
-                    height: _actionIconSize,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.srcIn,
+            child: _wrapTransitionDim(
+              _wrapActionsEntrance(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildProfileAvatar(post.user?.avatarUrl, theme),
+                    const SizedBox(height: 22),
+                    _wrapEngagementRise(_likeRise, _buildLikeButton()),
+                    const SizedBox(height: _actionSpacing),
+                    _wrapEngagementRise(
+                      _commentRise,
+                      KeyedSubtree(
+                        key: _commentActionKey,
+                        child: _buildTikTokAction(
+                          icon: LucideIcons.messageCircleMore400,
+                          label: _formatCount(_commentCount),
+                          color: Colors.white,
+                          onTap: _showComments,
+                          onLongPress: _showQuickCommentReactions,
+                          iconWidget: SvgPicture.asset(
+                            AppAssets.commentIcon,
+                            width: _actionIconSize,
+                            height: _actionIconSize,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: _actionSpacing),
-                _buildTikTokAction(
-                  icon: Icons.bookmark,
-                  label: _formatCount(_saveCount),
-                  color: _isSaved ? _tikTokSaveYellow : Colors.white,
-                  onTap: _handleSave,
-                ),
-                const SizedBox(height: _actionSpacing),
-                _buildTikTokAction(
-                  icon: LucideIcons.forward400,
-                  color: Colors.white,
-                  onTap: _showMoreOptions,
-                  iconWidget: SvgPicture.asset(
-                    AppAssets.shareArrowIcon,
-                    width: _actionIconSize,
-                    height: _actionIconSize,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.srcIn,
+                    const SizedBox(height: _actionSpacing),
+                    _buildTikTokAction(
+                      icon: Icons.bookmark,
+                      label: _formatCount(_saveCount),
+                      color: _isSaved ? _tikTokSaveYellow : Colors.white,
+                      onTap: _handleSave,
                     ),
-                  ),
+                    const SizedBox(height: _actionSpacing),
+                    KeyedSubtree(
+                      key: _shareActionKey,
+                      child: _buildTikTokAction(
+                        icon: LucideIcons.forward400,
+                        color: Colors.white,
+                        onTap: _showMoreOptions,
+                        onLongPress: _showQuickShare,
+                        iconWidget: SvgPicture.asset(
+                          AppAssets.shareArrowIcon,
+                          width: _actionIconSize,
+                          height: _actionIconSize,
+                          colorFilter: const ColorFilter.mode(
+                            Colors.white,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: _actionSpacing),
+                    _buildMusicDisc(theme, post),
+                  ],
                 ),
-                const SizedBox(height: _actionSpacing),
-                _buildMusicDisc(theme, post),
-              ],
+              ),
             ),
           ),
 
@@ -953,82 +1310,82 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             left: 0,
             right: 0,
             bottom: bottom,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_displayMedia.length > 1) ...[
-                  IgnorePointer(
-                    child: _buildMediaPageDots(_displayMedia.length),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: actionsOnRight
-                        ? _contentEdgeInset
-                        : _contentActionSidePadding,
-                    right: actionsOnRight
-                        ? _contentActionSidePadding
-                        : _contentEdgeInset,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      FeedRepostBanner(
-                        post: _postWithLocalRepostState(post),
-                        feedItem: widget.feedItem,
-                        repostQuote: _repostQuote,
-                      ),
-                      if (post.location != null &&
-                          post.location!.hasDisplayLabel)
-                        PostLocationChip(location: post.location!),
-                      if (post.isPromoted || post.isAd) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.white30),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                LucideIcons.flame,
-                                size: 12,
-                                color: Color(0xFFFF8C42),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                post.promotion?.label ??
-                                    AppLocalizations.of(context)!.promotedBadge,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
+            child: _wrapCaptionEntrance(
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_displayMedia.length > 1) ...[
+                    IgnorePointer(
+                      child: _buildMediaPageDots(_displayMedia.length),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: _contentEdgeInset,
+                      right: _contentActionSidePadding,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FeedRepostBanner(
+                          post: _postWithLocalRepostState(post),
+                          feedItem: widget.feedItem,
+                          repostQuote: _repostQuote,
                         ),
-                        const SizedBox(height: 6),
-                      ],
+                        if (post.location != null &&
+                            post.location!.hasDisplayLabel)
+                          PostLocationChip(location: post.location!),
+                        if (post.isPromoted || post.isAd) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white30),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  LucideIcons.flame,
+                                  size: 12,
+                                  color: Color(0xFFFF8C42),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  post.promotion?.label ??
+                                      AppLocalizations.of(
+                                        context,
+                                      )!.promotedBadge,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
 
-                      // Description + hashtags
-                      if ((post.description ?? '').isNotEmpty)
-                        _PostCaptionTags(post: post, maxLines: 3)
-                      else if (post.hashtags.isNotEmpty)
-                        _PostHashtagChips(tags: post.hashtags),
-                      const SizedBox(height: 10),
-                      _buildMusicSoundLabel(post),
-                    ],
+                        // Description + hashtags (See more / See less)
+                        if ((post.description ?? '').isNotEmpty)
+                          PostCaptionTags(post: post)
+                        else if (post.hashtags.isNotEmpty)
+                          PostHashtagChips(tags: post.hashtags),
+                        const SizedBox(height: 10),
+                        _buildMusicSoundLabel(post),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -1099,7 +1456,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           radius: _profileAvatarRadius,
           backgroundColor: Colors.white24,
           username: widget.post.user?.username,
-          fullName: widget.post.user?.username,
+          fullName: widget.post.user?.fullName,
           isFollowing: _isFollowing,
           onTap: _openAuthorProfile,
         ),
@@ -1181,10 +1538,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     String? label,
     required Color color,
     VoidCallback? onTap,
+    VoidCallback? onLongPress,
     Widget? iconWidget,
   }) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         width: _actionHitWidth,
@@ -1232,10 +1591,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     final sound = post.sound;
     final l10n = AppLocalizations.of(context)!;
     final label = sound?.name ?? l10n.cameraOriginalSound;
+    final canOpenSound = sound != null && sound.id.isNotEmpty;
 
     return GestureDetector(
-      onTap: _canTogglePlayback ? () => unawaited(_togglePostPlayback()) : null,
-      onLongPress: sound != null ? () => _openPostSound(post) : null,
+      onTap: canOpenSound
+          ? () => _openPostSound(post)
+          : (_canTogglePlayback
+                ? () => unawaited(_togglePostPlayback())
+                : null),
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: double.infinity,
@@ -1268,9 +1631,13 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   Widget _buildMusicDisc(ThemeData theme, PostEntity post) {
+    final canOpenSound = post.sound != null && post.sound!.id.isNotEmpty;
     return GestureDetector(
-      onTap: _canTogglePlayback ? () => unawaited(_togglePostPlayback()) : null,
-      onLongPress: post.sound != null ? () => _openPostSound(post) : null,
+      onTap: canOpenSound
+          ? () => _openPostSound(post)
+          : (_canTogglePlayback
+                ? () => unawaited(_togglePostPlayback())
+                : null),
       child: _buildMusicDiscVisual(theme),
     );
   }
@@ -1333,102 +1700,4 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   String _formatCount(int count) => formatCompactCount(count);
-}
-
-const _captionHashtagColor = Color(0xFF7FDBFF);
-
-class _PostCaptionTags extends StatelessWidget {
-  const _PostCaptionTags({required this.post, this.maxLines});
-
-  final PostEntity post;
-  final int? maxLines;
-
-  @override
-  Widget build(BuildContext context) {
-    final description = post.description!;
-    final captionStyle = TextStyle(
-      color: Colors.white.withValues(alpha: 0.9),
-      fontSize: 14,
-      height: 1.4,
-      shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
-    );
-
-    final inTextTags = TagParser.extractHashtagNames(
-      description,
-    ).map((tag) => tag.toLowerCase()).toSet();
-    final extraTags = post.hashtags
-        .where((tag) => !inTextTags.contains(tag.toLowerCase()))
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: TaggedText(
-            text: description,
-            style: captionStyle,
-            mentionStyle: TextStyle(
-              color: Colors.white.withValues(alpha: 0.95),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
-            ),
-            hashtagStyle: TextStyle(
-              color: _captionHashtagColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
-            ),
-            post: post,
-            mentionUserIds: MentionRefUtils.usernameToUserIdMap(
-              description,
-              post.mentions,
-              post: post,
-            ),
-            maxLines: maxLines,
-            overflow: TextOverflow.ellipsis,
-            onHashtagTap: (name) => openHashtagFeed(context, name),
-          ),
-        ),
-        if (extraTags.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          _PostHashtagChips(tags: extraTags),
-        ],
-      ],
-    );
-  }
-}
-
-class _PostHashtagChips extends StatelessWidget {
-  const _PostHashtagChips({required this.tags});
-
-  final List<String> tags;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: [
-        for (final tag in tags)
-          GestureDetector(
-            onTap: () => openHashtagFeed(context, tag),
-            behavior: HitTestBehavior.opaque,
-            child: Text(
-              '#$tag',
-              style: const TextStyle(
-                color: _captionHashtagColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                decoration: TextDecoration.underline,
-                decorationColor: _captionHashtagColor,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
 }

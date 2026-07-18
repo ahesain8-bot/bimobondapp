@@ -31,7 +31,7 @@ class GiftAnimationOverlay extends StatefulWidget {
 
   static OverlayEntry? _activeEntry;
 
-  /// Inserts above the current route (after the gift sheet is closed).
+  /// Inserts above every route layer (root overlay, after gift sheet closes).
   static Future<void> show(
     BuildContext context, {
     required String animationUrl,
@@ -47,7 +47,9 @@ class GiftAnimationOverlay extends StatefulWidget {
       unawaited(GiftLottieCache.instance.load(resolved));
     }
 
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    // Prefer the root navigator overlay so gifts sit above sheets/dialogs.
+    final overlay = Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
+        Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return Future.value();
 
     // Only one gift animation at a time — avoids dual VideoPlayers / crash.
@@ -71,6 +73,8 @@ class GiftAnimationOverlay extends StatefulWidget {
     }
 
     entry = OverlayEntry(
+      maintainState: false,
+      opaque: false,
       builder: (context) => GiftAnimationOverlay(
         animationUrl: resolved,
         thumbnailUrl: thumbnailUrl == null || thumbnailUrl.trim().isEmpty
@@ -114,14 +118,21 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   bool _lottieFailed = false;
   bool _videoFailed = false;
   late final _GiftMediaKind _kind;
+  late final bool _isWebp;
+
+  static bool _looksLikeWebp(String url) {
+    final lower = url.toLowerCase().split('?').first.trim();
+    return lower.endsWith('.webp');
+  }
 
   @override
   void initState() {
     super.initState();
+    _isWebp = _looksLikeWebp(widget.animationUrl);
     _kind = _detectKind(widget.animationUrl);
     _entranceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 420),
     )..forward();
 
     switch (_kind) {
@@ -132,7 +143,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         unawaited(_initVideo());
         break;
       case _GiftMediaKind.image:
-        Future<void>.delayed(const Duration(milliseconds: 1600), _finish);
+        // Animated WebP often needs a bit longer on screen.
+        final hold = _isWebp
+            ? const Duration(milliseconds: 2800)
+            : const Duration(milliseconds: 1600);
+        Future<void>.delayed(hold, _finish);
         break;
     }
   }
@@ -263,74 +278,52 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final size = MediaQuery.sizeOf(context);
-    final mediaSize = size.shortestSide * 0.72;
-
-    final labelParts = <String>[
-      if (widget.senderName != null && widget.senderName!.trim().isNotEmpty)
-        widget.senderName!.trim(),
-      if (widget.giftName != null && widget.giftName!.trim().isNotEmpty)
-        'sent ${widget.giftName!.trim()}',
-    ];
-    final label = labelParts.join(' ');
+    // Gift assets are authored at 1080×1080 — keep a 1:1 stage, full width.
+    final giftSize = size.width.clamp(0.0, size.height);
 
     return Material(
       type: MaterialType.transparency,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Transparent hit target only — no dim/fill behind the gift.
           Positioned.fill(
             child: GestureDetector(
               onTap: _finish,
-              behavior: HitTestBehavior.translucent,
+              behavior: HitTestBehavior.opaque,
               child: const SizedBox.expand(),
             ),
           ),
-          Center(
-            child: ScaleTransition(
-              scale: CurvedAnimation(
-                parent: _entranceController,
-                curve: Curves.easeOutBack,
+          // Square gift stage anchored to the bottom; slides up on enter.
+          Positioned(
+            left: (size.width - giftSize) / 2,
+            bottom: 0,
+            width: giftSize,
+            height: giftSize,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(
+                  parent: _entranceController,
+                  curve: Curves.easeOutCubic,
+                ),
               ),
               child: FadeTransition(
                 opacity: CurvedAnimation(
                   parent: _entranceController,
                   curve: Curves.easeOut,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                child: Opacity(
+                  opacity: 0.95,
+                  child: _withEdgeFade(
                     SizedBox(
-                      width: mediaSize,
-                      height: mediaSize,
+                      width: giftSize,
+                      height: giftSize,
                       child: _buildMedia(),
                     ),
-                    if (label.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 32),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -340,18 +333,38 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
   }
 
+  /// Fades the top 20%; softens the bottom slightly while keeping it more opaque.
+  Widget _withEdgeFade(Widget child) {
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0x00000000),
+          Color(0xFF000000),
+          Color(0xFF000000),
+          // Bottom stays mostly visible (higher opacity than a full fade-out).
+          Color(0xE6FFFFFF),
+        ],
+        stops: [0.0, 0.20, 0.90, 1.0],
+      ).createShader(bounds),
+      child: RepaintBoundary(child: child),
+    );
+  }
+
   Widget _buildMedia() {
     switch (_kind) {
       case _GiftMediaKind.lottie:
         final composition = _composition;
         final controller = _lottieController;
         if (composition != null && controller != null) {
-          // Lottie is software-painted — screen blend is GPU-safe here.
           return _lottieScreenBlend(
             Lottie(
               composition: composition,
               controller: controller,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
               addRepaintBoundary: true,
             ),
           );
@@ -359,44 +372,61 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         if (_lottieFailed) return _fallbackVisual();
         return const SizedBox.shrink();
       case _GiftMediaKind.video:
-        // Never wrap VideoPlayer in blend/saveLayer — that crashes Android.
         if (_videoFailed) return _fallbackVisual();
         final controller = _videoController;
         if (controller == null || !controller.value.isInitialized) {
           return const SizedBox.shrink();
         }
-        return FittedBox(
-          fit: BoxFit.contain,
-          child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
-            child: VideoPlayer(controller),
+        // Parent stage is 1:1 (1080×1080); cover the square.
+        return _giftLightenFilter(
+          FittedBox(
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
           ),
         );
       case _GiftMediaKind.image:
-        return _fallbackVisual(url: widget.animationUrl);
+        return _giftLightenFilter(_fallbackVisual(url: widget.animationUrl));
     }
+  }
+
+  /// Brightens gift media so it reads lighter over the feed.
+  Widget _giftLightenFilter(Widget child) {
+    return ColorFiltered(
+      colorFilter: const ColorFilter.matrix(<double>[
+        // Boost RGB + lift blacks slightly.
+        1.22, 0, 0, 0, 18,
+        0, 1.22, 0, 0, 18,
+        0, 0, 1.22, 0, 18,
+        0, 0, 0, 1, 0,
+      ]),
+      child: child,
+    );
   }
 
   /// Soft screen-style look for Lottie only (no Texture / VideoPlayer).
   Widget _lottieScreenBlend(Widget child) {
     return ColorFiltered(
       colorFilter: const ColorFilter.matrix(<double>[
-        1.15,
+        1.28,
         0,
         0,
         0,
+        12,
+        0,
+        1.28,
         0,
         0,
-        1.15,
+        12,
         0,
         0,
+        1.28,
         0,
-        0,
-        0,
-        1.15,
-        0,
-        0,
+        12,
         0,
         0,
         0,
@@ -414,9 +444,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         imageUrl: thumb,
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
       );
     }
-    return const Icon(Icons.card_giftcard, size: 120, color: Colors.white);
+    return const Center(
+      child: Icon(Icons.card_giftcard, size: 120, color: Colors.white),
+    );
   }
 }

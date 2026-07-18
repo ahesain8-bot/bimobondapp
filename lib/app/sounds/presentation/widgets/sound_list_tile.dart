@@ -124,7 +124,9 @@ class _SoundListTileState extends State<SoundListTile> {
                       '${sound.author} · ${formatSoundDuration(sound.duration)} · ${formatSoundUseCount(sound.useCount, l10n)}',
                       style: TextStyle(
                         fontSize: 13,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

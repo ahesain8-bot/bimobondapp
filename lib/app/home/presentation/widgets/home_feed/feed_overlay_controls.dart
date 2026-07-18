@@ -71,12 +71,7 @@ class _OverlayIconButton extends StatelessWidget {
         icon,
         color: feedOverlay.overlayForeground,
         size: HomeLayoutConstants.liveIconSize,
-        shadows: [
-          Shadow(
-            blurRadius: AppSizes.p4,
-            color: feedOverlay.shadow,
-          ),
-        ],
+        shadows: [Shadow(blurRadius: AppSizes.p4, color: feedOverlay.shadow)],
       ),
       tooltip: tooltip,
       onPressed: onPressed,

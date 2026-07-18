@@ -51,6 +51,8 @@ class ApiConstants {
   static String deleteComment(String commentId) => '/posts/comments/$commentId';
   static String toggleLikeComment(String commentId) =>
       '/posts/comments/$commentId/like';
+  static String commentLikes(String commentId) =>
+      '/posts/comments/$commentId/likes';
 
   static const String categories = '/categories';
 

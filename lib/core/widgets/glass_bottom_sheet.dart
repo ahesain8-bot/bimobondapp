@@ -302,34 +302,42 @@ class _DraggableSheetHostState extends State<_DraggableSheetHost> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableSheetExtent(
-      controller: _sheetController,
-      minChildSize: widget.minChildSize,
-      maxChildSize: widget.maxChildSize,
-      snapSizes: widget.snapSizes,
-      child: DraggableScrollableSheet(
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      // Lift the whole sheet above the keyboard so pinned footers stay tappable.
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: DraggableSheetExtent(
         controller: _sheetController,
-        initialChildSize: widget.initialChildSize,
         minChildSize: widget.minChildSize,
         maxChildSize: widget.maxChildSize,
-        expand: false,
-        snap: true,
         snapSizes: widget.snapSizes,
-        builder: (context, scrollController) {
-          Widget body = GlassBottomSheetShell(
-            expand: true,
-            showHandle: widget.showHandle,
-            title: widget.title,
-            lightSurface: widget.lightSurface,
-            child: widget.builder(context, scrollController),
-          );
-          if (widget.lightSurface) {
-            // Keep current app theme (white in light, dark surface in dark).
-          } else if (widget.adaptTheme) {
-            body = GlassBottomSheetTheme.wrap(context, body);
-          }
-          return body;
-        },
+        child: DraggableScrollableSheet(
+          controller: _sheetController,
+          initialChildSize: widget.initialChildSize,
+          minChildSize: widget.minChildSize,
+          maxChildSize: widget.maxChildSize,
+          expand: false,
+          snap: true,
+          snapSizes: widget.snapSizes,
+          builder: (context, scrollController) {
+            Widget body = GlassBottomSheetShell(
+              expand: true,
+              showHandle: widget.showHandle,
+              title: widget.title,
+              lightSurface: widget.lightSurface,
+              child: widget.builder(context, scrollController),
+            );
+            if (widget.lightSurface) {
+              // Keep current app theme (white in light, dark surface in dark).
+            } else if (widget.adaptTheme) {
+              body = GlassBottomSheetTheme.wrap(context, body);
+            }
+            return body;
+          },
+        ),
       ),
     );
   }

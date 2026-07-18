@@ -53,7 +53,9 @@ class _CameraEffectTestScreenState extends State<CameraEffectTestScreen> {
     });
 
     try {
-      await CameraEffectAssetLoader.preload(CameraEffectTestScreen.sunglassesAsset);
+      await CameraEffectAssetLoader.preload(
+        CameraEffectTestScreen.sunglassesAsset,
+      );
 
       final data = await rootBundle.load(CameraEffectTestScreen.personAsset);
       final result = await CameraFaceDetection.detectAccurateFromBytes(

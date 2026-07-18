@@ -594,10 +594,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get selectGender => 'اختر الجنس';
 
   @override
-  String get instagramProfileUrl => 'رابط حساب إنستجرام';
+  String get instagramProfileUrl => 'اسم المستخدم أو الرابط';
 
   @override
-  String get youtubeChannelUrl => 'رابط قناة يوتيوب';
+  String get youtubeChannelUrl => 'اسم المستخدم أو رابط القناة';
 
   @override
   String get egypt => 'مصر';
@@ -651,6 +651,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get navHome => 'الرئيسية';
+
+  @override
+  String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
 
   @override
   String get navFriends => 'الأصدقاء';
@@ -1073,7 +1076,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get navProfile => 'حسابي';
 
   @override
-  String get describePostHint => 'صف منشورك… استخدم @اسم_المستخدم و #وسم في النص';
+  String get describePostHint => 'أضف وصفًا...';
 
   @override
   String get addDescriptionHint => 'أضف وصفًا...';
@@ -1236,7 +1239,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noCommentsYet => 'لا توجد تعليقات بعد. كن أول من يعلق!';
 
   @override
-  String get addCommentHint => 'أضف تعليقًا… @اسم_المستخدم للإشارة';
+  String get addCommentHint => 'أضف تعليقًا...';
 
   @override
   String get justNow => 'الآن';
@@ -1348,6 +1351,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postShareSheetTitle => 'مشاركة المنشور';
 
   @override
+  String get postShareSendToTitle => 'إرسال إلى';
+
+  @override
   String get postShareSearchUsers => 'ابحث عن الأصدقاء والمستخدمين';
 
   @override
@@ -1390,6 +1396,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String postShareSentTo(String name) {
     return 'تم الإرسال إلى $name';
   }
+
+  @override
+  String get postShareSend => 'إرسال';
+
+  @override
+  String postShareSendToCount(int count) {
+    return 'إرسال ($count)';
+  }
+
+  @override
+  String postShareSentCount(int count) {
+    return 'تم الإرسال إلى $count أشخاص';
+  }
+
+  @override
+  String get postQuickShareTitle => 'الأصدقاء الأخيرون';
+
+  @override
+  String get postQuickShareSubtitle => 'اختر الأصدقاء، اضغط مرة أخرى للإلغاء، ثم أرسل';
 
   @override
   String get postAddToStoryHint => 'أنشئ قصتك — المنشور جاهز للمشاركة';
@@ -1661,6 +1686,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesInboxLastShare => 'شارك منشوراً';
 
   @override
+  String get messagesInboxLastSticker => 'ملصق';
+
+  @override
   String get messagesInboxMessageDeleted => 'تم حذف الرسالة';
 
   @override
@@ -1875,6 +1903,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatMoreGift => 'هدية';
 
   @override
+  String get chatMoreSticker => 'ملصق';
+
+  @override
   String get chatMorePoll => 'تصويت';
 
   @override
@@ -1888,6 +1919,21 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chatGiftSentLabel => 'تم إرسال الهدية';
+
+  @override
+  String get chatStickerSheetTitle => 'الملصقات';
+
+  @override
+  String get chatStickerSheetSubtitle => 'اضغط على ملصق لإرساله';
+
+  @override
+  String get chatStickerPackEmotions => 'المشاعر';
+
+  @override
+  String get chatStickerPackReactions => 'التفاعلات';
+
+  @override
+  String get chatStickerPackCelebrations => 'الاحتفالات';
 
   @override
   String get chatMessageContact => 'جهة اتصال';
@@ -3288,4 +3334,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get retry => 'حاول مرة أخرى';
+
+  @override
+  String get seeTranslation => 'عرض الترجمة';
+
+  @override
+  String get seeOriginal => 'عرض النص الأصلي';
+
+  @override
+  String get translationFailed => 'تعذر الترجمة';
 }

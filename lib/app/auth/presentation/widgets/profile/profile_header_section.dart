@@ -96,10 +96,7 @@ class ProfileHeaderSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSizes.p12),
-          ProfileBioText(
-            bio: user.bio,
-            placeholder: l10n.noBio,
-          ),
+          ProfileBioText(bio: user.bio, placeholder: l10n.noBio),
         ],
       ),
     );

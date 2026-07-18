@@ -1,4 +1,4 @@
-import 'package:bimobondapp/app/home/presentation/pages/video_post_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';

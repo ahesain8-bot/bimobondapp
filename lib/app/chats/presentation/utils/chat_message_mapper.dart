@@ -94,10 +94,7 @@ Map<String, dynamic> chatMessageToUiMap(
     message.content,
     message.payload,
   );
-  final contact = ChatContactPayload.tryParse(
-    message.content,
-    message.payload,
-  );
+  final contact = ChatContactPayload.tryParse(message.content, message.payload);
   final file = ChatFilePayload.tryParse(
     message.content,
     message.mediaUrl,
@@ -174,8 +171,8 @@ Map<String, dynamic> chatMessageToUiMap(
           'question': message.payload!['question']?.toString() ?? '',
           'options': message.payload!['options'] is List
               ? (message.payload!['options'] as List)
-                  .map((e) => e.toString())
-                  .toList()
+                    .map((e) => e.toString())
+                    .toList()
               : <String>[],
           'allowMultiple': message.payload!['allowMultiple'] == true,
           'totalVotes': 0,
@@ -196,10 +193,7 @@ Map<String, dynamic> chatMessageToUiMap(
   };
 }
 
-int compareChatMessagesByTime(
-  Map<String, dynamic> a,
-  Map<String, dynamic> b,
-) {
+int compareChatMessagesByTime(Map<String, dynamic> a, Map<String, dynamic> b) {
   final at = a['createdAtMs'] as int? ?? 0;
   final bt = b['createdAtMs'] as int? ?? 0;
   return at.compareTo(bt);

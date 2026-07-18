@@ -1232,13 +1232,13 @@ abstract class AppLocalizations {
   /// No description provided for @instagramProfileUrl.
   ///
   /// In en, this message translates to:
-  /// **'Instagram profile URL'**
+  /// **'Username or profile link'**
   String get instagramProfileUrl;
 
   /// No description provided for @youtubeChannelUrl.
   ///
   /// In en, this message translates to:
-  /// **'YouTube channel URL'**
+  /// **'Username or channel link'**
   String get youtubeChannelUrl;
 
   /// No description provided for @egypt.
@@ -1342,6 +1342,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Home'**
   String get navHome;
+
+  /// No description provided for @pressBackAgainToExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get pressBackAgainToExit;
 
   /// No description provided for @navFriends.
   ///
@@ -2114,13 +2120,13 @@ abstract class AppLocalizations {
   /// No description provided for @describePostHint.
   ///
   /// In en, this message translates to:
-  /// **'Describe your post… use @username and #tag in the text'**
+  /// **'Add a description...'**
   String get describePostHint;
 
   /// No description provided for @addDescriptionHint.
   ///
   /// In en, this message translates to:
-  /// **'Add description...'**
+  /// **'Add a description...'**
   String get addDescriptionHint;
 
   /// No description provided for @hashtagsLabel.
@@ -2432,7 +2438,7 @@ abstract class AppLocalizations {
   /// No description provided for @addCommentHint.
   ///
   /// In en, this message translates to:
-  /// **'Add comment… @username to mention'**
+  /// **'Add a comment...'**
   String get addCommentHint;
 
   /// No description provided for @justNow.
@@ -2633,6 +2639,12 @@ abstract class AppLocalizations {
   /// **'Share post'**
   String get postShareSheetTitle;
 
+  /// No description provided for @postShareSendToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to'**
+  String get postShareSendToTitle;
+
   /// No description provided for @postShareSearchUsers.
   ///
   /// In en, this message translates to:
@@ -2716,6 +2728,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sent to {name}'**
   String postShareSentTo(String name);
+
+  /// No description provided for @postShareSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get postShareSend;
+
+  /// No description provided for @postShareSendToCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Send ({count})'**
+  String postShareSendToCount(int count);
+
+  /// No description provided for @postShareSentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to {count} people'**
+  String postShareSentCount(int count);
+
+  /// No description provided for @postQuickShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent friends'**
+  String get postQuickShareTitle;
+
+  /// No description provided for @postQuickShareSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select friends, tap again to cancel, then send'**
+  String get postQuickShareSubtitle;
 
   /// No description provided for @postAddToStoryHint.
   ///
@@ -3251,6 +3293,12 @@ abstract class AppLocalizations {
   /// **'Shared a post'**
   String get messagesInboxLastShare;
 
+  /// No description provided for @messagesInboxLastSticker.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticker'**
+  String get messagesInboxLastSticker;
+
   /// No description provided for @messagesInboxMessageDeleted.
   ///
   /// In en, this message translates to:
@@ -3659,6 +3707,12 @@ abstract class AppLocalizations {
   /// **'Gift'**
   String get chatMoreGift;
 
+  /// No description provided for @chatMoreSticker.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticker'**
+  String get chatMoreSticker;
+
   /// No description provided for @chatMorePoll.
   ///
   /// In en, this message translates to:
@@ -3688,6 +3742,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gift sent'**
   String get chatGiftSentLabel;
+
+  /// No description provided for @chatStickerSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stickers'**
+  String get chatStickerSheetTitle;
+
+  /// No description provided for @chatStickerSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a sticker to send it'**
+  String get chatStickerSheetSubtitle;
+
+  /// No description provided for @chatStickerPackEmotions.
+  ///
+  /// In en, this message translates to:
+  /// **'Emotions'**
+  String get chatStickerPackEmotions;
+
+  /// No description provided for @chatStickerPackReactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Reactions'**
+  String get chatStickerPackReactions;
+
+  /// No description provided for @chatStickerPackCelebrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Celebrations'**
+  String get chatStickerPackCelebrations;
 
   /// No description provided for @chatMessageContact.
   ///
@@ -6292,6 +6376,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get retry;
+
+  /// No description provided for @seeTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'See translation'**
+  String get seeTranslation;
+
+  /// No description provided for @seeOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'See original'**
+  String get seeOriginal;
+
+  /// No description provided for @translationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not translate'**
+  String get translationFailed;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -38,6 +38,7 @@ class CustomVideoPlayer extends StatefulWidget {
     this.respectFeedPlaybackGate = true,
     this.controller,
     this.onPlaybackChanged,
+    this.onLongPress,
   });
 
   final String url;
@@ -47,6 +48,7 @@ class CustomVideoPlayer extends StatefulWidget {
   final bool respectFeedPlaybackGate;
   final CustomVideoPlayerController? controller;
   final VoidCallback? onPlaybackChanged;
+  final VoidCallback? onLongPress;
 
   @override
   State<CustomVideoPlayer> createState() => _CustomVideoPlayerState();
@@ -591,6 +593,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
     return GestureDetector(
       onTap: () => unawaited(_togglePlayback()),
+      onLongPress: widget.onLongPress,
       child: Stack(
         fit: StackFit.expand,
         children: [

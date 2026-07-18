@@ -249,8 +249,8 @@
   "enterUsername": "Enter username",
   "addBioToProfile": "Add a bio to your profile",
   "selectGender": "Select gender",
-  "instagramProfileUrl": "Instagram profile URL",
-  "youtubeChannelUrl": "YouTube channel URL",
+  "instagramProfileUrl": "Username or profile link",
+  "youtubeChannelUrl": "Username or channel link",
   "egypt": "Egypt",
   "saudiArabia": "Saudi Arabia",
   "uae": "UAE",
@@ -275,6 +275,7 @@
   "feedLive": "Live",
   "noPostsFound": "No posts found",
   "navHome": "Home",
+  "pressBackAgainToExit": "Press back again to exit",
   "navFriends": "Friends",
   "navAuctions": "Auctions",
   "auctionsSearchHint": "Search auctions...",
@@ -553,8 +554,8 @@
   "navAdd": "Add",
   "navChat": "Chat",
   "navProfile": "Profile",
-  "describePostHint": "Describe your post… use @username and #tag in the text",
-  "addDescriptionHint": "Add description...",
+  "describePostHint": "Add a description...",
+  "addDescriptionHint": "Add a description...",
   "hashtagsLabel": "Hashtags",
   "mentionsLabel": "Mention",
   "whoCanWatchLabel": "Who can view this post",
@@ -620,7 +621,7 @@
   "commentsSortOldest": "Oldest",
   "commentsSortTop": "Top",
   "noCommentsYet": "No comments yet. Be the first!",
-  "addCommentHint": "Add comment… @username to mention",
+  "addCommentHint": "Add a comment...",
   "justNow": "Just now",
   "inboxTimeMinutes": "{count}m",
   "@inboxTimeMinutes": {
@@ -689,6 +690,7 @@
   "postDownloadFailed": "Could not download media",
   "postShareAsGifUnavailable": "GIF share is only available for videos",
   "postShareSheetTitle": "Share post",
+  "postShareSendToTitle": "Send to",
   "postShareSearchUsers": "Search friends and users",
   "postShareNoUsers": "No users found",
   "postShareToApps": "Share to apps",
@@ -710,6 +712,25 @@
       }
     }
   },
+  "postShareSend": "Send",
+  "postShareSendToCount": "Send ({count})",
+  "@postShareSendToCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postShareSentCount": "Sent to {count} people",
+  "@postShareSentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postQuickShareTitle": "Recent friends",
+  "postQuickShareSubtitle": "Select friends, tap again to cancel, then send",
   "postAddToStoryHint": "Create your story — the post is ready to share",
   "postCreateGroupHint": "Pick contacts to start a group chat",
   "postUpdatedSuccessfully": "Post updated successfully",
@@ -1496,5 +1517,8 @@
   "interestSelectionInterestedLegend": "Interested",
   "interestSelectionSave": "Save",
   "settingsInterests": "Interests",
-  "retry": "Try again"
+  "retry": "Try again",
+  "seeTranslation": "See translation",
+  "seeOriginal": "See original",
+  "translationFailed": "Could not translate"
 }

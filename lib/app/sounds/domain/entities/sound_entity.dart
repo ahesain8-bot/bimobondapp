@@ -193,7 +193,10 @@ class SoundsPageEntity extends Equatable {
 class SoundPostPreviewEntity extends Equatable {
   const SoundPostPreviewEntity({
     required this.id,
+    this.type = 'VIDEO',
     this.thumbnailUrl,
+    this.videoUrl,
+    this.imageUrl,
     this.viewCount = 0,
     this.likeCount = 0,
     this.username,
@@ -201,16 +204,49 @@ class SoundPostPreviewEntity extends Equatable {
   });
 
   final String id;
+  final String type;
   final String? thumbnailUrl;
+  final String? videoUrl;
+  final String? imageUrl;
   final int viewCount;
   final int likeCount;
   final String? username;
   final String? avatarUrl;
 
+  bool get isVideo {
+    if (type.toUpperCase() == 'IMAGE') return false;
+    if (type.toUpperCase() == 'VIDEO') return true;
+    final video = videoUrl;
+    return video != null && video.isNotEmpty;
+  }
+
   String? get resolvedThumbnailUrl {
     final url = thumbnailUrl;
     if (url == null || url.isEmpty) return null;
     return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  String? get resolvedVideoUrl {
+    final url = videoUrl;
+    if (url == null || url.isEmpty) return null;
+    return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  String? get resolvedImageUrl {
+    final url = imageUrl;
+    if (url == null || url.isEmpty) return null;
+    return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  /// Cover/poster for grid tiles. Prefer any non-file-video URL (CDN thumbs
+  /// often contain "video" in the path and must still display as images).
+  String? get resolvedCoverUrl {
+    for (final candidate in [resolvedThumbnailUrl, resolvedImageUrl]) {
+      if (candidate == null || candidate.isEmpty) continue;
+      if (_isVideoFileUrl(candidate)) continue;
+      return candidate;
+    }
+    return null;
   }
 
   factory SoundPostPreviewEntity.fromJson(Map<String, dynamic> json) {
@@ -222,9 +258,16 @@ class SoundPostPreviewEntity extends Equatable {
       avatarUrl = user['avatarUrl']?.toString();
     }
 
+    final type = json['type']?.toString().trim().isNotEmpty == true
+        ? json['type'].toString()
+        : (_resolvePostPreviewVideo(json) != null ? 'VIDEO' : 'IMAGE');
+
     return SoundPostPreviewEntity(
       id: json['id']?.toString() ?? '',
-      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      type: type,
+      thumbnailUrl: _resolvePostPreviewThumbnail(json),
+      videoUrl: _resolvePostPreviewVideo(json),
+      imageUrl: _resolvePostPreviewImage(json),
       viewCount: _parseSoundInt(json['viewCount']),
       likeCount: _parseSoundInt(json['likeCount']),
       username: username,
@@ -235,12 +278,142 @@ class SoundPostPreviewEntity extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    type,
     thumbnailUrl,
+    videoUrl,
+    imageUrl,
     viewCount,
     likeCount,
     username,
     avatarUrl,
   ];
+}
+
+String? _firstNonEmptyString(Iterable<String?> values) {
+  for (final value in values) {
+    final trimmed = value?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+  }
+  return null;
+}
+
+/// True only for clear video *files* / streams — not CDN paths that contain
+/// the word "video" (those are often image thumbnails).
+bool _isVideoFileUrl(String url) {
+  if (url.isEmpty) return false;
+  final lower = url.toLowerCase();
+  final clean = lower.split('?').first;
+  if (MediaUtils.imageExtensions.any((ext) => clean.endsWith(ext))) {
+    return false;
+  }
+  if (MediaUtils.videoExtensions.any((ext) => clean.endsWith(ext))) {
+    return true;
+  }
+  return lower.contains('.m3u8');
+}
+
+String? _resolvePostPreviewThumbnail(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['thumbnailUrl']?.toString(),
+    json['coverUrl']?.toString(),
+    json['posterUrl']?.toString(),
+    json['imageUrl']?.toString(),
+  ]);
+  if (direct != null && !_isVideoFileUrl(direct)) return direct;
+
+  final media = json['media'];
+  if (media is List) {
+    for (final item in media) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final mediaType = map['mediaType']?.toString();
+      final candidate = _firstNonEmptyString([
+        map['thumbnailUrl']?.toString(),
+        map['coverUrl']?.toString(),
+        map['posterUrl']?.toString(),
+      ]);
+      if (candidate != null && !_isVideoFileUrl(candidate)) {
+        return candidate;
+      }
+      final url = map['url']?.toString();
+      if (url == null || url.isEmpty) continue;
+      if (mediaType?.toUpperCase() == 'IMAGE' ||
+          (!_isVideoFileUrl(url) &&
+              MediaUtils.isImage(url, mediaType: mediaType))) {
+        return url;
+      }
+    }
+  }
+  return null;
+}
+
+String? _resolvePostPreviewVideo(Map<String, dynamic> json) {
+  if (json['type']?.toString().toUpperCase() == 'IMAGE') return null;
+
+  final candidates = <String>[
+    if (json['hlsUrl']?.toString().trim().isNotEmpty == true)
+      json['hlsUrl'].toString(),
+    if (json['videoUrl']?.toString().trim().isNotEmpty == true)
+      json['videoUrl'].toString(),
+  ];
+
+  final media = json['media'];
+  if (media is List) {
+    for (final item in media) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final url = map['url']?.toString();
+      if (url == null || url.isEmpty) continue;
+      final mediaType = map['mediaType']?.toString();
+      if (mediaType?.toUpperCase() == 'IMAGE') continue;
+      if (mediaType?.toUpperCase() == 'VIDEO' || _isVideoFileUrl(url)) {
+        candidates.add(url);
+      }
+    }
+  }
+
+  for (final url in candidates) {
+    if (url.isEmpty) continue;
+    if (_isVideoFileUrl(url) || url.toLowerCase().contains('.m3u8')) {
+      return url;
+    }
+  }
+
+  // Explicit videoUrl / hlsUrl fields are trusted even without extension.
+  if (candidates.isNotEmpty) return candidates.first;
+  return null;
+}
+
+String? _resolvePostPreviewImage(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['imageUrl']?.toString(),
+    json['coverUrl']?.toString(),
+  ]);
+  if (direct != null && !_isVideoFileUrl(direct)) return direct;
+
+  final media = json['media'];
+  if (media is List) {
+    for (final item in media) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final url = map['url']?.toString();
+      if (url == null || url.isEmpty) continue;
+      final mediaType = map['mediaType']?.toString();
+      if (mediaType?.toUpperCase() == 'VIDEO' || _isVideoFileUrl(url)) {
+        continue;
+      }
+      if (mediaType?.toUpperCase() == 'IMAGE' ||
+          MediaUtils.isImage(url, mediaType: mediaType)) {
+        return url;
+      }
+    }
+  }
+
+  final thumb = json['thumbnailUrl']?.toString();
+  if (thumb != null && thumb.isNotEmpty && !_isVideoFileUrl(thumb)) {
+    return thumb;
+  }
+  return null;
 }
 
 class SoundDetailEntity extends Equatable {

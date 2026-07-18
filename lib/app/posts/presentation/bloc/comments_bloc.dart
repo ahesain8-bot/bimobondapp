@@ -231,6 +231,9 @@ class CommentsBloc extends Bloc<CommentsEvent, CommentsState> {
 
     final result = await deleteCommentUsecase(event.commentId);
     result.fold((failure) => emit(CommentsFailure(failure.message)), (_) {
+      emit(
+        DeleteCommentSuccess(event.commentId, parentId: event.parentId),
+      );
       emit(_applyDelete(currentState, event.commentId, event.parentId));
     });
   }

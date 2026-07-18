@@ -255,6 +255,43 @@ class _ProfileScreenState extends State<ProfileScreen>
     tab.hasReachedMax = false;
   }
 
+  void _onLikePostSuccess(LikePostSuccess state) {
+    final likedTab = _tabPosts[ProfileLayoutConstants.likedTabIndex];
+
+    // Keep like flags in sync across every loaded profile tab.
+    for (final tab in _tabPosts) {
+      for (var i = 0; i < tab.posts.length; i++) {
+        final post = tab.posts[i];
+        if (post.id != state.postId) continue;
+        final nextCount = state.liked
+            ? post.likeCount + (post.isLiked ? 0 : 1)
+            : (post.likeCount - (post.isLiked ? 1 : 0)).clamp(0, 1 << 30).toInt();
+        tab.posts[i] = post.copyWith(
+          isLiked: state.liked,
+          likeCount: nextCount,
+        );
+      }
+    }
+
+    if (state.liked) {
+      // Newly liked — force a refresh next time / immediately if on likes tab.
+      likedTab.posts.clear();
+      likedTab.page = 1;
+      likedTab.hasReachedMax = false;
+      if (_selectedTabIndex == ProfileLayoutConstants.likedTabIndex) {
+        setState(() => likedTab.isInitialLoading = true);
+        _fetchUserPosts(refresh: true);
+      } else {
+        setState(() {});
+      }
+      return;
+    }
+
+    // Unliked — drop from the likes grid immediately.
+    likedTab.posts.removeWhere((post) => post.id == state.postId);
+    setState(() {});
+  }
+
   Future<void> _onPullToRefresh() async {
     final tab = _tabPosts[_selectedTabIndex];
     _pullRefreshCompleter = Completer<void>();
@@ -344,6 +381,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               tab.isInitialLoading = tab.posts.isEmpty;
               _fetchUserPosts(refresh: true);
             }
+          } else if (state is LikePostSuccess) {
+            _onLikePostSuccess(state);
           } else if (state is SavePostSuccess) {
             final savedTab = _tabPosts[ProfileLayoutConstants.savedTabIndex];
             savedTab.posts.clear();

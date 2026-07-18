@@ -1,7 +1,7 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
-import 'package:bimobondapp/app/home/presentation/pages/video_post_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
@@ -200,6 +200,36 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
     });
   }
 
+  void _onLikePostSuccess(LikePostSuccess state) {
+    final index = _posts.indexWhere((p) => p.id == state.postId);
+    if (index == -1) return;
+
+    if (!state.liked &&
+        widget.args.source == ProfilePostsViewerSource.ownLiked) {
+      setState(() {
+        _posts.removeAt(index);
+        if (_currentIndex >= _posts.length) {
+          _currentIndex = (_posts.length - 1).clamp(0, _posts.length);
+        }
+      });
+      if (_posts.isEmpty && mounted) {
+        context.pop();
+      }
+      return;
+    }
+
+    final post = _posts[index];
+    final nextCount = state.liked
+        ? post.likeCount + (post.isLiked ? 0 : 1)
+        : (post.likeCount - (post.isLiked ? 1 : 0)).clamp(0, 1 << 30).toInt();
+    setState(() {
+      _posts[index] = post.copyWith(
+        isLiked: state.liked,
+        likeCount: nextCount,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<PostsBloc, PostsState>(
@@ -234,6 +264,8 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
           if (_posts.isEmpty && mounted) {
             context.pop();
           }
+        } else if (state is LikePostSuccess) {
+          _onLikePostSuccess(state);
         } else if (state is UpdatePostSuccess) {
           final index = _posts.indexWhere((p) => p.id == state.post.id);
           if (index != -1) {
@@ -244,6 +276,8 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         extendBodyBehindAppBar: true,
+        // Let embedded auction screens receive keyboard insets themselves.
+        resizeToAvoidBottomInset: false,
         appBar: CustomAppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -266,11 +300,15 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
               return LiveDetailsScreen(post: post, embeddedInFeed: true);
             }
             return VideoPostWidget(
-              key: ValueKey(post.id),
+              key: ValueKey('profile_post_${post.id}'),
               post: post,
               isActive: index == _currentIndex,
               respectFeedPlaybackGate: false,
+              // TikTok-style: likes/comments rise up when opening from profile.
+              animateChromeEntrance: true,
               bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
+              pageController: _pageController,
+              pageIndex: index,
             );
           },
         ),

@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_input_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_skeleton.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/engagement_sheet_header.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_engagement_users_tab.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_state.dart';
@@ -13,6 +17,7 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as di;
 import 'package:bimobondapp/app/posts/presentation/utils/comment_thread_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/comment_media.dart';
 import 'package:bimobondapp/core/utils/comment_sort.dart';
 import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -34,6 +39,7 @@ class CommentSheetWidget extends StatefulWidget {
     this.isPostOwner = false,
     this.initialTabIndex = 0,
     required this.sheetScrollController,
+    this.onCommentCountChanged,
   });
 
   final String postId;
@@ -44,6 +50,7 @@ class CommentSheetWidget extends StatefulWidget {
   final bool isPostOwner;
   final int initialTabIndex;
   final ScrollController sheetScrollController;
+  final ValueChanged<int>? onCommentCountChanged;
 
   /// Comments | Likes for everyone; Views added for post owner.
   int get _tabCount => isPostOwner ? 3 : 2;
@@ -53,7 +60,8 @@ class CommentSheetWidget extends StatefulWidget {
   static const int ownerViewsTabIndex = 2;
 
   /// Engagement sheet: Comments / Likes (+ Views for owner).
-  static Future<void> show(
+  /// Returns the latest comment count when the sheet closes.
+  static Future<int?> show(
     BuildContext context, {
     required String postId,
     required String postOwnerId,
@@ -62,9 +70,10 @@ class CommentSheetWidget extends StatefulWidget {
     required int viewCount,
     required bool isPostOwner,
     int initialTabIndex = 0,
-  }) {
+  }) async {
     final maxIndex = isPostOwner ? 2 : 1;
-    return GlassBottomSheet.showDraggable<void>(
+    var latestCount = commentCount;
+    await GlassBottomSheet.showDraggable<void>(
       context,
       initialChildSize: 0.72,
       minChildSize: 0.45,
@@ -79,8 +88,10 @@ class CommentSheetWidget extends StatefulWidget {
         isPostOwner: isPostOwner,
         initialTabIndex: initialTabIndex.clamp(0, maxIndex),
         sheetScrollController: scrollController,
+        onCommentCountChanged: (count) => latestCount = count,
       ),
     );
+    return latestCount;
   }
 
   @override
@@ -103,8 +114,16 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   final Set<String> _expandedReplyIds = {};
   late int _headerCommentCount;
   String _commentSort = 'newest';
+  bool _isSendingImage = false;
 
   ScrollController get _sheetScrollController => widget.sheetScrollController;
+
+  void _setHeaderCommentCount(int value) {
+    final next = value < 0 ? 0 : value;
+    if (_headerCommentCount == next) return;
+    setState(() => _headerCommentCount = next);
+    widget.onCommentCountChanged?.call(next);
+  }
 
   void _applyCommentSort(String sort) {
     if (_commentSort == sort) return;
@@ -131,6 +150,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
       initialIndex: widget.initialTabIndex,
     );
     _headerCommentCount = widget.postCommentCount;
+    widget.onCommentCountChanged?.call(_headerCommentCount);
     _commentsBloc = di.sl<CommentsBloc>();
     _commentsBloc.add(
       FetchCommentsRequested(
@@ -257,7 +277,41 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
   void _onSendComment() => _postComment(_commentController.text);
 
-  void _onQuickReaction(String emoji) => _postComment(emoji);
+  /// Insert emoji into the draft while typing; send as a sticker when empty.
+  void _onQuickReaction(String emoji) {
+    if (!_checkAuth()) return;
+    if (_commentController.text.trim().isEmpty) {
+      _postComment(emoji);
+      return;
+    }
+    TagTextEditing.insertText(_commentController, emoji);
+    _commentFocusNode.requestFocus();
+  }
+
+  Future<void> _onPickImageComment() async {
+    if (!_checkAuth() || _isSendingImage) return;
+
+    final draft = await ChatAttachmentPicker.pickFromGallery();
+    final path = draft?.filePath;
+    if (path == null || path.isEmpty || !mounted) return;
+
+    setState(() => _isSendingImage = true);
+    final result = await di.sl<UploadMediaUseCase>()(File(path));
+    if (!mounted) return;
+    setState(() => _isSendingImage = false);
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+      },
+      (url) {
+        final encoded = CommentMedia.encodeImage(url);
+        _postComment(encoded);
+      },
+    );
+  }
 
   String? get _currentUserId {
     final authState = context.read<AuthBloc>().state;
@@ -343,6 +397,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                         child: BlocConsumer<CommentsBloc, CommentsState>(
                           listenWhen: (previous, current) =>
                               current is AddCommentSuccess ||
+                              current is DeleteCommentSuccess ||
                               current is CommentsFailure ||
                               current is CommentsLoadSuccess,
                           listener: (context, state) {
@@ -353,7 +408,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                               });
                             } else if (state is AddCommentSuccess) {
                               if (state.comment.parentId == null) {
-                                setState(() => _headerCommentCount++);
+                                _setHeaderCommentCount(_headerCommentCount + 1);
                                 _commentsPage = 1;
                                 _commentsBloc.add(
                                   FetchCommentsRequested(
@@ -362,6 +417,10 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                                     sort: _commentSort,
                                   ),
                                 );
+                              }
+                            } else if (state is DeleteCommentSuccess) {
+                              if (state.isTopLevel) {
+                                _setHeaderCommentCount(_headerCommentCount - 1);
                               }
                             }
                           },
@@ -508,6 +567,8 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                         replyingToUsername: _replyingToUsername,
                         onClearReplyingTo: _clearReplyingTo,
                         onQuickReaction: _onQuickReaction,
+                        onPickImage: _onPickImageComment,
+                        isSendingImage: _isSendingImage,
                         commentController: _commentController,
                         commentFocusNode: _commentFocusNode,
                         onSendComment: _onSendComment,

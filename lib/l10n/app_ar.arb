@@ -249,8 +249,8 @@
   "enterUsername": "أدخل اسم المستخدم",
   "addBioToProfile": "أضف نبذة شخصية لملفك",
   "selectGender": "اختر الجنس",
-  "instagramProfileUrl": "رابط حساب إنستجرام",
-  "youtubeChannelUrl": "رابط قناة يوتيوب",
+  "instagramProfileUrl": "اسم المستخدم أو الرابط",
+  "youtubeChannelUrl": "اسم المستخدم أو رابط القناة",
   "egypt": "مصر",
   "saudiArabia": "السعودية",
   "uae": "الإمارات",
@@ -275,6 +275,7 @@
   "feedLive": "مباشر",
   "noPostsFound": "لا توجد منشورات",
   "navHome": "الرئيسية",
+  "pressBackAgainToExit": "اضغط رجوع مرة أخرى للخروج",
   "navFriends": "الأصدقاء",
   "navAuctions": "مزادات",
   "auctionsSearchHint": "ابحث في المزادات...",
@@ -553,7 +554,7 @@
   "navAdd": "إضافة",
   "navChat": "الدردشة",
   "navProfile": "حسابي",
-  "describePostHint": "صف منشورك… استخدم @اسم_المستخدم و #وسم في النص",
+  "describePostHint": "أضف وصفًا...",
   "addDescriptionHint": "أضف وصفًا...",
   "hashtagsLabel": "هاشتاجات",
   "mentionsLabel": "منشن",
@@ -620,7 +621,7 @@
   "commentsSortOldest": "الأقدم",
   "commentsSortTop": "الأكثر إعجاباً",
   "noCommentsYet": "لا توجد تعليقات بعد. كن أول من يعلق!",
-  "addCommentHint": "أضف تعليقًا… @اسم_المستخدم للإشارة",
+  "addCommentHint": "أضف تعليقًا...",
   "justNow": "الآن",
   "inboxTimeMinutes": "{count} د",
   "@inboxTimeMinutes": {
@@ -689,6 +690,7 @@
   "postDownloadFailed": "تعذر تنزيل الوسائط",
   "postShareAsGifUnavailable": "مشاركة GIF متاحة للفيديو فقط",
   "postShareSheetTitle": "مشاركة المنشور",
+  "postShareSendToTitle": "إرسال إلى",
   "postShareSearchUsers": "ابحث عن الأصدقاء والمستخدمين",
   "postShareNoUsers": "لم يتم العثور على مستخدمين",
   "postShareToApps": "مشاركة عبر التطبيقات",
@@ -710,6 +712,25 @@
       }
     }
   },
+  "postShareSend": "إرسال",
+  "postShareSendToCount": "إرسال ({count})",
+  "@postShareSendToCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postShareSentCount": "تم الإرسال إلى {count} أشخاص",
+  "@postShareSentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postQuickShareTitle": "الأصدقاء الأخيرون",
+  "postQuickShareSubtitle": "اختر الأصدقاء، اضغط مرة أخرى للإلغاء، ثم أرسل",
   "postAddToStoryHint": "أنشئ قصتك — المنشور جاهز للمشاركة",
   "postCreateGroupHint": "اختر جهات اتصال لبدء مجموعة",
   "postUpdatedSuccessfully": "تم تحديث المنشور بنجاح",
@@ -1480,5 +1501,8 @@
   "interestSelectionInterestedLegend": "مهتم",
   "interestSelectionSave": "حفظ",
   "settingsInterests": "الاهتمامات",
-  "retry": "حاول مرة أخرى"
+  "retry": "حاول مرة أخرى",
+  "seeTranslation": "عرض الترجمة",
+  "seeOriginal": "عرض النص الأصلي",
+  "translationFailed": "تعذر الترجمة"
 }

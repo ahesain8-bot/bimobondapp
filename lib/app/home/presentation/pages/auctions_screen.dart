@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_tab_app
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_filter_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_search_bar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
@@ -38,10 +39,10 @@ class AuctionsScreen extends StatefulWidget {
   const AuctionsScreen({super.key, this.isTabActive = false});
 
   @override
-  State<AuctionsScreen> createState() => _AuctionsScreenState();
+  State<AuctionsScreen> createState() => AuctionsScreenState();
 }
 
-class _AuctionsScreenState extends State<AuctionsScreen> {
+class AuctionsScreenState extends State<AuctionsScreen> {
   static const _searchDebounceDuration = Duration(milliseconds: 400);
   static const _endedPreviewLimit = 3;
 
@@ -55,6 +56,14 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   bool _isLoadingCategories = false;
   bool _isLoadingPostAuctions = false;
   bool _isLoadingEndedPreview = false;
+  bool _postAuctionsLoadFailed = false;
+  String? _postAuctionsErrorMessage;
+
+  /// Called when the user re-taps the Auctions tab while already on it.
+  void refreshFromTab() {
+    if (!mounted) return;
+    _beginVisibleRefresh();
+  }
 
   @override
   void initState() {
@@ -69,8 +78,22 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   void didUpdateWidget(AuctionsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isTabActive && !oldWidget.isTabActive) {
-      _loadTabData();
+      _beginVisibleRefresh();
     }
+  }
+
+  /// Clear content and show skeleton while auctions reload (Auctions icon tap).
+  void _beginVisibleRefresh() {
+    setState(() {
+      _postAuctionItems.clear();
+      _endedPreviewItems.clear();
+      _postAuctionsLoadFailed = false;
+      _postAuctionsErrorMessage = null;
+      _isLoadingPostAuctions = true;
+      _isLoadingEndedPreview = true;
+      _isLoadingCategories = _categories.isEmpty;
+    });
+    _loadTabData();
   }
 
   void _loadTabData() {
@@ -253,13 +276,16 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
   Future<void> _loadPostAuctions() async {
     setState(() {
       _isLoadingPostAuctions = true;
-      _postAuctionItems.clear();
+      _postAuctionsLoadFailed = false;
+      _postAuctionsErrorMessage = null;
     });
 
     final useCase = posts_di.sl<GetFeedUseCase>();
     final postsById = <String, PostEntity>{};
     var page = 1;
     var hasMore = true;
+    String? failureMessage;
+    var loadFailed = false;
 
     while (hasMore && page <= 10) {
       final search = _searchQuery.trim();
@@ -271,22 +297,40 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
         ),
       );
       var shouldContinue = false;
-      result.fold((_) => hasMore = false, (items) {
-        for (final item in items) {
-          final post = item.post;
-          if (!post.isAuctionable || post.auction == null) continue;
-          if (_isEndedPost(post)) continue;
-          if (!_filters.matchesClientCategory(post)) continue;
-          if (!_filters.matchesClientLiveStatus(post)) continue;
-          postsById[post.id] = post;
-        }
-        shouldContinue = items.length >= 30;
-      });
+      result.fold(
+        (failure) {
+          loadFailed = true;
+          failureMessage = failure.message;
+          hasMore = false;
+        },
+        (items) {
+          for (final item in items) {
+            final post = item.post;
+            if (!post.isAuctionable || post.auction == null) continue;
+            if (_isEndedPost(post)) continue;
+            if (!_filters.matchesClientCategory(post)) continue;
+            if (!_filters.matchesClientLiveStatus(post)) continue;
+            postsById[post.id] = post;
+          }
+          shouldContinue = items.length >= 30;
+        },
+      );
       if (!shouldContinue) {
         hasMore = false;
       } else {
         page++;
       }
+    }
+
+    if (!mounted) return;
+
+    if (loadFailed && postsById.isEmpty) {
+      setState(() {
+        _isLoadingPostAuctions = false;
+        _postAuctionsLoadFailed = true;
+        _postAuctionsErrorMessage = failureMessage;
+      });
+      return;
     }
 
     final mappedItems = postsById.values.map(
@@ -306,11 +350,12 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
       return bDate.compareTo(aDate);
     });
 
-    if (!mounted) return;
     setState(() {
       _postAuctionItems
         ..clear()
         ..addAll(mappedItems);
+      _postAuctionsLoadFailed = false;
+      _postAuctionsErrorMessage = null;
       _isLoadingPostAuctions = false;
     });
   }
@@ -375,13 +420,19 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
               vertical: AppSizes.p48,
               horizontal: AppSizes.p16,
             ),
-            child: Center(
-              child: CustomText(
-                l10n.noPostsFound,
-                variant: TextVariant.secondary,
-                textAlign: TextAlign.center,
-              ),
-            ),
+            child: _postAuctionsLoadFailed
+                ? FeedLoadErrorState(
+                    lightForeground: false,
+                    message: _postAuctionsErrorMessage,
+                    onRetry: () => unawaited(_loadPostAuctions()),
+                  )
+                : Center(
+                    child: CustomText(
+                      l10n.noPostsFound,
+                      variant: TextVariant.secondary,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
           ),
         ),
       ..._buildEndedPreviewSection(
@@ -557,7 +608,7 @@ class _AuctionsScreenState extends State<AuctionsScreen> {
                     onClearCategories: _clearCategoryFilters,
                   ),
                 ),
-              if (_isLoadingPostAuctions)
+              if (_isLoadingPostAuctions && _postAuctionItems.isEmpty)
                 const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.only(top: AppSizes.p20),

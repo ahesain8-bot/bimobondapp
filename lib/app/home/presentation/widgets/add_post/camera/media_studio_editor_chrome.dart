@@ -357,7 +357,10 @@ class MediaStudioClipDock extends StatelessWidget {
                             ),
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: _DockThumb(file: item.file, isVideo: item.isVideo),
+                          child: _DockThumb(
+                            file: item.file,
+                            isVideo: item.isVideo,
+                          ),
                         ),
                       );
                     },
@@ -374,7 +377,11 @@ class MediaStudioClipDock extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(LucideIcons.plus, color: Colors.white, size: 18),
+                  child: const Icon(
+                    LucideIcons.plus,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -510,10 +517,7 @@ class _PillButton extends StatelessWidget {
           height: 48,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Opacity(
-            opacity: onTap == null ? 0.5 : 1,
-            child: child,
-          ),
+          child: Opacity(opacity: onTap == null ? 0.5 : 1, child: child),
         ),
       ),
     );

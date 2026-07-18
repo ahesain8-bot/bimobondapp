@@ -4,7 +4,8 @@ import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gifts_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/purchase_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/send_gift_usecase.dart';
-import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart' as gifts_di;
+import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
+    as gifts_di;
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
@@ -127,8 +128,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
           _catalog = gifts;
           _inventory = inventory;
           _loading = false;
-          if (_selectedIndex != null &&
-              _selectedIndex! >= _catalog.length) {
+          if (_selectedIndex != null && _selectedIndex! >= _catalog.length) {
             _selectedIndex = null;
           }
         });
@@ -147,8 +147,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     return _catalog[index];
   }
 
-  int _ownedQuantity(String giftId) =>
-      _inventory?.quantityFor(giftId) ?? 0;
+  int _ownedQuantity(String giftId) => _inventory?.quantityFor(giftId) ?? 0;
 
   bool _canAfford(GiftEntity gift) {
     if (_ownedQuantity(gift.id) > 0) return true;
@@ -186,9 +185,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   }
 
   Future<bool> _purchaseGiftInternal(GiftEntity gift) async {
-    final result = await _purchaseGift(
-      PurchaseGiftParams(giftId: gift.id),
-    );
+    final result = await _purchaseGift(PurchaseGiftParams(giftId: gift.id));
     if (!mounted) return false;
 
     return result.fold(
@@ -365,9 +362,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                   if (_loading && _isLoggedIn)
                     const GiftBalanceChipSkeleton()
                   else
-                    _CoinBalanceChip(
-                      coins: _inventory?.balanceCoins ?? 0,
-                    ),
+                    _CoinBalanceChip(coins: _inventory?.balanceCoins ?? 0),
                 ],
               ),
             ),
@@ -403,10 +398,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextButton(
-                onPressed: _load,
-                child: Text(l10n.liveGiftRetry),
-              ),
+              TextButton(onPressed: _load, child: Text(l10n.liveGiftRetry)),
             ],
           ),
         ),
@@ -460,9 +452,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
           ? null
           : () {
               setState(() => _selectedIndex = index);
-              GiftLottieCache.instance.prefetch([
-                _catalog[index].animationUrl,
-              ]);
+              GiftLottieCache.instance.prefetch([_catalog[index].animationUrl]);
             },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
@@ -562,9 +552,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     if (selected == null) {
       primaryLabel = l10n.liveSelectGift;
     } else if (_busy) {
-      primaryLabel = _isPurchasing
-          ? l10n.liveGiftBuying
-          : l10n.liveGiftSending;
+      primaryLabel = _isPurchasing ? l10n.liveGiftBuying : l10n.liveGiftSending;
     } else if (_canSend) {
       primaryLabel = l10n.liveSendToHost;
       onPrimary = () => _send(selected);
@@ -676,11 +664,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 }
 
 class _GiftIcon extends StatelessWidget {
-  const _GiftIcon({
-    required this.gift,
-    required this.isSelected,
-    this.size,
-  });
+  const _GiftIcon({required this.gift, required this.isSelected, this.size});
 
   final GiftEntity gift;
   final bool isSelected;

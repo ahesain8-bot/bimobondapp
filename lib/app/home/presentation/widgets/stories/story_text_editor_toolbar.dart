@@ -20,11 +20,10 @@ class StoryTextEditorToolbar extends StatelessWidget {
   final VoidCallback onDelete;
 
   Color get _activePaletteColor => switch (overlay.backgroundMode) {
-        StoryTextBackgroundMode.none => overlay.textColor,
-        StoryTextBackgroundMode.translucent ||
-        StoryTextBackgroundMode.solid =>
-          overlay.backgroundColor,
-      };
+    StoryTextBackgroundMode.none => overlay.textColor,
+    StoryTextBackgroundMode.translucent ||
+    StoryTextBackgroundMode.solid => overlay.backgroundColor,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +49,8 @@ class StoryTextEditorToolbar extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final color = StoryTextStyleKit.palette[index];
-                final selected = color.toARGB32() == _activePaletteColor.toARGB32();
+                final selected =
+                    color.toARGB32() == _activePaletteColor.toARGB32();
                 return GestureDetector(
                   onTap: () => onChanged(overlay.applyPaletteColor(color)),
                   child: Container(
@@ -92,7 +92,8 @@ class StoryTextEditorToolbar extends StatelessWidget {
               ),
               _ToolbarIconButton(
                 icon: _backgroundIcon(overlay.backgroundMode),
-                isActive: overlay.backgroundMode != StoryTextBackgroundMode.none,
+                isActive:
+                    overlay.backgroundMode != StoryTextBackgroundMode.none,
                 onTap: () => onChanged(
                   overlay.copyWith(
                     backgroundMode: StoryTextStyleKit.cycleBackground(
@@ -107,10 +108,7 @@ class StoryTextEditorToolbar extends StatelessWidget {
                   overlay.copyWith(alignment: overlay.alignment.next()),
                 ),
               ),
-              _ToolbarIconButton(
-                icon: LucideIcons.trash2,
-                onTap: onDelete,
-              ),
+              _ToolbarIconButton(icon: LucideIcons.trash2, onTap: onDelete),
               const Spacer(),
               TextButton(
                 onPressed: onDone,

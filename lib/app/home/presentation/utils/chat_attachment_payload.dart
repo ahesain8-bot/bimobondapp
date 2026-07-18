@@ -146,15 +146,13 @@ class ChatContactPayload {
   static ChatContactPayload? _fromMap(Map<String, dynamic>? map) {
     if (map == null) return null;
     final userId = (map['userId'] ?? map['user_id'])?.toString();
-    final name = (map['name'] ??
-            map['displayName'] ??
-            map['username'] ??
-            map['fullName'])
-        ?.toString();
-    final phone = (map['phone'] ??
-            map['phoneNumber'] ??
-            map['mobile'] ??
-            '')
+    final name =
+        (map['name'] ??
+                map['displayName'] ??
+                map['username'] ??
+                map['fullName'])
+            ?.toString();
+    final phone = (map['phone'] ?? map['phoneNumber'] ?? map['mobile'] ?? '')
         .toString();
     final email = map['email']?.toString();
     final avatarUrl = (map['avatarUrl'] ?? map['avatar_url'])?.toString();
@@ -210,13 +208,14 @@ class ChatFilePayload {
   ]) {
     if (payload != null) {
       final url = (payload['url'] ?? mediaUrl)?.toString();
-      final fileName = (payload['fileName'] ??
-              payload['file_name'] ??
-              content ??
-              'file')
-          .toString();
-      final mime = (payload['mimeType'] ?? payload['mime_type'] ?? 'application/octet-stream')
-          .toString();
+      final fileName =
+          (payload['fileName'] ?? payload['file_name'] ?? content ?? 'file')
+              .toString();
+      final mime =
+          (payload['mimeType'] ??
+                  payload['mime_type'] ??
+                  'application/octet-stream')
+              .toString();
       final size = payload['sizeBytes'] ?? payload['size_bytes'];
       final sizeBytes = size is num
           ? size.toInt()
@@ -235,7 +234,9 @@ class ChatFilePayload {
     if (url != null && url.isNotEmpty) {
       return ChatFilePayload(
         url: MediaUtils.resolveAbsoluteUrl(url),
-        fileName: (content?.trim().isNotEmpty == true) ? content!.trim() : 'file',
+        fileName: (content?.trim().isNotEmpty == true)
+            ? content!.trim()
+            : 'file',
         mimeType: 'application/octet-stream',
       );
     }
@@ -281,8 +282,7 @@ class ChatGiftPayload {
       quantity: qty is num
           ? qty.toInt()
           : int.tryParse(qty?.toString() ?? '') ?? 1,
-      receiverId:
-          (payload['receiverId'] ?? payload['receiver_id'])?.toString(),
+      receiverId: (payload['receiverId'] ?? payload['receiver_id'])?.toString(),
     );
   }
 }

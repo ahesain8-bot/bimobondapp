@@ -228,9 +228,7 @@ class ProfileGridViewCount extends StatelessWidget {
             fontSize: ProfileLayoutConstants.gridViewCountFontSize,
             fontWeight: FontWeight.w600,
             height: 1,
-            shadows: [
-              Shadow(color: Color(0x80000000), blurRadius: 4),
-            ],
+            shadows: [Shadow(color: Color(0x80000000), blurRadius: 4)],
           ),
         ),
       ],

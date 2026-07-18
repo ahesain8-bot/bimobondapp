@@ -594,10 +594,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectGender => 'Select gender';
 
   @override
-  String get instagramProfileUrl => 'Instagram profile URL';
+  String get instagramProfileUrl => 'Username or profile link';
 
   @override
-  String get youtubeChannelUrl => 'YouTube channel URL';
+  String get youtubeChannelUrl => 'Username or channel link';
 
   @override
   String get egypt => 'Egypt';
@@ -651,6 +651,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navHome => 'Home';
+
+  @override
+  String get pressBackAgainToExit => 'Press back again to exit';
 
   @override
   String get navFriends => 'Friends';
@@ -1073,10 +1076,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navProfile => 'Profile';
 
   @override
-  String get describePostHint => 'Describe your post… use @username and #tag in the text';
+  String get describePostHint => 'Add a description...';
 
   @override
-  String get addDescriptionHint => 'Add description...';
+  String get addDescriptionHint => 'Add a description...';
 
   @override
   String get hashtagsLabel => 'Hashtags';
@@ -1236,7 +1239,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noCommentsYet => 'No comments yet. Be the first!';
 
   @override
-  String get addCommentHint => 'Add comment… @username to mention';
+  String get addCommentHint => 'Add a comment...';
 
   @override
   String get justNow => 'Just now';
@@ -1348,6 +1351,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postShareSheetTitle => 'Share post';
 
   @override
+  String get postShareSendToTitle => 'Send to';
+
+  @override
   String get postShareSearchUsers => 'Search friends and users';
 
   @override
@@ -1390,6 +1396,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String postShareSentTo(String name) {
     return 'Sent to $name';
   }
+
+  @override
+  String get postShareSend => 'Send';
+
+  @override
+  String postShareSendToCount(int count) {
+    return 'Send ($count)';
+  }
+
+  @override
+  String postShareSentCount(int count) {
+    return 'Sent to $count people';
+  }
+
+  @override
+  String get postQuickShareTitle => 'Recent friends';
+
+  @override
+  String get postQuickShareSubtitle => 'Select friends, tap again to cancel, then send';
 
   @override
   String get postAddToStoryHint => 'Create your story — the post is ready to share';
@@ -1661,6 +1686,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesInboxLastShare => 'Shared a post';
 
   @override
+  String get messagesInboxLastSticker => 'Sticker';
+
+  @override
   String get messagesInboxMessageDeleted => 'Message deleted';
 
   @override
@@ -1875,6 +1903,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMoreGift => 'Gift';
 
   @override
+  String get chatMoreSticker => 'Sticker';
+
+  @override
   String get chatMorePoll => 'Poll';
 
   @override
@@ -1888,6 +1919,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatGiftSentLabel => 'Gift sent';
+
+  @override
+  String get chatStickerSheetTitle => 'Stickers';
+
+  @override
+  String get chatStickerSheetSubtitle => 'Tap a sticker to send it';
+
+  @override
+  String get chatStickerPackEmotions => 'Emotions';
+
+  @override
+  String get chatStickerPackReactions => 'Reactions';
+
+  @override
+  String get chatStickerPackCelebrations => 'Celebrations';
 
   @override
   String get chatMessageContact => 'Contact';
@@ -3288,4 +3334,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Try again';
+
+  @override
+  String get seeTranslation => 'See translation';
+
+  @override
+  String get seeOriginal => 'See original';
+
+  @override
+  String get translationFailed => 'Could not translate';
 }
