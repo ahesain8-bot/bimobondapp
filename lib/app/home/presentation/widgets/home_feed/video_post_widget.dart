@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'dart:ui';
 
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_caption_tags.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_hashtag_chips.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_location_chip.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_bottom_info.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_gradient_overlay.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_layout_constants.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_media_badge.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_media_item.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_side_actions.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
-import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -29,25 +29,20 @@ import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases
 import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
-import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
-import 'package:bimobondapp/core/widgets/blurred_icon_badge.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 
 class VideoPostWidget extends StatefulWidget {
@@ -94,23 +89,6 @@ class VideoPostWidget extends StatefulWidget {
 
 class _VideoPostWidgetState extends State<VideoPostWidget>
     with TickerProviderStateMixin {
-  static const double _actionIconSize = 35;
-  static const double _actionLabelSize = 12;
-  static const double _actionSpacing = 20;
-  static const double _actionHitWidth = 48;
-  static const double _actionColumnInset = 8;
-  static const double _contentActionGap = 12;
-  static const double _contentActionSidePadding =
-      _actionColumnInset + _actionHitWidth + _contentActionGap;
-  static const double _contentEdgeInset = 16;
-  static const double _profileAvatarRadius = 24;
-  static const double _musicDiscSize = 40;
-  static const Color _tikTokLikeRed = Color(0xFFFE2C55);
-  static const Color _tikTokSaveYellow = Color(0xFFFACC15);
-  static const List<Shadow> _actionTextShadow = [
-    Shadow(color: Color(0x99000000), blurRadius: 6, offset: Offset(0, 1)),
-  ];
-
   int _currentPage = 0;
   late AnimationController _musicController;
   late AnimationController _likeAnimController;
@@ -862,69 +840,27 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   Widget _buildMediaItem(PostMediaEntity media, int index) {
-    final mediaUrl = MediaUtils.resolveAbsoluteUrl(media.url);
-    final isVideo =
-        MediaUtils.isVideo(mediaUrl, mediaType: media.mediaType) ||
-        widget.post.type == 'VIDEO';
     final isActiveSlide = _playbackActive && _currentPage == index;
+    final hasImageSound =
+        widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false;
     final videoController = _videoPlayerControllers.putIfAbsent(
       index,
       CustomVideoPlayerController.new,
     );
 
-    Widget child = isVideo
-        ? CustomVideoPlayer(
-            url: mediaUrl,
-            posterUrl: MediaUtils.resolveVideoPosterUrl(widget.post),
-            isActive: isActiveSlide,
-            respectFeedPlaybackGate: widget.respectFeedPlaybackGate,
-            controller: videoController,
-            onPlaybackChanged: _syncMusicDiscAnimation,
-            onLongPress: _showMoreOptions,
-          )
-        : mediaUrl.isEmpty
-        ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)
-        : SafeNetworkImage(
-            imageUrl: mediaUrl,
-            fit: BoxFit.contain,
-            width: double.infinity,
-            height: double.infinity,
-            errorIcon: LucideIcons.imageOff,
-          );
-
-    if (!isVideo) {
-      child = GestureDetector(
-        onTap: isActiveSlide &&
-                (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false)
-            ? () => unawaited(_togglePostPlayback())
-            : null,
-        onLongPress: _showMoreOptions,
-        behavior: HitTestBehavior.opaque,
-        child: isActiveSlide &&
-                (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false)
-            ? Stack(
-                fit: StackFit.expand,
-                alignment: Alignment.center,
-                children: [
-                  child,
-                  if (!_isPostPlaybackActive())
-                    BlurredIconBadge(
-                      icon: LucideIcons.play,
-                      diameter: 88,
-                      iconSize: 44,
-                      iconColor: Colors.white.withValues(alpha: 0.85),
-                    ),
-                ],
-              )
-            : child,
-      );
-    }
-
-    return SizedBox(
-      key: ValueKey('${mediaUrl}_$index'),
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height,
-      child: Center(child: child),
+    return VideoPostMediaItem(
+      media: media,
+      index: index,
+      post: widget.post,
+      isActiveSlide: isActiveSlide,
+      respectFeedPlaybackGate: widget.respectFeedPlaybackGate,
+      videoController: videoController,
+      isImagePlaybackActive: _isPostPlaybackActive(),
+      onPlaybackChanged: _syncMusicDiscAnimation,
+      onLongPress: _showMoreOptions,
+      onImageTap: isActiveSlide && hasImageSound
+          ? () => unawaited(_togglePostPlayback())
+          : null,
     );
   }
 
@@ -1100,25 +1036,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     return (1.0 - dimmed * 0.85).clamp(0.15, 1.0);
   }
 
-  Widget _wrapEngagementRise(Animation<double>? rise, Widget child) {
-    final controller = _chromeEntranceController;
-    if (controller == null || rise == null) return child;
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        return Transform.translate(offset: Offset(0, rise.value), child: child);
-      },
-      child: child,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final bottom = widget.bottomPadding ?? 30.0;
     final post = widget.post;
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
 
     return BlocListener<PostsBloc, PostsState>(
       listenWhen: (previous, current) {
@@ -1163,7 +1086,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           PopupDialogs.showErrorDialog(context, state.message);
         }
       },
-      child: _buildPostContent(size, bottom, post, theme),
+      child: _buildPostContent(size, bottom, post),
     );
   }
 
@@ -1171,9 +1094,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     Size size,
     double bottom,
     PostEntity post,
-    ThemeData theme,
   ) {
-    // Floating comments: left. Avatar/actions: right.
+    final canOpenSound = post.sound != null && post.sound!.id.isNotEmpty;
+    VoidCallback? musicTap;
+    if (canOpenSound) {
+      musicTap = () => _openPostSound(post);
+    } else if (_canTogglePlayback) {
+      musicTap = () => unawaited(_togglePostPlayback());
+    }
 
     return Container(
       height: size.height,
@@ -1182,7 +1110,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // ── Media Carousel ───────────────────────────────────────────────
           CarouselSlider.builder(
             carouselController: _carouselCtrl,
             itemCount: _displayMedia.length,
@@ -1202,189 +1129,72 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             itemBuilder: (context, index, _) =>
                 _buildMediaItem(_displayMedia[index], index),
           ),
-
-          // ── Gradient Overlay ─────────────────────────────────────────────
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.4),
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.75),
-                    ],
-                    stops: const [0.0, 0.15, 0.6, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Media Count Badge ─────────────────────────────────────────────
+          const VideoPostGradientOverlay(),
           if (_displayMedia.length > 1)
             Positioned(
-              top:
-                  MediaQuery.of(context).padding.top +
+              top: MediaQuery.of(context).padding.top +
                   (widget.feedTopBarClearance ??
                       HomeLayoutConstants.feedTopTabsTopPadding),
               left: 0,
               right: 0,
-              child: Center(child: _buildMediaCountBadge(_displayMedia.length)),
+              child: Center(
+                child: VideoPostMediaCountBadge(
+                  currentPage: _currentPage,
+                  total: _displayMedia.length,
+                ),
+              ),
             ),
-
-          // ── Side actions: always physical right ─────────────────────────
           Positioned(
-            right: _actionColumnInset,
+            right: VideoPostLayoutConstants.actionColumnInset,
             bottom: bottom + 20,
             child: _wrapTransitionDim(
               _wrapActionsEntrance(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    _buildProfileAvatar(post.user?.avatarUrl, theme),
-                    const SizedBox(height: 22),
-                    _wrapEngagementRise(_likeRise, _buildLikeButton()),
-                    const SizedBox(height: _actionSpacing),
-                    _wrapEngagementRise(
-                      _commentRise,
-                      KeyedSubtree(
-                        key: _commentActionKey,
-                        child: _buildTikTokAction(
-                          icon: LucideIcons.messageCircleMore400,
-                          label: _formatCount(_commentCount),
-                          color: Colors.white,
-                          onTap: _showComments,
-                          onLongPress: _showQuickCommentReactions,
-                          iconWidget: SvgPicture.asset(
-                            AppAssets.commentIcon,
-                            width: _actionIconSize,
-                            height: _actionIconSize,
-                            colorFilter: const ColorFilter.mode(
-                              Colors.white,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: _actionSpacing),
-                    _buildTikTokAction(
-                      icon: Icons.bookmark,
-                      label: _formatCount(_saveCount),
-                      color: _isSaved ? _tikTokSaveYellow : Colors.white,
-                      onTap: _handleSave,
-                    ),
-                    const SizedBox(height: _actionSpacing),
-                    KeyedSubtree(
-                      key: _shareActionKey,
-                      child: _buildTikTokAction(
-                        icon: LucideIcons.forward400,
-                        color: Colors.white,
-                        onTap: _showMoreOptions,
-                        onLongPress: _showQuickShare,
-                        iconWidget: SvgPicture.asset(
-                          AppAssets.shareArrowIcon,
-                          width: _actionIconSize,
-                          height: _actionIconSize,
-                          colorFilter: const ColorFilter.mode(
-                            Colors.white,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: _actionSpacing),
-                    _buildMusicDisc(theme, post),
-                  ],
+                VideoPostSideActions(
+                  avatarUrl: post.user?.avatarUrl,
+                  username: post.user?.username,
+                  fullName: post.user?.fullName,
+                  userId: _postAuthorUserId(),
+                  isFollowing: _isFollowing,
+                  isFollowLoading: _isFollowLoading,
+                  showFollowBadge: !_isPostOwner(),
+                  isLiked: _isLiked,
+                  likeLabel: _formatCount(_likeCount),
+                  likeScaleAnimation: _likeScaleAnim,
+                  commentLabel: _formatCount(_commentCount),
+                  isSaved: _isSaved,
+                  saveLabel: _formatCount(_saveCount),
+                  musicRotation: _musicController,
+                  commentActionKey: _commentActionKey,
+                  shareActionKey: _shareActionKey,
+                  onAvatarTap: _openAuthorProfile,
+                  onFollow: () => unawaited(_handleFollow()),
+                  onLike: _handleLike,
+                  onComment: _showComments,
+                  onCommentLongPress: () =>
+                      unawaited(_showQuickCommentReactions()),
+                  onSave: _handleSave,
+                  onShare: _showMoreOptions,
+                  onShareLongPress: _showQuickShare,
+                  onMusicTap: musicTap,
+                  likeRise: _likeRise,
+                  commentRise: _commentRise,
+                  engagementController: _chromeEntranceController,
                 ),
               ),
             ),
           ),
-
-          // ── Bottom Info ───────────────────────────────────────────────────
           Positioned(
             left: 0,
             right: 0,
             bottom: bottom,
             child: _wrapCaptionEntrance(
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_displayMedia.length > 1) ...[
-                    IgnorePointer(
-                      child: _buildMediaPageDots(_displayMedia.length),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: _contentEdgeInset,
-                      right: _contentActionSidePadding,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FeedRepostBanner(
-                          post: _postWithLocalRepostState(post),
-                          feedItem: widget.feedItem,
-                          repostQuote: _repostQuote,
-                        ),
-                        if (post.location != null &&
-                            post.location!.hasDisplayLabel)
-                          PostLocationChip(location: post.location!),
-                        if (post.isPromoted || post.isAd) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.white30),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  LucideIcons.flame,
-                                  size: 12,
-                                  color: Color(0xFFFF8C42),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  post.promotion?.label ??
-                                      AppLocalizations.of(
-                                        context,
-                                      )!.promotedBadge,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                        ],
-
-                        // Description + hashtags (See more / See less)
-                        if ((post.description ?? '').isNotEmpty)
-                          PostCaptionTags(post: post)
-                        else if (post.hashtags.isNotEmpty)
-                          PostHashtagChips(tags: post.hashtags),
-                        const SizedBox(height: 10),
-                        _buildMusicSoundLabel(post),
-                      ],
-                    ),
-                  ),
-                ],
+              VideoPostBottomInfo(
+                post: _postWithLocalRepostState(post),
+                feedItem: widget.feedItem,
+                repostQuote: _repostQuote,
+                currentPage: _currentPage,
+                mediaCount: _displayMedia.length,
+                onMusicTap: musicTap,
               ),
             ),
           ),
@@ -1393,310 +1203,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     );
   }
 
-  Widget _buildMediaCountBadge(int total) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-          ),
-          child: Text(
-            '${_currentPage + 1}/$total',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMediaPageDots(int total) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.max,
-      children: List.generate(
-        total,
-        (index) => AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: _currentPage == index ? 20 : 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: _currentPage == index
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileAvatar(String? avatarUrl, ThemeData theme) {
-    final showFollowBadge = !_isPostOwner();
-    final authorId = _postAuthorUserId();
-
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      clipBehavior: Clip.none,
-      children: [
-        StoryProfileAvatar(
-          userId: authorId,
-          imageUrl: avatarUrl,
-          fallbackText: widget.post.user?.username ?? 'User',
-          radius: _profileAvatarRadius,
-          backgroundColor: Colors.white24,
-          username: widget.post.user?.username,
-          fullName: widget.post.user?.fullName,
-          isFollowing: _isFollowing,
-          onTap: _openAuthorProfile,
-        ),
-        if (showFollowBadge)
-          Positioned(
-            bottom: -8,
-            child: GestureDetector(
-              onTap: _isFollowing ? null : _handleFollow,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  gradient: _isFollowing
-                      ? null
-                      : LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.secondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                  color: _isFollowing ? Colors.white : null,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _isFollowing ? Colors.white : Colors.black,
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-                child: _isFollowLoading
-                    ? Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: theme.colorScheme.primary,
-                        ),
-                      )
-                    : Icon(
-                        _isFollowing ? Icons.check : Icons.add,
-                        color: _isFollowing
-                            ? theme.colorScheme.primary
-                            : Colors.white,
-                        size: 12,
-                      ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildLikeButton() {
-    return _buildTikTokAction(
-      icon: Icons.favorite,
-      label: _formatCount(_likeCount),
-      color: _isLiked ? _tikTokLikeRed : Colors.white,
-      onTap: _handleLike,
-      iconWidget: ScaleTransition(
-        scale: _likeScaleAnim,
-        child: Icon(
-          Icons.favorite,
-          color: _isLiked ? _tikTokLikeRed : Colors.white,
-          size: _actionIconSize,
-          shadows: _actionTextShadow,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTikTokAction({
-    required IconData icon,
-    String? label,
-    required Color color,
-    VoidCallback? onTap,
-    VoidCallback? onLongPress,
-    Widget? iconWidget,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: _actionHitWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: _actionIconSize + 2,
-              child: Center(
-                child:
-                    iconWidget ??
-                    Icon(
-                      icon,
-                      color: color,
-                      size: _actionIconSize,
-                      shadows: _actionTextShadow,
-                    ),
-              ),
-            ),
-            if (label != null && label.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: _actionLabelSize,
-                  fontWeight: FontWeight.w600,
-                  shadows: _actionTextShadow,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   void _openPostSound(PostEntity post) {
     final sound = post.sound;
     if (sound == null || sound.id.isEmpty) return;
     unawaited(openSoundDetail(context, soundId: sound.id));
-  }
-
-  Widget _buildMusicSoundLabel(PostEntity post) {
-    final sound = post.sound;
-    final l10n = AppLocalizations.of(context)!;
-    final label = sound?.name ?? l10n.cameraOriginalSound;
-    final canOpenSound = sound != null && sound.id.isNotEmpty;
-
-    return GestureDetector(
-      onTap: canOpenSound
-          ? () => _openPostSound(post)
-          : (_canTogglePlayback
-                ? () => unawaited(_togglePostPlayback())
-                : null),
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.only(right: 10, left: 10, bottom: 24),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            BlurredIconBadge(
-              icon: LucideIcons.music,
-              diameter: 24,
-              iconSize: 12,
-              iconColor: Colors.white.withValues(alpha: 0.9),
-              blurSigma: 10,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 12,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMusicDisc(ThemeData theme, PostEntity post) {
-    final canOpenSound = post.sound != null && post.sound!.id.isNotEmpty;
-    return GestureDetector(
-      onTap: canOpenSound
-          ? () => _openPostSound(post)
-          : (_canTogglePlayback
-                ? () => unawaited(_togglePostPlayback())
-                : null),
-      child: _buildMusicDiscVisual(theme),
-    );
-  }
-
-  Widget _buildMusicDiscVisual(ThemeData theme) {
-    return AnimatedBuilder(
-      animation: _musicController,
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _musicController.value * 2 * 3.14159,
-          child: child,
-        );
-      },
-      child: Container(
-        width: _musicDiscSize,
-        height: _musicDiscSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.8),
-              theme.colorScheme.secondary.withValues(alpha: 0.8),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.primary.withValues(alpha: 0.4),
-              blurRadius: 12,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: ClipOval(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: const Icon(
-                  LucideIcons.music,
-                  color: Colors.white70,
-                  size: 12,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   String _formatCount(int count) => formatCompactCount(count);
