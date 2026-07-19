@@ -1,10 +1,13 @@
 package com.dubai.bimobondapp.ar_camera
 
 import android.app.Activity
+import android.graphics.Color
 import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 
@@ -19,7 +22,6 @@ object ArCameraBridge {
     @Volatile
     var currentFilter: FilterType = FilterType.NONE
 
-    /** 0..1 strength for color / beauty grades (TikTok intensity slider). */
     @Volatile
     var filterIntensity: Float = 1f
 
@@ -29,9 +31,26 @@ object ArCameraBridge {
     @Volatile
     var warpViewHeight: Int = 0
 
-    /** Front selfie camera when true; rear camera when false. */
     @Volatile
     var isFrontCamera: Boolean = true
+
+    @Volatile
+    private var letterboxTopPx: Int = 0
+
+    @Volatile
+    private var letterboxBottomPx: Int = 0
+
+    fun isPreviewLetterboxed(): Boolean = letterboxTopPx > 0 || letterboxBottomPx > 0
+
+    fun letterboxTopPx(): Int = letterboxTopPx
+
+    fun letterboxBottomPx(): Int = letterboxBottomPx
+
+    fun platformRootSize(): Pair<Int, Int>? {
+        val root = platformRoot ?: return null
+        if (root.width <= 0 || root.height <= 0) return null
+        return root.width to root.height
+    }
 
     /**
      * True while we wait for the first GL filtered frame before covering the live Preview.
@@ -47,6 +66,49 @@ object ArCameraBridge {
             warpViewWidth = width
             warpViewHeight = height
         }
+    }
+
+    /**
+     * TikTok-style vertical letterbox inside the PlatformView (no Flutter resize flash).
+     * Shrinking PreviewView/GL with FILL_CENTER zooms out while keeping full width.
+     */
+    fun setPreviewLetterbox(topPx: Int, bottomPx: Int) {
+        letterboxTopPx = topPx.coerceAtLeast(0)
+        letterboxBottomPx = bottomPx.coerceAtLeast(0)
+        mainHandler.post { applyPreviewLetterbox() }
+    }
+
+    fun reapplyPreviewLetterbox() {
+        mainHandler.post { applyPreviewLetterbox() }
+    }
+
+    private fun applyPreviewLetterbox() {
+        val root = platformRoot
+        root?.setBackgroundColor(Color.BLACK)
+        applyVerticalMargins(previewView, letterboxTopPx, letterboxBottomPx)
+        applyVerticalMargins(warpGlView, letterboxTopPx, letterboxBottomPx)
+        applyVerticalMargins(faceOverlay, letterboxTopPx, letterboxBottomPx)
+        warpGlView?.post {
+            updateWarpViewSize(warpGlView?.width ?: 0, warpGlView?.height ?: 0)
+        }
+    }
+
+    private fun applyVerticalMargins(view: View?, topPx: Int, bottomPx: Int) {
+        if (view == null) return
+        val lp = view.layoutParams as? FrameLayout.LayoutParams
+            ?: FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+        lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+        lp.topMargin = topPx
+        lp.bottomMargin = bottomPx
+        lp.leftMargin = 0
+        lp.rightMargin = 0
+        lp.gravity = android.view.Gravity.CENTER_HORIZONTAL or android.view.Gravity.TOP
+        view.layoutParams = lp
+        view.requestLayout()
     }
 
     fun setFilter(name: String, intensity: Float? = null) {
@@ -133,18 +195,15 @@ object ArCameraBridge {
                         preview?.visibility == View.INVISIBLE
 
                 if (alreadyOnGl) {
-                    // Color → color (or re-select): stay on GL, no swap.
                     awaitFirstGlFrame = false
                     showGlHidePreview()
                 } else {
-                    // Coming from Preview / Original: keep Preview on top until first GL frame.
+                    // Keep Preview visible until the first GL frame arrives (avoids black flash).
                     awaitFirstGlFrame = true
-                    // Keep GL mounted but behind/invisible to the user.
                     gl?.visibility = View.INVISIBLE
                     preview?.visibility = View.VISIBLE
                     preview?.bringToFront()
                     faceOverlay?.bringToFront()
-                    // Safety: if a GL frame never arrives, restore a visible preview.
                     mainHandler.postDelayed({
                         if (awaitFirstGlFrame && currentFilter.useShader()) {
                             awaitFirstGlFrame = false
@@ -159,12 +218,17 @@ object ArCameraBridge {
                 gl?.setCaptureEnabled(false)
                 gl?.visibility = View.GONE
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
-                preview?.visibility = View.INVISIBLE
+                // PreviewView shows the live camera; faceOverlay draws only the sticker
+                // on top (transparent). Keeping PreviewView VISIBLE also guarantees a
+                // Surface on a flip (an INVISIBLE TextureView never produces one, which
+                // otherwise times out the capture session → frozen preview). Clear any
+                // stale underlay so it doesn't cover the live PreviewView.
+                preview?.visibility = View.VISIBLE
+                faceOverlay?.clearUnderlay()
                 faceOverlay?.bringToFront()
             }
 
             else -> {
-                // Original — Preview only.
                 awaitFirstGlFrame = false
                 gl?.setCaptureEnabled(false)
                 gl?.visibility = View.GONE
@@ -183,7 +247,6 @@ object ArCameraBridge {
         gl?.visibility = View.VISIBLE
         gl?.bringToFront()
         preview?.visibility = View.INVISIBLE
-        // Keep overlay above GL if a PNG filter is somehow active (shouldn't for color).
         if (currentFilter.isPngOverlay()) {
             faceOverlay?.bringToFront()
         }
@@ -204,5 +267,7 @@ object ArCameraBridge {
         warpViewWidth = 0
         warpViewHeight = 0
         isFrontCamera = true
+        letterboxTopPx = 0
+        letterboxBottomPx = 0
     }
 }

@@ -223,9 +223,7 @@ class ChatContactMessageWidget extends StatelessWidget {
     final muted = isMe
         ? chatTheme.onSentBubbleMuted
         : chatTheme.onReceivedBubbleMuted;
-    final subtitle = payload.hasPhone
-        ? payload.phone
-        : (payload.email ?? '');
+    final subtitle = payload.hasPhone ? payload.phone : (payload.email ?? '');
 
     return InkWell(
       onTap: () => _onTap(context),
@@ -246,8 +244,9 @@ class ChatContactMessageWidget extends StatelessWidget {
             else
               CircleAvatar(
                 radius: 22,
-                backgroundColor: (isMe ? Colors.white : theme.colorScheme.primary)
-                    .withValues(alpha: 0.2),
+                backgroundColor:
+                    (isMe ? Colors.white : theme.colorScheme.primary)
+                        .withValues(alpha: 0.2),
                 child: Icon(LucideIcons.user, color: color, size: 22),
               ),
             const SizedBox(width: AppSizes.p10),
@@ -316,6 +315,9 @@ class ChatGiftMessageWidget extends StatelessWidget {
     final name = (giftName?.trim().isNotEmpty == true)
         ? giftName!.trim()
         : AppLocalizations.of(context)!.chatMoreGift;
+    final isWebp =
+        imageUrl != null &&
+        imageUrl.toLowerCase().split('?').first.endsWith('.webp');
 
     return SizedBox(
       width: ChatLayoutConstants.giftMessageWidth,
@@ -326,20 +328,26 @@ class ChatGiftMessageWidget extends StatelessWidget {
             height: 88,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  theme.colorScheme.primary.withValues(alpha: 0.35),
-                  theme.colorScheme.primary.withValues(alpha: 0.05),
-                ],
-              ),
+              color: isWebp ? Colors.black : null,
+              gradient: isWebp
+                  ? null
+                  : RadialGradient(
+                      colors: [
+                        theme.colorScheme.primary.withValues(alpha: 0.35),
+                        theme.colorScheme.primary.withValues(alpha: 0.05),
+                      ],
+                    ),
             ),
             clipBehavior: Clip.antiAlias,
             child: imageUrl != null && imageUrl.isNotEmpty
-                ? SafeNetworkImage(
-                    imageUrl: imageUrl,
-                    width: 88,
-                    height: 88,
-                    fit: BoxFit.cover,
+                ? ColoredBox(
+                    color: isWebp ? Colors.black : Colors.transparent,
+                    child: SafeNetworkImage(
+                      imageUrl: imageUrl,
+                      width: 88,
+                      height: 88,
+                      fit: BoxFit.contain,
+                    ),
                   )
                 : Icon(
                     LucideIcons.gift,
@@ -401,8 +409,8 @@ class ChatPollMessageWidget extends StatelessWidget {
         : <String>[];
     final counts = (poll['counts'] is List)
         ? (poll['counts'] as List)
-            .map((e) => e is num ? e.toInt() : int.tryParse('$e') ?? 0)
-            .toList()
+              .map((e) => e is num ? e.toInt() : int.tryParse('$e') ?? 0)
+              .toList()
         : List<int>.filled(options.length, 0);
     final totalVotes = poll['totalVotes'] is num
         ? (poll['totalVotes'] as num).toInt()
@@ -453,9 +461,7 @@ class ChatPollMessageWidget extends StatelessWidget {
           ],
           const SizedBox(height: AppSizes.p10),
           Text(
-            hasEnded
-                ? l10n.chatPollEnded
-                : l10n.chatPollVotesCount(totalVotes),
+            hasEnded ? l10n.chatPollEnded : l10n.chatPollVotesCount(totalVotes),
             style: theme.textTheme.labelSmall?.copyWith(color: muted),
           ),
         ],
@@ -492,8 +498,9 @@ class _PollOptionRow extends StatelessWidget {
         .withValues(alpha: isMe ? 0.16 : 0.08);
     final fill = selected
         ? theme.colorScheme.primary.withValues(alpha: isMe ? 0.55 : 0.35)
-        : (isMe ? Colors.white : theme.colorScheme.primary)
-            .withValues(alpha: isMe ? 0.28 : 0.16);
+        : (isMe ? Colors.white : theme.colorScheme.primary).withValues(
+            alpha: isMe ? 0.28 : 0.16,
+          );
 
     return Material(
       color: Colors.transparent,
@@ -530,8 +537,9 @@ class _PollOptionRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: onColor,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
@@ -554,10 +562,7 @@ class _PollOptionRow extends StatelessWidget {
 }
 
 class ChatVideoMessageWidget extends StatelessWidget {
-  const ChatVideoMessageWidget({
-    required this.videoUrl,
-    super.key,
-  });
+  const ChatVideoMessageWidget({required this.videoUrl, super.key});
 
   final String videoUrl;
 

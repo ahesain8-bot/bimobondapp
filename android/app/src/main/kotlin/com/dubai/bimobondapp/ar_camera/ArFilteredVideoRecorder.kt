@@ -1,6 +1,5 @@
 package com.dubai.bimobondapp.ar_camera
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -22,11 +21,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Encodes filtered ARGB frames into an H.264 MP4, and records mic audio in parallel.
- *
- * Video path is unchanged (lazy start on first frame). Audio uses [MediaRecorder] to a
- * temp file, then both tracks are remuxed into the final MP4 on [stop]. That keeps
- * filter / no-filter recording stable and always includes sound when the mic is allowed.
+ * Encodes filtered ARGB frames into an H.264 MP4 with parallel mic audio.
+ * Video starts on the first [offerFrame]; audio is remuxed with video on [stop].
  */
 class ArFilteredVideoRecorder {
 
@@ -40,9 +36,7 @@ class ArFilteredVideoRecorder {
     private var width = 0
     private var height = 0
 
-    /** Final user-facing file returned from [stop]. */
     private var finalOutputFile: File? = null
-    /** Video-only temp written by the H.264 encoder. */
     private var videoTempFile: File? = null
     private var audioTempFile: File? = null
     private var mediaRecorder: MediaRecorder? = null
@@ -55,8 +49,7 @@ class ArFilteredVideoRecorder {
 
     fun isRecording(): Boolean = armed.get() || running.get()
 
-    /** Prepare output path; encoder starts on first [offerFrame]. Mic starts immediately. */
-    fun arm(output: File, context: Context? = null) {
+    fun arm(output: File) {
         synchronized(lock) {
             abortInternal()
             finalOutputFile = output
@@ -212,7 +205,7 @@ class ArFilteredVideoRecorder {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(
                 MediaFormat.KEY_BIT_RATE,
-                (width * height * 3).coerceIn(1_500_000, 6_000_000),
+                (width * height * 4).coerceIn(4_000_000, 12_000_000),
             )
             setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
@@ -251,7 +244,8 @@ class ArFilteredVideoRecorder {
             val top = (srcH - newH) * 0.5f
             srcRect = Rect(0, top.toInt(), srcW.toInt(), (top + newH).toInt())
         }
-        canvas.drawBitmap(bitmap, srcRect, Rect(0, 0, dstW, dstH), null)
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(bitmap, srcRect, Rect(0, 0, dstW, dstH), paint)
     }
 
     private fun abortInternal() {
@@ -440,7 +434,7 @@ class ArFilteredVideoRecorder {
 
     companion object {
         private const val TAG = "ArFilteredVideoRecorder"
-        private const val FRAME_RATE = 20
-        private const val MAX_EDGE = 720
+        const val MAX_EDGE = 1280
+        const val FRAME_RATE = 30
     }
 }

@@ -27,10 +27,10 @@ class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({super.key, this.isTabActive = true});
 
   @override
-  State<HomeFeedScreen> createState() => _HomeFeedScreenState();
+  State<HomeFeedScreen> createState() => HomeFeedScreenState();
 }
 
-class _HomeFeedScreenState extends State<HomeFeedScreen> {
+class HomeFeedScreenState extends State<HomeFeedScreen> {
   final PageController _pageController = PageController();
   final List<FeedItemEntity> _feedItems = [];
   int _feedPage = 1;
@@ -38,10 +38,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   bool _isLoadingMore = false;
   int _currentPostIndex = 0;
   bool _awaitingInitialFeed = true;
+  bool _feedLoadFailed = false;
+  String? _feedErrorMessage;
+  bool _expectingFeedPage1 = false;
   HomeFeedTab _selectedFeedTab = HomeFeedTab.forYou;
   Completer<void>? _pullRefreshCompleter;
   final FeedVideoProgressNotifier _feedVideoProgress =
       FeedVideoProgressNotifier();
+
+  /// Called when the user re-taps the Home tab while already on it.
+  void refreshFromTab() {
+    if (!mounted) return;
+    _beginVisibleRefresh();
+  }
 
   @override
   void initState() {
@@ -55,10 +64,26 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   void didUpdateWidget(HomeFeedScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isTabActive && !oldWidget.isTabActive) {
-      _loadTabData();
+      _beginVisibleRefresh();
     } else if (!widget.isTabActive && oldWidget.isTabActive) {
       _feedVideoProgress.reset();
     }
+  }
+
+  /// Clear content and show skeleton while posts reload (Home icon tap).
+  void _beginVisibleRefresh() {
+    setState(() {
+      _currentPostIndex = 0;
+      _feedLoadFailed = false;
+      _feedErrorMessage = null;
+      _awaitingInitialFeed = true;
+      _feedItems.clear();
+    });
+    _feedVideoProgress.reset();
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    _loadTabData();
   }
 
   void _loadTabData() {
@@ -82,8 +107,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     if (refresh) {
       _feedPage = 1;
       _hasReachedMax = false;
+      _feedLoadFailed = false;
+      _feedErrorMessage = null;
+      _expectingFeedPage1 = true;
+      if (_feedItems.isEmpty && mounted) {
+        setState(() => _awaitingInitialFeed = true);
+      }
     } else if (_hasReachedMax) {
       return;
+    } else if (_feedPage == 1) {
+      _expectingFeedPage1 = true;
     }
 
     final viewerLocation = auth_di.sl<UserLocationStore>().viewerCoordinates;
@@ -108,6 +141,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       _selectedFeedTab = tab;
       _currentPostIndex = 0;
       _awaitingInitialFeed = true;
+      _feedLoadFailed = false;
+      _feedErrorMessage = null;
     });
     _feedVideoProgress.reset();
     if (_pageController.hasClients) {
@@ -187,8 +222,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       final loadedPage = _feedPage;
       final countBefore = _feedItems.length;
       setState(() {
+        _feedLoadFailed = false;
+        _feedErrorMessage = null;
         if (loadedPage == 1) {
           _awaitingInitialFeed = false;
+          _expectingFeedPage1 = false;
         }
         _mergeFeedItems(state.items, replace: loadedPage == 1);
         if (loadedPage == 1) {
@@ -249,24 +287,35 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         }
       });
     } else if (state is PostsFailure) {
+      // Ignore unrelated PostsBloc failures (likes, stories, profile grids, etc.).
+      final isFeedPage1Failure =
+          _expectingFeedPage1 && state.profileLoadKey == null;
       setState(() {
-        if (_feedPage == 1) {
+        if (isFeedPage1Failure) {
           _awaitingInitialFeed = false;
+          _expectingFeedPage1 = false;
+          if (_feedItems.isEmpty) {
+            _feedLoadFailed = true;
+            _feedErrorMessage = state.message;
+          }
         }
         if (_isLoadingMore && _feedPage > 1) {
           _feedPage--;
         }
         _isLoadingMore = false;
       });
-      if (_feedPage == 1) {
+      if (isFeedPage1Failure) {
         _completePullRefreshIfPending();
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.message),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
+      // Prefer in-place retry UI when the feed is empty; snackbar when content remains.
+      if (isFeedPage1Failure && _feedItems.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message),
+            backgroundColor: theme.colorScheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -308,10 +357,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           builder: (context, state) {
             final theme = Theme.of(context);
             final isLoadingFirstFeed =
-                _feedItems.isEmpty &&
-                (state is PostsLoading ||
-                    state is PostsInitial ||
-                    _awaitingInitialFeed);
+                _awaitingInitialFeed ||
+                (_feedItems.isEmpty &&
+                    (state is PostsLoading || state is PostsInitial));
 
             Widget wrapRefresh(Widget child) {
               return RefreshIndicator(
@@ -336,6 +384,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
             if (isLoadingFirstFeed) {
               return _withPersistentTopBar(wrapRefresh(const FeedSkeleton()));
+            }
+
+            if (_feedItems.isEmpty && _feedLoadFailed) {
+              return _withPersistentTopBar(
+                wrapRefresh(
+                  FeedLoadErrorState(
+                    message: _feedErrorMessage,
+                    onRetry: () => _fetchFeed(refresh: true),
+                  ),
+                ),
+              );
             }
 
             if (_feedItems.isEmpty) {

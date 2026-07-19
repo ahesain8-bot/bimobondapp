@@ -220,3 +220,102 @@ class CameraRecordingBadge extends StatelessWidget {
     );
   }
 }
+
+class FrontScreenFlashOverlay extends StatelessWidget {
+  const FrontScreenFlashOverlay({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const IgnorePointer(
+      child: CustomPaint(
+        painter: _FrontFlashVignettePainter(),
+        child: SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _FrontFlashVignettePainter extends CustomPainter {
+  const _FrontFlashVignettePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width * 0.5;
+    final cy = size.height * 0.42;
+    final rx = size.width * 0.62;
+    final ry = size.height * 0.48;
+
+    canvas.saveLayer(Offset.zero & size, Paint());
+
+    final rim = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(
+          (cx / size.width) * 2 - 1,
+          (cy / size.height) * 2 - 1,
+        ),
+        radius: 1.35,
+        colors: const [
+          Color(0x00FFFFFF),
+          Color(0x00FFFFFF),
+          Color(0x55FFFFFF),
+          Color(0xCCFFFFFF),
+          Color(0xFFFFFFFF),
+        ],
+        stops: const [0.0, 0.36, 0.58, 0.82, 1.0],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, rim);
+
+    final hole = Paint()
+      ..blendMode = BlendMode.dstOut
+      ..shader = RadialGradient(
+        colors: const [
+          Color(0xFFFFFFFF),
+          Color(0xFFFFFFFF),
+          Color(0x00FFFFFF),
+        ],
+        stops: const [0.0, 0.55, 1.0],
+      ).createShader(Rect.fromCenter(
+        center: Offset(cx, cy),
+        width: rx * 2,
+        height: ry * 2,
+      ));
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(cx, cy), width: rx * 2, height: ry * 2),
+      hole,
+    );
+
+    canvas.restore();
+
+    final topH = size.height * 0.16;
+    final bottomH = size.height * 0.2;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, topH),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [
+            Color(0xF2FFFFFF),
+            Color(0x00FFFFFF),
+          ],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, topH)),
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height - bottomH, size.width, bottomH),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: const [
+            Color(0xF2FFFFFF),
+            Color(0x00FFFFFF),
+          ],
+        ).createShader(
+          Rect.fromLTWH(0, size.height - bottomH, size.width, bottomH),
+        ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

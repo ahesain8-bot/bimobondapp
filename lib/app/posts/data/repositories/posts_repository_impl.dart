@@ -602,4 +602,22 @@ class PostsRepositoryImpl implements PostsRepository {
       return Left(FailureMapper.from(e));
     }
   }
+
+  @override
+  Future<Either<Failure, SocialUserPageEntity>> getCommentLikes(
+    String commentId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final pageModel = await remoteDataSource.getCommentLikes(
+        commentId,
+        page: page,
+        limit: limit,
+      );
+      return Right(_mapSocialUserPage(pageModel));
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
 }

@@ -47,6 +47,7 @@ class PersonalInfoFormSection extends StatelessWidget {
           controller: fullNameController,
           hint: l10n.enterYourName,
           l10n: l10n,
+          maxLength: ProfileFullName.maxLength,
         ),
         PersonalInfoEditField(
           label: l10n.usernameLabel,
@@ -60,7 +61,8 @@ class PersonalInfoFormSection extends StatelessWidget {
           controller: bioController,
           hint: l10n.addBioToProfile,
           l10n: l10n,
-          maxLines: 3,
+          minLines: 1,
+          maxLines: 2,
           maxLength: ProfileBioText.maxLength,
           isRequired: false,
         ),

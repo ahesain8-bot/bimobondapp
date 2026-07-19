@@ -138,4 +138,9 @@ abstract class PostsRepository {
     String commentId, {
     required bool liked,
   });
+  Future<Either<Failure, SocialUserPageEntity>> getCommentLikes(
+    String commentId, {
+    int page = 1,
+    int limit = 20,
+  });
 }

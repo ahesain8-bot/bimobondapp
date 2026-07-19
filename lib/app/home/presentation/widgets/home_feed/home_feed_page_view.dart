@@ -1,4 +1,4 @@
-import 'package:bimobondapp/app/home/presentation/pages/video_post_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_auction_preview.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
@@ -39,6 +39,9 @@ class HomeFeedPageView extends StatelessWidget {
             key: ValueKey(item.id),
             post: post,
             bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
+            feedTopBarClearance:
+                HomeLayoutConstants.feedTopBarHeight +
+                HomeLayoutConstants.feedTopBarBottomGap,
           );
         }
         return VideoPostWidget(
@@ -50,6 +53,8 @@ class HomeFeedPageView extends StatelessWidget {
           feedTopBarClearance:
               HomeLayoutConstants.feedTopBarHeight +
               HomeLayoutConstants.feedTopBarBottomGap,
+          pageController: controller,
+          pageIndex: index,
         );
       },
     );

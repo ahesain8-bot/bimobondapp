@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_item.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/pulsing_dot.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -16,11 +17,53 @@ class AuctionStatusBadge extends StatelessWidget {
 
   final AuctionItem auction;
 
+  bool get _isEnded {
+    final post = auction.post;
+    if (post != null) return AuctionSearchFilters.isPostEnded(post);
+    return auction.isEnded;
+  }
+
+  bool get _isLive {
+    final post = auction.post;
+    if (post != null) return AuctionSearchFilters.isPostLive(post);
+    return auction.isLive && !auction.isEnded;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    if (auction.isLive) {
+    // Ended wins over Live (API may mark ENDED while end date is still future).
+    if (_isEnded) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.p10,
+              vertical: AppSizes.p6,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+                width: 0.5,
+              ),
+            ),
+            child: CustomText(
+              l10n.auctionFinishedBadge.toUpperCase(),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_isLive) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         child: BackdropFilter(
@@ -50,35 +93,6 @@ class AuctionStatusBadge extends StatelessWidget {
                   color: Colors.white,
                 ),
               ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (auction.isEnded) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.p10,
-              vertical: AppSizes.p6,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.55),
-              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.15),
-                width: 0.5,
-              ),
-            ),
-            child: CustomText(
-              l10n.auctionFinishedBadge.toUpperCase(),
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
             ),
           ),
         ),

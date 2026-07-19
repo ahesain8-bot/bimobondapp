@@ -356,10 +356,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 Expanded(
                                   child: Transform.translate(
                                     // Follow finger while sliding left to cancel.
-                                    offset: Offset(
-                                      math.min(0.0, _dragX),
-                                      0.0,
-                                    ),
+                                    offset: Offset(math.min(0.0, _dragX), 0.0),
                                     child: Opacity(
                                       opacity: (1.0 + (_dragX / 80.0)).clamp(
                                         0.0,
@@ -382,8 +379,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                               overflow: TextOverflow.ellipsis,
                                               style: theme.textTheme.bodyMedium
                                                   ?.copyWith(
-                                                color: theme.hintColor,
-                                              ),
+                                                    color: theme.hintColor,
+                                                  ),
                                             ),
                                           ),
                                         ],
@@ -443,10 +440,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                     counterText: '',
                                     hintStyle: theme.textTheme.bodyMedium
                                         ?.copyWith(
-                                      color: chatTheme.inboxSecondaryText,
-                                      fontSize:
-                                          ChatLayoutConstants.inputHintFontSize,
-                                    ),
+                                          color: chatTheme.inboxSecondaryText,
+                                          fontSize: ChatLayoutConstants
+                                              .inputHintFontSize,
+                                        ),
                                     border: InputBorder.none,
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(

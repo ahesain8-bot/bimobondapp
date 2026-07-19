@@ -80,7 +80,8 @@ class ChatMessageModel extends ChatMessageEntity {
   static List<ChatMessageReactionEntity> _parseReactions(
     Map<String, dynamic> json,
   ) {
-    final raw = json['reactions'] ??
+    final raw =
+        json['reactions'] ??
         json['Reactions'] ??
         json['messageReactions'] ??
         json['message_reactions'];
@@ -89,7 +90,8 @@ class ChatMessageModel extends ChatMessageEntity {
       return _parseReactionsValue(raw);
     }
 
-    final single = json['reaction'] ??
+    final single =
+        json['reaction'] ??
         json['reactionEmoji'] ??
         json['reaction_emoji'] ??
         json['myReaction'] ??
@@ -141,10 +143,7 @@ class ChatMessageModel extends ChatMessageEntity {
 
         if (value is String && value.trim().isNotEmpty) {
           results.add(
-            ChatMessageReactionEntity(
-              userId: key,
-              emoji: value.trim(),
-            ),
+            ChatMessageReactionEntity(userId: key, emoji: value.trim()),
           );
         } else if (value is List && value.isNotEmpty && _looksLikeEmoji(key)) {
           results.add(ChatMessageReactionEntity(userId: '', emoji: key));
@@ -165,22 +164,24 @@ class ChatMessageModel extends ChatMessageEntity {
     if (item is! Map) return const [];
 
     final map = Map<String, dynamic>.from(item);
-    final emoji = (map['emoji'] ??
-            map['reaction'] ??
-            map['reactionEmoji'] ??
-            map['type'] ??
-            map['name'] ??
-            '')
-        .toString()
-        .trim();
+    final emoji =
+        (map['emoji'] ??
+                map['reaction'] ??
+                map['reactionEmoji'] ??
+                map['type'] ??
+                map['name'] ??
+                '')
+            .toString()
+            .trim();
     if (emoji.isEmpty) return const [];
 
     final user = map['user'];
-    final userId = (map['userId'] ??
-            map['user_id'] ??
-            (user is Map ? user['id'] ?? user['userId'] : null) ??
-            '')
-        .toString();
+    final userId =
+        (map['userId'] ??
+                map['user_id'] ??
+                (user is Map ? user['id'] ?? user['userId'] : null) ??
+                '')
+            .toString();
 
     return [ChatMessageReactionEntity(userId: userId, emoji: emoji)];
   }
@@ -188,7 +189,8 @@ class ChatMessageModel extends ChatMessageEntity {
   static bool _looksLikeEmoji(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return false;
-    return trimmed.length <= 8 && !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(trimmed);
+    return trimmed.length <= 8 &&
+        !RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(trimmed);
   }
 
   static List<ChatMessageReactionEntity> _dedupeReactions(
@@ -220,12 +222,15 @@ class ChatMessageModel extends ChatMessageEntity {
     ChatMessageType type,
     Map<String, dynamic>? payload,
   ) {
-    final media = json['mediaUrl'] ??
+    final media =
+        json['mediaUrl'] ??
         json['media_url'] ??
         json['audioUrl'] ??
         json['audio_url'] ??
         (json['media'] is Map ? (json['media'] as Map)['url'] : null) ??
-        (json['attachment'] is Map ? (json['attachment'] as Map)['url'] : null) ??
+        (json['attachment'] is Map
+            ? (json['attachment'] as Map)['url']
+            : null) ??
         payload?['url'];
     if (media != null) {
       return MediaUtils.resolveAbsoluteUrl(media.toString());
@@ -233,7 +238,8 @@ class ChatMessageModel extends ChatMessageEntity {
 
     final content = (json['content'] ?? json['text'])?.toString().trim();
     if (content == null || content.isEmpty) return null;
-    final isMediaType = type == ChatMessageType.image ||
+    final isMediaType =
+        type == ChatMessageType.image ||
         type == ChatMessageType.video ||
         type == ChatMessageType.audio ||
         type == ChatMessageType.file;

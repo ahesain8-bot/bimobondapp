@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_layout_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_tool_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -11,7 +12,7 @@ class CameraSideToolbarLabels {
     required this.beauty,
     required this.filters,
     required this.speed,
-    required this.zoom,
+    required this.switchCamera,
   });
 
   final String flash;
@@ -21,7 +22,7 @@ class CameraSideToolbarLabels {
   final String beauty;
   final String filters;
   final String speed;
-  final String zoom;
+  final String switchCamera;
 }
 
 class _SideToolItem {
@@ -30,20 +31,30 @@ class _SideToolItem {
     required this.label,
     required this.onTap,
     this.active = false,
+    this.showActiveBadge,
     this.badge,
+    this.layoutMode,
+    this.dimmed = false,
+    this.iconOnly = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool active;
+  final bool? showActiveBadge;
   final String? badge;
+  final CameraLayoutMode? layoutMode;
+  final bool dimmed;
+
+  /// Stays icon-only even when the rail is expanded (Flash / Switch Camera).
+  final bool iconOnly;
 }
 
-/// TikTok-style side rail (left in RTL, right in LTR).
 class CameraSideToolbar extends StatefulWidget {
   const CameraSideToolbar({
     super.key,
+    required this.onFlip,
     required this.onFlash,
     required this.onTimer,
     required this.onLayout,
@@ -51,16 +62,25 @@ class CameraSideToolbar extends StatefulWidget {
     required this.onBeauty,
     required this.onFilters,
     required this.onSpeed,
-    required this.onZoom,
+    required this.flashEnabled,
     required this.beautyEnabled,
     required this.filtersEnabled,
     required this.timerEnabled,
     required this.speedLabel,
+    this.showSpeed = true,
+    this.showAspectRatio = true,
+    this.aspectRatioEnabled = true,
     required this.labels,
+    this.ratioLetterboxed = false,
+    this.selectedLayoutMode = CameraLayoutMode.off,
+    this.layoutPickerOpen = false,
+    this.onLayoutModeSelected,
+    this.offLabel = 'Off',
     this.iconOnStartEdge = true,
-    this.collapsedCount = 5,
+    this.collapsedCount = 6,
   });
 
+  final VoidCallback onFlip;
   final VoidCallback onFlash;
   final VoidCallback onTimer;
   final VoidCallback onLayout;
@@ -68,12 +88,20 @@ class CameraSideToolbar extends StatefulWidget {
   final VoidCallback onBeauty;
   final VoidCallback onFilters;
   final VoidCallback onSpeed;
-  final VoidCallback onZoom;
+  final bool flashEnabled;
   final bool beautyEnabled;
   final bool filtersEnabled;
   final bool timerEnabled;
   final String speedLabel;
+  final bool showSpeed;
+  final bool showAspectRatio;
+  final bool aspectRatioEnabled;
   final CameraSideToolbarLabels labels;
+  final bool ratioLetterboxed;
+  final CameraLayoutMode selectedLayoutMode;
+  final bool layoutPickerOpen;
+  final ValueChanged<CameraLayoutMode>? onLayoutModeSelected;
+  final String offLabel;
   final bool iconOnStartEdge;
   final int collapsedCount;
 
@@ -84,11 +112,31 @@ class CameraSideToolbar extends StatefulWidget {
 class _CameraSideToolbarState extends State<CameraSideToolbar> {
   bool _expanded = false;
 
+  static const _rowStride = 54.0;
+  // Switch-camera sits first now, so Layout is the 4th row (index 3).
+  static const _layoutRowIndex = 3;
+  // Icons hug one edge of the 122px-wide rail and are only ~40px wide; anchor
+  // the popup to the icon (not the full rail width) so it opens right next to
+  // the button instead of drifting toward the screen center.
+  static const _iconRailWidth = 44.0;
+  static const _popupGap = 10.0;
+  static const _popupHeight = 244.0;
+
+  bool get _layoutActive => widget.selectedLayoutMode != CameraLayoutMode.off;
+
   List<_SideToolItem> get _allTools => [
         _SideToolItem(
-          icon: LucideIcons.wandSparkles,
+          icon: LucideIcons.switchCamera,
+          label: widget.labels.switchCamera,
+          onTap: widget.onFlip,
+          iconOnly: true,
+        ),
+        _SideToolItem(
+          icon: LucideIcons.zap,
           label: widget.labels.flash,
           onTap: widget.onFlash,
+          active: widget.flashEnabled,
+          iconOnly: true,
         ),
         _SideToolItem(
           icon: LucideIcons.timer,
@@ -100,35 +148,37 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           icon: LucideIcons.layoutGrid,
           label: widget.labels.layout,
           onTap: widget.onLayout,
+          active: _layoutActive || widget.layoutPickerOpen,
+          showActiveBadge: _layoutActive,
+          layoutMode: widget.selectedLayoutMode,
         ),
-        _SideToolItem(
-          icon: LucideIcons.ratio,
-          label: widget.labels.aspectRatio,
-          onTap: widget.onAspectRatio,
-        ),
-        _SideToolItem(
-          icon: LucideIcons.sparkles,
-          label: widget.labels.beauty,
-          onTap: widget.onBeauty,
-          active: widget.beautyEnabled,
-        ),
+        if (widget.showAspectRatio)
+          _SideToolItem(
+            icon: LucideIcons.ratio,
+            label: widget.labels.aspectRatio,
+            onTap: widget.aspectRatioEnabled ? widget.onAspectRatio : () {},
+            active: widget.ratioLetterboxed && widget.aspectRatioEnabled,
+            dimmed: !widget.aspectRatioEnabled,
+          ),
+        // _SideToolItem(
+        //   icon: LucideIcons.sparkles,
+        //   label: widget.labels.beauty,
+        //   onTap: widget.onBeauty,
+        //   active: widget.beautyEnabled,
+        // ),
         _SideToolItem(
           icon: LucideIcons.palette,
           label: widget.labels.filters,
           onTap: widget.onFilters,
           active: widget.filtersEnabled,
         ),
-        _SideToolItem(
-          icon: LucideIcons.gauge,
-          label: widget.labels.speed,
-          badge: widget.speedLabel,
-          onTap: widget.onSpeed,
-        ),
-        _SideToolItem(
-          icon: LucideIcons.zoomIn,
-          label: widget.labels.zoom,
-          onTap: widget.onZoom,
-        ),
+        if (widget.showSpeed)
+          _SideToolItem(
+            icon: LucideIcons.gauge,
+            label: widget.labels.speed,
+            badge: widget.speedLabel,
+            onTap: widget.onSpeed,
+          ),
       ];
 
   List<_SideToolItem> get _visibleTools {
@@ -145,44 +195,91 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
         ? CrossAxisAlignment.start
         : CrossAxisAlignment.end;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: align,
-      children: [
-        AnimatedSize(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          alignment: widget.iconOnStartEdge
-              ? Alignment.topLeft
-              : Alignment.topRight,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: align,
-            children: [
-              for (final tool in visible)
-                CameraRailToolRow(
-                  icon: tool.icon,
-                  label: tool.label,
-                  onTap: tool.onTap,
-                  active: tool.active,
-                  badge: tool.badge,
-                  iconOnStartEdge: widget.iconOnStartEdge,
-                ),
-            ],
-          ),
+    // Force LTR inside the rail so the manual [iconOnStartEdge] flag is the
+    // single source of truth for which edge the icons hug. Without this, an
+    // ambient RTL (Arabic) locale flips every start/end alignment a second
+    // time and the icons end up on the wrong (inner) edge.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: align,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: widget.iconOnStartEdge
+                  ? Alignment.topLeft
+                  : Alignment.topRight,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: align,
+                children: [
+                  for (final tool in visible) _buildToolRow(tool),
+                ],
+              ),
+            ),
+            if (_hasMore)
+              CameraRailExpandButton(
+                expanded: _expanded,
+                iconOnStartEdge: widget.iconOnStartEdge,
+                onTap: () => setState(() => _expanded = !_expanded),
+              ),
+          ],
         ),
-        if (_hasMore)
-          CameraRailExpandButton(
-            expanded: _expanded,
-            iconOnStartEdge: widget.iconOnStartEdge,
-            onTap: () => setState(() => _expanded = !_expanded),
+        if (widget.layoutPickerOpen && widget.onLayoutModeSelected != null)
+          Positioned(
+            top: _layoutPopupTop,
+            left: widget.iconOnStartEdge
+                ? _iconRailWidth + _popupGap
+                : null,
+            right: widget.iconOnStartEdge
+                ? null
+                : _iconRailWidth + _popupGap,
+            child: CameraLayoutPickerPopup(
+              selected: widget.selectedLayoutMode,
+              offLabel: widget.offLabel,
+              onSelected: widget.onLayoutModeSelected!,
+            ),
           ),
-      ],
+        ],
+      ),
     );
+  }
+
+  double get _layoutPopupTop =>
+      _layoutRowIndex * _rowStride + (_rowStride / 2) - (_popupHeight / 2);
+
+  Widget _buildToolRow(_SideToolItem tool) {
+    final row = CameraRailToolRow(
+      icon: tool.icon,
+      label: tool.label,
+      onTap: tool.onTap,
+      active: tool.active,
+      showActiveBadge: tool.showActiveBadge,
+      badge: tool.badge,
+      iconOnStartEdge: widget.iconOnStartEdge,
+      // Show the caption when the rail is expanded, except for icon-only tools
+      // (Flash / Switch Camera).
+      showLabel: _expanded && !tool.iconOnly,
+      customIcon: tool.layoutMode != null && tool.layoutMode != CameraLayoutMode.off
+          ? CameraLayoutIcon(
+              mode: tool.layoutMode!,
+              color: Colors.white,
+              size: 26,
+            )
+          : null,
+    );
+    if (tool.dimmed) {
+      return Opacity(opacity: 0.4, child: row);
+    }
+    return row;
   }
 }
 
-/// Chevron to expand/collapse the side tool rail.
 class CameraRailExpandButton extends StatelessWidget {
   const CameraRailExpandButton({
     super.key,
@@ -222,34 +319,6 @@ class CameraRailExpandButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// @deprecated Use [CameraRailTool] from camera_tool_icons.dart.
-class CameraSideTool extends StatelessWidget {
-  const CameraSideTool({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.caption,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? caption;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return CameraRailTool(
-      icon: icon,
-      label: caption ?? label,
-      onTap: onTap,
-      active: active,
     );
   }
 }

@@ -154,10 +154,6 @@ class CameraStudioSheets {
     );
   }
 
-  static void showMusicComingSoon(BuildContext context, String message) {
-    PopupDialogs.showErrorDialog(context, message);
-  }
-
   static Future<String?> showImportTypeSheet(
     BuildContext context, {
     required AppLocalizations l10n,
@@ -221,5 +217,205 @@ class CameraStudioSheets {
         l10n.cameraCaptureError(e.toString()),
       );
     }
+  }
+
+  static Future<void> showCountdownSheet(
+    BuildContext context, {
+    required AppLocalizations l10n,
+    required int initialCountdownSeconds,
+    required bool timerEnabled,
+    required ValueChanged<int> onStart,
+    required VoidCallback onTurnOff,
+  }) {
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return _CountdownSheetBody(
+          l10n: l10n,
+          initialCountdownSeconds: initialCountdownSeconds,
+          timerEnabled: timerEnabled,
+          onStart: onStart,
+          onTurnOff: onTurnOff,
+        );
+      },
+    );
+  }
+}
+
+class _CountdownSheetBody extends StatefulWidget {
+  const _CountdownSheetBody({
+    required this.l10n,
+    required this.initialCountdownSeconds,
+    required this.timerEnabled,
+    required this.onStart,
+    required this.onTurnOff,
+  });
+
+  final AppLocalizations l10n;
+  final int initialCountdownSeconds;
+  final bool timerEnabled;
+  final ValueChanged<int> onStart;
+  final VoidCallback onTurnOff;
+
+  @override
+  State<_CountdownSheetBody> createState() => _CountdownSheetBodyState();
+}
+
+class _CountdownSheetBodyState extends State<_CountdownSheetBody> {
+  // 0 = Off, otherwise countdown seconds (3 or 10).
+  late int _countdownSeconds;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.timerEnabled) {
+      _countdownSeconds = 0;
+    } else {
+      _countdownSeconds = widget.initialCountdownSeconds == 10 ? 10 : 3;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 12 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.l10n.cameraSetCountdown,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              _CountdownSegment(
+                selected: _countdownSeconds,
+                offLabel: widget.l10n.settingsOff,
+                onChanged: (v) => setState(() => _countdownSeconds = v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 48,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  if (_countdownSeconds == 0) {
+                    widget.onTurnOff();
+                  } else {
+                    widget.onStart(_countdownSeconds);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      _countdownSeconds == 0
+                          ? widget.l10n.settingsOff
+                          : widget.l10n.cameraStartCountdown,
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountdownSegment extends StatelessWidget {
+  const _CountdownSegment({
+    required this.selected,
+    required this.offLabel,
+    required this.onChanged,
+  });
+
+  final int selected;
+  final String offLabel;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _seg(0, offLabel),
+          _seg(3, '3s'),
+          _seg(10, '10s'),
+        ],
+      ),
+    );
+  }
+
+  Widget _seg(int seconds, String label) {
+    final active = selected == seconds;
+    return GestureDetector(
+      onTap: () => onChanged(seconds),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.black : Colors.white54,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -2,11 +2,11 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// TikTok-style top bar: flip (physical left), sound pill (center), close (right).
+/// TikTok-style top bar: sound pill (center), close (right).
+/// Camera flip now lives in the side toolbar.
 class CameraTopBar extends StatelessWidget {
   const CameraTopBar({
     super.key,
-    required this.onFlip,
     required this.onClose,
     required this.soundLabel,
     this.onSoundTap,
@@ -14,7 +14,6 @@ class CameraTopBar extends StatelessWidget {
     this.addSoundLabel = 'Add sound',
   });
 
-  final VoidCallback onFlip;
   final VoidCallback onClose;
   final String soundLabel;
   final VoidCallback? onSoundTap;
@@ -30,10 +29,9 @@ class CameraTopBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
       child: Row(
         children: [
-          _TopCircleButton(
-            icon: LucideIcons.switchCamera,
-            onTap: onFlip,
-          ),
+          // Balances the close button on the right so the sound pill stays
+          // centered — flip moved to the side toolbar.
+          const SizedBox(width: 48),
           Expanded(
             child: Center(
               child: GestureDetector(

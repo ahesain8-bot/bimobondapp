@@ -80,7 +80,8 @@ class AuctionSearchFilters extends Equatable {
       categoryIds: categoryIds,
       minPriceUsd: minPriceUsd,
       maxPriceUsd: maxPriceUsd,
-      timeRemaining: timeRemaining,
+      // Time-remaining windows target future end dates; drop for ended scans.
+      timeRemaining: AuctionTimeRemainingFilter.any,
     );
   }
 
@@ -123,7 +124,21 @@ class AuctionSearchFilters extends Equatable {
     };
   }
 
+  /// API / backend finished statuses (early close, sold, etc.).
+  static bool isAuctionStatusEnded(String? status) {
+    switch (status?.trim().toUpperCase()) {
+      case 'ENDED':
+      case 'FINISHED':
+      case 'COMPLETED':
+      case 'CLOSED':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   static bool isPostLive(PostEntity post) {
+    if (isPostEnded(post)) return false;
     final auction = post.auction;
     if (auction == null) return false;
     final now = DateTime.now().toUtc();
@@ -135,8 +150,30 @@ class AuctionSearchFilters extends Equatable {
   static bool isPostEnded(PostEntity post) {
     final auction = post.auction;
     if (auction == null) return false;
+    if (isAuctionStatusEnded(auction.status)) return true;
     final now = DateTime.now().toUtc();
     return !auction.endedAt.toUtc().isAfter(now);
+  }
+
+  /// Client-side text match for title / description / host when API search
+  /// is incomplete for ended auctions.
+  static bool matchesSearchQuery(PostEntity post, String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    final auction = post.auction;
+    final haystacks = <String?>[
+      auction?.itemName,
+      post.description,
+      post.user?.username,
+      post.user?.fullName,
+    ];
+    for (final value in haystacks) {
+      final text = value?.trim().toLowerCase();
+      if (text != null && text.isNotEmpty && text.contains(q)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   FeedAuctionQuery _toAuctionQuery() {
@@ -144,7 +181,9 @@ class AuctionSearchFilters extends Equatable {
     DateTime? targetDateFrom;
     DateTime? targetDateTo;
 
-    if (timeRemaining != AuctionTimeRemainingFilter.any) {
+    // Time-remaining filters only apply to live / upcoming auctions.
+    if (liveStatus != AuctionLiveStatusFilter.ended &&
+        timeRemaining != AuctionTimeRemainingFilter.any) {
       targetDateFrom = now;
       targetDateTo = now.add(_maxDurationFor(timeRemaining));
     }
@@ -162,7 +201,8 @@ class AuctionSearchFilters extends Equatable {
       auctionStatus: _auctionStatusForApi(),
       startedAtTo: switch (liveStatus) {
         AuctionLiveStatusFilter.live => now,
-        AuctionLiveStatusFilter.ended => now,
+        // Avoid date windows that conflict with ENDED+search on some backends.
+        AuctionLiveStatusFilter.ended => null,
         AuctionLiveStatusFilter.any => null,
       },
     );

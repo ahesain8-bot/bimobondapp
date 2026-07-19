@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_privacy_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
@@ -5,10 +7,13 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/custom_button.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/core/widgets/video_post_preview_placeholder.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -92,7 +97,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       controller: _descriptionController,
                       maxLines: 5,
                       decoration: InputDecoration(
-                        hintText: l10n.describePostHint,
+                        hintText: l10n.addDescriptionHint,
                         border: InputBorder.none,
                       ),
                     ),
@@ -185,25 +190,27 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
   Widget _buildReadOnlyMediaTile(PostMediaEntity media) {
     final isVideo = MediaUtils.isVideo(media.url, mediaType: media.mediaType);
+    final posterUrl = isVideo
+        ? MediaUtils.resolveVideoPosterUrl(widget.post)
+        : null;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-      child: Image.network(
-        media.url,
+      child: SizedBox(
         width: 80,
         height: 90,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => SizedBox(
-          width: 80,
-          height: 90,
-          child: ColoredBox(
-            color: Colors.grey.shade800,
-            child: Icon(
-              isVideo ? LucideIcons.video : LucideIcons.image,
-              color: Colors.white54,
-            ),
-          ),
-        ),
+        child: isVideo
+            ? _EditPostVideoThumb(
+                videoUrl: media.url,
+                posterUrl: posterUrl,
+              )
+            : SafeNetworkImage(
+                imageUrl: MediaUtils.resolveAbsoluteUrl(media.url),
+                width: 80,
+                height: 90,
+                fit: BoxFit.cover,
+                errorIcon: LucideIcons.image,
+              ),
       ),
     );
   }
@@ -250,6 +257,108 @@ class _EditPostScreenState extends State<EditPostScreen> {
       context,
       selectedStatus: _privacyStatus,
       onSelected: (status) => setState(() => _privacyStatus = status),
+    );
+  }
+}
+
+/// Video tile for edit post: poster → generated frame → black play placeholder.
+class _EditPostVideoThumb extends StatefulWidget {
+  const _EditPostVideoThumb({
+    required this.videoUrl,
+    this.posterUrl,
+  });
+
+  final String videoUrl;
+  final String? posterUrl;
+
+  @override
+  State<_EditPostVideoThumb> createState() => _EditPostVideoThumbState();
+}
+
+class _EditPostVideoThumbState extends State<_EditPostVideoThumb> {
+  Uint8List? _generatedBytes;
+  bool _generateStarted = false;
+
+  String? get _resolvedPoster {
+    final raw = widget.posterUrl?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    final resolved = MediaUtils.resolveAbsoluteUrl(raw);
+    if (MediaUtils.isVideo(resolved)) return null;
+    return isValidNetworkImageUrl(resolved) ? resolved : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeGenerate();
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditPostVideoThumb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl ||
+        oldWidget.posterUrl != widget.posterUrl) {
+      _generatedBytes = null;
+      _generateStarted = false;
+      _maybeGenerate();
+    }
+  }
+
+  void _maybeGenerate() {
+    if (_generateStarted || _resolvedPoster != null) return;
+    _generateStarted = true;
+    final url = MediaUtils.resolveAbsoluteUrl(widget.videoUrl);
+    if (url.isEmpty) return;
+    VideoThumbnailUtils.generateThumbnailBytes(
+      url,
+      timeMs: 0,
+      quality: 70,
+      maxHeight: 240,
+    ).then((bytes) {
+      if (!mounted || bytes == null) return;
+      setState(() => _generatedBytes = bytes);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final poster = _resolvedPoster;
+    Widget cover;
+    if (poster != null) {
+      cover = SafeNetworkImage(
+        imageUrl: poster,
+        width: 80,
+        height: 90,
+        fit: BoxFit.cover,
+      );
+    } else if (_generatedBytes != null) {
+      cover = Image.memory(
+        _generatedBytes!,
+        width: 80,
+        height: 90,
+        fit: BoxFit.cover,
+      );
+    } else {
+      cover = const VideoPostPreviewPlaceholder(
+        iconSize: 28,
+        icon: LucideIcons.play,
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        cover,
+        if (poster != null || _generatedBytes != null)
+          const Center(
+            child: Icon(
+              LucideIcons.play,
+              size: 22,
+              color: Colors.white,
+              shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+          ),
+      ],
     );
   }
 }

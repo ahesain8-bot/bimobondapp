@@ -1232,13 +1232,13 @@ abstract class AppLocalizations {
   /// No description provided for @instagramProfileUrl.
   ///
   /// In en, this message translates to:
-  /// **'Instagram profile URL'**
+  /// **'Username or profile link'**
   String get instagramProfileUrl;
 
   /// No description provided for @youtubeChannelUrl.
   ///
   /// In en, this message translates to:
-  /// **'YouTube channel URL'**
+  /// **'Username or channel link'**
   String get youtubeChannelUrl;
 
   /// No description provided for @egypt.
@@ -1342,6 +1342,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Home'**
   String get navHome;
+
+  /// No description provided for @pressBackAgainToExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get pressBackAgainToExit;
 
   /// No description provided for @navFriends.
   ///
@@ -2114,13 +2120,13 @@ abstract class AppLocalizations {
   /// No description provided for @describePostHint.
   ///
   /// In en, this message translates to:
-  /// **'Describe your post… use @username and #tag in the text'**
+  /// **'Add a description...'**
   String get describePostHint;
 
   /// No description provided for @addDescriptionHint.
   ///
   /// In en, this message translates to:
-  /// **'Add description...'**
+  /// **'Add a description...'**
   String get addDescriptionHint;
 
   /// No description provided for @hashtagsLabel.
@@ -2432,7 +2438,7 @@ abstract class AppLocalizations {
   /// No description provided for @addCommentHint.
   ///
   /// In en, this message translates to:
-  /// **'Add comment… @username to mention'**
+  /// **'Add a comment...'**
   String get addCommentHint;
 
   /// No description provided for @justNow.
@@ -2633,6 +2639,12 @@ abstract class AppLocalizations {
   /// **'Share post'**
   String get postShareSheetTitle;
 
+  /// No description provided for @postShareSendToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to'**
+  String get postShareSendToTitle;
+
   /// No description provided for @postShareSearchUsers.
   ///
   /// In en, this message translates to:
@@ -2716,6 +2728,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sent to {name}'**
   String postShareSentTo(String name);
+
+  /// No description provided for @postShareSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get postShareSend;
+
+  /// No description provided for @postShareSendToCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Send ({count})'**
+  String postShareSendToCount(int count);
+
+  /// No description provided for @postShareSentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to {count} people'**
+  String postShareSentCount(int count);
+
+  /// No description provided for @postQuickShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent friends'**
+  String get postQuickShareTitle;
+
+  /// No description provided for @postQuickShareSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select friends, tap again to cancel, then send'**
+  String get postQuickShareSubtitle;
 
   /// No description provided for @postAddToStoryHint.
   ///
@@ -3251,6 +3293,12 @@ abstract class AppLocalizations {
   /// **'Shared a post'**
   String get messagesInboxLastShare;
 
+  /// No description provided for @messagesInboxLastSticker.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticker'**
+  String get messagesInboxLastSticker;
+
   /// No description provided for @messagesInboxMessageDeleted.
   ///
   /// In en, this message translates to:
@@ -3659,6 +3707,12 @@ abstract class AppLocalizations {
   /// **'Gift'**
   String get chatMoreGift;
 
+  /// No description provided for @chatMoreSticker.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticker'**
+  String get chatMoreSticker;
+
   /// No description provided for @chatMorePoll.
   ///
   /// In en, this message translates to:
@@ -3688,6 +3742,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gift sent'**
   String get chatGiftSentLabel;
+
+  /// No description provided for @chatStickerSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stickers'**
+  String get chatStickerSheetTitle;
+
+  /// No description provided for @chatStickerSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a sticker to send it'**
+  String get chatStickerSheetSubtitle;
+
+  /// No description provided for @chatStickerPackEmotions.
+  ///
+  /// In en, this message translates to:
+  /// **'Emotions'**
+  String get chatStickerPackEmotions;
+
+  /// No description provided for @chatStickerPackReactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Reactions'**
+  String get chatStickerPackReactions;
+
+  /// No description provided for @chatStickerPackCelebrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Celebrations'**
+  String get chatStickerPackCelebrations;
 
   /// No description provided for @chatMessageContact.
   ///
@@ -4973,6 +5057,12 @@ abstract class AppLocalizations {
   /// **'Flash'**
   String get cameraFlash;
 
+  /// No description provided for @cameraSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch camera'**
+  String get cameraSwitch;
+
   /// No description provided for @cameraSpeed.
   ///
   /// In en, this message translates to:
@@ -4996,6 +5086,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Timer'**
   String get cameraTimer;
+
+  /// No description provided for @cameraSetCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Set countdown'**
+  String get cameraSetCountdown;
+
+  /// No description provided for @cameraStartCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Start countdown'**
+  String get cameraStartCountdown;
+
+  /// No description provided for @cameraDragRecordingLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to set recording limit'**
+  String get cameraDragRecordingLimit;
 
   /// No description provided for @cameraMusic.
   ///
@@ -5213,6 +5321,12 @@ abstract class AppLocalizations {
   /// **'Add sound'**
   String get cameraAddSound;
 
+  /// No description provided for @cameraMuteOriginalSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute original sound'**
+  String get cameraMuteOriginalSound;
+
   /// No description provided for @cameraLayout.
   ///
   /// In en, this message translates to:
@@ -5248,6 +5362,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Zoom'**
   String get cameraZoom;
+
+  /// No description provided for @cameraZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get cameraZoomOut;
+
+  /// No description provided for @cameraZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get cameraZoomIn;
 
   /// No description provided for @cameraGoLive.
   ///
@@ -5422,6 +5548,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Coming soon'**
   String get mediaEditorComingSoon;
+
+  /// No description provided for @mediaEditorDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get mediaEditorDone;
+
+  /// No description provided for @mediaEditorTrim.
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get mediaEditorTrim;
+
+  /// No description provided for @videoEditorSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get videoEditorSplit;
+
+  /// No description provided for @videoEditorDeleteSegment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get videoEditorDeleteSegment;
+
+  /// No description provided for @mediaEditorDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get mediaEditorDiscard;
+
+  /// No description provided for @mediaEditorSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get mediaEditorSaveDraft;
+
+  /// No description provided for @mediaEditorContinueEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue editing'**
+  String get mediaEditorContinueEditing;
+
+  /// No description provided for @mediaEditorSendToFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to friends'**
+  String get mediaEditorSendToFriends;
+
+  /// No description provided for @mediaEditorDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get mediaEditorDiscardTitle;
+
+  /// No description provided for @mediaEditorReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get mediaEditorReset;
+
+  /// No description provided for @mediaPhotoEditorFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Face'**
+  String get mediaPhotoEditorFace;
+
+  /// No description provided for @mediaPhotoEditorMakeup.
+  ///
+  /// In en, this message translates to:
+  /// **'Makeup'**
+  String get mediaPhotoEditorMakeup;
+
+  /// No description provided for @mediaPhotoEditorMagic.
+  ///
+  /// In en, this message translates to:
+  /// **'Magic'**
+  String get mediaPhotoEditorMagic;
+
+  /// No description provided for @mediaPhotoEditorSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth'**
+  String get mediaPhotoEditorSmooth;
+
+  /// No description provided for @mediaPhotoEditorSaturation.
+  ///
+  /// In en, this message translates to:
+  /// **'Saturation'**
+  String get mediaPhotoEditorSaturation;
+
+  /// No description provided for @mediaPhotoEditorBrightness.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get mediaPhotoEditorBrightness;
+
+  /// No description provided for @mediaPhotoEditorContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast'**
+  String get mediaPhotoEditorContrast;
+
+  /// No description provided for @mediaPhotoEditorExposure.
+  ///
+  /// In en, this message translates to:
+  /// **'Exposure'**
+  String get mediaPhotoEditorExposure;
+
+  /// No description provided for @mediaPhotoEditorWhiteBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Warmth'**
+  String get mediaPhotoEditorWhiteBalance;
+
+  /// No description provided for @mediaPhotoEditorHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get mediaPhotoEditorHighlights;
+
+  /// No description provided for @mediaPhotoEditorShadows.
+  ///
+  /// In en, this message translates to:
+  /// **'Shadows'**
+  String get mediaPhotoEditorShadows;
+
+  /// No description provided for @mediaPhotoEditorNose.
+  ///
+  /// In en, this message translates to:
+  /// **'Nose'**
+  String get mediaPhotoEditorNose;
+
+  /// No description provided for @mediaPhotoEditorOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get mediaPhotoEditorOn;
+
+  /// No description provided for @mediaTextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type something'**
+  String get mediaTextHint;
 
   /// No description provided for @promotePostTitle.
   ///
@@ -6292,6 +6562,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get retry;
+
+  /// No description provided for @seeTranslation.
+  ///
+  /// In en, this message translates to:
+  /// **'See translation'**
+  String get seeTranslation;
+
+  /// No description provided for @seeOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'See original'**
+  String get seeOriginal;
+
+  /// No description provided for @translationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not translate'**
+  String get translationFailed;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -224,6 +224,52 @@ class _CategoryRow extends StatelessWidget {
   }
 }
 
+/// Shows the server thumbnail when available, otherwise falls back to the
+/// emoji (offline / bundled) over an optional preview color.
+class _FilterThumbImage extends StatelessWidget {
+  const _FilterThumbImage({required this.item});
+
+  final ArFilterItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholderColor = _hexToColor(item.previewColorHex);
+
+    final emojiFallback = ColoredBox(
+      color: placeholderColor ?? Colors.transparent,
+      child: Center(
+        child: Text(item.emoji, style: const TextStyle(fontSize: 26)),
+      ),
+    );
+
+    if (!item.hasThumbnail) return emojiFallback;
+
+    return Image.network(
+      item.thumbnailUrl!,
+      width: 64,
+      height: 64,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return ColoredBox(
+          color: placeholderColor ?? Colors.white.withValues(alpha: 0.06),
+        );
+      },
+      errorBuilder: (context, error, stack) => emojiFallback,
+    );
+  }
+
+  static Color? _hexToColor(String? hex) {
+    if (hex == null) return null;
+    var value = hex.replaceFirst('#', '').trim();
+    if (value.length == 6) value = 'FF$value';
+    if (value.length != 8) return null;
+    final intValue = int.tryParse(value, radix: 16);
+    return intValue == null ? null : Color(intValue);
+  }
+}
+
 class _FilterThumb extends StatelessWidget {
   const _FilterThumb({
     required this.item,
@@ -258,9 +304,7 @@ class _FilterThumb extends StatelessWidget {
                   width: selected ? 2.5 : 1,
                 ),
               ),
-              child: Center(
-                child: Text(item.emoji, style: const TextStyle(fontSize: 26)),
-              ),
+              child: ClipOval(child: _FilterThumbImage(item: item)),
             ),
             const SizedBox(height: 6),
             Text(

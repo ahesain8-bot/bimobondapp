@@ -148,6 +148,8 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isKeyboardOpen = keyboardInset > 0;
     const chipInactiveBg = Color(0x1FFFFFFF);
     const chipInactiveBorder = Color(0x33FFFFFF);
     const labelColor = Colors.white;
@@ -247,6 +249,8 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
                         style: const TextStyle(color: labelColor),
                         cursorColor: Colors.white,
                         decoration: priceDecoration(l10n.auctionsFiltersMinPrice),
+                        textInputAction: TextInputAction.next,
+                        onTap: _ensureSheetRoomForKeyboard,
                       ),
                     ),
                   ),
@@ -265,6 +269,9 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
                         style: const TextStyle(color: labelColor),
                         cursorColor: Colors.white,
                         decoration: priceDecoration(l10n.auctionsFiltersMaxPrice),
+                        textInputAction: TextInputAction.done,
+                        onTap: _ensureSheetRoomForKeyboard,
+                        onSubmitted: (_) => FocusScope.of(context).unfocus(),
                       ),
                     ),
                   ),
@@ -315,6 +322,8 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
         ),
         SafeArea(
           top: false,
+          // Host already lifts for the keyboard; skip home-indicator padding then.
+          bottom: !isKeyboardOpen,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSizes.p16,
@@ -340,6 +349,17 @@ class _AuctionsFilterSheetState extends State<AuctionsFilterSheet> {
           ),
         ),
       ],
+    );
+  }
+
+  void _ensureSheetRoomForKeyboard() {
+    final extent = DraggableSheetExtent.maybeOf(context);
+    if (extent == null || !extent.controller.isAttached) return;
+    if (extent.controller.size >= extent.maxChildSize - 0.01) return;
+    extent.controller.animateTo(
+      extent.maxChildSize,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
     );
   }
 }

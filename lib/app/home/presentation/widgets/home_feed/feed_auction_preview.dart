@@ -125,11 +125,14 @@ class FeedAuctionPreview extends StatelessWidget {
   const FeedAuctionPreview({
     required this.post,
     this.bottomPadding = HomeLayoutConstants.feedPostBottomPadding,
+    this.feedTopBarClearance,
     super.key,
   });
 
   final PostEntity post;
   final double bottomPadding;
+  /// Extra top inset so the Active badge clears the feed Following/search bar.
+  final double? feedTopBarClearance;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +148,10 @@ class FeedAuctionPreview extends StatelessWidget {
         auction != null &&
         DateTime.now().toUtc().isAfter(auction.endedAt.toUtc());
     final showTapToEnter = showAuctionTapToEnter(post);
+    final topClearance =
+        feedTopBarClearance ??
+        (HomeLayoutConstants.feedTopBarHeight +
+            HomeLayoutConstants.feedTopBarBottomGap);
 
     return GestureDetector(
       onTap: () => openPost(context, post),
@@ -200,9 +207,14 @@ class FeedAuctionPreview extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + AppSizes.p12,
-                    left: AppSizes.p16,
+                  // start = left in LTR, right in RTL — opposite the search icon
+                  // (search sits on end in FeedTopBar).
+                  PositionedDirectional(
+                    top:
+                        MediaQuery.paddingOf(context).top +
+                        topClearance +
+                        AppSizes.p4,
+                    start: AppSizes.p16,
                     child: ProfileAuctionBadge(status: status),
                   ),
                   if (showTapToEnter)

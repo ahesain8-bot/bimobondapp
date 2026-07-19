@@ -147,7 +147,8 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
   bool _shouldIncludeEndedPost(PostEntity post) {
     if (!post.isAuctionable || post.auction == null) return false;
     if (!_filters.matchesClientCategory(post)) return false;
-    return AuctionSearchFilters.isPostEnded(post);
+    if (!AuctionSearchFilters.isPostEnded(post)) return false;
+    return AuctionSearchFilters.matchesSearchQuery(post, _searchQuery);
   }
 
   Future<({Map<String, AuctionItem> items, int nextPage, bool reachedMax})>
@@ -215,6 +216,8 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
     }
 
     final search = _searchQuery.trim();
+    // Prefer server search when present; client filter still applies as a
+    // safety net. If ENDED+search returns nothing, scan without API search.
     final searchParam = search.isEmpty ? null : search;
     final startPage = refresh ? 1 : _page;
     final maxPages = refresh ? _maxPagesPerRefresh : 1;
@@ -231,7 +234,8 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
         filters: _filters.withoutLiveStatus(),
         startPage: 1,
         maxPages: _maxPagesPerRefresh,
-        search: searchParam,
+        // Drop API search so we can match locally on ended auctions.
+        search: null,
       );
     }
 

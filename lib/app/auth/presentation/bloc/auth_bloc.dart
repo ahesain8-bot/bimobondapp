@@ -188,13 +188,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     UpdateProfileRequestedEvent event,
     Emitter<AuthState> emit,
   ) async {
-    emit(AuthLoading());
+    // Keep AuthSuccess while updating so MainScreen does not treat this as a
+    // fresh login (AuthLoading → AuthSuccess) and jump to the Home tab.
     final result = await updateProfileUseCase(event.data);
     result.fold(
       (failure) => emit(
-        const AuthFailure(
-          message: 'Failed to update profile',
-          messageKey: 'updateProfileFailed',
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Failed to update profile',
+          messageKey: failure.message.isNotEmpty ? null : 'updateProfileFailed',
         ),
       ),
       (user) => emit(AuthSuccess(user: user)),

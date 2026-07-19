@@ -68,6 +68,11 @@ abstract class PostsRemoteDataSource {
   );
   Future<bool> deleteComment(String commentId);
   Future<bool> toggleLikeComment(String commentId);
+  Future<SocialUserPageModel> getCommentLikes(
+    String commentId, {
+    int page = 1,
+    int limit = 20,
+  });
 }
 
 class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
@@ -831,6 +836,38 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       );
 
       return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<SocialUserPageModel> getCommentLikes(
+    String commentId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.commentLikes(commentId),
+        queryParameters: {'page': page, 'limit': limit},
+        options: Options(headers: await _optionalAuthHeaders()),
+      );
+
+      if (response.statusCode == 200) {
+        final users = _parsePostLikers(response.data);
+        return SocialUserPageModel.fromResponse(
+          response.data,
+          users,
+          requestedPage: page,
+          requestedLimit: limit,
+        );
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load likes',
+      );
     } catch (e) {
       throw DioHandler.handle(e);
     }

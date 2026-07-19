@@ -78,7 +78,11 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
     _messageSub = socketService.onNewMessage.listen((message) {
       if (message.chatId != _chatId) return;
-      add(ChatSocketMessageReceived(chatMessageToUiMap(message, event.currentUserId)));
+      add(
+        ChatSocketMessageReceived(
+          chatMessageToUiMap(message, event.currentUserId),
+        ),
+      );
     });
 
     _typingSub = socketService.onUserTyping.listen((payload) {
@@ -124,43 +128,36 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       GetChatMessagesParams(chatId: chatId, page: event.page, limit: limit),
     );
 
-    result.fold(
-      (failure) => emit(ChatFailure(failure.message)),
-      (messages) {
-        final uiMessages = chatMessagesToUiMaps(messages, userId);
-        final hasReachedMax = messages.length < limit;
+    result.fold((failure) => emit(ChatFailure(failure.message)), (messages) {
+      final uiMessages = chatMessagesToUiMaps(messages, userId);
+      final hasReachedMax = messages.length < limit;
 
-        if (state is ChatLoadSuccess && event.page > 1 && !event.refresh) {
-          final current = state as ChatLoadSuccess;
-          final existingIds = current.messages.map((m) => m['id']).toSet();
-          final merged = sortChatMessagesOldestFirst([
-            ...uiMessages.where((m) => !existingIds.contains(m['id'])),
-            ...current.messages,
-          ]);
-          emit(current.copyWith(messages: merged, hasReachedMax: hasReachedMax));
-        } else {
-          emit(
-            ChatLoadSuccess(
-              messages: uiMessages,
-              currentUserId: userId,
-              hasReachedMax: hasReachedMax,
-            ),
+      if (state is ChatLoadSuccess && event.page > 1 && !event.refresh) {
+        final current = state as ChatLoadSuccess;
+        final existingIds = current.messages.map((m) => m['id']).toSet();
+        final merged = sortChatMessagesOldestFirst([
+          ...uiMessages.where((m) => !existingIds.contains(m['id'])),
+          ...current.messages,
+        ]);
+        emit(current.copyWith(messages: merged, hasReachedMax: hasReachedMax));
+      } else {
+        emit(
+          ChatLoadSuccess(
+            messages: uiMessages,
+            currentUserId: userId,
+            hasReachedMax: hasReachedMax,
+          ),
+        );
+      }
+
+      for (final msg in messages) {
+        if (!msg.isDeleted && msg.senderId != userId && !msg.isReadBy(userId)) {
+          unawaited(
+            markMessageReadUseCase(MarkMessageReadParams(messageId: msg.id)),
           );
         }
-
-        for (final msg in messages) {
-          if (!msg.isDeleted &&
-              msg.senderId != userId &&
-              !msg.isReadBy(userId)) {
-            unawaited(
-              markMessageReadUseCase(
-                MarkMessageReadParams(messageId: msg.id),
-              ),
-            );
-          }
-        }
-      },
-    );
+      }
+    });
   }
 
   Future<void> _onMessageSendRequested(
@@ -184,23 +181,20 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       ),
     );
 
-    result.fold(
-      (failure) => emit(ChatFailure(failure.message)),
-      (message) {
-        final ui = chatMessageToUiMap(message, userId);
-        final ids = current.messages.map((m) => m['id']).toSet();
-        if (ids.contains(ui['id'])) {
-          emit(current.copyWith(isSending: false));
-          return;
-        }
-        emit(
-          current.copyWith(
-            messages: sortChatMessagesOldestFirst([...current.messages, ui]),
-            isSending: false,
-          ),
-        );
-      },
-    );
+    result.fold((failure) => emit(ChatFailure(failure.message)), (message) {
+      final ui = chatMessageToUiMap(message, userId);
+      final ids = current.messages.map((m) => m['id']).toSet();
+      if (ids.contains(ui['id'])) {
+        emit(current.copyWith(isSending: false));
+        return;
+      }
+      emit(
+        current.copyWith(
+          messages: sortChatMessagesOldestFirst([...current.messages, ui]),
+          isSending: false,
+        ),
+      );
+    });
   }
 
   Future<void> _onVoiceMessageSendRequested(
@@ -236,26 +230,22 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           ),
         );
 
-        sendResult.fold(
-          (failure) => emit(ChatFailure(failure.message)),
-          (message) {
-            final ui = chatMessageToUiMap(message, userId);
-            final ids = current.messages.map((m) => m['id']).toSet();
-            if (ids.contains(ui['id'])) {
-              emit(current.copyWith(isSending: false));
-              return;
-            }
-            emit(
-              current.copyWith(
-                messages: sortChatMessagesOldestFirst([
-                  ...current.messages,
-                  ui,
-                ]),
-                isSending: false,
-              ),
-            );
-          },
-        );
+        sendResult.fold((failure) => emit(ChatFailure(failure.message)), (
+          message,
+        ) {
+          final ui = chatMessageToUiMap(message, userId);
+          final ids = current.messages.map((m) => m['id']).toSet();
+          if (ids.contains(ui['id'])) {
+            emit(current.copyWith(isSending: false));
+            return;
+          }
+          emit(
+            current.copyWith(
+              messages: sortChatMessagesOldestFirst([...current.messages, ui]),
+              isSending: false,
+            ),
+          );
+        });
       },
     );
   }
@@ -363,17 +353,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       ),
     );
 
-    result.fold(
-      (failure) => emit(ChatFailure(failure.message)),
-      (message) {
-        final ui = chatMessageToUiMap(message, userId);
-        final updated = current.messages.map((m) {
-          if (m['id'] == ui['id']) return ui;
-          return m;
-        }).toList();
-        emit(current.copyWith(messages: updated));
-      },
-    );
+    result.fold((failure) => emit(ChatFailure(failure.message)), (message) {
+      final ui = chatMessageToUiMap(message, userId);
+      final updated = current.messages.map((m) {
+        if (m['id'] == ui['id']) return ui;
+        return m;
+      }).toList();
+      emit(current.copyWith(messages: updated));
+    });
   }
 
   void _emitSentMessage(
@@ -414,18 +401,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     );
 
     final result = await reactToMessageUseCase(
-      ReactToMessageParams(
-        messageId: event.messageId,
-        emoji: event.emoji,
-      ),
+      ReactToMessageParams(messageId: event.messageId, emoji: event.emoji),
     );
 
-    result.fold(
-      (failure) {
-        if (!emit.isDone) emit(ChatFailure(failure.message));
-      },
-      (_) {},
-    );
+    result.fold((failure) {
+      if (!emit.isDone) emit(ChatFailure(failure.message));
+    }, (_) {});
   }
 
   Future<void> _onMessageDeleteRequested(
@@ -445,10 +426,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       DeleteMessageParams(messageId: event.messageId),
     );
 
-    result.fold(
-      (failure) => emit(ChatFailure(failure.message)),
-      (_) {},
-    );
+    result.fold((failure) => emit(ChatFailure(failure.message)), (_) {});
   }
 
   void _onTypingChanged(ChatTypingChanged event, Emitter<ChatState> emit) {
@@ -462,7 +440,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     );
   }
 
-  void _onSocketMessage(ChatSocketMessageReceived event, Emitter<ChatState> emit) {
+  void _onSocketMessage(
+    ChatSocketMessageReceived event,
+    Emitter<ChatState> emit,
+  ) {
     if (state is! ChatLoadSuccess) return;
     final current = state as ChatLoadSuccess;
     final id = event.raw['id'];
@@ -485,14 +466,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         id != null &&
         event.raw['isDeleted'] != true) {
       unawaited(
-        markMessageReadUseCase(
-          MarkMessageReadParams(messageId: id.toString()),
-        ),
+        markMessageReadUseCase(MarkMessageReadParams(messageId: id.toString())),
       );
     }
   }
 
-  void _onSocketUserTyping(ChatSocketUserTyping event, Emitter<ChatState> emit) {
+  void _onSocketUserTyping(
+    ChatSocketUserTyping event,
+    Emitter<ChatState> emit,
+  ) {
     if (event.userId == _currentUserId) return;
     if (state is! ChatLoadSuccess) return;
     final current = state as ChatLoadSuccess;
@@ -510,7 +492,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) {
     return messages.map((m) {
       if (m['id'] == messageId) {
-        return {...m, 'reactions': [emoji]};
+        return {
+          ...m,
+          'reactions': [emoji],
+        };
       }
       return m;
     }).toList();

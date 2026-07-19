@@ -35,6 +35,7 @@ class ArCameraPlatformView(
         root.post {
             ArCameraBridge.applyCurrentFilter()
             ArCameraController.start(activity, activity, previewView, faceOverlay)
+            ArCameraBridge.reapplyPreviewLetterbox()
         }
     }
 

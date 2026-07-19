@@ -46,9 +46,8 @@ class WalletCustomAmountSection extends StatelessWidget {
     final coins = WalletCoinPricing.parseCoinsInput(controller.text);
     final packageMatch = WalletCoinPricing.packageForCoins(coins, packages);
     final needsApiPreview = coins > 0 && packageMatch == null;
-    final hasApiPreview = needsApiPreview &&
-        pricingPreview != null &&
-        previewForCoins == coins;
+    final hasApiPreview =
+        needsApiPreview && pricingPreview != null && previewForCoins == coins;
 
     final receiveCoins = packageMatch != null
         ? packageMatch.coinAmount
@@ -84,8 +83,9 @@ class WalletCustomAmountSection extends StatelessWidget {
     final coinsLabel = receiveCoins > 0
         ? LocaleFormatUtils.localizeDigits(receiveCoins.toString(), locale)
         : '—';
-    final activePackages =
-        packages.where((pack) => pack.isActive).toList(growable: false);
+    final activePackages = packages
+        .where((pack) => pack.isActive)
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

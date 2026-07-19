@@ -104,16 +104,19 @@ class _LoginMethodButton extends StatelessWidget {
           ),
           padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
         ),
-        child: Stack(
-          alignment: Alignment.center,
+        child: Row(
           children: [
-            Align(alignment: AlignmentDirectional.centerStart, child: icon),
-            CustomText(
-              label,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              textAlign: TextAlign.center,
+            SizedBox(width: 28, child: Center(child: icon)),
+            Expanded(
+              child: CustomText(
+                label,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                textAlign: TextAlign.center,
+              ),
             ),
+            // Balance the leading icon so the label stays visually centered.
+            const SizedBox(width: 28),
           ],
         ),
       ),

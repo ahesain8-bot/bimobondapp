@@ -264,12 +264,35 @@ class AppRouter {
       GoRoute(
         path: '/profile-posts',
         name: 'profile_posts_viewer',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final args = profilePostsOpenArgsFromExtra(state.extra);
-          if (args == null) {
-            return const Scaffold(body: Center(child: Text('Post not found')));
-          }
-          return ProfilePostsViewerScreen(args: args);
+          final child = args == null
+              ? const Scaffold(body: Center(child: Text('Post not found')))
+              : ProfilePostsViewerScreen(args: args);
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: child,
+            transitionDuration: const Duration(milliseconds: 380),
+            reverseTransitionDuration: const Duration(milliseconds: 280),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              final curved = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              return FadeTransition(
+                opacity: curved,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.06),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: child,
+                ),
+              );
+            },
+          );
         },
       ),
       GoRoute(
@@ -410,7 +433,7 @@ class AppRouter {
       GoRoute(
         path: '/media-studio-editor',
         name: 'media_studio_editor',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           final List<GalleryMediaItem> items;
           if (extra?['items'] is List) {
@@ -423,13 +446,23 @@ class AppRouter {
               ),
             ];
           }
-          return MediaStudioEditorScreen(
+          final child = MediaStudioEditorScreen(
             items: items,
-            initialIndex: extra?['initialIndex'] as int? ?? 0,
-            isStory: extra?['isStory'] as bool? ?? false,
-            initialSound: extra?['initialSound'] as SoundEntity?,
-            popOnDone: extra?['popOnDone'] as bool? ?? false,
-            initialEdit: MediaEditorSeed.fromExtra(extra?['initialEdit']),
+            initialIndex: extra['initialIndex'] as int? ?? 0,
+            isStory: extra['isStory'] as bool? ?? false,
+            initialSound: extra['initialSound'] as SoundEntity?,
+            popOnDone: extra['popOnDone'] as bool? ?? false,
+            initialEdit: MediaEditorSeed.fromExtra(extra['initialEdit']),
+          );
+          // Instant push after capture — avoids a blank/flashy default transition.
+          return CustomTransitionPage<MediaStudioExportResult>(
+            key: state.pageKey,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: const Duration(milliseconds: 150),
+            child: child,
+            transitionsBuilder: (_, animation, _, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
           );
         },
       ),
