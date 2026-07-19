@@ -315,14 +315,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
                   parent: _entranceController,
                   curve: Curves.easeOut,
                 ),
-                child: Opacity(
-                  opacity: 0.95,
-                  child: _withEdgeFade(
-                    SizedBox(
-                      width: giftSize,
-                      height: giftSize,
-                      child: _buildMedia(),
-                    ),
+                child: _withEdgeFade(
+                  SizedBox(
+                    width: giftSize,
+                    height: giftSize,
+                    child: _buildMedia(),
                   ),
                 ),
               ),
@@ -359,14 +356,12 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         final composition = _composition;
         final controller = _lottieController;
         if (composition != null && controller != null) {
-          return _lottieScreenBlend(
-            Lottie(
-              composition: composition,
-              controller: controller,
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-              addRepaintBoundary: true,
-            ),
+          return Lottie(
+            composition: composition,
+            controller: controller,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            addRepaintBoundary: true,
           );
         }
         if (_lottieFailed) return _fallbackVisual();
@@ -378,63 +373,18 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           return const SizedBox.shrink();
         }
         // Parent stage is 1:1 (1080×1080); cover the square.
-        return _giftLightenFilter(
-          FittedBox(
-            fit: BoxFit.cover,
-            clipBehavior: Clip.hardEdge,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
-            ),
+        return FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
           ),
         );
       case _GiftMediaKind.image:
-        return _giftLightenFilter(_fallbackVisual(url: widget.animationUrl));
+        return _fallbackVisual(url: widget.animationUrl);
     }
-  }
-
-  /// Brightens gift media so it reads lighter over the feed.
-  Widget _giftLightenFilter(Widget child) {
-    return ColorFiltered(
-      colorFilter: const ColorFilter.matrix(<double>[
-        // Boost RGB + lift blacks slightly.
-        1.22, 0, 0, 0, 18,
-        0, 1.22, 0, 0, 18,
-        0, 0, 1.22, 0, 18,
-        0, 0, 0, 1, 0,
-      ]),
-      child: child,
-    );
-  }
-
-  /// Soft screen-style look for Lottie only (no Texture / VideoPlayer).
-  Widget _lottieScreenBlend(Widget child) {
-    return ColorFiltered(
-      colorFilter: const ColorFilter.matrix(<double>[
-        1.28,
-        0,
-        0,
-        0,
-        12,
-        0,
-        1.28,
-        0,
-        0,
-        12,
-        0,
-        0,
-        1.28,
-        0,
-        12,
-        0,
-        0,
-        0,
-        1,
-        0,
-      ]),
-      child: child,
-    );
   }
 
   Widget _fallbackVisual({String? url}) {

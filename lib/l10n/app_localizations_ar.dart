@@ -24,7 +24,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginWithPhone => 'استخدام رقم الجوال';
 
   @override
-  String get loginWithEmailUsername => 'استخدام البريد الإلكتروني أو اسم المستخدم';
+  String get loginWithEmailUsername => 'استخدام البريد الالكتروني';
 
   @override
   String get loginEmailUsernameHint => 'البريد الإلكتروني أو اسم المستخدم';
