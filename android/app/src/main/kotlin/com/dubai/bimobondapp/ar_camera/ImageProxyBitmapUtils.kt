@@ -155,6 +155,50 @@ object ImageProxyBitmapUtils {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
     }
 
+    /**
+     * Applies rotation and (optionally) a horizontal mirror in a SINGLE matrix pass,
+     * producing `mirror(rotate(src))`. This replaces the previous rotate-then-mirror
+     * sequence (two full-frame allocations + copies) with one, which is a real
+     * per-frame saving on the analysis thread while recording. Only use this when the
+     * unmirrored `oriented` frame is NOT needed separately (e.g. no face detection),
+     * since detection must run on the un-mirrored image.
+     */
+    fun orient(bitmap: Bitmap, rotationDegrees: Int, mirror: Boolean): Bitmap {
+        if (rotationDegrees == 0 && !mirror) return bitmap
+        val matrix = Matrix()
+        if (rotationDegrees != 0) matrix.postRotate(rotationDegrees.toFloat())
+        if (mirror) matrix.postScale(-1f, 1f)
+        // These are all axis-aligned transforms (90°/180°/270° + horizontal flip) so
+        // bilinear filtering can't change the output; keep it off when we're only
+        // rotating (cheaper, matches the old `rotate`) and on when mirroring (matches
+        // the old `mirrorHorizontally`).
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, mirror)
+    }
+
+    /**
+     * Rotate + (optional) mirror + downscale-to-[maxEdge] in a SINGLE matrix pass.
+     * Produces `scale(mirror(rotate(src)))`. This collapses what used to be three
+     * separate full-frame allocations (rotate, mirror, scale) into one, which is a
+     * big reduction in per-frame garbage — fewer/shorter GC pauses mean a smoother
+     * preview AND more even encoder frame timing. Only use when no un-mirrored /
+     * full-resolution frame is needed separately (i.e. no face detection).
+     */
+    fun orientScaled(
+        bitmap: Bitmap,
+        rotationDegrees: Int,
+        mirror: Boolean,
+        maxEdge: Int,
+    ): Bitmap {
+        val largest = maxOf(bitmap.width, bitmap.height)
+        val scale = if (largest > maxEdge && maxEdge > 0) maxEdge.toFloat() / largest else 1f
+        if (rotationDegrees == 0 && !mirror && scale == 1f) return bitmap
+        val matrix = Matrix()
+        if (rotationDegrees != 0) matrix.postRotate(rotationDegrees.toFloat())
+        if (mirror) matrix.postScale(-1f, 1f)
+        if (scale != 1f) matrix.postScale(scale, scale)
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
     fun mirrorHorizontally(bitmap: Bitmap): Bitmap {
         val matrix = Matrix().apply {
             preScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
@@ -162,12 +206,12 @@ object ImageProxyBitmapUtils {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
-    /** Upright selfie bitmap matching the mirrored front-camera preview. */
-    fun toUprightMirroredSelfie(imageProxy: ImageProxy): Bitmap? {
+    fun toUprightCapture(imageProxy: ImageProxy, mirrorFront: Boolean): Bitmap? {
         val raw = toBitmap(imageProxy) ?: return null
         val rotation = imageProxy.imageInfo.rotationDegrees
         val oriented = rotate(raw, rotation)
         if (oriented !== raw) raw.recycle()
+        if (!mirrorFront) return oriented
         val mirrored = mirrorHorizontally(oriented)
         if (mirrored !== oriented) oriented.recycle()
         return mirrored
@@ -181,5 +225,69 @@ object ImageProxyBitmapUtils {
         val targetWidth = (bitmap.width * scale).toInt().coerceAtLeast(1)
         val targetHeight = (bitmap.height * scale).toInt().coerceAtLeast(1)
         return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, filter)
+    }
+
+    /**
+     * Crops [bitmap] to the FILL_CENTER region shown in a viewport of [viewW]x[viewH]
+     * (same mapping as PreviewView.ScaleType.FILL_CENTER).
+     */
+    fun cropFillCenterToViewport(bitmap: Bitmap, viewW: Int, viewH: Int): Bitmap {
+        if (viewW <= 0 || viewH <= 0) return bitmap
+        val imgW = bitmap.width.toFloat()
+        val imgH = bitmap.height.toFloat()
+        if (imgW <= 0f || imgH <= 0f) return bitmap
+
+        val scale = maxOf(viewW / imgW, viewH / imgH)
+        val displayW = imgW * scale
+        val displayH = imgH * scale
+        val offsetX = (viewW - displayW) / 2f
+        val offsetY = (viewH - displayH) / 2f
+
+        var left = ((0f - offsetX) / scale).toInt()
+        var top = ((0f - offsetY) / scale).toInt()
+        var right = ((viewW - offsetX) / scale).toInt()
+        var bottom = ((viewH - offsetY) / scale).toInt()
+
+        left = left.coerceIn(0, bitmap.width - 1)
+        top = top.coerceIn(0, bitmap.height - 1)
+        right = right.coerceIn(left + 1, bitmap.width)
+        bottom = bottom.coerceIn(top + 1, bitmap.height)
+
+        if (left == 0 && top == 0 && right == bitmap.width && bottom == bitmap.height) {
+            return bitmap
+        }
+        return Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
+    }
+
+    /**
+     * WYSIWYG letterbox: full [outW]x[outH] canvas with black bars and the same
+     * FILL_CENTER camera content TikTok shows in the mid band.
+     */
+    fun composeLetterboxedCapture(
+        source: Bitmap,
+        outW: Int,
+        outH: Int,
+        topBarPx: Int,
+        bottomBarPx: Int,
+    ): Bitmap {
+        val top = topBarPx.coerceAtLeast(0)
+        val bottom = bottomBarPx.coerceAtLeast(0)
+        val midH = (outH - top - bottom).coerceAtLeast(1)
+        val mid = cropFillCenterToViewport(source, outW, midH)
+        val out = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(out)
+        canvas.drawColor(android.graphics.Color.BLACK)
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        val dst = android.graphics.Rect(0, top, outW, top + midH)
+        canvas.drawBitmap(
+            mid,
+            android.graphics.Rect(0, 0, mid.width, mid.height),
+            dst,
+            paint,
+        )
+        if (mid !== source && !mid.isRecycled) {
+            mid.recycle()
+        }
+        return out
     }
 }

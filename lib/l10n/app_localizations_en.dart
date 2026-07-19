@@ -2640,6 +2640,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraFlash => 'Flash';
 
   @override
+  String get cameraSwitch => 'Switch camera';
+
+  @override
   String get cameraSpeed => 'Speed';
 
   @override
@@ -2650,6 +2653,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraTimer => 'Timer';
+
+  @override
+  String get cameraSetCountdown => 'Set countdown';
+
+  @override
+  String get cameraStartCountdown => 'Start countdown';
+
+  @override
+  String get cameraDragRecordingLimit => 'Drag to set recording limit';
 
   @override
   String get cameraMusic => 'Music';
@@ -2764,6 +2776,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraAddSound => 'Add sound';
 
   @override
+  String get cameraMuteOriginalSound => 'Mute original sound';
+
+  @override
   String get cameraLayout => 'Layout';
 
   @override
@@ -2780,6 +2795,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraZoom => 'Zoom';
+
+  @override
+  String get cameraZoomOut => 'Zoom out';
+
+  @override
+  String get cameraZoomIn => 'Zoom in';
 
   @override
   String get cameraGoLive => 'Go LIVE';
@@ -2867,6 +2888,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaEditorComingSoon => 'Coming soon';
+
+  @override
+  String get mediaEditorDone => 'Done';
+
+  @override
+  String get mediaEditorTrim => 'Trim';
+
+  @override
+  String get videoEditorSplit => 'Split';
+
+  @override
+  String get videoEditorDeleteSegment => 'Delete';
+
+  @override
+  String get mediaEditorReset => 'Reset';
+
+  @override
+  String get mediaEditorDiscard => 'Discard';
+
+  @override
+  String get mediaEditorSaveDraft => 'Save draft';
+
+  @override
+  String get mediaEditorContinueEditing => 'Continue editing';
+
+  @override
+  String get mediaEditorSendToFriends => 'Send to friends';
+
+  @override
+  String get mediaEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get mediaPhotoEditorFace => 'Face';
+
+  @override
+  String get mediaPhotoEditorMakeup => 'Makeup';
+
+  @override
+  String get mediaPhotoEditorMagic => 'Magic';
+
+  @override
+  String get mediaPhotoEditorSmooth => 'Smooth';
+
+  @override
+  String get mediaPhotoEditorSaturation => 'Saturation';
+
+  @override
+  String get mediaPhotoEditorBrightness => 'Brightness';
+
+  @override
+  String get mediaPhotoEditorContrast => 'Contrast';
+
+  @override
+  String get mediaPhotoEditorExposure => 'Exposure';
+
+  @override
+  String get mediaPhotoEditorWhiteBalance => 'Warmth';
+
+  @override
+  String get mediaPhotoEditorHighlights => 'Highlights';
+
+  @override
+  String get mediaPhotoEditorShadows => 'Shadows';
+
+  @override
+  String get mediaPhotoEditorNose => 'Nose';
+
+  @override
+  String get mediaPhotoEditorOn => 'On';
+
+  @override
+  String get mediaTextHint => 'Type something';
 
   @override
   String get promotePostTitle => 'Promote post';

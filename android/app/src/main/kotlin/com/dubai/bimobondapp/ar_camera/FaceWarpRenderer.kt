@@ -157,29 +157,26 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         val h = viewport[3]
         if (w <= 1 || h <= 1) return
 
-        val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
+        val rowBytes = w * 4
+        val buf = ByteBuffer.allocateDirect(rowBytes * h).order(ByteOrder.nativeOrder())
         GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
-        buf.rewind()
 
-        val pixels = IntArray(w * h)
-        val row = ByteArray(w * 4)
+        // GL_RGBA/UNSIGNED_BYTE byte order matches Bitmap.Config.ARGB_8888's native byte
+        // layout, so only a row flip (GL origin is bottom-left) is needed -- no per-pixel
+        // channel repacking. Bulk row copies + a native copyPixelsFromBuffer are far
+        // cheaper than the previous per-pixel Java loop, which was a major frame-time
+        // cost on every rendered frame.
+        val flipped = ByteBuffer.allocateDirect(rowBytes * h).order(ByteOrder.nativeOrder())
+        val rowBuf = ByteArray(rowBytes)
         for (y in 0 until h) {
-            buf.position((h - 1 - y) * w * 4)
-            buf.get(row)
-            var x = 0
-            while (x < w) {
-                val i = x * 4
-                val r = row[i].toInt() and 0xFF
-                val g = row[i + 1].toInt() and 0xFF
-                val b = row[i + 2].toInt() and 0xFF
-                val a = row[i + 3].toInt() and 0xFF
-                pixels[y * w + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
-                x++
-            }
+            buf.position((h - 1 - y) * rowBytes)
+            buf.get(rowBuf, 0, rowBytes)
+            flipped.put(rowBuf)
         }
+        flipped.rewind()
 
         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
+        bitmap.copyPixelsFromBuffer(flipped)
         synchronized(captureLock) {
             val previous = lastCapturedFrame
             lastCapturedFrame = bitmap

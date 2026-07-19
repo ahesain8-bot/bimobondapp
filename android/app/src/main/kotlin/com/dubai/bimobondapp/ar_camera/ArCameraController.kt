@@ -23,20 +23,37 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import androidx.camera.core.Camera
 
 object ArCameraController {
-    // Live preview uses a lighter analysis size for smooth filter FPS.
-    private const val ANALYSIS_WIDTH = 720
-    private const val ANALYSIS_HEIGHT = 960
-    private const val DETECT_MAX_DIMENSION = 320
-    private const val GL_MAX_EDGE = 720
-    private const val CAPTURE_MAX_EDGE = 720
-    private const val RECORD_FRAME_INTERVAL_MS = 66L // ~15 fps while recording
+    private const val ANALYSIS_WIDTH = 1080
+    private const val ANALYSIS_HEIGHT = 1440
+    private const val DETECT_MAX_DIMENSION = 384
+    private const val GL_MAX_EDGE = 1280
+    private const val CAPTURE_MAX_EDGE = 1920
+    private const val RECORD_PROCESS_EDGE = ArFilteredVideoRecorder.MAX_EDGE
+    private const val PHOTO_TARGET_WIDTH = 2160
+    private const val PHOTO_TARGET_HEIGHT = 2880
+    private const val RECORD_FRAME_INTERVAL_MS = 33L // ~30 fps production gate (matches pump)
+
+    // Consecutive face-detection misses before we clear overlays/stickers. A small
+    // grace avoids flicker on a single dropped detection while still removing the
+    // sticker quickly once the face actually leaves the frame.
+    private const val NO_FACE_CLEAR_THRESHOLD = 2
 
     private var faceLandmarker: FaceLandmarkerHelper? = null
     private var started = false
     private var analysisExecutor: ExecutorService? = null
+    private var recordOfferExecutor: ExecutorService? = null
+    private var recordPumpExecutor: ScheduledExecutorService? = null
+    private var recordPumpFuture: ScheduledFuture<*>? = null
+    private val recordFrameLock = Any()
+    private var latestRecordFrame: Bitmap? = null
+    private var pumpCurrentFrame: Bitmap? = null
     private val convertingFrame = AtomicBoolean(false)
     private var frameCounter = 0
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -46,6 +63,26 @@ object ArCameraController {
 
     @Volatile
     private var imageCapture: ImageCapture? = null
+
+    @Volatile
+    private var imageAnalysis: ImageAnalysis? = null
+
+    // True while a camera flip is rebinding. Frames are dropped so the analysis
+    // thread releases the camera and the new lens can open (fixes flip freeze
+    // when a face filter is active).
+    @Volatile
+    private var switchingCamera = false
+
+    // Consecutive frames with no detected face (used to clear stale stickers).
+    private var noFaceStreak = 0
+
+    @Volatile
+    private var camera: Camera? = null
+
+    @Volatile
+    private var torchEnabled = false
+
+    private var previousBrightness = Float.NaN
 
     @Volatile
     private var cachedWarpParams: FaceWarpParams = FaceWarpParams.INACTIVE
@@ -74,6 +111,9 @@ object ArCameraController {
         FaceLandmarkerHolder.warmup(activity)
         faceLandmarker = FaceLandmarkerHolder.get()
         analysisExecutor = Executors.newSingleThreadExecutor()
+        recordOfferExecutor = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "ar-video-offer").apply { priority = Thread.NORM_PRIORITY }
+        }
 
         if (!hasCameraPermission(activity)) {
             ActivityCompat.requestPermissions(
@@ -111,7 +151,6 @@ object ArCameraController {
         }
     }
 
-    /** Toggle front ↔ back camera. No-op while recording. */
     fun flipCamera(onResult: ((Boolean) -> Unit)? = null) {
         if (recording || videoRecorder.isRecording()) {
             onResult?.invoke(false)
@@ -126,6 +165,12 @@ object ArCameraController {
             return
         }
 
+        // Pause frame processing so the analysis thread stops holding the camera;
+        // otherwise the old lens never releases and the new one fails to open,
+        // freezing the preview (only reproduces when a face filter is active).
+        switchingCamera = true
+        imageAnalysis?.clearAnalyzer()
+
         ArCameraBridge.isFrontCamera = !ArCameraBridge.isFrontCamera
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
@@ -138,6 +183,74 @@ object ArCameraController {
             bindCamera(lifecycleOwner, previewView, faceOverlay)
             ArCameraBridge.applyCurrentFilter()
             onResult?.invoke(true)
+        }
+    }
+
+    fun toggleTorch(onResult: (Boolean, String?) -> Unit) {
+        val next = !torchEnabled
+        if (ArCameraBridge.isFrontCamera) {
+            try {
+                camera?.cameraControl?.enableTorch(false)
+            } catch (_: Exception) {
+            }
+            torchEnabled = next
+            applyScreenFlash(next)
+            onResult(torchEnabled, null)
+            return
+        }
+
+        applyScreenFlash(false)
+        val cam = camera
+        if (cam == null) {
+            onResult(false, "no_camera")
+            return
+        }
+        if (!cam.cameraInfo.hasFlashUnit()) {
+            onResult(false, "no_flash")
+            return
+        }
+        try {
+            cam.cameraControl.enableTorch(next)
+            torchEnabled = next
+            onResult(torchEnabled, null)
+        } catch (e: Exception) {
+            onResult(false, e.message ?: "torch_failed")
+        }
+    }
+
+    fun setLinearZoom(zoom: Float, onResult: (Boolean, String?) -> Unit) {
+        val cam = camera
+        if (cam == null) {
+            onResult(false, "no_camera")
+            return
+        }
+        try {
+            val clamped = zoom.coerceIn(0f, 1f)
+            cam.cameraControl.setLinearZoom(clamped)
+            onResult(true, null)
+        } catch (e: Exception) {
+            onResult(false, e.message ?: "zoom_failed")
+        }
+    }
+
+    private fun applyScreenFlash(enabled: Boolean) {
+        val activity = ArCameraBridge.hostActivity ?: return
+        activity.runOnUiThread {
+            val window = activity.window
+            val attrs = window.attributes
+            if (enabled) {
+                if (previousBrightness.isNaN()) {
+                    previousBrightness = attrs.screenBrightness
+                }
+                attrs.screenBrightness = 1f
+            } else if (!previousBrightness.isNaN()) {
+                attrs.screenBrightness = previousBrightness
+                previousBrightness = Float.NaN
+            } else {
+                attrs.screenBrightness =
+                    android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            }
+            window.attributes = attrs
         }
     }
 
@@ -166,7 +279,12 @@ object ArCameraController {
         faceLandmarker = null
         analysisExecutor?.shutdownNow()
         analysisExecutor = null
+        recordOfferExecutor?.shutdownNow()
+        recordOfferExecutor = null
         imageCapture = null
+        camera = null
+        torchEnabled = false
+        applyScreenFlash(false)
         lastCaptureBitmap?.recycle()
         lastCaptureBitmap = null
         ArCameraBridge.faceOverlay?.clearUnderlay()
@@ -176,11 +294,11 @@ object ArCameraController {
     fun abortCapture() {
         recording = false
         videoRecorder.abort()
+        stopRecordFramePump()
         captureBusy.set(false)
         recordingPixelCopyBusy.set(false)
     }
 
-    /** Saves a still photo. Uses CameraX ImageCapture (reliable); bakes AR filter when needed. */
     fun takePhoto(onResult: (String?, String?) -> Unit) {
         if (!captureBusy.compareAndSet(false, true)) {
             onResult(null, "busy")
@@ -199,49 +317,90 @@ object ArCameraController {
             }
         }
 
-        // Hard timeout so Flutter never hangs with isBusy forever.
         mainHandler.postDelayed({
             deliver(null, "photo_timeout")
         }, 8_000L)
 
-        val filter = ArCameraBridge.currentFilter
-        if (filter != FilterType.NONE) {
-            // One short wait for a baked filtered frame, then fall back to ImageCapture.
-            fun tryBaked(remaining: Int) {
-                snapshotVisibleFrame { bitmap ->
-                    if (bitmap != null) {
-                        try {
-                            val activity = ArCameraBridge.hostActivity
-                                ?: run {
-                                    deliver(null, "no_activity")
-                                    return@snapshotVisibleFrame
-                                }
-                            val file = File(
-                                activity.cacheDir,
-                                "ar_photo_${System.currentTimeMillis()}.jpg",
-                            )
-                            FileOutputStream(file).use { out ->
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
-                            }
-                            if (bitmap !== lastCaptureBitmap) bitmap.recycle()
-                            deliver(file.absolutePath, null)
-                        } catch (e: Exception) {
-                            takePhotoWithImageCapture(::deliver)
-                        }
-                        return@snapshotVisibleFrame
+        fun saveBaked(bitmap: Bitmap): Boolean {
+            val activity = ArCameraBridge.hostActivity ?: return false
+            var toSave = bitmap
+            var owned: Bitmap? = null
+            // Compose exact on-screen letterbox (black bars + mid FOV) so editor
+            // matches camera preview — mid-only crop looks zoomed when shown full-bleed.
+            if (ArCameraBridge.isPreviewLetterboxed()) {
+                val root = ArCameraBridge.platformRootSize()
+                if (root != null) {
+                    owned = ImageProxyBitmapUtils.composeLetterboxedCapture(
+                        bitmap,
+                        root.first,
+                        root.second,
+                        ArCameraBridge.letterboxTopPx(),
+                        ArCameraBridge.letterboxBottomPx(),
+                    )
+                    toSave = owned
+                }
+            }
+            return try {
+                val file = File(
+                    activity.cacheDir,
+                    "ar_photo_${System.currentTimeMillis()}.jpg",
+                )
+                FileOutputStream(file).use { fos ->
+                    java.io.BufferedOutputStream(fos, 64 * 1024).use { out ->
+                        toSave.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                        out.flush()
                     }
-                    if (remaining > 0) {
-                        mainHandler.postDelayed({ tryBaked(remaining - 1) }, 50)
-                    } else {
-                        takePhotoWithImageCapture(::deliver)
+                }
+                if (file.exists() && file.length() > 0L) {
+                    deliver(file.absolutePath, null)
+                    true
+                } else {
+                    false
+                }
+            } catch (_: Exception) {
+                false
+            } finally {
+                if (owned != null && owned !== bitmap && !owned.isRecycled) {
+                    owned.recycle()
+                }
+                if (bitmap !== lastCaptureBitmap) {
+                    try {
+                        bitmap.recycle()
+                    } catch (_: Exception) {
                     }
                 }
             }
-            tryBaked(6)
+        }
+
+        // High-res ImageCapture only when full-screen (no ratio letterbox).
+        // Letterboxed mode must bake from the live preview stream so FOV matches.
+        val filter = ArCameraBridge.currentFilter
+        if (filter == FilterType.NONE && !ArCameraBridge.isPreviewLetterboxed()) {
+            takePhotoWithImageCapture(::deliver)
             return
         }
 
-        takePhotoWithImageCapture(::deliver)
+        fun tryBaked(remaining: Int) {
+            snapshotVisibleFrame(preferImmediate = true) { bitmap ->
+                if (bitmap != null && !isMostlyEmpty(bitmap) && saveBaked(bitmap)) {
+                    return@snapshotVisibleFrame
+                }
+                if (bitmap != null && bitmap !== lastCaptureBitmap) {
+                    try {
+                        bitmap.recycle()
+                    } catch (_: Exception) {
+                    }
+                }
+                if (remaining > 0) {
+                    mainHandler.postDelayed({ tryBaked(remaining - 1) }, 16)
+                } else {
+                    takePhotoWithImageCapture(::deliver)
+                }
+            }
+        }
+
+        val retries = if (filter.isDistortion()) 2 else 1
+        tryBaked(retries)
     }
 
     private fun takePhotoWithImageCapture(onResult: (String?, String?) -> Unit) {
@@ -267,14 +426,54 @@ object ArCameraController {
                 object : ImageCapture.OnImageCapturedCallback() {
                     override fun onCaptureSuccess(image: ImageProxy) {
                         try {
-                            var selfie = ImageProxyBitmapUtils.toUprightMirroredSelfie(image)
+                            var selfie = ImageProxyBitmapUtils.toUprightCapture(
+                                image,
+                                mirrorFront = false,
+                            )
                             if (selfie == null) {
                                 onResult(null, "decode_failed")
                                 return
                             }
-                            selfie = bakeFilterOntoBitmap(selfie)
-                            FileOutputStream(file).use { out ->
-                                selfie.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                            val front = ArCameraBridge.isFrontCamera
+                            if (front &&
+                                (ArCameraBridge.currentFilter.isPngOverlay() ||
+                                    ArCameraBridge.currentFilter.isColorGrade() ||
+                                    ArCameraBridge.currentFilter.useShader())
+                            ) {
+                                // Filters bake in mirrored (preview) space — keep mirrored.
+                                val mirrored = ImageProxyBitmapUtils.mirrorHorizontally(selfie)
+                                if (mirrored !== selfie) selfie.recycle()
+                                selfie = bakeFilterOntoBitmap(mirrored)
+                            } else {
+                                selfie = bakeFilterOntoBitmap(selfie)
+                                if (front) {
+                                    val mirrored =
+                                        ImageProxyBitmapUtils.mirrorHorizontally(selfie)
+                                    if (mirrored !== selfie) selfie.recycle()
+                                    selfie = mirrored
+                                }
+                            }
+                            if (ArCameraBridge.isPreviewLetterboxed()) {
+                                val root = ArCameraBridge.platformRootSize()
+                                if (root != null) {
+                                    val composed = ImageProxyBitmapUtils.composeLetterboxedCapture(
+                                        selfie,
+                                        root.first,
+                                        root.second,
+                                        ArCameraBridge.letterboxTopPx(),
+                                        ArCameraBridge.letterboxBottomPx(),
+                                    )
+                                    if (composed !== selfie) {
+                                        selfie.recycle()
+                                        selfie = composed
+                                    }
+                                }
+                            }
+                            FileOutputStream(file).use { fos ->
+                                java.io.BufferedOutputStream(fos, 64 * 1024).use { out ->
+                                    selfie.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                                    out.flush()
+                                }
                             }
                             selfie.recycle()
                             if (file.exists() && file.length() > 0L) {
@@ -319,10 +518,10 @@ object ArCameraController {
                     101,
                 )
             }
-            // Encoder starts on the first PixelCopy frame so aspect matches preview.
-            videoRecorder.arm(file, activity)
+            videoRecorder.arm(file)
             recording = true
             lastRecordCopyMs = 0L
+            startRecordFramePump()
             if (ArCameraBridge.currentFilter.isDistortion()) {
                 ArCameraBridge.warpGlView?.setCaptureEnabled(true)
             }
@@ -339,6 +538,7 @@ object ArCameraController {
             return
         }
         recording = false
+        stopRecordFramePump()
         try {
             ArCameraBridge.warpGlView?.setCaptureEnabled(
                 ArCameraBridge.currentFilter.isDistortion(),
@@ -380,7 +580,10 @@ object ArCameraController {
         }
     }
 
-    private fun snapshotVisibleFrame(onDone: (Bitmap?) -> Unit) {
+    private fun snapshotVisibleFrame(
+        preferImmediate: Boolean = false,
+        onDone: (Bitmap?) -> Unit,
+    ) {
         val filter = ArCameraBridge.currentFilter
         val intensity = ArCameraBridge.filterIntensity
 
@@ -403,28 +606,26 @@ object ArCameraController {
             }
         }
 
-        // PNG + color grades: bake on CPU from the live analysis frame (reliable).
         if (!filter.isDistortion()) {
             mainHandler.post { onDone(bakeAnalysisFrame()) }
             return
         }
 
-        // Face warp: prefer the last GPU-rendered frame over unfiltered analysis.
         val gl = ArCameraBridge.warpGlView
         if (gl != null && gl.visibility == View.VISIBLE && gl.isGlInitialized()) {
             gl.setCaptureEnabled(true)
-            // Let at least one filtered draw land, then read it back.
-            mainHandler.postDelayed({
+            fun readGpu() {
                 val gpu = try {
                     gl.copyLastFilteredFrame()
                 } catch (_: Exception) {
                     null
                 }
                 if (gpu != null && !isMostlyEmpty(gpu)) {
+                    val edge = if (recording) RECORD_PROCESS_EDGE else CAPTURE_MAX_EDGE
                     val scaled = try {
                         ImageProxyBitmapUtils.scaleToMaxDimension(
                             gpu,
-                            CAPTURE_MAX_EDGE,
+                            edge,
                             filter = true,
                         )
                     } catch (_: Exception) {
@@ -436,7 +637,12 @@ object ArCameraController {
                     gpu?.recycle()
                     onDone(bakeAnalysisFrame())
                 }
-            }, 60)
+            }
+            if (preferImmediate) {
+                mainHandler.post { readGpu() }
+            } else {
+                mainHandler.postDelayed({ readGpu() }, 40)
+            }
             return
         }
 
@@ -461,32 +667,248 @@ object ArCameraController {
                 null
             }
             if (gpu != null && !isMostlyEmpty(gpu)) {
-                try {
-                    if (recording && videoRecorder.isRecording()) {
-                        videoRecorder.offerFrame(gpu)
-                    }
-                } finally {
-                    gpu.recycle()
-                    recordingPixelCopyBusy.set(false)
-                }
+                offerRecordingFrameAsync(gpu, recycleSourceAlways = true)
                 return
             }
             gpu?.recycle()
         }
 
         snapshotVisibleFrame { bitmap ->
-            try {
-                if (bitmap != null && recording && videoRecorder.isRecording()) {
-                    videoRecorder.offerFrame(bitmap)
-                }
-            } finally {
-                if (bitmap != null && bitmap !== lastCaptureBitmap) bitmap.recycle()
+            if (bitmap == null) {
                 recordingPixelCopyBusy.set(false)
+                return@snapshotVisibleFrame
             }
+            offerRecordingFrameAsync(
+                bitmap,
+                recycleSourceAlways = bitmap !== lastCaptureBitmap,
+            )
         }
     }
 
-    /** Applies active PNG / color-grade filter onto a mirrored camera bitmap. */
+    /**
+     * Recording-only fast path for color-grade/none filters. [displayBmp] here is a
+     * freshly rotated/mirrored frame that isn't aliased with [lastCaptureBitmap]
+     * ([retainCaptureFrame] always makes its own copy), so it can be baked and handed
+     * straight to the encoder without the extra defensive copy [snapshotVisibleFrame]
+     * needs for the async take-photo path. That removes a redundant full-frame copy
+     * from every single recorded frame, which was a real source of the video judder.
+     * Returns true if [displayBmp] was consumed (caller must not recycle it further).
+     */
+    private fun maybeCaptureRecordingFrameDirect(displayBmp: Bitmap, filter: FilterType): Boolean {
+        if (!videoRecorder.isRecording()) return false
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) return false
+        if (!recordingPixelCopyBusy.compareAndSet(false, true)) return false
+        lastRecordCopyMs = now
+
+        val baked = try {
+            if (filter.isColorGrade()) {
+                ArColorGradeBaker.apply(displayBmp, filter, ArCameraBridge.filterIntensity)
+            } else {
+                displayBmp
+            }
+        } catch (_: Exception) {
+            displayBmp
+        }
+        if (baked !== displayBmp && !displayBmp.isRecycled) {
+            displayBmp.recycle()
+        }
+        offerRecordingFrameAsync(baked, recycleSourceAlways = true)
+        return true
+    }
+
+    /**
+     * Recording-only fast path for shader-rendered color-grade filters. Takes a
+     * standalone copy of [source] synchronously (cheap, since [source] is about to be
+     * handed off to the GL renderer and recycled asynchronously), then bakes the
+     * color grade and hands off to the encoder on a background thread. This skips
+     * [snapshotVisibleFrame]'s mainHandler hop, which added queueing latency (racing
+     * against Flutter/UI-thread work) on top of an extra defensive copy.
+     */
+    private fun maybeCaptureRecordingFrameFromSource(source: Bitmap, filter: FilterType): Boolean {
+        if (!videoRecorder.isRecording() || source.isRecycled) return false
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) return false
+        if (!recordingPixelCopyBusy.compareAndSet(false, true)) return false
+        lastRecordCopyMs = now
+
+        val copy = try {
+            source.copy(Bitmap.Config.ARGB_8888, false)
+        } catch (_: Exception) {
+            null
+        }
+        if (copy == null) {
+            recordingPixelCopyBusy.set(false)
+            return false
+        }
+
+        fun bakeAndOffer() {
+            val baked = try {
+                if (filter.isColorGrade()) {
+                    val b = ArColorGradeBaker.apply(copy, filter, ArCameraBridge.filterIntensity)
+                    if (b !== copy && !copy.isRecycled) copy.recycle()
+                    b
+                } else {
+                    copy
+                }
+            } catch (_: Exception) {
+                copy
+            }
+            offerRecordingFrameAsync(baked, recycleSourceAlways = true)
+        }
+
+        val executor = recordOfferExecutor
+        if (executor == null) bakeAndOffer() else executor.execute { bakeAndOffer() }
+        return true
+    }
+
+    /**
+     * Feeds the encoder at a fixed [ArFilteredVideoRecorder.FRAME_RATE] cadence,
+     * repeating the last frame when the pipeline hasn't produced a new one yet.
+     * This decouples encoder timing from analysis/filter throughput so playback
+     * stays evenly paced (no stutter) even when a filter or compose step is slow.
+     *
+     * Two things are critical for smoothness and were the previous cause of the lag:
+     *  - Uses [ScheduledExecutorService.scheduleAtFixedRate] (constant wall-clock
+     *    cadence) instead of `scheduleWithFixedDelay` (whose real period was
+     *    draw-time + delay, so effective fps sagged and jittered).
+     *  - The encoder Surface derives each frame's timestamp from the moment it is
+     *    posted, so [offerFrame] must run OUTSIDE [recordFrameLock]; the pump only
+     *    holds the lock long enough to swap in a newly produced frame.
+     */
+    private fun startRecordFramePump() {
+        stopRecordFramePump()
+        val executor = Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "ar-video-pump").apply { priority = Thread.NORM_PRIORITY }
+        }
+        recordPumpExecutor = executor
+        val periodMs = (1000L / ArFilteredVideoRecorder.FRAME_RATE).coerceAtLeast(1L)
+        recordPumpFuture = executor.scheduleAtFixedRate(
+            { pumpRecordFrame() },
+            0L,
+            periodMs,
+            TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun pumpRecordFrame() {
+        if (!recording || !videoRecorder.isRecording()) return
+        // Adopt a freshly produced frame (if any) under the lock, then draw the
+        // pump-owned frame without holding the lock so the canvas post — and thus
+        // the frame's presentation timestamp — lands on the fixed-rate tick.
+        synchronized(recordFrameLock) {
+            val pending = latestRecordFrame
+            if (pending != null && !pending.isRecycled) {
+                pumpCurrentFrame?.takeIf { it !== pending && !it.isRecycled }?.recycle()
+                pumpCurrentFrame = pending
+                latestRecordFrame = null
+            }
+        }
+        val frame = pumpCurrentFrame ?: return
+        if (frame.isRecycled) return
+        try {
+            videoRecorder.offerFrame(frame)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun stopRecordFramePump() {
+        recordPumpFuture?.cancel(false)
+        recordPumpFuture = null
+        val executor = recordPumpExecutor
+        recordPumpExecutor = null
+        if (executor != null) {
+            executor.shutdown()
+            // Wait for any in-flight offerFrame() to finish before recycling the
+            // frame it may still be drawing, otherwise we could recycle a bitmap
+            // mid-draw and crash the encoder canvas.
+            try {
+                if (!executor.awaitTermination(300, TimeUnit.MILLISECONDS)) {
+                    executor.shutdownNow()
+                }
+            } catch (_: InterruptedException) {
+                executor.shutdownNow()
+            }
+        }
+        synchronized(recordFrameLock) {
+            latestRecordFrame?.takeIf { !it.isRecycled }?.recycle()
+            latestRecordFrame = null
+        }
+        pumpCurrentFrame?.takeIf { !it.isRecycled }?.recycle()
+        pumpCurrentFrame = null
+    }
+
+    private fun offerRecordingFrameAsync(source: Bitmap, recycleSourceAlways: Boolean) {
+        fun process() {
+            var framed: Bitmap? = null
+            try {
+                if (recording && videoRecorder.isRecording()) {
+                    framed = frameForRecording(source)
+                    synchronized(recordFrameLock) {
+                        // Only ever recycle the value we replace here; the pump owns
+                        // [pumpCurrentFrame] separately and never lives in this slot.
+                        val old = latestRecordFrame
+                        latestRecordFrame = framed
+                        if (old != null && old !== framed && old !== source && !old.isRecycled) {
+                            old.recycle()
+                        }
+                    }
+                }
+            } finally {
+                if (recycleSourceAlways && framed !== source && !source.isRecycled) {
+                    source.recycle()
+                }
+                recordingPixelCopyBusy.set(false)
+            }
+        }
+        val executor = recordOfferExecutor
+        if (executor == null) process() else executor.execute { process() }
+    }
+
+    /** Scales to encode size; letterbox composes at encode resolution (not full screen). */
+    private fun frameForRecording(source: Bitmap): Bitmap {
+        val maxEdge = RECORD_PROCESS_EDGE
+        val scaled = try {
+            ImageProxyBitmapUtils.scaleToMaxDimension(source, maxEdge, filter = true)
+        } catch (_: Exception) {
+            source
+        }
+
+        if (!ArCameraBridge.isPreviewLetterboxed()) {
+            return scaled
+        }
+
+        val root = ArCameraBridge.platformRootSize()
+        if (root == null || root.first <= 0 || root.second <= 0) {
+            return scaled
+        }
+
+        val rootW = root.first
+        val rootH = root.second
+        val fit = kotlin.math.min(1f, maxEdge.toFloat() / kotlin.math.max(rootW, rootH))
+        val outW = ((rootW * fit).toInt() and 1.inv()).coerceAtLeast(2)
+        val outH = ((rootH * fit).toInt() and 1.inv()).coerceAtLeast(2)
+        val top = (ArCameraBridge.letterboxTopPx() * fit).toInt().coerceAtLeast(0)
+        val bottom = (ArCameraBridge.letterboxBottomPx() * fit).toInt().coerceAtLeast(0)
+
+        val composed = try {
+            ImageProxyBitmapUtils.composeLetterboxedCapture(
+                scaled,
+                outW,
+                outH,
+                top,
+                bottom,
+            )
+        } catch (_: Exception) {
+            return scaled
+        }
+
+        if (scaled !== source && scaled !== composed && !scaled.isRecycled) {
+            scaled.recycle()
+        }
+        return composed
+    }
+
     private fun bakeFilterOntoBitmap(source: Bitmap): Bitmap {
         val filter = ArCameraBridge.currentFilter
         if (filter == FilterType.NONE || source.isRecycled) return source
@@ -548,11 +970,10 @@ object ArCameraController {
     }
 
     private fun retainCaptureFrame(source: Bitmap) {
-        // Always keep the latest analysis frame so shutter works on Original and
-        // color grades without waiting on fragile SurfaceView PixelCopy.
         if (source.isRecycled) return
+        val maxEdge = if (recording) RECORD_PROCESS_EDGE else CAPTURE_MAX_EDGE
         val copy = try {
-            ImageProxyBitmapUtils.scaleToMaxDimension(source, CAPTURE_MAX_EDGE, filter = true)
+            ImageProxyBitmapUtils.scaleToMaxDimension(source, maxEdge, filter = true)
                 .let { scaled ->
                     if (scaled !== source) {
                         scaled
@@ -598,8 +1019,14 @@ object ArCameraController {
         previewView: PreviewView,
         faceOverlay: FaceOverlayView,
     ) {
-        val activity = ArCameraBridge.hostActivity ?: return
-        val executor = analysisExecutor ?: return
+        val activity = ArCameraBridge.hostActivity ?: run {
+            switchingCamera = false
+            return
+        }
+        val executor = analysisExecutor ?: run {
+            switchingCamera = false
+            return
+        }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
@@ -614,61 +1041,94 @@ object ArCameraController {
                 .build()
             preview.surfaceProvider = previewView.surfaceProvider
 
-            val imageAnalysis = ImageAnalysis.Builder()
+            val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .setTargetResolution(target)
                 .setTargetRotation(displayRotation)
                 .build()
 
-            imageAnalysis.setAnalyzer(executor) { imageProxy ->
+            analysis.setAnalyzer(executor) { imageProxy ->
                 processImage(imageProxy, faceOverlay, activity)
             }
 
             val capture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setTargetResolution(Size(PHOTO_TARGET_WIDTH, PHOTO_TARGET_HEIGHT))
                 .setTargetRotation(displayRotation)
                 .build()
             imageCapture = capture
 
+            // Detach the previous analyzer + fully release the old lens before
+            // rebinding, so a flip doesn't fail to open the new camera.
+            imageAnalysis?.clearAnalyzer()
             cameraProvider.unbindAll()
+            imageAnalysis = analysis
             val selector = if (ArCameraBridge.isFrontCamera) {
                 CameraSelector.DEFAULT_FRONT_CAMERA
             } else {
                 CameraSelector.DEFAULT_BACK_CAMERA
             }
+            fun applyTorchAfterBind(bound: Camera?) {
+                camera = bound
+                if (bound == null) return
+                if (ArCameraBridge.isFrontCamera) {
+                    try {
+                        bound.cameraControl.enableTorch(false)
+                    } catch (_: Exception) {
+                    }
+                    applyScreenFlash(torchEnabled)
+                } else {
+                    applyScreenFlash(false)
+                    if (torchEnabled && bound.cameraInfo.hasFlashUnit()) {
+                        try {
+                            bound.cameraControl.enableTorch(true)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
             try {
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    selector,
-                    preview,
-                    imageAnalysis,
-                    capture,
-                )
-            } catch (_: Exception) {
-                // Prefer keeping ImageCapture so the shutter still works.
-                try {
-                    cameraProvider.unbindAll()
+                applyTorchAfterBind(
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         selector,
                         preview,
+                        analysis,
                         capture,
+                    ),
+                )
+            } catch (_: Exception) {
+                try {
+                    cameraProvider.unbindAll()
+                    applyTorchAfterBind(
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            selector,
+                            preview,
+                            capture,
+                        ),
                     )
                     imageCapture = capture
                 } catch (_: Exception) {
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            selector,
-                            preview,
-                            imageAnalysis,
+                        applyTorchAfterBind(
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                preview,
+                                analysis,
+                            ),
                         )
                     } catch (_: Exception) {
+                        camera = null
                     }
                     imageCapture = null
                 }
+            } finally {
+                // Resume frame processing now that the new lens is bound.
+                switchingCamera = false
             }
         }, ContextCompat.getMainExecutor(activity))
     }
@@ -678,6 +1138,12 @@ object ArCameraController {
         faceOverlay: FaceOverlayView,
         activity: Activity,
     ) {
+        // Drop frames while a camera flip is in progress so the analysis thread
+        // releases the current lens promptly and the new one can bind.
+        if (switchingCamera) {
+            imageProxy.close()
+            return
+        }
         if (!convertingFrame.compareAndSet(false, true)) {
             imageProxy.close()
             return
@@ -697,6 +1163,18 @@ object ArCameraController {
                 return
             }
 
+            // No-filter recording: the analysis frame's ONLY consumer is the video
+            // encoder. If the record gate hasn't elapsed yet, skip the whole
+            // rotate/mirror conversion — the frame pump repeats the last frame at a
+            // fixed cadence, so nothing is lost and the analysis thread stays free.
+            if (filter == FilterType.NONE && recording) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) {
+                    imageProxy.close()
+                    return
+                }
+            }
+
             val rawBitmap = ImageProxyBitmapUtils.toBitmap(imageProxy)
             imageProxy.close()
 
@@ -705,15 +1183,36 @@ object ArCameraController {
                 return
             }
 
-            oriented = ImageProxyBitmapUtils.rotate(rawBitmap, rotation)
-            if (oriented !== rawBitmap) rawBitmap.recycle()
-
             val needsFace =
                 filter.isDistortion() || filter.isBeauty() || filter.isPngOverlay()
-            // Less frequent detection keeps live preview snappy.
             val detectEvery = if (needsFace) 3 else 4
             val runDetection =
                 needsFace && (frameCounter % detectEvery == 0 || cachedSnapshot == null)
+
+            // Face detection needs the UN-mirrored upright frame, so for those filters
+            // we rotate only and mirror later. For non-face filters (color-grade /
+            // none) we never read the un-mirrored frame, so fold rotate + front-camera
+            // mirror into ONE matrix pass here — saving a full-frame copy per frame.
+            val front = ArCameraBridge.isFrontCamera
+            val mirrorInOrient = front && !needsFace
+            val needMirrorInBranch = front && needsFace
+
+            oriented = if (needsFace) {
+                // Face filters need the full-res un-mirrored upright frame for detection.
+                ImageProxyBitmapUtils.orient(rawBitmap, rotation, mirrorInOrient)
+            } else {
+                // Color-grade / none: no detection, so rotate + mirror + downscale to
+                // the encode/GL size in ONE pass. The later scaleToMaxDimension then
+                // becomes a no-op, so we allocate a single bitmap per frame instead of
+                // three — far less GC churn, smoother preview + steadier encode timing.
+                ImageProxyBitmapUtils.orientScaled(rawBitmap, rotation, mirrorInOrient, GL_MAX_EDGE)
+            }
+            if (oriented !== rawBitmap) rawBitmap.recycle()
+
+            // Note: do NOT downscale `oriented` here while recording. The preview /
+            // GL path and the still-capture buffer both read from it, so shrinking it
+            // up front made the live camera look low-res during recording. The encoder
+            // frame is scaled separately (frameForRecording), so quality is preserved.
 
             if (runDetection) {
                 val landmarker = faceLandmarker ?: FaceLandmarkerHolder.get().also { faceLandmarker = it }
@@ -738,20 +1237,27 @@ object ArCameraController {
                     }
                     if (detectBitmap !== oriented) detectBitmap.recycle()
                     if (raw != null) {
+                        noFaceStreak = 0
                         cachedSnapshot = FaceLandmarkSmoother.smooth(raw)
-                    } else if (filter.isDistortion()) {
-                        cachedSnapshot = null
-                        cachedWarpParams = FaceWarpParams.INACTIVE
+                    } else {
+                        // No face: clear the cached landmarks so stickers/overlays
+                        // (glasses, dog, big eyes, lips, distortion) disappear instead
+                        // of freezing the last pose on screen.
+                        noFaceStreak++
+                        if (noFaceStreak >= NO_FACE_CLEAR_THRESHOLD) {
+                            cachedSnapshot = null
+                            cachedWarpParams = FaceWarpParams.INACTIVE
+                            FaceLandmarkSmoother.reset()
+                        }
                     }
                 }
             }
 
             val activeSnapshot = cachedSnapshot
-            val front = ArCameraBridge.isFrontCamera
 
             when {
                 filter.useShader() -> {
-                    display = if (front) {
+                    display = if (needMirrorInBranch) {
                         ImageProxyBitmapUtils.mirrorHorizontally(oriented)
                     } else {
                         oriented
@@ -768,7 +1274,6 @@ object ArCameraController {
                         return
                     }
 
-                    // Downscale before GPU upload — biggest live FPS win.
                     val glInput = ImageProxyBitmapUtils.scaleToMaxDimension(
                         display,
                         GL_MAX_EDGE,
@@ -804,56 +1309,38 @@ object ArCameraController {
                         viewHeight,
                     ).also { cachedWarpParams = it }
 
-                    retainCaptureFrame(display)
+                    // Still-capture buffer isn't needed mid-recording for shader
+                    // filters (record frames come straight from `display`/GL), so
+                    // skip the per-frame copy+scale to keep the analysis thread free.
+                    if (!recording) retainCaptureFrame(display)
+                    val handledDirect = recording && !filter.isDistortion() &&
+                        maybeCaptureRecordingFrameFromSource(display, filter)
                     glView.submitFrameWithParams(display, params)
                     display = null
                     ArCameraBridge.onGlFramePresented()
-                    maybeCaptureRecordingFrame()
+                    if (!handledDirect) {
+                        maybeCaptureRecordingFrame()
+                    }
                 }
 
                 else -> {
-                    val displayBmp = if (front) {
-                        ImageProxyBitmapUtils.mirrorHorizontally(oriented)
-                    } else {
-                        oriented
-                    }
-                    if (displayBmp !== oriented) {
-                        oriented.recycle()
-                        oriented = null
-                    }
-                    retainCaptureFrame(displayBmp)
+                    val retainThisFrame = recording || (frameCounter % 2 == 0)
 
                     if (filter.isPngOverlay()) {
-                        // Same display frame landmarks come from — locks glasses/dog to the face.
-                        val underlay = try {
-                            ImageProxyBitmapUtils.scaleToMaxDimension(
-                                displayBmp,
-                                CAPTURE_MAX_EDGE,
-                                filter = true,
-                            ).let { scaled ->
-                                if (scaled !== displayBmp) {
-                                    scaled
-                                } else {
-                                    displayBmp.copy(Bitmap.Config.ARGB_8888, false)
-                                }
-                            }
-                        } catch (_: Exception) {
-                            null
-                        }
+                        // Live camera is shown by the (visible) PreviewView; faceOverlay
+                        // draws ONLY the stickers. Previously we also drew a full-res
+                        // mirrored camera "underlay" on the overlay every frame — with
+                        // PreviewView now visible that meant TWO camera layers rendering
+                        // plus a per-frame scale copy, which caused the lag. Dropping the
+                        // underlay leaves PreviewView as the single (hardware) camera layer.
+                        val frame = oriented
                         val snapshots = activeSnapshot?.let { listOf(it) } ?: emptyList()
-                        val landmarkW = activeSnapshot?.imageWidth ?: displayBmp.width
-                        val landmarkH = activeSnapshot?.imageHeight ?: displayBmp.height
+                        val landmarkW = activeSnapshot?.imageWidth ?: frame.width
+                        val landmarkH = activeSnapshot?.imageHeight ?: frame.height
                         val expectedFilter = filter
                         val expectedFront = front
                         activity.runOnUiThread {
-                            // Drop late frames after user swiped back to Original / another filter.
-                            if (ArCameraBridge.currentFilter != expectedFilter) {
-                                underlay?.takeIf { !it.isRecycled }?.recycle()
-                                return@runOnUiThread
-                            }
-                            if (underlay != null) {
-                                faceOverlay.setUnderlayFrame(underlay)
-                            }
+                            if (ArCameraBridge.currentFilter != expectedFilter) return@runOnUiThread
                             faceOverlay.setLandmarks(
                                 snapshots,
                                 landmarkW,
@@ -861,12 +1348,43 @@ object ArCameraController {
                                 isFrontCamera = expectedFront,
                             )
                         }
-                    }
 
-                    if (displayBmp !== lastCaptureBitmap) {
-                        displayBmp.recycle()
+                        // The mirrored full-res frame is only needed to bake the sticker
+                        // into a photo (on-demand) or a recording (every frame). Skip the
+                        // mirror + copy on the other frames to keep the preview smooth.
+                        if (retainThisFrame) {
+                            val captureSrc = if (needMirrorInBranch) {
+                                ImageProxyBitmapUtils.mirrorHorizontally(frame).also { frame.recycle() }
+                            } else {
+                                frame
+                            }
+                            oriented = null
+                            retainCaptureFrame(captureSrc)
+                            if (captureSrc !== lastCaptureBitmap) {
+                                captureSrc.recycle()
+                            }
+                        } else {
+                            frame.recycle()
+                            oriented = null
+                        }
+                        maybeCaptureRecordingFrame()
+                    } else {
+                        // NONE while recording: the frame is fed straight to the encoder.
+                        val displayBmp = if (needMirrorInBranch) {
+                            ImageProxyBitmapUtils.mirrorHorizontally(oriented)
+                        } else {
+                            oriented
+                        }
+                        if (displayBmp !== oriented) {
+                            oriented.recycle()
+                            oriented = null
+                        }
+                        if (recording && maybeCaptureRecordingFrameDirect(displayBmp, filter)) {
+                            // Ownership transferred to the recording pipeline above.
+                        } else if (displayBmp !== lastCaptureBitmap) {
+                            displayBmp.recycle()
+                        }
                     }
-                    maybeCaptureRecordingFrame()
                 }
             }
         } catch (_: Throwable) {
