@@ -81,4 +81,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("com.google.guava:guava:33.3.1-android")
+
+    // OpenCV Android SDK (Maven Central) — still-image beauty pipeline
+    implementation("org.opencv:opencv:4.9.0")
 }

@@ -164,28 +164,31 @@ class _MediaStudioSideRailState extends State<MediaStudioSideRail> {
         end: isRtl ? 0 : 10,
         start: isRtl ? 10 : 0,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final tool in visible)
-            _SideRailButton(
-              tool: tool,
-              showLabel: widget.showLabels,
-              onTap: tool.onTap,
-            ),
-          if (hasMore)
-            _SideRailButton(
-              tool: MediaStudioSideTool(
-                icon: _expanded
-                    ? LucideIcons.chevronUp
-                    : LucideIcons.chevronDown,
-                label: '',
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final tool in visible)
+              _SideRailButton(
+                tool: tool,
+                showLabel: widget.showLabels,
+                onTap: tool.onTap,
+              ),
+            if (hasMore)
+              _SideRailButton(
+                tool: MediaStudioSideTool(
+                  icon: _expanded
+                      ? LucideIcons.chevronUp
+                      : LucideIcons.chevronDown,
+                  label: '',
+                  onTap: () => setState(() => _expanded = !_expanded),
+                ),
+                showLabel: false,
                 onTap: () => setState(() => _expanded = !_expanded),
               ),
-              showLabel: false,
-              onTap: () => setState(() => _expanded = !_expanded),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -266,14 +266,14 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                             });
                           }
                         },
-                        onLongPressStart: isCentered &&
-                                !widget.isPhotoMode &&
-                                !widget.isBusy
+                        // Press-and-hold on the centered shutter records video in
+                        // BOTH photo and video mode. In photo mode it starts a
+                        // TikTok-style 15s quick video (the screen's hold handler
+                        // enforces the photo-mode + layout-off guards).
+                        onLongPressStart: isCentered && !widget.isBusy
                             ? widget.onHoldStart
                             : null,
-                        onLongPressEnd: isCentered && !widget.isPhotoMode
-                            ? widget.onHoldEnd
-                            : null,
+                        onLongPressEnd: isCentered ? widget.onHoldEnd : null,
                         child: item.isOriginal
                             ? _ShutterCircle(
                                 size: size,

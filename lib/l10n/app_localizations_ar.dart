@@ -2594,6 +2594,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraFlash => 'فلاش';
 
   @override
+  String get cameraSwitch => 'تبديل الكاميرا';
+
+  @override
   String get cameraSpeed => 'السرعة';
 
   @override
@@ -2604,6 +2607,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraTimer => 'مؤقت';
+
+  @override
+  String get cameraSetCountdown => 'تعيين العد التنازلي';
+
+  @override
+  String get cameraStartCountdown => 'بدء العد التنازلي';
+
+  @override
+  String get cameraDragRecordingLimit => 'اسحب لتعيين حد التسجيل';
 
   @override
   String get cameraMusic => 'موسيقى';
@@ -2718,6 +2730,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraAddSound => 'إضافة صوت';
 
   @override
+  String get cameraMuteOriginalSound => 'كتم الصوت الأصلي';
+
+  @override
   String get cameraLayout => 'التخطيط';
 
   @override
@@ -2734,6 +2749,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraZoom => 'تكبير';
+
+  @override
+  String get cameraZoomOut => 'تصغير';
+
+  @override
+  String get cameraZoomIn => 'تكبير';
 
   @override
   String get cameraGoLive => 'بدء البث';
@@ -2821,6 +2842,78 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mediaEditorComingSoon => 'قريباً';
+
+  @override
+  String get mediaEditorDone => 'تم';
+
+  @override
+  String get mediaEditorTrim => 'قص';
+
+  @override
+  String get videoEditorSplit => 'تقسيم';
+
+  @override
+  String get videoEditorDeleteSegment => 'حذف';
+
+  @override
+  String get mediaEditorReset => 'إعادة تعيين';
+
+  @override
+  String get mediaEditorDiscard => 'تجاهل';
+
+  @override
+  String get mediaEditorSaveDraft => 'حفظ كمسودة';
+
+  @override
+  String get mediaEditorContinueEditing => 'متابعة التعديل';
+
+  @override
+  String get mediaEditorSendToFriends => 'إرسال إلى الأصدقاء';
+
+  @override
+  String get mediaEditorDiscardTitle => 'تجاهل التغييرات؟';
+
+  @override
+  String get mediaPhotoEditorFace => 'الوجه';
+
+  @override
+  String get mediaPhotoEditorMakeup => 'مكياج';
+
+  @override
+  String get mediaPhotoEditorMagic => 'سحر';
+
+  @override
+  String get mediaPhotoEditorSmooth => 'تنعيم';
+
+  @override
+  String get mediaPhotoEditorSaturation => 'تشبع';
+
+  @override
+  String get mediaPhotoEditorBrightness => 'السطوع';
+
+  @override
+  String get mediaPhotoEditorContrast => 'التباين';
+
+  @override
+  String get mediaPhotoEditorExposure => 'التعريض';
+
+  @override
+  String get mediaPhotoEditorWhiteBalance => 'الدفء';
+
+  @override
+  String get mediaPhotoEditorHighlights => 'الإضاءات';
+
+  @override
+  String get mediaPhotoEditorShadows => 'الظلال';
+
+  @override
+  String get mediaPhotoEditorNose => 'الأنف';
+
+  @override
+  String get mediaPhotoEditorOn => 'تشغيل';
+
+  @override
+  String get mediaTextHint => 'اكتب شيئاً';
 
   @override
   String get promotePostTitle => 'ترويج المنشور';

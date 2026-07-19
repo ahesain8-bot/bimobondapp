@@ -4973,6 +4973,12 @@ abstract class AppLocalizations {
   /// **'Flash'**
   String get cameraFlash;
 
+  /// No description provided for @cameraSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch camera'**
+  String get cameraSwitch;
+
   /// No description provided for @cameraSpeed.
   ///
   /// In en, this message translates to:
@@ -4996,6 +5002,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Timer'**
   String get cameraTimer;
+
+  /// No description provided for @cameraSetCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Set countdown'**
+  String get cameraSetCountdown;
+
+  /// No description provided for @cameraStartCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Start countdown'**
+  String get cameraStartCountdown;
+
+  /// No description provided for @cameraDragRecordingLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to set recording limit'**
+  String get cameraDragRecordingLimit;
 
   /// No description provided for @cameraMusic.
   ///
@@ -5213,6 +5237,12 @@ abstract class AppLocalizations {
   /// **'Add sound'**
   String get cameraAddSound;
 
+  /// No description provided for @cameraMuteOriginalSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute original sound'**
+  String get cameraMuteOriginalSound;
+
   /// No description provided for @cameraLayout.
   ///
   /// In en, this message translates to:
@@ -5248,6 +5278,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Zoom'**
   String get cameraZoom;
+
+  /// No description provided for @cameraZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get cameraZoomOut;
+
+  /// No description provided for @cameraZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get cameraZoomIn;
 
   /// No description provided for @cameraGoLive.
   ///
@@ -5422,6 +5464,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Coming soon'**
   String get mediaEditorComingSoon;
+
+  /// No description provided for @mediaEditorDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get mediaEditorDone;
+
+  /// No description provided for @mediaEditorTrim.
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get mediaEditorTrim;
+
+  /// No description provided for @videoEditorSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get videoEditorSplit;
+
+  /// No description provided for @videoEditorDeleteSegment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get videoEditorDeleteSegment;
+
+  /// No description provided for @mediaEditorDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get mediaEditorDiscard;
+
+  /// No description provided for @mediaEditorSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get mediaEditorSaveDraft;
+
+  /// No description provided for @mediaEditorContinueEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue editing'**
+  String get mediaEditorContinueEditing;
+
+  /// No description provided for @mediaEditorSendToFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to friends'**
+  String get mediaEditorSendToFriends;
+
+  /// No description provided for @mediaEditorDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get mediaEditorDiscardTitle;
+
+  /// No description provided for @mediaEditorReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get mediaEditorReset;
+
+  /// No description provided for @mediaPhotoEditorFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Face'**
+  String get mediaPhotoEditorFace;
+
+  /// No description provided for @mediaPhotoEditorMakeup.
+  ///
+  /// In en, this message translates to:
+  /// **'Makeup'**
+  String get mediaPhotoEditorMakeup;
+
+  /// No description provided for @mediaPhotoEditorMagic.
+  ///
+  /// In en, this message translates to:
+  /// **'Magic'**
+  String get mediaPhotoEditorMagic;
+
+  /// No description provided for @mediaPhotoEditorSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth'**
+  String get mediaPhotoEditorSmooth;
+
+  /// No description provided for @mediaPhotoEditorSaturation.
+  ///
+  /// In en, this message translates to:
+  /// **'Saturation'**
+  String get mediaPhotoEditorSaturation;
+
+  /// No description provided for @mediaPhotoEditorBrightness.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get mediaPhotoEditorBrightness;
+
+  /// No description provided for @mediaPhotoEditorContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast'**
+  String get mediaPhotoEditorContrast;
+
+  /// No description provided for @mediaPhotoEditorExposure.
+  ///
+  /// In en, this message translates to:
+  /// **'Exposure'**
+  String get mediaPhotoEditorExposure;
+
+  /// No description provided for @mediaPhotoEditorWhiteBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Warmth'**
+  String get mediaPhotoEditorWhiteBalance;
+
+  /// No description provided for @mediaPhotoEditorHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get mediaPhotoEditorHighlights;
+
+  /// No description provided for @mediaPhotoEditorShadows.
+  ///
+  /// In en, this message translates to:
+  /// **'Shadows'**
+  String get mediaPhotoEditorShadows;
+
+  /// No description provided for @mediaPhotoEditorNose.
+  ///
+  /// In en, this message translates to:
+  /// **'Nose'**
+  String get mediaPhotoEditorNose;
+
+  /// No description provided for @mediaPhotoEditorOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get mediaPhotoEditorOn;
+
+  /// No description provided for @mediaTextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type something'**
+  String get mediaTextHint;
 
   /// No description provided for @promotePostTitle.
   ///

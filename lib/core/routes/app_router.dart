@@ -410,7 +410,7 @@ class AppRouter {
       GoRoute(
         path: '/media-studio-editor',
         name: 'media_studio_editor',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           final List<GalleryMediaItem> items;
           if (extra?['items'] is List) {
@@ -423,13 +423,23 @@ class AppRouter {
               ),
             ];
           }
-          return MediaStudioEditorScreen(
+          final child = MediaStudioEditorScreen(
             items: items,
-            initialIndex: extra?['initialIndex'] as int? ?? 0,
-            isStory: extra?['isStory'] as bool? ?? false,
-            initialSound: extra?['initialSound'] as SoundEntity?,
-            popOnDone: extra?['popOnDone'] as bool? ?? false,
-            initialEdit: MediaEditorSeed.fromExtra(extra?['initialEdit']),
+            initialIndex: extra['initialIndex'] as int? ?? 0,
+            isStory: extra['isStory'] as bool? ?? false,
+            initialSound: extra['initialSound'] as SoundEntity?,
+            popOnDone: extra['popOnDone'] as bool? ?? false,
+            initialEdit: MediaEditorSeed.fromExtra(extra['initialEdit']),
+          );
+          // Instant push after capture — avoids a blank/flashy default transition.
+          return CustomTransitionPage<MediaStudioExportResult>(
+            key: state.pageKey,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: const Duration(milliseconds: 150),
+            child: child,
+            transitionsBuilder: (_, animation, _, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
           );
         },
       ),
