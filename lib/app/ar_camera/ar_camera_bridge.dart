@@ -104,6 +104,22 @@ class ArCameraBridge {
     );
   }
 
+  /// Bakes a PNG LUT color grade onto a still image (same engine as live preview).
+  static Future<String?> applyColorLut({
+    required String path,
+    required String filter,
+    double intensity = 1.0,
+    int? maxEdge,
+  }) async {
+    final out = await _channel.invokeMethod<String>('applyColorLut', {
+      'path': path,
+      'filter': filter,
+      'intensity': intensity.clamp(0.0, 1.0),
+      if (maxEdge != null) 'maxEdge': maxEdge,
+    });
+    return out;
+  }
+
   /// Native OpenCV tone/color adjustments (Android).
   /// All levels are -100…100 (0 = original).
   static Future<String?> applyBeauty({
@@ -116,6 +132,7 @@ class ArCameraBridge {
     int highlightsLevel = 0,
     int shadowsLevel = 0,
     int noseLevel = 0,
+    int jawLevel = 0,
     int? maxEdge,
   }) async {
     final out = await _channel.invokeMethod<String>('applyBeauty', {
@@ -128,6 +145,7 @@ class ArCameraBridge {
       'highlightsLevel': highlightsLevel.clamp(-100, 100),
       'shadowsLevel': shadowsLevel.clamp(-100, 100),
       'noseLevel': noseLevel.clamp(-100, 100),
+      'jawLevel': jawLevel.clamp(-100, 100),
       if (maxEdge != null) 'maxEdge': maxEdge,
     });
     return out;

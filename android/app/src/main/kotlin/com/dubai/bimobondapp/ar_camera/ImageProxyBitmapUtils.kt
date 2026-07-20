@@ -38,11 +38,35 @@ object ImageProxyBitmapUtils {
         buffer.rewind()
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        // Fast path: tightly packed RGBA — a single native buffer copy.
         if (rowStride == pixelStride * width && pixelStride == 4) {
             bitmap.copyPixelsFromBuffer(buffer)
             return bitmap
         }
 
+        // Padded RGBA (rowStride > width*4, common on many devices): copy row by row
+        // into a tightly packed buffer with bulk gets, then one native upload. This
+        // replaces the old per-pixel ByteBuffer.get() loop (4 reads + repack per
+        // pixel = ~6M calls per 1080x1440 frame) that could dominate frame time and
+        // stutter both preview and recording.
+        if (pixelStride == 4) {
+            val rowBytes = width * 4
+            val packed = java.nio.ByteBuffer
+                .allocateDirect(rowBytes * height)
+                .order(java.nio.ByteOrder.nativeOrder())
+            val rowBuf = ByteArray(rowBytes)
+            for (row in 0 until height) {
+                buffer.position(row * rowStride)
+                buffer.get(rowBuf, 0, rowBytes)
+                packed.put(rowBuf)
+            }
+            packed.rewind()
+            bitmap.copyPixelsFromBuffer(packed)
+            return bitmap
+        }
+
+        // Rare fallback: unusual pixel stride — general per-pixel repack.
         val pixels = IntArray(width * height)
         var outputIndex = 0
         for (row in 0 until height) {

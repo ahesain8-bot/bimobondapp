@@ -12,6 +12,7 @@ class CameraTopBar extends StatelessWidget {
     this.onSoundTap,
     this.isLiveMode = false,
     this.addSoundLabel = 'Add sound',
+    this.showSound = true,
   });
 
   final VoidCallback onClose;
@@ -19,6 +20,10 @@ class CameraTopBar extends StatelessWidget {
   final VoidCallback? onSoundTap;
   final bool isLiveMode;
   final String addSoundLabel;
+
+  /// While recording, the sound pill overlaps the recording-seconds badge, so
+  /// the camera hides it (pass false).
+  final bool showSound;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +38,8 @@ class CameraTopBar extends StatelessWidget {
           // centered — flip moved to the side toolbar.
           const SizedBox(width: 48),
           Expanded(
-            child: Center(
+            child: showSound
+                ? Center(
               child: GestureDetector(
                 onTap: isLiveMode ? null : onSoundTap,
                 child: Container(
@@ -73,7 +79,8 @@ class CameraTopBar extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
+            )
+                : const SizedBox.shrink(),
           ),
           _TopCircleButton(
             icon: LucideIcons.x,

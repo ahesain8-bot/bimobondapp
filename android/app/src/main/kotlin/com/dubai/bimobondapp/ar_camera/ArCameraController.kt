@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.util.Size
+import android.view.Surface
 import android.view.View
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -75,6 +76,12 @@ object ArCameraController {
 
     // Consecutive frames with no detected face (used to clear stale stickers).
     private var noFaceStreak = 0
+
+    // True when the camera Preview is bound straight to the GL OES SurfaceTexture
+    // (the zero-CPU color-grade path). False = classic PreviewView binding used by
+    // NONE / PNG stickers / distortion (bitmap) filters.
+    @Volatile
+    private var boundToOes = false
 
     @Volatile
     private var camera: Camera? = null
@@ -271,6 +278,8 @@ object ArCameraController {
     fun stop() {
         abortCapture()
         started = false
+        boundToOes = false
+        rebindPosted = false
         convertingFrame.set(false)
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
@@ -372,6 +381,14 @@ object ArCameraController {
             }
         }
 
+        // OES GPU path: still MUST come from the same GL framebuffer as the live
+        // preview. ImageCapture is a different stream and was saving left↔right
+        // flipped vs what the user saw on screen.
+        if (boundToOes) {
+            takePhotoFromGl(::deliver, ::saveBaked)
+            return
+        }
+
         // High-res ImageCapture only when full-screen (no ratio letterbox).
         // Letterboxed mode must bake from the live preview stream so FOV matches.
         val filter = ArCameraBridge.currentFilter
@@ -401,6 +418,43 @@ object ArCameraController {
 
         val retries = if (filter.isDistortion()) 2 else 1
         tryBaked(retries)
+    }
+
+    /**
+     * Grabs the exact on-screen OES/GL frame (same pixels the user sees — same
+     * mirror, crop, LUT). Falls back to ImageCapture only if GL readback fails.
+     */
+    private fun takePhotoFromGl(
+        onResult: (String?, String?) -> Unit,
+        saveBaked: (Bitmap) -> Boolean,
+    ) {
+        val gl = ArCameraBridge.warpGlView
+        if (gl == null || !gl.isGlInitialized()) {
+            takePhotoWithImageCapture(onResult)
+            return
+        }
+        gl.setCaptureMaxEdge(CAPTURE_MAX_EDGE)
+        gl.requestCaptureNow()
+        fun tryRead(remaining: Int) {
+            val gpu = try {
+                gl.copyLastFilteredFrame()
+            } catch (_: Exception) {
+                null
+            }
+            if (gpu != null && !isMostlyEmpty(gpu) && saveBaked(gpu)) {
+                if (!recording) gl.setCaptureEnabled(false)
+                return
+            }
+            gpu?.recycle()
+            if (remaining > 0) {
+                gl.requestCaptureNow()
+                mainHandler.postDelayed({ tryRead(remaining - 1) }, 33)
+            } else {
+                if (!recording) gl.setCaptureEnabled(false)
+                takePhotoWithImageCapture(onResult)
+            }
+        }
+        mainHandler.postDelayed({ tryRead(3) }, 50)
     }
 
     private fun takePhotoWithImageCapture(onResult: (String?, String?) -> Unit) {
@@ -522,7 +576,11 @@ object ArCameraController {
             recording = true
             lastRecordCopyMs = 0L
             startRecordFramePump()
-            if (ArCameraBridge.currentFilter.isDistortion()) {
+            // Enable GL front-buffer capture whenever the frame is rendered on the
+            // GPU (OES path: NONE + color grades, OR a shader distortion) so recorded
+            // frames come from the already-rendered GPU output instead of a per-frame
+            // CPU pass.
+            if (boundToOes || ArCameraBridge.currentFilter.useShader()) {
                 ArCameraBridge.warpGlView?.setCaptureEnabled(true)
             }
             onResult(true, null)
@@ -543,6 +601,7 @@ object ArCameraController {
             ArCameraBridge.warpGlView?.setCaptureEnabled(
                 ArCameraBridge.currentFilter.isDistortion(),
             )
+            // OES color-grade capture is recording-only; leave it off after stop.
             val file = videoRecorder.stop()
             if (file != null && file.exists() && file.length() > 0L) {
                 onResult(file.absolutePath, null)
@@ -657,20 +716,25 @@ object ArCameraController {
         lastRecordCopyMs = now
 
         val filter = ArCameraBridge.currentFilter
-        // Distortion: pull the latest GL-filtered frame directly (no PixelCopy race).
-        if (filter.isDistortion()) {
+        // Anything on the GPU (OES path: NONE + color grades, OR a shader distortion)
+        // is already rendered. Pull the finished frame straight from GL instead of
+        // re-applying the grade on the CPU (LutStore.apply is a per-pixel trilinear
+        // pass over the whole frame — running it on EVERY recorded frame was the main
+        // cause of the recording/preview lag). The GPU output already has the exact
+        // same result baked in, so this is both correct and far cheaper.
+        if (boundToOes || filter.useShader()) {
             val gl = ArCameraBridge.warpGlView
-            gl?.setCaptureEnabled(true)
+            // take() — no Bitmap.copy. Skip isMostlyEmpty (full getPixel loop) on the
+            // hot recording path; empty frames are rare once GL is streaming.
             val gpu = try {
-                gl?.copyLastFilteredFrame()
+                gl?.takeLastFilteredFrame()
             } catch (_: Exception) {
                 null
             }
-            if (gpu != null && !isMostlyEmpty(gpu)) {
+            if (gpu != null) {
                 offerRecordingFrameAsync(gpu, recycleSourceAlways = true)
                 return
             }
-            gpu?.recycle()
         }
 
         snapshotVisibleFrame { bitmap ->
@@ -1014,6 +1078,149 @@ object ArCameraController {
             PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * Feeds the camera frames straight into the GL renderer's OES SurfaceTexture.
+     * CameraX writes directly to the GPU — no ImageAnalysis → Bitmap → upload, which
+     * is what caused the color-filter preview/record lag. Rotation + front mirror are
+     * applied in the OES shader (see [FaceWarpRenderer]).
+     */
+    private fun bindPreviewToOes(preview: Preview, glView: FaceWarpGlView, activity: Activity) {
+        val executor = ContextCompat.getMainExecutor(activity)
+        preview.setSurfaceProvider(executor) { request ->
+            val st = glView.cameraSurfaceTexture()
+            if (st == null) {
+                request.willNotProvideSurface()
+                return@setSurfaceProvider
+            }
+            val res = request.resolution
+            // Cap the OES buffer — back cameras often negotiate huge streams and that
+            // alone adds GPU fill + lag. 1280 max edge stays sharp on phone screens.
+            val maxBuf = 1280
+            val bufScale = minOf(1f, maxBuf.toFloat() / maxOf(res.width, res.height))
+            val bufW = ((res.width * bufScale).toInt() and 1.inv()).coerceAtLeast(2)
+            val bufH = ((res.height * bufScale).toInt() and 1.inv()).coerceAtLeast(2)
+            st.setDefaultBufferSize(bufW, bufH)
+            // Never apply selfie X-mirror — natural left/right (turn right → right).
+            glView.setCameraTransform(0, frontMirror = false, bufW, bufH)
+            request.setTransformationInfoListener(executor) { info ->
+                glView.setCameraTransform(
+                    info.rotationDegrees,
+                    frontMirror = false,
+                    bufW,
+                    bufH,
+                )
+            }
+            val surface = Surface(st)
+            request.provideSurface(surface, executor) { surface.release() }
+        }
+    }
+
+    /** Called (GL thread) after each OES frame — drives preview swap + recording. */
+    private fun onOesFramePresented() {
+        ArCameraBridge.onGlFramePresented()
+        if (recording) maybeCaptureRecordingFrame()
+    }
+
+    fun isBoundToOes(): Boolean = boundToOes
+
+    /**
+     * App minimized — pause the GLSurfaceView so EGL can be torn down cleanly.
+     * Without this, resume leaves a dead SurfaceTexture and a permanent black preview.
+     */
+    fun onHostPause() {
+        if (!started) return
+        try {
+            ArCameraBridge.warpGlView?.onPause()
+        } catch (_: Throwable) {
+        }
+    }
+
+    /**
+     * App restored from recents/minimize — restart GL + force a camera rebind onto
+     * the new OES SurfaceTexture. CameraX alone is not enough after GL context loss.
+     */
+    fun onHostResume() {
+        if (!started) return
+        if (recording || videoRecorder.isRecording()) return
+        val activity = ArCameraBridge.hostActivity ?: return
+        val gl = ArCameraBridge.warpGlView
+        try {
+            gl?.onResume()
+        } catch (_: Throwable) {
+        }
+        // Old OES surface is invalid after GL pause; require a fresh bind.
+        boundToOes = false
+        rebindPosted = false
+        switchingCamera = false
+        convertingFrame.set(false)
+        activity.runOnUiThread {
+            ArCameraBridge.syncPreviewNaturalOrientation()
+            gl?.ensureGlInitialized()
+            ArCameraBridge.applyCurrentFilter()
+            val wantsOes = ArCameraBridge.currentFilter.usesGpuPreview()
+            if (wantsOes) {
+                gl?.setOesEnabled(true)
+                if (gl?.cameraSurfaceTexture() != null) {
+                    requestPreviewRebind()
+                } else {
+                    gl?.onCameraSurfaceReady = {
+                        gl.onCameraSurfaceReady = null
+                        requestPreviewRebind()
+                    }
+                    gl?.requestRender()
+                }
+            } else {
+                requestPreviewRebind()
+            }
+        }
+    }
+
+    /** Bridge asks to route the live preview through the OES GPU path (color grade). */
+    fun ensureOesPreviewBound() {
+        if (boundToOes) return
+        if (recording || videoRecorder.isRecording()) return
+        val gl = ArCameraBridge.warpGlView ?: return
+        gl.setOesEnabled(true)
+        if (gl.cameraSurfaceTexture() != null) {
+            requestPreviewRebind()
+        } else {
+            // GL surface not created yet — bind as soon as the OES texture exists.
+            gl.onCameraSurfaceReady = {
+                gl.onCameraSurfaceReady = null
+                if (!boundToOes) requestPreviewRebind()
+            }
+        }
+    }
+
+    /** Bridge asks to route the live preview back through the classic PreviewView. */
+    fun ensurePreviewViewBound() {
+        if (!boundToOes) return
+        if (recording || videoRecorder.isRecording()) return
+        requestPreviewRebind()
+    }
+
+    @Volatile
+    private var rebindPosted = false
+
+    private fun requestPreviewRebind() {
+        val activity = ArCameraBridge.hostActivity ?: return
+        val lifecycleOwner = ArCameraBridge.lifecycleOwner ?: return
+        val previewView = ArCameraBridge.previewView ?: return
+        val faceOverlay = ArCameraBridge.faceOverlay ?: return
+        // Coalesce rapid rebind requests (filter spam / startup race) into ONE
+        // camera session change — each rebind was flashing black + adding lag.
+        if (rebindPosted) return
+        rebindPosted = true
+        // Pause analysis so the current lens releases cleanly before rebinding.
+        switchingCamera = true
+        imageAnalysis?.clearAnalyzer()
+        convertingFrame.set(false)
+        activity.runOnUiThread {
+            rebindPosted = false
+            bindCamera(lifecycleOwner, previewView, faceOverlay)
+        }
+    }
+
     private fun bindCamera(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
@@ -1039,7 +1246,23 @@ object ArCameraController {
                 .setTargetResolution(target)
                 .setTargetRotation(displayRotation)
                 .build()
-            preview.surfaceProvider = previewView.surfaceProvider
+
+            // Color grades render straight from the camera into a GL OES texture
+            // (no per-frame Bitmap → stock-camera-smooth). Everything else keeps the
+            // proven PreviewView binding so face filters/stickers are untouched.
+            val glView = ArCameraBridge.warpGlView
+            val useOes = ArCameraBridge.currentFilter.usesGpuPreview() &&
+                glView != null &&
+                glView.cameraSurfaceTexture() != null
+            boundToOes = useOes
+            if (useOes && glView != null) {
+                glView.setOesEnabled(true)
+                glView.setOnFramePresented { onOesFramePresented() }
+                bindPreviewToOes(preview, glView, activity)
+            } else {
+                glView?.setOesEnabled(false)
+                preview.surfaceProvider = previewView.surfaceProvider
+            }
 
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -1156,6 +1379,16 @@ object ArCameraController {
             val filter = ArCameraBridge.currentFilter
             frameCounter++
 
+            // OES GPU path (NONE + non-beauty color grades): the camera renders
+            // straight into GL, so the analysis frame has no consumer (recording is
+            // driven from the GL thread). Drop it — this is what removes the per-frame
+            // CPU cost/lag. If OES isn't bound yet, fall through to the bitmap path
+            // (fallback) so the preview is never black during the switch.
+            if (boundToOes && filter.usesGpuPreview()) {
+                imageProxy.close()
+                return
+            }
+
             // Original filter: PreviewView shows the live feed. Skip heavy
             // bitmap conversion — stills use CameraX ImageCapture instead.
             if (filter == FilterType.NONE && !recording) {
@@ -1257,6 +1490,8 @@ object ArCameraController {
 
             when {
                 filter.useShader() -> {
+                    // Front camera: mirror the bitmap so GL matches CameraX PreviewView
+                    // (stickers path). Without this, big-eyes/lips/nose look flipped vs glasses.
                     display = if (needMirrorInBranch) {
                         ImageProxyBitmapUtils.mirrorHorizontally(oriented)
                     } else {
