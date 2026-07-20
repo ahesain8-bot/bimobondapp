@@ -62,13 +62,22 @@ class SoundPickerSheet extends StatefulWidget {
       ),
     );
 
-    if (picked == null || !context.mounted) return null;
-    if (!picked.needsTrim) return picked;
+    if (picked == null || !context.mounted) {
+      await SoundAudioPreview.stop();
+      return null;
+    }
+    if (!picked.needsTrim) {
+      await SoundAudioPreview.stop();
+      return picked;
+    }
 
     // Wait until the catalog route is fully gone — opening trim in the same
     // frame drops the first check result (Future completes with null).
     await _waitForModalSettle(context);
-    if (!context.mounted) return null;
+    if (!context.mounted) {
+      await SoundAudioPreview.stop();
+      return null;
+    }
 
     // Re-open trim on the same sound restores the last saved period.
     final restorePeriod = initialSelection?.id == picked.sound.id;
@@ -82,6 +91,7 @@ class SoundPickerSheet extends StatefulWidget {
       allowMute: allowMuteOnTrim,
       initialMute: picked.muteOriginal,
     );
+    await SoundAudioPreview.stop();
     if (!context.mounted) return null;
     if (trim == null) {
       // Cancelled trim — keep prior period if we were re-editing it.

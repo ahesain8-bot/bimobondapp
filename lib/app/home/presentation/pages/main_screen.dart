@@ -14,6 +14,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_bottom_nav.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -182,38 +183,46 @@ class _MainScreenState extends State<MainScreen> {
               if (didPop) return;
               _handleSystemBack();
             },
-            child: Scaffold(
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              extendBody: isHome,
-              body: IndexedStack(
-                key: ValueKey(isLoggedIn),
-                index: _currentIndex,
-                children: pages,
-              ),
-              bottomNavigationBar: LiquidGlassBottomNav(
-                currentIndex: _currentIndex,
-                glassStyle: isHome,
-                onItemTap: (index) => _onNavTap(index, isLoggedIn: isLoggedIn),
-                items: isLoggedIn
-                    ? LiquidGlassBottomNavItems.loggedIn(
-                        homeLabel: l10n.navHome,
-                        auctionsLabel: l10n.navAuctions,
-                        chatLabel: l10n.navChat,
-                        profileLabel: l10n.navProfile,
-                      )
-                    : LiquidGlassBottomNavItems.guest(
-                        homeLabel: l10n.navHome,
-                        profileLabel: l10n.navProfile,
-                      ),
-                center: isLoggedIn
-                    ? LiquidGlassBottomNav.addButton(
-                        context: context,
-                        onTap: () => _onNavTap(
-                          LiquidGlassBottomNavItems.loggedInAddButtonIndex,
-                          isLoggedIn: true,
+            child: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: isHome
+                  ? feedImmersiveSystemUiOverlayStyle
+                  : appContentSystemUiOverlayStyle(
+                      Theme.of(context).brightness,
+                    ),
+              child: Scaffold(
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                extendBody: isHome,
+                body: IndexedStack(
+                  key: ValueKey(isLoggedIn),
+                  index: _currentIndex,
+                  children: pages,
+                ),
+                bottomNavigationBar: LiquidGlassBottomNav(
+                  currentIndex: _currentIndex,
+                  glassStyle: isHome,
+                  onItemTap: (index) =>
+                      _onNavTap(index, isLoggedIn: isLoggedIn),
+                  items: isLoggedIn
+                      ? LiquidGlassBottomNavItems.loggedIn(
+                          homeLabel: l10n.navHome,
+                          auctionsLabel: l10n.navAuctions,
+                          chatLabel: l10n.navChat,
+                          profileLabel: l10n.navProfile,
+                        )
+                      : LiquidGlassBottomNavItems.guest(
+                          homeLabel: l10n.navHome,
+                          profileLabel: l10n.navProfile,
                         ),
-                      )
-                    : null,
+                  center: isLoggedIn
+                      ? LiquidGlassBottomNav.addButton(
+                          context: context,
+                          onTap: () => _onNavTap(
+                            LiquidGlassBottomNavItems.loggedInAddButtonIndex,
+                            isLoggedIn: true,
+                          ),
+                        )
+                      : null,
+                ),
               ),
             ),
           ),

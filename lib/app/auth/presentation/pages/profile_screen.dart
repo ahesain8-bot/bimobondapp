@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
@@ -17,8 +17,10 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -411,11 +413,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 
             final user = authState.user;
             final theme = Theme.of(context);
-            final screenBackground = theme.brightness == Brightness.light
-                ? Colors.white
-                : theme.scaffoldBackgroundColor;
+            final screenBackground = theme.scaffoldBackgroundColor;
 
-            return Scaffold(
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: appContentSystemUiOverlayStyle(theme.brightness),
+              child: Scaffold(
               backgroundColor: screenBackground,
               body: SafeArea(
                 bottom: false,
@@ -484,6 +486,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
               ),
+            ),
             );
           },
         ),

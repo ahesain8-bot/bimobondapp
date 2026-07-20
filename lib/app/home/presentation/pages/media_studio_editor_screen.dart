@@ -668,20 +668,19 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
     });
-    await SoundAudioPreview.playAt(
-      picked.sound.id,
-      picked.sound.resolvedAudioUrl,
-      startOffset: picked.offset,
-      window: _soundWindow,
-    );
+    // Preview only inside the picker/trim sheets — stop once the user continues.
+    await SoundAudioPreview.stop();
   }
 
-  void _clearSound() => setState(() {
-        _selectedSound = null;
-        _soundStartOffset = Duration.zero;
-        _soundWindow = const Duration(seconds: 15);
-        _muteOriginalAudio = false;
-      });
+  void _clearSound() {
+    unawaited(SoundAudioPreview.stop());
+    setState(() {
+      _selectedSound = null;
+      _soundStartOffset = Duration.zero;
+      _soundWindow = const Duration(seconds: 15);
+      _muteOriginalAudio = false;
+    });
+  }
 
   Future<void> _shareCurrent() async {
     final file = _currentState.sourceFile;

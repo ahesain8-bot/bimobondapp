@@ -364,12 +364,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
     });
-    await SoundAudioPreview.playAt(
-      picked.sound.id,
-      picked.sound.resolvedAudioUrl,
-      startOffset: picked.offset,
-      window: _soundWindow,
-    );
+    // Preview only inside the picker/trim sheets — stop once the user continues.
+    await SoundAudioPreview.stop();
   }
 
   AwesomeFilter _effectiveCaptureFilter() {

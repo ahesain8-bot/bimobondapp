@@ -3,7 +3,7 @@ import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_list_tile.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
-import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -487,7 +487,11 @@ class SoundDetailVideoGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final post = posts[index];
         return GestureDetector(
-          onTap: () => openPostById(context, post.id),
+          onTap: () => openSoundPostsViewer(
+            context,
+            previews: posts,
+            initialIndex: index,
+          ),
           child: SoundDetailPostGridTile(
             post: post,
             showOriginalBadge: showOriginalOnFirst && index == 0,

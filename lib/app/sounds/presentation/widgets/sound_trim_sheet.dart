@@ -274,20 +274,38 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
       muteOriginal: _muteOriginal,
     );
 
-    // Close immediately so Use feels like "apply + dismiss".
     final player = _player;
+    try {
+      await player?.pause();
+      _playing = false;
+    } catch (_) {}
+
+    // Close immediately so Use feels like "apply + dismiss".
     if (mounted) {
       Navigator.of(context, rootNavigator: true).pop(result);
     }
+  }
+
+  Future<void> _closeWithoutApply() async {
+    if (_applying) return;
     try {
-      await player?.pause();
+      await _player?.pause();
+      _playing = false;
     } catch (_) {}
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 
   @override
   void dispose() {
     _player?.removeListener(_onPlayerTick);
-    _player?.dispose();
+    final player = _player;
+    _player = null;
+    try {
+      player?.pause();
+    } catch (_) {}
+    player?.dispose();
     super.dispose();
   }
 
@@ -304,10 +322,7 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
       allowMute: widget.allowMute,
       muteOriginal: _muteOriginal,
       applying: _applying,
-      onClose: () {
-        if (_applying) return;
-        Navigator.of(context, rootNavigator: true).pop();
-      },
+      onClose: () => unawaited(_closeWithoutApply()),
       onTogglePlay: () => unawaited(_togglePlay()),
       onConfirm: () => unawaited(_apply()),
       onMove: _onMove,
