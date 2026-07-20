@@ -51,8 +51,10 @@ class ArFilterCatalog {
   static const List<ArFilterItem> effectItems = [
     original,
     ArFilterItem(id: 'glasses', label: 'Glasses', emoji: '😎'),
+    ArFilterItem(id: 'shades', label: 'Shades', emoji: '🕶️'),
     ArFilterItem(id: 'dog', label: 'Dog', emoji: '🐶'),
     ArFilterItem(id: 'moustache', label: 'Moustache', emoji: '🥸'),
+    ArFilterItem(id: 'mask', label: 'Mask', emoji: '💀'),
     ArFilterItem(id: 'big_eyes', label: 'Big Eyes', emoji: '👀'),
     ArFilterItem(id: 'big_lips', label: 'Big Lips', emoji: '👄'),
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),

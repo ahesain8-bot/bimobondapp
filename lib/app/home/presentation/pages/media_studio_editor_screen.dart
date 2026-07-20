@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filters_panel.dart';
@@ -11,6 +9,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/media_crop_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/video_segment_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_color_lut.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_skin_smooth.dart';
@@ -144,13 +143,18 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   bool get _hasActiveColorFilter => ArFilterCatalog.isColorFilter(_arFilterId);
 
-  /// Apply Flutter color preview only when grade isn't already in the pixels
-  /// or the user changed away from the baked id.
-  bool get _applyArColorPreview {
+  /// True when a color grade needs to be applied in the editor because it isn't
+  /// already baked into the source pixels (gallery import, or the user changed
+  /// away from the baked id). We bake it natively via the PNG LUT — no matrix.
+  bool get _needsColorLutPreview {
     if (!_hasActiveColorFilter) return false;
     if (!_alreadyBaked) return true;
     return _arFilterId != _bakedFilterId;
   }
+
+  /// Any photo edit that requires a native-baked preview file (tone/geometry
+  /// adjustments or a LUT color grade).
+  bool get _hasPreviewEdits => _hasFaceEdits || _needsColorLutPreview;
 
   int get _maxFilesLimit => widget.isStory ? 1 : _maxFiles;
 
@@ -169,7 +173,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     _applyStateToUi(_states[_currentIndex]);
     // Warm fancy fonts in the background so Aa opens without a hitch.
     unawaited(MediaTextFontStyles.preload());
-    if (_hasFaceEdits) {
+    if (_hasPreviewEdits) {
       _scheduleFacePreview();
     }
   }
@@ -231,7 +235,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       _currentIndex = index;
       _applyStateToUi(_states[_currentIndex]);
     });
-    if (_hasFaceEdits) {
+    if (_hasPreviewEdits) {
       _scheduleFacePreview();
     }
   }
@@ -330,37 +334,19 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return edited ?? file;
   }
 
+  /// Bakes the color grade onto a photo using the native PNG-LUT engine (the
+  /// same lookup the live camera uses). Full resolution — no [maxEdge].
   Future<File> _bakeColorFilterToFile(
     File input,
     String filterId,
     double intensity,
   ) async {
-    final colorFilter = ArColorFilterMatrix.preview(
-      filterId,
+    final out = await MediaColorLut.apply(
+      input: input,
+      filterId: filterId,
       intensity: intensity,
     );
-    if (colorFilter == null) return input;
-
-    final bytes = await input.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final paint = Paint()..colorFilter = colorFilter;
-    canvas.drawImage(image, Offset.zero, paint);
-    final picture = recorder.endRecording();
-    final out = await picture.toImage(image.width, image.height);
-    image.dispose();
-    final data = await out.toByteData(format: ui.ImageByteFormat.png);
-    out.dispose();
-    if (data == null) return input;
-    final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/ar_edit_${DateTime.now().millisecondsSinceEpoch}.png',
-    );
-    await file.writeAsBytes(data.buffer.asUint8List());
-    return file;
+    return out ?? input;
   }
 
   Future<List<File>> _exportAll() async {
@@ -548,7 +534,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   void _scheduleFacePreview() {
     _smoothDebounce?.cancel();
-    if (!_hasFaceEdits) {
+    if (!_hasPreviewEdits) {
       _clearFacePreview();
       return;
     }
@@ -569,39 +555,79 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     if (mounted) setState(() {});
   }
 
+  void _deleteTemp(File? file, File source) {
+    if (file == null || file.path == source.path) return;
+    try {
+      file.deleteSync();
+    } catch (_) {}
+  }
+
+  /// Builds the live preview file natively: tone/geometry adjustments (OpenCV)
+  /// then the color grade (PNG LUT). Both run on Kotlin — no Flutter matrix.
   Future<void> _rebuildFacePreview() async {
-    if (!_hasFaceEdits) {
+    if (_currentState.isVideo || !_hasPreviewEdits) {
       _clearFacePreview();
       return;
     }
     final gen = ++_smoothGen;
     final source = _currentState.sourceFile;
-    final out = await MediaSkinSmooth.apply(
-      input: source,
-      saturation: _adj(MediaPhotoEditorTool.saturation),
-      brightness: _adj(MediaPhotoEditorTool.brightness),
-      contrast: _adj(MediaPhotoEditorTool.contrast),
-      exposure: _adj(MediaPhotoEditorTool.exposure),
-      whiteBalance: _adj(MediaPhotoEditorTool.whiteBalance),
-      highlights: _adj(MediaPhotoEditorTool.highlights),
-      shadows: _adj(MediaPhotoEditorTool.shadows),
-      nose: _adj(MediaPhotoEditorTool.nose),
-      // Fast live preview. Export uses full resolution (no maxEdge).
-      maxEdge: 960,
-    );
+    var working = source;
+    var produced = false;
+
+    if (_hasFaceEdits) {
+      final adjusted = await MediaSkinSmooth.apply(
+        input: working,
+        saturation: _adj(MediaPhotoEditorTool.saturation),
+        brightness: _adj(MediaPhotoEditorTool.brightness),
+        contrast: _adj(MediaPhotoEditorTool.contrast),
+        exposure: _adj(MediaPhotoEditorTool.exposure),
+        whiteBalance: _adj(MediaPhotoEditorTool.whiteBalance),
+        highlights: _adj(MediaPhotoEditorTool.highlights),
+        shadows: _adj(MediaPhotoEditorTool.shadows),
+        nose: _adj(MediaPhotoEditorTool.nose),
+        // Fast live preview. Export uses full resolution (no maxEdge).
+        maxEdge: 960,
+      );
+      if (gen != _smoothGen) {
+        _deleteTemp(adjusted, source);
+        return;
+      }
+      if (adjusted != null) {
+        working = adjusted;
+        produced = true;
+      }
+    }
+
+    if (_needsColorLutPreview) {
+      final graded = await MediaColorLut.apply(
+        input: working,
+        filterId: _arFilterId,
+        intensity: _arFilterIntensity,
+        maxEdge: 960,
+      );
+      if (gen != _smoothGen) {
+        _deleteTemp(graded, source);
+        if (produced) _deleteTemp(working, source);
+        return;
+      }
+      if (graded != null) {
+        if (produced) _deleteTemp(working, source);
+        working = graded;
+        produced = true;
+      }
+    }
+
     if (!mounted || gen != _smoothGen) {
-      try {
-        out?.deleteSync();
-      } catch (_) {}
+      if (produced) _deleteTemp(working, source);
       return;
     }
-    if (out == null) {
-      // Keep last good preview; don't blank the image.
+    if (!produced) {
+      // Native step(s) failed — keep last good preview, don't blank the image.
       return;
     }
     final previous = _smoothPreviewFile;
-    setState(() => _smoothPreviewFile = out);
-    if (previous != null && previous.path != out.path) {
+    setState(() => _smoothPreviewFile = working);
+    if (previous != null && previous.path != working.path) {
       Future<void>.delayed(const Duration(milliseconds: 200), () {
         try {
           previous.deleteSync();
@@ -631,6 +657,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
       _saveUiToCurrentState();
     });
+    // Rebuild the native LUT-baked preview for the newly selected grade (photos).
+    if (!_currentState.isVideo) {
+      if (_hasPreviewEdits) {
+        _scheduleFacePreview();
+      } else {
+        _clearFacePreview();
+      }
+    }
   }
 
   Future<void> _pickSound() async {
@@ -725,25 +759,25 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   Future<MediaTextOverlay?> _openTextEditor({MediaTextOverlay? initial}) async {
     // Opaque editor covers the studio — no parent setState needed (that rebuild
-    // was the main reason Aa felt slow). We render the current photo (with its
-    // active color grade) behind the editor so the background stays visible
-    // instead of turning black while typing.
-    final previewFile = (_smoothPreviewFile != null && _hasFaceEdits)
+    // was the main reason Aa felt slow). We render the current media (photo or
+    // video, with its active color grade) behind the editor so the background
+    // stays visible instead of turning black while typing.
+    final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
         ? _smoothPreviewFile!
         : _currentState.sourceFile;
     final selectedColorId = _hasActiveColorFilter ? _arFilterId : 'none';
-    // For a photo we render it behind the editor so it stays visible while
-    // typing. For a video we avoid spinning up a second (audio-playing) player
-    // and just dim to black — the underlying clip keeps playing behind.
-    final Widget background = _currentState.isVideo
-        ? const ColoredBox(color: Colors.black)
-        : MediaStudioPreview(
-            file: previewFile,
-            isVideo: false,
-            arFilterId: selectedColorId,
-            arFilterIntensity: _arFilterIntensity,
-            applyArColorPreview: _applyArColorPreview,
-          );
+    final Widget background = MediaStudioPreview(
+      file: previewFile,
+      isVideo: _currentState.isVideo,
+      arFilterId: selectedColorId,
+      arFilterIntensity: _arFilterIntensity,
+      applyArColorPreview:
+          _currentState.isVideo ? _needsColorLutPreview : false,
+      muted: _currentState.isVideo,
+      trimSegments: _currentState.isVideo
+          ? _currentState.trimSegments
+          : const [],
+    );
     setState(() => _subEditorOpen = true);
     final result = await MediaTextEditorOverlay.show(
       context,
@@ -966,7 +1000,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         : null;
     final selectedColorId = _hasActiveColorFilter ? _arFilterId : 'none';
     _previewSize = MediaQuery.of(context).size;
-    final previewFile = (_smoothPreviewFile != null && _hasFaceEdits)
+    final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
         ? _smoothPreviewFile!
         : _currentState.sourceFile;
 
@@ -989,7 +1023,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               isVideo: currentItem.isVideo,
               arFilterId: selectedColorId,
               arFilterIntensity: _arFilterIntensity,
-              applyArColorPreview: _applyArColorPreview,
+              // Photos: the grade is baked into previewFile via the native LUT.
+              // Videos: still previewed with the matrix path (matches export).
+              applyArColorPreview:
+                  currentItem.isVideo ? _needsColorLutPreview : false,
               paused: _subEditorOpen,
               trimSegments: currentItem.isVideo
                   ? _currentState.trimSegments
@@ -1056,11 +1093,17 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                       _saveUiToCurrentState();
                     }),
                     onFilterSelected: _selectArFilter,
-                    onIntensityChanged: (value) => setState(() {
-                      _arFilterIntensity = value;
-                      _saveUiToCurrentState();
-                    }),
+                    onIntensityChanged: (value) {
+                      setState(() {
+                        _arFilterIntensity = value;
+                        _saveUiToCurrentState();
+                      });
+                      if (!_currentState.isVideo && _needsColorLutPreview) {
+                        _scheduleFacePreview();
+                      }
+                    },
                     onClear: () => _selectArFilter('none'),
+                    onApply: () => setState(() => _showFilters = false),
                   ),
                 if (!_showPhotoEditor) ...[
                   MediaStudioClipDock(

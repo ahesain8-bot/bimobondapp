@@ -14,10 +14,14 @@ object MediaPipeLandmarkIndices {
     const val MOUTH_BOTTOM = 17
     const val MOUTH_TOP = 0
 
-    /** Top-of-head contour for ear / hat placement. */
+    /** Top-of-head contour for ear placement. */
     val TOP_HEAD = intArrayOf(
         10, 109, 67, 103, 54, 21, 162, 127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148,
     )
+
+    /** Lower-face cheek width for mask / gaiter scaling. */
+    const val LEFT_CHEEK = 234
+    const val RIGHT_CHEEK = 454
 
     val LEFT_EYE = intArrayOf(
         33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246,

@@ -223,12 +223,137 @@ class ArColorFilterCatalog {
                 0, 0, 0, 1, 0, //
               ],
             ),
+            // LUT-based grade (assets/luts/cityfilm.png). The live camera + the
+            // captured photo sample the LUT natively; the identity matrix here
+            // is just a neutral placeholder for the Flutter editor preview.
+            ArColorFilterItemModel(
+              id: 'cityfilm',
+              label: 'City Film',
+              emoji: '🎬',
+              sortOrder: 2,
+              previewColorHex: '#9AA7B0',
+              colorMatrix: _identityMatrix,
+            ),
+          ],
+        ),
+        // Film LUT pack (assets/luts/*.png). These are LUT-only grades: the live
+        // camera + captured photo sample the PNG LUT natively. The identity
+        // matrix is a neutral placeholder for the Flutter editor preview.
+        ArColorFilterCategoryModel(
+          id: 'film',
+          label: 'Film',
+          sortOrder: 3,
+          filters: [
+            ArColorFilterItemModel(
+              id: 'going_for_a_walk',
+              label: 'Going for a Walk',
+              emoji: '🚶',
+              sortOrder: 0,
+              previewColorHex: '#A8B89A',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'good_morning',
+              label: 'Good Morning',
+              emoji: '🌅',
+              sortOrder: 1,
+              previewColorHex: '#F3D9A6',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'nah',
+              label: 'Nah',
+              emoji: '😎',
+              sortOrder: 2,
+              previewColorHex: '#B6ADA0',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'once_upon_a_time',
+              label: 'Once Upon a Time',
+              emoji: '📖',
+              sortOrder: 3,
+              previewColorHex: '#C9B08A',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'passing_by',
+              label: 'Passing By',
+              emoji: '🚗',
+              sortOrder: 4,
+              previewColorHex: '#9FB0B5',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'serenity',
+              label: 'Serenity',
+              emoji: '🕊️',
+              sortOrder: 5,
+              previewColorHex: '#Bcd3d6',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'undeniable_2',
+              label: 'Undeniable 2',
+              emoji: '✨',
+              sortOrder: 6,
+              previewColorHex: '#D2B7A0',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'undeniable',
+              label: 'Undeniable',
+              emoji: '💫',
+              sortOrder: 7,
+              previewColorHex: '#D2B7A0',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'urban_cowboy',
+              label: 'Urban Cowboy',
+              emoji: '🤠',
+              sortOrder: 8,
+              previewColorHex: '#C7A98A',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'you_can_do_it',
+              label: 'You Can Do It',
+              emoji: '💪',
+              sortOrder: 9,
+              previewColorHex: '#E0C6A6',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'smooth_sailing',
+              label: 'Smooth Sailing',
+              emoji: '⛵',
+              sortOrder: 10,
+              previewColorHex: '#A9C4CC',
+              colorMatrix: _identityMatrix,
+            ),
+            ArColorFilterItemModel(
+              id: 'well_see',
+              label: "We'll See",
+              emoji: '🌤️',
+              sortOrder: 11,
+              previewColorHex: '#C3C0B2',
+              colorMatrix: _identityMatrix,
+            ),
           ],
         ),
       ],
     );
   }
 }
+
+/// Neutral placeholder matrix for LUT-only grades (native applies the real LUT).
+const List<double> _identityMatrix = [
+  1, 0, 0, 0, 0, //
+  0, 1, 0, 0, 0, //
+  0, 0, 1, 0, 0, //
+  0, 0, 0, 1, 0, //
+];
 
 class ArColorFilterCategoryModel {
   const ArColorFilterCategoryModel({

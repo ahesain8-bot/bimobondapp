@@ -442,14 +442,16 @@ class CameraRecordButton extends StatelessWidget {
                 border: Border.all(color: Colors.white, width: 4.5),
               ),
             ),
+            // Always use rectangle + borderRadius (never shape:circle) so
+            // AnimatedContainer's decoration lerp never hits Flutter's
+            // "A circle cannot have a border radius" assert while recording.
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               width: isRecording ? 30 : 58,
               height: isRecording ? 30 : 58,
               decoration: BoxDecoration(
                 color: innerColor,
-                shape: isRecording ? BoxShape.rectangle : BoxShape.circle,
-                borderRadius: isRecording ? BorderRadius.circular(6) : null,
+                borderRadius: BorderRadius.circular(isRecording ? 6 : 29),
               ),
             ),
           ],

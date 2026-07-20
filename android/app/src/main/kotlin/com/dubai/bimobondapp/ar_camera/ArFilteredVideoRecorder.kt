@@ -61,7 +61,7 @@ class ArFilteredVideoRecorder {
             audioTempFile?.delete()
             armed.set(true)
             frameIndex = 0
-            startMicRecorder()
+           
         }
     }
 
@@ -223,6 +223,7 @@ class ArFilteredVideoRecorder {
         drainHandler = Handler(thread.looper)
         running.set(true)
         armed.set(false)
+        startMicRecorder()   
         drainHandler?.post { drainLoop() }
         Log.i(TAG, "encoder started ${output.name} ${width}x$height (src ${srcW}x$srcH)")
     }

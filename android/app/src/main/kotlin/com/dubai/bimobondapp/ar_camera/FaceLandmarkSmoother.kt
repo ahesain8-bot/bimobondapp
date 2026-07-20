@@ -58,6 +58,10 @@ object FaceLandmarkSmoother {
             mouthBottom = lerpPoint(prev.mouthBottom, current.mouthBottom, alpha),
             topHead = lerpPoint(prev.topHead, current.topHead, alpha),
             landmarks = smoothLandmarks(prev.landmarks, current.landmarks, alpha),
+            hasHeadPose = current.hasHeadPose || prev.hasHeadPose,
+            pitchDeg = lerp(prev.pitchDeg, current.pitchDeg, alpha),
+            yawDeg = lerp(prev.yawDeg, current.yawDeg, alpha),
+            rollDeg = lerpAngle(prev.rollDeg, current.rollDeg, alpha),
         )
         previous = smoothed
         return smoothed
@@ -85,6 +89,16 @@ object FaceLandmarkSmoother {
     ): List<PointF> {
         if (prev.size != cur.size) return cur
         return List(cur.size) { i -> lerpPoint(prev[i], cur[i], alpha) }
+    }
+
+    private fun lerp(from: Float, to: Float, alpha: Float): Float =
+        from + (to - from) * alpha
+
+    private fun lerpAngle(from: Float, to: Float, alpha: Float): Float {
+        var d = to - from
+        while (d > 180f) d -= 360f
+        while (d < -180f) d += 360f
+        return from + d * alpha
     }
 
     private fun lerpPoint(from: PointF, to: PointF, alpha: Float): PointF {

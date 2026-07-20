@@ -144,14 +144,15 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           onTap: widget.onTimer,
           active: widget.timerEnabled,
         ),
-        _SideToolItem(
-          icon: LucideIcons.layoutGrid,
-          label: widget.labels.layout,
-          onTap: widget.onLayout,
-          active: _layoutActive || widget.layoutPickerOpen,
-          showActiveBadge: _layoutActive,
-          layoutMode: widget.selectedLayoutMode,
-        ),
+        // Layout temporarily hidden (photo + video). Uncomment to restore.
+        // _SideToolItem(
+        //   icon: LucideIcons.layoutGrid,
+        //   label: widget.labels.layout,
+        //   onTap: widget.onLayout,
+        //   active: _layoutActive || widget.layoutPickerOpen,
+        //   showActiveBadge: _layoutActive,
+        //   layoutMode: widget.selectedLayoutMode,
+        // ),
         if (widget.showAspectRatio)
           _SideToolItem(
             icon: LucideIcons.ratio,

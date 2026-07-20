@@ -13,8 +13,10 @@ String arFilterLabelFromId(
   return switch (id) {
     'none' => l10n.cameraFilterOriginal,
     'glasses' => l10n.cameraEffectGlasses,
+    'shades' => l10n.cameraEffectSunglasses,
     'dog' => l10n.cameraEffectDog,
     'moustache' => l10n.cameraEffectMoustache,
+    'mask' => fallback ?? 'Mask',
     'big_eyes' => l10n.cameraEffectBigEyes,
     'big_lips' => l10n.cameraEffectBigLips,
     'long_nose' => l10n.cameraEffectNose,

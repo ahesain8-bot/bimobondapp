@@ -64,6 +64,9 @@ class AddPostCameraScreen extends StatefulWidget {
 class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     with FeedPlaybackBlocker {
   CameraState? _cameraState;
+  // Preserve native preview identity across layout mode changes to avoid a
+  // brief native re-init ("blink") when the preview widget moves.
+  static const _arPreviewKey = ValueKey<String>('ar-camera-preview');
   bool _pendingVideoStart = false;
   bool _returnToPhotoAfterVideo = false;
   bool _showFilters = false;
@@ -1711,24 +1714,31 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
   }
 
-  Widget _buildLayoutCameraPreview() {
-    final mode = _layoutMode;
-    final last = mode.cellCount - 1;
-    final active = last < 0
-        ? 0
-        : (_layoutActiveCell < 0
-            ? 0
-            : (_layoutActiveCell > last ? last : _layoutActiveCell));
+  /// Native AR preview host — always the same widget tree so the PlatformView
+  /// is never torn down when layout mode toggles (that caused mirror + blink).
+  Widget _buildNativeArPreviewHost() {
     return ColoredBox(
       color: Colors.black,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final screen = Size(constraints.maxWidth, constraints.maxHeight);
-          final cell = mode.cellRect(screen, active);
-          final frame = CameraLayoutComposer.previewFrameForCell(
-            screen: screen,
-            cell: cell,
-          );
+          final Rect frame;
+          if (_layoutMode == CameraLayoutMode.off) {
+            frame = Offset.zero & screen;
+          } else {
+            final mode = _layoutMode;
+            final last = mode.cellCount - 1;
+            final active = last < 0
+                ? 0
+                : (_layoutActiveCell < 0
+                    ? 0
+                    : (_layoutActiveCell > last ? last : _layoutActiveCell));
+            final cell = mode.cellRect(screen, active);
+            frame = CameraLayoutComposer.previewFrameForCell(
+              screen: screen,
+              cell: cell,
+            );
+          }
           return Stack(
             clipBehavior: Clip.hardEdge,
             children: [
@@ -1737,7 +1747,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 top: frame.top,
                 width: frame.width,
                 height: frame.height,
-                child: const ArCameraPreview(),
+                child: ArCameraPreview(key: _arPreviewKey),
               ),
             ],
           );
@@ -1754,9 +1764,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       fit: StackFit.expand,
       children: [
         Positioned.fill(
-          child: _layoutMode == CameraLayoutMode.off
-              ? _wrapPreviewGestures(const ArCameraPreview())
-              : _wrapPreviewGestures(_buildLayoutCameraPreview()),
+          child: _wrapPreviewGestures(_buildNativeArPreviewHost()),
         ),
         if (_flashEnabled && _isFrontCamera)
           const Positioned.fill(child: FrontScreenFlashOverlay()),
@@ -1885,7 +1893,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               : (_studioMode == CameraStudioMode.video
                     ? CaptureMode.video
                     : CaptureMode.photo),
-          mirrorFrontCamera: true,
+          // Mirror only when the active sensor is actually the front camera.
+          // This prevents a brief "wrong mirrored" preview flash during
+          // layout reconfiguration.
+          mirrorFrontCamera: _isFrontCamera,
         ),
         sensorConfig: SensorConfig.single(
           sensor: Sensor.position(SensorPosition.back),

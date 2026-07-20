@@ -20,4 +20,9 @@ data class FaceLandmarkSnapshot(
     val mouthBottom: PointF,
     val topHead: PointF,
     val landmarks: List<PointF>,
+    /** Head pose from facial transformation matrix (degrees). */
+    val hasHeadPose: Boolean = false,
+    val pitchDeg: Float = 0f,
+    val yawDeg: Float = 0f,
+    val rollDeg: Float = 0f,
 )

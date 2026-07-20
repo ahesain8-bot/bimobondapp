@@ -48,21 +48,31 @@ class FaceLandmarkerHelper(context: Context) {
     }
 
     private fun createLandmarker(delegate: Delegate): FaceLandmarker {
+        return try {
+            createLandmarker(delegate, outputPoseMatrix = true)
+        } catch (e: Exception) {
+            Log.w(TAG, "Pose matrices unavailable, landmarks-only landmarker", e)
+            createLandmarker(delegate, outputPoseMatrix = false)
+        }
+    }
+
+    private fun createLandmarker(delegate: Delegate, outputPoseMatrix: Boolean): FaceLandmarker {
         val baseOptions = BaseOptions.builder()
             .setDelegate(delegate)
             .setModelAssetPath(MODEL_ASSET)
             .build()
 
-        val options = FaceLandmarker.FaceLandmarkerOptions.builder()
+        val builder = FaceLandmarker.FaceLandmarkerOptions.builder()
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.VIDEO)
             .setNumFaces(1)
             .setMinFaceDetectionConfidence(0.5f)
             .setMinFacePresenceConfidence(0.5f)
             .setMinTrackingConfidence(0.5f)
-            .build()
-
-        return FaceLandmarker.createFromOptions(appContext, options)
+        if (outputPoseMatrix) {
+            builder.setOutputFacialTransformationMatrixes(true)
+        }
+        return FaceLandmarker.createFromOptions(appContext, builder.build())
     }
 
     companion object {
