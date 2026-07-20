@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:video_player/video_player.dart';
 
 class SoundAudioPreview {
@@ -26,7 +28,9 @@ class SoundAudioPreview {
     await playAt(soundId, audioUrl);
   }
 
-  /// Plays [audioUrl] from [startOffset] for up to [window] (default 15s).
+  /// Plays [audioUrl] from [startOffset] for up to [window] (default 15s),
+  /// then stops. Does not loop — leftover looping was causing music to keep
+  /// playing after the picker closed / during capture & upload.
   static Future<void> playAt(
     String soundId,
     String audioUrl, {
@@ -42,9 +46,8 @@ class SoundAudioPreview {
     _controller = controller;
     _playingId = soundId;
     _loopStart = startOffset < Duration.zero ? Duration.zero : startOffset;
-    _loopEnd = _loopStart + (window <= Duration.zero
-        ? const Duration(seconds: 15)
-        : window);
+    _loopEnd = _loopStart +
+        (window <= Duration.zero ? const Duration(seconds: 15) : window);
 
     try {
       await controller.initialize();
@@ -72,11 +75,10 @@ class SoundAudioPreview {
     if (controller == null || !controller.value.isInitialized) return;
     if (!controller.value.isPlaying) return;
     final pos = controller.value.position;
-    final end = _loopEnd > _loopStart
-        ? _loopEnd
-        : controller.value.duration;
+    final end = _loopEnd > _loopStart ? _loopEnd : controller.value.duration;
     if (end > Duration.zero && pos >= end - const Duration(milliseconds: 80)) {
-      controller.seekTo(_loopStart);
+      // End of the selected preview window — stop (do not seek/loop).
+      unawaited(stop());
     }
   }
 
@@ -88,8 +90,12 @@ class SoundAudioPreview {
     _loopEnd = Duration.zero;
     if (controller != null) {
       controller.removeListener(_onTick);
-      await controller.pause();
-      await controller.dispose();
+      try {
+        await controller.pause();
+      } catch (_) {}
+      try {
+        await controller.dispose();
+      } catch (_) {}
     }
   }
 }

@@ -190,6 +190,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   @override
   void dispose() {
     _smoothDebounce?.cancel();
+    unawaited(SoundAudioPreview.stop());
     try {
       _smoothPreviewFile?.deleteSync();
     } catch (_) {}
@@ -426,6 +427,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   Future<void> _finishAsPost({required bool asStory}) async {
     if (_isProcessing) return;
+    unawaited(SoundAudioPreview.stop());
     setState(() => _isProcessing = true);
 
     try {
@@ -695,9 +697,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       allowMuteOnTrim: hasVideo,
     );
     if (!mounted || picked == null) return;
+    if (picked.cleared) {
+      _clearSound();
+      return;
+    }
+    final sound = picked.sound;
+    if (sound == null) return;
 
     setState(() {
-      _selectedSound = picked.sound;
+      _selectedSound = sound;
       _soundStartOffset = picked.offset;
       _soundWindow = picked.window > Duration.zero
           ? picked.window
@@ -1054,15 +1062,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                   onEdit: _editText,
                 ),
               ),
-            if (_currentState.textOverlays.isNotEmpty)
-              Positioned.fill(
-                child: MediaTextOverlayLayer(
-                  key: ValueKey('text-overlays-$_currentIndex'),
-                  overlays: _currentState.textOverlays,
-                  onChanged: _moveOverlay,
-                  onEdit: _editText,
-                ),
-              ),
             SafeArea(
               child: Column(
                 children: [
@@ -1077,106 +1076,75 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                         ? () {}
                         : () => _showSettingsSheet(l10n),
                   ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: 8,
+                          bottom: 8,
+                          right: isRtl ? null : 0,
+                          left: isRtl ? 0 : null,
+                          child: MediaStudioSideRail(tools: _sideTools(l10n)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_showPhotoEditor)
+                    MediaPhotoEditorPanel(
+                      l10n: l10n,
+                      tab: _photoEditorTab,
+                      selectedTool: _photoEditorTool,
+                      magicOn: _magicOn,
+                      adjustmentValues: _adjustments,
+                      onTabChanged: (tab) =>
+                          setState(() => _photoEditorTab = tab),
+                      onToolSelected: _onPhotoEditorToolSelected,
+                      onMagicToggled: _onMagicToggled,
+                      onAdjustmentChanged: _onAdjustmentChanged,
+                      onReset: _resetPhotoEditor,
+                    )
+                  else if (_showFilters)
+                    ArColorFiltersPanel(
+                      selectedFilterId: selectedColorId,
+                      selectedCategoryId: _arColorCategoryId,
+                      intensity: _arFilterIntensity,
+                      onCategorySelected: (id) => setState(() {
+                        _arColorCategoryId = id;
+                        _saveUiToCurrentState();
+                      }),
+                      onFilterSelected: _selectArFilter,
+                      onIntensityChanged: (value) {
+                        setState(() {
+                          _arFilterIntensity = value;
+                          _saveUiToCurrentState();
+                        });
+                        if (!_currentState.isVideo && _needsColorLutPreview) {
+                          _scheduleFacePreview();
+                        }
+                      },
+                      onClear: () => _selectArFilter('none'),
+                      onApply: () => setState(() => _showFilters = false),
+                    ),
+                  if (!_showPhotoEditor) ...[
+                    MediaStudioClipDock(
+                      items:
+                          _states.map((s) => s.item).toList(growable: false),
+                      selectedIndex: _currentIndex,
+                      onSelected: _selectIndex,
+                      onAdd: _isProcessing ? () {} : _addMedia,
+                    ),
+                    MediaStudioBottomActions(
+                      yourStoryLabel: l10n.messagesYourStory,
+                      nextLabel: l10n.nextAction,
+                      avatarUrl: avatarUrl,
+                      enabled: !_isProcessing,
+                      onYourStory: _onYourStory,
+                      onNext: _onNext,
+                    ),
+                  ],
                 ],
               ),
             ),
-            if (_showPhotoEditor)
-              MediaPhotoEditorPanel(
-                l10n: l10n,
-                tab: _photoEditorTab,
-                selectedTool: _photoEditorTool,
-                magicOn: _magicOn,
-                adjustmentValues: _adjustments,
-                onTabChanged: (tab) => setState(() => _photoEditorTab = tab),
-                onToolSelected: _onPhotoEditorToolSelected,
-                onMagicToggled: _onMagicToggled,
-                onAdjustmentChanged: _onAdjustmentChanged,
-                onReset: _resetPhotoEditor,
-              )
-            else if (_showFilters)
-              ArColorFiltersPanel(
-                selectedFilterId: selectedColorId,
-                selectedCategoryId: _arColorCategoryId,
-                intensity: _arFilterIntensity,
-                onCategorySelected: (id) => setState(() {
-                  _arColorCategoryId = id;
-                  _saveUiToCurrentState();
-                }),
-                onFilterSelected: _selectArFilter,
-                onIntensityChanged: (value) {
-                  setState(() {
-                    _arFilterIntensity = value;
-                    _saveUiToCurrentState();
-                  });
-                  if (!_currentState.isVideo && _needsColorLutPreview) {
-                    _scheduleFacePreview();
-                  }
-                },
-                onClear: () => _selectArFilter('none'),
-                onApply: () => setState(() => _showFilters = false),
-              ),
-            if (!_showPhotoEditor) ...[
-              MediaStudioClipDock(
-                items: _states.map((s) => s.item).toList(growable: false),
-                selectedIndex: _currentIndex,
-                onSelected: _selectIndex,
-                onAdd: _isProcessing ? () {} : _addMedia,
-              ),
-              MediaStudioBottomActions(
-                yourStoryLabel: l10n.messagesYourStory,
-                nextLabel: l10n.nextAction,
-                avatarUrl: avatarUrl,
-                enabled: !_isProcessing,
-                onYourStory: _onYourStory,
-                onNext: _onNext,
-              ),
-              if (_showPhotoEditor)
-                MediaPhotoEditorPanel(
-                  l10n: l10n,
-                  tab: _photoEditorTab,
-                  selectedTool: _photoEditorTool,
-                  magicOn: _magicOn,
-                  adjustmentValues: _adjustments,
-                  onTabChanged: (tab) => setState(() => _photoEditorTab = tab),
-                  onToolSelected: _onPhotoEditorToolSelected,
-                  onMagicToggled: _onMagicToggled,
-                  onAdjustmentChanged: _onAdjustmentChanged,
-                  onReset: _resetPhotoEditor,
-                )
-              else if (_showFilters)
-                ArColorFiltersPanel(
-                  selectedFilterId: selectedColorId,
-                  selectedCategoryId: _arColorCategoryId,
-                  intensity: _arFilterIntensity,
-                  onCategorySelected: (id) => setState(() {
-                    _arColorCategoryId = id;
-                    _saveUiToCurrentState();
-                  }),
-                  onFilterSelected: _selectArFilter,
-                  onIntensityChanged: (value) => setState(() {
-                    _arFilterIntensity = value;
-                    _saveUiToCurrentState();
-                  }),
-                  onClear: () => _selectArFilter('none'),
-                  onApply: () {},
-                ),
-              if (!_showPhotoEditor) ...[
-                MediaStudioClipDock(
-                  items: _states.map((s) => s.item).toList(growable: false),
-                  selectedIndex: _currentIndex,
-                  onSelected: _selectIndex,
-                  onAdd: _isProcessing ? () {} : _addMedia,
-                ),
-                MediaStudioBottomActions(
-                  yourStoryLabel: l10n.messagesYourStory,
-                  nextLabel: l10n.nextAction,
-                  avatarUrl: avatarUrl,
-                  enabled: !_isProcessing,
-                  onYourStory: _onYourStory,
-                  onNext: _onNext,
-                ),
-              ],
-            ],
             if (_showExitMenu)
               _ExitConfirmMenu(
                 isRtl: isRtl,

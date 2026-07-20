@@ -15,6 +15,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_sett
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_settings_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_tag_button.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
@@ -140,6 +141,7 @@ class _AddPostScreenState extends State<AddPostScreen>
 
   @override
   void dispose() {
+    SoundAudioPreview.stop();
     _descriptionController.dispose();
     _auctionItemNameController.dispose();
     _startingPriceController.dispose();
@@ -331,6 +333,9 @@ class _AddPostScreenState extends State<AddPostScreen>
       }
     }
 
+    // Stop any leftover sound preview before upload/processing starts.
+    SoundAudioPreview.stop();
+
     context.read<PostsBloc>().add(
       CreatePostWithMediaRequestedEvent(
         type: _type,
@@ -404,8 +409,18 @@ class _AddPostScreenState extends State<AddPostScreen>
       initialWindow: _soundWindow,
     );
     if (!mounted || picked == null) return;
+    if (picked.cleared) {
+      setState(() {
+        _selectedSound = null;
+        _soundStartOffset = Duration.zero;
+        _soundWindow = const Duration(seconds: 15);
+      });
+      return;
+    }
+    final sound = picked.sound;
+    if (sound == null) return;
     setState(() {
-      _selectedSound = picked.sound;
+      _selectedSound = sound;
       _soundStartOffset = picked.offset;
       _soundWindow = picked.window > Duration.zero
           ? picked.window

@@ -3377,7 +3377,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get soundConfirmSelection => 'Use selected sound';
 
   @override
-  String get soundClearSelection => 'Clear';
+  String get soundClearSelection => 'Remove music';
 
   @override
   String get soundDetailTitle => 'Sound';

@@ -135,10 +135,7 @@ class _SoundListTileState extends State<SoundListTile> {
                     fit: StackFit.expand,
                     children: [
                       if (cover != null && cover.isNotEmpty)
-                        SafeNetworkImage(
-                          imageUrl: cover,
-                          fit: BoxFit.cover,
-                        )
+                        SafeNetworkImage(imageUrl: cover, fit: BoxFit.cover)
                       else
                         ColoredBox(
                           color: silhouetteBg,

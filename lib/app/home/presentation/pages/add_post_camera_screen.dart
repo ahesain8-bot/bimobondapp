@@ -193,6 +193,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void dispose() {
     _recordTimer?.cancel();
     _countdownTimer?.cancel();
+    unawaited(SoundAudioPreview.stop());
     _clearLayoutCapture();
     if (_useNativeArFilters) {
       unawaited(ArCameraBridge.setPreviewLetterbox(topPx: 0, bottomPx: 0));
@@ -211,6 +212,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Future<void> _importFromGallery(List<GalleryMediaItem> items) async {
     if (items.isEmpty || !mounted) return;
+    unawaited(SoundAudioPreview.stop());
     setState(() => _isBusy = true);
     try {
       if (widget.returnMediaOnDone) {
@@ -320,6 +322,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     File file, {
     required String type,
   }) async {
+    // Leave camera → editor: never carry a catalog preview into the next step.
+    unawaited(SoundAudioPreview.stop());
     final edited = await MediaGalleryImportFlow.openBatchEditor(
       context,
       items: [GalleryMediaItem(file: file, type: type)],
@@ -359,8 +363,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       initialWindow: _soundWindow,
     );
     if (!mounted || picked == null) return;
+    if (picked.cleared) {
+      _clearSound();
+      return;
+    }
+    final sound = picked.sound;
+    if (sound == null) return;
     setState(() {
-      _selectedSound = picked.sound;
+      _selectedSound = sound;
       _soundStartOffset = picked.offset;
       _soundWindow = picked.window > Duration.zero
           ? picked.window
@@ -371,6 +381,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     await SoundAudioPreview.stop();
   }
 
+  void _clearSound() {
+    unawaited(SoundAudioPreview.stop());
+    setState(() {
+      _selectedSound = null;
+      _soundStartOffset = Duration.zero;
+      _soundWindow = const Duration(seconds: 15);
+      _muteOriginalAudio = false;
+    });
+  }
+
   AwesomeFilter _effectiveCaptureFilter() {
     if (_selectedFilter.id != AwesomeFilter.None.id) return _selectedFilter;
     if (_beautyEnabled) return CameraFilterCatalog.beautyFilter.filter;
@@ -379,6 +399,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Future<void> _onMediaCapture(MediaCapture capture) async {
     if (!mounted) return;
+
+    // Capture begins — kill any leftover catalog preview so it can't keep
+    // looping under the processing / editor flow.
+    unawaited(SoundAudioPreview.stop());
 
     if (capture.status == MediaCaptureStatus.failure) {
       if (_isBusy || _isProcessingCapture) {
@@ -565,6 +589,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _startRecordTimer({bool resume = false}) {
+    unawaited(SoundAudioPreview.stop());
     _recordTimer?.cancel();
     // Capture the speed for this segment so per-portion speed is preserved even
     // if the user changes speed again later.
@@ -1875,6 +1900,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           },
           onTimerToggle: _openCountdownSheet,
           onMusicTap: _pickSound,
+          onClearSound: _selectedSound == null ? null : _clearSound,
           onLayoutTap: _toggleLayoutPicker,
           onAspectRatioTap: _toggleRatioLetterbox,
           onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
@@ -2013,6 +2039,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                     setState(() => _showFilters = !_showFilters),
                 onTimerToggle: _openCountdownSheet,
                 onMusicTap: _pickSound,
+                onClearSound: _selectedSound == null ? null : _clearSound,
                 onLayoutTap: _toggleLayoutPicker,
                 onAspectRatioTap: _toggleRatioLetterbox,
                 onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),

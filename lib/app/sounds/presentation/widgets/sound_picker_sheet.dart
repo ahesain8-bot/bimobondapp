@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.d
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_trim_sheet.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
@@ -47,9 +48,7 @@ class SoundPickerSheet extends StatefulWidget {
       isScrollControlled: true,
       builder: (ctx) => SoundPickerTheme(
         child: Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-          ),
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
           child: GlassBottomSheetShell(
             lightSurface: true,
             expand: false,
@@ -63,6 +62,15 @@ class SoundPickerSheet extends StatefulWidget {
     );
 
     if (picked == null || !context.mounted) {
+      await SoundAudioPreview.stop();
+      return null;
+    }
+    if (picked.cleared) {
+      await SoundAudioPreview.stop();
+      return picked;
+    }
+    final sound = picked.sound;
+    if (sound == null) {
       await SoundAudioPreview.stop();
       return null;
     }
@@ -80,10 +88,10 @@ class SoundPickerSheet extends StatefulWidget {
     }
 
     // Re-open trim on the same sound restores the last saved period.
-    final restorePeriod = initialSelection?.id == picked.sound.id;
+    final restorePeriod = initialSelection?.id == sound.id;
     final trim = await SoundTrimSheet.show(
       context,
-      sound: picked.sound,
+      sound: sound,
       windowLength: restorePeriod
           ? (initialWindow ?? const Duration(seconds: 15))
           : const Duration(seconds: 15),
@@ -96,7 +104,7 @@ class SoundPickerSheet extends StatefulWidget {
     if (trim == null) {
       // Cancelled trim — keep prior period if we were re-editing it.
       return SoundPickResult(
-        sound: picked.sound,
+        sound: sound,
         offset: restorePeriod ? initialOffset : Duration.zero,
         window: restorePeriod
             ? (initialWindow ?? const Duration(seconds: 15))
@@ -104,9 +112,9 @@ class SoundPickerSheet extends StatefulWidget {
       );
     }
 
-    await SoundLocalCatalogStore.pushRecent(picked.sound);
+    await SoundLocalCatalogStore.pushRecent(sound);
     return SoundPickResult(
-      sound: picked.sound,
+      sound: sound,
       offset: trim.offset,
       window: trim.window,
       muteOriginal: trim.muteOriginal,
@@ -304,16 +312,12 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
       // Second tap → choose period; check applies sound and closes the sheet.
       await SoundAudioPreview.stop();
       if (!mounted) return;
-      Navigator.of(context).pop(
-        SoundPickResult(sound: sound, needsTrim: true),
-      );
+      Navigator.of(context).pop(SoundPickResult(sound: sound, needsTrim: true));
       return;
     }
 
     setState(() => _selected = sound);
-    unawaited(
-      SoundAudioPreview.toggle(sound.id, sound.resolvedAudioUrl),
-    );
+    unawaited(SoundAudioPreview.toggle(sound.id, sound.resolvedAudioUrl));
   }
 
   Future<void> _confirm(
@@ -339,9 +343,13 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   Future<void> _openTrim(SoundEntity sound) async {
     await SoundAudioPreview.stop();
     if (!mounted) return;
-    Navigator.of(context).pop(
-      SoundPickResult(sound: sound, needsTrim: true),
-    );
+    Navigator.of(context).pop(SoundPickResult(sound: sound, needsTrim: true));
+  }
+
+  Future<void> _clearSelection() async {
+    await SoundAudioPreview.stop();
+    if (!mounted) return;
+    Navigator.of(context).pop(const SoundPickResult.cleared());
   }
 
   Future<void> _toggleFavorite(SoundEntity sound) async {
@@ -350,10 +358,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     setState(() {
       if (favorited) {
         _favoriteIds.add(sound.id);
-        _favorites = [
-          sound,
-          ..._favorites.where((s) => s.id != sound.id),
-        ];
+        _favorites = [sound, ..._favorites.where((s) => s.id != sound.id)];
       } else {
         _favoriteIds.remove(sound.id);
         _favorites = _favorites.where((s) => s.id != sound.id).toList();
@@ -391,8 +396,10 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.88;
+    final canRemove = widget.initialSelection != null;
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -423,6 +430,29 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
                   unawaited(_loadForYou());
                 },
               ),
+              if (canRemove)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: OutlinedButton.icon(
+                    onPressed: () => unawaited(_clearSelection()),
+                    icon: Icon(
+                      Icons.music_off_rounded,
+                      size: 18,
+                      color: scheme.onSurface.withValues(alpha: 0.75),
+                    ),
+                    label: Text(l10n.soundClearSelection),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: scheme.onSurface,
+                      side: BorderSide(
+                        color: scheme.onSurface.withValues(alpha: 0.18),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: SoundPickerList(
                   loading: _currentLoading(),
@@ -430,8 +460,8 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
                   selectedId: _selected?.id,
                   favoriteIds: _favoriteIds,
                   error: _error,
-                  showError: _tabController.index == 0 ||
-                      _tabController.index == 1,
+                  showError:
+                      _tabController.index == 0 || _tabController.index == 1,
                   onRetry: () => unawaited(_retryCurrent()),
                   onSoundTap: (sound) => unawaited(_onSoundTap(sound)),
                   onScissorsTap: (sound) => unawaited(_openTrim(sound)),

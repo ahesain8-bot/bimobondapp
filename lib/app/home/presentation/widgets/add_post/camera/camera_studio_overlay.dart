@@ -62,6 +62,7 @@ class CameraStudioOverlay extends StatelessWidget {
     required this.onFiltersToggle,
     required this.onTimerToggle,
     required this.onMusicTap,
+    this.onClearSound,
     required this.onLayoutTap,
     required this.onAspectRatioTap,
     required this.onTextModeTap,
@@ -130,6 +131,7 @@ class CameraStudioOverlay extends StatelessWidget {
   final VoidCallback onFiltersToggle;
   final VoidCallback onTimerToggle;
   final VoidCallback onMusicTap;
+  final VoidCallback? onClearSound;
   final VoidCallback onLayoutTap;
   final VoidCallback onAspectRatioTap;
   final VoidCallback onTextModeTap;
@@ -247,6 +249,7 @@ class CameraStudioOverlay extends StatelessWidget {
                   soundLabel: soundLabel ?? l10n.cameraOriginalSound,
                   addSoundLabel: l10n.cameraAddSound,
                   onSoundTap: onMusicTap,
+                  onClearSound: onClearSound,
                   isLiveMode: isLiveMode,
                   // Hide the sound pill while recording — it overlaps the
                   // recording-seconds badge shown at the top center.

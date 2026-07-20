@@ -6482,7 +6482,7 @@ abstract class AppLocalizations {
   /// No description provided for @soundClearSelection.
   ///
   /// In en, this message translates to:
-  /// **'Clear'**
+  /// **'Remove music'**
   String get soundClearSelection;
 
   /// No description provided for @soundDetailTitle.

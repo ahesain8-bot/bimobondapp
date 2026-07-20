@@ -3377,7 +3377,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get soundConfirmSelection => 'استخدام الصوت المحدد';
 
   @override
-  String get soundClearSelection => 'مسح';
+  String get soundClearSelection => 'إزالة الموسيقى';
 
   @override
   String get soundDetailTitle => 'الصوت';
