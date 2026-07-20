@@ -6,7 +6,6 @@ import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostEntity post;
@@ -40,7 +39,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         if (state is UpdatePostSuccess && state.post.id == _post.id) {
           setState(() => _post = state.post);
         } else if (state is DeletePostSuccess && state.postId == _post.id) {
-          context.pop();
+          Navigator.of(context).maybePop();
         }
       },
       child: Scaffold(
@@ -51,12 +50,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           elevation: 0,
           leading: IconButton(
             icon: const DirectionalBackIcon(color: Colors.white, size: 20),
-            onPressed: () => context.pop(),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
         body: VideoPostWidget(
           key: ValueKey('${_post.id}_${_post.description}'),
           post: _post,
+          isActive: true,
+          // Never the home feed — gate stays blocked under overlays like sound
+          // detail, which would leave this screen silent/frozen.
+          respectFeedPlaybackGate: false,
           bottomPadding: MediaQuery.of(context).padding.bottom + 16,
           openCommentsOnLoad: widget.openCommentsOnLoad,
           highlightCommentId: widget.highlightCommentId,

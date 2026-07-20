@@ -1,16 +1,76 @@
 package com.dubai.bimobondapp.ar_camera
 
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Bakes AR color grades into pixels so photo/video match the live GPU preview.
- * Matrices align with Flutter [ArColorFilterMatrix].
+ * The grade is sampled from the same PNG LUT the live GPU preview uses.
  */
 object ArColorGradeBaker {
+
+    /**
+     * Loads [inputPath], bakes the [filterId] color grade via its LUT, and writes
+     * the result to a new JPEG in the cache dir. Returns the output path, or null
+     * when there's nothing to apply / the LUT can't be loaded. Used by the editor
+     * (photos) so gallery imports get the exact same look as the live camera.
+     *
+     * [maxEdge] > 0 downscales for a fast live preview; pass null/0 for full-res
+     * export.
+     */
+    fun applyToFile(
+        context: Context,
+        inputPath: String,
+        filterId: String,
+        intensity: Float,
+        maxEdge: Int? = null,
+    ): String? {
+        val filter = FilterType.fromId(filterId)
+        val asset = filter.lutAsset() ?: return null
+        val t = intensity.coerceIn(0f, 1f)
+        if (t <= 0.001f) return null
+
+        val decoded = BitmapFactory.decodeFile(inputPath) ?: return null
+        val source = if (maxEdge != null && maxEdge > 0) {
+            downscale(decoded, maxEdge)
+        } else {
+            decoded
+        }
+
+        // LutStore.apply returns the same instance it was given when the LUT
+        // can't be loaded — treat that as "nothing baked".
+        val graded = LutStore.apply(context, source, asset, t)
+        val applied = graded !== source
+
+        return try {
+            if (!applied) return null
+            val out = File(context.cacheDir, "ar_lut_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(out).use { stream ->
+                graded.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+            }
+            out.absolutePath
+        } catch (_: Throwable) {
+            null
+        } finally {
+            if (graded !== source && graded !== decoded && !graded.isRecycled) {
+                graded.recycle()
+            }
+            if (source !== decoded && !source.isRecycled) source.recycle()
+            if (!decoded.isRecycled) decoded.recycle()
+        }
+    }
+
+    private fun downscale(src: Bitmap, maxEdge: Int): Bitmap {
+        val longest = maxOf(src.width, src.height)
+        if (longest <= maxEdge) return src
+        val scale = maxEdge.toFloat() / longest
+        val m = Matrix().apply { postScale(scale, scale) }
+        return Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
+    }
 
     fun apply(
         source: Bitmap,
@@ -21,87 +81,10 @@ object ArColorGradeBaker {
         val t = intensity.coerceIn(0f, 1f)
         if (t <= 0.001f) return source
 
-        val matrix = colorMatrixFor(filter) ?: return source
-        val blended = if (t >= 0.999f) matrix else lerpIdentity(matrix, t)
-
-        val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(out)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-            colorFilter = ColorMatrixColorFilter(ColorMatrix(blended))
-        }
-        canvas.drawBitmap(source, 0f, 0f, paint)
-        return out
-    }
-
-    private fun colorMatrixFor(filter: FilterType): FloatArray? = when (filter) {
-        FilterType.WHITENING -> floatArrayOf(
-            1.12f, 0.02f, 0.02f, 0f, 12f,
-            0.02f, 1.10f, 0.02f, 0f, 10f,
-            0.02f, 0.02f, 1.08f, 0f, 8f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.CLARENDON -> floatArrayOf(
-            1.15f, -0.04f, 0.04f, 0f, 8f,
-            -0.02f, 1.12f, 0.02f, 0f, 4f,
-            0.02f, -0.06f, 1.20f, 0f, 6f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.LUDWIG -> floatArrayOf(
-            1.05f, 0.02f, 0.00f, 0f, 6f,
-            0.00f, 1.08f, 0.02f, 0f, 4f,
-            0.00f, 0.00f, 1.12f, 0f, 8f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.ROSY -> floatArrayOf(
-            1.14f, 0.04f, 0.04f, 0f, 10f,
-            0.02f, 0.98f, 0.02f, 0f, 4f,
-            0.06f, 0.02f, 1.02f, 0f, 8f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.VALENCIA -> floatArrayOf(
-            1.18f, 0.06f, -0.02f, 0f, 14f,
-            0.04f, 1.06f, -0.02f, 0f, 8f,
-            -0.04f, 0.00f, 0.96f, 0f, 2f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.WARM -> floatArrayOf(
-            1.16f, 0.08f, 0.00f, 0f, 12f,
-            0.04f, 1.06f, 0.00f, 0f, 6f,
-            -0.04f, -0.02f, 0.94f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.COOL -> floatArrayOf(
-            0.94f, 0.00f, 0.06f, 0f, 0f,
-            0.00f, 1.02f, 0.06f, 0f, 4f,
-            0.04f, 0.04f, 1.18f, 0f, 10f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.VINTAGE -> floatArrayOf(
-            0.95f, 0.10f, 0.05f, 0f, 8f,
-            0.05f, 0.90f, 0.05f, 0f, 4f,
-            0.05f, 0.10f, 0.78f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        FilterType.MONO -> floatArrayOf(
-            0.33f, 0.59f, 0.08f, 0f, 0f,
-            0.33f, 0.59f, 0.08f, 0f, 0f,
-            0.33f, 0.59f, 0.08f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        else -> null
-    }
-
-    private fun lerpIdentity(target: FloatArray, t: Float): FloatArray {
-        val out = FloatArray(20)
-        val identity = floatArrayOf(
-            1f, 0f, 0f, 0f, 0f,
-            0f, 1f, 0f, 0f, 0f,
-            0f, 0f, 1f, 0f, 0f,
-            0f, 0f, 0f, 1f, 0f,
-        )
-        for (i in 0 until 20) {
-            out[i] = identity[i] + (target[i] - identity[i]) * t
-        }
-        return out
+        // Bake the same PNG LUT the live GPU preview uses so the saved photo
+        // matches exactly. No matrix fallback — every grade ships a LUT.
+        val ctx = ArCameraBridge.hostActivity?.applicationContext ?: return source
+        val asset = filter.lutAsset() ?: return source
+        return LutStore.apply(ctx, source, asset, t)
     }
 }

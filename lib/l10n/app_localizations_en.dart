@@ -1686,9 +1686,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messagesInboxLastShare => 'Shared a post';
 
   @override
-  String get messagesInboxLastSticker => 'Sticker';
-
-  @override
   String get messagesInboxMessageDeleted => 'Message deleted';
 
   @override
@@ -1903,9 +1900,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMoreGift => 'Gift';
 
   @override
-  String get chatMoreSticker => 'Sticker';
-
-  @override
   String get chatMorePoll => 'Poll';
 
   @override
@@ -1919,21 +1913,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatGiftSentLabel => 'Gift sent';
-
-  @override
-  String get chatStickerSheetTitle => 'Stickers';
-
-  @override
-  String get chatStickerSheetSubtitle => 'Tap a sticker to send it';
-
-  @override
-  String get chatStickerPackEmotions => 'Emotions';
-
-  @override
-  String get chatStickerPackReactions => 'Reactions';
-
-  @override
-  String get chatStickerPackCelebrations => 'Celebrations';
 
   @override
   String get chatMessageContact => 'Contact';
@@ -3342,10 +3321,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get soundTabMine => 'My sounds';
 
   @override
+  String get soundTabHot => 'Hot';
+
+  @override
+  String get soundTabForYou => 'For You';
+
+  @override
+  String get soundTabFavorites => 'Favorites';
+
+  @override
+  String get soundTabRecent => 'Recent';
+
+  @override
   String get soundPickerEmpty => 'No sounds found';
 
   @override
   String get soundPickFromFiles => 'Pick from files';
+
+  @override
+  String get soundTrimTooltip => 'Trim';
+
+  @override
+  String get soundFavoriteTooltip => 'Favorite';
+
+  @override
+  String soundSecondsSelected(int count) {
+    return '${count}s selected';
+  }
 
   @override
   String get soundUseThis => 'Use';
@@ -3354,10 +3356,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get soundUseThisSound => 'Use this sound';
 
   @override
+  String get soundUseSoundCta => 'Use sound';
+
+  @override
+  String get soundSave => 'Save';
+
+  @override
+  String get soundSaved => 'Saved';
+
+  @override
+  String get soundAddToStory => 'Add to Story';
+
+  @override
+  String get soundFindRelatedHint => 'Find related content';
+
+  @override
+  String get soundOriginalBadge => 'Original';
+
+  @override
   String get soundConfirmSelection => 'Use selected sound';
 
   @override
-  String get soundClearSelection => 'Clear';
+  String get soundClearSelection => 'Remove music';
 
   @override
   String get soundDetailTitle => 'Sound';
@@ -3386,6 +3406,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String soundUseCountMillions(String count) {
     return '${count}M videos';
+  }
+
+  @override
+  String soundPostsCount(int count) {
+    return '$count posts';
+  }
+
+  @override
+  String soundPostsCountThousands(String count) {
+    return '${count}K posts';
+  }
+
+  @override
+  String soundPostsCountMillions(String count) {
+    return '${count}M posts';
   }
 
   @override

@@ -30,8 +30,10 @@ class MediaTextEditorOverlay extends StatefulWidget {
         opaque: true,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: const Duration(milliseconds: 120),
-        pageBuilder: (_, _, _) =>
-            MediaTextEditorOverlay(initial: initial, background: background),
+        pageBuilder: (_, _, _) => MediaTextEditorOverlay(
+          initial: initial,
+          background: background,
+        ),
       ),
     );
   }
@@ -49,6 +51,7 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
   late int _fontStyleIndex;
   late MediaTextLook _look;
   final _colorsKey = GlobalKey();
+  bool _allowPop = false;
 
   // ---- @mention autocomplete -----------------------------------------------
   List<SocialUserEntity> _friends = const [];
@@ -74,19 +77,20 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
 
   /// Live preview overlay used only to resolve contrast / look helpers.
   MediaTextOverlay get _previewOverlay => MediaTextOverlay(
-    id: 'preview',
-    text: _controller.text,
-    color: _color,
-    backgroundColor: _look == MediaTextLook.background ? _color : null,
-    fontSize: _fontSize,
-    textAlign: _textAlign,
-    fontStyleId: _activeFont.id,
-    fontWeight: _activeFont.fontWeight,
-    fontStyle: _activeFont.fontStyle,
-    fontFamily: _activeFont.fontFamily,
-    letterSpacing: _activeFont.letterSpacing,
-    look: _look,
-  );
+        id: 'preview',
+        text: _controller.text,
+        color: _color,
+        backgroundColor:
+            _look == MediaTextLook.background ? _color : null,
+        fontSize: _fontSize,
+        textAlign: _textAlign,
+        fontStyleId: _activeFont.id,
+        fontWeight: _activeFont.fontWeight,
+        fontStyle: _activeFont.fontStyle,
+        fontFamily: _activeFont.fontFamily,
+        letterSpacing: _activeFont.letterSpacing,
+        look: _look,
+      );
 
   @override
   void initState() {
@@ -96,9 +100,8 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
     _color = widget.initial?.color ?? Colors.white;
     _fontSize = widget.initial?.fontSize ?? 28;
     _textAlign = widget.initial?.textAlign ?? TextAlign.center;
-    _fontStyleIndex = MediaTextFontStyles.indexOfId(
-      widget.initial?.fontStyleId,
-    );
+    _fontStyleIndex =
+        MediaTextFontStyles.indexOfId(widget.initial?.fontStyleId);
     _look = widget.initial?.look ?? MediaTextLook.none;
     _controller.addListener(_onTextChanged);
     _preloadPeople();
@@ -175,6 +178,7 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
   void _done() {
     final text = _controller.text.trim();
     if (text.isEmpty) {
+      _allowPop = true;
       Navigator.of(context).pop();
       return;
     }
@@ -184,14 +188,14 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
     final dx = alignChanged
         ? MediaTextOverlay.dxForAlign(_textAlign)
         : (widget.initial?.center.dx ??
-              MediaTextOverlay.dxForAlign(_textAlign));
+            MediaTextOverlay.dxForAlign(_textAlign));
     final font = _activeFont;
-    final base =
-        widget.initial ??
+    final base = widget.initial ??
         MediaTextOverlay(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           text: text,
         );
+    _allowPop = true;
     Navigator.of(context).pop(
       base.copyWith(
         text: text,
@@ -205,7 +209,8 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
         fontStyleId: font.id,
         letterSpacing: font.letterSpacing,
         look: _look,
-        backgroundColor: _look == MediaTextLook.background ? _color : null,
+        backgroundColor:
+            _look == MediaTextLook.background ? _color : null,
       ),
     );
   }
@@ -224,7 +229,8 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
 
   void _cycleFontStyle() {
     setState(() {
-      _fontStyleIndex = (_fontStyleIndex + 1) % MediaTextFontStyles.all.length;
+      _fontStyleIndex =
+          (_fontStyleIndex + 1) % MediaTextFontStyles.all.length;
     });
   }
 
@@ -273,16 +279,20 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
         return null;
       case MediaTextLook.none:
         return const [
-          Shadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 1)),
+          Shadow(
+            color: Colors.black45,
+            blurRadius: 8,
+            offset: Offset(0, 1),
+          ),
         ];
     }
   }
 
   TextStyle get _editorTextStyle => _activeFont.resolve(
-    color: _previewOverlay.resolvedTextColor,
-    fontSize: _fontSize,
-    shadows: _fieldShadows,
-  );
+        color: _previewOverlay.resolvedTextColor,
+        fontSize: _fontSize,
+        shadows: _fieldShadows,
+      );
 
   Widget _roundIconButton({
     required VoidCallback onTap,
@@ -346,7 +356,10 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
               ? Colors.white
               : Colors.transparent,
           borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: Colors.white, width: active ? 2 : 1.4),
+          border: Border.all(
+            color: Colors.white,
+            width: active ? 2 : 1.4,
+          ),
         ),
         child: Text(
           'A',
@@ -472,7 +485,9 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final bg = _look == MediaTextLook.background ? _color : null;
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
       backgroundColor: Colors.black,
       resizeToAvoidBottomInset: true,
       body: Stack(
@@ -482,179 +497,212 @@ class _MediaTextEditorOverlayState extends State<MediaTextEditorOverlay> {
             Positioned.fill(child: widget.background!),
             // Subtle scrim keeps the white editing controls / text readable
             // over bright photos without hiding the background.
-            const Positioned.fill(child: ColoredBox(color: Color(0x59000000))),
+            const Positioned.fill(
+              child: ColoredBox(color: Color(0x59000000)),
+            ),
           ],
           SafeArea(
             child: Column(
-              children: [
-                SizedBox(
-                  height: 48,
-                  child: Stack(
-                    alignment: Alignment.center,
+          children: [
+            SizedBox(
+              height: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // TikTok order: color → look(A) → alignment → font
-                          _colorButton(),
-                          const SizedBox(width: 10),
-                          _lookButton(),
-                          const SizedBox(width: 10),
-                          _roundIconButton(
-                            onTap: _cycleTextAlign,
-                            child: Icon(
-                              _alignIcon,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          _roundIconButton(
-                            onTap: _cycleFontStyle,
-                            child: Text(
-                              'Aa',
-                              style: _activeFont
-                                  .resolve(color: Colors.white, fontSize: 15)
-                                  .copyWith(height: 1),
-                            ),
-                          ),
-                        ],
+                      // TikTok order: color → look(A) → alignment → font
+                      _colorButton(),
+                      const SizedBox(width: 10),
+                      _lookButton(),
+                      const SizedBox(width: 10),
+                      _roundIconButton(
+                        onTap: _cycleTextAlign,
+                        child: Icon(_alignIcon, color: Colors.white, size: 22),
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: GestureDetector(
-                            onTap: _done,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                l10n.mediaEditorDone,
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
+                      const SizedBox(width: 10),
+                      _roundIconButton(
+                        onTap: _cycleFontStyle,
+                        child: Text(
+                          'Aa',
+                          style: _activeFont
+                              .resolve(color: Colors.white, fontSize: 15)
+                              .copyWith(height: 1),
                         ),
                       ),
                     ],
                   ),
-                ),
-                Expanded(
-                  child: Center(
+                  Align(
+                    alignment: Alignment.centerRight,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Container(
-                        padding: bg != null
-                            ? const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 6,
-                              )
-                            : EdgeInsets.zero,
-                        decoration: bg != null
-                            ? BoxDecoration(
-                                color: bg,
-                                borderRadius: BorderRadius.circular(10),
-                              )
-                            : null,
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          autofocus: false,
-                          maxLines: null,
-                          textAlign: _textAlign,
-                          cursorColor: _previewOverlay.resolvedTextColor,
-                          style: _editorTextStyle,
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintText: l10n.mediaTextHint,
-                            hintStyle: _editorTextStyle.copyWith(
-                              color: _previewOverlay.resolvedTextColor
-                                  .withValues(alpha: 0.45),
-                              shadows: null,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_mentionQuery != null) _mentionDropdown(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 4,
-                    horizontal: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.format_size,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                      Expanded(
-                        child: Slider(
-                          value: _fontSize,
-                          min: 16,
-                          max: 64,
-                          activeColor: Colors.white,
-                          inactiveColor: Colors.white24,
-                          onChanged: (v) => setState(() => _fontSize = v),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  key: _colorsKey,
-                  height: 48,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    itemCount: _palette.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      final color = _palette[index];
-                      final selected = color.toARGB32() == _color.toARGB32();
-                      return GestureDetector(
-                        onTap: () => setState(() => _color = color),
+                      padding: const EdgeInsets.only(right: 12),
+                      child: GestureDetector(
+                        onTap: _done,
                         child: Container(
-                          width: 34,
-                          height: 34,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: selected
-                                  ? const Color(0xFFFE2C55)
-                                  : Colors.white,
-                              width: selected ? 3 : 1.5,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            l10n.mediaEditorDone,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Container(
+                    padding: bg != null
+                        ? const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 6,
+                          )
+                        : EdgeInsets.zero,
+                    decoration: bg != null
+                        ? BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(10),
+                          )
+                        : null,
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      autofocus: false,
+                      maxLines: null,
+                      textAlign: _textAlign,
+                      cursorColor: _previewOverlay.resolvedTextColor,
+                      style: _editorTextStyle,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        hintText: l10n.mediaTextHint,
+                        hintStyle: _editorTextStyle.copyWith(
+                          color: _previewOverlay.resolvedTextColor
+                              .withValues(alpha: 0.45),
+                          shadows: null,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
+            if (_mentionQuery != null) _mentionDropdown(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.format_size, color: Colors.white70, size: 20),
+                  Expanded(
+                    child: Slider(
+                      value: _fontSize,
+                      min: 16,
+                      max: 64,
+                      activeColor: Colors.white,
+                      inactiveColor: Colors.white24,
+                      onChanged: (v) => setState(() => _fontSize = v),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              key: _colorsKey,
+              height: 48,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                itemCount: _palette.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final color = _palette[index];
+                  final selected = color.toARGB32() == _color.toARGB32();
+                  return GestureDetector(
+                    onTap: () => setState(() => _color = color),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFFFE2C55)
+                              : Colors.white,
+                          width: selected ? 3 : 1.5,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  bool get _shouldPromptExit =>
+      widget.initial != null || _controller.text.trim().isNotEmpty;
+
+  Future<bool> _onWillPop() async {
+    if (_allowPop) return true;
+    if (!_shouldPromptExit) return true;
+
+    final l10n = AppLocalizations.of(context)!;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.mediaEditorDiscardTitle),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.mediaEditorContinueEditing),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l10n.addPostDraftsComingSoon)),
+              );
+            },
+            child: Text(l10n.mediaEditorSaveDraft),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _allowPop = true;
+              Navigator.of(context).pop<MediaTextOverlay?>(null);
+            },
+            child: Text(l10n.mediaEditorDiscard),
           ),
         ],
       ),
     );
+
+    return false;
   }
 }

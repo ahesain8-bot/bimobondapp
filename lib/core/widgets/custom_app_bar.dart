@@ -1,8 +1,8 @@
 import 'package:bimobondapp/core/utils/app_bar_utils.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -89,13 +89,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: elevation,
       bottom: _showBottomDivider ? const AppBarBottomDivider() : null,
       systemOverlayStyle: backgroundColor != null
-          ? (ThemeData.estimateBrightnessForColor(backgroundColor!) ==
-                  Brightness.dark
-              ? SystemUiOverlayStyle.light
-              : SystemUiOverlayStyle.dark)
-          : (theme.brightness == Brightness.dark
-              ? SystemUiOverlayStyle.light
-              : SystemUiOverlayStyle.dark),
+          ? appContentSystemUiOverlayStyle(
+              ThemeData.estimateBrightnessForColor(backgroundColor!),
+            )
+          : appContentSystemUiOverlayStyle(theme.brightness),
     );
   }
 

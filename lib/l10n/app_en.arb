@@ -1493,12 +1493,30 @@
   "soundTabTrending": "Trending",
   "soundTabBrowse": "Browse",
   "soundTabMine": "My sounds",
+  "soundTabHot": "Hot",
+  "soundTabForYou": "For You",
+  "soundTabFavorites": "Favorites",
+  "soundTabRecent": "Recent",
   "soundPickerEmpty": "No sounds found",
   "soundPickFromFiles": "Pick from files",
+  "soundTrimTooltip": "Trim",
+  "soundFavoriteTooltip": "Favorite",
+  "soundSecondsSelected": "{count}s selected",
+  "@soundSecondsSelected": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "soundUseThis": "Use",
   "soundUseThisSound": "Use this sound",
+  "soundUseSoundCta": "Use sound",
+  "soundSave": "Save",
+  "soundSaved": "Saved",
+  "soundAddToStory": "Add to Story",
+  "soundFindRelatedHint": "Find related content",
+  "soundOriginalBadge": "Original",
   "soundConfirmSelection": "Use selected sound",
-  "soundClearSelection": "Clear",
+  "soundClearSelection": "Remove music",
   "soundDetailTitle": "Sound",
   "soundVideosUsing": "Videos using this sound",
   "soundNoVideosYet": "No videos yet",
@@ -1522,6 +1540,24 @@
   },
   "soundUseCountMillions": "{count}M videos",
   "@soundUseCountMillions": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundPostsCount": "{count} posts",
+  "@soundPostsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "soundPostsCountThousands": "{count}K posts",
+  "@soundPostsCountThousands": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundPostsCountMillions": "{count}M posts",
+  "@soundPostsCountMillions": {
     "placeholders": {
       "count": { "type": "String" }
     }

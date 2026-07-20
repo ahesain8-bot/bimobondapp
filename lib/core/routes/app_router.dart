@@ -451,6 +451,11 @@ class AppRouter {
             initialIndex: extra['initialIndex'] as int? ?? 0,
             isStory: extra['isStory'] as bool? ?? false,
             initialSound: extra['initialSound'] as SoundEntity?,
+            initialSoundOffset: Duration(
+              milliseconds: extra['initialSoundOffsetMs'] as int? ?? 0,
+            ),
+            initialMuteOriginal:
+                extra['initialMuteOriginal'] as bool? ?? false,
             popOnDone: extra['popOnDone'] as bool? ?? false,
             initialEdit: MediaEditorSeed.fromExtra(extra['initialEdit']),
           );

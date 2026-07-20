@@ -1686,9 +1686,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messagesInboxLastShare => 'شارك منشوراً';
 
   @override
-  String get messagesInboxLastSticker => 'ملصق';
-
-  @override
   String get messagesInboxMessageDeleted => 'تم حذف الرسالة';
 
   @override
@@ -1903,9 +1900,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatMoreGift => 'هدية';
 
   @override
-  String get chatMoreSticker => 'ملصق';
-
-  @override
   String get chatMorePoll => 'تصويت';
 
   @override
@@ -1919,21 +1913,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chatGiftSentLabel => 'تم إرسال الهدية';
-
-  @override
-  String get chatStickerSheetTitle => 'الملصقات';
-
-  @override
-  String get chatStickerSheetSubtitle => 'اضغط على ملصق لإرساله';
-
-  @override
-  String get chatStickerPackEmotions => 'المشاعر';
-
-  @override
-  String get chatStickerPackReactions => 'التفاعلات';
-
-  @override
-  String get chatStickerPackCelebrations => 'الاحتفالات';
 
   @override
   String get chatMessageContact => 'جهة اتصال';
@@ -3342,10 +3321,33 @@ class AppLocalizationsAr extends AppLocalizations {
   String get soundTabMine => 'أصواتي';
 
   @override
+  String get soundTabHot => 'الأكثر رواجاً';
+
+  @override
+  String get soundTabForYou => 'لك';
+
+  @override
+  String get soundTabFavorites => 'المفضلة';
+
+  @override
+  String get soundTabRecent => 'الأخيرة';
+
+  @override
   String get soundPickerEmpty => 'لا توجد أصوات';
 
   @override
   String get soundPickFromFiles => 'اختر من الملفات';
+
+  @override
+  String get soundTrimTooltip => 'قص';
+
+  @override
+  String get soundFavoriteTooltip => 'المفضلة';
+
+  @override
+  String soundSecondsSelected(int count) {
+    return '$count ث محددة';
+  }
 
   @override
   String get soundUseThis => 'استخدام';
@@ -3354,10 +3356,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get soundUseThisSound => 'استخدم هذا الصوت';
 
   @override
+  String get soundUseSoundCta => 'استخدام الصوت';
+
+  @override
+  String get soundSave => 'حفظ';
+
+  @override
+  String get soundSaved => 'تم الحفظ';
+
+  @override
+  String get soundAddToStory => 'إضافة إلى القصة';
+
+  @override
+  String get soundFindRelatedHint => 'البحث عن محتوى مشابه';
+
+  @override
+  String get soundOriginalBadge => 'أصلي';
+
+  @override
   String get soundConfirmSelection => 'استخدام الصوت المحدد';
 
   @override
-  String get soundClearSelection => 'مسح';
+  String get soundClearSelection => 'إزالة الموسيقى';
 
   @override
   String get soundDetailTitle => 'الصوت';
@@ -3386,6 +3406,21 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String soundUseCountMillions(String count) {
     return '$count مليون فيديو';
+  }
+
+  @override
+  String soundPostsCount(int count) {
+    return '$count منشور';
+  }
+
+  @override
+  String soundPostsCountThousands(String count) {
+    return '$count ألف منشور';
+  }
+
+  @override
+  String soundPostsCountMillions(String count) {
+    return '$count مليون منشور';
   }
 
   @override

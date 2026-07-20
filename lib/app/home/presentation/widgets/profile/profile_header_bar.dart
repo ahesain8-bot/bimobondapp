@@ -1,9 +1,11 @@
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// TikTok-style profile top bar (light theme friendly).
+/// TikTok-style profile top bar (follows app light/dark theme).
 class ProfileHeaderBar extends StatelessWidget {
   const ProfileHeaderBar({
     required this.onAddFriends,
@@ -22,52 +24,56 @@ class ProfileHeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final iconColor = theme.colorScheme.onSurface;
+    final overlay = appContentSystemUiOverlayStyle(theme.brightness);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: ProfileLayoutConstants.headerHorizontalPadding,
-        vertical: ProfileLayoutConstants.headerVerticalPadding,
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: onAddFriends,
-            visualDensity: VisualDensity.compact,
-            icon: Icon(
-              LucideIcons.userPlus,
-              size: ProfileLayoutConstants.headerMenuIconSize,
-              color: iconColor,
-            ),
-          ),
-          IconButton(
-            onPressed: onWallet,
-            visualDensity: VisualDensity.compact,
-            icon: AppCoinIcon(
-              size: ProfileLayoutConstants.headerMenuIconSize,
-              color: AppCoinColors.icon,
-            ),
-          ),
-          const Spacer(),
-          if (onShare != null)
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlay,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ProfileLayoutConstants.headerHorizontalPadding,
+          vertical: ProfileLayoutConstants.headerVerticalPadding,
+        ),
+        child: Row(
+          children: [
             IconButton(
-              onPressed: onShare,
+              onPressed: onAddFriends,
               visualDensity: VisualDensity.compact,
               icon: Icon(
-                LucideIcons.share,
+                LucideIcons.userPlus,
                 size: ProfileLayoutConstants.headerMenuIconSize,
                 color: iconColor,
               ),
             ),
-          IconButton(
-            onPressed: onSettings,
-            visualDensity: VisualDensity.compact,
-            icon: Icon(
-              LucideIcons.menu,
-              size: ProfileLayoutConstants.headerMenuIconSize,
-              color: iconColor,
+            IconButton(
+              onPressed: onWallet,
+              visualDensity: VisualDensity.compact,
+              icon: AppCoinIcon(
+                size: ProfileLayoutConstants.headerMenuIconSize,
+                color: AppCoinColors.icon,
+              ),
             ),
-          ),
-        ],
+            const Spacer(),
+            if (onShare != null)
+              IconButton(
+                onPressed: onShare,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  LucideIcons.share,
+                  size: ProfileLayoutConstants.headerMenuIconSize,
+                  color: iconColor,
+                ),
+              ),
+            IconButton(
+              onPressed: onSettings,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                LucideIcons.menu,
+                size: ProfileLayoutConstants.headerMenuIconSize,
+                color: iconColor,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

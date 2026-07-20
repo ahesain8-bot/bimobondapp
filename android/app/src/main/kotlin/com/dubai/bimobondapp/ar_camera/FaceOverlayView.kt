@@ -8,11 +8,9 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
+import android.util.SparseArray
 import android.view.View
-import com.dubai.bimobondapp.R
-import kotlin.math.atan2
 import kotlin.math.max
-import kotlin.math.sqrt
 
 class FaceOverlayView @JvmOverloads constructor(
     context: Context,
@@ -26,12 +24,7 @@ class FaceOverlayView @JvmOverloads constructor(
     }
 
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-
-    private var glassesBitmap: Bitmap? = null
-    private var moustacheBitmap: Bitmap? = null
-    private var earsPart: FilterPart? = null
-    private var nosePart: FilterPart? = null
-    private var tonguePart: FilterPart? = null
+    private val stickerBitmaps = SparseArray<Bitmap>()
 
     private var snapshots: List<FaceLandmarkSnapshot> = emptyList()
     private var imageWidth = 0
@@ -43,63 +36,17 @@ class FaceOverlayView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        ensureAssetsLoaded()
+    }
+
+    private fun bitmapFor(resId: Int): Bitmap? {
+        stickerBitmaps.get(resId)?.let { return it }
         val options = BitmapFactory.Options().apply {
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-
-        if (glassesBitmap == null) {
-            glassesBitmap = BitmapFactory.decodeResource(resources, R.drawable.glasses_round, options)
-        }
-        if (moustacheBitmap == null) {
-            moustacheBitmap =
-                BitmapFactory.decodeResource(resources, R.drawable.filter_moustache, options)
-        }
-
-        if (earsPart == null) {
-            earsPart = loadFilterPart(R.drawable.filter_ears, options)
-            nosePart = loadFilterPart(R.drawable.filter_nose, options)
-            tonguePart = loadFilterPart(R.drawable.filter_tongue, options)
-        }
-    }
-
-    private data class FilterPart(
-        val bitmap: Bitmap,
-        val anchorX: Float,
-        val anchorY: Float
-    )
-
-    private fun loadFilterPart(resId: Int, options: BitmapFactory.Options): FilterPart? {
-        val bitmap = BitmapFactory.decodeResource(resources, resId, options) ?: return null
-        val center = computeVisualCenter(bitmap)
-        return FilterPart(bitmap, center[0], center[1])
-    }
-
-    private fun computeVisualCenter(bitmap: Bitmap): FloatArray {
-        val w = bitmap.width
-        val h = bitmap.height
-        var minX = w
-        var maxX = 0
-        var minY = h
-        var maxY = 0
-        var found = false
-
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                if (Color.alpha(bitmap.getPixel(x, y)) > 30) {
-                    found = true
-                    minX = minOf(minX, x)
-                    maxX = maxOf(maxX, x)
-                    minY = minOf(minY, y)
-                    maxY = maxOf(maxY, y)
-                }
-            }
-        }
-
-        if (!found) {
-            return floatArrayOf(w / 2f, h / 2f)
-        }
-
-        return floatArrayOf((minX + maxX) / 2f, (minY + maxY) / 2f)
+        val loaded = BitmapFactory.decodeResource(resources, resId, options) ?: return null
+        stickerBitmaps.put(resId, loaded)
+        return loaded
     }
 
     fun setLandmarks(
@@ -153,6 +100,9 @@ class FaceOverlayView @JvmOverloads constructor(
     }
 
     fun setFilter(filter: FilterType) {
+        if (currentFilter != filter) {
+            StickerPoseSmoother.reset()
+        }
         currentFilter = filter
         if (!filter.isPngOverlay()) {
             resetForNonPngFilter()
@@ -181,12 +131,7 @@ class FaceOverlayView @JvmOverloads constructor(
         drawHeight = out.height
         try {
             for (snapshot in snapshots) {
-                when (currentFilter) {
-                    FilterType.SUNGLASSES -> drawGlasses(canvas, snapshot)
-                    FilterType.EMOJI -> drawFaceFilter(canvas, snapshot)
-                    FilterType.MOUSTACHE -> drawMoustache(canvas, snapshot)
-                    else -> Unit
-                }
+                drawConfiguredStickers(canvas, snapshot)
             }
         } finally {
             mappingMode = prevMode
@@ -203,21 +148,20 @@ class FaceOverlayView @JvmOverloads constructor(
     private var drawHeight: Int = 0
 
     private fun ensureAssetsLoaded() {
-        if (glassesBitmap != null && moustacheBitmap != null && earsPart != null) return
-        val options = BitmapFactory.Options().apply {
-            inPreferredConfig = Bitmap.Config.ARGB_8888
+        for (config in StickerCatalog.configsFor(currentFilter)) {
+            bitmapFor(config.drawableRes)
         }
-        if (glassesBitmap == null) {
-            glassesBitmap = BitmapFactory.decodeResource(resources, R.drawable.glasses_round, options)
-        }
-        if (moustacheBitmap == null) {
-            moustacheBitmap =
-                BitmapFactory.decodeResource(resources, R.drawable.filter_moustache, options)
-        }
-        if (earsPart == null) {
-            earsPart = loadFilterPart(R.drawable.filter_ears, options)
-            nosePart = loadFilterPart(R.drawable.filter_nose, options)
-            tonguePart = loadFilterPart(R.drawable.filter_tongue, options)
+        // Warm common stickers so filter switches don't hitch.
+        for (config in listOf(
+            StickerCatalog.glasses,
+            StickerCatalog.shades,
+            StickerCatalog.moustache,
+            StickerCatalog.mask,
+            StickerCatalog.dogEars,
+            StickerCatalog.dogNose,
+            StickerCatalog.dogTongue,
+        )) {
+            bitmapFor(config.drawableRes)
         }
     }
 
@@ -255,14 +199,11 @@ class FaceOverlayView @JvmOverloads constructor(
         for (snapshot in snapshots) {
             when (currentFilter) {
                 FilterType.NONE -> drawBox(canvas, snapshot)
-                FilterType.SUNGLASSES -> drawGlasses(canvas, snapshot)
-                FilterType.EMOJI -> drawFaceFilter(canvas, snapshot)
-                FilterType.MOUSTACHE -> drawMoustache(canvas, snapshot)
                 FilterType.WHITENING -> drawLipstick(canvas, snapshot, "#E91E63", 45)
                 FilterType.WARM -> drawLipstick(canvas, snapshot, "#E64A19", 40)
-                FilterType.BIG_EYES, FilterType.BIG_LIPS, FilterType.LONG_NOSE,
-                FilterType.MONO, FilterType.COOL, FilterType.VINTAGE, FilterType.ROSY,
-                FilterType.CLARENDON, FilterType.VALENCIA, FilterType.LUDWIG -> Unit
+                else -> if (currentFilter.isPngOverlay()) {
+                    drawConfiguredStickers(canvas, snapshot)
+                }
             }
         }
     }
@@ -302,14 +243,17 @@ class FaceOverlayView @JvmOverloads constructor(
         }
 
         return when (mappingMode) {
-            // Capture compose: frame matches analysis orientation for the active camera.
+            // Capture bake: bitmaps are selfie-mirrored for front camera, so flip
+            // landmark X to land on the mirrored pixels.
             MappingMode.MIRRORED_BITMAP -> {
                 val sx = viewW / imageWidth
                 val sy = viewH / imageHeight
                 val mx = if (isFrontCamera) (imageWidth - x) * sx else x * sx
                 floatArrayOf(mx, y * sy)
             }
-            // Live view: FILL_CENTER. Front selfie underlay/preview is mirrored on X.
+            // Live view: CameraX PreviewView selfie-mirrors the front camera.
+            // Landmarks stay in natural (un-mirrored) analysis space, so flip X
+            // for front so stickers sit on the eyes/nose instead of the opposite side.
             MappingMode.LIVE_VIEW -> {
                 val scale = max(viewW / imageWidth, viewH / imageHeight)
                 val offsetX = (viewW - imageWidth * scale) / 2f
@@ -319,105 +263,45 @@ class FaceOverlayView @JvmOverloads constructor(
                 } else {
                     x * scale + offsetX
                 }
-                val mappedY = y * scale + offsetY
-                floatArrayOf(mappedX, mappedY)
+                floatArrayOf(mappedX, y * scale + offsetY)
             }
         }
     }
 
-    private fun faceMetrics(snapshot: FaceLandmarkSnapshot): FaceMetrics? {
-        val box = snapshot.boundingBox
-        val topLeft = mapPoint(box.left, box.top)
-        val topRight = mapPoint(box.right, box.top)
-        val bottomLeft = mapPoint(box.left, box.bottom)
-        val bottomRight = mapPoint(box.right, box.bottom)
-
-        val faceWidth = sqrt(
-            (topRight[0] - topLeft[0]) * (topRight[0] - topLeft[0]) +
-                (topRight[1] - topLeft[1]) * (topRight[1] - topLeft[1])
-        )
-        val faceHeight = sqrt(
-            (bottomLeft[0] - topLeft[0]) * (bottomLeft[0] - topLeft[0]) +
-                (bottomLeft[1] - topLeft[1]) * (bottomLeft[1] - topLeft[1])
-        )
-
-        if (faceWidth <= 0f || faceHeight <= 0f) return null
-
-        return FaceMetrics(
-            faceWidth = faceWidth,
-            faceHeight = faceHeight,
-            centerX = (topLeft[0] + topRight[0] + bottomLeft[0] + bottomRight[0]) / 4f,
-            topCenterY = (topLeft[1] + topRight[1]) / 2f
-        )
-    }
-
-    private fun distance(a: FloatArray, b: FloatArray): Float {
-        return sqrt(
-            (b[0] - a[0]) * (b[0] - a[0]) +
-                (b[1] - a[1]) * (b[1] - a[1])
-        )
-    }
-
-    private fun screenOrderedEyes(
-        leftEye: FloatArray,
-        rightEye: FloatArray
-    ): Pair<FloatArray, FloatArray> {
-        return if (leftEye[0] <= rightEye[0]) {
-            leftEye to rightEye
-        } else {
-            rightEye to leftEye
+    /**
+     * Draws every sticker listed for [currentFilter] as an **intact** PNG quad.
+     * Placement is resolved in screen space from live landmarks (see
+     * [StickerScreenPoseResolver]).
+     */
+    private fun drawConfiguredStickers(canvas: Canvas, snapshot: FaceLandmarkSnapshot) {
+        ensureAssetsLoaded()
+        for (config in StickerCatalog.configsFor(currentFilter)) {
+            val bitmap = bitmapFor(config.drawableRes) ?: continue
+            val raw = StickerScreenPoseResolver.resolve(config, snapshot, ::mapPoint) ?: continue
+            val pose = StickerPoseSmoother.smooth(config.id, raw)
+            drawIntactSticker(canvas, bitmap, pose)
         }
     }
 
-    private fun eyeTiltAngle(screenLeft: FloatArray, screenRight: FloatArray): Float {
-        return Math.toDegrees(
-            atan2(
-                (screenRight[1] - screenLeft[1]).toDouble(),
-                (screenRight[0] - screenLeft[0]).toDouble()
-            )
-        ).toFloat()
-    }
+    /** Intact textured quad — never mesh-slice the PNG. */
+    private fun drawIntactSticker(canvas: Canvas, bitmap: Bitmap, pose: StickerPose) {
+        if (pose.width <= 0f) return
 
-    private fun drawBitmapAt(
-        canvas: Canvas,
-        bitmap: Bitmap,
-        centerX: Float,
-        centerY: Float,
-        targetWidth: Float,
-        angle: Float
-    ) {
-        val aspect = bitmap.height.toFloat() / bitmap.width.toFloat()
-        val targetHeight = targetWidth * aspect
+        val targetWidth = pose.width
+        val targetHeight = if (pose.height > 0f) {
+            pose.height
+        } else {
+            val aspect = bitmap.height.toFloat() / bitmap.width.toFloat().coerceAtLeast(1f)
+            targetWidth * aspect
+        }
 
-        val destRect = RectF(
-            -targetWidth / 2f,
-            -targetHeight / 2f,
-            targetWidth / 2f,
-            targetHeight / 2f
-        )
-
+        val dest = RectF(0f, 0f, targetWidth, targetHeight)
         canvas.save()
-        canvas.translate(centerX, centerY)
-        canvas.rotate(angle)
-        canvas.drawBitmap(bitmap, null, destRect, bitmapPaint)
-        canvas.restore()
-    }
-
-    private fun drawBitmapAnchored(
-        canvas: Canvas,
-        part: FilterPart,
-        targetX: Float,
-        targetY: Float,
-        targetWidth: Float,
-        angle: Float
-    ) {
-        val scale = targetWidth / part.bitmap.width
-        canvas.save()
-        canvas.translate(targetX, targetY)
-        canvas.rotate(angle)
-        canvas.scale(scale, scale)
-        canvas.translate(-part.anchorX, -part.anchorY)
-        canvas.drawBitmap(part.bitmap, 0f, 0f, bitmapPaint)
+        canvas.translate(pose.centerX, pose.centerY)
+        canvas.rotate(pose.rollDeg)
+        canvas.scale(pose.yawScaleX, 1f)
+        canvas.translate(-targetWidth * pose.pivotU, -targetHeight * pose.pivotV)
+        canvas.drawBitmap(bitmap, null, dest, bitmapPaint)
         canvas.restore()
     }
 
@@ -433,93 +317,4 @@ class FaceOverlayView @JvmOverloads constructor(
             boxPaint
         )
     }
-
-    private fun drawGlasses(canvas: Canvas, snapshot: FaceLandmarkSnapshot) {
-        val bitmap = glassesBitmap ?: return
-        val metrics = faceMetrics(snapshot) ?: return
-
-        val left = mapPoint(snapshot.leftEye.x, snapshot.leftEye.y)
-        val right = mapPoint(snapshot.rightEye.x, snapshot.rightEye.y)
-        val (screenLeft, screenRight) = screenOrderedEyes(left, right)
-        val bridge = mapPoint(snapshot.noseBridge.x, snapshot.noseBridge.y)
-
-        val eyeDistance = distance(screenLeft, screenRight)
-        val angle = eyeTiltAngle(screenLeft, screenRight)
-        // Anchor on nose bridge (X) + eye line (Y) so glasses sit centered on the face.
-        val centerX = bridge[0]
-        val centerY = (screenLeft[1] + screenRight[1]) * 0.5f
-
-        drawBitmapAt(
-            canvas,
-            bitmap,
-            centerX,
-            centerY,
-            max(eyeDistance * 3.5f, metrics.faceWidth * 0.7f),
-            angle,
-        )
-    }
-
-    private fun drawMoustache(canvas: Canvas, snapshot: FaceLandmarkSnapshot) {
-        val bitmap = moustacheBitmap ?: return
-        val metrics = faceMetrics(snapshot) ?: return
-
-        val ml = mapPoint(snapshot.mouthLeft.x, snapshot.mouthLeft.y)
-        val mr = mapPoint(snapshot.mouthRight.x, snapshot.mouthRight.y)
-        val (screenLeft, screenRight) = screenOrderedEyes(ml, mr)
-        val nose = mapPoint(snapshot.noseTip.x, snapshot.noseTip.y)
-
-        val mouthWidth = distance(screenLeft, screenRight)
-        val angle = eyeTiltAngle(screenLeft, screenRight)
-        val centerX = (screenLeft[0] + screenRight[0]) * 0.5f
-        val mouthY = (screenLeft[1] + screenRight[1]) * 0.5f
-        // Sit between nose tip and upper lip.
-        val centerY = nose[1] * 0.4f + mouthY * 0.6f
-
-        drawBitmapAt(
-            canvas,
-            bitmap,
-            centerX,
-            centerY,
-            max(mouthWidth * 1.9f, metrics.faceWidth * 0.48f),
-            angle,
-        )
-    }
-
-    private fun drawFaceFilter(canvas: Canvas, snapshot: FaceLandmarkSnapshot) {
-        val ears = earsPart ?: return
-        val nose = nosePart ?: return
-        val tongue = tonguePart ?: return
-        val metrics = faceMetrics(snapshot) ?: return
-
-        val left = mapPoint(snapshot.leftEye.x, snapshot.leftEye.y)
-        val right = mapPoint(snapshot.rightEye.x, snapshot.rightEye.y)
-        val (screenLeft, screenRight) = screenOrderedEyes(left, right)
-        val faceNose = mapPoint(snapshot.noseTip.x, snapshot.noseTip.y)
-        val faceMouth = mapPoint(snapshot.mouthBottom.x, snapshot.mouthBottom.y)
-
-        val eyeDistance = distance(screenLeft, screenRight)
-        val angle = eyeTiltAngle(screenLeft, screenRight)
-
-        val ml = mapPoint(snapshot.mouthLeft.x, snapshot.mouthLeft.y)
-        val mr = mapPoint(snapshot.mouthRight.x, snapshot.mouthRight.y)
-        val faceCenterX = (ml[0] + mr[0]) / 2f
-
-        val eyeCenterX = (snapshot.leftEye.x + snapshot.rightEye.x) / 2f
-        val earImageY = snapshot.topHead.y - snapshot.boundingBox.height() * 0.18f
-        val earAnchor = mapPoint(eyeCenterX, earImageY)
-
-        val noseY = faceNose[1] + metrics.faceHeight * 0.01f
-        val tongueY = faceMouth[1] + metrics.faceHeight * 0.04f
-
-        drawBitmapAnchored(canvas, ears, earAnchor[0], earAnchor[1], metrics.faceWidth * 1.05f, angle)
-        drawBitmapAnchored(canvas, nose, faceCenterX, noseY, eyeDistance * 1.1f, angle)
-        drawBitmapAnchored(canvas, tongue, faceCenterX, tongueY, eyeDistance * 1.25f, angle)
-    }
-
-    private data class FaceMetrics(
-        val faceWidth: Float,
-        val faceHeight: Float,
-        val centerX: Float,
-        val topCenterY: Float
-    )
 }

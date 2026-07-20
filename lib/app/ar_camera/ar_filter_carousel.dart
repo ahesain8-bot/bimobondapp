@@ -21,6 +21,10 @@ class ArFilterCarousel extends StatefulWidget {
     this.onHoldStart,
     this.onHoldEnd,
     this.height,
+    this.showSideActions = false,
+    this.soloShutter = false,
+    this.onConfirm,
+    this.onCancel,
   });
 
   final List<ArFilterItem> items;
@@ -34,6 +38,17 @@ class ArFilterCarousel extends StatefulWidget {
   final GestureLongPressStartCallback? onHoldStart;
   final GestureLongPressEndCallback? onHoldEnd;
   final double? height;
+
+  /// After a clip is recorded (draft exists, not currently recording) the
+  /// shutter is flanked by ✗ (cancel) and ✓ (confirm → next), TikTok-style.
+  final bool showSideActions;
+
+  /// While recording / reviewing a draft, hide the neighboring filter circles
+  /// so only the centered shutter (+ side actions) shows — a clean capture UI.
+  final bool soloShutter;
+
+  final VoidCallback? onConfirm;
+  final VoidCallback? onCancel;
 
   static const inactiveSize = 52.0;
   static const activeSize = 84.0;
@@ -206,7 +221,10 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
         const SizedBox(height: 4),
         SizedBox(
           height: widget.height ?? (ArFilterCarousel.activeSize + 8),
-          child: NotificationListener<ScrollNotification>(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              NotificationListener<ScrollNotification>(
             onNotification: (notification) {
               if (notification.metrics.axis != Axis.horizontal) return false;
 
@@ -235,7 +253,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
             child: ListView.builder(
               controller: _controller,
               scrollDirection: Axis.horizontal,
-              physics: widget.isRecording
+              physics: widget.isRecording || widget.soloShutter
                   ? const NeverScrollableScrollPhysics()
                   : const _FilterSnapPhysics(
                       itemExtent: ArFilterCarousel.itemStride,
@@ -250,6 +268,12 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                 final isCentered = (index - _scrollOffset / ArFilterCarousel.itemStride)
                         .abs() <
                     0.35;
+
+                // Recording / reviewing: only render the centered shutter, keep
+                // the same stride so it stays centered.
+                if (widget.soloShutter && !isCentered) {
+                  return const SizedBox(width: ArFilterCarousel.itemStride);
+                }
 
                 return SizedBox(
                   width: ArFilterCarousel.itemStride,
@@ -287,7 +311,6 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                                 size: size,
                                 isActive: isCentered,
                                 isRecording: widget.isRecording && isCentered,
-                                progress: widget.recordProgress,
                               ),
                       ),
                     ),
@@ -296,8 +319,64 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
               },
             ),
           ),
+              if (widget.showSideActions)
+                Positioned.fill(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _SideAction(
+                        icon: Icons.close,
+                        background: Colors.black.withValues(alpha: 0.5),
+                        onTap: widget.onCancel,
+                      ),
+                      const SizedBox(
+                        width: ArFilterCarousel.activeSize + 56,
+                      ),
+                      _SideAction(
+                        icon: Icons.check,
+                        background: const Color(0xFFFE2C55),
+                        onTap: widget.onConfirm,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
+    );
+  }
+}
+
+/// Round ✗ / ✓ button shown beside the shutter while reviewing a draft clip.
+class _SideAction extends StatelessWidget {
+  const _SideAction({
+    required this.icon,
+    required this.background,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color background;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: background,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.85),
+            width: 2,
+          ),
+        ),
+        child: Icon(icon, color: Colors.white, size: 26),
+      ),
     );
   }
 }
@@ -390,14 +469,16 @@ class _ShutterCircle extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (isRecording)
+          // Show the accumulated recorded amount even while paused, so the ring
+          // stays highlighted between segments (TikTok-style).
+          if (isRecording || progress > 0.001)
             SizedBox(
               width: ring,
               height: ring,
               child: CircularProgressIndicator(
                 value: progress.clamp(0, 1),
-                strokeWidth: 3,
-                color: Colors.white,
+                strokeWidth: 4,
+                color: const Color(0xFFFE2C55),
                 backgroundColor: Colors.white24,
               ),
             ),
@@ -414,14 +495,17 @@ class _ShutterCircle extends StatelessWidget {
               ),
             ),
           ),
+          // Never mix BoxShape.circle with borderRadius — AnimatedContainer
+          // lerps both and Flutter asserts "A circle cannot have a border radius".
           AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             width: inner,
             height: inner,
             decoration: BoxDecoration(
               color: innerColor,
-              shape: isRecording ? BoxShape.rectangle : BoxShape.circle,
-              borderRadius: isRecording ? BorderRadius.circular(6) : null,
+              borderRadius: BorderRadius.circular(
+                isRecording ? 6 : inner / 2,
+              ),
             ),
           ),
         ],
@@ -436,14 +520,12 @@ class _FilterCircle extends StatelessWidget {
     required this.size,
     required this.isActive,
     required this.isRecording,
-    required this.progress,
   });
 
   final String emoji;
   final double size;
   final bool isActive;
   final bool isRecording;
-  final double progress;
 
   @override
   Widget build(BuildContext context) {
@@ -457,17 +539,6 @@ class _FilterCircle extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (isRecording)
-            SizedBox(
-              width: size,
-              height: size,
-              child: CircularProgressIndicator(
-                value: progress.clamp(0, 1),
-                strokeWidth: 3,
-                color: Colors.white,
-                backgroundColor: Colors.white24,
-              ),
-            ),
           Container(
             width: size,
             height: size,

@@ -28,6 +28,19 @@ data class FaceWarpParams(
         const val FILTER_CLARENDON = 10
         const val FILTER_VALENCIA = 11
         const val FILTER_LUDWIG = 12
+        const val FILTER_CITY_FILM = 13
+        const val FILTER_GOING_FOR_A_WALK = 14
+        const val FILTER_GOOD_MORNING = 15
+        const val FILTER_NAH = 16
+        const val FILTER_ONCE_UPON_A_TIME = 17
+        const val FILTER_PASSING_BY = 18
+        const val FILTER_SERENITY = 19
+        const val FILTER_UNDENIABLE_2 = 20
+        const val FILTER_UNDENIABLE = 21
+        const val FILTER_URBAN_COWBOY = 22
+        const val FILTER_YOU_CAN_DO_IT = 23
+        const val FILTER_SMOOTH_SAILING = 24
+        const val FILTER_WELL_SEE = 25
 
         val INACTIVE = FaceWarpParams(
             filterType = FILTER_NONE,
@@ -55,6 +68,19 @@ object FaceWarpParamsBuilder {
         FilterType.CLARENDON -> FaceWarpParams.FILTER_CLARENDON
         FilterType.VALENCIA -> FaceWarpParams.FILTER_VALENCIA
         FilterType.LUDWIG -> FaceWarpParams.FILTER_LUDWIG
+        FilterType.CITY_FILM -> FaceWarpParams.FILTER_CITY_FILM
+        FilterType.GOING_FOR_A_WALK -> FaceWarpParams.FILTER_GOING_FOR_A_WALK
+        FilterType.GOOD_MORNING -> FaceWarpParams.FILTER_GOOD_MORNING
+        FilterType.NAH -> FaceWarpParams.FILTER_NAH
+        FilterType.ONCE_UPON_A_TIME -> FaceWarpParams.FILTER_ONCE_UPON_A_TIME
+        FilterType.PASSING_BY -> FaceWarpParams.FILTER_PASSING_BY
+        FilterType.SERENITY -> FaceWarpParams.FILTER_SERENITY
+        FilterType.UNDENIABLE_2 -> FaceWarpParams.FILTER_UNDENIABLE_2
+        FilterType.UNDENIABLE -> FaceWarpParams.FILTER_UNDENIABLE
+        FilterType.URBAN_COWBOY -> FaceWarpParams.FILTER_URBAN_COWBOY
+        FilterType.YOU_CAN_DO_IT -> FaceWarpParams.FILTER_YOU_CAN_DO_IT
+        FilterType.SMOOTH_SAILING -> FaceWarpParams.FILTER_SMOOTH_SAILING
+        FilterType.WELL_SEE -> FaceWarpParams.FILTER_WELL_SEE
         else -> FaceWarpParams.FILTER_NONE
     }
 
@@ -88,6 +114,7 @@ object FaceWarpParamsBuilder {
                 y,
                 imageWidth,
                 imageHeight,
+                // Front uploads are selfie-mirrored to match PreviewView; invert X in UV.
                 isFrontCamera = ArCameraBridge.isFrontCamera,
             )
 
@@ -235,19 +262,20 @@ object FaceWarpParamsBuilder {
 
         val padX = (maxX - minX) * 0.10f
         val padY = (maxY - minY) * 0.18f
+        val front = ArCameraBridge.isFrontCamera
         val a = FaceCoordinateMapper.toWarpUv(
             minX - padX,
             minY - padY,
             imageWidth,
             imageHeight,
-            isFrontCamera = ArCameraBridge.isFrontCamera,
+            isFrontCamera = front,
         )
         val b = FaceCoordinateMapper.toWarpUv(
             maxX + padX,
             maxY + padY,
             imageWidth,
             imageHeight,
-            isFrontCamera = ArCameraBridge.isFrontCamera,
+            isFrontCamera = front,
         )
 
         return floatArrayOf(

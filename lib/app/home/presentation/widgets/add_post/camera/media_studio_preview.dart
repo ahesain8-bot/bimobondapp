@@ -26,6 +26,7 @@ class MediaStudioPreview extends StatefulWidget {
     this.arFilterIntensity = 1.0,
     this.applyArColorPreview = true,
     this.paused = false,
+    this.muted = false,
     this.trimSegments = const [],
   });
 
@@ -35,6 +36,9 @@ class MediaStudioPreview extends StatefulWidget {
   /// Pauses video playback (e.g. while a sub-editor like Trim/Text is open on
   /// top) so its audio doesn't play behind the other screen.
   final bool paused;
+
+  /// Mutes video audio (e.g. a second preview instance behind the text editor).
+  final bool muted;
 
   /// Kept ranges of the clip (from the Trim editor). When non-empty the preview
   /// plays only these ranges — trimmed-out parts are skipped — so what you see
@@ -90,13 +94,19 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       setState(() {});
     }
 
-    if (oldWidget.paused != widget.paused) {
+    if (oldWidget.paused != widget.paused ||
+        oldWidget.muted != widget.muted) {
       final controller = _videoController;
       if (controller != null && controller.value.isInitialized) {
-        if (widget.paused) {
-          controller.pause();
-        } else {
-          controller.play();
+        if (oldWidget.muted != widget.muted) {
+          controller.setVolume(widget.muted ? 0 : 1);
+        }
+        if (oldWidget.paused != widget.paused) {
+          if (widget.paused) {
+            controller.pause();
+          } else {
+            controller.play();
+          }
         }
       }
     }
@@ -171,7 +181,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         return;
       }
       await controller.setLooping(true);
-      await controller.setVolume(1);
+      await controller.setVolume(widget.muted ? 0 : 1);
       if (widget.trimSegments.isNotEmpty) {
         await controller.seekTo(widget.trimSegments.first.start);
       }

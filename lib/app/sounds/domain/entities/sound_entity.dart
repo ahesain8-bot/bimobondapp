@@ -82,6 +82,29 @@ class SoundEntity extends Equatable {
     return MediaUtils.resolveAbsoluteUrl(url);
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'author': author,
+        'audioUrl': audioUrl,
+        if (coverUrl != null) 'coverUrl': coverUrl,
+        'duration': duration,
+        'useCount': useCount,
+        'isOriginal': isOriginal,
+        'isActive': isActive,
+        if (originalSoundId != null) 'originalSoundId': originalSoundId,
+        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+        if (creator != null)
+          'creator': {
+            'id': creator!.id,
+            'username': creator!.username,
+            if (creator!.fullName != null) 'fullName': creator!.fullName,
+            if (creator!.avatarUrl != null) 'avatarUrl': creator!.avatarUrl,
+            'isVerified': creator!.isVerified,
+          },
+        if (postCount != null) '_count': {'posts': postCount},
+      };
+
   factory SoundEntity.fromJson(Map<String, dynamic> json) {
     final count = json['_count'];
     int? postsCount;

@@ -17,7 +17,6 @@ import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 class ProfilePostsViewerScreen extends StatefulWidget {
   const ProfilePostsViewerScreen({
@@ -213,7 +212,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
         }
       });
       if (_posts.isEmpty && mounted) {
-        context.pop();
+        Navigator.of(context).maybePop();
       }
       return;
     }
@@ -262,7 +261,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
             }
           });
           if (_posts.isEmpty && mounted) {
-            context.pop();
+            Navigator.of(context).maybePop();
           }
         } else if (state is LikePostSuccess) {
           _onLikePostSuccess(state);
@@ -283,7 +282,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
           elevation: 0,
           leading: IconButton(
             icon: const DirectionalBackIcon(color: Colors.white, size: 20),
-            onPressed: () => context.pop(),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
         body: PageView.builder(

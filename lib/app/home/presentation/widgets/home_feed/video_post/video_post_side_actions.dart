@@ -162,6 +162,7 @@ class VideoPostSideActions extends StatelessWidget {
         const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
         VideoPostMusicDisc(
           rotation: musicRotation,
+          avatarUrl: avatarUrl,
           onTap: onMusicTap,
         ),
       ],
