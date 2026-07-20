@@ -3,29 +3,25 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// X / play / check chrome for the sound trim sheet.
-/// The right check applies the selected period and closes the sheet.
+/// X / play chrome for the sound trim sheet.
 class SoundTrimHeader extends StatelessWidget {
   const SoundTrimHeader({
     super.key,
     required this.canPlay,
     required this.playing,
-    required this.confirmEnabled,
+    required this.enabled,
     required this.onClose,
     required this.onTogglePlay,
-    required this.onConfirm,
   });
 
   final bool canPlay;
   final bool playing;
-  final bool confirmEnabled;
+  final bool enabled;
   final VoidCallback onClose;
   final VoidCallback onTogglePlay;
-  final VoidCallback onConfirm;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
     final onSurface = scheme.onSurface;
     final iconColor = onSurface.withValues(alpha: 0.87);
@@ -33,31 +29,20 @@ class SoundTrimHeader extends StatelessWidget {
     return Row(
       children: [
         IconButton(
-          onPressed: confirmEnabled ? onClose : null,
+          onPressed: enabled ? onClose : null,
           tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           icon: Icon(LucideIcons.x, color: iconColor, size: 24),
         ),
         const Spacer(),
         if (canPlay)
           IconButton(
-            onPressed: confirmEnabled ? onTogglePlay : null,
+            onPressed: enabled ? onTogglePlay : null,
             icon: Icon(
               playing ? LucideIcons.pause : LucideIcons.play,
               color: iconColor,
               size: 24,
             ),
           ),
-        IconButton(
-          onPressed: confirmEnabled ? onConfirm : null,
-          tooltip: l10n.soundUseThis,
-          icon: Icon(
-            LucideIcons.check,
-            size: 24,
-            color: confirmEnabled
-                ? scheme.primary
-                : onSurface.withValues(alpha: 0.28),
-          ),
-        ),
       ],
     );
   }
@@ -148,7 +133,9 @@ class SoundTrimSheetBody extends StatelessWidget {
     required this.onClose,
     required this.onTogglePlay,
     required this.onConfirm,
-    required this.onDrag,
+    required this.onMove,
+    required this.onResizeStart,
+    required this.onResizeEnd,
     required this.onMuteChanged,
     this.applying = false,
   });
@@ -166,14 +153,18 @@ class SoundTrimSheetBody extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onTogglePlay;
   final VoidCallback onConfirm;
-  final ValueChanged<double> onDrag;
+  final ValueChanged<double> onMove;
+  final ValueChanged<double> onResizeStart;
+  final ValueChanged<double> onResizeEnd;
   final ValueChanged<bool> onMuteChanged;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
-    final selectedSeconds = window.inSeconds.clamp(1, 9999);
+    final selectedSeconds = window.inMilliseconds <= 0
+        ? 1
+        : (window.inMilliseconds / 1000).ceil().clamp(1, 9999);
     // Check applies + closes even while waveform is still loading.
     final canConfirm = !applying;
 
@@ -191,10 +182,9 @@ class SoundTrimSheetBody extends StatelessWidget {
               SoundTrimHeader(
                 canPlay: canPlay,
                 playing: playing,
-                confirmEnabled: canConfirm,
+                enabled: canConfirm,
                 onClose: onClose,
                 onTogglePlay: onTogglePlay,
-                onConfirm: onConfirm,
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -210,7 +200,9 @@ class SoundTrimSheetBody extends StatelessWidget {
                         track: track,
                         window: window,
                         offset: offset,
-                        onDrag: applying ? (_) {} : onDrag,
+                        onMove: applying ? (_) {} : onMove,
+                        onResizeStart: applying ? (_) {} : onResizeStart,
+                        onResizeEnd: applying ? (_) {} : onResizeEnd,
                       ),
               ),
               const SizedBox(height: 10),
@@ -226,6 +218,25 @@ class SoundTrimSheetBody extends StatelessWidget {
                   onChanged: onMuteChanged,
                 ),
               ],
+              // const SizedBox(height: 12),
+              // Padding(
+              //   padding: const EdgeInsets.symmetric(horizontal: 12),
+              //   child: SizedBox(
+              //     width: double.infinity,
+              //     child: FilledButton(
+              //       onPressed: canConfirm ? onConfirm : null,
+              //       style: FilledButton.styleFrom(
+              //         backgroundColor: SoundPickerTheme.accentOf(context),
+              //         foregroundColor: scheme.onPrimary,
+              //         minimumSize: const Size.fromHeight(48),
+              //         shape: RoundedRectangleBorder(
+              //           borderRadius: BorderRadius.circular(12),
+              //         ),
+              //       ),
+              //       child: Text(l10n.soundUseThis),
+              //     ),
+              //   ),
+              // ),
             ],
           ),
         ),
@@ -240,50 +251,97 @@ String formatTrimClock(Duration d) {
   return '$m:$s';
 }
 
-/// Rounded waveform track with pink selection window.
-class SoundTrimWaveform extends StatelessWidget {
+enum _TrimDragMode { move, left, right }
+
+/// Rounded waveform track with a resizable selection window.
+class SoundTrimWaveform extends StatefulWidget {
   const SoundTrimWaveform({
     super.key,
     required this.bars,
     required this.track,
     required this.window,
     required this.offset,
-    required this.onDrag,
+    required this.onMove,
+    required this.onResizeStart,
+    required this.onResizeEnd,
   });
 
   final List<double> bars;
   final Duration track;
   final Duration window;
   final Duration offset;
-  final ValueChanged<double> onDrag;
+  final ValueChanged<double> onMove;
+  final ValueChanged<double> onResizeStart;
+  final ValueChanged<double> onResizeEnd;
+
+  @override
+  State<SoundTrimWaveform> createState() => _SoundTrimWaveformState();
+}
+
+class _SoundTrimWaveformState extends State<SoundTrimWaveform> {
+  static const _handleHitSlop = 28.0;
+
+  _TrimDragMode _mode = _TrimDragMode.move;
 
   @override
   Widget build(BuildContext context) {
     const height = 72.0;
     final scheme = Theme.of(context).colorScheme;
+    final accent = SoundPickerTheme.accentOf(context);
     final trackBg = scheme.surfaceContainerHighest.withValues(alpha: 0.55);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalW = constraints.maxWidth;
-        final windowFrac = track.inMicroseconds == 0
+        final windowFrac = widget.track.inMicroseconds == 0
             ? 1.0
-            : (window.inMicroseconds / track.inMicroseconds).clamp(0.0, 1.0);
-        final offsetFrac = track.inMicroseconds == 0
+            : (widget.window.inMicroseconds / widget.track.inMicroseconds)
+                  .clamp(0.0, 1.0);
+        final offsetFrac = widget.track.inMicroseconds == 0
             ? 0.0
-            : (offset.inMicroseconds / track.inMicroseconds).clamp(0.0, 1.0);
+            : (widget.offset.inMicroseconds / widget.track.inMicroseconds)
+                  .clamp(0.0, 1.0);
         final windowW = totalW * windowFrac;
         final windowLeft = totalW * offsetFrac;
+        final windowRight = windowLeft + windowW;
 
-        void moveToLocalDx(double localDx) {
-          final left = (localDx - windowW / 2).clamp(0.0, totalW - windowW);
-          onDrag(totalW == 0 ? 0 : left / totalW);
+        void applyAt(double localDx) {
+          final frac = totalW == 0 ? 0.0 : (localDx / totalW).clamp(0.0, 1.0);
+          switch (_mode) {
+            case _TrimDragMode.left:
+              widget.onResizeStart(frac);
+            case _TrimDragMode.right:
+              widget.onResizeEnd(frac);
+            case _TrimDragMode.move:
+              final left = (localDx - windowW / 2).clamp(0.0, totalW - windowW);
+              widget.onMove(totalW == 0 ? 0 : left / totalW);
+          }
+        }
+
+        _TrimDragMode modeFor(double localDx) {
+          if ((localDx - windowLeft).abs() <= _handleHitSlop) {
+            return _TrimDragMode.left;
+          }
+          if ((localDx - windowRight).abs() <= _handleHitSlop) {
+            return _TrimDragMode.right;
+          }
+          if (localDx >= windowLeft && localDx <= windowRight) {
+            return _TrimDragMode.move;
+          }
+          // Tap outside: jump window centered on tap.
+          return _TrimDragMode.move;
         }
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (d) => moveToLocalDx(d.localPosition.dx),
-          onHorizontalDragUpdate: (d) => moveToLocalDx(d.localPosition.dx),
+          onTapDown: (d) {
+            _mode = modeFor(d.localPosition.dx);
+            applyAt(d.localPosition.dx);
+          },
+          onHorizontalDragStart: (d) {
+            _mode = modeFor(d.localPosition.dx);
+          },
+          onHorizontalDragUpdate: (d) => applyAt(d.localPosition.dx),
           child: Container(
             height: height,
             width: totalW,
@@ -297,11 +355,11 @@ class SoundTrimWaveform extends StatelessWidget {
                 Positioned.fill(
                   child: CustomPaint(
                     painter: SoundTrimWaveformPainter(
-                      bars: bars,
+                      bars: widget.bars,
                       selectionStart: offsetFrac,
                       selectionEnd: (offsetFrac + windowFrac).clamp(0.0, 1.0),
                       idleColor: scheme.onSurface.withValues(alpha: 0.87),
-                      accentColor: SoundPickerTheme.accentOf(context),
+                      accentColor: accent,
                     ),
                   ),
                 ),
@@ -309,15 +367,19 @@ class SoundTrimWaveform extends StatelessWidget {
                   left: windowLeft,
                   top: 0,
                   bottom: 0,
-                  width: windowW,
+                  width: windowW.clamp(4.0, totalW),
                   child: IgnorePointer(
-                    child: Container(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        border: Border.all(
-                          color: SoundPickerTheme.accentOf(context),
-                          width: 2,
-                        ),
+                        border: Border.all(color: accent, width: 2),
                         borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          _TrimHandle(color: accent),
+                          const Spacer(),
+                          _TrimHandle(color: accent),
+                        ],
                       ),
                     ),
                   ),
@@ -327,6 +389,28 @@ class SoundTrimWaveform extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TrimHandle extends StatelessWidget {
+  const _TrimHandle({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      alignment: Alignment.center,
+      child: Container(
+        width: 4,
+        height: 28,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
     );
   }
 }

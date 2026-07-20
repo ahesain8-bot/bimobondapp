@@ -23,6 +23,7 @@ class NativeVideoProcessor {
     File input, {
     required File audio,
     Duration startOffset = Duration.zero,
+    Duration? audioEnd,
     double musicVolume = 1.0,
     bool keepOriginalAudio = true,
   }) async {
@@ -45,6 +46,9 @@ class NativeVideoProcessor {
               volume: musicVolume,
               audioStartTime:
                   startOffset <= Duration.zero ? null : startOffset,
+              audioEndTime: audioEnd != null && audioEnd > startOffset
+                  ? audioEnd
+                  : null,
             ),
           ],
         ),
@@ -78,6 +82,7 @@ class NativeVideoProcessor {
       silent,
       audio: audio,
       startOffset: startOffset,
+      audioEnd: startOffset + duration,
       musicVolume: musicVolume,
       keepOriginalAudio: false,
     );

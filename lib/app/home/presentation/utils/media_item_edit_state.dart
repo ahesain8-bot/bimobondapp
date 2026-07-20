@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dar
 import 'package:bimobondapp/app/home/presentation/utils/media_text_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_compositor.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/core/utils/video_trim_segment.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 
@@ -219,6 +220,7 @@ class MediaStudioExportResult {
     this.effectSlug,
     this.beautyEnabled = false,
     this.arFilterId,
+    this.sound,
   });
 
   final List<File> files;
@@ -227,6 +229,8 @@ class MediaStudioExportResult {
   final String? effectSlug;
   final bool beautyEnabled;
   final String? arFilterId;
+  /// Sound chosen in the studio (may differ from the caller's initial sound).
+  final SoundEntity? sound;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.

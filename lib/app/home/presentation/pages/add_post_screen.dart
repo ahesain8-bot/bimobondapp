@@ -91,6 +91,8 @@ class _AddPostScreenState extends State<AddPostScreen>
   late DateTime _auctionStartDate;
   late DateTime _auctionEndDate;
   SoundEntity? _selectedSound;
+  Duration _soundStartOffset = Duration.zero;
+  Duration _soundWindow = const Duration(seconds: 15);
   AddPostLocationSelection? _selectedLocation;
 
   @override
@@ -181,11 +183,13 @@ class _AddPostScreenState extends State<AddPostScreen>
       items: items,
       initialIndex: index,
       initialSound: _selectedSound,
+      initialSoundOffset: _soundStartOffset,
     );
     if (!mounted || edited == null || edited.files.isEmpty) return;
 
     setState(() {
       _selectedFiles = edited.files;
+      if (edited.sound != null) _selectedSound = edited.sound;
       _updateType();
     });
   }
@@ -232,6 +236,7 @@ class _AddPostScreenState extends State<AddPostScreen>
         final toAdd = edited.files.take(remaining).toList();
         setState(() {
           _selectedFiles = [..._selectedFiles, ...toAdd];
+          if (edited.sound != null) _selectedSound = edited.sound;
           _updateType();
         });
       },
@@ -259,6 +264,7 @@ class _AddPostScreenState extends State<AddPostScreen>
     final toAdd = result.files.take(remaining).toList();
     setState(() {
       _selectedFiles = [..._selectedFiles, ...toAdd];
+      if (result.sound != null) _selectedSound = result.sound;
       _updateType();
     });
   }
@@ -394,9 +400,17 @@ class _AddPostScreenState extends State<AddPostScreen>
     final picked = await SoundPickerSheet.show(
       context,
       initialSelection: _selectedSound,
+      initialOffset: _soundStartOffset,
+      initialWindow: _soundWindow,
     );
     if (!mounted || picked == null) return;
-    setState(() => _selectedSound = picked.sound);
+    setState(() {
+      _selectedSound = picked.sound;
+      _soundStartOffset = picked.offset;
+      _soundWindow = picked.window > Duration.zero
+          ? picked.window
+          : const Duration(seconds: 15);
+    });
   }
 
   Future<void> _openSoundDetail() async {
@@ -517,6 +531,7 @@ class _AddPostScreenState extends State<AddPostScreen>
           const SizedBox(width: 12),
           AddPostCoverPreview(
             file: coverFile,
+            soundName: _selectedSound?.name,
             onAdd: widget.isStory ? _retakeStory : _showMediaPickerOptions,
             onEdit: () {
               if (widget.isStory) {

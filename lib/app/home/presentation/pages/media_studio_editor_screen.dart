@@ -25,6 +25,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_text_overlay_layer.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_editor.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_file.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
@@ -77,6 +78,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   /// Where playback starts inside the selected track (TikTok-style trim).
   Duration _soundStartOffset = Duration.zero;
+
+  /// Selected sound period length (typically 15s).
+  Duration _soundWindow = const Duration(seconds: 15);
 
   /// Mute the video's own audio when mixing the selected music in.
   bool _muteOriginalAudio = false;
@@ -390,14 +394,19 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     final audio = await SoundLocalFile.resolve(audioUrl);
     if (audio == null) return;
 
-    // How long a photo-turned-video should last: the remaining track from the
-    // chosen start, capped so a single still doesn't become a huge file.
+    // Photo + music → 15s clip from the chosen start (TikTok-style).
     final trackSeconds = sound.duration > 0 ? sound.duration : 0;
-    final remaining = trackSeconds - _soundStartOffset.inSeconds;
-    final photoSeconds = remaining > 0
-        ? remaining.clamp(3, _photoMusicMaxSeconds)
-        : _photoMusicMaxSeconds;
-    final photoDuration = Duration(seconds: photoSeconds);
+    var photoSeconds = _soundWindow.inSeconds.clamp(1, _photoMusicMaxSeconds);
+    if (photoSeconds < _photoMusicMaxSeconds) {
+      photoSeconds = _photoMusicMaxSeconds;
+    }
+    if (trackSeconds > 0) {
+      final remaining = trackSeconds - _soundStartOffset.inSeconds;
+      if (remaining > 0 && remaining < photoSeconds) {
+        photoSeconds = remaining;
+      }
+    }
+    final photoDuration = Duration(seconds: photoSeconds.clamp(1, _photoMusicMaxSeconds));
 
     for (var i = 0; i < results.length; i++) {
       final isVideo = i < _states.length ? _states[i].isVideo : false;
@@ -409,6 +418,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             file,
             audio: audio,
             startOffset: _soundStartOffset,
+            audioEnd: _soundStartOffset + _soundWindow,
             keepOriginalAudio: !_muteOriginalAudio,
           );
         } else {
@@ -443,6 +453,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             effectSlug: primaryEffectSlugFromStates(_states),
             beautyEnabled: _states.any((s) => s.beautyEnabled),
             arFilterId: primaryArFilterIdFromStates(_states),
+            sound: _selectedSound,
           ),
         );
         return;
@@ -643,23 +654,34 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     final picked = await SoundPickerSheet.show(
       context,
       initialSelection: _selectedSound,
+      initialOffset: _soundStartOffset,
+      initialWindow: _soundWindow,
       allowMuteOnTrim: hasVideo,
     );
     if (!mounted || picked == null) return;
 
-    // Check on the period sheet already applied + closed — just keep the result.
     setState(() {
       _selectedSound = picked.sound;
       _soundStartOffset = picked.offset;
+      _soundWindow = picked.window > Duration.zero
+          ? picked.window
+          : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
     });
+    await SoundAudioPreview.playAt(
+      picked.sound.id,
+      picked.sound.resolvedAudioUrl,
+      startOffset: picked.offset,
+      window: _soundWindow,
+    );
   }
 
   void _clearSound() => setState(() {
-    _selectedSound = null;
-    _soundStartOffset = Duration.zero;
-    _muteOriginalAudio = false;
-  });
+        _selectedSound = null;
+        _soundStartOffset = Duration.zero;
+        _soundWindow = const Duration(seconds: 15);
+        _muteOriginalAudio = false;
+      });
 
   Future<void> _shareCurrent() async {
     final file = _currentState.sourceFile;

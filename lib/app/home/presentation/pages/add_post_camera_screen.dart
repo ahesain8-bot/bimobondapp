@@ -30,6 +30,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_sheets.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
@@ -112,6 +113,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   CameraStudioMode _studioMode = CameraStudioMode.video;
   SoundEntity? _selectedSound;
   Duration _soundStartOffset = Duration.zero;
+  Duration _soundWindow = const Duration(seconds: 15);
   bool _muteOriginalAudio = false;
   File? _storyCapturedFile;
   String? _storyCapturedType;
@@ -242,6 +244,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         files: result.files,
         type: MediaGalleryImportFlow.resolvePostType(result.files),
         filterName: result.filterName ?? _activeFilterName,
+        sound: result.sound ?? _selectedSound,
       ),
     );
   }
@@ -336,7 +339,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         'files': edited.files,
         'type': MediaGalleryImportFlow.resolvePostType(edited.files),
         'isStory': false,
-        'initialSound': _selectedSound,
+        'initialSound': edited.sound ?? _selectedSound,
         if (edited.filterName != null) 'filterName': edited.filterName,
         'filterCategory': edited.filterCategory.name,
         if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
@@ -349,13 +352,24 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final picked = await SoundPickerSheet.show(
       context,
       initialSelection: _selectedSound,
+      initialOffset: _soundStartOffset,
+      initialWindow: _soundWindow,
     );
     if (!mounted || picked == null) return;
     setState(() {
       _selectedSound = picked.sound;
       _soundStartOffset = picked.offset;
+      _soundWindow = picked.window > Duration.zero
+          ? picked.window
+          : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
     });
+    await SoundAudioPreview.playAt(
+      picked.sound.id,
+      picked.sound.resolvedAudioUrl,
+      startOffset: picked.offset,
+      window: _soundWindow,
+    );
   }
 
   AwesomeFilter _effectiveCaptureFilter() {

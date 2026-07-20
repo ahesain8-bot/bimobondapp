@@ -33,6 +33,8 @@ class SoundPickerSheet extends StatefulWidget {
   static Future<SoundPickResult?> show(
     BuildContext context, {
     SoundEntity? initialSelection,
+    Duration initialOffset = Duration.zero,
+    Duration? initialWindow,
     bool allowMuteOnTrim = false,
   }) async {
     await SoundAudioPreview.stop();
@@ -68,22 +70,35 @@ class SoundPickerSheet extends StatefulWidget {
     await _waitForModalSettle(context);
     if (!context.mounted) return null;
 
+    // Re-open trim on the same sound restores the last saved period.
+    final restorePeriod = initialSelection?.id == picked.sound.id;
     final trim = await SoundTrimSheet.show(
       context,
       sound: picked.sound,
+      windowLength: restorePeriod
+          ? (initialWindow ?? const Duration(seconds: 15))
+          : const Duration(seconds: 15),
+      initialOffset: restorePeriod ? initialOffset : Duration.zero,
       allowMute: allowMuteOnTrim,
       initialMute: picked.muteOriginal,
     );
     if (!context.mounted) return null;
     if (trim == null) {
-      // Cancelled trim — keep the sound without a custom start.
-      return SoundPickResult(sound: picked.sound);
+      // Cancelled trim — keep prior period if we were re-editing it.
+      return SoundPickResult(
+        sound: picked.sound,
+        offset: restorePeriod ? initialOffset : Duration.zero,
+        window: restorePeriod
+            ? (initialWindow ?? const Duration(seconds: 15))
+            : const Duration(seconds: 15),
+      );
     }
 
     await SoundLocalCatalogStore.pushRecent(picked.sound);
     return SoundPickResult(
       sound: picked.sound,
       offset: trim.offset,
+      window: trim.window,
       muteOriginal: trim.muteOriginal,
       didTrim: true,
     );
