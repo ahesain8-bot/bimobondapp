@@ -111,6 +111,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   String? _selectedEffectSlug;
   CameraStudioMode _studioMode = CameraStudioMode.video;
   SoundEntity? _selectedSound;
+  Duration _soundStartOffset = Duration.zero;
+  bool _muteOriginalAudio = false;
   File? _storyCapturedFile;
   String? _storyCapturedType;
   late final CameraFaceDetectorService _faceDetectorService;
@@ -149,7 +151,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _selectedDuration = CameraStudioConstants.durationOptions.first;
       _studioMode = CameraStudioMode.photo;
     }
-    _faceDetectorService = CameraFaceDetectorService(isFrontCamera: _isFrontCamera);
+    _faceDetectorService = CameraFaceDetectorService(
+      isFrontCamera: _isFrontCamera,
+    );
     if (_useNativeArFilters) {
       _isFrontCamera = true;
       ArCameraBridge.warmup();
@@ -186,9 +190,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     _countdownTimer?.cancel();
     _clearLayoutCapture();
     if (_useNativeArFilters) {
-      unawaited(
-        ArCameraBridge.setPreviewLetterbox(topPx: 0, bottomPx: 0),
-      );
+      unawaited(ArCameraBridge.setPreviewLetterbox(topPx: 0, bottomPx: 0));
     }
     for (final path in _videoSegments) {
       try {
@@ -212,6 +214,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           items: items,
           isStory: widget.isStory,
           initialSound: _selectedSound,
+          initialSoundOffset: _soundStartOffset,
+          initialMuteOriginal: _muteOriginalAudio,
         );
         if (edited != null && mounted) {
           _returnPickedMedia(edited);
@@ -223,6 +227,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         items: items,
         isStory: widget.isStory,
         initialSound: _selectedSound,
+        initialSoundOffset: _soundStartOffset,
+        initialMuteOriginal: _muteOriginalAudio,
       );
     } finally {
       if (mounted) setState(() => _isBusy = false);
@@ -313,6 +319,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       items: [GalleryMediaItem(file: file, type: type)],
       isStory: widget.isStory,
       initialSound: _selectedSound,
+      initialSoundOffset: _soundStartOffset,
+      initialMuteOriginal: _muteOriginalAudio,
       initialEdit: _captureEditSeed,
     );
     if (!mounted || edited == null || edited.files.isEmpty) return;
@@ -342,8 +350,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       context,
       initialSelection: _selectedSound,
     );
-    if (!mounted) return;
-    setState(() => _selectedSound = picked);
+    if (!mounted || picked == null) return;
+    setState(() {
+      _selectedSound = picked.sound;
+      _soundStartOffset = picked.offset;
+      _muteOriginalAudio = picked.muteOriginal;
+    });
   }
 
   AwesomeFilter _effectiveCaptureFilter() {
@@ -403,9 +415,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       if (!mounted) return;
     }
 
-    if (!isVideo &&
-        capture.isPicture &&
-        _layoutMode != CameraLayoutMode.off) {
+    if (!isVideo && capture.isPicture && _layoutMode != CameraLayoutMode.off) {
       await _handleLayoutPhoto(file);
       return;
     }
@@ -635,9 +645,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
     if (_isBusy) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.cameraCaptureError('busy'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.cameraCaptureError('busy'))));
       return;
     }
 
@@ -729,7 +739,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   /// speed applied to the next segment.
   void _onSpeedSelected(double speed) {
     if (speed == _selectedSpeed) return;
-    if (_isRecording && _layoutMode == CameraLayoutMode.off && !_quickVideoMode) {
+    if (_isRecording &&
+        _layoutMode == CameraLayoutMode.off &&
+        !_quickVideoMode) {
       unawaited(_splitSegmentForSpeedChange(speed));
     } else {
       setState(() => _selectedSpeed = speed);
@@ -838,10 +850,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               : 0,
           letterboxBottomPx: _ratioLetterboxed
               ? (CameraRatioLetterbox.bottomHeight(
-                      useNativeAr: true,
-                      filtersPanelOpen: _showFilters,
-                    ) *
-                    dpr)
+                          useNativeAr: true,
+                          filtersPanelOpen: _showFilters,
+                        ) *
+                        dpr)
                     .round()
               : 0,
         );
@@ -914,10 +926,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               : 0,
           letterboxBottomPx: _ratioLetterboxed
               ? (CameraRatioLetterbox.bottomHeight(
-                      useNativeAr: true,
-                      filtersPanelOpen: _showFilters,
-                    ) *
-                    dpr)
+                          useNativeAr: true,
+                          filtersPanelOpen: _showFilters,
+                        ) *
+                        dpr)
                     .round()
               : 0,
         );
@@ -957,8 +969,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void _onArFilterSelected(int index) {
     final clamped = index.clamp(0, ArFilterCatalog.items.length - 1);
     final id = ArFilterCatalog.items[clamped].id;
-    final intensity =
-        ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
+    final intensity = ArFilterCatalog.isColorFilter(id)
+        ? _arFilterIntensity
+        : 1.0;
     if (clamped == _arFilterIndex) {
       ArCameraBridge.setFilter(id, intensity: intensity);
       return;
@@ -983,12 +996,18 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final current = ArFilterCatalog.effectCarouselIndex(currentId);
     final velocity = details.primaryVelocity ?? 0;
     if (velocity < -80 || _arSwipeDrag < -36) {
-      final next = (current + 1).clamp(0, ArFilterCatalog.effectItems.length - 1);
+      final next = (current + 1).clamp(
+        0,
+        ArFilterCatalog.effectItems.length - 1,
+      );
       _onArFilterSelected(
         ArFilterCatalog.indexOfId(ArFilterCatalog.effectItems[next].id),
       );
     } else if (velocity > 80 || _arSwipeDrag > 36) {
-      final prev = (current - 1).clamp(0, ArFilterCatalog.effectItems.length - 1);
+      final prev = (current - 1).clamp(
+        0,
+        ArFilterCatalog.effectItems.length - 1,
+      );
       _onArFilterSelected(
         ArFilterCatalog.indexOfId(ArFilterCatalog.effectItems[prev].id),
       );
@@ -1025,7 +1044,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       if (current <= 1) {
         timer.cancel();
         _countdownTimer = null;
-          // doesn't auto-trigger on the next capture (and is off on return).
+        // doesn't auto-trigger on the next capture (and is off on return).
         setState(() {
           _countdownValue = null;
           _timerEnabled = false;
@@ -1038,7 +1057,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       }
     });
   }
-
 
   /// are disabled — Flutter's [SystemSound] was silent in that case.
   void _playCountdownTick({required bool isFinal}) {
@@ -1165,9 +1183,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           setState(() => _layoutPickerOpen = false);
         }
       }
-      final next = (_pinchBaseZoom +
-              (details.scale - 1.0) * _pinchZoomSensitivity)
-          .clamp(0.0, 1.0);
+      final next =
+          (_pinchBaseZoom + (details.scale - 1.0) * _pinchZoomSensitivity)
+              .clamp(0.0, 1.0);
       unawaited(_applyZoom(next));
       return;
     }
@@ -1515,8 +1533,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
     if (picked.isEmpty || !mounted) return;
     if (_layoutMode == CameraLayoutMode.off) return;
-    if (index >= _layoutCellPhotos.length ||
-        _layoutCellPhotos[index] != null) {
+    if (index >= _layoutCellPhotos.length || _layoutCellPhotos[index] != null) {
       return;
     }
 
@@ -1699,9 +1716,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           else
             _buildCamerAwesomeBody(l10n, filters),
           if (_showShutterFlash)
-            const IgnorePointer(
-              child: ColoredBox(color: Color(0xE6FFFFFF)),
-            ),
+            const IgnorePointer(child: ColoredBox(color: Color(0xE6FFFFFF))),
           if (_isProcessingCapture)
             CameraAppLoading(message: l10n.promoteProcessing),
           if (_isBusy && !_isProcessingCapture)
@@ -1717,8 +1732,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final active = last < 0
         ? 0
         : (_layoutActiveCell < 0
-            ? 0
-            : (_layoutActiveCell > last ? last : _layoutActiveCell));
+              ? 0
+              : (_layoutActiveCell > last ? last : _layoutActiveCell));
     return ColoredBox(
       color: Colors.black,
       child: LayoutBuilder(
@@ -1778,7 +1793,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           selectedSpeed: _selectedSpeed,
           studioMode: _studioMode,
           showFilters: _showFilters,
-          beautyEnabled: _beautyEnabled ||
+          beautyEnabled:
+              _beautyEnabled ||
               ArFilterCatalog.items[_arFilterIndex].id == 'whitening',
           timerEnabled: _timerEnabled,
           flashEnabled: _flashEnabled,
@@ -1915,89 +1931,91 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             children: [
               _wrapPreviewGestures(const SizedBox.expand()),
               CameraStudioOverlay(
-            l10n: l10n,
-            isStoryMode: widget.isStory,
-            showGalleryUpload: !widget.returnMediaOnDone,
-            cameraState: state,
-            preview: preview,
-            faceStream: _faceDetectorService.stream,
-            filters: filters,
-            filterCategorySlug: _filterCategorySlug,
-            selectedFilter: _selectedFilter,
-            selectedDuration: _effectiveMaxRecordSeconds,
-            selectedSpeed: _selectedSpeed,
-            studioMode: _studioMode,
-            showFilters: _showFilters && _filtersReady,
-            beautyEnabled: _beautyEnabled,
-            timerEnabled: _timerEnabled,
-            flashEnabled: _flashEnabled,
-            isRecording: _isRecording,
-            isBusy: _isBusy || _isProcessingCapture,
-            recordSeconds: _recordSeconds,
-            hasDraftClips:
-              _layoutMode == CameraLayoutMode.off && _videoSegments.isNotEmpty,
-            onFinishRecording: () {
-              unawaited(_finishMultiClipVideo());
-            },
-            onDiscardDraft: _discardVideoDraft,
-            countdownValue: _countdownValue,
-            selectedEffectSlug: _selectedEffectSlug,
-            workspaceTabIndex: _workspaceTabIndex,
-            onClose: () => context.pop(),
-            onFilterCategorySelected: _onFilterCategorySelected,
-            onFilterSelected: _applyFilter,
-            onClearFilter: _clearFilter,
-            onDurationSelected: _onDurationSelected,
-            onStudioModeSelected: _onStudioModeSelected,
-            onEffectsTap: () => CameraStudioSheets.showEffectsPicker(
-              context,
-              l10n: l10n,
-              selectedEffectSlug: _selectedEffectSlug,
-              onSelected: _selectEffect,
-            ),
-            onUploadTap: () => CameraStudioSheets.pickFromLibrary(
-              context,
-              l10n: l10n,
-              limit: widget.isStory ? 1 : 5,
-              chooseMediaType: true,
-              onPicked: _importFromGallery,
-            ),
-            onGoLiveTap: () =>
-                CameraStudioSheets.showLiveSetup(context, l10n: l10n),
-            onRecordTap: _onRecordTap,
-            onFlip: _flipCamera,
-            onFlash: _toggleFlash,
-            onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
-              context,
-              selectedSpeed: _selectedSpeed,
-              onSelected: _onSpeedSelected,
-            ),
-            onBeautyTap: () => _applyBeauty(!_beautyEnabled),
-            onFiltersToggle: () => setState(() => _showFilters = !_showFilters),
-            onTimerToggle: _openCountdownSheet,
-            onMusicTap: _pickSound,
-            onLayoutTap: _toggleLayoutPicker,
-            onAspectRatioTap: _toggleRatioLetterbox,
-            onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
-            ratioLetterboxed: _ratioLetterboxed,
-            selectedLayoutMode: _layoutMode,
-            layoutPickerOpen: _layoutPickerOpen,
-            onLayoutModeSelected: _onLayoutModeSelected,
-            layoutCellPhotos: _layoutCellPhotos,
-            layoutActiveCellIndex: _layoutActiveCell,
-            onLayoutCellDelete: _deleteLayoutCell,
-            onLayoutCellDuplicate: (index) =>
-                unawaited(_duplicateLayoutCell(index)),
-            onLayoutCellImport: _studioMode == CameraStudioMode.video
-                ? null
-                : (index) => unawaited(_importLayoutCell(index)),
-            onWorkspaceTabSelected: _onWorkspaceTabSelected,
-            soundLabel: _studioMode == CameraStudioMode.live
-                ? l10n.cameraLiveTitleHint
-                : (_selectedSound?.name ?? l10n.cameraAddSound),
-            onLongPressStart: (_) => _onRecordHoldStart(),
-            onLongPressEnd: (_) => _onRecordHoldEnd(),
-            filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
+                l10n: l10n,
+                isStoryMode: widget.isStory,
+                showGalleryUpload: !widget.returnMediaOnDone,
+                cameraState: state,
+                preview: preview,
+                faceStream: _faceDetectorService.stream,
+                filters: filters,
+                filterCategorySlug: _filterCategorySlug,
+                selectedFilter: _selectedFilter,
+                selectedDuration: _effectiveMaxRecordSeconds,
+                selectedSpeed: _selectedSpeed,
+                studioMode: _studioMode,
+                showFilters: _showFilters && _filtersReady,
+                beautyEnabled: _beautyEnabled,
+                timerEnabled: _timerEnabled,
+                flashEnabled: _flashEnabled,
+                isRecording: _isRecording,
+                isBusy: _isBusy || _isProcessingCapture,
+                recordSeconds: _recordSeconds,
+                hasDraftClips:
+                    _layoutMode == CameraLayoutMode.off &&
+                    _videoSegments.isNotEmpty,
+                onFinishRecording: () {
+                  unawaited(_finishMultiClipVideo());
+                },
+                onDiscardDraft: _discardVideoDraft,
+                countdownValue: _countdownValue,
+                selectedEffectSlug: _selectedEffectSlug,
+                workspaceTabIndex: _workspaceTabIndex,
+                onClose: () => context.pop(),
+                onFilterCategorySelected: _onFilterCategorySelected,
+                onFilterSelected: _applyFilter,
+                onClearFilter: _clearFilter,
+                onDurationSelected: _onDurationSelected,
+                onStudioModeSelected: _onStudioModeSelected,
+                onEffectsTap: () => CameraStudioSheets.showEffectsPicker(
+                  context,
+                  l10n: l10n,
+                  selectedEffectSlug: _selectedEffectSlug,
+                  onSelected: _selectEffect,
+                ),
+                onUploadTap: () => CameraStudioSheets.pickFromLibrary(
+                  context,
+                  l10n: l10n,
+                  limit: widget.isStory ? 1 : 5,
+                  chooseMediaType: true,
+                  onPicked: _importFromGallery,
+                ),
+                onGoLiveTap: () =>
+                    CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+                onRecordTap: _onRecordTap,
+                onFlip: _flipCamera,
+                onFlash: _toggleFlash,
+                onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
+                  context,
+                  selectedSpeed: _selectedSpeed,
+                  onSelected: _onSpeedSelected,
+                ),
+                onBeautyTap: () => _applyBeauty(!_beautyEnabled),
+                onFiltersToggle: () =>
+                    setState(() => _showFilters = !_showFilters),
+                onTimerToggle: _openCountdownSheet,
+                onMusicTap: _pickSound,
+                onLayoutTap: _toggleLayoutPicker,
+                onAspectRatioTap: _toggleRatioLetterbox,
+                onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+                ratioLetterboxed: _ratioLetterboxed,
+                selectedLayoutMode: _layoutMode,
+                layoutPickerOpen: _layoutPickerOpen,
+                onLayoutModeSelected: _onLayoutModeSelected,
+                layoutCellPhotos: _layoutCellPhotos,
+                layoutActiveCellIndex: _layoutActiveCell,
+                onLayoutCellDelete: _deleteLayoutCell,
+                onLayoutCellDuplicate: (index) =>
+                    unawaited(_duplicateLayoutCell(index)),
+                onLayoutCellImport: _studioMode == CameraStudioMode.video
+                    ? null
+                    : (index) => unawaited(_importLayoutCell(index)),
+                onWorkspaceTabSelected: _onWorkspaceTabSelected,
+                soundLabel: _studioMode == CameraStudioMode.live
+                    ? l10n.cameraLiveTitleHint
+                    : (_selectedSound?.name ?? l10n.cameraAddSound),
+                onLongPressStart: (_) => _onRecordHoldStart(),
+                onLongPressEnd: (_) => _onRecordHoldEnd(),
+                filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
               ),
             ],
           );

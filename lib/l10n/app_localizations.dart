@@ -3293,12 +3293,6 @@ abstract class AppLocalizations {
   /// **'Shared a post'**
   String get messagesInboxLastShare;
 
-  /// No description provided for @messagesInboxLastSticker.
-  ///
-  /// In en, this message translates to:
-  /// **'Sticker'**
-  String get messagesInboxLastSticker;
-
   /// No description provided for @messagesInboxMessageDeleted.
   ///
   /// In en, this message translates to:
@@ -3707,12 +3701,6 @@ abstract class AppLocalizations {
   /// **'Gift'**
   String get chatMoreGift;
 
-  /// No description provided for @chatMoreSticker.
-  ///
-  /// In en, this message translates to:
-  /// **'Sticker'**
-  String get chatMoreSticker;
-
   /// No description provided for @chatMorePoll.
   ///
   /// In en, this message translates to:
@@ -3742,36 +3730,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gift sent'**
   String get chatGiftSentLabel;
-
-  /// No description provided for @chatStickerSheetTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Stickers'**
-  String get chatStickerSheetTitle;
-
-  /// No description provided for @chatStickerSheetSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap a sticker to send it'**
-  String get chatStickerSheetSubtitle;
-
-  /// No description provided for @chatStickerPackEmotions.
-  ///
-  /// In en, this message translates to:
-  /// **'Emotions'**
-  String get chatStickerPackEmotions;
-
-  /// No description provided for @chatStickerPackReactions.
-  ///
-  /// In en, this message translates to:
-  /// **'Reactions'**
-  String get chatStickerPackReactions;
-
-  /// No description provided for @chatStickerPackCelebrations.
-  ///
-  /// In en, this message translates to:
-  /// **'Celebrations'**
-  String get chatStickerPackCelebrations;
 
   /// No description provided for @chatMessageContact.
   ///
@@ -5573,6 +5531,12 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get videoEditorDeleteSegment;
 
+  /// No description provided for @mediaEditorReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get mediaEditorReset;
+
   /// No description provided for @mediaEditorDiscard.
   ///
   /// In en, this message translates to:
@@ -5602,12 +5566,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Discard changes?'**
   String get mediaEditorDiscardTitle;
-
-  /// No description provided for @mediaEditorReset.
-  ///
-  /// In en, this message translates to:
-  /// **'Reset'**
-  String get mediaEditorReset;
 
   /// No description provided for @mediaPhotoEditorFace.
   ///
@@ -6413,6 +6371,30 @@ abstract class AppLocalizations {
   /// **'My sounds'**
   String get soundTabMine;
 
+  /// No description provided for @soundTabHot.
+  ///
+  /// In en, this message translates to:
+  /// **'Hot'**
+  String get soundTabHot;
+
+  /// No description provided for @soundTabForYou.
+  ///
+  /// In en, this message translates to:
+  /// **'For You'**
+  String get soundTabForYou;
+
+  /// No description provided for @soundTabFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get soundTabFavorites;
+
+  /// No description provided for @soundTabRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get soundTabRecent;
+
   /// No description provided for @soundPickerEmpty.
   ///
   /// In en, this message translates to:
@@ -6425,6 +6407,24 @@ abstract class AppLocalizations {
   /// **'Pick from files'**
   String get soundPickFromFiles;
 
+  /// No description provided for @soundTrimTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get soundTrimTooltip;
+
+  /// No description provided for @soundFavoriteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get soundFavoriteTooltip;
+
+  /// No description provided for @soundSecondsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}s selected'**
+  String soundSecondsSelected(int count);
+
   /// No description provided for @soundUseThis.
   ///
   /// In en, this message translates to:
@@ -6436,6 +6436,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use this sound'**
   String get soundUseThisSound;
+
+  /// No description provided for @soundUseSoundCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Use sound'**
+  String get soundUseSoundCta;
+
+  /// No description provided for @soundSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get soundSave;
+
+  /// No description provided for @soundSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get soundSaved;
+
+  /// No description provided for @soundAddToStory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Story'**
+  String get soundAddToStory;
+
+  /// No description provided for @soundFindRelatedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Find related content'**
+  String get soundFindRelatedHint;
+
+  /// No description provided for @soundOriginalBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get soundOriginalBadge;
 
   /// No description provided for @soundConfirmSelection.
   ///
@@ -6490,6 +6526,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count}M videos'**
   String soundUseCountMillions(String count);
+
+  /// No description provided for @soundPostsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} posts'**
+  String soundPostsCount(int count);
+
+  /// No description provided for @soundPostsCountThousands.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}K posts'**
+  String soundPostsCountThousands(String count);
+
+  /// No description provided for @soundPostsCountMillions.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}M posts'**
+  String soundPostsCountMillions(String count);
 
   /// No description provided for @interestSelectionTitle.
   ///

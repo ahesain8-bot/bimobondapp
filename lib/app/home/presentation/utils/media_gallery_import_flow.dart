@@ -43,6 +43,8 @@ class MediaGalleryImportFlow {
     required List<GalleryMediaItem> items,
     bool isStory = false,
     Object? initialSound,
+    Duration initialSoundOffset = Duration.zero,
+    bool initialMuteOriginal = false,
     int initialIndex = 0,
     MediaEditorSeed? initialEdit,
   }) {
@@ -55,6 +57,8 @@ class MediaGalleryImportFlow {
         'initialIndex': initialIndex,
         'isStory': isStory,
         'initialSound': initialSound,
+        'initialSoundOffsetMs': initialSoundOffset.inMilliseconds,
+        'initialMuteOriginal': initialMuteOriginal,
         'popOnDone': true,
         if (initialEdit != null) 'initialEdit': initialEdit.toExtra(),
       },
@@ -66,6 +70,8 @@ class MediaGalleryImportFlow {
     required List<GalleryMediaItem> items,
     bool isStory = false,
     Object? initialSound,
+    Duration initialSoundOffset = Duration.zero,
+    bool initialMuteOriginal = false,
     bool replaceRoute = true,
   }) async {
     final edited = await openBatchEditor(
@@ -73,6 +79,8 @@ class MediaGalleryImportFlow {
       items: items,
       isStory: isStory,
       initialSound: initialSound,
+      initialSoundOffset: initialSoundOffset,
+      initialMuteOriginal: initialMuteOriginal,
     );
     if (edited == null || edited.files.isEmpty || !context.mounted) return;
 

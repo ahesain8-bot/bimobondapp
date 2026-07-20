@@ -27,7 +27,6 @@ import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_e
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_file.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
-import 'package:bimobondapp/app/sounds/presentation/widgets/sound_trim_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
@@ -48,6 +47,8 @@ class MediaStudioEditorScreen extends StatefulWidget {
     this.initialIndex = 0,
     this.isStory = false,
     this.initialSound,
+    this.initialSoundOffset = Duration.zero,
+    this.initialMuteOriginal = false,
     this.popOnDone = false,
     this.initialEdit,
   });
@@ -56,6 +57,8 @@ class MediaStudioEditorScreen extends StatefulWidget {
   final int initialIndex;
   final bool isStory;
   final SoundEntity? initialSound;
+  final Duration initialSoundOffset;
+  final bool initialMuteOriginal;
   final bool popOnDone;
   final MediaEditorSeed? initialEdit;
 
@@ -158,6 +161,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   void initState() {
     super.initState();
     _selectedSound = widget.initialSound;
+    _soundStartOffset = widget.initialSoundOffset;
+    _muteOriginalAudio = widget.initialMuteOriginal;
     _states = widget.items.map(MediaItemEditState.fromItem).toList();
     if (widget.initialEdit != null && _states.isNotEmpty) {
       _states[0] = MediaItemEditState.fromItemWithSeed(
@@ -287,7 +292,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
     // Only bake a color grade the user picked in the editor — not one the native
     // capture already baked into the recorded pixels (avoids double-applying).
-    final needsColor = ArFilterCatalog.isColorFilter(state.arFilterId) &&
+    final needsColor =
+        ArFilterCatalog.isColorFilter(state.arFilterId) &&
         (!state.alreadyBaked || state.arFilterId != state.bakedArFilterId);
     final colorMatrix = needsColor
         ? ArColorFilterMatrix.exportMatrix(
@@ -308,8 +314,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
     }
 
-    final segments =
-        state.trimSegments.isNotEmpty ? state.trimSegments : null;
+    final segments = state.trimSegments.isNotEmpty ? state.trimSegments : null;
 
     if (colorMatrix == null && overlayPng == null && segments == null) {
       return file;
@@ -634,45 +639,27 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   }
 
   Future<void> _pickSound() async {
+    final hasVideo = _states.any((s) => s.isVideo);
     final picked = await SoundPickerSheet.show(
       context,
       initialSelection: _selectedSound,
+      allowMuteOnTrim: hasVideo,
     );
-    if (!mounted) return;
-    if (picked == null) {
-      _clearSound();
-      return;
-    }
+    if (!mounted || picked == null) return;
 
-    // TikTok-style trim: choose the start point + (for videos) whether to mute
-    // the original audio.
-    final sameTrack = _selectedSound?.id == picked.id;
-    final hasVideo = _states.any((s) => s.isVideo);
-    final result = await SoundTrimSheet.show(
-      context,
-      sound: picked,
-      initialOffset: sameTrack ? _soundStartOffset : Duration.zero,
-      allowMute: hasVideo,
-      initialMute: sameTrack ? _muteOriginalAudio : false,
-    );
-    if (!mounted) return;
+    // Check on the period sheet already applied + closed — just keep the result.
     setState(() {
-      _selectedSound = picked;
-      if (result != null) {
-        _soundStartOffset = result.offset;
-        _muteOriginalAudio = result.muteOriginal;
-      } else if (!sameTrack) {
-        _soundStartOffset = Duration.zero;
-        _muteOriginalAudio = false;
-      }
+      _selectedSound = picked.sound;
+      _soundStartOffset = picked.offset;
+      _muteOriginalAudio = picked.muteOriginal;
     });
   }
 
   void _clearSound() => setState(() {
-        _selectedSound = null;
-        _soundStartOffset = Duration.zero;
-        _muteOriginalAudio = false;
-      });
+    _selectedSound = null;
+    _soundStartOffset = Duration.zero;
+    _muteOriginalAudio = false;
+  });
 
   Future<void> _shareCurrent() async {
     final file = _currentState.sourceFile;
@@ -942,9 +929,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   void _saveDraftPlaceholder(AppLocalizations l10n) {
     setState(() => _showExitMenu = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.addPostDraftsComingSoon)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.addPostDraftsComingSoon)));
   }
 
   void _sendToFriends() {
@@ -977,124 +964,125 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _requestExit();
       },
       child: Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          RepaintBoundary(
-            child: MediaStudioPreview(
-              // Stable key — do NOT key on beauty preview path (that blinks).
-              key: ValueKey('studio-preview-$_currentIndex'),
-              file: previewFile,
-              isVideo: currentItem.isVideo,
-              arFilterId: selectedColorId,
-              arFilterIntensity: _arFilterIntensity,
-              applyArColorPreview: _applyArColorPreview,
-              paused: _subEditorOpen,
-              trimSegments: currentItem.isVideo
-                  ? _currentState.trimSegments
-                  : const [],
-            ),
-          ),
-          if (_currentState.textOverlays.isNotEmpty)
-            Positioned.fill(
-              child: MediaTextOverlayLayer(
-                key: ValueKey('text-overlays-$_currentIndex'),
-                overlays: _currentState.textOverlays,
-                onChanged: _moveOverlay,
-                onEdit: _editText,
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            RepaintBoundary(
+              child: MediaStudioPreview(
+                // Stable key — do NOT key on beauty preview path (that blinks).
+                key: ValueKey('studio-preview-$_currentIndex'),
+                file: previewFile,
+                isVideo: currentItem.isVideo,
+                arFilterId: selectedColorId,
+                arFilterIntensity: _arFilterIntensity,
+                applyArColorPreview: _applyArColorPreview,
+                paused: _subEditorOpen,
+                trimSegments: currentItem.isVideo
+                    ? _currentState.trimSegments
+                    : const [],
               ),
             ),
-          SafeArea(
-            child: Column(
-              children: [
-                MediaStudioTopBar(
-                  soundLabel: soundLabel,
-                  onBack: _isProcessing ? () {} : _requestExit,
-                  onSoundTap: _isProcessing ? () {} : _pickSound,
-                  onClearSound: _selectedSound == null || _isProcessing
-                      ? null
-                      : _clearSound,
-                  onSettingsTap: _isProcessing
-                      ? () {}
-                      : () => _showSettingsSheet(l10n),
+            if (_currentState.textOverlays.isNotEmpty)
+              Positioned.fill(
+                child: MediaTextOverlayLayer(
+                  key: ValueKey('text-overlays-$_currentIndex'),
+                  overlays: _currentState.textOverlays,
+                  onChanged: _moveOverlay,
+                  onEdit: _editText,
                 ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: 8,
-                        bottom: 8,
-                        right: isRtl ? null : 0,
-                        left: isRtl ? 0 : null,
-                        child: MediaStudioSideRail(tools: _sideTools(l10n)),
-                      ),
-                    ],
+              ),
+            SafeArea(
+              child: Column(
+                children: [
+                  MediaStudioTopBar(
+                    soundLabel: soundLabel,
+                    onBack: _isProcessing ? () {} : _requestExit,
+                    onSoundTap: _isProcessing ? () {} : _pickSound,
+                    onClearSound: _selectedSound == null || _isProcessing
+                        ? null
+                        : _clearSound,
+                    onSettingsTap: _isProcessing
+                        ? () {}
+                        : () => _showSettingsSheet(l10n),
                   ),
-                ),
-                if (_showPhotoEditor)
-                  MediaPhotoEditorPanel(
-                    l10n: l10n,
-                    tab: _photoEditorTab,
-                    selectedTool: _photoEditorTool,
-                    magicOn: _magicOn,
-                    adjustmentValues: _adjustments,
-                    onTabChanged: (tab) =>
-                        setState(() => _photoEditorTab = tab),
-                    onToolSelected: _onPhotoEditorToolSelected,
-                    onMagicToggled: _onMagicToggled,
-                    onAdjustmentChanged: _onAdjustmentChanged,
-                    onReset: _resetPhotoEditor,
-                  )
-                else if (_showFilters)
-                  ArColorFiltersPanel(
-                    selectedFilterId: selectedColorId,
-                    selectedCategoryId: _arColorCategoryId,
-                    intensity: _arFilterIntensity,
-                    onCategorySelected: (id) => setState(() {
-                      _arColorCategoryId = id;
-                      _saveUiToCurrentState();
-                    }),
-                    onFilterSelected: _selectArFilter,
-                    onIntensityChanged: (value) => setState(() {
-                      _arFilterIntensity = value;
-                      _saveUiToCurrentState();
-                    }),
-                    onClear: () => _selectArFilter('none'),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: 8,
+                          bottom: 8,
+                          right: isRtl ? null : 0,
+                          left: isRtl ? 0 : null,
+                          child: MediaStudioSideRail(tools: _sideTools(l10n)),
+                        ),
+                      ],
+                    ),
                   ),
-                if (!_showPhotoEditor) ...[
-                  MediaStudioClipDock(
-                    items: _states.map((s) => s.item).toList(growable: false),
-                    selectedIndex: _currentIndex,
-                    onSelected: _selectIndex,
-                    onAdd: _isProcessing ? () {} : _addMedia,
-                  ),
-                  MediaStudioBottomActions(
-                    yourStoryLabel: l10n.messagesYourStory,
-                    nextLabel: l10n.nextAction,
-                    avatarUrl: avatarUrl,
-                    enabled: !_isProcessing,
-                    onYourStory: _onYourStory,
-                    onNext: _onNext,
-                  ),
+                  if (_showPhotoEditor)
+                    MediaPhotoEditorPanel(
+                      l10n: l10n,
+                      tab: _photoEditorTab,
+                      selectedTool: _photoEditorTool,
+                      magicOn: _magicOn,
+                      adjustmentValues: _adjustments,
+                      onTabChanged: (tab) =>
+                          setState(() => _photoEditorTab = tab),
+                      onToolSelected: _onPhotoEditorToolSelected,
+                      onMagicToggled: _onMagicToggled,
+                      onAdjustmentChanged: _onAdjustmentChanged,
+                      onReset: _resetPhotoEditor,
+                    )
+                  else if (_showFilters)
+                    ArColorFiltersPanel(
+                      selectedFilterId: selectedColorId,
+                      selectedCategoryId: _arColorCategoryId,
+                      intensity: _arFilterIntensity,
+                      onCategorySelected: (id) => setState(() {
+                        _arColorCategoryId = id;
+                        _saveUiToCurrentState();
+                      }),
+                      onFilterSelected: _selectArFilter,
+                      onIntensityChanged: (value) => setState(() {
+                        _arFilterIntensity = value;
+                        _saveUiToCurrentState();
+                      }),
+                      onClear: () => _selectArFilter('none'),
+                    ),
+                  if (!_showPhotoEditor) ...[
+                    MediaStudioClipDock(
+                      items: _states.map((s) => s.item).toList(growable: false),
+                      selectedIndex: _currentIndex,
+                      onSelected: _selectIndex,
+                      onAdd: _isProcessing ? () {} : _addMedia,
+                    ),
+                    MediaStudioBottomActions(
+                      yourStoryLabel: l10n.messagesYourStory,
+                      nextLabel: l10n.nextAction,
+                      avatarUrl: avatarUrl,
+                      enabled: !_isProcessing,
+                      onYourStory: _onYourStory,
+                      onNext: _onNext,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          if (_showExitMenu)
-            _ExitConfirmMenu(
-              isRtl: isRtl,
-              onDiscard: _discardAndLeave,
-              onSaveDraft: () => _saveDraftPlaceholder(l10n),
-              onSendToFriends: _sendToFriends,
-              onDismiss: _continueEditing,
-              discardLabel: l10n.mediaEditorDiscard,
-              saveDraftLabel: l10n.mediaEditorSaveDraft,
-              sendLabel: l10n.mediaEditorSendToFriends,
-            ),
-          if (_isProcessing) CameraAppLoading(message: l10n.promoteProcessing),
-        ],
-      ),
+            if (_showExitMenu)
+              _ExitConfirmMenu(
+                isRtl: isRtl,
+                onDiscard: _discardAndLeave,
+                onSaveDraft: () => _saveDraftPlaceholder(l10n),
+                onSendToFriends: _sendToFriends,
+                onDismiss: _continueEditing,
+                discardLabel: l10n.mediaEditorDiscard,
+                saveDraftLabel: l10n.mediaEditorSaveDraft,
+                sendLabel: l10n.mediaEditorSendToFriends,
+              ),
+            if (_isProcessing)
+              CameraAppLoading(message: l10n.promoteProcessing),
+          ],
+        ),
       ),
     );
   }

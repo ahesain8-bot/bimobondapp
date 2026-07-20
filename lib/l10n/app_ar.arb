@@ -1477,10 +1477,28 @@
   "soundTabTrending": "الرائج",
   "soundTabBrowse": "تصفح",
   "soundTabMine": "أصواتي",
+  "soundTabHot": "الأكثر رواجاً",
+  "soundTabForYou": "لك",
+  "soundTabFavorites": "المفضلة",
+  "soundTabRecent": "الأخيرة",
   "soundPickerEmpty": "لا توجد أصوات",
   "soundPickFromFiles": "اختر من الملفات",
+  "soundTrimTooltip": "قص",
+  "soundFavoriteTooltip": "المفضلة",
+  "soundSecondsSelected": "{count} ث محددة",
+  "@soundSecondsSelected": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "soundUseThis": "استخدام",
   "soundUseThisSound": "استخدم هذا الصوت",
+  "soundUseSoundCta": "استخدام الصوت",
+  "soundSave": "حفظ",
+  "soundSaved": "تم الحفظ",
+  "soundAddToStory": "إضافة إلى القصة",
+  "soundFindRelatedHint": "البحث عن محتوى مشابه",
+  "soundOriginalBadge": "أصلي",
   "soundConfirmSelection": "استخدام الصوت المحدد",
   "soundClearSelection": "مسح",
   "soundDetailTitle": "الصوت",
@@ -1506,6 +1524,24 @@
   },
   "soundUseCountMillions": "{count} مليون فيديو",
   "@soundUseCountMillions": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundPostsCount": "{count} منشور",
+  "@soundPostsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "soundPostsCountThousands": "{count} ألف منشور",
+  "@soundPostsCountThousands": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundPostsCountMillions": "{count} مليون منشور",
+  "@soundPostsCountMillions": {
     "placeholders": {
       "count": { "type": "String" }
     }

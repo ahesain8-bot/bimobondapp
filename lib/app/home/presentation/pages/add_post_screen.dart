@@ -395,8 +395,8 @@ class _AddPostScreenState extends State<AddPostScreen>
       context,
       initialSelection: _selectedSound,
     );
-    if (!mounted) return;
-    setState(() => _selectedSound = picked);
+    if (!mounted || picked == null) return;
+    setState(() => _selectedSound = picked.sound);
   }
 
   Future<void> _openSoundDetail() async {

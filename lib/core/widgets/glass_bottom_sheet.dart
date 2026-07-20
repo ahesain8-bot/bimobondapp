@@ -23,6 +23,7 @@ class GlassBottomSheet {
       return await showModalBottomSheet<T>(
         context: context,
         isScrollControlled: isScrollControlled,
+        useRootNavigator: true,
         backgroundColor: Colors.transparent,
         barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.55),
         shape: const RoundedRectangleBorder(
@@ -101,6 +102,7 @@ class GlassBottomSheet {
     bool expand = false,
     EdgeInsetsGeometry? padding,
     bool adaptTheme = false,
+    bool lightSurface = false,
   }) {
     return open<T>(
       context,
@@ -111,6 +113,7 @@ class GlassBottomSheet {
           scrollable: scrollable,
           showHandle: showHandle,
           expand: expand,
+          lightSurface: lightSurface,
           child: padding == null ? child : Padding(padding: padding, child: child),
         );
         if (isScrollControlled) {
@@ -119,7 +122,9 @@ class GlassBottomSheet {
             child: body,
           );
         }
-        if (adaptTheme) {
+        if (lightSurface) {
+          // Keep the caller's theme (white surface in light mode).
+        } else if (adaptTheme) {
           body = GlassBottomSheetTheme.wrap(ctx, body);
         }
         return body;

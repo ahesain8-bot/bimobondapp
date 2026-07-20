@@ -21,11 +21,14 @@ class _PostCaptionTagsState extends State<PostCaptionTags> {
 
   bool _expanded = false;
 
-  TextStyle get _captionStyle => TextStyle(
-    color: Colors.white.withValues(alpha: 0.9),
+  TextStyle get _captionStyle => const TextStyle(
+    color: Colors.white,
     fontSize: 14,
-    height: 1.4,
-    shadows: const [Shadow(color: Colors.black54, blurRadius: 6)],
+    height: 1.35,
+    fontWeight: FontWeight.w400,
+    shadows: [
+      Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+    ],
   );
 
   bool _measureOverflow(double maxWidth, String text) {
@@ -72,19 +75,29 @@ class _PostCaptionTagsState extends State<PostCaptionTags> {
               child: TaggedText(
                 text: description,
                 style: _captionStyle,
-                mentionStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.95),
+                mentionStyle: const TextStyle(
+                  color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  shadows: const [
-                    Shadow(color: Colors.black54, blurRadius: 6),
+                  shadows: [
+                    Shadow(
+                      color: Colors.black54,
+                      blurRadius: 6,
+                      offset: Offset(0, 1),
+                    ),
                   ],
                 ),
                 hashtagStyle: const TextStyle(
-                  color: postCaptionHashtagColor,
+                  color: Colors.white,
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                  fontWeight: FontWeight.w600,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black54,
+                      blurRadius: 6,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
                 ),
                 post: post,
                 mentionUserIds: MentionRefUtils.usernameToUserIdMap(
