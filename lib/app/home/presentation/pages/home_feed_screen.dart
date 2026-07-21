@@ -134,16 +134,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     _feedItems.addAll(incoming.where((item) => !existingIds.contains(item.id)));
   }
 
-  void _prefetchNextPageIfNeeded() {
-    if (_isLoadingMore || _hasReachedMax) return;
-    if (_feedItems.isEmpty) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _loadMorePosts();
-    });
-  }
-
   Future<void> _onPullToRefresh() async {
     _pullRefreshCompleter = Completer<void>();
     _fetchFeed(refresh: true);
@@ -206,9 +196,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       });
       if (loadedPage == 1) {
         _completePullRefreshIfPending();
-      }
-      if (!_hasReachedMax) {
-        _prefetchNextPageIfNeeded();
       }
     } else if (state is CreatePostSuccess) {
       if (!state.post.isStory) {

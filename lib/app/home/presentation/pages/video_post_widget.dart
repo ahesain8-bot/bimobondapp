@@ -50,10 +50,12 @@ class VideoPostWidget extends StatefulWidget {
   final FeedItemEntity? feedItem;
   final double? bottomPadding;
   final bool isActive;
+
   /// When false, playback ignores [FeedPlaybackGate] (e.g. profile posts viewer).
   final bool respectFeedPlaybackGate;
   final bool openCommentsOnLoad;
   final String? highlightCommentId;
+
   /// Extra top offset for carousel badge when a feed top bar overlays the post.
   final double? feedTopBarClearance;
 
@@ -93,7 +95,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   ];
 
   int _currentPage = 0;
-  late AnimationController _musicController;
   late AnimationController _likeAnimController;
   late Animation<double> _likeScaleAnim;
   final CarouselSliderController _carouselCtrl = CarouselSliderController();
@@ -135,11 +136,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     _repostQuote = _initialRepostQuote();
     _isFollowing = widget.post.user?.isFollowing ?? false;
     _followStatusResolved = widget.post.user?.isFollowing != null;
-
-    _musicController = AnimationController(
-      duration: const Duration(seconds: 8),
-      vsync: this,
-    )..repeat();
 
     _likeAnimController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -549,13 +545,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     return _postSoundController?.value.isPlaying ?? false;
   }
 
-  void _syncMusicDiscAnimation() {
-    if (!_playbackActive || !_isPostPlaybackActive()) {
-      if (_musicController.isAnimating) _musicController.stop();
-      return;
-    }
-    if (!_musicController.isAnimating) _musicController.repeat();
-  }
+  // The music disc is static now (no rotation), so there is no animation to
+  // sync. Kept as a no-op because playback paths still call it.
+  void _syncMusicDiscAnimation() {}
 
   Future<void> _togglePostPlayback() async {
     if (!_canTogglePlayback) return;
@@ -763,7 +755,6 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   void dispose() {
     FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
     unawaited(_stopPostSound());
-    _musicController.dispose();
     _likeAnimController.dispose();
     super.dispose();
   }
@@ -1275,57 +1266,43 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     );
   }
 
+  // Static disc (no rotation): avoids a permanent 60fps ticker and the
+  // per-frame re-blur of the BackdropFilter behind a moving video.
   Widget _buildMusicDiscVisual(ThemeData theme) {
-    return AnimatedBuilder(
-      animation: _musicController,
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _musicController.value * 2 * 3.14159,
-          child: child,
-        );
-      },
-      child: Container(
-        width: _musicDiscSize,
-        height: _musicDiscSize,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.8),
-              theme.colorScheme.secondary.withValues(alpha: 0.8),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.primary.withValues(alpha: 0.4),
-              blurRadius: 12,
-              spreadRadius: 2,
-            ),
+    return Container(
+      width: _musicDiscSize,
+      height: _musicDiscSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.8),
+            theme.colorScheme.secondary.withValues(alpha: 0.8),
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: ClipOval(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: const Icon(
-                  LucideIcons.music,
-                  color: Colors.white70,
-                  size: 12,
-                ),
-              ),
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.4),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          ),
+          child: const Icon(
+            LucideIcons.music,
+            color: Colors.white70,
+            size: 12,
           ),
         ),
       ),

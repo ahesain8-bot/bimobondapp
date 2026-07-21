@@ -16,8 +16,40 @@ class AppLocationService {
   final UserLocationStore _store;
   final UserLocationRemoteDataSource _remote;
 
+  /// Reuses an in-flight ensure so concurrent callers share one request.
+  Future<bool>? _ensureInFlight;
+
+  /// When the last ensure finished, used to throttle repeat syncs.
+  DateTime? _lastEnsuredAt;
+
+  /// Splash and the home feed both call [ensureViewerLocation] within a few
+  /// seconds of each other; without this window each would geocode and PUT
+  /// the location again.
+  static const _ensureThrottle = Duration(minutes: 5);
+
   /// Uses cached coordinates when available; otherwise requests GPS once.
-  Future<bool> ensureViewerLocation() async {
+  ///
+  /// De-duplicated across the app session: concurrent calls share the same
+  /// request, and repeat calls within [_ensureThrottle] are skipped so the
+  /// geocode + `PUT /users/me/location` only happens once per open.
+  Future<bool> ensureViewerLocation() {
+    final inFlight = _ensureInFlight;
+    if (inFlight != null) return inFlight;
+
+    final last = _lastEnsuredAt;
+    if (last != null && DateTime.now().difference(last) < _ensureThrottle) {
+      return Future.value(true);
+    }
+
+    final future = _ensureViewerLocation();
+    _ensureInFlight = future;
+    return future.whenComplete(() {
+      _lastEnsuredAt = DateTime.now();
+      _ensureInFlight = null;
+    });
+  }
+
+  Future<bool> _ensureViewerLocation() async {
     if (_store.viewerCoordinates != null) {
       await syncStoredLocationToBackend();
       return true;

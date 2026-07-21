@@ -9,11 +9,14 @@ class AppMediaCacheManager {
 
   static const _cacheKey = 'bimobondMediaCache';
 
+  // Images also load through this cache (SafeNetworkImage), so the object
+  // limit must comfortably hold feed images + avatars + covers, not just a
+  // handful of videos.
   static final CacheManager instance = CacheManager(
     Config(
       _cacheKey,
       stalePeriod: const Duration(days: 14),
-      maxNrOfCacheObjects: 200,
+      maxNrOfCacheObjects: 1000,
     ),
   );
 

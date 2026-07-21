@@ -23,6 +23,12 @@ class NotificationCoordinator {
   String? _activeUserId;
 
   Future<void> onLoggedIn(String userId) async {
+    // Idempotent on purpose: on cold start AuthSuccess is emitted twice
+    // (CheckAuthStatus from cache, then FetchProfile from /auth/me) and a
+    // post-frame sync also fires. Without this guard each repeat would
+    // re-init push, reconnect the socket, and re-hit unread-count + device
+    // login — several redundant API calls on every open.
+    if (_activeUserId == userId) return;
     _activeUserId = userId;
     await pushService.initialize(onTokenRefresh: _syncDeviceRegistration);
     await socketService.connectAndJoin(userId);

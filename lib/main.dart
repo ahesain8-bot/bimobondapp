@@ -1,6 +1,5 @@
 import 'package:bimobondapp/core/utils/google_maps_bootstrap.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
-import 'dart:async';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -47,10 +46,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bimobondapp/firebase_options.dart';
 
-Future<void> _preloadCameraStudioCatalog() async {
-  await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded();
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await configureGoogleMaps();
@@ -70,7 +65,10 @@ void main() async {
   await gifts_di.initGifts();
   await auctions_di.initAuctions();
   await camera_studio_di.initCameraStudio();
-  await _preloadCameraStudioCatalog();
+  // Use the bundled filter/effect catalog at launch (local, no network). The
+  // add-post camera refreshes it from the API when it actually opens, so the
+  // two catalog requests no longer run on every cold start.
+  CameraStudioCatalogLoader.applyBundledCatalog();
   await chats_di.initChats();
   await notifications_di.initNotifications();
   runApp(const MyApp());

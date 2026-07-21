@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// True when [url] is a non-empty http(s) URL that is not a video file.
@@ -93,7 +92,9 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   @override
   void didUpdateWidget(SafeNetworkImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.width != widget.width ||
+        oldWidget.height != widget.height) {
       _disposeStream();
       _imageInfo = null;
       _failed = false;
@@ -133,9 +134,8 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     }
 
     _failed = false;
-    unawaited(_cacheImageInBackground(url!));
 
-    final provider = NetworkImage(url);
+    final provider = _imageProvider(url!);
     final stream = provider.resolve(createLocalImageConfiguration(context));
     _stream = stream;
     _listener = ImageStreamListener(
@@ -161,12 +161,38 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     stream.addListener(_listener!);
   }
 
-  Future<void> _cacheImageInBackground(String url) async {
-    try {
-      await AppMediaCacheManager.instance.downloadFile(url);
-    } catch (_) {
-      // Display uses NetworkImage; cache is best-effort only.
+  ImageProvider<Object> _imageProvider(String url) {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final pixelRatio = mediaQuery?.devicePixelRatio ?? 1;
+    final width = widget.width;
+    final height = widget.height;
+
+    int? cacheWidth;
+    int? cacheHeight;
+
+    // Supplying one decode dimension preserves the source aspect ratio.
+    // Prefer width because most feed/grid images are width-constrained.
+    if (width != null && width.isFinite && width > 0) {
+      cacheWidth = (width * pixelRatio).ceil().clamp(1, 4096);
+    } else if (height != null && height.isFinite && height > 0) {
+      cacheHeight = (height * pixelRatio).ceil().clamp(1, 4096);
+    } else {
+      final screenWidth = mediaQuery?.size.width;
+      if (screenWidth != null && screenWidth.isFinite && screenWidth > 0) {
+        cacheWidth = (screenWidth * pixelRatio).ceil().clamp(1, 4096);
+      }
     }
+
+    // Single fetch path: downloads through the shared disk cache, so the same
+    // URL is never downloaded twice (across widgets and app restarts).
+    return ResizeImage.resizeIfNeeded(
+      cacheWidth,
+      cacheHeight,
+      CachedNetworkImageProvider(
+        url,
+        cacheManager: AppMediaCacheManager.instance,
+      ),
+    );
   }
 
   void _notifyLoaded() {
@@ -400,5 +426,11 @@ class _SafeNetworkAvatarState extends State<SafeNetworkAvatar> {
 Future<void> precacheSafeNetworkImage(BuildContext context, String url) {
   final resolved = MediaUtils.resolveAbsoluteUrl(url.trim());
   if (!isValidNetworkImageUrl(resolved)) return Future.value();
-  return precacheImage(NetworkImage(resolved), context);
+  return precacheImage(
+    CachedNetworkImageProvider(
+      resolved,
+      cacheManager: AppMediaCacheManager.instance,
+    ),
+    context,
+  );
 }
