@@ -1,10 +1,7 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
-import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
-    as auth_di;
 import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
-import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -52,10 +49,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateToNext() async {
-    await Future.wait([
-      Future.delayed(const Duration(seconds: 3)),
-      auth_di.sl<AppLocationService>().ensureViewerLocation(),
-    ]);
+    // Location is intentionally deferred until the first For You page loads,
+    // so geocoding and backend sync do not delay app startup.
+    await Future.delayed(const Duration(seconds: 3));
 
     if (!mounted) return;
     final authState = context.read<AuthBloc>().state;

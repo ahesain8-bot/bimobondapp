@@ -23,7 +23,6 @@ class VideoPostSideActions extends StatelessWidget {
     required this.commentLabel,
     required this.isSaved,
     required this.saveLabel,
-    required this.musicRotation,
     required this.commentActionKey,
     required this.shareActionKey,
     required this.onAvatarTap,
@@ -54,7 +53,6 @@ class VideoPostSideActions extends StatelessWidget {
   final String commentLabel;
   final bool isSaved;
   final String saveLabel;
-  final Animation<double> musicRotation;
   final GlobalKey commentActionKey;
   final GlobalKey shareActionKey;
   final VoidCallback onAvatarTap;
@@ -161,7 +159,6 @@ class VideoPostSideActions extends StatelessWidget {
         ),
         const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
         VideoPostMusicDisc(
-          rotation: musicRotation,
           avatarUrl: avatarUrl,
           onTap: onMusicTap,
         ),

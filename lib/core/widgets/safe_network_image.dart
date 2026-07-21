@@ -162,36 +162,11 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   }
 
   ImageProvider<Object> _imageProvider(String url) {
-    final mediaQuery = MediaQuery.maybeOf(context);
-    final pixelRatio = mediaQuery?.devicePixelRatio ?? 1;
-    final width = widget.width;
-    final height = widget.height;
-
-    int? cacheWidth;
-    int? cacheHeight;
-
-    // Supplying one decode dimension preserves the source aspect ratio.
-    // Prefer width because most feed/grid images are width-constrained.
-    if (width != null && width.isFinite && width > 0) {
-      cacheWidth = (width * pixelRatio).ceil().clamp(1, 4096);
-    } else if (height != null && height.isFinite && height > 0) {
-      cacheHeight = (height * pixelRatio).ceil().clamp(1, 4096);
-    } else {
-      final screenWidth = mediaQuery?.size.width;
-      if (screenWidth != null && screenWidth.isFinite && screenWidth > 0) {
-        cacheWidth = (screenWidth * pixelRatio).ceil().clamp(1, 4096);
-      }
-    }
-
-    // Single fetch path: downloads through the shared disk cache, so the same
-    // URL is never downloaded twice (across widgets and app restarts).
-    return ResizeImage.resizeIfNeeded(
-      cacheWidth,
-      cacheHeight,
-      CachedNetworkImageProvider(
-        url,
-        cacheManager: AppMediaCacheManager.instance,
-      ),
+    return safeNetworkImageProvider(
+      context,
+      url,
+      width: widget.width,
+      height: widget.height,
     );
   }
 
@@ -422,15 +397,60 @@ class _SafeNetworkAvatarState extends State<SafeNetworkAvatar> {
   }
 }
 
-/// Precache a remote image using the disk cache.
-Future<void> precacheSafeNetworkImage(BuildContext context, String url) {
+/// Provider used by [SafeNetworkImage] to display [url].
+///
+/// Shared with [precacheSafeNetworkImage] so a precache produces the exact
+/// same in-memory cache key as the widget that later displays the image —
+/// the preloaded decode is reused instead of decoding twice.
+ImageProvider<Object> safeNetworkImageProvider(
+  BuildContext context,
+  String url, {
+  double? width,
+  double? height,
+}) {
+  final mediaQuery = MediaQuery.maybeOf(context);
+  final pixelRatio = mediaQuery?.devicePixelRatio ?? 1;
+
+  int? cacheWidth;
+  int? cacheHeight;
+
+  // Supplying one decode dimension preserves the source aspect ratio.
+  // Prefer width because most feed/grid images are width-constrained.
+  if (width != null && width.isFinite && width > 0) {
+    cacheWidth = (width * pixelRatio).ceil().clamp(1, 4096);
+  } else if (height != null && height.isFinite && height > 0) {
+    cacheHeight = (height * pixelRatio).ceil().clamp(1, 4096);
+  } else {
+    final screenWidth = mediaQuery?.size.width;
+    if (screenWidth != null && screenWidth.isFinite && screenWidth > 0) {
+      cacheWidth = (screenWidth * pixelRatio).ceil().clamp(1, 4096);
+    }
+  }
+
+  // Single fetch path: downloads through the shared disk cache, so the same
+  // URL is never downloaded twice (across widgets and app restarts).
+  return ResizeImage.resizeIfNeeded(
+    cacheWidth,
+    cacheHeight,
+    CachedNetworkImageProvider(
+      url,
+      cacheManager: AppMediaCacheManager.instance,
+    ),
+  );
+}
+
+/// Precache a remote image (download + decode) so it renders instantly when
+/// a [SafeNetworkImage] with the same [width]/[height] displays it later.
+Future<void> precacheSafeNetworkImage(
+  BuildContext context,
+  String url, {
+  double? width,
+  double? height,
+}) {
   final resolved = MediaUtils.resolveAbsoluteUrl(url.trim());
   if (!isValidNetworkImageUrl(resolved)) return Future.value();
   return precacheImage(
-    CachedNetworkImageProvider(
-      resolved,
-      cacheManager: AppMediaCacheManager.instance,
-    ),
+    safeNetworkImageProvider(context, resolved, width: width, height: height),
     context,
   );
 }

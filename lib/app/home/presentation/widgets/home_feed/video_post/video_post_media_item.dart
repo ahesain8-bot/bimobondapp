@@ -15,7 +15,6 @@ class VideoPostMediaItem extends StatelessWidget {
     required this.respectFeedPlaybackGate,
     required this.videoController,
     required this.isImagePlaybackActive,
-    required this.onPlaybackChanged,
     required this.onLongPress,
     this.onImageTap,
     super.key,
@@ -28,7 +27,6 @@ class VideoPostMediaItem extends StatelessWidget {
   final bool respectFeedPlaybackGate;
   final CustomVideoPlayerController videoController;
   final bool isImagePlaybackActive;
-  final VoidCallback onPlaybackChanged;
   final VoidCallback onLongPress;
   final VoidCallback? onImageTap;
 
@@ -38,26 +36,32 @@ class VideoPostMediaItem extends StatelessWidget {
     final isVideo =
         MediaUtils.isVideo(mediaUrl, mediaType: media.mediaType) ||
         post.type == 'VIDEO';
+    // Prefer the adaptive HLS rendition for the post's primary video. Keep
+    // each item's own URL for later carousel slides, because the post-level
+    // HLS URL represents only the primary video.
+    final hlsUrl = post.hlsUrl?.trim();
+    final playbackUrl = isVideo && index == 0 && hlsUrl?.isNotEmpty == true
+        ? MediaUtils.resolveAbsoluteUrl(hlsUrl!)
+        : mediaUrl;
 
     Widget child = isVideo
         ? CustomVideoPlayer(
-            url: mediaUrl,
+            url: playbackUrl,
             posterUrl: MediaUtils.resolveVideoPosterUrl(post),
             isActive: isActiveSlide,
             respectFeedPlaybackGate: respectFeedPlaybackGate,
             controller: videoController,
-            onPlaybackChanged: onPlaybackChanged,
             onLongPress: onLongPress,
           )
         : mediaUrl.isEmpty
-            ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)
-            : SafeNetworkImage(
-                imageUrl: mediaUrl,
-                fit: BoxFit.contain,
-                width: double.infinity,
-                height: double.infinity,
-                errorIcon: LucideIcons.imageOff,
-              );
+        ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)
+        : SafeNetworkImage(
+            imageUrl: mediaUrl,
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+            errorIcon: LucideIcons.imageOff,
+          );
 
     if (!isVideo) {
       child = GestureDetector(
@@ -84,9 +88,9 @@ class VideoPostMediaItem extends StatelessWidget {
     }
 
     return SizedBox(
-      key: ValueKey('${mediaUrl}_$index'),
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height,
+      key: ValueKey('${playbackUrl}_$index'),
+      width: MediaQuery.sizeOf(context).width,
+      height: MediaQuery.sizeOf(context).height,
       child: Center(child: child),
     );
   }

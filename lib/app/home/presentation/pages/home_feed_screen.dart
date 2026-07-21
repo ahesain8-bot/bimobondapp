@@ -3,13 +3,18 @@ import 'dart:async';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_top_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_tab.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
+    as notifications_di;
+import 'package:bimobondapp/app/notifications/presentation/services/notification_coordinator.dart';
 import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/core/services/app_location_service.dart';
+import 'package:bimobondapp/core/services/feed_video_prewarmer.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -45,6 +50,8 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   Completer<void>? _pullRefreshCompleter;
   final FeedVideoProgressNotifier _feedVideoProgress =
       FeedVideoProgressNotifier();
+  final FeedMediaPreloader _mediaPreloader = FeedMediaPreloader();
+  bool _didRunPostFeedBootstrap = false;
 
   /// Called when the user re-taps the Home tab while already on it.
   void refreshFromTab() {
@@ -64,7 +71,13 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   void didUpdateWidget(HomeFeedScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isTabActive && !oldWidget.isTabActive) {
-      _beginVisibleRefresh();
+      // Coming back from another tab keeps the user's place in the feed.
+      // Only load when there is nothing to show yet; a full refresh happens
+      // solely when the user re-taps Home while already on it
+      // (refreshFromTab).
+      if (_feedItems.isEmpty) {
+        _loadTabData();
+      }
     } else if (!widget.isTabActive && oldWidget.isTabActive) {
       _feedVideoProgress.reset();
     }
@@ -87,19 +100,26 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _loadTabData() {
-    unawaited(_loadTabDataWithLocation());
+    // Cached coordinates are still included by _fetchFeed when available.
+    // Fresh location and notification network work start after page 1.
+    _fetchFeed(refresh: true);
   }
 
-  Future<void> _loadTabDataWithLocation() async {
-    await auth_di.sl<AppLocationService>().ensureViewerLocation();
-    if (!mounted) return;
-    _fetchFeed(refresh: true);
+  void _runPostFeedBootstrap() {
+    if (_didRunPostFeedBootstrap) return;
+    _didRunPostFeedBootstrap = true;
+
+    notifications_di
+        .sl<NotificationCoordinator>()
+        .allowLoginSideEffects();
+    unawaited(auth_di.sl<AppLocationService>().ensureViewerLocation());
   }
 
   @override
   void dispose() {
     _feedVideoProgress.dispose();
     _pageController.dispose();
+    FeedVideoPrewarmer.instance.clear();
     super.dispose();
   }
 
@@ -195,6 +215,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
 
     setState(() => _currentPostIndex = index);
     _feedVideoProgress.reset();
+    _mediaPreloader.preloadAround(context, _feedItems, index);
 
     final threshold =
         _feedItems.length <= HomeLayoutConstants.feedPrefetchMinPosts
@@ -234,7 +255,14 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       });
       if (loadedPage == 1) {
         _completePullRefreshIfPending();
+        _mediaPreloader.reset();
+        if (_selectedFeedTab == HomeFeedTab.forYou) {
+          _runPostFeedBootstrap();
+        }
       }
+      // Warm the next post's media (first slide / video poster / avatar) so
+      // scrolling to it shows content immediately.
+      _mediaPreloader.preloadAround(context, _feedItems, _currentPostIndex);
     } else if (state is CreatePostSuccess) {
       if (!state.post.isStory) {
         _fetchFeed(refresh: true);

@@ -326,7 +326,7 @@ class FetchStoriesRequestedEvent extends PostsEvent {
 
   const FetchStoriesRequestedEvent({
     this.page = 1,
-    this.limit = 30,
+    this.limit = 10,
     this.isRefresh = false,
   });
 

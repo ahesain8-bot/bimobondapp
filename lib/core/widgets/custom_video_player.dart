@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/services/feed_video_prewarmer.dart';
+import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:bimobondapp/core/widgets/blurred_icon_badge.dart';
-import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/core/widgets/video_loading_indicator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,6 +47,7 @@ class CustomVideoPlayer extends StatefulWidget {
   final String url;
   final String? posterUrl;
   final bool isActive;
+
   /// When false, playback is not paused by [FeedPlaybackGate] (e.g. auction detail).
   final bool respectFeedPlaybackGate;
   final CustomVideoPlayerController? controller;
@@ -63,6 +67,15 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   String? _errorMessage;
   bool _isInitializing = false;
   bool _playbackMuted = false;
+
+  /// True only after the user tapped to pause. Auto states (starting up,
+  /// buffering, adopting a prewarmed controller) must not show the pause UI.
+  bool _userPaused = false;
+
+  /// Whether the current controller has started playing at least once. Once
+  /// it has, the poster is never overlaid again (the video's own frame is
+  /// always better than flashing the thumbnail during brief buffering).
+  bool _hasEverPlayed = false;
   int _initGeneration = 0;
   Uint8List? _generatedPosterBytes;
   bool _posterGenerationStarted = false;
@@ -121,7 +134,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   /// Clears [_controller] synchronously so [build] never mounts [VideoPlayer]
   /// with a controller that is being torn down.
   (VideoPlayerController controller, VoidCallback listener)?
-      _detachControllerSync() {
+  _detachControllerSync() {
     final controller = _controller;
     if (controller == null) return null;
     final listener = _playbackListener ?? () {};
@@ -218,6 +231,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       _generatedPosterBytes = null;
       _posterGenerationStarted = false;
       _playbackMuted = false;
+      _userPaused = false;
+      _hasEverPlayed = false;
       _maybeGeneratePoster();
       if (_shouldPlay) {
         unawaited(_initController());
@@ -270,36 +285,23 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     }
   }
 
-  Future<void> _initController() async {
-    if (!_shouldPlay || _isInitializing) return;
+  /// Completed disk-cache copy of [url], or null. HLS playlists are always
+  /// streamed (a cached .m3u8 still points at network segments).
+  Future<File?> _cachedVideoFile(String url) async {
+    if (url.toLowerCase().split('?').first.endsWith('.m3u8')) return null;
+    try {
+      final info = await AppMediaCacheManager.instance.getFileFromCache(url);
+      final file = info?.file;
+      if (file != null && await file.exists()) return file;
+    } catch (_) {}
+    return null;
+  }
 
-    final url = _resolvedUrl;
-    final generation = ++_initGeneration;
-
-    if (url.isEmpty) {
-      if (!mounted) return;
-      setState(() => _errorMessage = 'No video URL');
-      return;
-    }
-
-    _isInitializing = true;
-    if (mounted) setState(() => _errorMessage = null);
-
-    final previous = _detachControllerSync();
-    if (previous != null) {
-      unawaited(_disposeController(previous.$1, previous.$2));
-    }
-
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      videoPlayerOptions: VideoPlayerOptions(
-        mixWithOthers: false,
-        allowBackgroundPlayback: false,
-      ),
-    );
-    _controller = controller;
-
-    void listener() {
+  VoidCallback _makePlaybackListener(
+    VideoPlayerController controller,
+    int generation,
+  ) {
+    return () {
       if (!mounted || generation != _initGeneration) return;
       if (!identical(controller, _controller)) return;
       try {
@@ -318,8 +320,89 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           _notifyPlaybackChanged();
         }
       } catch (_) {}
+    };
+  }
+
+  /// Takes ownership of an already-initialized [controller] (from the
+  /// prewarmer) and starts playback immediately.
+  Future<void> _attachAndPlay(
+    VideoPlayerController controller,
+    int generation,
+  ) async {
+    _controller = controller;
+    final listener = _makePlaybackListener(controller, generation);
+    _playbackListener = listener;
+    controller.addListener(listener);
+
+    _isInitializing = false;
+    if (mounted) setState(() {});
+
+    final ok = await _startPlayback(controller, generation, muted: false);
+    if (!ok && mounted && generation == _initGeneration) {
+      final mutedOk = await _startPlayback(controller, generation, muted: true);
+      if (!mutedOk && !identical(controller, _controller)) return;
+      if (!mutedOk && mounted && generation == _initGeneration) {
+        setState(() {
+          _errorMessage = 'Video unavailable (audio not supported)';
+        });
+      }
+    }
+  }
+
+  Future<void> _initController() async {
+    if (!_shouldPlay || _isInitializing) return;
+
+    final url = _resolvedUrl;
+    final generation = ++_initGeneration;
+
+    if (url.isEmpty) {
+      if (!mounted) return;
+      setState(() => _errorMessage = 'No video URL');
+      return;
     }
 
+    _isInitializing = true;
+    _userPaused = false;
+    _hasEverPlayed = false;
+    if (mounted) setState(() => _errorMessage = null);
+
+    final previous = _detachControllerSync();
+    if (previous != null) {
+      unawaited(_disposeController(previous.$1, previous.$2));
+    }
+
+    // Adopt a controller the prewarmer already initialized and buffered —
+    // playback starts instantly, with no init or network wait.
+    final prewarmed = FeedVideoPrewarmer.instance.take(url);
+    if (prewarmed != null) {
+      if (prewarmed.value.isInitialized && !prewarmed.value.hasError) {
+        await _attachAndPlay(prewarmed, generation);
+        return;
+      }
+      unawaited(prewarmed.dispose());
+    }
+
+    // Play from the local copy when the feed preloader already downloaded
+    // this video — startup is instant, with no network buffering.
+    final cachedFile = await _cachedVideoFile(url);
+    if (!mounted || generation != _initGeneration || !_shouldPlay) {
+      _isInitializing = false;
+      return;
+    }
+
+    final options = VideoPlayerOptions(
+      mixWithOthers: false,
+      allowBackgroundPlayback: false,
+    );
+    final controller = cachedFile != null
+        ? VideoPlayerController.file(cachedFile, videoPlayerOptions: options)
+        : VideoPlayerController.networkUrl(
+            Uri.parse(url),
+            videoPlayerOptions: options,
+          );
+    _controller = controller;
+
+    final listener = _makePlaybackListener(controller, generation);
     _playbackListener = listener;
     controller.addListener(listener);
 
@@ -407,6 +490,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           !identical(controller, _controller)) {
         return false;
       }
+      _userPaused = false;
+      _hasEverPlayed = true;
       setState(() => _errorMessage = null);
       _syncFeedProgress();
       _notifyPlaybackChanged();
@@ -432,14 +517,21 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   Future<void> _togglePlayback() async {
     final controller = _controller;
-    if (controller == null || !_isControllerReady(controller) || _isInitializing) {
+    if (controller == null ||
+        !_isControllerReady(controller) ||
+        _isInitializing) {
       return;
     }
     try {
       if (controller.value.isPlaying) {
+        _userPaused = true;
         await controller.pause();
       } else {
-        await _startPlayback(controller, _initGeneration, muted: _playbackMuted);
+        await _startPlayback(
+          controller,
+          _initGeneration,
+          muted: _playbackMuted,
+        );
       }
       if (mounted) setState(() {});
       _syncFeedProgress();
@@ -465,6 +557,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     _initGeneration++;
     _isInitializing = false;
     _playbackMuted = false;
+    _userPaused = false;
+    _hasEverPlayed = false;
     final detached = _detachControllerSync();
     if (mounted) setState(() {});
     if (detached != null) {
@@ -476,7 +570,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (!mounted || !_shouldPlay) return;
     final notifier = _progressNotifier;
     final controller = _controller;
-    if (notifier == null || controller == null || !_isControllerReady(controller)) {
+    if (notifier == null ||
+        controller == null ||
+        !_isControllerReady(controller)) {
       return;
     }
     try {
@@ -536,6 +632,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   bool _shouldShowPosterOverlay() {
     if (_errorMessage != null) return false;
     if (!_hasPosterVisual && !_hasNetworkPosterAttempt) return false;
+    // Once the video has rendered, its own frame stays up during brief
+    // buffering; flashing the thumbnail over it looks like a glitch.
+    if (_hasEverPlayed) return false;
     final controller = _controller;
     if (controller == null || !_isControllerReady(controller)) return true;
     try {
@@ -550,10 +649,13 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       fit: StackFit.expand,
       children: [
         const ColoredBox(color: Colors.black),
+        // BoxFit.contain so the poster is letterboxed exactly like the video
+        // (Center + AspectRatio) — no zoomed full-screen frame that jumps to
+        // the real post size once playback starts.
         if (_resolvedPosterUrl != null)
           SafeNetworkImage(
             imageUrl: _resolvedPosterUrl!,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             width: double.infinity,
             height: double.infinity,
             blankOnError: true,
@@ -561,7 +663,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         if (_generatedPosterBytes != null)
           Image.memory(
             _generatedPosterBytes!,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             width: double.infinity,
             height: double.infinity,
             gaplessPlayback: true,
@@ -574,7 +676,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
-    final canMountVideoPlayer = widget.isActive &&
+    final canMountVideoPlayer =
+        widget.isActive &&
         _shouldPlay &&
         controller != null &&
         identical(controller, _controller) &&
@@ -582,7 +685,10 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         !_isInitializing;
     final isReady = canMountVideoPlayer;
     final isBuffering = isReady && _readIsBuffering(controller);
-    final isPaused = isReady && !isBuffering && !_readIsPlaying(controller);
+    // Only a deliberate tap-to-pause shows the pause UI; transient not-playing
+    // states (startup, prewarmed handover, buffering) must not flash it.
+    final isPaused =
+        isReady && !isBuffering && _userPaused && !_readIsPlaying(controller);
 
     if (_errorMessage != null && !isReady) {
       return _buildError();
@@ -613,7 +719,12 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           if (_shouldShowPosterOverlay())
             Positioned.fill(child: _buildPosterLayer()),
           if (showVideoLoading)
-            const Center(child: CustomLoadingWidget(size: 72)),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.paddingOf(context).bottom + 2,
+              child: const Center(child: VideoLoadingIndicator()),
+            ),
           if (isPaused)
             Center(
               child: Column(

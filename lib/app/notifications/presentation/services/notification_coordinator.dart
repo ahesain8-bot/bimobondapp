@@ -21,8 +21,18 @@ class NotificationCoordinator {
 
   StreamSubscription<String>? _tokenRefreshSub;
   String? _activeUserId;
+  String? _pendingLoginUserId;
+  bool _loginSideEffectsAllowed = false;
 
   Future<void> onLoggedIn(String userId) async {
+    // Auth is resolved before the first feed page. Queue notification network
+    // work so socket, unread count, and device registration do not compete
+    // with the initial For You request.
+    if (!_loginSideEffectsAllowed) {
+      _pendingLoginUserId = userId;
+      return;
+    }
+
     // Idempotent on purpose: on cold start AuthSuccess is emitted twice
     // (CheckAuthStatus from cache, then FetchProfile from /auth/me) and a
     // post-frame sync also fires. Without this guard each repeat would
@@ -40,7 +50,22 @@ class NotificationCoordinator {
     });
   }
 
+  /// Allows login side effects after the first For You page is visible.
+  ///
+  /// The gate remains open for this app process, so later re-logins do not
+  /// depend on another feed load.
+  void allowLoginSideEffects() {
+    if (_loginSideEffectsAllowed) return;
+    _loginSideEffectsAllowed = true;
+    final pendingUserId = _pendingLoginUserId;
+    _pendingLoginUserId = null;
+    if (pendingUserId != null) {
+      unawaited(onLoggedIn(pendingUserId));
+    }
+  }
+
   Future<void> onLoggedOut() async {
+    _pendingLoginUserId = null;
     final userId = _activeUserId;
     _activeUserId = null;
     unreadBadge.stop();
