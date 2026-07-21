@@ -1,10 +1,6 @@
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:flutter/material.dart';
 
-/// Approximate ColorFilters for [ArFilterCatalog] color grades (preview / export).
-///
-/// Matrices are read from [ArFilterCatalog.colorCatalog] (the model), so the
-/// bundled/offline data and the future server data share one source of truth.
 class ArColorFilterMatrix {
   ArColorFilterMatrix._();
 
@@ -17,8 +13,6 @@ class ArColorFilterMatrix {
     return ColorFilter.matrix(_lerpIdentity(matrix, t));
   }
 
-  /// Intensity-adjusted 4x5 color matrix for baking onto files (native export).
-  /// Returns null when there's nothing to apply.
   static List<double>? exportMatrix(String? filterId, {double intensity = 1.0}) {
     final matrix = matrixFor(filterId);
     if (matrix == null) return null;

@@ -2,102 +2,79 @@ package com.dubai.bimobondapp.ar_camera
 
 import com.dubai.bimobondapp.R
 
-/**
- * Per-sticker bind recipe — add a new sticker by appending a config, not by
- * writing another drawX() with magic numbers.
- *
- * All landmark indices are MediaPipe Face Mesh (468).
- * [pivotU]/[pivotV] are the PNG's "pin" in 0..1 texture space (center of draw).
- */
 enum class StickerPinX {
-    /** Midpoint of left/right reference landmarks on screen. */
+
     REF_MIDPOINT,
-    /** Primary [anchorLandmark] screen X. */
+
     ANCHOR,
-    /** Nose bridge (glasses horizontal lock). */
+
     NOSE_BRIDGE,
-    /** Mouth corner midpoint. */
+
     MOUTH_MIDPOINT,
-    /** Averaged eye-center midpoint. */
+
     EYE_MIDPOINT,
 }
 
 enum class StickerPinY {
-    /** Primary [anchorLandmark] screen Y (+ [offsetYFaceFrac]). */
+
     ANCHOR,
-    /** Midline Y of left/right reference landmarks. */
+
     REF_MIDLINE,
-    /** Averaged eye-center line Y (glasses vertical lock). */
+
     EYE_LINE,
-    /** 40% nose tip + 60% mouth midline (moustache). */
+
     NOSE_MOUTH_BLEND,
-    /** [topHead] Y + faceHeight * [offsetYFaceFrac] (dog ears). */
+
     TOP_HEAD_OFFSET,
 }
 
 data class StickerAnchorConfig(
     val id: String,
     val drawableRes: Int,
-    /** Left reference landmark for scale + roll (e.g. eye outer corner). */
+
     val leftLandmark: Int,
-    /** Right reference landmark for scale + roll. */
+
     val rightLandmark: Int,
-    /** Primary position landmark (e.g. nose bridge). */
+
     val anchorLandmark: Int,
-    /** Optional second mix-in for Y (e.g. mouth). -1 = unused. */
+
     val secondaryAnchorLandmark: Int = -1,
-    /** Blend of primary/secondary for Y: 0 = primary only, 1 = secondary only. */
+
     val secondaryBlendY: Float = 0f,
-    /** Extra offset as a fraction of face height (positive = down). */
+
     val offsetYFaceFrac: Float = 0f,
-    /** Extra offset as a fraction of face width (positive = right in image space). */
+
     val offsetXFaceFrac: Float = 0f,
-    /**
-     * Target sticker width = refDistance * [widthOverRef].
-     * refDistance = distance(leftLandmark, rightLandmark).
-     */
+
     val widthOverRef: Float = 2.4f,
-    /** Cap width as a fraction of face bounding-box width (0 = no cap). */
+
     val maxFaceWidthFrac: Float = 0f,
-    /** Floor width as a fraction of face width (0 = no floor). */
+
     val minFaceWidthFrac: Float = 0f,
-    /** PNG pin (0..1). */
+
     val pivotU: Float = 0.5f,
     val pivotV: Float = 0.5f,
-    /** Extra degrees added after roll from landmarks. */
+
     val rotationOffsetDeg: Float = 0f,
-    /** How much yaw squeezes width (0 = ignore yaw, 0.35 = mild). */
+
     val yawSqueeze: Float = 0.25f,
-    /**
-     * When true, scale uses max(landmarkSpan, faceBoxWidth) so wide faces /
-     * cheeks still get full cover (mask). Glasses should leave this false.
-     */
+
     val scaleFromFaceBox: Boolean = false,
-    /**
-     * If > 0, quad HEIGHT is forced so [heightAnchorTopLandmark]→
-     * [heightAnchorBottomLandmark] spans this fraction of it (guarantees the
-     * gaiter reaches the chin regardless of PNG aspect). 0 = use PNG aspect.
-     */
+
     val heightSpanFrac: Float = 0f,
     val heightAnchorTopLandmark: Int = -1,
     val heightAnchorBottomLandmark: Int = -1,
-    /** Screen-space horizontal pin (after mapPoint). */
+
     val pinX: StickerPinX = StickerPinX.REF_MIDPOINT,
-    /** Screen-space vertical pin (after mapPoint). */
+
     val pinY: StickerPinY = StickerPinY.ANCHOR,
-    /**
-     * When true, left/right refs use [FaceLandmarkSnapshot.leftEye]/[rightEye]
-     * (averaged iris regions) instead of single corner indices — much stabler.
-     */
+
     val useAveragedEyes: Boolean = false,
-    /**
-     * Sticker width = ref screen span * this (e.g. eye distance * 3.5 for glasses).
-     * Ignored when [widthFaceFrac] > 0.
-     */
+
     val widthScreenMult: Float = 0f,
-    /** Sticker width = face screen width * this (dog ears). */
+
     val widthFaceFrac: Float = 0f,
-    /** Floor width = face screen width * this (glasses min 0.7). */
+
     val widthMinFaceFrac: Float = 0f,
 )
 
@@ -150,16 +127,6 @@ object StickerCatalog {
         yawSqueeze = 0f,
     )
 
-    /**
-     * Intact skull gaiter. PNG content is ~60% of asset width, so full-quad
-     * width must be sized off the FACE box, not blown up arbitrarily.
-     *
-     * FIX: previous widthOverRef=2.65 + no cap (maxFaceWidthFrac=0) let width
-     * grow to ~2.65x face width — the mask hung far past both jaw edges and
-     * its aspect got squashed against the forced height, which is what made
-     * it look stretched / mirrored-duplicate at the bottom. Now bounded to a
-     * sane 1.05x–1.55x range around face width.
-     */
     val mask = StickerAnchorConfig(
         id = "mask",
         drawableRes = R.drawable.filter_skull_mask,
@@ -206,8 +173,7 @@ object StickerCatalog {
         pinX = StickerPinX.ANCHOR,
         pinY = StickerPinY.ANCHOR,
         widthScreenMult = 1.1f,
-        // filter_nose.png is mostly transparent padding; pin the opaque nose top
-        // (not bitmap geometric center) onto the detected nose tip.
+
         pivotU = 0.305f,
         pivotV = 0.154f,
         yawSqueeze = 0.15f,
@@ -224,8 +190,7 @@ object StickerCatalog {
         pinY = StickerPinY.ANCHOR,
         offsetYFaceFrac = 0.04f,
         widthScreenMult = 1.25f,
-        // filter_tongue.png has empty padding on the right; pin top-center of
-        // opaque tongue onto the mouth so it hangs straight down.
+
         pivotU = 0.333f,
         pivotV = 0.0f,
         yawSqueeze = 0.12f,

@@ -1,6 +1,5 @@
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 
-/// Shared AR filter / effect catalog used by test screen and main camera.
 class ArFilterItem {
   const ArFilterItem({
     required this.id,
@@ -14,11 +13,8 @@ class ArFilterItem {
   final String label;
   final String emoji;
 
-  /// Server-provided preview image. When present the carousel shows this
-  /// instead of [emoji]; [emoji] stays only as an offline fallback.
   final String? thumbnailUrl;
 
-  /// Optional solid color placeholder (behind the thumbnail while it loads).
   final String? previewColorHex;
 
   bool get hasThumbnail => (thumbnailUrl ?? '').isNotEmpty;
@@ -47,7 +43,6 @@ class ArFilterCatalog {
     emoji: '✨',
   );
 
-  /// Stickers + face warp — shown in the bottom shutter carousel.
   static const List<ArFilterItem> effectItems = [
     original,
     ArFilterItem(id: 'glasses', label: 'Glasses', emoji: '😎'),
@@ -60,13 +55,8 @@ class ArFilterCatalog {
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
   ];
 
-  /// Source of truth for the color grades. Currently the bundled (offline)
-  /// catalog; swap this for the server-fetched [ArColorFilterCatalog] later
-  /// and the whole UI + matrices follow automatically.
   static ArColorFilterCatalog colorCatalog = ArColorFilterCatalog.bundled();
 
-  /// Replace the active color catalog (e.g. once fetched from the server) and
-  /// drop the cached derived lists so they rebuild from the new data.
   static void updateColorCatalog(ArColorFilterCatalog catalog) {
     colorCatalog = catalog;
     _colorItemsCache = null;
@@ -76,8 +66,6 @@ class ArFilterCatalog {
   static List<ArFilterItem>? _colorItemsCache;
   static List<ArColorFilterCategory>? _colorCategoriesCache;
 
-  /// Color / portrait-style grades — TikTok Filters sheet only.
-  /// Derived from [colorCatalog] so there is a single source of truth.
   static List<ArFilterItem> get colorItems => _colorItemsCache ??= [
         for (final category in colorCatalog.categories)
           for (final filter in category.filters)
@@ -100,7 +88,6 @@ class ArFilterCatalog {
           ),
       ];
 
-  /// Flat list for lookups / MethodChannel ids.
   static List<ArFilterItem> get items => [
         ...effectItems,
         ...colorItems,

@@ -49,10 +49,6 @@ object FaceLandmarkMapper {
         )
     }
 
-    /**
-     * Euler degrees [pitch, yaw, roll] from MediaPipe's 4×4 facial transform
-     * (column-major). Returns null when the matrix output is unavailable.
-     */
     private fun extractHeadPose(result: FaceLandmarkerResult): FloatArray? {
         val matrices = try {
             result.facialTransformationMatrixes()
@@ -62,10 +58,7 @@ object FaceLandmarkMapper {
             null
         } ?: return null
         if (matrices.size < 16) return null
-        // Column-major rotation R:
-        // [0]=r00 [4]=r01 [8]=r02
-        // [1]=r10 [5]=r11 [9]=r12
-        // [2]=r20 [6]=r21 [10]=r22
+
         val r00 = matrices[0]
         val r10 = matrices[1]
         val r20 = matrices[2]

@@ -4,31 +4,17 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 
-/**
- * Loads and samples the 512x512 PNG "lookup" LUTs (GPUImage layout: 8x8 tiles
- * of 64x64 = a 64^3 cube) bundled under `assets/luts/`.
- *
- * Single source of truth for the color grades:
- *  - the live camera samples the LUT on the GPU (see [FaceWarpRenderer])
- *  - captured photos are baked on the CPU here (see [apply])
- *
- * The CPU sampler mirrors the GLSL `applyLut()` so live preview and the saved
- * photo match. To upgrade a filter's look, just replace its PNG with a
- * professional LUT — no code change.
- */
 object LutStore {
 
     private const val DIM = 512
     private const val TILES = 8
     private const val LEVELS = 64
 
-    // Flutter packages declared assets under this prefix inside the APK.
     private const val ASSET_PREFIX = "flutter_assets/assets/luts/"
 
     private val bitmapCache = HashMap<String, Bitmap?>()
     private val pixelCache = HashMap<String, IntArray?>()
 
-    /** LUT bitmap for [asset] (e.g. "warm.png"), or null if it can't be loaded. */
     @Synchronized
     fun bitmap(context: Context, asset: String): Bitmap? {
         if (bitmapCache.containsKey(asset)) return bitmapCache[asset]
@@ -59,11 +45,6 @@ object LutStore {
         return out
     }
 
-    /**
-     * Bakes [asset]'s grade into [source] at [intensity] (0..1). Returns a new
-     * bitmap, or [source] unchanged when the LUT can't be loaded (caller then
-     * falls back to its matrix path).
-     */
     fun apply(
         context: Context,
         source: Bitmap,
@@ -106,7 +87,6 @@ object LutStore {
         return out
     }
 
-    /** Trilinear sample matching the GLSL lookup. Returns 0xRRGGBB. */
     private fun sample(lut: IntArray, r: Float, g: Float, b: Float): Int {
         val rr = r.coerceIn(0f, 1f)
         val gg = g.coerceIn(0f, 1f)
@@ -130,7 +110,6 @@ object LutStore {
         return (nr shl 16) or (ng shl 8) or nb
     }
 
-    /** Bilinear sample within a single blue slice/tile. */
     private fun sliceSample(lut: IntArray, slice: Int, r: Float, g: Float): Int {
         val tileX = slice % TILES
         val tileY = slice / TILES

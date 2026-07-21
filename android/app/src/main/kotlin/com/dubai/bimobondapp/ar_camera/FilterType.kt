@@ -50,23 +50,13 @@ enum class FilterType {
             this == URBAN_COWBOY || this == YOU_CAN_DO_IT || this == SMOOTH_SAILING ||
             this == WELL_SEE
 
-    /** Beauty grades that benefit from face-aware skin smoothing / lip tint. */
     fun isBeauty(): Boolean =
         this == WHITENING || this == ROSY || this == LUDWIG
 
     fun useShader(): Boolean = isDistortion() || isColorGrade()
 
-    /**
-     * Renders straight from the camera into the GL OES texture (zero per-frame CPU).
-     * ALL color grades stay on this path (including beauty) so switching filters never
-     * rebinds the camera — that rebind was the black-screen flash.
-     */
-    fun usesGpuPreview(): Boolean = this == NONE || isColorGrade()
+    fun usesGpuPreview(): Boolean = isColorGrade()
 
-    /**
-     * Bundled LUT PNG (under `assets/luts/`) for this color grade, or null.
-     * Both the GPU (live) and CPU (photo bake) paths sample this same file.
-     */
     fun lutAsset(): String? = when (this) {
         WHITENING -> "whitening.png"
         WARM -> "warm.png"

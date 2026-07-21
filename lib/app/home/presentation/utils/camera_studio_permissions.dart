@@ -17,6 +17,8 @@ class CameraStudioPermissions {
   }
 
   static Future<bool> ensureMicrophone() async {
+    final current = await Permission.microphone.status;
+    if (current.isGranted) return true;
     final status = await Permission.microphone.request();
     return status.isGranted;
   }

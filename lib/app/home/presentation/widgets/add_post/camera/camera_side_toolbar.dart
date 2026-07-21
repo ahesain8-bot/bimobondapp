@@ -144,7 +144,6 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           onTap: widget.onTimer,
           active: widget.timerEnabled,
         ),
-        // Layout temporarily hidden (photo + video). Uncomment to restore.
         // _SideToolItem(
         //   icon: LucideIcons.layoutGrid,
         //   label: widget.labels.layout,

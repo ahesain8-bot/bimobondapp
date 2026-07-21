@@ -7,6 +7,7 @@ import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
+import android.view.Surface
 
 class FaceWarpGlView @JvmOverloads constructor(
     context: Context,
@@ -20,7 +21,6 @@ class FaceWarpGlView @JvmOverloads constructor(
     @Volatile
     private var cameraSurfaceTexture: SurfaceTexture? = null
 
-    /** Notified (main thread) when the camera SurfaceTexture exists — bind camera. */
     @Volatile
     var onCameraSurfaceReady: ((SurfaceTexture) -> Unit)? = null
 
@@ -29,8 +29,7 @@ class FaceWarpGlView @JvmOverloads constructor(
         glInitialized = true
         renderer.onCameraSurfaceReady = { st ->
             cameraSurfaceTexture = st
-            // requestRender() is thread-safe — do NOT hop every camera frame onto the
-            // main Handler (that was adding UI-thread jank / lag on every frame).
+
             st.setOnFrameAvailableListener { requestRender() }
             mainHandler.post { onCameraSurfaceReady?.invoke(st) }
         }
@@ -42,7 +41,6 @@ class FaceWarpGlView @JvmOverloads constructor(
 
     fun cameraSurfaceTexture(): SurfaceTexture? = cameraSurfaceTexture
 
-    /** Turns the direct camera→OES→grade GPU path on/off (color grades / none). */
     fun setOesEnabled(enabled: Boolean) {
         ensureGlInitialized()
         queueEvent { renderer.oesEnabled = enabled }
@@ -59,7 +57,6 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.lutIntensity = intensity
     }
 
-    /** Invoked on the GL thread after each presented frame (preview swap + record). */
     fun setOnFramePresented(callback: (() -> Unit)?) {
         renderer.onFramePresented = callback
     }
@@ -79,7 +76,6 @@ class FaceWarpGlView @JvmOverloads constructor(
         }
     }
 
-    /** Sets (or clears, when null) the active color-grade LUT on the GL thread. */
     fun submitLut(bitmap: Bitmap?) {
         ensureGlInitialized()
         queueEvent {
@@ -106,15 +102,11 @@ class FaceWarpGlView @JvmOverloads constructor(
     }
 
     fun setCaptureEnabled(enabled: Boolean) {
-        // Volatile flag — no queueEvent needed (avoids per-frame GL-thread spam).
+
         ensureGlInitialized()
         renderer.captureEnabled = enabled
     }
 
-    /**
-     * Takes ownership of the last GPU capture (no extra Bitmap.copy). Caller must
-     * recycle. Used by the recording path to avoid a full-frame copy every tick.
-     */
     fun takeLastFilteredFrame(): Bitmap? {
         if (!glInitialized) return null
         return renderer.takeLastCapturedFrame()
@@ -124,7 +116,26 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.captureMaxEdge = maxEdge.coerceAtLeast(2)
     }
 
-    /** Force one GPU readback on the next draw (photo / keyframe). */
+    fun setEncoderSurface(surface: Surface?, width: Int, height: Int) {
+        ensureGlInitialized()
+        queueEvent {
+            renderer.setEncoderTarget(surface, width, height)
+        }
+        requestRender()
+    }
+
+    fun clearEncoderSurface(onDone: (() -> Unit)? = null) {
+        if (!glInitialized) {
+            onDone?.invoke()
+            return
+        }
+        queueEvent {
+            renderer.setEncoderTarget(null, 0, 0)
+            if (onDone != null) mainHandler.post(onDone)
+        }
+        requestRender()
+    }
+
     fun requestCaptureNow() {
         ensureGlInitialized()
         queueEvent {
@@ -134,7 +145,6 @@ class FaceWarpGlView @JvmOverloads constructor(
         requestRender()
     }
 
-    /** Thread-safe copy of the last GPU-filtered frame (null if none yet). */
     fun copyLastFilteredFrame(): Bitmap? {
         if (!glInitialized) return null
         return renderer.copyLastCapturedFrame()

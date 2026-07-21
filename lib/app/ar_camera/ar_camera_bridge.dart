@@ -92,10 +92,6 @@ class ArCameraBridge {
     });
   }
 
-  /// Plays a native countdown beep (TikTok-style). A short tick each second and
-  /// a distinct double-beep on the last second ([isFinal]). Native so it plays
-  /// on the media stream regardless of the system touch-sound setting.
-  /// Fire-and-forget; errors (e.g. no handler on non-Android) are ignored.
   static void playCountdownTick({bool isFinal = false}) {
     unawaited(
       _channel
@@ -104,7 +100,6 @@ class ArCameraBridge {
     );
   }
 
-  /// Bakes a PNG LUT color grade onto a still image (same engine as live preview).
   static Future<String?> applyColorLut({
     required String path,
     required String filter,
@@ -120,8 +115,6 @@ class ArCameraBridge {
     return out;
   }
 
-  /// Native OpenCV tone/color adjustments (Android).
-  /// All levels are -100…100 (0 = original).
   static Future<String?> applyBeauty({
     required String path,
     int saturationLevel = 0,

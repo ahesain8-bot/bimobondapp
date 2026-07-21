@@ -73,6 +73,8 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
     implementation("androidx.camera:camera-view:1.4.1")
+    implementation("androidx.camera:camera-video:1.4.1")
+    implementation("androidx.camera:camera-effects:1.4.1")
     // MediaPipe Face Landmarker (468-point mesh)
     // 0.10.29+ restores missing ABI / 16KB page native libs (fixes
     // UnsatisfiedLinkError: libmediapipe_tasks_vision_jni.so not found).

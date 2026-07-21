@@ -20,10 +20,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Encodes filtered ARGB frames into an H.264 MP4 with parallel mic audio.
- * Video starts on the first [offerFrame]; audio is remuxed with video on [stop].
- */
 class ArFilteredVideoRecorder {
 
     private val lock = Any()
@@ -47,6 +43,9 @@ class ArFilteredVideoRecorder {
     private var drainThread: HandlerThread? = null
     private var drainHandler: Handler? = null
 
+    @Volatile
+    private var surfaceSession = false
+
     fun isRecording(): Boolean = armed.get() || running.get()
 
     fun arm(output: File) {
@@ -61,11 +60,39 @@ class ArFilteredVideoRecorder {
             audioTempFile?.delete()
             armed.set(true)
             frameIndex = 0
-           
+            surfaceSession = false
         }
     }
 
+    fun startSurfaceSession(output: File, width: Int, height: Int): Surface? {
+        synchronized(lock) {
+            abortInternal()
+            finalOutputFile = output
+            val parent = output.parentFile ?: output.absoluteFile.parentFile
+            val base = output.nameWithoutExtension
+            videoTempFile = File(parent, "${base}_v.mp4")
+            audioTempFile = File(parent, "${base}_a.m4a")
+            videoTempFile?.delete()
+            audioTempFile?.delete()
+            armed.set(false)
+            frameIndex = 0
+            surfaceSession = true
+            val out = videoTempFile ?: return null
+            return try {
+                startEncoder(out, width, height)
+                inputSurface
+            } catch (e: Exception) {
+                Log.e(TAG, "startSurfaceSession failed", e)
+                abortInternal()
+                null
+            }
+        }
+    }
+
+    fun isSurfaceSession(): Boolean = surfaceSession
+
     fun offerFrame(bitmap: Bitmap) {
+        if (surfaceSession) return
         if (!armed.get() && !running.get()) return
         synchronized(lock) {
             if (!running.get()) {
@@ -106,6 +133,7 @@ class ArFilteredVideoRecorder {
             }
             releaseVideoEncoder()
             stopMicRecorder()
+            surfaceSession = false
 
             val video = videoTempFile
             val audio = audioTempFile
@@ -223,7 +251,7 @@ class ArFilteredVideoRecorder {
         drainHandler = Handler(thread.looper)
         running.set(true)
         armed.set(false)
-        startMicRecorder()   
+        startMicRecorder()
         drainHandler?.post { drainLoop() }
         Log.i(TAG, "encoder started ${output.name} ${width}x$height (src ${srcW}x$srcH)")
     }
@@ -252,6 +280,7 @@ class ArFilteredVideoRecorder {
     private fun abortInternal() {
         running.set(false)
         armed.set(false)
+        surfaceSession = false
         releaseVideoEncoder()
         stopMicRecorder()
         cleanupTemps()
@@ -333,10 +362,6 @@ class ArFilteredVideoRecorder {
         audioTempFile = null
     }
 
-    /**
-     * Copies H.264 from [videoFile] and AAC from [audioFile] into [outFile].
-     * Falls back to video-only if audio is missing.
-     */
     private fun muxAv(videoFile: File, audioFile: File?, outFile: File): File {
         outFile.delete()
         val hasAudio = audioFile != null && audioFile.exists() && audioFile.length() > 512L

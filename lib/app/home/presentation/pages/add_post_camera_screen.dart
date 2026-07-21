@@ -870,8 +870,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       return;
     }
 
-    // Instant feedback — capture work continues in parallel feel.
-    unawaited(_playShutterFlash());
+    // Instant feedback — skip in layout mode (full-screen white flash feels wrong
+    // while filling grid cells; normal single photo still gets the shutter blink).
+    if (_layoutMode == CameraLayoutMode.off) {
+      unawaited(_playShutterFlash());
+    }
 
     if (_useNativeArFilters) {
       _isCapturingPhoto = true;
@@ -948,13 +951,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_recordSeconds >= _selectedDuration) return;
 
     if (_useNativeArFilters) {
-      setState(() => _isBusy = true);
+      // Camera preview is already live — never show "Starting camera..." here.
+      // That overlay was the first-tap flash; 2nd tap felt instant because
+      // mic/encoder were already warm.
       try {
-        // Native AR records mic in parallel — ensure permission every time.
-        await CameraStudioPermissions.ensureMicrophone();
+        final micOk = await CameraStudioPermissions.ensureMicrophone();
+        if (!micOk || !mounted || _isRecording) return;
         if (_ratioLetterboxed) {
           await _syncNativePreviewLetterbox(letterboxed: true);
         }
+        if (!mounted || _isRecording) return;
         final media = MediaQuery.of(context);
         final dpr = media.devicePixelRatio;
         await ArCameraBridge.startRecording(
@@ -972,10 +978,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               : 0,
         );
         if (!mounted) return;
-        setState(() => _isBusy = false);
         _startRecordTimer(resume: _shouldResumeRecordTimer);
       } catch (_) {
-        if (mounted) setState(() => _isBusy = false);
+        _quickVideoMode = false;
       }
       return;
     }
@@ -1504,21 +1509,29 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     });
   }
 
-  /// Removes the captured media from [index] so the user can re-shoot that
-  /// frame. Only valid while the grid is still being filled.
+  /// Removes the captured media from [index] and shifts later cells left so
+  /// there is no empty gap in the middle of the grid.
   void _deleteLayoutCell(int index) {
     if (_layoutMode == CameraLayoutMode.off) return;
     if (index < 0 || index >= _layoutCellPhotos.length) return;
-    final next = List<String?>.from(_layoutCellPhotos);
-    final path = next[index];
+    final path = _layoutCellPhotos[index];
     if (path == null) return;
-    next[index] = null;
     try {
       File(path).deleteSync();
     } catch (_) {}
+
+    final kept = <String>[
+      for (var i = 0; i < _layoutCellPhotos.length; i++)
+        if (i != index)
+          if (_layoutCellPhotos[i] case final p?) p,
+    ];
+    final next = List<String?>.filled(_layoutMode.cellCount, null);
+    for (var i = 0; i < kept.length; i++) {
+      next[i] = kept[i];
+    }
+
     setState(() {
       _layoutCellPhotos = next;
-      // Shoot the freed frame next.
       _layoutActiveCell = next.indexWhere((p) => p == null);
       _recordSeconds = 0;
     });

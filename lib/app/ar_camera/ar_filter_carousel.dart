@@ -4,9 +4,6 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// TikTok-style filter carousel where the selected center circle is also the shutter.
-/// Index 0 (Original) is the red record button; other items are filter circles.
-/// Hold the selected circle to record video; tap for photo / toggle.
 class ArFilterCarousel extends StatefulWidget {
   const ArFilterCarousel({
     super.key,
@@ -39,12 +36,8 @@ class ArFilterCarousel extends StatefulWidget {
   final GestureLongPressEndCallback? onHoldEnd;
   final double? height;
 
-  /// After a clip is recorded (draft exists, not currently recording) the
-  /// shutter is flanked by ✗ (cancel) and ✓ (confirm → next), TikTok-style.
   final bool showSideActions;
 
-  /// While recording / reviewing a draft, hide the neighboring filter circles
-  /// so only the centered shutter (+ side actions) shows — a clean capture UI.
   final bool soloShutter;
 
   final VoidCallback? onConfirm;
@@ -139,7 +132,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
         .round()
         .clamp(0, _filters.length - 1);
     final target = index * ArFilterCarousel.itemStride;
-    // Soft settle if physics left us slightly off-center.
+
     if ((_controller.offset - target).abs() > 1.5) {
       _scrollTo(index, animated: true).then((_) {
         if (mounted) _emit(index);
@@ -158,7 +151,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     final center = _scrollOffset / ArFilterCarousel.itemStride;
     final distance = (index - center).abs();
     final t = (1.0 - distance).clamp(0.0, 1.0);
-    // Ease the grow so neighbors visibly morph while dragging.
+
     final eased = Curves.easeOut.transform(t);
     return ArFilterCarousel.inactiveSize +
         (ArFilterCarousel.activeSize - ArFilterCarousel.inactiveSize) * eased;
@@ -269,8 +262,6 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                         .abs() <
                     0.35;
 
-                // Recording / reviewing: only render the centered shutter, keep
-                // the same stride so it stays centered.
                 if (widget.soloShutter && !isCentered) {
                   return const SizedBox(width: ArFilterCarousel.itemStride);
                 }
@@ -290,10 +281,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                             });
                           }
                         },
-                        // Press-and-hold on the centered shutter records video in
-                        // BOTH photo and video mode. In photo mode it starts a
-                        // TikTok-style 15s quick video (the screen's hold handler
-                        // enforces the photo-mode + layout-off guards).
+
                         onLongPressStart: isCentered && !widget.isBusy
                             ? widget.onHoldStart
                             : null,
@@ -348,7 +336,6 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   }
 }
 
-/// Round ✗ / ✓ button shown beside the shutter while reviewing a draft clip.
 class _SideAction extends StatelessWidget {
   const _SideAction({
     required this.icon,
@@ -381,7 +368,6 @@ class _SideAction extends StatelessWidget {
   }
 }
 
-/// Snaps to the nearest filter stride with a soft spring (visible swipe motion).
 class _FilterSnapPhysics extends ScrollPhysics {
   const _FilterSnapPhysics({
     required this.itemExtent,
@@ -469,8 +455,7 @@ class _ShutterCircle extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Show the accumulated recorded amount even while paused, so the ring
-          // stays highlighted between segments (TikTok-style).
+
           if (isRecording || progress > 0.001)
             SizedBox(
               width: ring,
@@ -495,8 +480,7 @@ class _ShutterCircle extends StatelessWidget {
               ),
             ),
           ),
-          // Never mix BoxShape.circle with borderRadius — AnimatedContainer
-          // lerps both and Flutter asserts "A circle cannot have a border radius".
+
           AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             width: inner,

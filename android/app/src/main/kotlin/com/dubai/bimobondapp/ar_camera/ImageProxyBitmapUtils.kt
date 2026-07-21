@@ -39,17 +39,11 @@ object ImageProxyBitmapUtils {
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-        // Fast path: tightly packed RGBA — a single native buffer copy.
         if (rowStride == pixelStride * width && pixelStride == 4) {
             bitmap.copyPixelsFromBuffer(buffer)
             return bitmap
         }
 
-        // Padded RGBA (rowStride > width*4, common on many devices): copy row by row
-        // into a tightly packed buffer with bulk gets, then one native upload. This
-        // replaces the old per-pixel ByteBuffer.get() loop (4 reads + repack per
-        // pixel = ~6M calls per 1080x1440 frame) that could dominate frame time and
-        // stutter both preview and recording.
         if (pixelStride == 4) {
             val rowBytes = width * 4
             val packed = java.nio.ByteBuffer
@@ -66,7 +60,6 @@ object ImageProxyBitmapUtils {
             return bitmap
         }
 
-        // Rare fallback: unusual pixel stride — general per-pixel repack.
         val pixels = IntArray(width * height)
         var outputIndex = 0
         for (row in 0 until height) {
@@ -179,34 +172,15 @@ object ImageProxyBitmapUtils {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
     }
 
-    /**
-     * Applies rotation and (optionally) a horizontal mirror in a SINGLE matrix pass,
-     * producing `mirror(rotate(src))`. This replaces the previous rotate-then-mirror
-     * sequence (two full-frame allocations + copies) with one, which is a real
-     * per-frame saving on the analysis thread while recording. Only use this when the
-     * unmirrored `oriented` frame is NOT needed separately (e.g. no face detection),
-     * since detection must run on the un-mirrored image.
-     */
     fun orient(bitmap: Bitmap, rotationDegrees: Int, mirror: Boolean): Bitmap {
         if (rotationDegrees == 0 && !mirror) return bitmap
         val matrix = Matrix()
         if (rotationDegrees != 0) matrix.postRotate(rotationDegrees.toFloat())
         if (mirror) matrix.postScale(-1f, 1f)
-        // These are all axis-aligned transforms (90°/180°/270° + horizontal flip) so
-        // bilinear filtering can't change the output; keep it off when we're only
-        // rotating (cheaper, matches the old `rotate`) and on when mirroring (matches
-        // the old `mirrorHorizontally`).
+
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, mirror)
     }
 
-    /**
-     * Rotate + (optional) mirror + downscale-to-[maxEdge] in a SINGLE matrix pass.
-     * Produces `scale(mirror(rotate(src)))`. This collapses what used to be three
-     * separate full-frame allocations (rotate, mirror, scale) into one, which is a
-     * big reduction in per-frame garbage — fewer/shorter GC pauses mean a smoother
-     * preview AND more even encoder frame timing. Only use when no un-mirrored /
-     * full-resolution frame is needed separately (i.e. no face detection).
-     */
     fun orientScaled(
         bitmap: Bitmap,
         rotationDegrees: Int,
@@ -251,10 +225,6 @@ object ImageProxyBitmapUtils {
         return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, filter)
     }
 
-    /**
-     * Crops [bitmap] to the FILL_CENTER region shown in a viewport of [viewW]x[viewH]
-     * (same mapping as PreviewView.ScaleType.FILL_CENTER).
-     */
     fun cropFillCenterToViewport(bitmap: Bitmap, viewW: Int, viewH: Int): Bitmap {
         if (viewW <= 0 || viewH <= 0) return bitmap
         val imgW = bitmap.width.toFloat()
@@ -283,10 +253,6 @@ object ImageProxyBitmapUtils {
         return Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
     }
 
-    /**
-     * WYSIWYG letterbox: full [outW]x[outH] canvas with black bars and the same
-     * FILL_CENTER camera content TikTok shows in the mid band.
-     */
     fun composeLetterboxedCapture(
         source: Bitmap,
         outW: Int,
