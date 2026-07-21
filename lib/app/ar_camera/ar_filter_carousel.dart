@@ -33,9 +33,7 @@ class ArFilterCarousel extends StatefulWidget {
   final GestureLongPressStartCallback? onHoldStart;
   final GestureLongPressEndCallback? onHoldEnd;
   final double? height;
-
   final bool showSideActions;
-
   final bool soloShutter;
   final VoidCallback? onConfirm;
   final VoidCallback? onCancel;
@@ -159,12 +157,10 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   }
 
   void _onScrollEnd() {
-    if (_programmaticScroll || !_controller.hasClients) return;
-    final index = (_controller.offset / ArFilterCarousel.itemStride)
-        .round()
-        .clamp(0, _filters.length - 1);
-    final target = index * ArFilterCarousel.itemStride;
-
+    if (_programmaticScroll || !_controller.hasClients || _n == 0) return;
+    final loop = (_controller.offset / ArFilterCarousel.itemStride).round();
+    final real = _realFromLoop(loop);
+    final target = loop * ArFilterCarousel.itemStride;
     if ((_controller.offset - target).abs() > 1.5) {
       _scrollToReal(real, animated: true).then((_) {
         if (mounted) _emit(real);
@@ -205,57 +201,55 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     return SizedBox(
       height: widget.height ?? (ArFilterCarousel.activeSize + 8),
       child: Stack(
-            alignment: Alignment.center,
-            children: [
-              NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  if (notification.metrics.axis != Axis.horizontal) {
-                    return false;
-                  }
+        alignment: Alignment.center,
+        children: [
+          NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification.metrics.axis != Axis.horizontal) {
+                return false;
+              }
 
-                  if (notification is ScrollUpdateNotification ||
-                      notification is ScrollStartNotification) {
-                    final next = _controller.hasClients
-                        ? _controller.offset
-                        : _scrollOffset;
-                    final hapticReal = _realFromLoop(
-                      (next / ArFilterCarousel.itemStride).round(),
-                    );
-                    if (hapticReal != _lastHapticReal) {
-                      _lastHapticReal = hapticReal;
-                      HapticFeedback.selectionClick();
-                    }
-                    if ((next - _scrollOffset).abs() > 0.2) {
-                      setState(() => _scrollOffset = next);
-                    }
-                  }
+              if (notification is ScrollUpdateNotification ||
+                  notification is ScrollStartNotification) {
+                final next =
+                    _controller.hasClients ? _controller.offset : _scrollOffset;
+                final hapticReal = _realFromLoop(
+                  (next / ArFilterCarousel.itemStride).round(),
+                );
+                if (hapticReal != _lastHapticReal) {
+                  _lastHapticReal = hapticReal;
+                  HapticFeedback.selectionClick();
+                }
+                if ((next - _scrollOffset).abs() > 0.2) {
+                  setState(() => _scrollOffset = next);
+                }
+              }
 
-                  if (notification is ScrollEndNotification) {
-                    _onScrollEnd();
-                  }
-                  return false;
-                },
-                child: ListView.builder(
-                  controller: _controller,
-                  scrollDirection: Axis.horizontal,
-                  physics: widget.isRecording || widget.soloShutter
-                      ? const NeverScrollableScrollPhysics()
-                      : const _FilterSnapPhysics(
-                          itemExtent: ArFilterCarousel.itemStride,
-                          parent: BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                          ),
-                        ),
-                  padding: EdgeInsets.symmetric(horizontal: sidePadding),
-                  itemCount: _itemCount,
-                  itemBuilder: (context, loopIndex) {
-                    final real = _realFromLoop(loopIndex);
-                    final item = _filters[real];
-                    final size = _sizeForLoop(loopIndex);
-                    final opacity = _opacityForLoop(loopIndex);
-                    final center =
-                        _scrollOffset / ArFilterCarousel.itemStride;
-                    final isCentered = (loopIndex - center).abs() < 0.35;
+              if (notification is ScrollEndNotification) {
+                _onScrollEnd();
+              }
+              return false;
+            },
+            child: ListView.builder(
+              controller: _controller,
+              scrollDirection: Axis.horizontal,
+              physics: widget.isRecording || widget.soloShutter
+                  ? const NeverScrollableScrollPhysics()
+                  : const _FilterSnapPhysics(
+                      itemExtent: ArFilterCarousel.itemStride,
+                      parent: BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                    ),
+              padding: EdgeInsets.symmetric(horizontal: sidePadding),
+              itemCount: _itemCount,
+              itemBuilder: (context, loopIndex) {
+                final real = _realFromLoop(loopIndex);
+                final item = _filters[real];
+                final size = _sizeForLoop(loopIndex);
+                final opacity = _opacityForLoop(loopIndex);
+                final center = _scrollOffset / ArFilterCarousel.itemStride;
+                final isCentered = (loopIndex - center).abs() < 0.35;
 
                 if (widget.soloShutter && !isCentered) {
                   return const SizedBox(width: ArFilterCarousel.itemStride);
@@ -271,21 +265,21 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                           if (isCentered) {
                             _onActiveTap();
                           } else {
-                            _scrollTo(index, animated: true).then((_) {
-                              if (mounted) _emit(index);
+                            _scrollToReal(real, animated: true).then((_) {
+                              if (mounted) _emit(real);
                             });
                           }
                         },
-
                         onLongPressStart: isCentered && !widget.isBusy
                             ? widget.onHoldStart
                             : null,
                         onLongPressEnd: isCentered ? widget.onHoldEnd : null,
-                        child: item.isOriginal
+                        child: item.isOriginal && isCentered
                             ? _ShutterCircle(
                                 size: size,
-                                isActive: isCentered,
-                                isRecording: widget.isRecording && isCentered,
+                                isActive: true,
+                                isRecording:
+                                    widget.isRecording && isCentered,
                                 isPhotoMode: widget.isPhotoMode,
                                 progress: widget.recordProgress,
                               )
@@ -293,36 +287,39 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                                 emoji: item.emoji,
                                 size: size,
                                 isActive: isCentered,
-                                isRecording: widget.isRecording && isCentered,
+                                isRecording:
+                                    widget.isRecording && isCentered,
                               ),
                       ),
-                    );
-                  },
-                ),
-              ),
-              if (widget.showSideActions)
-                Positioned.fill(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _SideAction(
-                        icon: Icons.close,
-                        background: Colors.black.withValues(alpha: 0.5),
-                        onTap: widget.onCancel,
-                      ),
-                      const SizedBox(
-                        width: ArFilterCarousel.activeSize + 56,
-                      ),
-                      _SideAction(
-                        icon: Icons.check,
-                        background: const Color(0xFFFE2C55),
-                        onTap: widget.onConfirm,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-            ],
+                );
+              },
+            ),
           ),
+          if (widget.showSideActions)
+            Positioned.fill(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _SideAction(
+                    icon: Icons.close,
+                    background: Colors.black.withValues(alpha: 0.5),
+                    onTap: widget.onCancel,
+                  ),
+                  const SizedBox(
+                    width: ArFilterCarousel.activeSize + 56,
+                  ),
+                  _SideAction(
+                    icon: Icons.check,
+                    background: const Color(0xFFFE2C55),
+                    onTap: widget.onConfirm,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
