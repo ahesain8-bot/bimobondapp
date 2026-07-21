@@ -3,10 +3,6 @@ package com.dubai.bimobondapp.ar_camera
 import kotlin.math.abs
 import kotlin.math.max
 
-/**
- * Maps image-space landmarks to the same texture UV space used by the GPU
- * centerCrop shader and [FaceOverlayView] FILL_CENTER layout.
- */
 object FaceCoordinateMapper {
 
     fun toScreenNormalized(
@@ -101,11 +97,6 @@ object FaceCoordinateMapper {
         return abs(edge[0] - center[0]).coerceAtLeast(0.001f)
     }
 
-    /**
-     * Converts image-space landmark coordinates to texture UV for the GPU upload.
-     * Front camera uploads a horizontally-mirrored bitmap (invert X).
-     * Back camera uploads the oriented bitmap as-is.
-     */
     fun toWarpUv(
         x: Float,
         y: Float,
@@ -122,7 +113,6 @@ object FaceCoordinateMapper {
         return floatArrayOf(u, v)
     }
 
-    /** Converts a pixel radius to texture UV X units (mirror-safe, aspect-independent). */
     fun toWarpRadiusX(
         radiusPx: Float,
         imageWidth: Int,
@@ -130,7 +120,6 @@ object FaceCoordinateMapper {
         return (radiusPx / imageWidth).coerceAtLeast(0.001f)
     }
 
-    /** Converts a pixel length to texture UV Y units. */
     fun toWarpLengthY(
         lengthPx: Float,
         imageHeight: Int,

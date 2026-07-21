@@ -474,20 +474,20 @@ class _BalanceActionButton extends StatelessWidget {
                 ),
               ),
             ),
-              const SizedBox(height: 8),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? dotColor : Colors.transparent,
-                ),
+            const SizedBox(height: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? dotColor : Colors.transparent,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
     );
   }
 }

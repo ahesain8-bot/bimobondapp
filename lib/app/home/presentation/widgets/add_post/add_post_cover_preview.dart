@@ -13,12 +13,14 @@ class AddPostCoverPreview extends StatefulWidget {
     required this.file,
     required this.onEdit,
     required this.onAdd,
+    this.soundName,
     super.key,
   });
 
   final File? file;
   final VoidCallback onEdit;
   final VoidCallback onAdd;
+  final String? soundName;
 
   @override
   State<AddPostCoverPreview> createState() => _AddPostCoverPreviewState();
@@ -125,6 +127,38 @@ class _AddPostCoverPreviewState extends State<AddPostCoverPreview> {
                       ),
                     ),
                   ),
+                  if (widget.soundName != null &&
+                      widget.soundName!.trim().isNotEmpty)
+                    Positioned(
+                      left: 6,
+                      right: 6,
+                      bottom: 36,
+                      child: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.music,
+                            size: 11,
+                            color: Colors.white.withValues(alpha: 0.95),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.soundName!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.95),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                shadows: const [
+                                  Shadow(blurRadius: 6, color: Colors.black54),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   Positioned(
                     left: 8,
                     right: 8,

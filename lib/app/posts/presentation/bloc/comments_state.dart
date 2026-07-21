@@ -64,8 +64,13 @@ class ToggleLikeCommentSuccess extends CommentsState {
 class DeleteCommentSuccess extends CommentsState {
   final String commentId;
 
-  const DeleteCommentSuccess(this.commentId);
+  /// Null when a top-level comment was deleted (affects post comment count).
+  final String? parentId;
+
+  const DeleteCommentSuccess(this.commentId, {this.parentId});
+
+  bool get isTopLevel => parentId == null;
 
   @override
-  List<Object?> get props => [commentId];
+  List<Object?> get props => [commentId, parentId];
 }

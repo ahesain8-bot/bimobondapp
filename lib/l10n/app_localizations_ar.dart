@@ -24,7 +24,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginWithPhone => 'استخدام رقم الجوال';
 
   @override
-  String get loginWithEmailUsername => 'استخدام البريد الإلكتروني أو اسم المستخدم';
+  String get loginWithEmailUsername => 'استخدام البريد الالكتروني';
 
   @override
   String get loginEmailUsernameHint => 'البريد الإلكتروني أو اسم المستخدم';
@@ -594,10 +594,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get selectGender => 'اختر الجنس';
 
   @override
-  String get instagramProfileUrl => 'رابط حساب إنستجرام';
+  String get instagramProfileUrl => 'اسم المستخدم أو الرابط';
 
   @override
-  String get youtubeChannelUrl => 'رابط قناة يوتيوب';
+  String get youtubeChannelUrl => 'اسم المستخدم أو رابط القناة';
 
   @override
   String get egypt => 'مصر';
@@ -651,6 +651,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get navHome => 'الرئيسية';
+
+  @override
+  String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
 
   @override
   String get navFriends => 'الأصدقاء';
@@ -1073,7 +1076,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get navProfile => 'حسابي';
 
   @override
-  String get describePostHint => 'صف منشورك… استخدم @اسم_المستخدم و #وسم في النص';
+  String get describePostHint => 'أضف وصفًا...';
 
   @override
   String get addDescriptionHint => 'أضف وصفًا...';
@@ -1236,7 +1239,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noCommentsYet => 'لا توجد تعليقات بعد. كن أول من يعلق!';
 
   @override
-  String get addCommentHint => 'أضف تعليقًا… @اسم_المستخدم للإشارة';
+  String get addCommentHint => 'أضف تعليقًا...';
 
   @override
   String get justNow => 'الآن';
@@ -1348,6 +1351,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postShareSheetTitle => 'مشاركة المنشور';
 
   @override
+  String get postShareSendToTitle => 'إرسال إلى';
+
+  @override
   String get postShareSearchUsers => 'ابحث عن الأصدقاء والمستخدمين';
 
   @override
@@ -1390,6 +1396,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String postShareSentTo(String name) {
     return 'تم الإرسال إلى $name';
   }
+
+  @override
+  String get postShareSend => 'إرسال';
+
+  @override
+  String postShareSendToCount(int count) {
+    return 'إرسال ($count)';
+  }
+
+  @override
+  String postShareSentCount(int count) {
+    return 'تم الإرسال إلى $count أشخاص';
+  }
+
+  @override
+  String get postQuickShareTitle => 'الأصدقاء الأخيرون';
+
+  @override
+  String get postQuickShareSubtitle => 'اختر الأصدقاء، اضغط مرة أخرى للإلغاء، ثم أرسل';
 
   @override
   String get postAddToStoryHint => 'أنشئ قصتك — المنشور جاهز للمشاركة';
@@ -2594,6 +2619,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraFlash => 'فلاش';
 
   @override
+  String get cameraSwitch => 'تبديل الكاميرا';
+
+  @override
   String get cameraSpeed => 'السرعة';
 
   @override
@@ -2604,6 +2632,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraTimer => 'مؤقت';
+
+  @override
+  String get cameraSetCountdown => 'تعيين العد التنازلي';
+
+  @override
+  String get cameraStartCountdown => 'بدء العد التنازلي';
+
+  @override
+  String get cameraDragRecordingLimit => 'اسحب لتعيين حد التسجيل';
 
   @override
   String get cameraMusic => 'موسيقى';
@@ -2718,6 +2755,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraAddSound => 'إضافة صوت';
 
   @override
+  String get cameraMuteOriginalSound => 'كتم الصوت الأصلي';
+
+  @override
   String get cameraLayout => 'التخطيط';
 
   @override
@@ -2734,6 +2774,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cameraZoom => 'تكبير';
+
+  @override
+  String get cameraZoomOut => 'تصغير';
+
+  @override
+  String get cameraZoomIn => 'تكبير';
 
   @override
   String get cameraGoLive => 'بدء البث';
@@ -2821,6 +2867,78 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mediaEditorComingSoon => 'قريباً';
+
+  @override
+  String get mediaEditorDone => 'تم';
+
+  @override
+  String get mediaEditorTrim => 'قص';
+
+  @override
+  String get videoEditorSplit => 'تقسيم';
+
+  @override
+  String get videoEditorDeleteSegment => 'حذف';
+
+  @override
+  String get mediaEditorReset => 'إعادة تعيين';
+
+  @override
+  String get mediaEditorDiscard => 'تجاهل';
+
+  @override
+  String get mediaEditorSaveDraft => 'حفظ كمسودة';
+
+  @override
+  String get mediaEditorContinueEditing => 'متابعة التعديل';
+
+  @override
+  String get mediaEditorSendToFriends => 'إرسال إلى الأصدقاء';
+
+  @override
+  String get mediaEditorDiscardTitle => 'تجاهل التغييرات؟';
+
+  @override
+  String get mediaPhotoEditorFace => 'الوجه';
+
+  @override
+  String get mediaPhotoEditorMakeup => 'مكياج';
+
+  @override
+  String get mediaPhotoEditorMagic => 'سحر';
+
+  @override
+  String get mediaPhotoEditorSmooth => 'تنعيم';
+
+  @override
+  String get mediaPhotoEditorSaturation => 'تشبع';
+
+  @override
+  String get mediaPhotoEditorBrightness => 'السطوع';
+
+  @override
+  String get mediaPhotoEditorContrast => 'التباين';
+
+  @override
+  String get mediaPhotoEditorExposure => 'التعريض';
+
+  @override
+  String get mediaPhotoEditorWhiteBalance => 'الدفء';
+
+  @override
+  String get mediaPhotoEditorHighlights => 'الإضاءات';
+
+  @override
+  String get mediaPhotoEditorShadows => 'الظلال';
+
+  @override
+  String get mediaPhotoEditorNose => 'الأنف';
+
+  @override
+  String get mediaPhotoEditorOn => 'تشغيل';
+
+  @override
+  String get mediaTextHint => 'اكتب شيئاً';
 
   @override
   String get promotePostTitle => 'ترويج المنشور';
@@ -3203,10 +3321,33 @@ class AppLocalizationsAr extends AppLocalizations {
   String get soundTabMine => 'أصواتي';
 
   @override
+  String get soundTabHot => 'الأكثر رواجاً';
+
+  @override
+  String get soundTabForYou => 'لك';
+
+  @override
+  String get soundTabFavorites => 'المفضلة';
+
+  @override
+  String get soundTabRecent => 'الأخيرة';
+
+  @override
   String get soundPickerEmpty => 'لا توجد أصوات';
 
   @override
   String get soundPickFromFiles => 'اختر من الملفات';
+
+  @override
+  String get soundTrimTooltip => 'قص';
+
+  @override
+  String get soundFavoriteTooltip => 'المفضلة';
+
+  @override
+  String soundSecondsSelected(int count) {
+    return '$count ث محددة';
+  }
 
   @override
   String get soundUseThis => 'استخدام';
@@ -3215,10 +3356,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get soundUseThisSound => 'استخدم هذا الصوت';
 
   @override
+  String get soundUseSoundCta => 'استخدام الصوت';
+
+  @override
+  String get soundSave => 'حفظ';
+
+  @override
+  String get soundSaved => 'تم الحفظ';
+
+  @override
+  String get soundAddToStory => 'إضافة إلى القصة';
+
+  @override
+  String get soundFindRelatedHint => 'البحث عن محتوى مشابه';
+
+  @override
+  String get soundOriginalBadge => 'أصلي';
+
+  @override
   String get soundConfirmSelection => 'استخدام الصوت المحدد';
 
   @override
-  String get soundClearSelection => 'مسح';
+  String get soundClearSelection => 'إزالة الموسيقى';
 
   @override
   String get soundDetailTitle => 'الصوت';
@@ -3247,6 +3406,21 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String soundUseCountMillions(String count) {
     return '$count مليون فيديو';
+  }
+
+  @override
+  String soundPostsCount(int count) {
+    return '$count منشور';
+  }
+
+  @override
+  String soundPostsCountThousands(String count) {
+    return '$count ألف منشور';
+  }
+
+  @override
+  String soundPostsCountMillions(String count) {
+    return '$count مليون منشور';
   }
 
   @override
@@ -3288,4 +3462,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get retry => 'حاول مرة أخرى';
+
+  @override
+  String get seeTranslation => 'عرض الترجمة';
+
+  @override
+  String get seeOriginal => 'عرض النص الأصلي';
+
+  @override
+  String get translationFailed => 'تعذر الترجمة';
 }

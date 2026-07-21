@@ -27,10 +27,12 @@ import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -404,37 +406,40 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            PostsSearchHeader(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              onBack: () => context.pop(),
-              onSearch: () => unawaited(_submitSearch()),
-              onSubmitted: () => unawaited(_submitSearch()),
-              onClear: _clearField,
-              onChanged: (_) => setState(() {}),
-              showMoreMenu: _showResults,
-              onMore: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.searchComingSoon)),
-                );
-              },
-            ),
-            if (_showResults)
-              SearchResultsTabs(
-                selected: _resultsTab,
-                onChanged: (tab) => unawaited(_onTabChanged(tab)),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: appContentSystemUiOverlayStyle(theme.brightness),
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              PostsSearchHeader(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onBack: () => context.pop(),
+                onSearch: () => unawaited(_submitSearch()),
+                onSubmitted: () => unawaited(_submitSearch()),
+                onClear: _clearField,
+                onChanged: (_) => setState(() {}),
+                showMoreMenu: _showResults,
+                onMore: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.searchComingSoon)),
+                  );
+                },
               ),
-            Expanded(
-              child: _showResults
-                  ? _buildResults(l10n, theme)
-                  : _buildIdle(l10n),
-            ),
-          ],
+              if (_showResults)
+                SearchResultsTabs(
+                  selected: _resultsTab,
+                  onChanged: (tab) => unawaited(_onTabChanged(tab)),
+                ),
+              Expanded(
+                child: _showResults
+                    ? _buildResults(l10n, theme)
+                    : _buildIdle(l10n),
+              ),
+            ],
+          ),
         ),
       ),
     );

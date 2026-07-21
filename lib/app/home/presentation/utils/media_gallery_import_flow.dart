@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -12,11 +13,13 @@ class CameraMediaPickResult {
     required this.files,
     required this.type,
     this.filterName,
+    this.sound,
   });
 
   final List<File> files;
   final String type;
   final String? filterName;
+  final SoundEntity? sound;
 }
 
 /// Runs gallery items through the media studio editor, then opens add post.
@@ -43,6 +46,8 @@ class MediaGalleryImportFlow {
     required List<GalleryMediaItem> items,
     bool isStory = false,
     Object? initialSound,
+    Duration initialSoundOffset = Duration.zero,
+    bool initialMuteOriginal = false,
     int initialIndex = 0,
     MediaEditorSeed? initialEdit,
   }) {
@@ -55,6 +60,8 @@ class MediaGalleryImportFlow {
         'initialIndex': initialIndex,
         'isStory': isStory,
         'initialSound': initialSound,
+        'initialSoundOffsetMs': initialSoundOffset.inMilliseconds,
+        'initialMuteOriginal': initialMuteOriginal,
         'popOnDone': true,
         if (initialEdit != null) 'initialEdit': initialEdit.toExtra(),
       },
@@ -66,6 +73,8 @@ class MediaGalleryImportFlow {
     required List<GalleryMediaItem> items,
     bool isStory = false,
     Object? initialSound,
+    Duration initialSoundOffset = Duration.zero,
+    bool initialMuteOriginal = false,
     bool replaceRoute = true,
   }) async {
     final edited = await openBatchEditor(
@@ -73,6 +82,8 @@ class MediaGalleryImportFlow {
       items: items,
       isStory: isStory,
       initialSound: initialSound,
+      initialSoundOffset: initialSoundOffset,
+      initialMuteOriginal: initialMuteOriginal,
     );
     if (edited == null || edited.files.isEmpty || !context.mounted) return;
 
@@ -80,7 +91,7 @@ class MediaGalleryImportFlow {
       'files': edited.files,
       'type': resolvePostType(edited.files),
       'isStory': isStory,
-      'initialSound': initialSound,
+      'initialSound': edited.sound ?? initialSound,
       if (edited.filterName != null) 'filterName': edited.filterName,
       'filterCategory': edited.filterCategory.name,
       if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,

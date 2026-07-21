@@ -15,6 +15,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_sett
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_settings_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_tag_button.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
@@ -91,6 +92,8 @@ class _AddPostScreenState extends State<AddPostScreen>
   late DateTime _auctionStartDate;
   late DateTime _auctionEndDate;
   SoundEntity? _selectedSound;
+  Duration _soundStartOffset = Duration.zero;
+  Duration _soundWindow = const Duration(seconds: 15);
   AddPostLocationSelection? _selectedLocation;
 
   @override
@@ -138,6 +141,7 @@ class _AddPostScreenState extends State<AddPostScreen>
 
   @override
   void dispose() {
+    SoundAudioPreview.stop();
     _descriptionController.dispose();
     _auctionItemNameController.dispose();
     _startingPriceController.dispose();
@@ -181,11 +185,13 @@ class _AddPostScreenState extends State<AddPostScreen>
       items: items,
       initialIndex: index,
       initialSound: _selectedSound,
+      initialSoundOffset: _soundStartOffset,
     );
     if (!mounted || edited == null || edited.files.isEmpty) return;
 
     setState(() {
       _selectedFiles = edited.files;
+      if (edited.sound != null) _selectedSound = edited.sound;
       _updateType();
     });
   }
@@ -232,6 +238,7 @@ class _AddPostScreenState extends State<AddPostScreen>
         final toAdd = edited.files.take(remaining).toList();
         setState(() {
           _selectedFiles = [..._selectedFiles, ...toAdd];
+          if (edited.sound != null) _selectedSound = edited.sound;
           _updateType();
         });
       },
@@ -259,6 +266,7 @@ class _AddPostScreenState extends State<AddPostScreen>
     final toAdd = result.files.take(remaining).toList();
     setState(() {
       _selectedFiles = [..._selectedFiles, ...toAdd];
+      if (result.sound != null) _selectedSound = result.sound;
       _updateType();
     });
   }
@@ -324,6 +332,9 @@ class _AddPostScreenState extends State<AddPostScreen>
         return;
       }
     }
+
+    // Stop any leftover sound preview before upload/processing starts.
+    SoundAudioPreview.stop();
 
     context.read<PostsBloc>().add(
       CreatePostWithMediaRequestedEvent(
@@ -394,9 +405,27 @@ class _AddPostScreenState extends State<AddPostScreen>
     final picked = await SoundPickerSheet.show(
       context,
       initialSelection: _selectedSound,
+      initialOffset: _soundStartOffset,
+      initialWindow: _soundWindow,
     );
-    if (!mounted) return;
-    setState(() => _selectedSound = picked);
+    if (!mounted || picked == null) return;
+    if (picked.cleared) {
+      setState(() {
+        _selectedSound = null;
+        _soundStartOffset = Duration.zero;
+        _soundWindow = const Duration(seconds: 15);
+      });
+      return;
+    }
+    final sound = picked.sound;
+    if (sound == null) return;
+    setState(() {
+      _selectedSound = sound;
+      _soundStartOffset = picked.offset;
+      _soundWindow = picked.window > Duration.zero
+          ? picked.window
+          : const Duration(seconds: 15);
+    });
   }
 
   Future<void> _openSoundDetail() async {
@@ -517,6 +546,7 @@ class _AddPostScreenState extends State<AddPostScreen>
           const SizedBox(width: 12),
           AddPostCoverPreview(
             file: coverFile,
+            soundName: _selectedSound?.name,
             onAdd: widget.isStory ? _retakeStory : _showMediaPickerOptions,
             onEdit: () {
               if (widget.isStory) {

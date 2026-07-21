@@ -93,7 +93,9 @@ String inboxLastMessagePreview(
       case ChatMessageType.text:
       case ChatMessageType.unknown:
         body = contentPreview;
-        if (body.isEmpty && last.mediaUrl != null && last.mediaUrl!.isNotEmpty) {
+        if (body.isEmpty &&
+            last.mediaUrl != null &&
+            last.mediaUrl!.isNotEmpty) {
           body = l10n.messagesInboxLastPhoto;
         }
         break;
@@ -140,14 +142,13 @@ int _chatActivityMillis(ChatEntity chat) {
 
 List<ChatEntity> sortChatsByRecentActivity(List<ChatEntity> chats) {
   final sorted = List<ChatEntity>.from(chats);
-  sorted.sort((a, b) => _chatActivityMillis(b).compareTo(_chatActivityMillis(a)));
+  sorted.sort(
+    (a, b) => _chatActivityMillis(b).compareTo(_chatActivityMillis(a)),
+  );
   return sorted;
 }
 
-List<InboxChatItem> filterInboxChats(
-  List<InboxChatItem> items,
-  String query,
-) {
+List<InboxChatItem> filterInboxChats(List<InboxChatItem> items, String query) {
   if (query.isEmpty) return items;
   final q = query.toLowerCase();
   return items

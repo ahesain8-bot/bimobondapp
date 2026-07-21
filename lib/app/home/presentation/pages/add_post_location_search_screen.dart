@@ -14,10 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class AddPostLocationSelection {
-  const AddPostLocationSelection({
-    required this.country,
-    required this.city,
-  });
+  const AddPostLocationSelection({required this.country, required this.city});
 
   final CountryEntity country;
   final CityEntity city;
@@ -188,10 +185,7 @@ class _AddPostLocationSearchScreenState
     final result = await countries_di.sl<GetCountryCitiesUseCase>()(
       GetCountryCitiesParams(code: code),
     );
-    result.fold(
-      (_) {},
-      (page) => _citiesCache[code] = page.cities,
-    );
+    result.fold((_) {}, (page) => _citiesCache[code] = page.cities);
     _citiesLoadingCodes.remove(code);
   }
 
@@ -253,9 +247,9 @@ class _AddPostLocationSearchScreenState
   }
 
   void _selectCity(CountryEntity country, CityEntity city) {
-    Navigator.of(context).pop(
-      AddPostLocationSelection(country: country, city: city),
-    );
+    Navigator.of(
+      context,
+    ).pop(AddPostLocationSelection(country: country, city: city));
   }
 
   @override
@@ -287,9 +281,9 @@ class _AddPostLocationSearchScreenState
                     child: Text(
                       inCityMode
                           ? (_selectedCountry!.emoji != null &&
-                                  _selectedCountry!.emoji!.isNotEmpty
-                              ? '${_selectedCountry!.emoji} ${_selectedCountry!.name}'
-                              : _selectedCountry!.name)
+                                    _selectedCountry!.emoji!.isNotEmpty
+                                ? '${_selectedCountry!.emoji} ${_selectedCountry!.name}'
+                                : _selectedCountry!.name)
                           : l10n.addLocationLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -480,7 +474,8 @@ class _AddPostLocationSearchScreenState
       itemCount: cities.length,
       itemBuilder: (context, index) {
         final city = cities[index];
-        final selected = initialCityId == city.id &&
+        final selected =
+            initialCityId == city.id &&
             widget.initial?.country.code == country.code;
         return _LocationTile(
           title: city.name,
@@ -491,7 +486,11 @@ class _AddPostLocationSearchScreenState
             color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
           ),
           trailing: selected
-              ? Icon(LucideIcons.check, size: 18, color: theme.colorScheme.primary)
+              ? Icon(
+                  LucideIcons.check,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                )
               : null,
           onTap: () => _selectCity(country, city),
         );
@@ -574,17 +573,15 @@ class _LocationTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.45),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.45,
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              trailing!,
-            ],
+            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
           ],
         ),
       ),

@@ -40,11 +40,7 @@ class LivePostCommentsArea extends StatelessWidget {
         shaderCallback: (bounds) => const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.black,
-            Colors.black,
-          ],
+          colors: [Colors.transparent, Colors.black, Colors.black],
           stops: [0.0, 0.12, 1.0],
         ).createShader(bounds),
         blendMode: BlendMode.dstIn,
@@ -68,12 +64,12 @@ class LivePostCommentsArea extends StatelessWidget {
                   giftImageUrl: giftCommentImageUrl(comment),
                   onProfileTap: comment.user.id.isNotEmpty
                       ? () => openUserStoryOrProfile(
-                            context,
-                            userId: comment.user.id,
-                            username: comment.user.username,
-                            fullName: comment.user.fullName,
-                            avatarUrl: comment.user.avatarUrl,
-                          )
+                          context,
+                          userId: comment.user.id,
+                          username: comment.user.username,
+                          fullName: comment.user.fullName,
+                          avatarUrl: comment.user.avatarUrl,
+                        )
                       : null,
                   userId: comment.user.id,
                 ),

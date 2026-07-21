@@ -1,6 +1,5 @@
 package com.dubai.bimobondapp.ar_camera
 
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -21,13 +20,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Encodes filtered ARGB frames into an H.264 MP4, and records mic audio in parallel.
- *
- * Video path is unchanged (lazy start on first frame). Audio uses [MediaRecorder] to a
- * temp file, then both tracks are remuxed into the final MP4 on [stop]. That keeps
- * filter / no-filter recording stable and always includes sound when the mic is allowed.
- */
 class ArFilteredVideoRecorder {
 
     private val lock = Any()
@@ -40,9 +32,7 @@ class ArFilteredVideoRecorder {
     private var width = 0
     private var height = 0
 
-    /** Final user-facing file returned from [stop]. */
     private var finalOutputFile: File? = null
-    /** Video-only temp written by the H.264 encoder. */
     private var videoTempFile: File? = null
     private var audioTempFile: File? = null
     private var mediaRecorder: MediaRecorder? = null
@@ -53,10 +43,12 @@ class ArFilteredVideoRecorder {
     private var drainThread: HandlerThread? = null
     private var drainHandler: Handler? = null
 
+    @Volatile
+    private var surfaceSession = false
+
     fun isRecording(): Boolean = armed.get() || running.get()
 
-    /** Prepare output path; encoder starts on first [offerFrame]. Mic starts immediately. */
-    fun arm(output: File, context: Context? = null) {
+    fun arm(output: File) {
         synchronized(lock) {
             abortInternal()
             finalOutputFile = output
@@ -68,11 +60,39 @@ class ArFilteredVideoRecorder {
             audioTempFile?.delete()
             armed.set(true)
             frameIndex = 0
-            startMicRecorder()
+            surfaceSession = false
         }
     }
 
+    fun startSurfaceSession(output: File, width: Int, height: Int): Surface? {
+        synchronized(lock) {
+            abortInternal()
+            finalOutputFile = output
+            val parent = output.parentFile ?: output.absoluteFile.parentFile
+            val base = output.nameWithoutExtension
+            videoTempFile = File(parent, "${base}_v.mp4")
+            audioTempFile = File(parent, "${base}_a.m4a")
+            videoTempFile?.delete()
+            audioTempFile?.delete()
+            armed.set(false)
+            frameIndex = 0
+            surfaceSession = true
+            val out = videoTempFile ?: return null
+            return try {
+                startEncoder(out, width, height)
+                inputSurface
+            } catch (e: Exception) {
+                Log.e(TAG, "startSurfaceSession failed", e)
+                abortInternal()
+                null
+            }
+        }
+    }
+
+    fun isSurfaceSession(): Boolean = surfaceSession
+
     fun offerFrame(bitmap: Bitmap) {
+        if (surfaceSession) return
         if (!armed.get() && !running.get()) return
         synchronized(lock) {
             if (!running.get()) {
@@ -113,6 +133,7 @@ class ArFilteredVideoRecorder {
             }
             releaseVideoEncoder()
             stopMicRecorder()
+            surfaceSession = false
 
             val video = videoTempFile
             val audio = audioTempFile
@@ -212,7 +233,7 @@ class ArFilteredVideoRecorder {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(
                 MediaFormat.KEY_BIT_RATE,
-                (width * height * 3).coerceIn(1_500_000, 6_000_000),
+                (width * height * 4).coerceIn(4_000_000, 12_000_000),
             )
             setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
@@ -230,6 +251,7 @@ class ArFilteredVideoRecorder {
         drainHandler = Handler(thread.looper)
         running.set(true)
         armed.set(false)
+        startMicRecorder()
         drainHandler?.post { drainLoop() }
         Log.i(TAG, "encoder started ${output.name} ${width}x$height (src ${srcW}x$srcH)")
     }
@@ -251,12 +273,14 @@ class ArFilteredVideoRecorder {
             val top = (srcH - newH) * 0.5f
             srcRect = Rect(0, top.toInt(), srcW.toInt(), (top + newH).toInt())
         }
-        canvas.drawBitmap(bitmap, srcRect, Rect(0, 0, dstW, dstH), null)
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(bitmap, srcRect, Rect(0, 0, dstW, dstH), paint)
     }
 
     private fun abortInternal() {
         running.set(false)
         armed.set(false)
+        surfaceSession = false
         releaseVideoEncoder()
         stopMicRecorder()
         cleanupTemps()
@@ -338,10 +362,6 @@ class ArFilteredVideoRecorder {
         audioTempFile = null
     }
 
-    /**
-     * Copies H.264 from [videoFile] and AAC from [audioFile] into [outFile].
-     * Falls back to video-only if audio is missing.
-     */
     private fun muxAv(videoFile: File, audioFile: File?, outFile: File): File {
         outFile.delete()
         val hasAudio = audioFile != null && audioFile.exists() && audioFile.length() > 512L
@@ -440,7 +460,7 @@ class ArFilteredVideoRecorder {
 
     companion object {
         private const val TAG = "ArFilteredVideoRecorder"
-        private const val FRAME_RATE = 20
-        private const val MAX_EDGE = 720
+        const val MAX_EDGE = 1280
+        const val FRAME_RATE = 30
     }
 }

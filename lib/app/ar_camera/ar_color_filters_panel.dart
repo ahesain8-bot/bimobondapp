@@ -6,7 +6,6 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// TikTok-style Filters bottom sheet — color / portrait grades only.
 class ArColorFiltersPanel extends StatelessWidget {
   const ArColorFiltersPanel({
     super.key,
@@ -17,6 +16,7 @@ class ArColorFiltersPanel extends StatelessWidget {
     required this.onFilterSelected,
     required this.onIntensityChanged,
     required this.onClear,
+    required this.onApply,
   });
 
   final String selectedFilterId;
@@ -26,6 +26,8 @@ class ArColorFiltersPanel extends StatelessWidget {
   final ValueChanged<String> onFilterSelected;
   final ValueChanged<double> onIntensityChanged;
   final VoidCallback onClear;
+
+  final VoidCallback onApply;
 
   bool get _showIntensity =>
       selectedFilterId != 'none' &&
@@ -68,6 +70,7 @@ class ArColorFiltersPanel extends StatelessWidget {
                         selectedFilterId: selectedFilterId,
                         onCategorySelected: onCategorySelected,
                         onClear: onClear,
+                        onApply: onApply,
                       ),
                       const SizedBox(height: 14),
                       SizedBox(
@@ -138,17 +141,20 @@ class _CategoryRow extends StatelessWidget {
     required this.selectedFilterId,
     required this.onCategorySelected,
     required this.onClear,
+    required this.onApply,
   });
 
   final String selectedCategoryId;
   final String selectedFilterId;
   final ValueChanged<String> onCategorySelected;
   final VoidCallback onClear;
+  final VoidCallback onApply;
 
   @override
   Widget build(BuildContext context) {
     final noneSelected = selectedFilterId == 'none' ||
         !ArFilterCatalog.isColorFilter(selectedFilterId);
+    final l10n = AppLocalizations.of(context)!;
 
     return SizedBox(
       height: 40,
@@ -184,7 +190,6 @@ class _CategoryRow extends StatelessWidget {
               itemBuilder: (context, index) {
                 final category = ArFilterCatalog.colorCategories[index];
                 final selected = category.id == selectedCategoryId;
-                final l10n = AppLocalizations.of(context)!;
                 return GestureDetector(
                   onTap: () => onCategorySelected(category.id),
                   behavior: HitTestBehavior.opaque,
@@ -218,9 +223,88 @@ class _CategoryRow extends StatelessWidget {
               },
             ),
           ),
+          Container(
+            width: 1,
+            height: 18,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            color: Colors.white.withValues(alpha: 0.25),
+          ),
+          GestureDetector(
+            onTap: onApply,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: SizedBox(
+                height: 36,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.check,
+                      size: 20,
+                      color: Colors.white.withValues(alpha: 0.95),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      l10n.mediaEditorDone,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+}
+
+class _FilterThumbImage extends StatelessWidget {
+  const _FilterThumbImage({required this.item});
+
+  final ArFilterItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholderColor = _hexToColor(item.previewColorHex);
+
+    final emojiFallback = ColoredBox(
+      color: placeholderColor ?? Colors.transparent,
+      child: Center(
+        child: Text(item.emoji, style: const TextStyle(fontSize: 26)),
+      ),
+    );
+
+    if (!item.hasThumbnail) return emojiFallback;
+
+    return Image.network(
+      item.thumbnailUrl!,
+      width: 64,
+      height: 64,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return ColoredBox(
+          color: placeholderColor ?? Colors.white.withValues(alpha: 0.06),
+        );
+      },
+      errorBuilder: (context, error, stack) => emojiFallback,
+    );
+  }
+
+  static Color? _hexToColor(String? hex) {
+    if (hex == null) return null;
+    var value = hex.replaceFirst('#', '').trim();
+    if (value.length == 6) value = 'FF$value';
+    if (value.length != 8) return null;
+    final intValue = int.tryParse(value, radix: 16);
+    return intValue == null ? null : Color(intValue);
   }
 }
 
@@ -258,9 +342,7 @@ class _FilterThumb extends StatelessWidget {
                   width: selected ? 2.5 : 1,
                 ),
               ),
-              child: Center(
-                child: Text(item.emoji, style: const TextStyle(fontSize: 26)),
-              ),
+              child: ClipOval(child: _FilterThumbImage(item: item)),
             ),
             const SizedBox(height: 6),
             Text(

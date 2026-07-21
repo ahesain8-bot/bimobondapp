@@ -30,6 +30,7 @@ import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_use
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
 import 'package:bimobondapp/app/auctions/presentation/widgets/auction_gifts_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_parts.dart';
@@ -182,11 +183,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (widget.post?.auction != null) {
       _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
+        _syncAuctionFinishedState();
         setState(() {});
       });
     }
 
-    _syncAuctionFinishedFromGiftTotal();
+    _syncAuctionFinishedState();
     _recordPostViewIfNeeded();
     unawaited(_startAuctionRealtime());
   }
@@ -480,6 +482,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
           sort: 'oldest',
         ),
       );
+      _isAuctionFinished = false;
+      _syncAuctionFinishedState();
+      if (!_isAuctionFinished && !_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
     }
 
     final prevTotal = oldWidget.post?.auction?.currentTotalCoins;
@@ -490,17 +497,29 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       if (nextTotal != null && nextTotal != prevTotal) {
         _bidPopController.forward(from: 0);
       }
-      _syncAuctionFinishedFromGiftTotal();
+      _syncAuctionFinishedState();
+    } else if (oldWidget.post?.auction?.status !=
+            widget.post?.auction?.status ||
+        oldWidget.post?.auction?.endedAt != widget.post?.auction?.endedAt) {
+      _syncAuctionFinishedState();
     }
   }
 
-  void _syncAuctionFinishedFromGiftTotal() {
-    final auction = widget.post?.auction;
+  void _syncAuctionFinishedState() {
+    final post = widget.post;
+    final auction = post?.auction;
     if (auction == null || _isAuctionFinished) return;
+
+    final endedByStatusOrDate = AuctionSearchFilters.isPostEnded(post!);
     final targetCoins = auction.targetPriceCoins;
-    if (targetCoins > 0 && _highestBidCoins >= targetCoins) {
+    final targetReached =
+        targetCoins > 0 && _highestBidCoins >= targetCoins;
+
+    if (endedByStatusOrDate || targetReached) {
       _isAuctionFinished = true;
-      _pulseController.stop();
+      if (_pulseController.isAnimating) {
+        _pulseController.stop();
+      }
     }
   }
 
@@ -956,10 +975,14 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final isAuctionFinishedBadge = _isAuctionFinished;
     final targetPrice = _auctionTargetPrice;
     final isPostOwner = _isPostOwner();
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isKeyboardOpen = keyboardInset > 0;
 
     final scaffold = Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
+      // Keep media full-bleed; lift the chrome with [keyboardInset] instead.
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -996,7 +1019,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
             ),
           ),
           GestureDetector(
-            onTap: () => setState(() => _isUIHidden = !_isUIHidden),
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              setState(() => _isUIHidden = !_isUIHidden);
+            },
             onHorizontalDragEnd: hasMultipleMedia
                 ? null
                 : (details) {
@@ -1010,126 +1036,140 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                     }
                   },
             behavior: HitTestBehavior.translucent,
-            child: AnimatedSlide(
-              duration: LiveDetailsLayoutConstants.uiHideDuration,
-              offset: _isUIHidden
-                  ? Offset(
-                      _isRtl
-                          ? -LiveDetailsLayoutConstants.uiSlideOffset
-                          : LiveDetailsLayoutConstants.uiSlideOffset,
-                      0,
-                    )
-                  : Offset.zero,
-              curve: Curves.easeInOutCubic,
-              child: AnimatedOpacity(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: keyboardInset),
+              child: AnimatedSlide(
                 duration: LiveDetailsLayoutConstants.uiHideDuration,
-                opacity: _isUIHidden ? 0 : 1,
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      if (hasMultipleMedia) ...[
-                        const SizedBox(
-                          height: LiveDetailsLayoutConstants
-                              .mediaPageIndicatorTopPadding,
-                        ),
-                        MediaPageIndicator(
-                          count: imageUrls.length,
-                          currentIndex: _currentImageIndex,
-                        ),
-                        const SizedBox(height: AppSizes.p8),
-                      ],
-                      LiveDetailsHeader(
-                        hostName: hostName,
-                        subtitle: widget.post?.auction?.itemName,
-                        viewersLabel: _viewersLabel(l10n),
-                        avatarUrl: _avatarUrl(),
-                        hostUserId: _hostUserId,
-                        isFollowing: _isFollowing,
-                        followLabel: l10n.liveFollow,
-                        followingLabel: l10n.liveFollowing,
-                        liveBadgeLabel: isAuctionFinishedBadge
-                            ? l10n.auctionFinishedBadge
-                            : isAuctionActive
-                            ? l10n.auctionActiveBadge
-                            : l10n.liveBadge,
-                        isAuctionActiveBadge: isAuctionActive,
-                        isAuctionFinishedBadge: isAuctionFinishedBadge,
-                        pulseAnimation: _pulseAnimation,
-                        showCloseButton: !widget.embeddedInFeed,
-                        showAuctionGifts: _isAuctionPost,
-                        onAuctionGifts: _showAuctionGiftsSheet,
-                        showOwnerMenu: isPostOwner,
-                        showFollowButton:
-                            !isPostOwner &&
-                            _hostUserId != null &&
-                            !_isAuctionPost,
-                        onProfileTap: _hostUserId != null
-                            ? _openHostProfile
-                            : null,
-                        onOwnerMenu: _showOwnerOptions,
-                        onClose: () => context.pop(),
-                        onFollowTap: _isFollowLoading ? () {} : _toggleFollow,
-                        countdownBelowProfile: widget.post?.auction != null
-                            ? AuctionCountdownBar(
-                                parts: _auctionCountdownParts(),
-                              )
-                            : null,
-                      ),
-                      const Expanded(
-                        child: IgnorePointer(child: SizedBox.expand()),
-                      ),
-                      Align(
-                        alignment: _isRtl
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: CompactHighestBid(
-                          topBidLabel: l10n.liveTopBid,
-                          bidAmountText: _formatHighestBid(l10n),
-                          showGiftIcon: _usesGiftTotal,
-                          showCoinIcon: widget.post?.auction != null,
-                          targetPrice: targetPrice,
-                          targetPriceLabel: _auctionTargetPriceLabel(l10n),
-                          isFinished: _isAuctionFinished,
-                          popAnimation: _bidPopAnimation,
-                          theme: theme,
-                        ),
-                      ),
-                      if (_showCommentsArea) ...[
-                        const SizedBox(height: AppSizes.p12),
-                        if (_usesPostComments)
-                          LivePostCommentsArea(
-                            isRtl: _isRtl,
-                            comments: _visiblePostComments,
-                            scrollController: _chatScrollController,
-                          )
-                        else
-                          LiveMockChatArea(
-                            isRtl: _isRtl,
-                            messages: _mockChatMessages,
-                            authorLabel: l10n.liveChatYou,
-                            scrollController: _chatScrollController,
+                offset: _isUIHidden
+                    ? Offset(
+                        _isRtl
+                            ? -LiveDetailsLayoutConstants.uiSlideOffset
+                            : LiveDetailsLayoutConstants.uiSlideOffset,
+                        0,
+                      )
+                    : Offset.zero,
+                curve: Curves.easeInOutCubic,
+                child: AnimatedOpacity(
+                  duration: LiveDetailsLayoutConstants.uiHideDuration,
+                  opacity: _isUIHidden ? 0 : 1,
+                  child: SafeArea(
+                    // Avoid stacking home-indicator padding on top of the keyboard.
+                    bottom: !isKeyboardOpen,
+                    child: Column(
+                      children: [
+                        if (hasMultipleMedia) ...[
+                          const SizedBox(
+                            height: LiveDetailsLayoutConstants
+                                .mediaPageIndicatorTopPadding,
                           ),
+                          MediaPageIndicator(
+                            count: imageUrls.length,
+                            currentIndex: _currentImageIndex,
+                          ),
+                          const SizedBox(height: AppSizes.p8),
+                        ],
+                        LiveDetailsHeader(
+                          hostName: hostName,
+                          subtitle: widget.post?.auction?.itemName,
+                          viewersLabel: _viewersLabel(l10n),
+                          avatarUrl: _avatarUrl(),
+                          hostUserId: _hostUserId,
+                          isFollowing: _isFollowing,
+                          followLabel: l10n.liveFollow,
+                          followingLabel: l10n.liveFollowing,
+                          liveBadgeLabel: isAuctionFinishedBadge
+                              ? l10n.auctionFinishedBadge
+                              : isAuctionActive
+                              ? l10n.auctionActiveBadge
+                              : l10n.liveBadge,
+                          isAuctionActiveBadge: isAuctionActive,
+                          isAuctionFinishedBadge: isAuctionFinishedBadge,
+                          pulseAnimation: _pulseAnimation,
+                          showCloseButton: !widget.embeddedInFeed,
+                          showAuctionGifts: _isAuctionPost,
+                          onAuctionGifts: _showAuctionGiftsSheet,
+                          showOwnerMenu: isPostOwner,
+                          showFollowButton:
+                              !isPostOwner &&
+                              _hostUserId != null &&
+                              !_isAuctionPost,
+                          onProfileTap: _hostUserId != null
+                              ? _openHostProfile
+                              : null,
+                          onOwnerMenu: _showOwnerOptions,
+                          onClose: () => context.pop(),
+                          onFollowTap: _isFollowLoading ? () {} : _toggleFollow,
+                          countdownBelowProfile: widget.post?.auction != null
+                              ? AuctionCountdownBar(
+                                  parts: _auctionCountdownParts(),
+                                )
+                              : null,
+                        ),
+                        if (!isKeyboardOpen) ...[
+                          const Expanded(
+                            child: IgnorePointer(child: SizedBox.expand()),
+                          ),
+                          Align(
+                            alignment: _isRtl
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: CompactHighestBid(
+                              topBidLabel: l10n.liveTopBid,
+                              bidAmountText: _formatHighestBid(l10n),
+                              showGiftIcon: _usesGiftTotal,
+                              showCoinIcon: widget.post?.auction != null,
+                              targetPrice: targetPrice,
+                              targetPriceLabel: _auctionTargetPriceLabel(l10n),
+                              isFinished: _isAuctionFinished,
+                              popAnimation: _bidPopAnimation,
+                              theme: theme,
+                            ),
+                          ),
+                          if (_showCommentsArea) ...[
+                            const SizedBox(height: AppSizes.p12),
+                            if (_usesPostComments)
+                              LivePostCommentsArea(
+                                isRtl: _isRtl,
+                                comments: _visiblePostComments,
+                                scrollController: _chatScrollController,
+                              )
+                            else
+                              LiveMockChatArea(
+                                isRtl: _isRtl,
+                                messages: _mockChatMessages,
+                                authorLabel: l10n.liveChatYou,
+                                scrollController: _chatScrollController,
+                              ),
+                          ],
+                        ] else
+                          const Spacer(),
+                        GestureDetector(
+                          onTap: () {},
+                          behavior: HitTestBehavior.opaque,
+                          child: LiveBiddingInput(
+                            controller: _chatController,
+                            hintText: _biddingEnabled
+                                ? l10n.addCommentHint
+                                : l10n.auctionBiddingClosed,
+                            enabled: _biddingEnabled,
+                            showGiftButton: _canSendGiftToHost,
+                            quickBidAmounts: widget.post != null
+                                ? const <int>[]
+                                : _biddingEnabled
+                                ? LiveDetailsLayoutConstants.quickBidAmounts
+                                : const <int>[],
+                            quickBidLabelBuilder: (amount) =>
+                                l10n.liveQuickBid(amount),
+                            theme: theme,
+                            onSend: _placeBidOrComment,
+                            onGift: _biddingEnabled ? _showGiftSheet : () {},
+                            onQuickBid: _addBid,
+                          ),
+                        ),
                       ],
-                      LiveBiddingInput(
-                        controller: _chatController,
-                        hintText: _biddingEnabled
-                            ? l10n.addCommentHint
-                            : l10n.auctionBiddingClosed,
-                        enabled: _biddingEnabled,
-                        showGiftButton: _canSendGiftToHost,
-                        quickBidAmounts: widget.post != null
-                            ? const <int>[]
-                            : _biddingEnabled
-                            ? LiveDetailsLayoutConstants.quickBidAmounts
-                            : const <int>[],
-                        quickBidLabelBuilder: (amount) =>
-                            l10n.liveQuickBid(amount),
-                        theme: theme,
-                        onSend: _placeBidOrComment,
-                        onGift: _biddingEnabled ? _showGiftSheet : () {},
-                        onQuickBid: _addBid,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

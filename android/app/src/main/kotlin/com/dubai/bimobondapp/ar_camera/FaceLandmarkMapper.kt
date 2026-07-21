@@ -25,6 +25,8 @@ object FaceLandmarkMapper {
         val topHead = computeTopHead(points)
         val boundingBox = computeBoundingBox(points)
 
+        val pose = extractHeadPose(result)
+
         return FaceLandmarkSnapshot(
             imageWidth = imageWidth,
             imageHeight = imageHeight,
@@ -40,7 +42,37 @@ object FaceLandmarkMapper {
             mouthBottom = points[MediaPipeLandmarkIndices.MOUTH_BOTTOM],
             topHead = topHead,
             landmarks = points,
+            hasHeadPose = pose != null,
+            pitchDeg = pose?.get(0) ?: 0f,
+            yawDeg = pose?.get(1) ?: 0f,
+            rollDeg = pose?.get(2) ?: 0f,
         )
+    }
+
+    private fun extractHeadPose(result: FaceLandmarkerResult): FloatArray? {
+        val matrices = try {
+            result.facialTransformationMatrixes()
+                .orElse(null)
+                ?.firstOrNull()
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        if (matrices.size < 16) return null
+
+        val r00 = matrices[0]
+        val r10 = matrices[1]
+        val r20 = matrices[2]
+        val r21 = matrices[6]
+        val r22 = matrices[10]
+        val pitch = Math.toDegrees(kotlin.math.atan2(-r21.toDouble(), r22.toDouble())).toFloat()
+        val yaw = Math.toDegrees(
+            kotlin.math.atan2(
+                r20.toDouble(),
+                kotlin.math.sqrt((r00 * r00 + r10 * r10).toDouble()),
+            ),
+        ).toFloat()
+        val roll = Math.toDegrees(kotlin.math.atan2(r10.toDouble(), r00.toDouble())).toFloat()
+        return floatArrayOf(pitch, yaw, roll)
     }
 
     private fun toPoint(landmark: NormalizedLandmark, width: Int, height: Int): PointF {

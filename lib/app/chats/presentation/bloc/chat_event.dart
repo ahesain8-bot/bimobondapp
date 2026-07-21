@@ -8,10 +8,7 @@ abstract class ChatEvent extends Equatable {
 }
 
 class ChatStarted extends ChatEvent {
-  const ChatStarted({
-    required this.chatId,
-    required this.currentUserId,
-  });
+  const ChatStarted({required this.chatId, required this.currentUserId});
 
   final String chatId;
   final String currentUserId;
@@ -66,14 +63,14 @@ class ChatAttachmentSendRequested extends ChatEvent {
 
   @override
   List<Object?> get props => [
-        messageType,
-        content,
-        localFilePath,
-        replyToId,
-        payload,
-        mimeType,
-        sizeBytes,
-      ];
+    messageType,
+    content,
+    localFilePath,
+    replyToId,
+    payload,
+    mimeType,
+    sizeBytes,
+  ];
 }
 
 class ChatPollVoteRequested extends ChatEvent {
@@ -149,10 +146,7 @@ class ChatSocketMessageReceived extends ChatEvent {
 }
 
 class ChatSocketUserTyping extends ChatEvent {
-  const ChatSocketUserTyping({
-    required this.userId,
-    required this.isTyping,
-  });
+  const ChatSocketUserTyping({required this.userId, required this.isTyping});
 
   final String userId;
   final bool isTyping;

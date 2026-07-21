@@ -36,20 +36,21 @@ class PhoneTextField extends StatefulWidget {
 class _PhoneTextFieldState extends State<PhoneTextField> {
   late String _selectedCountryCode;
 
-  final List<Map<String, String>> _countries = [
-    {'code': '+20', 'name': 'Egypt', 'flag': '🇪🇬'},
-    {'code': '+966', 'name': 'Saudi Arabia', 'flag': '🇸🇦'},
-    {'code': '+971', 'name': 'UAE', 'flag': '🇦🇪'},
-    {'code': '+1', 'name': 'USA', 'flag': '🇺🇸'},
-    {'code': '+44', 'name': 'UK', 'flag': '🇬🇧'},
-    {'code': '+965', 'name': 'Kuwait', 'flag': '🇰🇼'},
-    {'code': '+974', 'name': 'Qatar', 'flag': '🇶🇦'},
-  ];
-
   @override
   void initState() {
     super.initState();
     _selectedCountryCode = widget.initialCountryCode ?? '+20';
+  }
+
+  @override
+  void didUpdateWidget(covariant PhoneTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.initialCountryCode;
+    if (next != null &&
+        next != oldWidget.initialCountryCode &&
+        next != _selectedCountryCode) {
+      setState(() => _selectedCountryCode = next);
+    }
   }
 
   String _flagForCode(String code) {
@@ -70,6 +71,31 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
         return '🇶🇦';
       default:
         return '';
+    }
+  }
+
+  /// Local-number example for the selected dial code (code is shown beside the field).
+  String _hintForCode(String code, AppLocalizations l10n) {
+    if (widget.hintText != null && widget.hintText!.trim().isNotEmpty) {
+      return widget.hintText!;
+    }
+    switch (code) {
+      case '+20':
+        return '100 123 4567';
+      case '+966':
+        return '512 345 678';
+      case '+971':
+        return '50 123 4567';
+      case '+1':
+        return '201 555 0123';
+      case '+44':
+        return '7911 123456';
+      case '+965':
+        return '5000 1234';
+      case '+974':
+        return '3312 3456';
+      default:
+        return l10n.phoneHint;
     }
   }
 
@@ -129,7 +155,11 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
             if (widget.labelText != null)
               SizedBox(
                 width: 100,
-                child: CustomText(widget.labelText!, fontSize: 15, fontWeight: FontWeight.w500),
+                child: CustomText(
+                  widget.labelText!,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             InkWell(
               onTap: _showCountryPicker,
@@ -140,7 +170,11 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                     fontSize: 15,
                     color: theme.textTheme.bodyLarge?.color,
                   ),
-                  Icon(Icons.arrow_drop_down, size: 20, color: theme.disabledColor.withOpacity(0.5)),
+                  Icon(
+                    Icons.arrow_drop_down,
+                    size: 20,
+                    color: theme.disabledColor.withOpacity(0.5),
+                  ),
                   const SizedBox(width: AppSizes.p8),
                 ],
               ),
@@ -151,7 +185,7 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                 keyboardType: TextInputType.phone,
                 style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: widget.hintText ?? l10n.phoneHint,
+                  hintText: _hintForCode(_selectedCountryCode, l10n),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -221,11 +255,7 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                         ),
                       ),
                     ),
-                    Container(
-                      width: 1,
-                      height: 24,
-                      color: style.fieldDivider,
-                    ),
+                    Container(width: 1, height: 24, color: style.fieldDivider),
                     Expanded(
                       child: TextField(
                         controller: widget.controller,
@@ -239,7 +269,7 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                         cursorColor: AppTheme.primaryColor,
                         decoration: authFieldDecoration(
                           style: style,
-                          hintText: widget.hintText ?? l10n.phoneHint,
+                          hintText: _hintForCode(_selectedCountryCode, l10n),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: AppSizes.p12,
                             vertical: 14,
@@ -322,7 +352,7 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
                   keyboardType: TextInputType.phone,
                   style: const TextStyle(fontSize: 16),
                   decoration: InputDecoration(
-                    hintText: widget.hintText ?? l10n.phoneHint,
+                    hintText: _hintForCode(_selectedCountryCode, l10n),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppSizes.p12,

@@ -1,14 +1,23 @@
-/// Shared AR filter / effect catalog used by test screen and main camera.
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
+
 class ArFilterItem {
   const ArFilterItem({
     required this.id,
     required this.label,
     required this.emoji,
+    this.thumbnailUrl,
+    this.previewColorHex,
   });
 
   final String id;
   final String label;
   final String emoji;
+
+  final String? thumbnailUrl;
+
+  final String? previewColorHex;
+
+  bool get hasThumbnail => (thumbnailUrl ?? '').isNotEmpty;
 
   bool get isOriginal => id == 'none';
 }
@@ -34,49 +43,51 @@ class ArFilterCatalog {
     emoji: '✨',
   );
 
-  /// Stickers + face warp — shown in the bottom shutter carousel.
   static const List<ArFilterItem> effectItems = [
     original,
     ArFilterItem(id: 'glasses', label: 'Glasses', emoji: '😎'),
+    ArFilterItem(id: 'shades', label: 'Shades', emoji: '🕶️'),
     ArFilterItem(id: 'dog', label: 'Dog', emoji: '🐶'),
     ArFilterItem(id: 'moustache', label: 'Moustache', emoji: '🥸'),
+    ArFilterItem(id: 'mask', label: 'Mask', emoji: '💀'),
     ArFilterItem(id: 'big_eyes', label: 'Big Eyes', emoji: '👀'),
     ArFilterItem(id: 'big_lips', label: 'Big Lips', emoji: '👄'),
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
   ];
 
-  /// Color / “white” portrait-style grades — TikTok Filters sheet only.
-  static const List<ArFilterItem> colorItems = [
-    ArFilterItem(id: 'whitening', label: 'Pure', emoji: '🤍'),
-    ArFilterItem(id: 'clarendon', label: 'Bright', emoji: '☀️'),
-    ArFilterItem(id: 'ludwig', label: 'Clean', emoji: '✨'),
-    ArFilterItem(id: 'rosy', label: 'Soft', emoji: '🌸'),
-    ArFilterItem(id: 'valencia', label: 'Sunset', emoji: '🌇'),
-    ArFilterItem(id: 'warm', label: 'Warm', emoji: '🍑'),
-    ArFilterItem(id: 'cool', label: 'Cool', emoji: '❄️'),
-    ArFilterItem(id: 'vintage', label: 'Retro', emoji: '🎞️'),
-    ArFilterItem(id: 'mono', label: 'B & W', emoji: '🖤'),
-  ];
+  static ArColorFilterCatalog colorCatalog = ArColorFilterCatalog.bundled();
 
-  static const List<ArColorFilterCategory> colorCategories = [
-    ArColorFilterCategory(
-      id: 'portrait',
-      label: 'Portrait',
-      filterIds: ['whitening', 'clarendon', 'ludwig', 'rosy', 'valencia'],
-    ),
-    ArColorFilterCategory(
-      id: 'life',
-      label: 'Life',
-      filterIds: ['warm', 'cool'],
-    ),
-    ArColorFilterCategory(
-      id: 'retro',
-      label: 'Retro',
-      filterIds: ['vintage', 'mono'],
-    ),
-  ];
+  static void updateColorCatalog(ArColorFilterCatalog catalog) {
+    colorCatalog = catalog;
+    _colorItemsCache = null;
+    _colorCategoriesCache = null;
+  }
 
-  /// Flat list for lookups / MethodChannel ids.
+  static List<ArFilterItem>? _colorItemsCache;
+  static List<ArColorFilterCategory>? _colorCategoriesCache;
+
+  static List<ArFilterItem> get colorItems => _colorItemsCache ??= [
+        for (final category in colorCatalog.categories)
+          for (final filter in category.filters)
+            ArFilterItem(
+              id: filter.id,
+              label: filter.label,
+              emoji: filter.emoji ?? '',
+              thumbnailUrl: filter.thumbnailUrl,
+              previewColorHex: filter.previewColorHex,
+            ),
+      ];
+
+  static List<ArColorFilterCategory> get colorCategories =>
+      _colorCategoriesCache ??= [
+        for (final category in colorCatalog.categories)
+          ArColorFilterCategory(
+            id: category.id,
+            label: category.label,
+            filterIds: [for (final f in category.filters) f.id],
+          ),
+      ];
+
   static List<ArFilterItem> get items => [
         ...effectItems,
         ...colorItems,

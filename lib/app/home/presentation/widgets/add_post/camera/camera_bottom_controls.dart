@@ -142,19 +142,17 @@ class _ModeDurationItem extends StatelessWidget {
                 ? (isLive
                       ? LiveDetailsLayoutConstants.liveBadgeColor
                       : Colors.white)
-                : Colors.white60,
-            fontSize: selected ? 14 : 13,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                : Colors.white,
+            fontSize: selected ? 16 : 15,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
             letterSpacing: isLive && selected ? 0.5 : 0,
-            shadows: selected
-                ? const [
-                    Shadow(
-                      color: Colors.black45,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ]
-                : null,
+            shadows: const [
+              Shadow(
+                color: Colors.black54,
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
         ),
       ),
@@ -220,9 +218,16 @@ class _WorkspaceTab extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: selected ? Colors.white : Colors.white54,
-              fontSize: 15,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+              shadows: const [
+                Shadow(
+                  color: Colors.black54,
+                  blurRadius: 6,
+                  offset: Offset(0, 1),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 4),
@@ -313,19 +318,17 @@ class CameraModeTab extends StatelessWidget {
                 ? (isLive
                       ? LiveDetailsLayoutConstants.liveBadgeColor
                       : Colors.white)
-                : Colors.white60,
-            fontSize: isSelected ? 14 : 13,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                : Colors.white,
+            fontSize: isSelected ? 16 : 15,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
             letterSpacing: isLive && isSelected ? 0.6 : 0,
-            shadows: isSelected
-                ? const [
-                    Shadow(
-                      color: Colors.black45,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ]
-                : null,
+            shadows: const [
+              Shadow(
+                color: Colors.black54,
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
         ),
       ),
@@ -439,14 +442,16 @@ class CameraRecordButton extends StatelessWidget {
                 border: Border.all(color: Colors.white, width: 4.5),
               ),
             ),
+            // Always use rectangle + borderRadius (never shape:circle) so
+            // AnimatedContainer's decoration lerp never hits Flutter's
+            // "A circle cannot have a border radius" assert while recording.
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               width: isRecording ? 30 : 58,
               height: isRecording ? 30 : 58,
               decoration: BoxDecoration(
                 color: innerColor,
-                shape: isRecording ? BoxShape.rectangle : BoxShape.circle,
-                borderRadius: isRecording ? BorderRadius.circular(6) : null,
+                borderRadius: BorderRadius.circular(isRecording ? 6 : 29),
               ),
             ),
           ],
@@ -532,8 +537,10 @@ class CameraCaptureControls extends StatelessWidget {
                 progress: recordProgress,
                 isPhotoMode: isPhotoMode,
                 onTap: onRecordTap,
-                onLongPressStart: isPhotoMode ? null : onLongPressStart,
-                onLongPressEnd: isPhotoMode ? null : onLongPressEnd,
+                // Photo mode also supports press-and-hold for a quick 15s
+                // video (TikTok-style), so long-press is enabled everywhere.
+                onLongPressStart: onLongPressStart,
+                onLongPressEnd: onLongPressEnd,
               ),
             ),
           ),

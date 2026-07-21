@@ -1,14 +1,22 @@
 package com.dubai.bimobondapp.ar_camera
 
 import android.graphics.Bitmap
+import android.graphics.SurfaceTexture
+import android.opengl.EGL14
+import android.opengl.EGLExt
+import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
+import android.os.SystemClock
+import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import android.opengl.EGLConfig as AndroidEglConfig
+import android.opengl.EGLSurface as AndroidEglSurface
 
 class FaceWarpRenderer : GLSurfaceView.Renderer {
 
@@ -45,6 +53,68 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var uLipRect = 0
     private var uBeauty = 0
     private var uIntensity = 0
+    private var uLut = 0
+    private var uHasLut = 0
+
+    private var lutTextureId = 0
+
+    @Volatile
+    private var pendingLut: Bitmap? = null
+
+    @Volatile
+    private var wantLut = false
+    private var lutReady = false
+
+    private var oesProgram = 0
+    private var oesTextureId = 0
+    private var cameraSurfaceTexture: SurfaceTexture? = null
+    private val stMatrix = FloatArray(16)
+
+    private var oesAPosition = 0
+    private var oesATexCoord = 0
+    private var oesUTexture = 0
+    private var oesUStMatrix = 0
+    private var oesUTexTransform = 0
+    private var oesUViewSize = 0
+    private var oesUTexSize = 0
+    private var oesULut = 0
+    private var oesUHasLut = 0
+    private var oesUIntensity = 0
+
+    private val texMatrixGl = FloatArray(9)
+    private var texMatrixReady = false
+    private val oesViewport = IntArray(4)
+
+    @Volatile
+    var oesEnabled = false
+
+    @Volatile
+    private var cameraRotationDegrees = 0
+
+    @Volatile
+    private var cameraFrontMirror = false
+
+    @Volatile
+    private var cameraBufW = 0
+
+    @Volatile
+    private var cameraBufH = 0
+
+    @Volatile
+    var lutIntensity = 1f
+
+    @Volatile
+    var onCameraSurfaceReady: ((SurfaceTexture) -> Unit)? = null
+
+    @Volatile
+    var onFramePresented: (() -> Unit)? = null
+
+    fun setCameraTransform(rotationDegrees: Int, frontMirror: Boolean, bufW: Int, bufH: Int) {
+        cameraRotationDegrees = ((rotationDegrees % 360) + 360) % 360
+        cameraFrontMirror = frontMirror
+        if (bufW > 0) cameraBufW = bufW
+        if (bufH > 0) cameraBufH = bufH
+    }
 
     fun updateTexture(bitmap: Bitmap) {
         pendingBitmap?.recycle()
@@ -53,6 +123,16 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     fun setWarpParams(params: FaceWarpParams) {
         warpParams = params
+    }
+
+    fun setLut(bitmap: Bitmap?) {
+        if (bitmap == null) {
+            wantLut = false
+            pendingLut = null
+            return
+        }
+        pendingLut = bitmap
+        wantLut = true
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -70,15 +150,58 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uLipRect = GLES20.glGetUniformLocation(program, "uLipRect")
         uBeauty = GLES20.glGetUniformLocation(program, "uBeauty")
         uIntensity = GLES20.glGetUniformLocation(program, "uIntensity")
+        uLut = GLES20.glGetUniformLocation(program, "uLut")
+        uHasLut = GLES20.glGetUniformLocation(program, "uHasLut")
 
-        val textures = IntArray(1)
-        GLES20.glGenTextures(1, textures, 0)
+        val textures = IntArray(3)
+        GLES20.glGenTextures(3, textures, 0)
         textureId = textures[0]
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+        lutTextureId = textures[1]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+        oesTextureId = textures[2]
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE,
+        )
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE,
+        )
+
+        oesProgram = buildProgram(VERTEX_SHADER, OES_FRAGMENT_SHADER)
+        oesAPosition = GLES20.glGetAttribLocation(oesProgram, "aPosition")
+        oesATexCoord = GLES20.glGetAttribLocation(oesProgram, "aTexCoord")
+        oesUTexture = GLES20.glGetUniformLocation(oesProgram, "uTexture")
+        oesUStMatrix = GLES20.glGetUniformLocation(oesProgram, "uStMatrix")
+        oesUTexTransform = GLES20.glGetUniformLocation(oesProgram, "uTexTransform")
+        oesUViewSize = GLES20.glGetUniformLocation(oesProgram, "uViewSize")
+        oesUTexSize = GLES20.glGetUniformLocation(oesProgram, "uTexSize")
+        oesULut = GLES20.glGetUniformLocation(oesProgram, "uLut")
+        oesUHasLut = GLES20.glGetUniformLocation(oesProgram, "uHasLut")
+        oesUIntensity = GLES20.glGetUniformLocation(oesProgram, "uIntensity")
+
+        val st = SurfaceTexture(oesTextureId)
+        cameraSurfaceTexture = st
+        onCameraSurfaceReady?.invoke(st)
+
+        lutReady = false
+        texMatrixReady = false
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -86,19 +209,49 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        uploadPendingBitmap()
+        uploadPendingLut()
 
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
+        val st = cameraSurfaceTexture
+        if (oesEnabled && st != null) {
+            try {
+                st.updateTexImage()
+                st.getTransformMatrix(stMatrix)
+            } catch (_: Throwable) {
+                return
+            }
+            drawOes()
+
+            presentToEncoder { drawOes() }
+            if (captureEnabled) captureFrontBuffer { drawOes() }
+            onFramePresented?.invoke()
+            return
+        }
+
+        uploadPendingBitmap()
         if (textureWidth <= 0 || textureHeight <= 0) return
 
+        drawBitmapFrame()
+        presentToEncoder { drawBitmapFrame() }
+        if (captureEnabled) captureFrontBuffer { drawBitmapFrame() }
+        onFramePresented?.invoke()
+    }
+
+    private fun drawBitmapFrame() {
         val params = warpParams
         GLES20.glUseProgram(program)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
         GLES20.glUniform1i(uTexture, 0)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
+        GLES20.glUniform1i(uLut, 1)
+        GLES20.glUniform1f(uHasLut, if (lutReady && wantLut) 1f else 0f)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
 
         GLES20.glUniform1i(uFilterType, params.filterType)
         GLES20.glUniform4fv(uBulge1, 1, params.bulge1, 0)
@@ -109,9 +262,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform1f(uBeauty, params.beauty)
         GLES20.glUniform1f(uIntensity, params.intensity.coerceIn(0f, 1f))
 
-        val viewport = IntArray(4)
-        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, viewport, 0)
-        GLES20.glUniform2f(uViewSize, viewport[2].toFloat(), viewport[3].toFloat())
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
+        GLES20.glUniform2f(uViewSize, captureViewport[2].toFloat(), captureViewport[3].toFloat())
         GLES20.glUniform2f(uTexSize, textureWidth.toFloat(), textureHeight.toFloat())
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -126,17 +278,215 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         GLES20.glDisableVertexAttribArray(aPosition)
         GLES20.glDisableVertexAttribArray(aTexCoord)
+    }
 
-        if (captureEnabled) {
-            captureFrontBuffer()
+    private fun drawOes() {
+        if (oesProgram == 0 || oesTextureId == 0) return
+        GLES20.glUseProgram(oesProgram)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
+        GLES20.glUniform1i(oesUTexture, 0)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
+        GLES20.glUniform1i(oesULut, 1)
+        GLES20.glUniform1f(oesUHasLut, if (lutReady && wantLut) 1f else 0f)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+
+        GLES20.glUniformMatrix4fv(oesUStMatrix, 1, false, stMatrix, 0)
+        GLES20.glUniform1f(oesUIntensity, lutIntensity.coerceIn(0f, 1f))
+
+        // Y-flip (GL vs Android). Required — without this the preview is upside-down.
+        if (!texMatrixReady) {
+            texMatrixGl[0] = 1f; texMatrixGl[1] = 0f; texMatrixGl[2] = 0f
+            texMatrixGl[3] = 0f; texMatrixGl[4] = -1f; texMatrixGl[5] = 0f
+            texMatrixGl[6] = 0f; texMatrixGl[7] = 1f; texMatrixGl[8] = 1f
+            texMatrixReady = true
         }
+        GLES20.glUniformMatrix3fv(oesUTexTransform, 1, false, texMatrixGl, 0)
+
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, oesViewport, 0)
+        GLES20.glUniform2f(oesUViewSize, oesViewport[2].toFloat(), oesViewport[3].toFloat())
+
+        // After rot 90/270 the displayed frame is portrait — swap for FILL_CENTER.
+        val rot = cameraRotationDegrees
+        val dw: Int
+        val dh: Int
+        if (rot == 90 || rot == 270) {
+            dw = cameraBufH
+            dh = cameraBufW
+        } else {
+            dw = cameraBufW
+            dh = cameraBufH
+        }
+        GLES20.glUniform2f(
+            oesUTexSize,
+            dw.toFloat().coerceAtLeast(1f),
+            dh.toFloat().coerceAtLeast(1f),
+        )
+
+        GLES20.glEnableVertexAttribArray(oesAPosition)
+        GLES20.glVertexAttribPointer(oesAPosition, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
+        GLES20.glEnableVertexAttribArray(oesATexCoord)
+        vertexBuffer.position(2)
+        GLES20.glVertexAttribPointer(oesATexCoord, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
+        vertexBuffer.position(0)
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+        GLES20.glDisableVertexAttribArray(oesAPosition)
+        GLES20.glDisableVertexAttribArray(oesATexCoord)
     }
 
     @Volatile
     var captureEnabled: Boolean = false
 
+    @Volatile
+    private var encoderAndroidSurface: Surface? = null
+
+    @Volatile
+    private var encoderWidth = 0
+
+    @Volatile
+    private var encoderHeight = 0
+
+    private var encoderEglSurface: AndroidEglSurface? = null
+    private var lastEncoderSwapMs = 0L
+    private val encoderMinIntervalMs = 33L
+    private val encoderRestoreViewport = IntArray(4)
+
+    fun setEncoderTarget(surface: Surface?, width: Int, height: Int) {
+        destroyEncoderEglSurface()
+        encoderAndroidSurface = surface
+        encoderWidth = width.coerceAtLeast(2)
+        encoderHeight = height.coerceAtLeast(2)
+        lastEncoderSwapMs = 0L
+    }
+
+    private fun destroyEncoderEglSurface() {
+        val eglSurf = encoderEglSurface
+        encoderEglSurface = null
+        if (eglSurf != null && eglSurf != EGL14.EGL_NO_SURFACE) {
+            val display = EGL14.eglGetCurrentDisplay()
+            if (display != null && display != EGL14.EGL_NO_DISPLAY) {
+                try {
+                    EGL14.eglDestroySurface(display, eglSurf)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+    }
+
+    private fun chooseRecordableConfig(
+        display: android.opengl.EGLDisplay,
+    ): AndroidEglConfig? {
+        val attribList = intArrayOf(
+            EGL14.EGL_RED_SIZE, 8,
+            EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8,
+            EGL14.EGL_ALPHA_SIZE, 8,
+            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGLExt.EGL_RECORDABLE_ANDROID, 1,
+            EGL14.EGL_NONE,
+        )
+        val configs = arrayOfNulls<AndroidEglConfig>(1)
+        val numConfigs = IntArray(1)
+        if (!EGL14.eglChooseConfig(display, attribList, 0, configs, 0, 1, numConfigs, 0)) {
+
+            val fallback = intArrayOf(
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE,
+            )
+            if (!EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, numConfigs, 0)) {
+                return null
+            }
+        }
+        return configs[0]
+    }
+
+    private fun presentToEncoder(draw: () -> Unit) {
+        val androidSurface = encoderAndroidSurface ?: return
+        if (!androidSurface.isValid) return
+        val encW = encoderWidth
+        val encH = encoderHeight
+        if (encW < 2 || encH < 2) return
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastEncoderSwapMs < encoderMinIntervalMs) return
+
+        val eglDisplay = EGL14.eglGetCurrentDisplay()
+        val eglContext = EGL14.eglGetCurrentContext()
+        val backupDraw = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW)
+        val backupRead = EGL14.eglGetCurrentSurface(EGL14.EGL_READ)
+        if (eglDisplay == EGL14.EGL_NO_DISPLAY ||
+            eglContext == EGL14.EGL_NO_CONTEXT ||
+            backupDraw == EGL14.EGL_NO_SURFACE
+        ) {
+            return
+        }
+
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, encoderRestoreViewport, 0)
+
+        var eglSurf = encoderEglSurface
+        if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) {
+            val config = chooseRecordableConfig(eglDisplay) ?: return
+            val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
+            eglSurf = EGL14.eglCreateWindowSurface(
+                eglDisplay,
+                config,
+                androidSurface,
+                surfaceAttribs,
+                0,
+            )
+            if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) return
+            encoderEglSurface = eglSurf
+        }
+
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurf, eglSurf, eglContext)) return
+        try {
+            GLES20.glViewport(0, 0, encW, encH)
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            draw()
+            EGLExt.eglPresentationTimeANDROID(
+                eglDisplay,
+                eglSurf,
+                now * 1_000_000L,
+            )
+            EGL14.eglSwapBuffers(eglDisplay, eglSurf)
+            lastEncoderSwapMs = now
+        } catch (_: Throwable) {
+        } finally {
+            EGL14.eglMakeCurrent(eglDisplay, backupDraw, backupRead, eglContext)
+            GLES20.glViewport(
+                encoderRestoreViewport[0],
+                encoderRestoreViewport[1],
+                encoderRestoreViewport[2],
+                encoderRestoreViewport[3],
+            )
+        }
+    }
+
+    @Volatile
+    var captureMaxEdge: Int = 960
+
     private val captureLock = Any()
     private var lastCapturedFrame: Bitmap? = null
+
+    private var captureReadBuf: ByteBuffer? = null
+    private var captureFlipBuf: ByteBuffer? = null
+    private var captureRowBuf: ByteArray? = null
+    private var captureBufBytes = 0
+    private var lastCaptureMs = 0L
+    private val captureMinIntervalMs = 33L
+
+    @Volatile
+    var forceCaptureNextFrame: Boolean = false
 
     fun peekLastCapturedFrame(): Bitmap? = synchronized(captureLock) { lastCapturedFrame }
 
@@ -150,40 +500,173 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
     }
 
-    private fun captureFrontBuffer() {
-        val viewport = IntArray(4)
-        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, viewport, 0)
-        val w = viewport[2]
-        val h = viewport[3]
-        if (w <= 1 || h <= 1) return
+    fun takeLastCapturedFrame(): Bitmap? = synchronized(captureLock) {
+        val frame = lastCapturedFrame
+        lastCapturedFrame = null
+        if (frame == null || frame.isRecycled) return null
+        return frame
+    }
 
-        val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
-        GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
-        buf.rewind()
-
-        val pixels = IntArray(w * h)
-        val row = ByteArray(w * 4)
-        for (y in 0 until h) {
-            buf.position((h - 1 - y) * w * 4)
-            buf.get(row)
-            var x = 0
-            while (x < w) {
-                val i = x * 4
-                val r = row[i].toInt() and 0xFF
-                val g = row[i + 1].toInt() and 0xFF
-                val b = row[i + 2].toInt() and 0xFF
-                val a = row[i + 3].toInt() and 0xFF
-                pixels[y * w + x] = (a shl 24) or (r shl 16) or (g shl 8) or b
-                x++
+    private fun ensureCaptureBuffers(bytes: Int, rowBytes: Int) {
+        if (captureBufBytes >= bytes && captureReadBuf != null && captureFlipBuf != null) {
+            captureReadBuf!!.clear()
+            captureFlipBuf!!.clear()
+            if (captureRowBuf == null || captureRowBuf!!.size < rowBytes) {
+                captureRowBuf = ByteArray(rowBytes)
             }
+            return
+        }
+        captureReadBuf = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder())
+        captureFlipBuf = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder())
+        captureRowBuf = ByteArray(rowBytes)
+        captureBufBytes = bytes
+    }
+
+    private var captureScratchBitmap: Bitmap? = null
+    private val captureViewport = IntArray(4)
+
+    private var captureFboId = 0
+    private var captureFboTexId = 0
+    private var captureFboW = 0
+    private var captureFboH = 0
+
+    private fun ensureCaptureFbo(w: Int, h: Int) {
+        if (captureFboId != 0 && captureFboW == w && captureFboH == h) return
+        releaseCaptureFbo()
+        val tex = IntArray(1)
+        GLES20.glGenTextures(1, tex, 0)
+        captureFboTexId = tex[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, captureFboTexId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D,
+            0,
+            GLES20.GL_RGBA,
+            w,
+            h,
+            0,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            null,
+        )
+        val fbo = IntArray(1)
+        GLES20.glGenFramebuffers(1, fbo, 0)
+        captureFboId = fbo[0]
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, captureFboId)
+        GLES20.glFramebufferTexture2D(
+            GLES20.GL_FRAMEBUFFER,
+            GLES20.GL_COLOR_ATTACHMENT0,
+            GLES20.GL_TEXTURE_2D,
+            captureFboTexId,
+            0,
+        )
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        captureFboW = w
+        captureFboH = h
+    }
+
+    private fun releaseCaptureFbo() {
+        if (captureFboId != 0) {
+            GLES20.glDeleteFramebuffers(1, intArrayOf(captureFboId), 0)
+            captureFboId = 0
+        }
+        if (captureFboTexId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(captureFboTexId), 0)
+            captureFboTexId = 0
+        }
+        captureFboW = 0
+        captureFboH = 0
+    }
+
+    private fun captureFrontBuffer(redraw: (() -> Unit)? = null) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val force = forceCaptureNextFrame
+        if (!force && now - lastCaptureMs < captureMinIntervalMs) return
+        forceCaptureNextFrame = false
+        lastCaptureMs = now
+
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
+        val screenX = captureViewport[0]
+        val screenY = captureViewport[1]
+        val screenW = captureViewport[2]
+        val screenH = captureViewport[3]
+        if (screenW <= 1 || screenH <= 1) return
+
+        val maxEdge = captureMaxEdge.coerceAtLeast(2)
+        val largest = maxOf(screenW, screenH)
+        val useFbo = redraw != null && largest > maxEdge
+        val readW: Int
+        val readH: Int
+        if (useFbo) {
+            val s = maxEdge.toFloat() / largest
+            readW = ((screenW * s).toInt() and 1.inv()).coerceAtLeast(2)
+            readH = ((screenH * s).toInt() and 1.inv()).coerceAtLeast(2)
+            ensureCaptureFbo(readW, readH)
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, captureFboId)
+            GLES20.glViewport(0, 0, readW, readH)
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            try {
+                redraw!!()
+            } catch (_: Throwable) {
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                GLES20.glViewport(screenX, screenY, screenW, screenH)
+                return
+            }
+        } else {
+            readW = screenW
+            readH = screenH
         }
 
-        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
+        val rowBytes = readW * 4
+        val bytes = rowBytes * readH
+        ensureCaptureBuffers(bytes, rowBytes)
+        val buf = captureReadBuf!!
+        val flipped = captureFlipBuf!!
+        val rowBuf = captureRowBuf!!
+        buf.clear()
+        flipped.clear()
+
+        GLES20.glReadPixels(0, 0, readW, readH, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
+
+        if (useFbo) {
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glViewport(screenX, screenY, screenW, screenH)
+        }
+
+        for (row in 0 until readH) {
+            buf.position((readH - 1 - row) * rowBytes)
+            buf.get(rowBuf, 0, rowBytes)
+            flipped.put(rowBuf)
+        }
+        flipped.rewind()
+
+        var scratch = captureScratchBitmap
+        if (scratch == null || scratch.isRecycled ||
+            scratch.width != readW || scratch.height != readH
+        ) {
+            scratch?.recycle()
+            scratch = Bitmap.createBitmap(readW, readH, Bitmap.Config.ARGB_8888)
+            captureScratchBitmap = scratch
+        }
+        scratch.copyPixelsFromBuffer(flipped)
+
+        val out: Bitmap = if (!useFbo && largest > maxEdge) {
+            val s = maxEdge.toFloat() / largest
+            val sw = ((readW * s).toInt() and 1.inv()).coerceAtLeast(2)
+            val sh = ((readH * s).toInt() and 1.inv()).coerceAtLeast(2)
+            Bitmap.createScaledBitmap(scratch, sw, sh, true)
+        } else {
+            scratch.copy(Bitmap.Config.ARGB_8888, false)
+        }
+
         synchronized(captureLock) {
             val previous = lastCapturedFrame
-            lastCapturedFrame = bitmap
-            if (previous != null && !previous.isRecycled) {
+            lastCapturedFrame = out
+            if (previous != null && previous !== out && !previous.isRecycled) {
                 previous.recycle()
             }
         }
@@ -191,20 +674,63 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     fun release() {
         captureEnabled = false
+        destroyEncoderEglSurface()
+        encoderAndroidSurface = null
+        encoderWidth = 0
+        encoderHeight = 0
         synchronized(captureLock) {
             lastCapturedFrame?.recycle()
             lastCapturedFrame = null
         }
         pendingBitmap?.recycle()
         pendingBitmap = null
+        pendingLut = null
+        lutReady = false
+        oesEnabled = false
+        texMatrixReady = false
+        captureScratchBitmap?.recycle()
+        captureScratchBitmap = null
+        captureReadBuf = null
+        captureFlipBuf = null
+        captureRowBuf = null
+        captureBufBytes = 0
+        releaseCaptureFbo()
+        try {
+            cameraSurfaceTexture?.release()
+        } catch (_: Throwable) {
+        }
+        cameraSurfaceTexture = null
         if (textureId != 0) {
             GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
             textureId = 0
+        }
+        if (lutTextureId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(lutTextureId), 0)
+            lutTextureId = 0
+        }
+        if (oesTextureId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(oesTextureId), 0)
+            oesTextureId = 0
         }
         if (program != 0) {
             GLES20.glDeleteProgram(program)
             program = 0
         }
+        if (oesProgram != 0) {
+            GLES20.glDeleteProgram(oesProgram)
+            oesProgram = 0
+        }
+    }
+
+    private fun uploadPendingLut() {
+        val bitmap = pendingLut ?: return
+        pendingLut = null
+        if (bitmap.isRecycled) return
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        lutReady = true
+
     }
 
     private fun uploadPendingBitmap() {
@@ -274,6 +800,64 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             }
         """
 
+        private const val OES_FRAGMENT_SHADER = """
+            #extension GL_OES_EGL_image_external : require
+            precision highp float;
+            varying vec2 vTexCoord;
+            uniform samplerExternalOES uTexture;
+            uniform sampler2D uLut;
+            uniform float uHasLut;
+            uniform mat4 uStMatrix;
+            uniform mat3 uTexTransform;
+            uniform vec2 uViewSize;
+            uniform vec2 uTexSize;
+            uniform float uIntensity;
+
+            vec3 applyLut(vec3 texColor) {
+                float blueColor = texColor.b * 63.0;
+                vec2 quad1;
+                quad1.y = floor(floor(blueColor) / 8.0);
+                quad1.x = floor(blueColor) - (quad1.y * 8.0);
+                vec2 quad2;
+                quad2.y = floor(ceil(blueColor) / 8.0);
+                quad2.x = ceil(blueColor) - (quad2.y * 8.0);
+                vec2 texPos1;
+                texPos1.x = (quad1.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
+                texPos1.y = (quad1.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
+                vec2 texPos2;
+                texPos2.x = (quad2.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
+                texPos2.y = (quad2.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
+                vec4 newColor1 = texture2D(uLut, texPos1);
+                vec4 newColor2 = texture2D(uLut, texPos2);
+                return mix(newColor1, newColor2, fract(blueColor)).rgb;
+            }
+
+            // Same as PreviewView FILL_CENTER: fill the view, crop overflow, keep aspect.
+            vec2 fillCenter(vec2 uv) {
+                float viewAspect = uViewSize.x / max(uViewSize.y, 1.0);
+                float texAspect = uTexSize.x / max(uTexSize.y, 1.0);
+                if (texAspect > viewAspect) {
+                    float s = viewAspect / texAspect;
+                    return vec2(uv.x * s + (1.0 - s) * 0.5, uv.y);
+                } else {
+                    float s = texAspect / viewAspect;
+                    return vec2(uv.x, uv.y * s + (1.0 - s) * 0.5);
+                }
+            }
+
+            void main() {
+                vec2 d = fillCenter(vTexCoord);
+                vec2 uv = (uTexTransform * vec3(d, 1.0)).xy;
+                vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
+                vec3 col = texture2D(uTexture, st).rgb;
+                if (uHasLut > 0.5) {
+                    vec3 graded = applyLut(clamp(col, 0.0, 1.0));
+                    col = mix(col, graded, clamp(uIntensity, 0.0, 1.0));
+                }
+                gl_FragColor = vec4(col, 1.0);
+            }
+        """
+
         private const val FRAGMENT_SHADER = """
             precision highp float;
             varying vec2 vTexCoord;
@@ -288,6 +872,29 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform vec4 uLipRect;
             uniform float uBeauty;
             uniform float uIntensity;
+            uniform sampler2D uLut;
+            uniform float uHasLut;
+
+            // 512x512 lookup LUT sampling (8x8 tiles of 64x64 = 64^3 cube).
+            // Mirrors LutStore.kt so live preview and the baked photo match.
+            vec3 applyLut(vec3 texColor) {
+                float blueColor = texColor.b * 63.0;
+                vec2 quad1;
+                quad1.y = floor(floor(blueColor) / 8.0);
+                quad1.x = floor(blueColor) - (quad1.y * 8.0);
+                vec2 quad2;
+                quad2.y = floor(ceil(blueColor) / 8.0);
+                quad2.x = ceil(blueColor) - (quad2.y * 8.0);
+                vec2 texPos1;
+                texPos1.x = (quad1.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
+                texPos1.y = (quad1.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
+                vec2 texPos2;
+                texPos2.x = (quad2.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
+                texPos2.y = (quad2.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
+                vec4 newColor1 = texture2D(uLut, texPos1);
+                vec4 newColor2 = texture2D(uLut, texPos2);
+                return mix(newColor1, newColor2, fract(blueColor)).rgb;
+            }
 
             vec2 centerCrop(vec2 uv) {
                 float viewAspect = uViewSize.x / uViewSize.y;
@@ -408,7 +1015,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     col = smoothSkin(tc, uTexSize, col, uBeauty);
                 }
 
-                if (uFilterType == 4) { // Beauty / skin smooth
+                if (uHasLut > 0.5) {
+                    // Professional path: sample the color grade from the LUT.
+                    col = applyLut(clamp(col, 0.0, 1.0));
+                } else if (uFilterType == 4) { // Beauty / skin smooth
                     vec3 b = pow(col, vec3(0.90));
                     b = mix(b, b + vec3(0.04, 0.03, 0.03), 0.55);
                     b = mix(b, vec3(luma(b)), 0.04);

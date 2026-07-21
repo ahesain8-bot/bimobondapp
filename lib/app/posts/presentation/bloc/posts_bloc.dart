@@ -153,7 +153,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     );
     result.fold(
       (failure) => emit(PostsFailure(failure.message)),
-      (_) => emit(LikePostSuccess(event.postId)),
+      (_) => emit(LikePostSuccess(event.postId, liked: event.liked)),
     );
   }
 

@@ -3,7 +3,9 @@ import 'dart:ui';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_bar_utils.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Shared blurred app bar for home tabs (auctions, messages) and chat.
 class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -35,6 +37,7 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final overlay = appContentSystemUiOverlayStyle(theme.brightness);
 
     final titleContent = titleWidget ??
         Text(
@@ -68,26 +71,30 @@ class HomeTabAppBar extends StatelessWidget implements PreferredSizeWidget {
               )
             : null);
 
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: MessagesLayoutConstants.appBarBlurSigma,
-          sigmaY: MessagesLayoutConstants.appBarBlurSigma,
-        ),
-        child: AppBar(
-          backgroundColor: theme.scaffoldBackgroundColor.withValues(
-            alpha: MessagesLayoutConstants.appBarBackgroundAlpha,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlay,
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: MessagesLayoutConstants.appBarBlurSigma,
+            sigmaY: MessagesLayoutConstants.appBarBlurSigma,
           ),
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          toolbarHeight: MessagesLayoutConstants.appBarHeight,
-          titleSpacing: 0,
-          automaticallyImplyLeading: false,
-          leading: balancedLeading,
-          centerTitle: centerTitle,
-          title: centerTitle ? Center(child: titleContent) : titleContent,
-          actions: trailingActions,
-          bottom: showBottomDivider ? const AppBarBottomDivider() : null,
+          child: AppBar(
+            backgroundColor: theme.scaffoldBackgroundColor.withValues(
+              alpha: MessagesLayoutConstants.appBarBackgroundAlpha,
+            ),
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            systemOverlayStyle: overlay,
+            toolbarHeight: MessagesLayoutConstants.appBarHeight,
+            titleSpacing: 0,
+            automaticallyImplyLeading: false,
+            leading: balancedLeading,
+            centerTitle: centerTitle,
+            title: centerTitle ? Center(child: titleContent) : titleContent,
+            actions: trailingActions,
+            bottom: showBottomDivider ? const AppBarBottomDivider() : null,
+          ),
         ),
       ),
     );

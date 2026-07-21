@@ -8,7 +8,9 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/gallery_ar_effects_layer.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
+import 'package:bimobondapp/core/utils/video_trim_segment.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
@@ -23,10 +25,25 @@ class MediaStudioPreview extends StatefulWidget {
     this.arFilterId = 'none',
     this.arFilterIntensity = 1.0,
     this.applyArColorPreview = true,
+    this.paused = false,
+    this.muted = false,
+    this.trimSegments = const [],
   });
 
   final File file;
   final bool isVideo;
+
+  /// Pauses video playback (e.g. while a sub-editor like Trim/Text is open on
+  /// top) so its audio doesn't play behind the other screen.
+  final bool paused;
+
+  /// Mutes video audio (e.g. a second preview instance behind the text editor).
+  final bool muted;
+
+  /// Kept ranges of the clip (from the Trim editor). When non-empty the preview
+  /// plays only these ranges — trimmed-out parts are skipped — so what you see
+  /// matches the exported result.
+  final List<VideoTrimSegment> trimSegments;
   final AwesomeFilter? filter;
   final CameraEffectDefinition? effect;
 
@@ -76,6 +93,53 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         oldWidget.effect?.slug != widget.effect?.slug) {
       setState(() {});
     }
+
+    if (oldWidget.paused != widget.paused ||
+        oldWidget.muted != widget.muted) {
+      final controller = _videoController;
+      if (controller != null && controller.value.isInitialized) {
+        if (oldWidget.muted != widget.muted) {
+          controller.setVolume(widget.muted ? 0 : 1);
+        }
+        if (oldWidget.paused != widget.paused) {
+          if (widget.paused) {
+            controller.pause();
+          } else {
+            controller.play();
+          }
+        }
+      }
+    }
+
+    if (!listEquals(oldWidget.trimSegments, widget.trimSegments)) {
+      final controller = _videoController;
+      if (controller != null &&
+          controller.value.isInitialized &&
+          widget.trimSegments.isNotEmpty) {
+        controller.seekTo(widget.trimSegments.first.start);
+      }
+    }
+  }
+
+  /// Skips trimmed-out gaps during playback so the preview matches the export.
+  void _enforceTrim() {
+    final controller = _videoController;
+    final ranges = widget.trimSegments;
+    if (controller == null ||
+        ranges.isEmpty ||
+        !controller.value.isInitialized ||
+        !controller.value.isPlaying) {
+      return;
+    }
+    final pos = controller.value.position;
+    final inRange = ranges.any((s) => pos >= s.start && pos < s.end);
+    if (!inRange) {
+      final next = ranges.firstWhere(
+        (s) => s.start > pos,
+        orElse: () => ranges.first,
+      );
+      controller.seekTo(next.start);
+    }
   }
 
   Future<void> _initVideo() async {
@@ -108,6 +172,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
     }
 
     controller.addListener(onUpdate);
+    controller.addListener(_enforceTrim);
 
     try {
       await controller.initialize();
@@ -116,8 +181,12 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         return;
       }
       await controller.setLooping(true);
-      await controller.setVolume(1);
+      await controller.setVolume(widget.muted ? 0 : 1);
+      if (widget.trimSegments.isNotEmpty) {
+        await controller.seekTo(widget.trimSegments.first.start);
+      }
       await controller.play();
+      if (widget.paused) await controller.pause();
       setState(() {
         _mediaSize = controller.value.size;
         _isVideoLoading = false;
@@ -226,6 +295,8 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
           errorBuilder: (_, _, _) => const ColoredBox(
             color: Colors.black,
             child: Center(

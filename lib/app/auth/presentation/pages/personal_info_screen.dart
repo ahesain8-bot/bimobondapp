@@ -69,7 +69,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
     final authState = context.read<AuthBloc>().state;
     if (widget.user != null) {
-      _fullNameController.text = widget.user!.fullName ?? '';
+      _fullNameController.text =
+          ProfileFullName.clamp(widget.user!.fullName ?? '');
       _usernameController.text = widget.user!.username ?? '';
       _bioController.text = widget.user!.bio ?? '';
       _setPhoneData(widget.user!.phoneNumber);
@@ -78,7 +79,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       _selectedGender = widget.user!.gender;
       _selectedCountry = widget.user!.country;
     } else if (authState is AuthSuccess) {
-      _fullNameController.text = authState.user.fullName ?? '';
+      _fullNameController.text =
+          ProfileFullName.clamp(authState.user.fullName ?? '');
       _usernameController.text = authState.user.username ?? '';
       _bioController.text = authState.user.bio ?? '';
       _setPhoneData(authState.user.phoneNumber);
@@ -117,23 +119,60 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         : bioText;
 
     final data = <String, dynamic>{
-      'fullName': _fullNameController.text.trim(),
+      'fullName': ProfileFullName.clamp(_fullNameController.text),
       'username': _usernameController.text.trim(),
       'bio': cappedBio,
       'gender': _selectedGender,
       'country': _selectedCountry,
       'phoneNumber': fullPhoneNumber,
-      'instagramUrl': _instagramController.text.trim().isEmpty
-          ? null
-          : _instagramController.text.trim(),
-      'youtubeUrl': _youtubeController.text.trim().isEmpty
-          ? null
-          : _youtubeController.text.trim(),
+      // Accept username or full link — no client URL-format validation.
+      'instagramUrl': _normalizeSocialLink(
+        _instagramController.text,
+        fallbackHost: 'instagram.com',
+      ),
+      'youtubeUrl': _normalizeSocialLink(
+        _youtubeController.text,
+        fallbackHost: 'youtube.com',
+        youtubeStyle: true,
+      ),
     };
 
     data.removeWhere((key, value) => value == null);
 
     context.read<AuthBloc>().add(UpdateProfileRequestedEvent(data));
+  }
+
+  /// Allows free text on Instagram/YouTube fields.
+  /// If the user already pasted a link, keep it; otherwise build a safe URL
+  /// so backend URL validators don't reject plain usernames.
+  String? _normalizeSocialLink(
+    String raw, {
+    required String fallbackHost,
+    bool youtubeStyle = false,
+  }) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    final lower = trimmed.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      return trimmed;
+    }
+
+    var handle = trimmed;
+    if (handle.startsWith('@')) {
+      handle = handle.substring(1).trim();
+    }
+    if (handle.isEmpty) return null;
+
+    // Already a domain path without scheme.
+    if (handle.contains(fallbackHost) || handle.contains('/')) {
+      return 'https://${handle.replaceFirst(RegExp(r'^/+'), '')}';
+    }
+
+    if (youtubeStyle) {
+      return 'https://$fallbackHost/@$handle';
+    }
+    return 'https://$fallbackHost/$handle';
   }
 
   void _showGenderPicker(AppLocalizations l10n) {
@@ -150,7 +189,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       context,
       l10n: l10n,
       selectedCountry: _selectedCountry,
-      onSelected: (country) => setState(() => _selectedCountry = country),
+      onSelected: (country) {
+        setState(() {
+          _selectedCountry = country;
+          final dial = dialCodeForPersonalInfoCountry(country);
+          if (dial != null) {
+            _selectedCountryCode = dial;
+          }
+        });
+      },
     );
   }
 
@@ -170,7 +217,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             context,
             l10n.profileUpdatedSuccessfully,
           );
-          context.pop();
+          if (context.canPop()) {
+            context.pop();
+          }
         } else if (state is AuthFailure) {
           setState(() => _isUpdating = false);
           final message = state.messageKey != null
@@ -207,7 +256,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             onSavePressed: _saveProfile,
             onChangePhotoTap: () => context.pushNamed('change_avatar'),
             onCountryCodeChanged: (code) {
-              setState(() => _selectedCountryCode = code);
+              setState(() {
+                _selectedCountryCode = code;
+                final country = personalInfoCountryForDialCode(code);
+                if (country != null) {
+                  _selectedCountry = country;
+                }
+              });
             },
             onGenderTap: () => _showGenderPicker(l10n),
             onCountryTap: () => _showCountryPicker(l10n),

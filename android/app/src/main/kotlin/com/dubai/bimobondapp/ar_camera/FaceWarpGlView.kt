@@ -2,8 +2,12 @@ package com.dubai.bimobondapp.ar_camera
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.SurfaceTexture
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
+import android.view.Surface
 
 class FaceWarpGlView @JvmOverloads constructor(
     context: Context,
@@ -12,14 +16,49 @@ class FaceWarpGlView @JvmOverloads constructor(
 
     private val renderer = FaceWarpRenderer()
     private var glInitialized = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    @Volatile
+    private var cameraSurfaceTexture: SurfaceTexture? = null
+
+    @Volatile
+    var onCameraSurfaceReady: ((SurfaceTexture) -> Unit)? = null
 
     fun ensureGlInitialized() {
         if (glInitialized) return
         glInitialized = true
+        renderer.onCameraSurfaceReady = { st ->
+            cameraSurfaceTexture = st
+
+            st.setOnFrameAvailableListener { requestRender() }
+            mainHandler.post { onCameraSurfaceReady?.invoke(st) }
+        }
         setEGLContextClientVersion(2)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
+    }
+
+    fun cameraSurfaceTexture(): SurfaceTexture? = cameraSurfaceTexture
+
+    fun setOesEnabled(enabled: Boolean) {
+        ensureGlInitialized()
+        queueEvent { renderer.oesEnabled = enabled }
+        requestRender()
+    }
+
+    fun isOesEnabled(): Boolean = renderer.oesEnabled
+
+    fun setCameraTransform(rotationDegrees: Int, frontMirror: Boolean, bufW: Int, bufH: Int) {
+        renderer.setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
+    }
+
+    fun setLutIntensity(intensity: Float) {
+        renderer.lutIntensity = intensity
+    }
+
+    fun setOnFramePresented(callback: (() -> Unit)?) {
+        renderer.onFramePresented = callback
     }
 
     fun submitFrame(bitmap: Bitmap) {
@@ -35,6 +74,14 @@ class FaceWarpGlView @JvmOverloads constructor(
         queueEvent {
             renderer.setWarpParams(params)
         }
+    }
+
+    fun submitLut(bitmap: Bitmap?) {
+        ensureGlInitialized()
+        queueEvent {
+            renderer.setLut(bitmap)
+        }
+        requestRender()
     }
 
     fun setRenderModeSafe(mode: Int) {
@@ -55,13 +102,49 @@ class FaceWarpGlView @JvmOverloads constructor(
     }
 
     fun setCaptureEnabled(enabled: Boolean) {
+
         ensureGlInitialized()
-        queueEvent {
-            renderer.captureEnabled = enabled
-        }
+        renderer.captureEnabled = enabled
     }
 
-    /** Thread-safe copy of the last GPU-filtered frame (null if none yet). */
+    fun takeLastFilteredFrame(): Bitmap? {
+        if (!glInitialized) return null
+        return renderer.takeLastCapturedFrame()
+    }
+
+    fun setCaptureMaxEdge(maxEdge: Int) {
+        renderer.captureMaxEdge = maxEdge.coerceAtLeast(2)
+    }
+
+    fun setEncoderSurface(surface: Surface?, width: Int, height: Int) {
+        ensureGlInitialized()
+        queueEvent {
+            renderer.setEncoderTarget(surface, width, height)
+        }
+        requestRender()
+    }
+
+    fun clearEncoderSurface(onDone: (() -> Unit)? = null) {
+        if (!glInitialized) {
+            onDone?.invoke()
+            return
+        }
+        queueEvent {
+            renderer.setEncoderTarget(null, 0, 0)
+            if (onDone != null) mainHandler.post(onDone)
+        }
+        requestRender()
+    }
+
+    fun requestCaptureNow() {
+        ensureGlInitialized()
+        queueEvent {
+            renderer.captureEnabled = true
+            renderer.forceCaptureNextFrame = true
+        }
+        requestRender()
+    }
+
     fun copyLastFilteredFrame(): Bitmap? {
         if (!glInitialized) return null
         return renderer.copyLastCapturedFrame()

@@ -79,10 +79,12 @@ class PostsFailure extends PostsState {
 
 class LikePostSuccess extends PostsState {
   final String postId;
-  const LikePostSuccess(this.postId);
+  final bool liked;
+
+  const LikePostSuccess(this.postId, {required this.liked});
 
   @override
-  List<Object?> get props => [postId];
+  List<Object?> get props => [postId, liked];
 }
 
 class SavePostSuccess extends PostsState {

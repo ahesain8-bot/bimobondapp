@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 
@@ -47,9 +48,10 @@ class AuctionItem {
     final now = DateTime.now().toUtc();
     final startedAt = auction.startedAt.toUtc();
     final endedAt = auction.endedAt.toUtc();
-    final isLive = !startedAt.isAfter(now) && endedAt.isAfter(now);
-    final isEnded = !endedAt.isAfter(now);
-    final countdown = formatAuctionCountdown(now, startedAt, endedAt);
+    final isEnded = AuctionSearchFilters.isPostEnded(post);
+    final isLive = AuctionSearchFilters.isPostLive(post);
+    final countdown =
+        isEnded ? null : formatAuctionCountdown(now, startedAt, endedAt);
     final owner = post.user;
     final ownerHandle = owner?.username.trim();
     final hasOwnerHandle =

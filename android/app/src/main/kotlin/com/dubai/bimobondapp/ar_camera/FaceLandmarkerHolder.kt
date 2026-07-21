@@ -6,7 +6,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Process-wide face landmarker kept warm so AR camera opens quickly. */
 object FaceLandmarkerHolder {
 
     private const val TAG = "FaceLandmarkerHolder"
@@ -36,8 +35,7 @@ object FaceLandmarkerHolder {
                 ready.set(true)
                 Log.i(TAG, "Face landmarker ready")
             } catch (t: Throwable) {
-                // UnsatisfiedLinkError / LinkageError are Errors, not Exceptions —
-                // catching only Exception crashes the whole process.
+
                 Log.e(TAG, "Face landmarker warmup failed; AR face effects disabled", t)
                 unavailable.set(true)
                 warmupStarted.set(false)

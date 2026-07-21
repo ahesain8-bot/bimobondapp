@@ -3,6 +3,7 @@ import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/attachment_grid_menu_item.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -179,7 +180,7 @@ class ChatSheets {
             return Center(
               child: GestureDetector(
                 onTap: () {
-                  messageController.text += emoji;
+                  TagTextEditing.insertText(messageController, emoji);
                   onEmojiInserted();
                   Navigator.pop(context);
                 },

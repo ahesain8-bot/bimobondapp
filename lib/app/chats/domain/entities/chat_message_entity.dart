@@ -17,10 +17,7 @@ enum ChatMessageType {
 }
 
 class ChatMessageReactionEntity extends Equatable {
-  const ChatMessageReactionEntity({
-    required this.userId,
-    required this.emoji,
-  });
+  const ChatMessageReactionEntity({required this.userId, required this.emoji});
 
   final String userId;
   final String emoji;
@@ -70,21 +67,21 @@ class ChatMessageEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        chatId,
-        senderId,
-        type,
-        content,
-        mediaUrl,
-        replyToId,
-        sharedPostId,
-        sharedPost,
-        payload,
-        poll,
-        createdAt,
-        readByUserIds,
-        reactions,
-        isDeleted,
-        replyPreview,
-      ];
+    id,
+    chatId,
+    senderId,
+    type,
+    content,
+    mediaUrl,
+    replyToId,
+    sharedPostId,
+    sharedPost,
+    payload,
+    poll,
+    createdAt,
+    readByUserIds,
+    reactions,
+    isDeleted,
+    replyPreview,
+  ];
 }

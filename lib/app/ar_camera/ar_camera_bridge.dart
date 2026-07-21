@@ -29,15 +29,27 @@ class ArCameraBridge {
     });
   }
 
-  static Future<String?> takePhoto() async {
+  static Future<String?> takePhoto({
+    int? letterboxTopPx,
+    int? letterboxBottomPx,
+  }) async {
     final path = await _channel
-        .invokeMethod<String>('takePhoto')
+        .invokeMethod<String>('takePhoto', {
+          if (letterboxTopPx != null) 'letterboxTopPx': letterboxTopPx,
+          if (letterboxBottomPx != null) 'letterboxBottomPx': letterboxBottomPx,
+        })
         .timeout(const Duration(seconds: 10));
     return path;
   }
 
-  static Future<void> startRecording() async {
-    await _channel.invokeMethod<void>('startRecording');
+  static Future<void> startRecording({
+    int? letterboxTopPx,
+    int? letterboxBottomPx,
+  }) async {
+    await _channel.invokeMethod<void>('startRecording', {
+      if (letterboxTopPx != null) 'letterboxTopPx': letterboxTopPx,
+      if (letterboxBottomPx != null) 'letterboxBottomPx': letterboxBottomPx,
+    });
   }
 
   static Future<String?> stopRecording() async {
@@ -54,9 +66,81 @@ class ArCameraBridge {
     return path;
   }
 
-  /// Toggles front ↔ back. Returns whether the active camera is front.
   static Future<bool> flipCamera() async {
     final isFront = await _channel.invokeMethod<bool>('flipCamera');
     return isFront ?? true;
+  }
+
+  static Future<bool> toggleTorch() async {
+    final enabled = await _channel.invokeMethod<bool>('toggleTorch');
+    return enabled ?? false;
+  }
+
+  static Future<void> setPreviewLetterbox({
+    required int topPx,
+    required int bottomPx,
+  }) async {
+    await _channel.invokeMethod<void>('setPreviewLetterbox', {
+      'topPx': topPx,
+      'bottomPx': bottomPx,
+    });
+  }
+
+  static Future<void> setZoom(double zoom) async {
+    await _channel.invokeMethod<void>('setZoom', {
+      'zoom': zoom.clamp(0.0, 1.0),
+    });
+  }
+
+  static void playCountdownTick({bool isFinal = false}) {
+    unawaited(
+      _channel
+          .invokeMethod<void>('playCountdownTick', {'isFinal': isFinal})
+          .catchError((_) {}),
+    );
+  }
+
+  static Future<String?> applyColorLut({
+    required String path,
+    required String filter,
+    double intensity = 1.0,
+    int? maxEdge,
+  }) async {
+    final out = await _channel.invokeMethod<String>('applyColorLut', {
+      'path': path,
+      'filter': filter,
+      'intensity': intensity.clamp(0.0, 1.0),
+      if (maxEdge != null) 'maxEdge': maxEdge,
+    });
+    return out;
+  }
+
+  static Future<String?> applyBeauty({
+    required String path,
+    int saturationLevel = 0,
+    int brightnessLevel = 0,
+    int contrastLevel = 0,
+    int exposureLevel = 0,
+    int whiteBalanceLevel = 0,
+    int highlightsLevel = 0,
+    int shadowsLevel = 0,
+    int noseLevel = 0,
+    int jawLevel = 0,
+    int? maxEdge,
+  }) async {
+    final out = await _channel.invokeMethod<String>('applyBeauty', {
+      'path': path,
+      'saturationLevel': saturationLevel.clamp(-100, 100),
+      'brightnessLevel': brightnessLevel.clamp(-100, 100),
+      'contrastLevel': contrastLevel.clamp(-100, 100),
+      'exposureLevel': exposureLevel.clamp(-100, 100),
+      'whiteBalanceLevel': whiteBalanceLevel.clamp(-100, 100),
+      'highlightsLevel': highlightsLevel.clamp(-100, 100),
+      'shadowsLevel': shadowsLevel.clamp(-100, 100),
+      'noseLevel': noseLevel.clamp(-100, 100),
+      'jawLevel': jawLevel.clamp(-100, 100),
+      if (maxEdge != null) 'maxEdge': maxEdge,
+    });
+    return out;
   }
 }

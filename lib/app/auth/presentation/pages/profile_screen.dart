@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
@@ -17,8 +17,10 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -255,6 +257,43 @@ class _ProfileScreenState extends State<ProfileScreen>
     tab.hasReachedMax = false;
   }
 
+  void _onLikePostSuccess(LikePostSuccess state) {
+    final likedTab = _tabPosts[ProfileLayoutConstants.likedTabIndex];
+
+    // Keep like flags in sync across every loaded profile tab.
+    for (final tab in _tabPosts) {
+      for (var i = 0; i < tab.posts.length; i++) {
+        final post = tab.posts[i];
+        if (post.id != state.postId) continue;
+        final nextCount = state.liked
+            ? post.likeCount + (post.isLiked ? 0 : 1)
+            : (post.likeCount - (post.isLiked ? 1 : 0)).clamp(0, 1 << 30).toInt();
+        tab.posts[i] = post.copyWith(
+          isLiked: state.liked,
+          likeCount: nextCount,
+        );
+      }
+    }
+
+    if (state.liked) {
+      // Newly liked — force a refresh next time / immediately if on likes tab.
+      likedTab.posts.clear();
+      likedTab.page = 1;
+      likedTab.hasReachedMax = false;
+      if (_selectedTabIndex == ProfileLayoutConstants.likedTabIndex) {
+        setState(() => likedTab.isInitialLoading = true);
+        _fetchUserPosts(refresh: true);
+      } else {
+        setState(() {});
+      }
+      return;
+    }
+
+    // Unliked — drop from the likes grid immediately.
+    likedTab.posts.removeWhere((post) => post.id == state.postId);
+    setState(() {});
+  }
+
   Future<void> _onPullToRefresh() async {
     final tab = _tabPosts[_selectedTabIndex];
     _pullRefreshCompleter = Completer<void>();
@@ -344,6 +383,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               tab.isInitialLoading = tab.posts.isEmpty;
               _fetchUserPosts(refresh: true);
             }
+          } else if (state is LikePostSuccess) {
+            _onLikePostSuccess(state);
           } else if (state is SavePostSuccess) {
             final savedTab = _tabPosts[ProfileLayoutConstants.savedTabIndex];
             savedTab.posts.clear();
@@ -372,11 +413,11 @@ class _ProfileScreenState extends State<ProfileScreen>
 
             final user = authState.user;
             final theme = Theme.of(context);
-            final screenBackground = theme.brightness == Brightness.light
-                ? Colors.white
-                : theme.scaffoldBackgroundColor;
+            final screenBackground = theme.scaffoldBackgroundColor;
 
-            return Scaffold(
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: appContentSystemUiOverlayStyle(theme.brightness),
+              child: Scaffold(
               backgroundColor: screenBackground,
               body: SafeArea(
                 bottom: false,
@@ -445,6 +486,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
               ),
+            ),
             );
           },
         ),

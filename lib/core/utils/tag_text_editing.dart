@@ -6,15 +6,28 @@ class TagTextEditing {
 
   static void insertToken(TextEditingController controller, String token) {
     assert(token == '@' || token == '#');
+    insertText(controller, token);
+  }
+
+  /// Inserts [value] at the current cursor (or replaces the selection).
+  static void insertText(TextEditingController controller, String value) {
+    if (value.isEmpty) return;
     final text = controller.text;
     final selection = controller.selection;
-    final offset = selection.isValid ? selection.baseOffset : text.length;
-    final safeOffset = offset.clamp(0, text.length);
+    final int start;
+    final int end;
+    if (selection.isValid) {
+      start = selection.start.clamp(0, text.length);
+      end = selection.end.clamp(0, text.length);
+    } else {
+      start = text.length;
+      end = text.length;
+    }
 
-    final newText = text.replaceRange(safeOffset, safeOffset, token);
+    final newText = text.replaceRange(start, end, value);
     controller.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: safeOffset + token.length),
+      selection: TextSelection.collapsed(offset: start + value.length),
     );
   }
 

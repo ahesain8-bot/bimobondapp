@@ -164,28 +164,31 @@ class _MediaStudioSideRailState extends State<MediaStudioSideRail> {
         end: isRtl ? 0 : 10,
         start: isRtl ? 10 : 0,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final tool in visible)
-            _SideRailButton(
-              tool: tool,
-              showLabel: widget.showLabels,
-              onTap: tool.onTap,
-            ),
-          if (hasMore)
-            _SideRailButton(
-              tool: MediaStudioSideTool(
-                icon: _expanded
-                    ? LucideIcons.chevronUp
-                    : LucideIcons.chevronDown,
-                label: '',
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final tool in visible)
+              _SideRailButton(
+                tool: tool,
+                showLabel: widget.showLabels,
+                onTap: tool.onTap,
+              ),
+            if (hasMore)
+              _SideRailButton(
+                tool: MediaStudioSideTool(
+                  icon: _expanded
+                      ? LucideIcons.chevronUp
+                      : LucideIcons.chevronDown,
+                  label: '',
+                  onTap: () => setState(() => _expanded = !_expanded),
+                ),
+                showLabel: false,
                 onTap: () => setState(() => _expanded = !_expanded),
               ),
-              showLabel: false,
-              onTap: () => setState(() => _expanded = !_expanded),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -357,7 +360,10 @@ class MediaStudioClipDock extends StatelessWidget {
                             ),
                           ),
                           clipBehavior: Clip.antiAlias,
-                          child: _DockThumb(file: item.file, isVideo: item.isVideo),
+                          child: _DockThumb(
+                            file: item.file,
+                            isVideo: item.isVideo,
+                          ),
                         ),
                       );
                     },
@@ -374,7 +380,11 @@ class MediaStudioClipDock extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(LucideIcons.plus, color: Colors.white, size: 18),
+                  child: const Icon(
+                    LucideIcons.plus,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -510,10 +520,7 @@ class _PillButton extends StatelessWidget {
           height: 48,
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Opacity(
-            opacity: onTap == null ? 0.5 : 1,
-            child: child,
-          ),
+          child: Opacity(opacity: onTap == null ? 0.5 : 1, child: child),
         ),
       ),
     );

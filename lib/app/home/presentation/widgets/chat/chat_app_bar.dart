@@ -2,9 +2,11 @@ import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -33,8 +35,11 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    final overlay = appContentSystemUiOverlayStyle(theme.brightness);
 
-    return Directionality(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlay,
+      child: Directionality(
       textDirection: TextDirection.ltr,
       child: Material(
         color: theme.scaffoldBackgroundColor,
@@ -138,6 +143,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

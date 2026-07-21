@@ -5,10 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class WalletGlassStyle {
-  const WalletGlassStyle._({
-    required this.isDark,
-    required this.colorScheme,
-  });
+  const WalletGlassStyle._({required this.isDark, required this.colorScheme});
 
   factory WalletGlassStyle.of(BuildContext context) {
     final theme = Theme.of(context);
@@ -37,9 +34,8 @@ class WalletGlassStyle {
       ? Colors.white.withValues(alpha: 0.12)
       : colorScheme.outlineVariant.withValues(alpha: 0.4);
 
-  Color get sheetFill => isDark
-      ? const Color(0xE6141414)
-      : Colors.white.withValues(alpha: 0.92);
+  Color get sheetFill =>
+      isDark ? const Color(0xE6141414) : Colors.white.withValues(alpha: 0.92);
 
   Color get sheetBorder => isDark
       ? Colors.white.withValues(alpha: 0.12)
@@ -133,10 +129,7 @@ class WalletGlassTextField extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 6, left: 4),
                 child: Text(
                   field.errorText!,
-                  style: TextStyle(
-                    color: AppTheme.errorAccent,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: AppTheme.errorAccent, fontSize: 12),
                 ),
               ),
           ],
@@ -163,8 +156,7 @@ class WalletGlassPrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = WalletGlassStyle.of(context);
-    final backgroundColor =
-        enabled ? AppTheme.primaryColor : style.surfaceFill;
+    final backgroundColor = enabled ? AppTheme.primaryColor : style.surfaceFill;
     final borderColor = enabled
         ? AppTheme.primaryColor.withValues(alpha: 0.5)
         : style.surfaceBorder;

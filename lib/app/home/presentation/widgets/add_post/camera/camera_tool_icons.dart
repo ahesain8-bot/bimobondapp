@@ -7,8 +7,8 @@ class CameraToolIcons {
 
   static const labelStyle = TextStyle(
     color: Colors.white,
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
     height: 1.1,
     shadows: [
       Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
@@ -153,32 +153,50 @@ class CameraRailToolRow extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.active = false,
+    this.showActiveBadge,
     this.badge,
     this.iconOnStartEdge = true,
+    this.customIcon,
+    this.showLabel = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool active;
+  final bool? showActiveBadge;
   final String? badge;
   /// When true, icon sits on the physical start edge (left rail in RTL).
   final bool iconOnStartEdge;
+  final Widget? customIcon;
+
+  /// Show the text caption beside the icon (used when the rail is expanded).
+  final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
     final iconWidget = Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: CameraToolIcons.circleDecoration(active: active),
-          alignment: Alignment.center,
-          child: Icon(
-            icon,
-            color: active ? Colors.black : Colors.white,
-            size: 20,
+        // Transparent icon — no solid container behind it (TikTok-style). Bold,
+        // pure-white glyph with a soft shadow so it stays legible on any scene.
+        SizedBox(
+          width: 46,
+          height: 46,
+          child: Center(
+            child: customIcon ??
+                Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 30,
+                  shadows: const [
+                    Shadow(
+                      color: Colors.black87,
+                      blurRadius: 10,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
           ),
         ),
         if (badge != null)
@@ -202,7 +220,7 @@ class CameraRailToolRow extends StatelessWidget {
               ),
             ),
           ),
-        if (active)
+        if (showActiveBadge ?? active)
           Positioned(
             right: iconOnStartEdge ? -3 : null,
             left: iconOnStartEdge ? null : -3,
@@ -224,19 +242,28 @@ class CameraRailToolRow extends StatelessWidget {
       ],
     );
 
-    final labelWidget = ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 76),
+    final labelWidget = Flexible(
       child: Text(
         label,
-        style: CameraToolIcons.labelStyle.copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-        maxLines: 2,
+        style: CameraToolIcons.labelStyle.copyWith(fontSize: 13),
+        maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: iconOnStartEdge ? TextAlign.left : TextAlign.right,
       ),
     );
+
+    // Icon hugs the screen edge; the caption (when shown) sits toward center.
+    final rowChildren = <Widget>[
+      if (showLabel && !iconOnStartEdge) ...[
+        labelWidget,
+        const SizedBox(width: 10),
+      ],
+      iconWidget,
+      if (showLabel && iconOnStartEdge) ...[
+        const SizedBox(width: 10),
+        labelWidget,
+      ],
+    ];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -249,9 +276,7 @@ class CameraRailToolRow extends StatelessWidget {
             mainAxisAlignment: iconOnStartEdge
                 ? MainAxisAlignment.start
                 : MainAxisAlignment.end,
-            children: iconOnStartEdge
-                ? [iconWidget, const SizedBox(width: 10), labelWidget]
-                : [labelWidget, const SizedBox(width: 10), iconWidget],
+            children: rowChildren,
           ),
         ),
       ),

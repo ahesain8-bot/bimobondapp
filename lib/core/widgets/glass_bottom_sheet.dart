@@ -23,6 +23,7 @@ class GlassBottomSheet {
       return await showModalBottomSheet<T>(
         context: context,
         isScrollControlled: isScrollControlled,
+        useRootNavigator: true,
         backgroundColor: Colors.transparent,
         barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.55),
         shape: const RoundedRectangleBorder(
@@ -101,6 +102,7 @@ class GlassBottomSheet {
     bool expand = false,
     EdgeInsetsGeometry? padding,
     bool adaptTheme = false,
+    bool lightSurface = false,
   }) {
     return open<T>(
       context,
@@ -111,6 +113,7 @@ class GlassBottomSheet {
           scrollable: scrollable,
           showHandle: showHandle,
           expand: expand,
+          lightSurface: lightSurface,
           child: padding == null ? child : Padding(padding: padding, child: child),
         );
         if (isScrollControlled) {
@@ -119,7 +122,9 @@ class GlassBottomSheet {
             child: body,
           );
         }
-        if (adaptTheme) {
+        if (lightSurface) {
+          // Keep the caller's theme (white surface in light mode).
+        } else if (adaptTheme) {
           body = GlassBottomSheetTheme.wrap(ctx, body);
         }
         return body;
@@ -302,34 +307,42 @@ class _DraggableSheetHostState extends State<_DraggableSheetHost> {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableSheetExtent(
-      controller: _sheetController,
-      minChildSize: widget.minChildSize,
-      maxChildSize: widget.maxChildSize,
-      snapSizes: widget.snapSizes,
-      child: DraggableScrollableSheet(
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      // Lift the whole sheet above the keyboard so pinned footers stay tappable.
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: DraggableSheetExtent(
         controller: _sheetController,
-        initialChildSize: widget.initialChildSize,
         minChildSize: widget.minChildSize,
         maxChildSize: widget.maxChildSize,
-        expand: false,
-        snap: true,
         snapSizes: widget.snapSizes,
-        builder: (context, scrollController) {
-          Widget body = GlassBottomSheetShell(
-            expand: true,
-            showHandle: widget.showHandle,
-            title: widget.title,
-            lightSurface: widget.lightSurface,
-            child: widget.builder(context, scrollController),
-          );
-          if (widget.lightSurface) {
-            // Keep current app theme (white in light, dark surface in dark).
-          } else if (widget.adaptTheme) {
-            body = GlassBottomSheetTheme.wrap(context, body);
-          }
-          return body;
-        },
+        child: DraggableScrollableSheet(
+          controller: _sheetController,
+          initialChildSize: widget.initialChildSize,
+          minChildSize: widget.minChildSize,
+          maxChildSize: widget.maxChildSize,
+          expand: false,
+          snap: true,
+          snapSizes: widget.snapSizes,
+          builder: (context, scrollController) {
+            Widget body = GlassBottomSheetShell(
+              expand: true,
+              showHandle: widget.showHandle,
+              title: widget.title,
+              lightSurface: widget.lightSurface,
+              child: widget.builder(context, scrollController),
+            );
+            if (widget.lightSurface) {
+              // Keep current app theme (white in light, dark surface in dark).
+            } else if (widget.adaptTheme) {
+              body = GlassBottomSheetTheme.wrap(context, body);
+            }
+            return body;
+          },
+        ),
       ),
     );
   }

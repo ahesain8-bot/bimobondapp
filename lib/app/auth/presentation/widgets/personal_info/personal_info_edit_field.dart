@@ -12,6 +12,7 @@ class PersonalInfoEditField extends StatelessWidget {
     required this.hint,
     required this.l10n,
     this.prefix,
+    this.minLines,
     this.maxLines = 1,
     this.maxLength,
     this.isRequired = true,
@@ -23,6 +24,7 @@ class PersonalInfoEditField extends StatelessWidget {
   final String hint;
   final AppLocalizations l10n;
   final String? prefix;
+  final int? minLines;
   final int maxLines;
   final int? maxLength;
   final bool isRequired;
@@ -31,6 +33,7 @@ class PersonalInfoEditField extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isRTL = Directionality.of(context) == TextDirection.rtl;
+    final expandsVertically = maxLines > 1 || (minLines != null && minLines! > 1);
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -43,7 +46,7 @@ class PersonalInfoEditField extends StatelessWidget {
         ),
       ),
       child: Row(
-        crossAxisAlignment: maxLines > 1
+        crossAxisAlignment: expandsVertically || maxLength != null
             ? CrossAxisAlignment.start
             : CrossAxisAlignment.center,
         children: [
@@ -52,45 +55,57 @@ class PersonalInfoEditField extends StatelessWidget {
             child: CustomText(label, fontSize: 15, fontWeight: FontWeight.w500),
           ),
           Expanded(
-            child: TextFormField(
-              controller: controller,
-              maxLines: maxLines,
-              maxLength: maxLength,
-              maxLengthEnforcement: maxLength != null
-                  ? MaxLengthEnforcement.enforced
-                  : null,
-              buildCounter: maxLength != null
-                  ? (
-                      context, {
-                      required currentLength,
-                      required isFocused,
-                      maxLength,
-                    }) => Text(
-                      '$currentLength/$maxLength',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.disabledColor.withValues(alpha: 0.6),
-                      ),
-                    )
-                  : null,
-              style: const TextStyle(fontSize: 15),
-              decoration: InputDecoration(
-                hintText: hint,
-                prefixText: prefix,
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                hintStyle: TextStyle(
-                  color: theme.disabledColor.withValues(alpha: 0.5),
-                  fontSize: 15,
+            child: Directionality(
+              // Usernames / @handles are always LTR so the caret stays correct in Arabic UI.
+              textDirection: prefix != null
+                  ? TextDirection.ltr
+                  : Directionality.of(context),
+              child: TextFormField(
+                controller: controller,
+                minLines: minLines,
+                maxLines: maxLines,
+                maxLength: maxLength,
+                maxLengthEnforcement: maxLength != null
+                    ? MaxLengthEnforcement.enforced
+                    : null,
+                textAlign: prefix != null ? TextAlign.left : TextAlign.start,
+                buildCounter: maxLength != null
+                    ? (
+                        context, {
+                        required currentLength,
+                        required isFocused,
+                        maxLength,
+                      }) => Text(
+                        '$currentLength/$maxLength',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.disabledColor.withValues(alpha: 0.6),
+                        ),
+                      )
+                    : null,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  prefixText: prefix,
+                  prefixStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  hintStyle: TextStyle(
+                    color: theme.disabledColor.withValues(alpha: 0.5),
+                    fontSize: 15,
+                  ),
                 ),
+                validator: (value) {
+                  if (isRequired && (value == null || value.trim().isEmpty)) {
+                    return l10n.fieldIsRequired(label);
+                  }
+                  return null;
+                },
               ),
-              validator: (value) {
-                if (isRequired && (value == null || value.isEmpty)) {
-                  return l10n.fieldIsRequired(label);
-                }
-                return null;
-              },
             ),
           ),
           Icon(

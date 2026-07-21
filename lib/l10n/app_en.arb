@@ -249,8 +249,8 @@
   "enterUsername": "Enter username",
   "addBioToProfile": "Add a bio to your profile",
   "selectGender": "Select gender",
-  "instagramProfileUrl": "Instagram profile URL",
-  "youtubeChannelUrl": "YouTube channel URL",
+  "instagramProfileUrl": "Username or profile link",
+  "youtubeChannelUrl": "Username or channel link",
   "egypt": "Egypt",
   "saudiArabia": "Saudi Arabia",
   "uae": "UAE",
@@ -275,6 +275,7 @@
   "feedLive": "Live",
   "noPostsFound": "No posts found",
   "navHome": "Home",
+  "pressBackAgainToExit": "Press back again to exit",
   "navFriends": "Friends",
   "navAuctions": "Auctions",
   "auctionsSearchHint": "Search auctions...",
@@ -553,8 +554,8 @@
   "navAdd": "Add",
   "navChat": "Chat",
   "navProfile": "Profile",
-  "describePostHint": "Describe your post… use @username and #tag in the text",
-  "addDescriptionHint": "Add description...",
+  "describePostHint": "Add a description...",
+  "addDescriptionHint": "Add a description...",
   "hashtagsLabel": "Hashtags",
   "mentionsLabel": "Mention",
   "whoCanWatchLabel": "Who can view this post",
@@ -620,7 +621,7 @@
   "commentsSortOldest": "Oldest",
   "commentsSortTop": "Top",
   "noCommentsYet": "No comments yet. Be the first!",
-  "addCommentHint": "Add comment… @username to mention",
+  "addCommentHint": "Add a comment...",
   "justNow": "Just now",
   "inboxTimeMinutes": "{count}m",
   "@inboxTimeMinutes": {
@@ -689,6 +690,7 @@
   "postDownloadFailed": "Could not download media",
   "postShareAsGifUnavailable": "GIF share is only available for videos",
   "postShareSheetTitle": "Share post",
+  "postShareSendToTitle": "Send to",
   "postShareSearchUsers": "Search friends and users",
   "postShareNoUsers": "No users found",
   "postShareToApps": "Share to apps",
@@ -710,6 +712,25 @@
       }
     }
   },
+  "postShareSend": "Send",
+  "postShareSendToCount": "Send ({count})",
+  "@postShareSendToCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postShareSentCount": "Sent to {count} people",
+  "@postShareSentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "postQuickShareTitle": "Recent friends",
+  "postQuickShareSubtitle": "Select friends, tap again to cancel, then send",
   "postAddToStoryHint": "Create your story — the post is ready to share",
   "postCreateGroupHint": "Pick contacts to start a group chat",
   "postUpdatedSuccessfully": "Post updated successfully",
@@ -1181,10 +1202,14 @@
   "deleteForEveryone": "Delete for everyone",
   "cameraFlip": "Flip",
   "cameraFlash": "Flash",
+  "cameraSwitch": "Switch camera",
   "cameraSpeed": "Speed",
   "cameraBeauty": "Beauty",
   "cameraFilters": "Filters",
   "cameraTimer": "Timer",
+  "cameraSetCountdown": "Set countdown",
+  "cameraStartCountdown": "Start countdown",
+  "cameraDragRecordingLimit": "Drag to set recording limit",
   "cameraMusic": "Music",
   "cameraEffects": "Effects",
   "cameraUpload": "Upload from library",
@@ -1231,12 +1256,15 @@
   "cameraModeLive": "LIVE",
   "cameraModeText": "Text",
   "cameraAddSound": "Add sound",
+  "cameraMuteOriginalSound": "Mute original sound",
   "cameraLayout": "Layout",
   "cameraAspectRatio": "Ratio",
   "cameraTabPost": "Post",
   "cameraTabCreative": "Creative",
   "cameraDuration10m": "10m",
   "cameraZoom": "Zoom",
+  "cameraZoomOut": "Zoom out",
+  "cameraZoomIn": "Zoom in",
   "cameraGoLive": "Go LIVE",
   "cameraLiveTitleHint": "Add a title",
   "cameraLiveComingSoon": "Live streaming is coming soon.",
@@ -1266,6 +1294,30 @@
   "mediaEditorEdit": "Edit",
   "mediaEditorMore": "More",
   "mediaEditorComingSoon": "Coming soon",
+  "mediaEditorDone": "Done",
+  "mediaEditorTrim": "Trim",
+  "videoEditorSplit": "Split",
+  "videoEditorDeleteSegment": "Delete",
+  "mediaEditorReset": "Reset",
+  "mediaEditorDiscard": "Discard",
+  "mediaEditorSaveDraft": "Save draft",
+  "mediaEditorContinueEditing": "Continue editing",
+  "mediaEditorSendToFriends": "Send to friends",
+  "mediaEditorDiscardTitle": "Discard changes?",
+  "mediaPhotoEditorFace": "Face",
+  "mediaPhotoEditorMakeup": "Makeup",
+  "mediaPhotoEditorMagic": "Magic",
+  "mediaPhotoEditorSmooth": "Smooth",
+  "mediaPhotoEditorSaturation": "Saturation",
+  "mediaPhotoEditorBrightness": "Brightness",
+  "mediaPhotoEditorContrast": "Contrast",
+  "mediaPhotoEditorExposure": "Exposure",
+  "mediaPhotoEditorWhiteBalance": "Warmth",
+  "mediaPhotoEditorHighlights": "Highlights",
+  "mediaPhotoEditorShadows": "Shadows",
+  "mediaPhotoEditorNose": "Nose",
+  "mediaPhotoEditorOn": "On",
+  "mediaTextHint": "Type something",
   "promotePostTitle": "Promote post",
   "promotionScreenTitle": "Promotion",
   "promotePostAction": "Promote",
@@ -1441,12 +1493,30 @@
   "soundTabTrending": "Trending",
   "soundTabBrowse": "Browse",
   "soundTabMine": "My sounds",
+  "soundTabHot": "Hot",
+  "soundTabForYou": "For You",
+  "soundTabFavorites": "Favorites",
+  "soundTabRecent": "Recent",
   "soundPickerEmpty": "No sounds found",
   "soundPickFromFiles": "Pick from files",
+  "soundTrimTooltip": "Trim",
+  "soundFavoriteTooltip": "Favorite",
+  "soundSecondsSelected": "{count}s selected",
+  "@soundSecondsSelected": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "soundUseThis": "Use",
   "soundUseThisSound": "Use this sound",
+  "soundUseSoundCta": "Use sound",
+  "soundSave": "Save",
+  "soundSaved": "Saved",
+  "soundAddToStory": "Add to Story",
+  "soundFindRelatedHint": "Find related content",
+  "soundOriginalBadge": "Original",
   "soundConfirmSelection": "Use selected sound",
-  "soundClearSelection": "Clear",
+  "soundClearSelection": "Remove music",
   "soundDetailTitle": "Sound",
   "soundVideosUsing": "Videos using this sound",
   "soundNoVideosYet": "No videos yet",
@@ -1474,6 +1544,24 @@
       "count": { "type": "String" }
     }
   },
+  "soundPostsCount": "{count} posts",
+  "@soundPostsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "soundPostsCountThousands": "{count}K posts",
+  "@soundPostsCountThousands": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "soundPostsCountMillions": "{count}M posts",
+  "@soundPostsCountMillions": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
   "interestSelectionTitle": "Choose your interests",
   "interestSelectionSubtitle": "Pick a few categories so we can personalize your experience.",
   "interestSelectionSkip": "Skip",
@@ -1496,5 +1584,8 @@
   "interestSelectionInterestedLegend": "Interested",
   "interestSelectionSave": "Save",
   "settingsInterests": "Interests",
-  "retry": "Try again"
+  "retry": "Try again",
+  "seeTranslation": "See translation",
+  "seeOriginal": "See original",
+  "translationFailed": "Could not translate"
 }

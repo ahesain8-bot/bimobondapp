@@ -16,7 +16,7 @@ class QuickCommentReactions extends StatelessWidget {
     '😮',
   ];
 
-  static const double emojiSize = 22;
+  static const double emojiSize = 26;
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +26,12 @@ class QuickCommentReactions extends StatelessWidget {
         return GestureDetector(
           onTap: () => onReactionSelected(emoji),
           behavior: HitTestBehavior.opaque,
-          child: Text(
-            emoji,
-            style: const TextStyle(fontSize: emojiSize, height: 1.1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Text(
+              emoji,
+              style: const TextStyle(fontSize: emojiSize, height: 1.1),
+            ),
           ),
         );
       }).toList(),

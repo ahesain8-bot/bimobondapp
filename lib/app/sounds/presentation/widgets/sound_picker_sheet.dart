@@ -2,45 +2,133 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
-import 'package:bimobondapp/app/sounds/domain/usecases/get_my_sounds_usecase.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/get_sounds_usecase.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/get_trending_sounds_usecase.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/upload_sound_usecase.dart';
-import 'package:bimobondapp/app/sounds/presentation/di/sounds_injector.dart' as sounds_di;
-import 'package:bimobondapp/core/navigation/sound_navigation.dart';
+import 'package:bimobondapp/app/sounds/presentation/di/sounds_injector.dart'
+    as sounds_di;
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_duration_probe.dart';
-import 'package:bimobondapp/app/sounds/presentation/widgets/sound_list_tile.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
-import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_catalog_store.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_pick_result.dart';
+import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_header.dart';
+import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_list.dart';
+import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.dart';
+import 'package:bimobondapp/app/sounds/presentation/widgets/sound_trim_sheet.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class SoundPickerSheet extends StatefulWidget {
   const SoundPickerSheet({
     super.key,
     this.initialSelection,
+    this.allowMuteOnTrim = false,
   });
 
   final SoundEntity? initialSelection;
+  final bool allowMuteOnTrim;
 
-  static Future<SoundEntity?> show(
+  static Future<SoundPickResult?> show(
     BuildContext context, {
     SoundEntity? initialSelection,
+    Duration initialOffset = Duration.zero,
+    Duration? initialWindow,
+    bool allowMuteOnTrim = false,
   }) async {
     await SoundAudioPreview.stop();
     if (!context.mounted) return null;
-    return GlassBottomSheet.showContent<SoundEntity?>(
+
+    // Catalog sheet first. Trim opens AFTER it closes so the check action
+    // is not nested inside another modal (which broke apply on post).
+    final picked = await GlassBottomSheet.open<SoundPickResult?>(
       context,
       isScrollControlled: true,
-      adaptTheme: true,
-      child: SoundPickerSheet(initialSelection: initialSelection),
+      builder: (ctx) => SoundPickerTheme(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: GlassBottomSheetShell(
+            lightSurface: true,
+            expand: false,
+            child: SoundPickerSheet(
+              initialSelection: initialSelection,
+              allowMuteOnTrim: allowMuteOnTrim,
+            ),
+          ),
+        ),
+      ),
     );
+
+    if (picked == null || !context.mounted) {
+      await SoundAudioPreview.stop();
+      return null;
+    }
+    if (picked.cleared) {
+      await SoundAudioPreview.stop();
+      return picked;
+    }
+    final sound = picked.sound;
+    if (sound == null) {
+      await SoundAudioPreview.stop();
+      return null;
+    }
+    if (!picked.needsTrim) {
+      await SoundAudioPreview.stop();
+      return picked;
+    }
+
+    // Wait until the catalog route is fully gone — opening trim in the same
+    // frame drops the first check result (Future completes with null).
+    await _waitForModalSettle(context);
+    if (!context.mounted) {
+      await SoundAudioPreview.stop();
+      return null;
+    }
+
+    // Re-open trim on the same sound restores the last saved period.
+    final restorePeriod = initialSelection?.id == sound.id;
+    final trim = await SoundTrimSheet.show(
+      context,
+      sound: sound,
+      windowLength: restorePeriod
+          ? (initialWindow ?? const Duration(seconds: 15))
+          : const Duration(seconds: 15),
+      initialOffset: restorePeriod ? initialOffset : Duration.zero,
+      allowMute: allowMuteOnTrim,
+      initialMute: picked.muteOriginal,
+    );
+    await SoundAudioPreview.stop();
+    if (!context.mounted) return null;
+    if (trim == null) {
+      // Cancelled trim — keep prior period if we were re-editing it.
+      return SoundPickResult(
+        sound: sound,
+        offset: restorePeriod ? initialOffset : Duration.zero,
+        window: restorePeriod
+            ? (initialWindow ?? const Duration(seconds: 15))
+            : const Duration(seconds: 15),
+      );
+    }
+
+    await SoundLocalCatalogStore.pushRecent(sound);
+    return SoundPickResult(
+      sound: sound,
+      offset: trim.offset,
+      window: trim.window,
+      muteOriginal: trim.muteOriginal,
+      didTrim: true,
+    );
+  }
+
+  /// Lets the previous modal finish popping before another is presented.
+  static Future<void> _waitForModalSettle(BuildContext context) async {
+    await Future<void>.delayed(Duration.zero);
+    if (!context.mounted) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!context.mounted) return;
+    await Future<void>.delayed(const Duration(milliseconds: 120));
   }
 
   @override
@@ -55,14 +143,17 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
 
-  List<SoundEntity> _trending = [];
-  List<SoundEntity> _browse = [];
-  List<SoundEntity> _mine = [];
+  List<SoundEntity> _hot = [];
+  List<SoundEntity> _forYou = [];
+  List<SoundEntity> _favorites = [];
+  List<SoundEntity> _recent = [];
+  final Set<String> _favoriteIds = {};
 
-  bool _loadingTrending = true;
-  bool _loadingBrowse = true;
-  bool _loadingMine = true;
+  bool _loadingHot = true;
+  bool _loadingForYou = true;
+  bool _loadingLocal = true;
   bool _uploading = false;
+  bool _showSearch = false;
 
   SoundEntity? _selected;
   String? _error;
@@ -71,12 +162,12 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   void initState() {
     super.initState();
     _selected = widget.initialSelection;
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_onTabChanged);
     _searchController.addListener(_onSearchChanged);
-    unawaited(_loadTrending());
-    unawaited(_loadBrowse());
-    unawaited(_loadMine());
+    unawaited(_loadHot());
+    unawaited(_loadForYou());
+    unawaited(_loadLocalTabs());
   }
 
   @override
@@ -99,42 +190,42 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     _debounceTimer?.cancel();
     _debounceTimer = Timer(_debounce, () {
       if (_tabController.index == 1) {
-        unawaited(_loadBrowse());
+        unawaited(_loadForYou());
       }
     });
   }
 
-  Future<void> _loadTrending() async {
+  Future<void> _loadHot() async {
     setState(() {
-      _loadingTrending = true;
+      _loadingHot = true;
       _error = null;
     });
     final result = await sounds_di.sl<GetTrendingSoundsUseCase>()(
-      const GetTrendingSoundsParams(limit: 30),
+      const GetTrendingSoundsParams(limit: 40),
     );
     if (!mounted) return;
     result.fold(
       (failure) => setState(() {
-        _loadingTrending = false;
+        _loadingHot = false;
         _error = failure.message;
       }),
       (sounds) => setState(() {
-        _loadingTrending = false;
-        _trending = sounds;
+        _loadingHot = false;
+        _hot = sounds;
       }),
     );
   }
 
-  Future<void> _loadBrowse() async {
+  Future<void> _loadForYou() async {
     setState(() {
-      _loadingBrowse = true;
+      _loadingForYou = true;
       _error = null;
     });
     final query = _searchController.text.trim();
     final result = await sounds_di.sl<GetSoundsUseCase>()(
       GetSoundsParams(
         page: 1,
-        limit: 30,
+        limit: 40,
         search: query.isEmpty ? null : query,
         sort: SoundSort.trending,
       ),
@@ -142,35 +233,29 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     if (!mounted) return;
     result.fold(
       (failure) => setState(() {
-        _loadingBrowse = false;
+        _loadingForYou = false;
         _error = failure.message;
       }),
       (page) => setState(() {
-        _loadingBrowse = false;
-        _browse = page.sounds;
+        _loadingForYou = false;
+        _forYou = page.sounds;
       }),
     );
   }
 
-  Future<void> _loadMine() async {
-    setState(() {
-      _loadingMine = true;
-      _error = null;
-    });
-    final result = await sounds_di.sl<GetMySoundsUseCase>()(
-      const GetMySoundsParams(page: 1, limit: 30),
-    );
+  Future<void> _loadLocalTabs() async {
+    setState(() => _loadingLocal = true);
+    final favorites = await SoundLocalCatalogStore.listFavorites();
+    final recent = await SoundLocalCatalogStore.listRecent();
     if (!mounted) return;
-    result.fold(
-      (failure) => setState(() {
-        _loadingMine = false;
-        _error = failure.message;
-      }),
-      (page) => setState(() {
-        _loadingMine = false;
-        _mine = page.sounds;
-      }),
-    );
+    setState(() {
+      _favorites = favorites;
+      _recent = recent;
+      _favoriteIds
+        ..clear()
+        ..addAll(favorites.map((s) => s.id));
+      _loadingLocal = false;
+    });
   }
 
   Future<void> _pickFromDevice() async {
@@ -206,13 +291,12 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
           setState(() => _uploading = false);
           PopupDialogs.showErrorDialog(context, failure.message);
         },
-        (sound) {
+        (sound) async {
           setState(() {
             _uploading = false;
             _selected = sound;
-            _mine = [sound, ..._mine];
           });
-          Navigator.of(context).pop(sound);
+          await _confirm(sound);
         },
       );
     } catch (e) {
@@ -222,163 +306,172 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     }
   }
 
-  Future<void> _openSoundPage(SoundEntity sound) async {
-    final picked = await openSoundDetail(
-      context,
-      soundId: sound.id,
-      pickMode: true,
-      preview: sound,
+  Future<void> _onSoundTap(SoundEntity sound) async {
+    final alreadySelected = _selected?.id == sound.id;
+    if (alreadySelected) {
+      // Second tap → choose period; check applies sound and closes the sheet.
+      await SoundAudioPreview.stop();
+      if (!mounted) return;
+      Navigator.of(context).pop(SoundPickResult(sound: sound, needsTrim: true));
+      return;
+    }
+
+    setState(() => _selected = sound);
+    unawaited(SoundAudioPreview.toggle(sound.id, sound.resolvedAudioUrl));
+  }
+
+  Future<void> _confirm(
+    SoundEntity sound, {
+    Duration offset = Duration.zero,
+    bool muteOriginal = false,
+    bool didTrim = false,
+  }) async {
+    await SoundAudioPreview.stop();
+    await SoundLocalCatalogStore.pushRecent(sound);
+    if (!mounted) return;
+    Navigator.of(context).pop(
+      SoundPickResult(
+        sound: sound,
+        offset: offset,
+        muteOriginal: muteOriginal,
+        didTrim: didTrim,
+      ),
     );
-    if (!mounted || picked == null) return;
-    Navigator.of(context).pop(picked);
+  }
+
+  /// Scissors: close catalog with [needsTrim]; [show] opens trim next.
+  Future<void> _openTrim(SoundEntity sound) async {
+    await SoundAudioPreview.stop();
+    if (!mounted) return;
+    Navigator.of(context).pop(SoundPickResult(sound: sound, needsTrim: true));
+  }
+
+  Future<void> _clearSelection() async {
+    await SoundAudioPreview.stop();
+    if (!mounted) return;
+    Navigator.of(context).pop(const SoundPickResult.cleared());
+  }
+
+  Future<void> _toggleFavorite(SoundEntity sound) async {
+    final favorited = await SoundLocalCatalogStore.toggleFavorite(sound);
+    if (!mounted) return;
+    setState(() {
+      if (favorited) {
+        _favoriteIds.add(sound.id);
+        _favorites = [sound, ..._favorites.where((s) => s.id != sound.id)];
+      } else {
+        _favoriteIds.remove(sound.id);
+        _favorites = _favorites.where((s) => s.id != sound.id).toList();
+      }
+    });
   }
 
   List<SoundEntity> _currentList() {
     return switch (_tabController.index) {
-      0 => _trending,
-      1 => _browse,
-      _ => _mine,
+      0 => _hot,
+      1 => _forYou,
+      2 => _favorites,
+      _ => _recent,
     };
   }
 
   bool _currentLoading() {
     return switch (_tabController.index) {
-      0 => _loadingTrending,
-      1 => _loadingBrowse,
-      _ => _loadingMine,
+      0 => _loadingHot,
+      1 => _loadingForYou,
+      _ => _loadingLocal,
     };
+  }
+
+  Future<void> _retryCurrent() async {
+    switch (_tabController.index) {
+      case 0:
+        await _loadHot();
+      case 1:
+        await _loadForYou();
+      default:
+        await _loadLocalTabs();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.88;
+    final canRemove = widget.initialSelection != null;
 
-    return SizedBox(
-      height: maxHeight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSizes.p16,
-              AppSizes.p8,
-              AppSizes.p8,
-              AppSizes.p8,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CustomText(
-                    l10n.soundPickerTitle,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Material(
+        color: scheme.surface,
+        child: SizedBox(
+          height: maxHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SoundPickerHeader(
+                tabController: _tabController,
+                showSearch: _showSearch,
+                searchController: _searchController,
+                uploading: _uploading,
+                onToggleSearch: () => setState(() {
+                  _showSearch = !_showSearch;
+                  if (!_showSearch) {
+                    _searchController.clear();
+                    unawaited(_loadForYou());
+                  } else {
+                    _tabController.animateTo(1);
+                  }
+                }),
+                onPickFromDevice: () => unawaited(_pickFromDevice()),
+                onSearchSubmitted: () {
+                  _tabController.animateTo(1);
+                  unawaited(_loadForYou());
+                },
+              ),
+              if (canRemove)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: OutlinedButton.icon(
+                    onPressed: () => unawaited(_clearSelection()),
+                    icon: Icon(
+                      Icons.music_off_rounded,
+                      size: 18,
+                      color: scheme.onSurface.withValues(alpha: 0.75),
+                    ),
+                    label: Text(l10n.soundClearSelection),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: scheme.onSurface,
+                      side: BorderSide(
+                        color: scheme.onSurface.withValues(alpha: 0.18),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
-                if (_selected != null)
-                  TextButton(
-                    onPressed: () => setState(() => _selected = null),
-                    child: Text(l10n.soundClearSelection),
-                  ),
-                IconButton(
-                  onPressed: _uploading ? null : _pickFromDevice,
-                  tooltip: l10n.soundPickFromFiles,
-                  icon: _uploading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CustomLoadingWidget(size: 20),
-                        )
-                      : const Icon(LucideIcons.folderOpen),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSizes.p16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: l10n.soundSearchHint,
-                prefixIcon: const Icon(LucideIcons.search, size: 20),
-                isDense: true,
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.45),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                  borderSide: BorderSide.none,
+              Expanded(
+                child: SoundPickerList(
+                  loading: _currentLoading(),
+                  sounds: _currentList(),
+                  selectedId: _selected?.id,
+                  favoriteIds: _favoriteIds,
+                  error: _error,
+                  showError:
+                      _tabController.index == 0 || _tabController.index == 1,
+                  onRetry: () => unawaited(_retryCurrent()),
+                  onSoundTap: (sound) => unawaited(_onSoundTap(sound)),
+                  onScissorsTap: (sound) => unawaited(_openTrim(sound)),
+                  onFavoriteTap: (sound) => unawaited(_toggleFavorite(sound)),
                 ),
               ),
-              onSubmitted: (_) {
-                if (_tabController.index != 1) {
-                  _tabController.animateTo(1);
-                }
-                unawaited(_loadBrowse());
-              },
-            ),
-          ),
-          TabBar(
-            controller: _tabController,
-            tabs: [
-              Tab(text: l10n.soundTabTrending),
-              Tab(text: l10n.soundTabBrowse),
-              Tab(text: l10n.soundTabMine),
             ],
           ),
-          Expanded(
-            child: _buildList(l10n),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildList(AppLocalizations l10n) {
-    if (_currentLoading()) {
-      return const Center(child: CustomLoadingWidget());
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p24),
-          child: CustomText(
-            _error!,
-            variant: TextVariant.secondary,
-            textAlign: TextAlign.center,
-          ),
         ),
-      );
-    }
-
-    final sounds = _currentList();
-    if (sounds.isEmpty) {
-      return Center(
-        child: CustomText(
-          l10n.soundPickerEmpty,
-          variant: TextVariant.secondary,
-        ),
-      );
-    }
-
-    return ListView.separated(
-      itemCount: sounds.length,
-      separatorBuilder: (_, __) => Divider(
-        height: 1,
-        indent: 76,
-        color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
       ),
-      itemBuilder: (context, index) {
-        final sound = sounds[index];
-        final isSelected = _selected?.id == sound.id;
-        return SoundListTile(
-          sound: sound,
-          isSelected: isSelected,
-          onTap: () => unawaited(_openSoundPage(sound)),
-        );
-      },
     );
   }
 }

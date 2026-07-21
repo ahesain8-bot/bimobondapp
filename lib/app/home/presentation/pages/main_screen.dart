@@ -14,9 +14,11 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_bottom_nav.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -31,6 +33,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
   String? _pendingOpenStoryUserId;
+  final GlobalKey<HomeFeedScreenState> _homeFeedKey =
+      GlobalKey<HomeFeedScreenState>();
+  final GlobalKey<AuctionsScreenState> _auctionsKey =
+      GlobalKey<AuctionsScreenState>();
 
   @override
   void initState() {
@@ -70,7 +76,28 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
+    // Re-tapping the active tab refreshes that section (TikTok-style).
+    if (index == _currentIndex) {
+      if (index == 0) {
+        _homeFeedKey.currentState?.refreshFromTab();
+      } else if (isLoggedIn && index == 1) {
+        _auctionsKey.currentState?.refreshFromTab();
+      }
+      return;
+    }
+
     setState(() => _currentIndex = index);
+  }
+
+  void _handleSystemBack() {
+    // Any tab except Home → go Home first (don't exit).
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+
+    // On Home → close the app.
+    SystemNavigator.pop();
   }
 
   @override
@@ -88,21 +115,29 @@ class _MainScreenState extends State<MainScreen> {
 
         final pages = isLoggedIn
             ? [
-                HomeFeedScreen(isTabActive: isHome),
-                AuctionsScreen(isTabActive: _currentIndex == 1),
+                HomeFeedScreen(key: _homeFeedKey, isTabActive: isHome),
+                AuctionsScreen(
+                  key: _auctionsKey,
+                  isTabActive: _currentIndex == 1,
+                ),
                 const SizedBox.shrink(),
                 MessagesScreen(isTabActive: _currentIndex == 3),
                 ProfileScreen(isTabActive: _currentIndex == 4),
               ]
-            : [HomeFeedScreen(isTabActive: isHome), const ProfileTab()];
+            : [
+                HomeFeedScreen(key: _homeFeedKey, isTabActive: isHome),
+                const ProfileTab(),
+              ];
 
         return MultiBlocListener(
           listeners: [
             BlocListener<AuthBloc, AuthState>(
               listenWhen: (previous, current) {
                 if (current is AuthInitial) return true;
-                // Only reset tab on fresh login, not profile refresh (AuthSuccess → AuthSuccess).
-                return current is AuthSuccess && previous is! AuthSuccess;
+                // Fresh login only — ignore profile refresh and
+                // AuthLoading → AuthSuccess from update-profile.
+                return current is AuthSuccess &&
+                    (previous is AuthInitial || previous is AuthFailure);
               },
               listener: (context, authState) {
                 if (authState is AuthSuccess) {
@@ -142,38 +177,53 @@ class _MainScreenState extends State<MainScreen> {
               },
             ),
           ],
-          child: Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            extendBody: isHome,
-            body: IndexedStack(
-              key: ValueKey(isLoggedIn),
-              index: _currentIndex,
-              children: pages,
-            ),
-            bottomNavigationBar: LiquidGlassBottomNav(
-              currentIndex: _currentIndex,
-              glassStyle: isHome,
-              onItemTap: (index) => _onNavTap(index, isLoggedIn: isLoggedIn),
-              items: isLoggedIn
-                  ? LiquidGlassBottomNavItems.loggedIn(
-                      homeLabel: l10n.navHome,
-                      auctionsLabel: l10n.navAuctions,
-                      chatLabel: l10n.navChat,
-                      profileLabel: l10n.navProfile,
-                    )
-                  : LiquidGlassBottomNavItems.guest(
-                      homeLabel: l10n.navHome,
-                      profileLabel: l10n.navProfile,
+          child: PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) return;
+              _handleSystemBack();
+            },
+            child: AnnotatedRegion<SystemUiOverlayStyle>(
+              value: isHome
+                  ? feedImmersiveSystemUiOverlayStyle
+                  : appContentSystemUiOverlayStyle(
+                      Theme.of(context).brightness,
                     ),
-              center: isLoggedIn
-                  ? LiquidGlassBottomNav.addButton(
-                      context: context,
-                      onTap: () => _onNavTap(
-                        LiquidGlassBottomNavItems.loggedInAddButtonIndex,
-                        isLoggedIn: true,
-                      ),
-                    )
-                  : null,
+              child: Scaffold(
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                extendBody: isHome,
+                body: IndexedStack(
+                  key: ValueKey(isLoggedIn),
+                  index: _currentIndex,
+                  children: pages,
+                ),
+                bottomNavigationBar: LiquidGlassBottomNav(
+                  currentIndex: _currentIndex,
+                  glassStyle: isHome,
+                  onItemTap: (index) =>
+                      _onNavTap(index, isLoggedIn: isLoggedIn),
+                  items: isLoggedIn
+                      ? LiquidGlassBottomNavItems.loggedIn(
+                          homeLabel: l10n.navHome,
+                          auctionsLabel: l10n.navAuctions,
+                          chatLabel: l10n.navChat,
+                          profileLabel: l10n.navProfile,
+                        )
+                      : LiquidGlassBottomNavItems.guest(
+                          homeLabel: l10n.navHome,
+                          profileLabel: l10n.navProfile,
+                        ),
+                  center: isLoggedIn
+                      ? LiquidGlassBottomNav.addButton(
+                          context: context,
+                          onTap: () => _onNavTap(
+                            LiquidGlassBottomNavItems.loggedInAddButtonIndex,
+                            isLoggedIn: true,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
             ),
           ),
         );

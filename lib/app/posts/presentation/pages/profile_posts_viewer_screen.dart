@@ -1,7 +1,7 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
-import 'package:bimobondapp/app/home/presentation/pages/video_post_widget.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
@@ -17,7 +17,6 @@ import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 class ProfilePostsViewerScreen extends StatefulWidget {
   const ProfilePostsViewerScreen({
@@ -200,6 +199,36 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
     });
   }
 
+  void _onLikePostSuccess(LikePostSuccess state) {
+    final index = _posts.indexWhere((p) => p.id == state.postId);
+    if (index == -1) return;
+
+    if (!state.liked &&
+        widget.args.source == ProfilePostsViewerSource.ownLiked) {
+      setState(() {
+        _posts.removeAt(index);
+        if (_currentIndex >= _posts.length) {
+          _currentIndex = (_posts.length - 1).clamp(0, _posts.length);
+        }
+      });
+      if (_posts.isEmpty && mounted) {
+        Navigator.of(context).maybePop();
+      }
+      return;
+    }
+
+    final post = _posts[index];
+    final nextCount = state.liked
+        ? post.likeCount + (post.isLiked ? 0 : 1)
+        : (post.likeCount - (post.isLiked ? 1 : 0)).clamp(0, 1 << 30).toInt();
+    setState(() {
+      _posts[index] = post.copyWith(
+        isLiked: state.liked,
+        likeCount: nextCount,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<PostsBloc, PostsState>(
@@ -232,8 +261,10 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
             }
           });
           if (_posts.isEmpty && mounted) {
-            context.pop();
+            Navigator.of(context).maybePop();
           }
+        } else if (state is LikePostSuccess) {
+          _onLikePostSuccess(state);
         } else if (state is UpdatePostSuccess) {
           final index = _posts.indexWhere((p) => p.id == state.post.id);
           if (index != -1) {
@@ -244,12 +275,14 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
       child: Scaffold(
         backgroundColor: Colors.black,
         extendBodyBehindAppBar: true,
+        // Let embedded auction screens receive keyboard insets themselves.
+        resizeToAvoidBottomInset: false,
         appBar: CustomAppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
             icon: const DirectionalBackIcon(color: Colors.white, size: 20),
-            onPressed: () => context.pop(),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
         body: PageView.builder(
@@ -266,11 +299,15 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
               return LiveDetailsScreen(post: post, embeddedInFeed: true);
             }
             return VideoPostWidget(
-              key: ValueKey(post.id),
+              key: ValueKey('profile_post_${post.id}'),
               post: post,
               isActive: index == _currentIndex,
               respectFeedPlaybackGate: false,
+              // TikTok-style: likes/comments rise up when opening from profile.
+              animateChromeEntrance: true,
               bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
+              pageController: _pageController,
+              pageIndex: index,
             );
           },
         ),
