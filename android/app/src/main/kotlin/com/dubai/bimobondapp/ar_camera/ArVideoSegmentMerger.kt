@@ -8,7 +8,6 @@ import android.util.Log
 import java.io.File
 import java.nio.ByteBuffer
 
-/** Concatenates same-codec H.264 segment MP4s into one file (TikTok multi-clip). */
 object ArVideoSegmentMerger {
     private const val TAG = "ArVideoSegmentMerger"
 

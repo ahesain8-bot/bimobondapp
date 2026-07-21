@@ -1,17 +1,16 @@
 package com.dubai.bimobondapp.ar_camera
 
-/** Normalized GPU warp uniforms in raw texture UV space (0..1). */
 data class FaceWarpParams(
     val filterType: Int,
     val bulge1: FloatArray,
     val bulge2: FloatArray,
     val noseRect: FloatArray,
     val nosePull: Float,
-    /** Lip bounding box (minU, minV, maxU, maxV) in warp UV space; zeros = none. */
+
     val lipRect: FloatArray = floatArrayOf(0f, 0f, 0f, 0f),
-    /** Skin-smoothing / beauty strength (0 = off). */
+
     val beauty: Float = 0f,
-    /** Mix original ↔ full filter look (0 = off, 1 = full). */
+
     val intensity: Float = 1f,
 ) {
     companion object {
@@ -114,7 +113,7 @@ object FaceWarpParamsBuilder {
                 y,
                 imageWidth,
                 imageHeight,
-                // Front uploads are selfie-mirrored to match PreviewView; invert X in UV.
+
                 isFrontCamera = ArCameraBridge.isFrontCamera,
             )
 
@@ -211,7 +210,7 @@ object FaceWarpParamsBuilder {
             }
 
             else -> {
-                // Color grades (whitening / warm / mono / cool / vintage / rosy).
+
                 val lipRect = snapshot?.let { computeLipRect(it, imageWidth, imageHeight) }
                     ?: floatArrayOf(0f, 0f, 0f, 0f)
                 val beauty = when (filter) {
@@ -234,7 +233,6 @@ object FaceWarpParamsBuilder {
         }
     }
 
-    /** Lip bounding box in warp UV space, padded slightly for a soft tint mask. */
     private fun computeLipRect(
         snapshot: FaceLandmarkSnapshot,
         imageWidth: Int,

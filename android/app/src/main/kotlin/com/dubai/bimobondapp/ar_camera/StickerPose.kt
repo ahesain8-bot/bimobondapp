@@ -3,33 +3,24 @@ package com.dubai.bimobondapp.ar_camera
 import android.graphics.PointF
 import kotlin.math.sqrt
 
-/**
- * Resolved sticker placement. When produced by [StickerScreenPoseResolver], all
- * geometry is in **view / screen pixels** (already mapped through mapPoint).
- */
 data class StickerPose(
     val centerX: Float,
     val centerY: Float,
     val width: Float,
-    /** Explicit quad height in the same units as [width]. <=0 = bitmap aspect. */
+
     val height: Float,
     val rollDeg: Float,
-    /** Horizontal squeeze from yaw (1 = face-on, &lt;1 = turned). */
+
     val yawScaleX: Float,
     val pivotU: Float,
     val pivotV: Float,
 )
 
-/** Face size in screen pixels — used for width floors and vertical offsets. */
 private data class ScreenFaceMetrics(
     val faceWidth: Float,
     val faceHeight: Float,
 )
 
-/**
- * Maps landmarks → exact screen placement using the same recipes as the old
- * per-filter draw functions (nose-bridge X + eye-line Y for glasses, etc.).
- */
 object StickerScreenPoseResolver {
 
     fun resolve(

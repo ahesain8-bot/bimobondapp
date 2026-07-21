@@ -3,6 +3,7 @@ package com.dubai.bimobondapp
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
+import androidx.camera.lifecycle.ProcessCameraProvider
 import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
@@ -30,6 +31,8 @@ class MainActivity : FlutterActivity() {
 
         // Load OpenCV early so first beauty apply is fast.
         beautyExecutor.execute { BeautyFilterProcessor.ensureOpenCv() }
+        // Prefetch CameraX + MediaPipe before the user taps + (cuts open delay).
+        warmArCameraPipeline()
 
         flutterEngine.platformViewsController.registry.registerViewFactory(
             AR_CAMERA_VIEW_TYPE,
@@ -40,7 +43,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "warmup" -> {
-                        FaceLandmarkerHolder.warmup(this)
+                        warmArCameraPipeline()
                         result.success(null)
                     }
                     "applyBeauty" -> {
@@ -228,6 +231,27 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /** Prefetch CameraX provider + MediaPipe so + → camera isn't cold-starting. */
+    private fun warmArCameraPipeline() {
+        FaceLandmarkerHolder.warmup(this)
+        try {
+            ProcessCameraProvider.getInstance(this)
+        } catch (_: Throwable) {
+        }
+        // Warm H.264 encoder so the first record tap isn't cold.
+        Executors.newSingleThreadExecutor { r ->
+            Thread(r, "ar-encoder-warm").apply { isDaemon = true }
+        }.execute {
+            try {
+                val codec = android.media.MediaCodec.createEncoderByType(
+                    android.media.MediaFormat.MIMETYPE_VIDEO_AVC,
+                )
+                codec.release()
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     override fun onRequestPermissionsResult(

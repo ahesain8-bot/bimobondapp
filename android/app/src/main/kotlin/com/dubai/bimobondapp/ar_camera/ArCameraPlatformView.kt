@@ -42,17 +42,19 @@ class ArCameraPlatformView(
         warpGlView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
             ArCameraBridge.updateWarpViewSize(right - left, bottom - top)
         }
-        warpGlView.post {
-            ArCameraBridge.updateWarpViewSize(warpGlView.width, warpGlView.height)
-        }
-        // Warm the GL surface early so the first camera bind can go straight to OES
-        // (avoids Preview→OES rebind flash + lag on open).
-        warpGlView.ensureGlInitialized()
+
+        previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+        previewView.visibility = View.VISIBLE
         warpGlView.visibility = View.INVISIBLE
+
+        warpGlView.ensureGlInitialized()
+
+        ArCameraBridge.syncPreviewNaturalOrientation()
+        ArCameraController.start(activity, activity, previewView, faceOverlay)
+        ArCameraBridge.applyCurrentFilter()
         root.post {
-            ArCameraBridge.syncPreviewNaturalOrientation()
-            ArCameraBridge.applyCurrentFilter()
-            ArCameraController.start(activity, activity, previewView, faceOverlay)
+            ArCameraBridge.updateWarpViewSize(warpGlView.width, warpGlView.height)
             ArCameraBridge.reapplyPreviewLetterbox()
         }
     }

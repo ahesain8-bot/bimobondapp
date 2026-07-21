@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.media.MediaCodec
+import android.media.MediaFormat
 import android.os.Handler
 import android.os.Looper
 import android.util.Size
@@ -14,8 +16,15 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
+import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FallbackStrategy
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.VideoCapture
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -29,21 +38,27 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.camera.core.Camera
+import android.util.Log
 
 object ArCameraController {
     private const val ANALYSIS_WIDTH = 1080
     private const val ANALYSIS_HEIGHT = 1440
+    /** Analysis while PNG stickers active. Photos use ImageCapture (unchanged). */
+    private const val PNG_ANALYSIS_WIDTH = 480
+    private const val PNG_ANALYSIS_HEIGHT = 640
     private const val DETECT_MAX_DIMENSION = 384
+    /** Sticker video encode edge — keep modest so preview stays responsive while recording. */
+    private const val PNG_RECORD_EDGE = 640
+    private const val PNG_RECORD_INTERVAL_MS = 66L
     private const val GL_MAX_EDGE = 1280
     private const val CAPTURE_MAX_EDGE = 1920
     private const val RECORD_PROCESS_EDGE = ArFilteredVideoRecorder.MAX_EDGE
+
+    private const val RECORD_GL_EDGE = 720
     private const val PHOTO_TARGET_WIDTH = 2160
     private const val PHOTO_TARGET_HEIGHT = 2880
-    private const val RECORD_FRAME_INTERVAL_MS = 33L // ~30 fps production gate (matches pump)
+    private const val RECORD_FRAME_INTERVAL_MS = 33L
 
-    // Consecutive face-detection misses before we clear overlays/stickers. A small
-    // grace avoids flicker on a single dropped detection while still removing the
-    // sticker quickly once the face actually leaves the frame.
     private const val NO_FACE_CLEAR_THRESHOLD = 2
 
     private var faceLandmarker: FaceLandmarkerHelper? = null
@@ -59,6 +74,7 @@ object ArCameraController {
     private var frameCounter = 0
     private val mainHandler = Handler(Looper.getMainLooper())
     private val videoRecorder = ArFilteredVideoRecorder()
+    private val simpleHardwareRecorder = ArSimpleHardwareRecorder()
     private val captureBusy = AtomicBoolean(false)
     private val recordingPixelCopyBusy = AtomicBoolean(false)
 
@@ -68,20 +84,32 @@ object ArCameraController {
     @Volatile
     private var imageAnalysis: ImageAnalysis? = null
 
-    // True while a camera flip is rebinding. Frames are dropped so the analysis
-    // thread releases the camera and the new lens can open (fixes flip freeze
-    // when a face filter is active).
+    @Volatile
+    private var videoCapture: VideoCapture<Recorder>? = null
+
+    @Volatile
+    private var hardwareRecording = false
+
+    @Volatile
+    private var glSurfaceRecording = false
+
     @Volatile
     private var switchingCamera = false
 
-    // Consecutive frames with no detected face (used to clear stale stickers).
     private var noFaceStreak = 0
 
-    // True when the camera Preview is bound straight to the GL OES SurfaceTexture
-    // (the zero-CPU color-grade path). False = classic PreviewView binding used by
-    // NONE / PNG stickers / distortion (bitmap) filters.
     @Volatile
     private var boundToOes = false
+
+    @Volatile
+    private var preferOesBinding = false
+
+    /** True when ImageAnalysis last bound at PNG sticker resolution. */
+    @Volatile
+    private var pngFastAnalysisBound = false
+
+    /** Hardware VideoCapture sticker bake (PNG only) — same lag profile as normal record. */
+    private var stickerCameraOverlay: StickerCameraOverlay? = null
 
     @Volatile
     private var camera: Camera? = null
@@ -114,6 +142,7 @@ object ArCameraController {
 
         previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+        previewView.visibility = View.VISIBLE
 
         FaceLandmarkerHolder.warmup(activity)
         faceLandmarker = FaceLandmarkerHolder.get()
@@ -121,6 +150,9 @@ object ArCameraController {
         recordOfferExecutor = Executors.newSingleThreadExecutor { r ->
             Thread(r, "ar-video-offer").apply { priority = Thread.NORM_PRIORITY }
         }
+        stickerCameraOverlay = StickerCameraOverlay(activity.applicationContext)
+
+        warmVideoEncoder()
 
         if (!hasCameraPermission(activity)) {
             ActivityCompat.requestPermissions(
@@ -142,9 +174,13 @@ object ArCameraController {
             )
         }
 
-        previewView.post {
-            if (started) {
-                bindCamera(lifecycleOwner, previewView, faceOverlay)
+        if (previewView.width > 0 && previewView.height > 0) {
+            bindCamera(lifecycleOwner, previewView, faceOverlay)
+        } else {
+            previewView.post {
+                if (started) {
+                    bindCamera(lifecycleOwner, previewView, faceOverlay)
+                }
             }
         }
     }
@@ -159,7 +195,7 @@ object ArCameraController {
     }
 
     fun flipCamera(onResult: ((Boolean) -> Unit)? = null) {
-        if (recording || videoRecorder.isRecording()) {
+        if (isRecordingActive()) {
             onResult?.invoke(false)
             return
         }
@@ -172,9 +208,6 @@ object ArCameraController {
             return
         }
 
-        // Pause frame processing so the analysis thread stops holding the camera;
-        // otherwise the old lens never releases and the new one fails to open,
-        // freezing the preview (only reproduces when a face filter is active).
         switchingCamera = true
         imageAnalysis?.clearAnalyzer()
 
@@ -264,14 +297,30 @@ object ArCameraController {
     fun onFilterChanged() {
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
-        // Unstick analysis if a previous conversion hung mid-switch.
+
         convertingFrame.set(false)
-        if (!ArCameraBridge.currentFilter.isPngOverlay() &&
-            !ArCameraBridge.currentFilter.isDistortion() &&
-            !ArCameraBridge.currentFilter.isBeauty()
+        val filter = ArCameraBridge.currentFilter
+        if (!filter.isPngOverlay() &&
+            !filter.isDistortion() &&
+            !filter.isBeauty()
         ) {
             cachedSnapshot = null
             FaceLandmarkSmoother.reset()
+        }
+        if (filter.isPngOverlay()) {
+            StickerPoseSmoother.reset()
+        } else {
+            stickerCameraOverlay?.clear()
+        }
+        // Rebind analysis at sticker resolution when entering/leaving PNG (Preview stays sharp).
+        val wantPngFast = filter.isPngOverlay()
+        if (started &&
+            !isRecordingActive() &&
+            !boundToOes &&
+            wantPngFast != pngFastAnalysisBound &&
+            canRebindCamera()
+        ) {
+            requestPreviewRebind()
         }
     }
 
@@ -279,18 +328,28 @@ object ArCameraController {
         abortCapture()
         started = false
         boundToOes = false
+        preferOesBinding = false
+        pngFastAnalysisBound = false
         rebindPosted = false
         convertingFrame.set(false)
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
         cachedSnapshot = null
         FaceLandmarkSmoother.reset()
+        StickerPoseSmoother.reset()
         faceLandmarker = null
         analysisExecutor?.shutdownNow()
         analysisExecutor = null
         recordOfferExecutor?.shutdownNow()
         recordOfferExecutor = null
+        try {
+            stickerCameraOverlay?.release()
+        } catch (_: Exception) {
+        }
+        stickerCameraOverlay = null
         imageCapture = null
+        videoCapture = null
+        simpleHardwareRecorder.attach(null)
         camera = null
         torchEnabled = false
         applyScreenFlash(false)
@@ -302,11 +361,24 @@ object ArCameraController {
 
     fun abortCapture() {
         recording = false
+        hardwareRecording = false
+        glSurfaceRecording = false
+        try {
+            ArCameraBridge.warpGlView?.clearEncoderSurface(null)
+        } catch (_: Exception) {
+        }
+        simpleHardwareRecorder.abort()
         videoRecorder.abort()
         stopRecordFramePump()
         captureBusy.set(false)
         recordingPixelCopyBusy.set(false)
     }
+
+    private fun isRecordingActive(): Boolean =
+        recording || hardwareRecording || videoRecorder.isRecording() ||
+            simpleHardwareRecorder.isRecording()
+
+    fun isRecordingNow(): Boolean = isRecordingActive()
 
     fun takePhoto(onResult: (String?, String?) -> Unit) {
         if (!captureBusy.compareAndSet(false, true)) {
@@ -334,8 +406,7 @@ object ArCameraController {
             val activity = ArCameraBridge.hostActivity ?: return false
             var toSave = bitmap
             var owned: Bitmap? = null
-            // Compose exact on-screen letterbox (black bars + mid FOV) so editor
-            // matches camera preview — mid-only crop looks zoomed when shown full-bleed.
+
             if (ArCameraBridge.isPreviewLetterboxed()) {
                 val root = ArCameraBridge.platformRootSize()
                 if (root != null) {
@@ -381,18 +452,17 @@ object ArCameraController {
             }
         }
 
-        // OES GPU path: still MUST come from the same GL framebuffer as the live
-        // preview. ImageCapture is a different stream and was saving left↔right
-        // flipped vs what the user saw on screen.
         if (boundToOes) {
             takePhotoFromGl(::deliver, ::saveBaked)
             return
         }
 
-        // High-res ImageCapture only when full-screen (no ratio letterbox).
-        // Letterboxed mode must bake from the live preview stream so FOV matches.
         val filter = ArCameraBridge.currentFilter
-        if (filter == FilterType.NONE && !ArCameraBridge.isPreviewLetterboxed()) {
+        // Stickers: always use hardware ImageCapture (hi-res) then bake overlay —
+        // analysis frames are intentionally small for tracking and look soft if used.
+        if (filter.isPngOverlay() ||
+            (filter == FilterType.NONE && !ArCameraBridge.isPreviewLetterboxed())
+        ) {
             takePhotoWithImageCapture(::deliver)
             return
         }
@@ -420,10 +490,6 @@ object ArCameraController {
         tryBaked(retries)
     }
 
-    /**
-     * Grabs the exact on-screen OES/GL frame (same pixels the user sees — same
-     * mirror, crop, LUT). Falls back to ImageCapture only if GL readback fails.
-     */
     private fun takePhotoFromGl(
         onResult: (String?, String?) -> Unit,
         saveBaked: (Bitmap) -> Boolean,
@@ -473,8 +539,7 @@ object ArCameraController {
         val executor = analysisExecutor ?: ContextCompat.getMainExecutor(activity)
 
         try {
-            // Bake rotation + front-camera mirror into pixels. EXIF-only
-            // isReversedHorizontal often saves photos upside-down on Android.
+
             capture.takePicture(
                 executor,
                 object : ImageCapture.OnImageCapturedCallback() {
@@ -494,7 +559,7 @@ object ArCameraController {
                                     ArCameraBridge.currentFilter.isColorGrade() ||
                                     ArCameraBridge.currentFilter.useShader())
                             ) {
-                                // Filters bake in mirrored (preview) space — keep mirrored.
+
                                 val mirrored = ImageProxyBitmapUtils.mirrorHorizontally(selfie)
                                 if (mirrored !== selfie) selfie.recycle()
                                 selfie = bakeFilterOntoBitmap(mirrored)
@@ -553,7 +618,7 @@ object ArCameraController {
     }
 
     fun startRecording(onResult: (Boolean, String?) -> Unit) {
-        if (recording || videoRecorder.isRecording()) {
+        if (isRecordingActive()) {
             onResult(false, "already_recording")
             return
         }
@@ -572,36 +637,171 @@ object ArCameraController {
                     101,
                 )
             }
+
+            if ((ArCameraBridge.currentFilter == FilterType.NONE ||
+                    ArCameraBridge.currentFilter.isPngOverlay()) &&
+                !ArCameraBridge.isPreviewLetterboxed() &&
+                !boundToOes &&
+                simpleHardwareRecorder.isAvailable()
+            ) {
+                simpleHardwareRecorder.start(activity, file) { ok, err ->
+                    if (ok) {
+                        recording = true
+                        hardwareRecording = true
+                        glSurfaceRecording = false
+                        onResult(true, null)
+                    } else {
+
+                        startBitmapRecording(file, onResult)
+                    }
+                }
+                return
+            }
+
+            if (ArCameraBridge.currentFilter.useShader() || boundToOes) {
+                startGlSurfaceRecording(file, onResult)
+                return
+            }
+
+            startBitmapRecording(file, onResult)
+        } catch (e: Exception) {
+            recording = false
+            hardwareRecording = false
+            glSurfaceRecording = false
+            onResult(false, e.message ?: "record_start_failed")
+        }
+    }
+
+    private fun startGlSurfaceRecording(file: File, onResult: (Boolean, String?) -> Unit) {
+        val gl = ArCameraBridge.warpGlView
+        if (gl == null || !gl.isGlInitialized()) {
+            startBitmapRecording(file, onResult)
+            return
+        }
+        val vw = ArCameraBridge.warpViewWidth.takeIf { it > 0 }
+            ?: gl.width.coerceAtLeast(1)
+        val vh = ArCameraBridge.warpViewHeight.takeIf { it > 0 }
+            ?: gl.height.coerceAtLeast(1)
+        val maxEdge = RECORD_GL_EDGE
+        val scale = minOf(1f, maxEdge.toFloat() / maxOf(vw, vh))
+        val encW = ((vw * scale).toInt() and 1.inv()).coerceAtLeast(2)
+        val encH = ((vh * scale).toInt() and 1.inv()).coerceAtLeast(2)
+
+        val surface = try {
+            videoRecorder.startSurfaceSession(file, encW, encH)
+        } catch (_: Exception) {
+            null
+        }
+        if (surface == null) {
+            startBitmapRecording(file, onResult)
+            return
+        }
+
+        try {
+            recording = true
+            hardwareRecording = false
+            glSurfaceRecording = true
+            lastRecordCopyMs = 0L
+
+            gl.setCaptureEnabled(false)
+            gl.setOnFramePresented(null)
+            gl.setEncoderSurface(surface, encW, encH)
+            onResult(true, null)
+        } catch (e: Exception) {
+            glSurfaceRecording = false
+            recording = false
+            try {
+                gl.clearEncoderSurface(null)
+            } catch (_: Exception) {
+            }
+            videoRecorder.abort()
+            startBitmapRecording(file, onResult)
+        }
+    }
+
+    private fun startBitmapRecording(file: File, onResult: (Boolean, String?) -> Unit) {
+        try {
             videoRecorder.arm(file)
             recording = true
+            hardwareRecording = false
+            glSurfaceRecording = false
             lastRecordCopyMs = 0L
             startRecordFramePump()
-            // Enable GL front-buffer capture whenever the frame is rendered on the
-            // GPU (OES path: NONE + color grades, OR a shader distortion) so recorded
-            // frames come from the already-rendered GPU output instead of a per-frame
-            // CPU pass.
+
+            val gl = ArCameraBridge.warpGlView
             if (boundToOes || ArCameraBridge.currentFilter.useShader()) {
-                ArCameraBridge.warpGlView?.setCaptureEnabled(true)
+                gl?.setCaptureEnabled(true)
+                gl?.setCaptureMaxEdge(RECORD_GL_EDGE)
+
+                gl?.setOnFramePresented { onOesFramePresented() }
             }
             onResult(true, null)
         } catch (e: Exception) {
             recording = false
+            hardwareRecording = false
+            glSurfaceRecording = false
             onResult(false, e.message ?: "record_start_failed")
         }
     }
 
     fun stopRecording(onResult: (String?, String?) -> Unit) {
-        if (!recording && !videoRecorder.isRecording()) {
+        if (!isRecordingActive()) {
             onResult(null, "not_recording")
             return
         }
+
+        if (hardwareRecording || simpleHardwareRecorder.isRecording()) {
+            recording = false
+            hardwareRecording = false
+            glSurfaceRecording = false
+            simpleHardwareRecorder.stop { file, err ->
+                if (file != null) {
+                    onResult(file.absolutePath, null)
+                } else {
+                    onResult(null, err ?: "empty_video")
+                }
+            }
+            return
+        }
+
+        if (glSurfaceRecording || videoRecorder.isSurfaceSession()) {
+            recording = false
+            glSurfaceRecording = false
+            val gl = ArCameraBridge.warpGlView
+
+            fun finishStop() {
+                try {
+                    val file = videoRecorder.stop()
+                    if (file != null && file.exists() && file.length() > 0L) {
+                        onResult(file.absolutePath, null)
+                    } else {
+                        onResult(null, "empty_video")
+                    }
+                } catch (e: Exception) {
+                    onResult(null, e.message ?: "record_stop_failed")
+                }
+            }
+            if (gl != null) {
+                gl.clearEncoderSurface { finishStop() }
+            } else {
+                finishStop()
+            }
+            return
+        }
+
         recording = false
         stopRecordFramePump()
         try {
-            ArCameraBridge.warpGlView?.setCaptureEnabled(
+            val gl = ArCameraBridge.warpGlView
+            gl?.setCaptureEnabled(
                 ArCameraBridge.currentFilter.isDistortion(),
             )
-            // OES color-grade capture is recording-only; leave it off after stop.
+            gl?.setCaptureMaxEdge(CAPTURE_MAX_EDGE)
+
+            if (!boundToOes) {
+                gl?.setOnFramePresented(null)
+            }
+
             val file = videoRecorder.stop()
             if (file != null && file.exists() && file.length() > 0L) {
                 onResult(file.absolutePath, null)
@@ -709,23 +909,18 @@ object ArCameraController {
     }
 
     private fun maybeCaptureRecordingFrame() {
-        if (!recording || !videoRecorder.isRecording()) return
+        if (!recording || glSurfaceRecording || !videoRecorder.isRecording()) return
+        if (videoRecorder.isSurfaceSession()) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) return
         if (!recordingPixelCopyBusy.compareAndSet(false, true)) return
         lastRecordCopyMs = now
 
         val filter = ArCameraBridge.currentFilter
-        // Anything on the GPU (OES path: NONE + color grades, OR a shader distortion)
-        // is already rendered. Pull the finished frame straight from GL instead of
-        // re-applying the grade on the CPU (LutStore.apply is a per-pixel trilinear
-        // pass over the whole frame — running it on EVERY recorded frame was the main
-        // cause of the recording/preview lag). The GPU output already has the exact
-        // same result baked in, so this is both correct and far cheaper.
+
         if (boundToOes || filter.useShader()) {
             val gl = ArCameraBridge.warpGlView
-            // take() — no Bitmap.copy. Skip isMostlyEmpty (full getPixel loop) on the
-            // hot recording path; empty frames are rare once GL is streaming.
+
             val gpu = try {
                 gl?.takeLastFilteredFrame()
             } catch (_: Exception) {
@@ -749,16 +944,8 @@ object ArCameraController {
         }
     }
 
-    /**
-     * Recording-only fast path for color-grade/none filters. [displayBmp] here is a
-     * freshly rotated/mirrored frame that isn't aliased with [lastCaptureBitmap]
-     * ([retainCaptureFrame] always makes its own copy), so it can be baked and handed
-     * straight to the encoder without the extra defensive copy [snapshotVisibleFrame]
-     * needs for the async take-photo path. That removes a redundant full-frame copy
-     * from every single recorded frame, which was a real source of the video judder.
-     * Returns true if [displayBmp] was consumed (caller must not recycle it further).
-     */
     private fun maybeCaptureRecordingFrameDirect(displayBmp: Bitmap, filter: FilterType): Boolean {
+        if (glSurfaceRecording || videoRecorder.isSurfaceSession()) return false
         if (!videoRecorder.isRecording()) return false
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) return false
@@ -781,65 +968,6 @@ object ArCameraController {
         return true
     }
 
-    /**
-     * Recording-only fast path for shader-rendered color-grade filters. Takes a
-     * standalone copy of [source] synchronously (cheap, since [source] is about to be
-     * handed off to the GL renderer and recycled asynchronously), then bakes the
-     * color grade and hands off to the encoder on a background thread. This skips
-     * [snapshotVisibleFrame]'s mainHandler hop, which added queueing latency (racing
-     * against Flutter/UI-thread work) on top of an extra defensive copy.
-     */
-    private fun maybeCaptureRecordingFrameFromSource(source: Bitmap, filter: FilterType): Boolean {
-        if (!videoRecorder.isRecording() || source.isRecycled) return false
-        val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) return false
-        if (!recordingPixelCopyBusy.compareAndSet(false, true)) return false
-        lastRecordCopyMs = now
-
-        val copy = try {
-            source.copy(Bitmap.Config.ARGB_8888, false)
-        } catch (_: Exception) {
-            null
-        }
-        if (copy == null) {
-            recordingPixelCopyBusy.set(false)
-            return false
-        }
-
-        fun bakeAndOffer() {
-            val baked = try {
-                if (filter.isColorGrade()) {
-                    val b = ArColorGradeBaker.apply(copy, filter, ArCameraBridge.filterIntensity)
-                    if (b !== copy && !copy.isRecycled) copy.recycle()
-                    b
-                } else {
-                    copy
-                }
-            } catch (_: Exception) {
-                copy
-            }
-            offerRecordingFrameAsync(baked, recycleSourceAlways = true)
-        }
-
-        val executor = recordOfferExecutor
-        if (executor == null) bakeAndOffer() else executor.execute { bakeAndOffer() }
-        return true
-    }
-
-    /**
-     * Feeds the encoder at a fixed [ArFilteredVideoRecorder.FRAME_RATE] cadence,
-     * repeating the last frame when the pipeline hasn't produced a new one yet.
-     * This decouples encoder timing from analysis/filter throughput so playback
-     * stays evenly paced (no stutter) even when a filter or compose step is slow.
-     *
-     * Two things are critical for smoothness and were the previous cause of the lag:
-     *  - Uses [ScheduledExecutorService.scheduleAtFixedRate] (constant wall-clock
-     *    cadence) instead of `scheduleWithFixedDelay` (whose real period was
-     *    draw-time + delay, so effective fps sagged and jittered).
-     *  - The encoder Surface derives each frame's timestamp from the moment it is
-     *    posted, so [offerFrame] must run OUTSIDE [recordFrameLock]; the pump only
-     *    holds the lock long enough to swap in a newly produced frame.
-     */
     private fun startRecordFramePump() {
         stopRecordFramePump()
         val executor = Executors.newSingleThreadScheduledExecutor { r ->
@@ -857,17 +985,21 @@ object ArCameraController {
 
     private fun pumpRecordFrame() {
         if (!recording || !videoRecorder.isRecording()) return
-        // Adopt a freshly produced frame (if any) under the lock, then draw the
-        // pump-owned frame without holding the lock so the canvas post — and thus
-        // the frame's presentation timestamp — lands on the fixed-rate tick.
+
+        val pngOverlay = ArCameraBridge.currentFilter.isPngOverlay()
+        var hasNewFrame = false
         synchronized(recordFrameLock) {
             val pending = latestRecordFrame
             if (pending != null && !pending.isRecycled) {
                 pumpCurrentFrame?.takeIf { it !== pending && !it.isRecycled }?.recycle()
                 pumpCurrentFrame = pending
                 latestRecordFrame = null
+                hasNewFrame = true
             }
         }
+        // Stickers: only blit when a new baked frame arrives — re-drawing the same
+        // bitmap at 30fps was starving the live preview while recording.
+        if (pngOverlay && !hasNewFrame) return
         val frame = pumpCurrentFrame ?: return
         if (frame.isRecycled) return
         try {
@@ -883,9 +1015,7 @@ object ArCameraController {
         recordPumpExecutor = null
         if (executor != null) {
             executor.shutdown()
-            // Wait for any in-flight offerFrame() to finish before recycling the
-            // frame it may still be drawing, otherwise we could recycle a bitmap
-            // mid-draw and crash the encoder canvas.
+
             try {
                 if (!executor.awaitTermination(300, TimeUnit.MILLISECONDS)) {
                     executor.shutdownNow()
@@ -909,8 +1039,7 @@ object ArCameraController {
                 if (recording && videoRecorder.isRecording()) {
                     framed = frameForRecording(source)
                     synchronized(recordFrameLock) {
-                        // Only ever recycle the value we replace here; the pump owns
-                        // [pumpCurrentFrame] separately and never lives in this slot.
+
                         val old = latestRecordFrame
                         latestRecordFrame = framed
                         if (old != null && old !== framed && old !== source && !old.isRecycled) {
@@ -929,7 +1058,6 @@ object ArCameraController {
         if (executor == null) process() else executor.execute { process() }
     }
 
-    /** Scales to encode size; letterbox composes at encode resolution (not full screen). */
     private fun frameForRecording(source: Bitmap): Bitmap {
         val maxEdge = RECORD_PROCESS_EDGE
         val scaled = try {
@@ -997,7 +1125,6 @@ object ArCameraController {
         }
     }
 
-    /** PixelCopy sometimes "succeeds" with an empty / green garbage buffer. */
     private fun isMostlyEmpty(bitmap: Bitmap): Boolean {
         if (bitmap.width <= 0 || bitmap.height <= 0) return true
         val stepX = (bitmap.width / 8).coerceAtLeast(1)
@@ -1013,7 +1140,7 @@ object ArCameraController {
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
                 samples++
-                // Classic CameraX/GL garbage: pure green or near-black empty.
+
                 if ((r < 8 && b < 8 && g > 180) || (r + g + b) < 24) {
                     nearBlack++
                 }
@@ -1078,12 +1205,19 @@ object ArCameraController {
             PackageManager.PERMISSION_GRANTED
     }
 
-    /**
-     * Feeds the camera frames straight into the GL renderer's OES SurfaceTexture.
-     * CameraX writes directly to the GPU — no ImageAnalysis → Bitmap → upload, which
-     * is what caused the color-filter preview/record lag. Rotation + front mirror are
-     * applied in the OES shader (see [FaceWarpRenderer]).
-     */
+    private fun warmVideoEncoder() {
+        val executor = recordOfferExecutor ?: return
+        executor.execute {
+            try {
+                val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+                codec.release()
+                Log.i("ArCameraController", "video encoder warmed")
+            } catch (t: Throwable) {
+                Log.w("ArCameraController", "video encoder warm failed", t)
+            }
+        }
+    }
+
     private fun bindPreviewToOes(preview: Preview, glView: FaceWarpGlView, activity: Activity) {
         val executor = ContextCompat.getMainExecutor(activity)
         preview.setSurfaceProvider(executor) { request ->
@@ -1093,16 +1227,27 @@ object ArCameraController {
                 return@setSurfaceProvider
             }
             val res = request.resolution
-            // Cap the OES buffer — back cameras often negotiate huge streams and that
-            // alone adds GPU fill + lag. 1280 max edge stays sharp on phone screens.
-            val maxBuf = 1280
+            // Keep camera buffer aspect (e.g. 1440x1080 → 960x720). Do NOT force
+            // phone screen aspect — that stretched/squashed faces.
+            val maxBuf = 960
             val bufScale = minOf(1f, maxBuf.toFloat() / maxOf(res.width, res.height))
             val bufW = ((res.width * bufScale).toInt() and 1.inv()).coerceAtLeast(2)
             val bufH = ((res.height * bufScale).toInt() and 1.inv()).coerceAtLeast(2)
             st.setDefaultBufferSize(bufW, bufH)
-            // Never apply selfie X-mirror — natural left/right (turn right → right).
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindPreviewToOes cam=${res.width}x${res.height} " +
+                    "view=${glView.width}x${glView.height} buf=${bufW}x${bufH} " +
+                    "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+
             glView.setCameraTransform(0, frontMirror = false, bufW, bufH)
             request.setTransformationInfoListener(executor) { info ->
+                android.util.Log.i(
+                    "ArCameraOES",
+                    "transform rot=${info.rotationDegrees} buf=${bufW}x${bufH} " +
+                        "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+                )
                 glView.setCameraTransform(
                     info.rotationDegrees,
                     frontMirror = false,
@@ -1112,21 +1257,30 @@ object ArCameraController {
             }
             val surface = Surface(st)
             request.provideSurface(surface, executor) { surface.release() }
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindPreviewToOes: surfaceProvided +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            ArCameraBridge.onOesSurfaceProvided()
         }
     }
 
-    /** Called (GL thread) after each OES frame — drives preview swap + recording. */
     private fun onOesFramePresented() {
         ArCameraBridge.onGlFramePresented()
-        if (recording) maybeCaptureRecordingFrame()
+
+        if (recording && !hardwareRecording && !glSurfaceRecording) {
+            maybeCaptureRecordingFrame()
+        }
     }
 
     fun isBoundToOes(): Boolean = boundToOes
 
-    /**
-     * App minimized — pause the GLSurfaceView so EGL can be torn down cleanly.
-     * Without this, resume leaves a dead SurfaceTexture and a permanent black preview.
-     */
+    fun setPreferOesBinding(prefer: Boolean) {
+        preferOesBinding = prefer
+    }
+
+    fun canRebindCamera(): Boolean = started && !isRecordingActive()
+
     fun onHostPause() {
         if (!started) return
         try {
@@ -1135,20 +1289,16 @@ object ArCameraController {
         }
     }
 
-    /**
-     * App restored from recents/minimize — restart GL + force a camera rebind onto
-     * the new OES SurfaceTexture. CameraX alone is not enough after GL context loss.
-     */
     fun onHostResume() {
         if (!started) return
-        if (recording || videoRecorder.isRecording()) return
+        if (isRecordingActive()) return
         val activity = ArCameraBridge.hostActivity ?: return
         val gl = ArCameraBridge.warpGlView
         try {
             gl?.onResume()
         } catch (_: Throwable) {
         }
-        // Old OES surface is invalid after GL pause; require a fresh bind.
+
         boundToOes = false
         rebindPosted = false
         switchingCamera = false
@@ -1156,46 +1306,68 @@ object ArCameraController {
         activity.runOnUiThread {
             ArCameraBridge.syncPreviewNaturalOrientation()
             gl?.ensureGlInitialized()
+            preferOesBinding = false
+            boundToOes = false
             ArCameraBridge.applyCurrentFilter()
-            val wantsOes = ArCameraBridge.currentFilter.usesGpuPreview()
-            if (wantsOes) {
-                gl?.setOesEnabled(true)
-                if (gl?.cameraSurfaceTexture() != null) {
-                    requestPreviewRebind()
-                } else {
-                    gl?.onCameraSurfaceReady = {
-                        gl.onCameraSurfaceReady = null
-                        requestPreviewRebind()
-                    }
-                    gl?.requestRender()
-                }
-            } else {
+
+            if (!ArCameraBridge.currentFilter.usesGpuPreview()) {
                 requestPreviewRebind()
             }
         }
     }
 
-    /** Bridge asks to route the live preview through the OES GPU path (color grade). */
     fun ensureOesPreviewBound() {
-        if (boundToOes) return
-        if (recording || videoRecorder.isRecording()) return
-        val gl = ArCameraBridge.warpGlView ?: return
+        if (boundToOes) {
+            android.util.Log.i(
+                "ArCameraOES",
+                "ensureOes: alreadyBound +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            return
+        }
+        if (isRecordingActive()) {
+            android.util.Log.w(
+                "ArCameraOES",
+                "ensureOes: recording — skip +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            return
+        }
+        preferOesBinding = true
+        val gl = ArCameraBridge.warpGlView ?: run {
+            android.util.Log.e("ArCameraOES", "ensureOes: gl null")
+            return
+        }
         gl.setOesEnabled(true)
-        if (gl.cameraSurfaceTexture() != null) {
+        val stReady = gl.cameraSurfaceTexture() != null
+        android.util.Log.i(
+            "ArCameraOES",
+            "ensureOes: requestRebind stReady=$stReady +${ArCameraBridge.oesDiagElapsedMs()}ms",
+        )
+        if (stReady) {
             requestPreviewRebind()
         } else {
-            // GL surface not created yet — bind as soon as the OES texture exists.
+
             gl.onCameraSurfaceReady = {
                 gl.onCameraSurfaceReady = null
+                android.util.Log.i(
+                    "ArCameraOES",
+                    "ensureOes: surfaceReady → rebind +${ArCameraBridge.oesDiagElapsedMs()}ms",
+                )
                 if (!boundToOes) requestPreviewRebind()
             }
         }
     }
 
-    /** Bridge asks to route the live preview back through the classic PreviewView. */
     fun ensurePreviewViewBound() {
+        preferOesBinding = false
         if (!boundToOes) return
-        if (recording || videoRecorder.isRecording()) return
+        if (isRecordingActive()) return
+        requestPreviewRebind()
+    }
+
+    fun forcePreviewViewRebind() {
+        if (isRecordingActive()) return
+        preferOesBinding = false
+        boundToOes = false
         requestPreviewRebind()
     }
 
@@ -1207,14 +1379,23 @@ object ArCameraController {
         val lifecycleOwner = ArCameraBridge.lifecycleOwner ?: return
         val previewView = ArCameraBridge.previewView ?: return
         val faceOverlay = ArCameraBridge.faceOverlay ?: return
-        // Coalesce rapid rebind requests (filter spam / startup race) into ONE
-        // camera session change — each rebind was flashing black + adding lag.
-        if (rebindPosted) return
+
+        if (rebindPosted) {
+            android.util.Log.i(
+                "ArCameraOES",
+                "rebind: alreadyPosted +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            return
+        }
         rebindPosted = true
-        // Pause analysis so the current lens releases cleanly before rebinding.
+
         switchingCamera = true
         imageAnalysis?.clearAnalyzer()
         convertingFrame.set(false)
+        android.util.Log.i(
+            "ArCameraOES",
+            "rebind: posted preferOes=$preferOesBinding +${ArCameraBridge.oesDiagElapsedMs()}ms",
+        )
         activity.runOnUiThread {
             rebindPosted = false
             bindCamera(lifecycleOwner, previewView, faceOverlay)
@@ -1236,62 +1417,55 @@ object ArCameraController {
         }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
         cameraProviderFuture.addListener({
+            val bindStart = android.os.SystemClock.elapsedRealtime()
             val cameraProvider = cameraProviderFuture.get()
             val displayRotation = activity.windowManager.defaultDisplay.rotation
-            val target = Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
+            val previewTarget = Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
+            val pngFast = ArCameraBridge.currentFilter.isPngOverlay()
+            pngFastAnalysisBound = pngFast
+            val analysisTarget = if (pngFast) {
+                Size(PNG_ANALYSIS_WIDTH, PNG_ANALYSIS_HEIGHT)
+            } else {
+                Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
+            }
 
-            // Same target size for Preview + Analysis so FILL_CENTER crops match.
-            // Different aspect ratios cause glasses/dog to sit off the nose/eyes.
             val preview = Preview.Builder()
-                .setTargetResolution(target)
+                .setTargetResolution(previewTarget)
                 .setTargetRotation(displayRotation)
                 .build()
 
-            // Color grades render straight from the camera into a GL OES texture
-            // (no per-frame Bitmap → stock-camera-smooth). Everything else keeps the
-            // proven PreviewView binding so face filters/stickers are untouched.
             val glView = ArCameraBridge.warpGlView
-            val useOes = ArCameraBridge.currentFilter.usesGpuPreview() &&
+            val useOes = preferOesBinding &&
                 glView != null &&
                 glView.cameraSurfaceTexture() != null
-            boundToOes = useOes
-            if (useOes && glView != null) {
-                glView.setOesEnabled(true)
-                glView.setOnFramePresented { onOesFramePresented() }
-                bindPreviewToOes(preview, glView, activity)
-            } else {
-                glView?.setOesEnabled(false)
-                preview.surfaceProvider = previewView.surfaceProvider
-            }
 
-            val analysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .setTargetResolution(target)
-                .setTargetRotation(displayRotation)
-                .build()
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindCamera: START useOes=$useOes preferOes=$preferOesBinding " +
+                    "stReady=${glView?.cameraSurfaceTexture() != null} " +
+                    "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
 
-            analysis.setAnalyzer(executor) { imageProxy ->
-                processImage(imageProxy, faceOverlay, activity)
-            }
-
-            val capture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                .setTargetResolution(Size(PHOTO_TARGET_WIDTH, PHOTO_TARGET_HEIGHT))
-                .setTargetRotation(displayRotation)
-                .build()
-            imageCapture = capture
-
-            // Detach the previous analyzer + fully release the old lens before
-            // rebinding, so a flip doesn't fail to open the new camera.
             imageAnalysis?.clearAnalyzer()
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindCamera: unbindAll BEFORE +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
             cameraProvider.unbindAll()
-            imageAnalysis = analysis
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindCamera: unbindAll AFTER +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            imageAnalysis = null
+            videoCapture = null
+            simpleHardwareRecorder.attach(null)
+
             val selector = if (ArCameraBridge.isFrontCamera) {
                 CameraSelector.DEFAULT_FRONT_CAMERA
             } else {
                 CameraSelector.DEFAULT_BACK_CAMERA
             }
+
             fun applyTorchAfterBind(bound: Camera?) {
                 camera = bound
                 if (bound == null) return
@@ -1311,19 +1485,19 @@ object ArCameraController {
                     }
                 }
             }
-            try {
-                applyTorchAfterBind(
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        selector,
-                        preview,
-                        analysis,
-                        capture,
-                    ),
-                )
-            } catch (_: Exception) {
+
+            if (useOes && glView != null) {
+                boundToOes = true
+                glView.setOesEnabled(true)
+                glView.setOnFramePresented { onOesFramePresented() }
+                bindPreviewToOes(preview, glView, activity)
+                val capture = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                    .setTargetResolution(Size(PHOTO_TARGET_WIDTH, PHOTO_TARGET_HEIGHT))
+                    .setTargetRotation(displayRotation)
+                    .build()
+                imageCapture = capture
                 try {
-                    cameraProvider.unbindAll()
                     applyTorchAfterBind(
                         cameraProvider.bindToLifecycle(
                             lifecycleOwner,
@@ -1332,7 +1506,11 @@ object ArCameraController {
                             capture,
                         ),
                     )
-                    imageCapture = capture
+                    android.util.Log.i(
+                        "ArCameraOES",
+                        "bindCamera: OES bind OK cost=${android.os.SystemClock.elapsedRealtime() - bindStart}ms " +
+                            "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+                    )
                 } catch (_: Exception) {
                     try {
                         cameraProvider.unbindAll()
@@ -1341,16 +1519,170 @@ object ArCameraController {
                                 lifecycleOwner,
                                 selector,
                                 preview,
-                                analysis,
                             ),
+                        )
+                        imageCapture = null
+                        android.util.Log.w(
+                            "ArCameraOES",
+                            "bindCamera: OES bind fallback preview-only " +
+                                "+${ArCameraBridge.oesDiagElapsedMs()}ms",
                         )
                     } catch (_: Exception) {
                         camera = null
+                        boundToOes = false
+                        imageCapture = null
+                        android.util.Log.e(
+                            "ArCameraOES",
+                            "bindCamera: OES bind FAILED +${ArCameraBridge.oesDiagElapsedMs()}ms",
+                        )
                     }
-                    imageCapture = null
+                }
+                switchingCamera = false
+                return@addListener
+            }
+
+            boundToOes = false
+            glView?.setOesEnabled(false)
+            preview.surfaceProvider = previewView.surfaceProvider
+
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .setTargetResolution(analysisTarget)
+                .setTargetRotation(displayRotation)
+                .build()
+
+            analysis.setAnalyzer(executor) { imageProxy ->
+                processImage(imageProxy, faceOverlay, activity)
+            }
+
+            val capture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setTargetResolution(Size(PHOTO_TARGET_WIDTH, PHOTO_TARGET_HEIGHT))
+                .setTargetRotation(displayRotation)
+                .build()
+            imageCapture = capture
+
+            val recorder = Recorder.Builder()
+                .setQualitySelector(
+                    QualitySelector.fromOrderedList(
+                        listOf(Quality.HD, Quality.SD, Quality.LOWEST),
+                        FallbackStrategy.lowerQualityOrHigherThan(Quality.SD),
+                    ),
+                )
+                .build()
+            val hwVideo = VideoCapture.Builder(recorder)
+                .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
+                .build()
+            hwVideo.targetRotation = displayRotation
+
+            imageAnalysis = analysis
+            fun bindWithVideo(): Boolean {
+                return try {
+                    if (pngFast) {
+                        val overlay = stickerCameraOverlay ?: StickerCameraOverlay(
+                            activity.applicationContext,
+                        ).also { stickerCameraOverlay = it }
+                        val effect = overlay.ensureEffect()
+                        val viewPort = try {
+                            previewView.getViewPort(displayRotation)
+                        } catch (_: Exception) {
+                            null
+                        }
+                        val groupBuilder = UseCaseGroup.Builder()
+                            .addUseCase(preview)
+                            .addUseCase(analysis)
+                            .addUseCase(capture)
+                            .addUseCase(hwVideo)
+                            .addEffect(effect)
+                        if (viewPort != null) {
+                            groupBuilder.setViewPort(viewPort)
+                        }
+                        applyTorchAfterBind(
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                groupBuilder.build(),
+                            ),
+                        )
+                    } else {
+                        applyTorchAfterBind(
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                preview,
+                                analysis,
+                                capture,
+                                hwVideo,
+                            ),
+                        )
+                    }
+                    videoCapture = hwVideo
+                    simpleHardwareRecorder.attach(hwVideo)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            try {
+                if (!bindWithVideo()) {
+                    cameraProvider.unbindAll()
+                    // Fallback without OverlayEffect (software record path if PNG hw fails later).
+                    applyTorchAfterBind(
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            selector,
+                            preview,
+                            analysis,
+                            capture,
+                            hwVideo,
+                        ),
+                    )
+                    videoCapture = hwVideo
+                    simpleHardwareRecorder.attach(hwVideo)
+                }
+            } catch (_: Exception) {
+                try {
+                    cameraProvider.unbindAll()
+                    applyTorchAfterBind(
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            selector,
+                            preview,
+                            analysis,
+                            capture,
+                        ),
+                    )
+                } catch (_: Exception) {
+                    try {
+                        cameraProvider.unbindAll()
+                        applyTorchAfterBind(
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                preview,
+                                capture,
+                            ),
+                        )
+                        imageCapture = capture
+                    } catch (_: Exception) {
+                        try {
+                            cameraProvider.unbindAll()
+                            applyTorchAfterBind(
+                                cameraProvider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    selector,
+                                    preview,
+                                    analysis,
+                                ),
+                            )
+                        } catch (_: Exception) {
+                            camera = null
+                        }
+                        imageCapture = null
+                    }
                 }
             } finally {
-                // Resume frame processing now that the new lens is bound.
                 switchingCamera = false
             }
         }, ContextCompat.getMainExecutor(activity))
@@ -1361,8 +1693,7 @@ object ArCameraController {
         faceOverlay: FaceOverlayView,
         activity: Activity,
     ) {
-        // Drop frames while a camera flip is in progress so the analysis thread
-        // releases the current lens promptly and the new one can bind.
+
         if (switchingCamera) {
             imageProxy.close()
             return
@@ -1379,27 +1710,25 @@ object ArCameraController {
             val filter = ArCameraBridge.currentFilter
             frameCounter++
 
-            // OES GPU path (NONE + non-beauty color grades): the camera renders
-            // straight into GL, so the analysis frame has no consumer (recording is
-            // driven from the GL thread). Drop it — this is what removes the per-frame
-            // CPU cost/lag. If OES isn't bound yet, fall through to the bitmap path
-            // (fallback) so the preview is never black during the switch.
             if (boundToOes && filter.usesGpuPreview()) {
                 imageProxy.close()
                 return
             }
 
-            // Original filter: PreviewView shows the live feed. Skip heavy
-            // bitmap conversion — stills use CameraX ImageCapture instead.
+            if (hardwareRecording) {
+                // Normal/hardware path: drop frames (zero CPU).
+                // PNG: keep lightweight landmark updates so live overlay + OverlayEffect stay sticky.
+                if (!filter.isPngOverlay()) {
+                    imageProxy.close()
+                    return
+                }
+            }
+
             if (filter == FilterType.NONE && !recording) {
                 imageProxy.close()
                 return
             }
 
-            // No-filter recording: the analysis frame's ONLY consumer is the video
-            // encoder. If the record gate hasn't elapsed yet, skip the whole
-            // rotate/mirror conversion — the frame pump repeats the last frame at a
-            // fixed cadence, so nothing is lost and the analysis thread stays free.
             if (filter == FilterType.NONE && recording) {
                 val now = android.os.SystemClock.elapsedRealtime()
                 if (now - lastRecordCopyMs < RECORD_FRAME_INTERVAL_MS) {
@@ -1418,43 +1747,54 @@ object ArCameraController {
 
             val needsFace =
                 filter.isDistortion() || filter.isBeauty() || filter.isPngOverlay()
-            val detectEvery = if (needsFace) 3 else 4
+            // Stickers/glasses: detect every frame so overlays stick like TikTok (no catch-up lag).
+            // Beauty/distortion keep throttling to protect GPU warp path FPS.
+            val detectEvery = when {
+                // Stickers: every other frame — enough stickiness, much less MediaPipe load.
+                filter.isPngOverlay() -> 2
+                needsFace -> 3
+                else -> 4
+            }
             val runDetection =
                 needsFace && (frameCounter % detectEvery == 0 || cachedSnapshot == null)
 
-            // Face detection needs the UN-mirrored upright frame, so for those filters
-            // we rotate only and mirror later. For non-face filters (color-grade /
-            // none) we never read the un-mirrored frame, so fold rotate + front-camera
-            // mirror into ONE matrix pass here — saving a full-frame copy per frame.
             val front = ArCameraBridge.isFrontCamera
             val mirrorInOrient = front && !needsFace
             val needMirrorInBranch = front && needsFace
 
-            oriented = if (needsFace) {
-                // Face filters need the full-res un-mirrored upright frame for detection.
-                ImageProxyBitmapUtils.orient(rawBitmap, rotation, mirrorInOrient)
-            } else {
-                // Color-grade / none: no detection, so rotate + mirror + downscale to
-                // the encode/GL size in ONE pass. The later scaleToMaxDimension then
-                // becomes a no-op, so we allocate a single bitmap per frame instead of
-                // three — far less GC churn, smoother preview + steadier encode timing.
-                ImageProxyBitmapUtils.orientScaled(rawBitmap, rotation, mirrorInOrient, GL_MAX_EDGE)
+            oriented = when {
+                filter.isPngOverlay() -> {
+                    // Tiny bitmap for MediaPipe only — keeps live tracking light.
+                    ImageProxyBitmapUtils.orientScaled(
+                        rawBitmap,
+                        rotation,
+                        mirrorInOrient,
+                        DETECT_MAX_DIMENSION,
+                    )
+                }
+                needsFace -> {
+                    ImageProxyBitmapUtils.orient(rawBitmap, rotation, mirrorInOrient)
+                }
+                else -> {
+                    val edge = if (filter.isColorGrade()) RECORD_GL_EDGE else GL_MAX_EDGE
+                    ImageProxyBitmapUtils.orientScaled(rawBitmap, rotation, mirrorInOrient, edge)
+                }
             }
-            if (oriented !== rawBitmap) rawBitmap.recycle()
-
-            // Note: do NOT downscale `oriented` here while recording. The preview /
-            // GL path and the still-capture buffer both read from it, so shrinking it
-            // up front made the live camera look low-res during recording. The encoder
-            // frame is scaled separately (frameForRecording), so quality is preserved.
+            // Keep rawBitmap for PNG hi-res record frames; recycle after PNG branch.
+            if (oriented !== rawBitmap && !filter.isPngOverlay()) rawBitmap.recycle()
 
             if (runDetection) {
                 val landmarker = faceLandmarker ?: FaceLandmarkerHolder.get().also { faceLandmarker = it }
                 if (landmarker != null) {
-                    val detectBitmap = ImageProxyBitmapUtils.scaleToMaxDimension(
-                        oriented,
-                        DETECT_MAX_DIMENSION,
-                        filter = false,
-                    )
+                    val detectBitmap = if (filter.isPngOverlay()) {
+                        oriented
+                    } else {
+                        ImageProxyBitmapUtils.scaleToMaxDimension(
+                            oriented,
+                            DETECT_MAX_DIMENSION,
+                            filter = false,
+                        )
+                    }
                     val result = landmarker.detect(detectBitmap)
                     val raw = result?.let {
                         val mapped = FaceLandmarkMapper.fromResult(
@@ -1471,11 +1811,13 @@ object ArCameraController {
                     if (detectBitmap !== oriented) detectBitmap.recycle()
                     if (raw != null) {
                         noFaceStreak = 0
-                        cachedSnapshot = FaceLandmarkSmoother.smooth(raw)
+                        if (filter.isPngOverlay()) {
+                            cachedSnapshot = raw
+                        } else {
+                            cachedSnapshot = FaceLandmarkSmoother.smooth(raw)
+                        }
                     } else {
-                        // No face: clear the cached landmarks so stickers/overlays
-                        // (glasses, dog, big eyes, lips, distortion) disappear instead
-                        // of freezing the last pose on screen.
+
                         noFaceStreak++
                         if (noFaceStreak >= NO_FACE_CLEAR_THRESHOLD) {
                             cachedSnapshot = null
@@ -1490,8 +1832,7 @@ object ArCameraController {
 
             when {
                 filter.useShader() -> {
-                    // Front camera: mirror the bitmap so GL matches CameraX PreviewView
-                    // (stickers path). Without this, big-eyes/lips/nose look flipped vs glasses.
+
                     display = if (needMirrorInBranch) {
                         ImageProxyBitmapUtils.mirrorHorizontally(oriented)
                     } else {
@@ -1511,7 +1852,7 @@ object ArCameraController {
 
                     val glInput = ImageProxyBitmapUtils.scaleToMaxDimension(
                         display,
-                        GL_MAX_EDGE,
+                        if (filter.isColorGrade()) RECORD_GL_EDGE else GL_MAX_EDGE,
                         filter = true,
                     )
                     val snapshotForGl = if (
@@ -1544,38 +1885,27 @@ object ArCameraController {
                         viewHeight,
                     ).also { cachedWarpParams = it }
 
-                    // Still-capture buffer isn't needed mid-recording for shader
-                    // filters (record frames come straight from `display`/GL), so
-                    // skip the per-frame copy+scale to keep the analysis thread free.
                     if (!recording) retainCaptureFrame(display)
-                    val handledDirect = recording && !filter.isDistortion() &&
-                        maybeCaptureRecordingFrameFromSource(display, filter)
+
+                    if (recording && !glSurfaceRecording) {
+                        glView.setCaptureEnabled(true)
+                        glView.setCaptureMaxEdge(RECORD_GL_EDGE)
+                    }
                     glView.submitFrameWithParams(display, params)
                     display = null
                     ArCameraBridge.onGlFramePresented()
-                    if (!handledDirect) {
-                        maybeCaptureRecordingFrame()
-                    }
                 }
 
                 else -> {
-                    val retainThisFrame = recording || (frameCounter % 2 == 0)
-
                     if (filter.isPngOverlay()) {
-                        // Live camera is shown by the (visible) PreviewView; faceOverlay
-                        // draws ONLY the stickers. Previously we also drew a full-res
-                        // mirrored camera "underlay" on the overlay every frame — with
-                        // PreviewView now visible that meant TWO camera layers rendering
-                        // plus a per-frame scale copy, which caused the lag. Dropping the
-                        // underlay leaves PreviewView as the single (hardware) camera layer.
-                        val frame = oriented
+                        val landmarkW = activeSnapshot?.imageWidth ?: oriented.width
+                        val landmarkH = activeSnapshot?.imageHeight ?: oriented.height
                         val snapshots = activeSnapshot?.let { listOf(it) } ?: emptyList()
-                        val landmarkW = activeSnapshot?.imageWidth ?: frame.width
-                        val landmarkH = activeSnapshot?.imageHeight ?: frame.height
                         val expectedFilter = filter
                         val expectedFront = front
-                        activity.runOnUiThread {
-                            if (ArCameraBridge.currentFilter != expectedFilter) return@runOnUiThread
+                        // Regular post (not front-of-queue) so sticker updates don't starve UI.
+                        mainHandler.post {
+                            if (ArCameraBridge.currentFilter != expectedFilter) return@post
                             faceOverlay.setLandmarks(
                                 snapshots,
                                 landmarkW,
@@ -1583,28 +1913,81 @@ object ArCameraController {
                                 isFrontCamera = expectedFront,
                             )
                         }
+                        stickerCameraOverlay?.updateLandmarks(
+                            expectedFilter,
+                            snapshots,
+                            landmarkW,
+                            landmarkH,
+                            expectedFront,
+                        )
 
-                        // The mirrored full-res frame is only needed to bake the sticker
-                        // into a photo (on-demand) or a recording (every frame). Skip the
-                        // mirror + copy on the other frames to keep the preview smooth.
-                        if (retainThisFrame) {
-                            val captureSrc = if (needMirrorInBranch) {
-                                ImageProxyBitmapUtils.mirrorHorizontally(frame).also { frame.recycle() }
-                            } else {
-                                frame
+                        // Preferred path: hardware VideoCapture + OverlayEffect (zero encode lag).
+                        // Fallback only when HW recorder isn't active (rare bind failure).
+                        if (recording && !hardwareRecording) {
+                            val now = android.os.SystemClock.elapsedRealtime()
+                            if (now - lastRecordCopyMs >= PNG_RECORD_INTERVAL_MS &&
+                                recordingPixelCopyBusy.compareAndSet(false, true)
+                            ) {
+                                lastRecordCopyMs = now
+                                val hiRes = ImageProxyBitmapUtils.orientScaled(
+                                    rawBitmap,
+                                    rotation,
+                                    false,
+                                    PNG_RECORD_EDGE,
+                                )
+                                val captureSrc = if (needMirrorInBranch) {
+                                    ImageProxyBitmapUtils.mirrorHorizontally(hiRes).also {
+                                        if (it !== hiRes && !hiRes.isRecycled) hiRes.recycle()
+                                    }
+                                } else {
+                                    hiRes
+                                }
+                                val exec = recordOfferExecutor
+                                if (exec != null) {
+                                    exec.execute {
+                                        try {
+                                            val baked = try {
+                                                ArCameraBridge.faceOverlay?.composeOnto(captureSrc)
+                                                    ?: captureSrc
+                                            } catch (_: Exception) {
+                                                captureSrc
+                                            }
+                                            if (recording && videoRecorder.isRecording()) {
+                                                synchronized(recordFrameLock) {
+                                                    val old = latestRecordFrame
+                                                    latestRecordFrame = baked
+                                                    if (old != null &&
+                                                        old !== baked &&
+                                                        !old.isRecycled
+                                                    ) {
+                                                        old.recycle()
+                                                    }
+                                                }
+                                                if (baked !== captureSrc && !captureSrc.isRecycled) {
+                                                    captureSrc.recycle()
+                                                }
+                                            } else {
+                                                if (baked !== captureSrc && !baked.isRecycled) {
+                                                    baked.recycle()
+                                                }
+                                                if (!captureSrc.isRecycled) captureSrc.recycle()
+                                            }
+                                        } finally {
+                                            recordingPixelCopyBusy.set(false)
+                                        }
+                                    }
+                                } else {
+                                    recordingPixelCopyBusy.set(false)
+                                    if (!captureSrc.isRecycled) captureSrc.recycle()
+                                }
                             }
-                            oriented = null
-                            retainCaptureFrame(captureSrc)
-                            if (captureSrc !== lastCaptureBitmap) {
-                                captureSrc.recycle()
-                            }
-                        } else {
-                            frame.recycle()
-                            oriented = null
                         }
-                        maybeCaptureRecordingFrame()
+
+                        if (oriented !== rawBitmap && !oriented.isRecycled) oriented.recycle()
+                        oriented = null
+                        if (!rawBitmap.isRecycled) rawBitmap.recycle()
                     } else {
-                        // NONE while recording: the frame is fed straight to the encoder.
+
                         val displayBmp = if (needMirrorInBranch) {
                             ImageProxyBitmapUtils.mirrorHorizontally(oriented)
                         } else {
@@ -1615,7 +1998,7 @@ object ArCameraController {
                             oriented = null
                         }
                         if (recording && maybeCaptureRecordingFrameDirect(displayBmp, filter)) {
-                            // Ownership transferred to the recording pipeline above.
+
                         } else if (displayBmp !== lastCaptureBitmap) {
                             displayBmp.recycle()
                         }

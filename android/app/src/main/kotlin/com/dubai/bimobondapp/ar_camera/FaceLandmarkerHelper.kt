@@ -19,8 +19,7 @@ class FaceLandmarkerHelper(context: Context) {
 
     fun setup() {
         if (faceLandmarker != null) return
-        // Try GPU first for lower latency, fall back to CPU.
-        // LinkageError (missing .so) must not escape — callers catch Throwable too.
+
         faceLandmarker = try {
             createLandmarker(Delegate.GPU)
         } catch (e: Exception) {
@@ -34,7 +33,7 @@ class FaceLandmarkerHelper(context: Context) {
 
     fun detect(bitmap: Bitmap): FaceLandmarkerResult? {
         val landmarker = faceLandmarker ?: return null
-        // VIDEO mode requires strictly increasing timestamps.
+
         val now = SystemClock.uptimeMillis()
         frameTimestampMs = if (now > frameTimestampMs) now else frameTimestampMs + 1L
         val mpImage = BitmapImageBuilder(bitmap).build()

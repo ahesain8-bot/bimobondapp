@@ -1,37 +1,5 @@
 import 'dart:convert';
 
-/// Data model for the AR color filters (Portrait / Life / Retro grades).
-///
-/// This mirrors the shape the backend stores in the database and returns from
-/// the API (e.g. `GET /camera-studio/color-filters`). The app fetches it and
-/// falls back to [ArColorFilterCatalog.bundled] when offline.
-///
-/// JSON shape:
-/// {
-///   "version": "2026-07-18T01",
-///   "colorFilterCategories": [
-///     {
-///       "id": "portrait",
-///       "label": "Portrait",
-///       "sortOrder": 0,
-///       "filters": [
-///         {
-///           "id": "whitening",
-///           "label": "Pure",
-///           "thumbnailUrl": "https://cdn.example.com/filters/pure.jpg",
-///           "emoji": "🤍",                          // optional offline fallback
-///           "previewColorHex": "#F0E0D0",          // optional placeholder color
-///           "sortOrder": 0,
-///           "adjustments": {                        // optional (dashboard sliders)
-///             "brightness": 8, "contrast": 6, "saturation": 4,
-///             "warmth": 10, "tint": 0, "exposure": 5, "fade": 0
-///           },
-///           "colorMatrix": [ /* exactly 20 numbers */ ]
-///         }
-///       ]
-///     }
-///   ]
-/// }
 class ArColorFilterCatalog {
   const ArColorFilterCatalog({
     required this.version,
@@ -42,7 +10,7 @@ class ArColorFilterCatalog {
   final List<ArColorFilterCategoryModel> categories;
 
   factory ArColorFilterCatalog.fromJson(Map<String, dynamic> json) {
-    // Allow the payload to be wrapped in { "data": { ... } }.
+
     final data = json['data'];
     if (data is Map<String, dynamic>) {
       return ArColorFilterCatalog.fromJson(data);
@@ -82,7 +50,6 @@ class ArColorFilterCatalog {
     throw const FormatException('Invalid color filter catalog');
   }
 
-  /// Offline fallback = the values the app used to hardcode.
   static ArColorFilterCatalog bundled() {
     return const ArColorFilterCatalog(
       version: 'bundled',
@@ -99,10 +66,10 @@ class ArColorFilterCatalog {
               sortOrder: 0,
               previewColorHex: '#F0E0D0',
               colorMatrix: [
-                1.12, 0.02, 0.02, 0, 12, //
-                0.02, 1.10, 0.02, 0, 10, //
-                0.02, 0.02, 1.08, 0, 8, //
-                0, 0, 0, 1, 0, //
+                1.12, 0.02, 0.02, 0, 12,
+                0.02, 1.10, 0.02, 0, 10,
+                0.02, 0.02, 1.08, 0, 8,
+                0, 0, 0, 1, 0,
               ],
             ),
             ArColorFilterItemModel(
@@ -112,10 +79,10 @@ class ArColorFilterCatalog {
               sortOrder: 1,
               previewColorHex: '#FFF3D6',
               colorMatrix: [
-                1.15, -0.04, 0.04, 0, 8, //
-                -0.02, 1.12, 0.02, 0, 4, //
-                0.02, -0.06, 1.20, 0, 6, //
-                0, 0, 0, 1, 0, //
+                1.15, -0.04, 0.04, 0, 8,
+                -0.02, 1.12, 0.02, 0, 4,
+                0.02, -0.06, 1.20, 0, 6,
+                0, 0, 0, 1, 0,
               ],
             ),
             ArColorFilterItemModel(
@@ -125,10 +92,10 @@ class ArColorFilterCatalog {
               sortOrder: 2,
               previewColorHex: '#EAF2F5',
               colorMatrix: [
-                1.05, 0.02, 0.00, 0, 6, //
-                0.00, 1.08, 0.02, 0, 4, //
-                0.00, 0.00, 1.12, 0, 8, //
-                0, 0, 0, 1, 0, //
+                1.05, 0.02, 0.00, 0, 6,
+                0.00, 1.08, 0.02, 0, 4,
+                0.00, 0.00, 1.12, 0, 8,
+                0, 0, 0, 1, 0,
               ],
             ),
             ArColorFilterItemModel(
@@ -138,10 +105,10 @@ class ArColorFilterCatalog {
               sortOrder: 3,
               previewColorHex: '#F9DCE0',
               colorMatrix: [
-                1.14, 0.04, 0.04, 0, 10, //
-                0.02, 0.98, 0.02, 0, 4, //
-                0.06, 0.02, 1.02, 0, 8, //
-                0, 0, 0, 1, 0, //
+                1.14, 0.04, 0.04, 0, 10,
+                0.02, 0.98, 0.02, 0, 4,
+                0.06, 0.02, 1.02, 0, 8,
+                0, 0, 0, 1, 0,
               ],
             ),
             ArColorFilterItemModel(
@@ -151,10 +118,10 @@ class ArColorFilterCatalog {
               sortOrder: 4,
               previewColorHex: '#F7C9A3',
               colorMatrix: [
-                1.18, 0.06, -0.02, 0, 14, //
-                0.04, 1.06, -0.02, 0, 8, //
-                -0.04, 0.00, 0.96, 0, 2, //
-                0, 0, 0, 1, 0, //
+                1.18, 0.06, -0.02, 0, 14,
+                0.04, 1.06, -0.02, 0, 8,
+                -0.04, 0.00, 0.96, 0, 2,
+                0, 0, 0, 1, 0,
               ],
             ),
           ],
@@ -171,10 +138,10 @@ class ArColorFilterCatalog {
               sortOrder: 0,
               previewColorHex: '#F6C6A0',
               colorMatrix: [
-                1.16, 0.08, 0.00, 0, 12, //
-                0.04, 1.06, 0.00, 0, 6, //
-                -0.04, -0.02, 0.94, 0, 0, //
-                0, 0, 0, 1, 0, //
+                1.16, 0.08, 0.00, 0, 12,
+                0.04, 1.06, 0.00, 0, 6,
+                -0.04, -0.02, 0.94, 0, 0,
+                0, 0, 0, 1, 0,
               ],
             ),
             ArColorFilterItemModel(
@@ -184,10 +151,10 @@ class ArColorFilterCatalog {
               sortOrder: 1,
               previewColorHex: '#BFE0F2',
               colorMatrix: [
-                0.94, 0.00, 0.06, 0, 0, //
-                0.00, 1.02, 0.06, 0, 4, //
-                0.04, 0.04, 1.18, 0, 10, //
-                0, 0, 0, 1, 0, //
+                0.94, 0.00, 0.06, 0, 0,
+                0.00, 1.02, 0.06, 0, 4,
+                0.04, 0.04, 1.18, 0, 10,
+                0, 0, 0, 1, 0,
               ],
             ),
           ],
@@ -204,10 +171,10 @@ class ArColorFilterCatalog {
               sortOrder: 0,
               previewColorHex: '#D8C39A',
               colorMatrix: [
-                0.95, 0.10, 0.05, 0, 8, //
-                0.05, 0.90, 0.05, 0, 4, //
-                0.05, 0.10, 0.78, 0, 0, //
-                0, 0, 0, 1, 0, //
+                0.95, 0.10, 0.05, 0, 8,
+                0.05, 0.90, 0.05, 0, 4,
+                0.05, 0.10, 0.78, 0, 0,
+                0, 0, 0, 1, 0,
               ],
             ),
             ArColorFilterItemModel(
@@ -217,15 +184,13 @@ class ArColorFilterCatalog {
               sortOrder: 1,
               previewColorHex: '#B0B0B0',
               colorMatrix: [
-                0.33, 0.59, 0.08, 0, 0, //
-                0.33, 0.59, 0.08, 0, 0, //
-                0.33, 0.59, 0.08, 0, 0, //
-                0, 0, 0, 1, 0, //
+                0.33, 0.59, 0.08, 0, 0,
+                0.33, 0.59, 0.08, 0, 0,
+                0.33, 0.59, 0.08, 0, 0,
+                0, 0, 0, 1, 0,
               ],
             ),
-            // LUT-based grade (assets/luts/cityfilm.png). The live camera + the
-            // captured photo sample the LUT natively; the identity matrix here
-            // is just a neutral placeholder for the Flutter editor preview.
+
             ArColorFilterItemModel(
               id: 'cityfilm',
               label: 'City Film',
@@ -236,9 +201,7 @@ class ArColorFilterCatalog {
             ),
           ],
         ),
-        // Film LUT pack (assets/luts/*.png). These are LUT-only grades: the live
-        // camera + captured photo sample the PNG LUT natively. The identity
-        // matrix is a neutral placeholder for the Flutter editor preview.
+
         ArColorFilterCategoryModel(
           id: 'film',
           label: 'Film',
@@ -347,12 +310,11 @@ class ArColorFilterCatalog {
   }
 }
 
-/// Neutral placeholder matrix for LUT-only grades (native applies the real LUT).
 const List<double> _identityMatrix = [
-  1, 0, 0, 0, 0, //
-  0, 1, 0, 0, 0, //
-  0, 0, 1, 0, 0, //
-  0, 0, 0, 1, 0, //
+  1, 0, 0, 0, 0,
+  0, 1, 0, 0, 0,
+  0, 0, 1, 0, 0,
+  0, 0, 0, 1, 0,
 ];
 
 class ArColorFilterCategoryModel {
@@ -412,22 +374,16 @@ class ArColorFilterItemModel {
   final String id;
   final String label;
 
-  /// Image URL shown as the filter thumbnail in the carousel (server-provided).
   final String? thumbnailUrl;
 
-  /// Optional emoji fallback used offline / when [thumbnailUrl] is null.
   final String? emoji;
 
-  /// Optional solid color placeholder (while the thumbnail loads / offline).
   final String? previewColorHex;
 
-  /// Human-friendly slider values the dashboard used to build [colorMatrix].
-  /// Optional — the app only needs [colorMatrix]; this is for re-editing.
   final ArColorFilterAdjustments? adjustments;
 
   final int sortOrder;
 
-  /// Exactly 20 numbers (4 rows x 5 columns Android/Flutter ColorMatrix).
   final List<double> colorMatrix;
 
   factory ArColorFilterItemModel.fromJson(Map<String, dynamic> json) {
@@ -457,20 +413,9 @@ class ArColorFilterItemModel {
         'colorMatrix': colorMatrix,
       };
 
-  /// A ColorMatrix is only valid with exactly 20 values.
   bool get hasValidMatrix => colorMatrix.length == 20;
 }
 
-/// The dashboard-facing slider values (all -100..100, 0 = no change).
-/// The backend converts these into [ArColorFilterItemModel.colorMatrix].
-///
-/// - brightness: lighter / darker (additive offset)
-/// - contrast:   flatter / punchier tones
-/// - saturation: richer colors / -100 = black & white
-/// - warmth:     + warm (yellow/red), - cool (blue)
-/// - tint:       + magenta, - green
-/// - exposure:   overall gain (like brightness, but multiplicative)
-/// - fade:       + faded/matte look (lifted blacks), - deeper blacks
 class ArColorFilterAdjustments {
   const ArColorFilterAdjustments({
     this.brightness = 0,

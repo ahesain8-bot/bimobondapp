@@ -3,25 +3,12 @@ package com.dubai.bimobondapp.ar_camera
 import android.graphics.PointF
 import android.graphics.RectF
 
-/**
- * Adaptive exponential smoothing to reduce landmark jitter between frames.
- *
- * Uses a high base alpha (responsive) that jumps even higher when the face
- * moves quickly — mimicking TikTok's near-instant tracking feel while still
- * eliminating micro-jitter when the face is mostly still.
- */
 object FaceLandmarkSmoother {
 
-    /** Base interpolation weight toward the new frame (0 = frozen, 1 = raw). */
     private const val BASE_ALPHA = 0.75f
 
-    /** Alpha used when a fast movement is detected. */
     private const val FAST_ALPHA = 0.95f
 
-    /**
-     * Movement threshold (fraction of face width). If the bounding-box centre
-     * shifts more than this between two frames, we treat it as a fast motion.
-     */
     private const val FAST_THRESHOLD_FRACTION = 0.06f
 
     @Volatile
@@ -67,9 +54,6 @@ object FaceLandmarkSmoother {
         return smoothed
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-
-    /** Choose alpha dynamically based on how much the face moved. */
     private fun computeAlpha(prev: FaceLandmarkSnapshot, cur: FaceLandmarkSnapshot): Float {
         val faceW = cur.boundingBox.width().coerceAtLeast(1f)
         val prevCx = prev.boundingBox.centerX()

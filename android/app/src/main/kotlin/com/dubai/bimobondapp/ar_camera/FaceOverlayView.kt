@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.util.SparseArray
+import android.view.Choreographer
 import android.view.View
 import kotlin.math.max
 
@@ -31,12 +32,55 @@ class FaceOverlayView @JvmOverloads constructor(
     private var imageHeight = 0
     private var isFrontCamera = true
     private var currentFilter = FilterType.NONE
-    /** Mirrored analysis frame drawn under stickers so placement matches the camera content. */
+
     private var underlayFrame: Bitmap? = null
+
+    /** Bumps only when MediaPipe landmarks change — drives pose prediction correctly. */
+    private var landmarkSampleGen = 0L
+
+    private var predictLoopActive = false
+    private var predictFrameParity = 0
+    private val predictFrameCallback: Choreographer.FrameCallback =
+        object : Choreographer.FrameCallback {
+            override fun doFrame(frameTimeNanos: Long) {
+                if (!predictLoopActive) return
+                if (!currentFilter.isPngOverlay() || snapshots.isEmpty()) {
+                    stopPredictLoop()
+                    return
+                }
+                // Keep overlay prediction while recording — hardware encode no longer
+                // fights the UI thread (software sticker bake path is gone).
+                predictFrameParity++
+                if (predictFrameParity % 2 == 0) {
+                    invalidate()
+                }
+                Choreographer.getInstance().postFrameCallback(this)
+            }
+        }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         ensureAssetsLoaded()
+        if (currentFilter.isPngOverlay() && snapshots.isNotEmpty()) {
+            startPredictLoop()
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        stopPredictLoop()
+        super.onDetachedFromWindow()
+    }
+
+    private fun startPredictLoop() {
+        if (predictLoopActive) return
+        predictLoopActive = true
+        Choreographer.getInstance().postFrameCallback(predictFrameCallback)
+    }
+
+    private fun stopPredictLoop() {
+        if (!predictLoopActive) return
+        predictLoopActive = false
+        Choreographer.getInstance().removeFrameCallback(predictFrameCallback)
     }
 
     private fun bitmapFor(resId: Int): Bitmap? {
@@ -55,21 +99,19 @@ class FaceOverlayView @JvmOverloads constructor(
         imageHeight: Int,
         isFrontCamera: Boolean,
     ) {
-        // Ignore stale analysis callbacks after leaving glasses/dog.
+
         if (!currentFilter.isPngOverlay()) return
         this.snapshots = snapshots
         this.imageWidth = imageWidth
         this.imageHeight = imageHeight
         this.isFrontCamera = isFrontCamera
-        postInvalidate()
+        landmarkSampleGen++
+        invalidate()
+        if (snapshots.isNotEmpty()) startPredictLoop() else stopPredictLoop()
     }
 
-    /**
-     * Draws the same mirrored analysis frame stickers are computed from (pixel-perfect align).
-     * Pass null to clear and show CameraX PreviewView again.
-     */
     fun setUnderlayFrame(frame: Bitmap?) {
-        // Ignore stale analysis callbacks after leaving glasses/dog.
+
         if (frame != null && !currentFilter.isPngOverlay()) {
             if (!frame.isRecycled) frame.recycle()
             return
@@ -91,8 +133,8 @@ class FaceOverlayView @JvmOverloads constructor(
         postInvalidate()
     }
 
-    /** Clear underlay + landmarks when switching away from PNG overlays (e.g. back to Original). */
     fun resetForNonPngFilter() {
+        stopPredictLoop()
         snapshots = emptyList()
         imageWidth = 0
         imageHeight = 0
@@ -102,18 +144,17 @@ class FaceOverlayView @JvmOverloads constructor(
     fun setFilter(filter: FilterType) {
         if (currentFilter != filter) {
             StickerPoseSmoother.reset()
+            landmarkSampleGen++
         }
         currentFilter = filter
         if (!filter.isPngOverlay()) {
             resetForNonPngFilter()
+        } else if (snapshots.isNotEmpty()) {
+            startPredictLoop()
         }
         postInvalidate()
     }
 
-    /**
-     * Bakes glasses/dog overlays onto a mirrored camera frame for photo/video capture.
-     * Uses 1:1 image→bitmap mapping (not live-view FILL_CENTER) so stickers stay on the face.
-     */
     fun composeOnto(cameraFrame: Bitmap): Bitmap {
         if (!currentFilter.isPngOverlay() || snapshots.isEmpty() || imageWidth == 0 || imageHeight == 0) {
             return cameraFrame
@@ -131,7 +172,7 @@ class FaceOverlayView @JvmOverloads constructor(
         drawHeight = out.height
         try {
             for (snapshot in snapshots) {
-                drawConfiguredStickers(canvas, snapshot)
+                drawConfiguredStickers(canvas, snapshot, extrapolate = false)
             }
         } finally {
             mappingMode = prevMode
@@ -151,7 +192,7 @@ class FaceOverlayView @JvmOverloads constructor(
         for (config in StickerCatalog.configsFor(currentFilter)) {
             bitmapFor(config.drawableRes)
         }
-        // Warm common stickers so filter switches don't hitch.
+
         for (config in listOf(
             StickerCatalog.glasses,
             StickerCatalog.shades,
@@ -180,7 +221,7 @@ class FaceOverlayView @JvmOverloads constructor(
 
         val frame = underlayFrame
         if (frame != null && !frame.isRecycled && imageWidth > 0 && imageHeight > 0) {
-            // Same FILL_CENTER used by mapPoint — stickers lock to this bitmap.
+
             val scale = max(width.toFloat() / imageWidth, height.toFloat() / imageHeight)
             val drawW = imageWidth * scale
             val drawH = imageHeight * scale
@@ -202,7 +243,7 @@ class FaceOverlayView @JvmOverloads constructor(
                 FilterType.WHITENING -> drawLipstick(canvas, snapshot, "#E91E63", 45)
                 FilterType.WARM -> drawLipstick(canvas, snapshot, "#E64A19", 40)
                 else -> if (currentFilter.isPngOverlay()) {
-                    drawConfiguredStickers(canvas, snapshot)
+                    drawConfiguredStickers(canvas, snapshot, extrapolate = true)
                 }
             }
         }
@@ -210,23 +251,23 @@ class FaceOverlayView @JvmOverloads constructor(
 
     private fun drawLipstick(canvas: Canvas, snapshot: FaceLandmarkSnapshot, colorHex: String, alphaValue: Int) {
         if (snapshot.landmarks.size < 300) return
-        
+
         val path = android.graphics.Path()
         val startPt = mapPoint(snapshot.landmarks[61].x, snapshot.landmarks[61].y)
         path.moveTo(startPt[0], startPt[1])
-        
+
         for (idx in MediaPipeLandmarkIndices.UPPER_LIP) {
             val pt = mapPoint(snapshot.landmarks[idx].x, snapshot.landmarks[idx].y)
             path.lineTo(pt[0], pt[1])
         }
-        
+
         for (i in MediaPipeLandmarkIndices.LOWER_LIP.indices.reversed()) {
             val idx = MediaPipeLandmarkIndices.LOWER_LIP[i]
             val pt = mapPoint(snapshot.landmarks[idx].x, snapshot.landmarks[idx].y)
             path.lineTo(pt[0], pt[1])
         }
         path.close()
-        
+
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
             color = Color.parseColor(colorHex)
@@ -243,17 +284,14 @@ class FaceOverlayView @JvmOverloads constructor(
         }
 
         return when (mappingMode) {
-            // Capture bake: bitmaps are selfie-mirrored for front camera, so flip
-            // landmark X to land on the mirrored pixels.
+
             MappingMode.MIRRORED_BITMAP -> {
                 val sx = viewW / imageWidth
                 val sy = viewH / imageHeight
                 val mx = if (isFrontCamera) (imageWidth - x) * sx else x * sx
                 floatArrayOf(mx, y * sy)
             }
-            // Live view: CameraX PreviewView selfie-mirrors the front camera.
-            // Landmarks stay in natural (un-mirrored) analysis space, so flip X
-            // for front so stickers sit on the eyes/nose instead of the opposite side.
+
             MappingMode.LIVE_VIEW -> {
                 val scale = max(viewW / imageWidth, viewH / imageHeight)
                 val offsetX = (viewW - imageWidth * scale) / 2f
@@ -268,22 +306,24 @@ class FaceOverlayView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Draws every sticker listed for [currentFilter] as an **intact** PNG quad.
-     * Placement is resolved in screen space from live landmarks (see
-     * [StickerScreenPoseResolver]).
-     */
-    private fun drawConfiguredStickers(canvas: Canvas, snapshot: FaceLandmarkSnapshot) {
+    private fun drawConfiguredStickers(
+        canvas: Canvas,
+        snapshot: FaceLandmarkSnapshot,
+        extrapolate: Boolean,
+    ) {
         ensureAssetsLoaded()
         for (config in StickerCatalog.configsFor(currentFilter)) {
             val bitmap = bitmapFor(config.drawableRes) ?: continue
             val raw = StickerScreenPoseResolver.resolve(config, snapshot, ::mapPoint) ?: continue
-            val pose = StickerPoseSmoother.smooth(config.id, raw)
+            val pose = if (extrapolate) {
+                StickerPoseSmoother.smooth(config.id, raw, landmarkSampleGen)
+            } else {
+                raw
+            }
             drawIntactSticker(canvas, bitmap, pose)
         }
     }
 
-    /** Intact textured quad — never mesh-slice the PNG. */
     private fun drawIntactSticker(canvas: Canvas, bitmap: Bitmap, pose: StickerPose) {
         if (pose.width <= 0f) return
 

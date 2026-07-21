@@ -6,7 +6,6 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// TikTok-style Filters bottom sheet — color / portrait grades only.
 class ArColorFiltersPanel extends StatelessWidget {
   const ArColorFiltersPanel({
     super.key,
@@ -27,7 +26,7 @@ class ArColorFiltersPanel extends StatelessWidget {
   final ValueChanged<String> onFilterSelected;
   final ValueChanged<double> onIntensityChanged;
   final VoidCallback onClear;
-  /// Closes the sheet and keeps the current filter so the user can shoot.
+
   final VoidCallback onApply;
 
   bool get _showIntensity =>
@@ -265,8 +264,6 @@ class _CategoryRow extends StatelessWidget {
   }
 }
 
-/// Shows the server thumbnail when available, otherwise falls back to the
-/// emoji (offline / bundled) over an optional preview color.
 class _FilterThumbImage extends StatelessWidget {
   const _FilterThumbImage({required this.item});
 

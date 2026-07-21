@@ -2,15 +2,21 @@ package com.dubai.bimobondapp.ar_camera
 
 import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
+import android.opengl.EGL14
+import android.opengl.EGLExt
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
+import android.os.SystemClock
+import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import android.opengl.EGLConfig as AndroidEglConfig
+import android.opengl.EGLSurface as AndroidEglSurface
 
 class FaceWarpRenderer : GLSurfaceView.Renderer {
 
@@ -52,7 +58,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     private var lutTextureId = 0
 
-    // LUT bitmaps come from LutStore's cache — never recycle them here.
     @Volatile
     private var pendingLut: Bitmap? = null
 
@@ -60,11 +65,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var wantLut = false
     private var lutReady = false
 
-    // ---- OES direct-camera pipeline (stock-camera-smooth color grades) --------
-    // When [oesEnabled], the camera renders straight into an EXTERNAL_OES texture
-    // via [cameraSurfaceTexture] and we grade it on the GPU in one pass — no
-    // per-frame Bitmap conversion or upload. The classic bitmap path below stays
-    // intact for face filters (glasses/dog/eyes/nose/beauty) and as a fallback.
     private var oesProgram = 0
     private var oesTextureId = 0
     private var cameraSurfaceTexture: SurfaceTexture? = null
@@ -81,7 +81,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUHasLut = 0
     private var oesUIntensity = 0
 
-    // Constant Y-flip (GL vs Android). Built once — was rebuilt every frame before.
     private val texMatrixGl = FloatArray(9)
     private var texMatrixReady = false
     private val oesViewport = IntArray(4)
@@ -104,11 +103,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     var lutIntensity = 1f
 
-    /** Called on the GL thread once the camera SurfaceTexture exists (bind camera). */
     @Volatile
     var onCameraSurfaceReady: ((SurfaceTexture) -> Unit)? = null
 
-    /** Called on the GL thread after each presented frame (drives preview swap + record). */
     @Volatile
     var onFramePresented: (() -> Unit)? = null
 
@@ -128,7 +125,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         warpParams = params
     }
 
-    /** Sets (or clears, when null) the active color-grade LUT bitmap. */
     fun setLut(bitmap: Bitmap?) {
         if (bitmap == null) {
             wantLut = false
@@ -173,7 +169,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
 
-        // External OES texture the camera renders into directly (no Bitmap path).
         oesTextureId = textures[2]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
         GLES20.glTexParameteri(
@@ -205,7 +200,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         cameraSurfaceTexture = st
         onCameraSurfaceReady?.invoke(st)
 
-        // GL context (re)created: any previously uploaded LUT is gone.
         lutReady = false
         texMatrixReady = false
     }
@@ -220,7 +214,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        // Direct GPU path: camera → OES texture → grade → screen. Zero CPU/Bitmap.
         val st = cameraSurfaceTexture
         if (oesEnabled && st != null) {
             try {
@@ -230,7 +223,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return
             }
             drawOes()
-            if (captureEnabled) captureFrontBuffer()
+
+            presentToEncoder { drawOes() }
+            if (captureEnabled) captureFrontBuffer { drawOes() }
             onFramePresented?.invoke()
             return
         }
@@ -238,6 +233,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uploadPendingBitmap()
         if (textureWidth <= 0 || textureHeight <= 0) return
 
+        drawBitmapFrame()
+        presentToEncoder { drawBitmapFrame() }
+        if (captureEnabled) captureFrontBuffer { drawBitmapFrame() }
+        onFramePresented?.invoke()
+    }
+
+    private fun drawBitmapFrame() {
         val params = warpParams
         GLES20.glUseProgram(program)
 
@@ -260,9 +262,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform1f(uBeauty, params.beauty)
         GLES20.glUniform1f(uIntensity, params.intensity.coerceIn(0f, 1f))
 
-        val viewport = IntArray(4)
-        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, viewport, 0)
-        GLES20.glUniform2f(uViewSize, viewport[2].toFloat(), viewport[3].toFloat())
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
+        GLES20.glUniform2f(uViewSize, captureViewport[2].toFloat(), captureViewport[3].toFloat())
         GLES20.glUniform2f(uTexSize, textureWidth.toFloat(), textureHeight.toFloat())
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -277,10 +278,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         GLES20.glDisableVertexAttribArray(aPosition)
         GLES20.glDisableVertexAttribArray(aTexCoord)
-
-        if (captureEnabled) {
-            captureFrontBuffer()
-        }
     }
 
     private fun drawOes() {
@@ -300,11 +297,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glUniformMatrix4fv(oesUStMatrix, 1, false, stMatrix, 0)
         GLES20.glUniform1f(oesUIntensity, lutIntensity.coerceIn(0f, 1f))
 
-        // Y-flip only (GL vs Android). Built once — no per-frame Matrix work.
+        // Y-flip (GL vs Android). Required — without this the preview is upside-down.
         if (!texMatrixReady) {
-            // Column-major mat3 for scale(1, -1) about (0.5, 0.5):
-            // x' = x
-            // y' = 1 - y
             texMatrixGl[0] = 1f; texMatrixGl[1] = 0f; texMatrixGl[2] = 0f
             texMatrixGl[3] = 0f; texMatrixGl[4] = -1f; texMatrixGl[5] = 0f
             texMatrixGl[6] = 0f; texMatrixGl[7] = 1f; texMatrixGl[8] = 1f
@@ -315,8 +309,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, oesViewport, 0)
         GLES20.glUniform2f(oesUViewSize, oesViewport[2].toFloat(), oesViewport[3].toFloat())
 
-        // ST matrix already orients the buffer, so crop aspect uses the DISPLAY
-        // size (swap W/H when CameraX reports 90/270).
+        // After rot 90/270 the displayed frame is portrait — swap for FILL_CENTER.
         val rot = cameraRotationDegrees
         val dw: Int
         val dh: Int
@@ -349,22 +342,149 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     var captureEnabled: Boolean = false
 
-    /** Cap GPU→CPU readback size while recording (full-screen read was a major lag source). */
+    @Volatile
+    private var encoderAndroidSurface: Surface? = null
+
+    @Volatile
+    private var encoderWidth = 0
+
+    @Volatile
+    private var encoderHeight = 0
+
+    private var encoderEglSurface: AndroidEglSurface? = null
+    private var lastEncoderSwapMs = 0L
+    private val encoderMinIntervalMs = 33L
+    private val encoderRestoreViewport = IntArray(4)
+
+    fun setEncoderTarget(surface: Surface?, width: Int, height: Int) {
+        destroyEncoderEglSurface()
+        encoderAndroidSurface = surface
+        encoderWidth = width.coerceAtLeast(2)
+        encoderHeight = height.coerceAtLeast(2)
+        lastEncoderSwapMs = 0L
+    }
+
+    private fun destroyEncoderEglSurface() {
+        val eglSurf = encoderEglSurface
+        encoderEglSurface = null
+        if (eglSurf != null && eglSurf != EGL14.EGL_NO_SURFACE) {
+            val display = EGL14.eglGetCurrentDisplay()
+            if (display != null && display != EGL14.EGL_NO_DISPLAY) {
+                try {
+                    EGL14.eglDestroySurface(display, eglSurf)
+                } catch (_: Throwable) {
+                }
+            }
+        }
+    }
+
+    private fun chooseRecordableConfig(
+        display: android.opengl.EGLDisplay,
+    ): AndroidEglConfig? {
+        val attribList = intArrayOf(
+            EGL14.EGL_RED_SIZE, 8,
+            EGL14.EGL_GREEN_SIZE, 8,
+            EGL14.EGL_BLUE_SIZE, 8,
+            EGL14.EGL_ALPHA_SIZE, 8,
+            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGLExt.EGL_RECORDABLE_ANDROID, 1,
+            EGL14.EGL_NONE,
+        )
+        val configs = arrayOfNulls<AndroidEglConfig>(1)
+        val numConfigs = IntArray(1)
+        if (!EGL14.eglChooseConfig(display, attribList, 0, configs, 0, 1, numConfigs, 0)) {
+
+            val fallback = intArrayOf(
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE,
+            )
+            if (!EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, numConfigs, 0)) {
+                return null
+            }
+        }
+        return configs[0]
+    }
+
+    private fun presentToEncoder(draw: () -> Unit) {
+        val androidSurface = encoderAndroidSurface ?: return
+        if (!androidSurface.isValid) return
+        val encW = encoderWidth
+        val encH = encoderHeight
+        if (encW < 2 || encH < 2) return
+
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastEncoderSwapMs < encoderMinIntervalMs) return
+
+        val eglDisplay = EGL14.eglGetCurrentDisplay()
+        val eglContext = EGL14.eglGetCurrentContext()
+        val backupDraw = EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW)
+        val backupRead = EGL14.eglGetCurrentSurface(EGL14.EGL_READ)
+        if (eglDisplay == EGL14.EGL_NO_DISPLAY ||
+            eglContext == EGL14.EGL_NO_CONTEXT ||
+            backupDraw == EGL14.EGL_NO_SURFACE
+        ) {
+            return
+        }
+
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, encoderRestoreViewport, 0)
+
+        var eglSurf = encoderEglSurface
+        if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) {
+            val config = chooseRecordableConfig(eglDisplay) ?: return
+            val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
+            eglSurf = EGL14.eglCreateWindowSurface(
+                eglDisplay,
+                config,
+                androidSurface,
+                surfaceAttribs,
+                0,
+            )
+            if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) return
+            encoderEglSurface = eglSurf
+        }
+
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurf, eglSurf, eglContext)) return
+        try {
+            GLES20.glViewport(0, 0, encW, encH)
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            draw()
+            EGLExt.eglPresentationTimeANDROID(
+                eglDisplay,
+                eglSurf,
+                now * 1_000_000L,
+            )
+            EGL14.eglSwapBuffers(eglDisplay, eglSurf)
+            lastEncoderSwapMs = now
+        } catch (_: Throwable) {
+        } finally {
+            EGL14.eglMakeCurrent(eglDisplay, backupDraw, backupRead, eglContext)
+            GLES20.glViewport(
+                encoderRestoreViewport[0],
+                encoderRestoreViewport[1],
+                encoderRestoreViewport[2],
+                encoderRestoreViewport[3],
+            )
+        }
+    }
+
     @Volatile
     var captureMaxEdge: Int = 960
 
     private val captureLock = Any()
     private var lastCapturedFrame: Bitmap? = null
 
-    // Reused across frames — allocating ~10–20MB direct buffers every frame caused GC jank.
     private var captureReadBuf: ByteBuffer? = null
     private var captureFlipBuf: ByteBuffer? = null
     private var captureRowBuf: ByteArray? = null
     private var captureBufBytes = 0
     private var lastCaptureMs = 0L
-    private val captureMinIntervalMs = 33L // ~30 fps — matches the encoder pump
+    private val captureMinIntervalMs = 33L
 
-    /** When true, the next draw ignores the capture throttle (still photo). */
     @Volatile
     var forceCaptureNextFrame: Boolean = false
 
@@ -380,7 +500,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
     }
 
-    /** Ownership transfer — no copy. Caller must recycle. */
     fun takeLastCapturedFrame(): Bitmap? = synchronized(captureLock) {
         val frame = lastCapturedFrame
         lastCapturedFrame = null
@@ -406,7 +525,63 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var captureScratchBitmap: Bitmap? = null
     private val captureViewport = IntArray(4)
 
-    private fun captureFrontBuffer() {
+    private var captureFboId = 0
+    private var captureFboTexId = 0
+    private var captureFboW = 0
+    private var captureFboH = 0
+
+    private fun ensureCaptureFbo(w: Int, h: Int) {
+        if (captureFboId != 0 && captureFboW == w && captureFboH == h) return
+        releaseCaptureFbo()
+        val tex = IntArray(1)
+        GLES20.glGenTextures(1, tex, 0)
+        captureFboTexId = tex[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, captureFboTexId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D,
+            0,
+            GLES20.GL_RGBA,
+            w,
+            h,
+            0,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            null,
+        )
+        val fbo = IntArray(1)
+        GLES20.glGenFramebuffers(1, fbo, 0)
+        captureFboId = fbo[0]
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, captureFboId)
+        GLES20.glFramebufferTexture2D(
+            GLES20.GL_FRAMEBUFFER,
+            GLES20.GL_COLOR_ATTACHMENT0,
+            GLES20.GL_TEXTURE_2D,
+            captureFboTexId,
+            0,
+        )
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        captureFboW = w
+        captureFboH = h
+    }
+
+    private fun releaseCaptureFbo() {
+        if (captureFboId != 0) {
+            GLES20.glDeleteFramebuffers(1, intArrayOf(captureFboId), 0)
+            captureFboId = 0
+        }
+        if (captureFboTexId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(captureFboTexId), 0)
+            captureFboTexId = 0
+        }
+        captureFboW = 0
+        captureFboH = 0
+    }
+
+    private fun captureFrontBuffer(redraw: (() -> Unit)? = null) {
         val now = android.os.SystemClock.elapsedRealtime()
         val force = forceCaptureNextFrame
         if (!force && now - lastCaptureMs < captureMinIntervalMs) return
@@ -414,12 +589,40 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         lastCaptureMs = now
 
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
-        val w = captureViewport[2]
-        val h = captureViewport[3]
-        if (w <= 1 || h <= 1) return
+        val screenX = captureViewport[0]
+        val screenY = captureViewport[1]
+        val screenW = captureViewport[2]
+        val screenH = captureViewport[3]
+        if (screenW <= 1 || screenH <= 1) return
 
-        val rowBytes = w * 4
-        val bytes = rowBytes * h
+        val maxEdge = captureMaxEdge.coerceAtLeast(2)
+        val largest = maxOf(screenW, screenH)
+        val useFbo = redraw != null && largest > maxEdge
+        val readW: Int
+        val readH: Int
+        if (useFbo) {
+            val s = maxEdge.toFloat() / largest
+            readW = ((screenW * s).toInt() and 1.inv()).coerceAtLeast(2)
+            readH = ((screenH * s).toInt() and 1.inv()).coerceAtLeast(2)
+            ensureCaptureFbo(readW, readH)
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, captureFboId)
+            GLES20.glViewport(0, 0, readW, readH)
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            try {
+                redraw!!()
+            } catch (_: Throwable) {
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                GLES20.glViewport(screenX, screenY, screenW, screenH)
+                return
+            }
+        } else {
+            readW = screenW
+            readH = screenH
+        }
+
+        val rowBytes = readW * 4
+        val bytes = rowBytes * readH
         ensureCaptureBuffers(bytes, rowBytes)
         val buf = captureReadBuf!!
         val flipped = captureFlipBuf!!
@@ -427,33 +630,34 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         buf.clear()
         flipped.clear()
 
-        GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
+        GLES20.glReadPixels(0, 0, readW, readH, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
 
-        // GL origin is bottom-left — flip rows into Bitmap order (bulk row copies).
-        for (row in 0 until h) {
-            buf.position((h - 1 - row) * rowBytes)
+        if (useFbo) {
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glViewport(screenX, screenY, screenW, screenH)
+        }
+
+        for (row in 0 until readH) {
+            buf.position((readH - 1 - row) * rowBytes)
             buf.get(rowBuf, 0, rowBytes)
             flipped.put(rowBuf)
         }
         flipped.rewind()
 
-        // Reuse the full-res scratch bitmap (avoid createBitmap every frame).
         var scratch = captureScratchBitmap
-        if (scratch == null || scratch.isRecycled || scratch.width != w || scratch.height != h) {
+        if (scratch == null || scratch.isRecycled ||
+            scratch.width != readW || scratch.height != readH
+        ) {
             scratch?.recycle()
-            scratch = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            scratch = Bitmap.createBitmap(readW, readH, Bitmap.Config.ARGB_8888)
             captureScratchBitmap = scratch
         }
         scratch.copyPixelsFromBuffer(flipped)
 
-        // Shrink once for the encoder — encoder MAX_EDGE is 1280; 960 keeps
-        // readback→scale cheaper without a visible quality drop on phone screens.
-        val maxEdge = captureMaxEdge.coerceAtLeast(2)
-        val largest = maxOf(w, h)
-        val out: Bitmap = if (largest > maxEdge) {
+        val out: Bitmap = if (!useFbo && largest > maxEdge) {
             val s = maxEdge.toFloat() / largest
-            val sw = ((w * s).toInt() and 1.inv()).coerceAtLeast(2)
-            val sh = ((h * s).toInt() and 1.inv()).coerceAtLeast(2)
+            val sw = ((readW * s).toInt() and 1.inv()).coerceAtLeast(2)
+            val sh = ((readH * s).toInt() and 1.inv()).coerceAtLeast(2)
             Bitmap.createScaledBitmap(scratch, sw, sh, true)
         } else {
             scratch.copy(Bitmap.Config.ARGB_8888, false)
@@ -470,6 +674,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     fun release() {
         captureEnabled = false
+        destroyEncoderEglSurface()
+        encoderAndroidSurface = null
+        encoderWidth = 0
+        encoderHeight = 0
         synchronized(captureLock) {
             lastCapturedFrame?.recycle()
             lastCapturedFrame = null
@@ -486,6 +694,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         captureFlipBuf = null
         captureRowBuf = null
         captureBufBytes = 0
+        releaseCaptureFbo()
         try {
             cameraSurfaceTexture?.release()
         } catch (_: Throwable) {
@@ -521,7 +730,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
         lutReady = true
-        // Do NOT recycle: LutStore owns/caches this bitmap.
+
     }
 
     private fun uploadPendingBitmap() {
@@ -591,9 +800,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             }
         """
 
-        // Direct camera (EXTERNAL_OES) → color grade in ONE GPU pass. This is the
-        // "stock-camera-smooth" path: the camera writes into the OES texture and we
-        // grade it here — no Bitmap, no CPU LUT, no glReadPixels for preview.
         private const val OES_FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
             precision highp float;
@@ -626,24 +832,23 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return mix(newColor1, newColor2, fract(blueColor)).rgb;
             }
 
-            vec2 centerCrop(vec2 uv) {
-                float viewAspect = uViewSize.x / uViewSize.y;
-                float texAspect = uTexSize.x / uTexSize.y;
+            // Same as PreviewView FILL_CENTER: fill the view, crop overflow, keep aspect.
+            vec2 fillCenter(vec2 uv) {
+                float viewAspect = uViewSize.x / max(uViewSize.y, 1.0);
+                float texAspect = uTexSize.x / max(uTexSize.y, 1.0);
                 if (texAspect > viewAspect) {
-                    float scale = viewAspect / texAspect;
-                    float offset = (1.0 - scale) * 0.5;
-                    return vec2(uv.x * scale + offset, uv.y);
+                    float s = viewAspect / texAspect;
+                    return vec2(uv.x * s + (1.0 - s) * 0.5, uv.y);
                 } else {
-                    float scale = texAspect / viewAspect;
-                    float offset = (1.0 - scale) * 0.5;
-                    return vec2(uv.x, uv.y * scale + offset);
+                    float s = texAspect / viewAspect;
+                    return vec2(uv.x, uv.y * s + (1.0 - s) * 0.5);
                 }
             }
 
             void main() {
-                vec2 d = centerCrop(vTexCoord);
-                vec3 b = uTexTransform * vec3(d, 1.0);
-                vec2 st = (uStMatrix * vec4(b.xy, 0.0, 1.0)).xy;
+                vec2 d = fillCenter(vTexCoord);
+                vec2 uv = (uTexTransform * vec3(d, 1.0)).xy;
+                vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
                 vec3 col = texture2D(uTexture, st).rgb;
                 if (uHasLut > 0.5) {
                     vec3 graded = applyLut(clamp(col, 0.0, 1.0));

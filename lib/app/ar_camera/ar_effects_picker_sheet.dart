@@ -4,7 +4,6 @@ import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-/// AR face-effect picker matching the live camera carousel catalog.
 class ArEffectsPickerSheet {
   ArEffectsPickerSheet._();
 
