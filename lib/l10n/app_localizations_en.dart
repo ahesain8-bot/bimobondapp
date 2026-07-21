@@ -2625,7 +2625,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraSpeed => 'Speed';
 
   @override
-  String get cameraBeauty => 'Beauty';
+  String get cameraBeauty => 'Retouch';
 
   @override
   String get cameraFilters => 'Filters';
@@ -2740,7 +2740,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openCameraStudio => 'Open camera';
 
   @override
-  String get cameraModePhoto => 'Photo';
+  String get cameraModePhoto => 'PHOTO';
 
   @override
   String get cameraModeVideo => 'Video';
@@ -2749,7 +2749,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraModeLive => 'LIVE';
 
   @override
-  String get cameraModeText => 'Text';
+  String get cameraModeText => 'TEXT';
 
   @override
   String get cameraAddSound => 'Add sound';
@@ -2767,7 +2767,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraTabPost => 'Post';
 
   @override
-  String get cameraTabCreative => 'Creative';
+  String get cameraTabCreative => 'Create';
 
   @override
   String get cameraDuration10m => '10m';

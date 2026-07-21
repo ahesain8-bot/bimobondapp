@@ -5252,7 +5252,7 @@ abstract class AppLocalizations {
   /// No description provided for @cameraModePhoto.
   ///
   /// In en, this message translates to:
-  /// **'Photo'**
+  /// **'PHOTO'**
   String get cameraModePhoto;
 
   /// No description provided for @cameraModeVideo.
@@ -5270,7 +5270,7 @@ abstract class AppLocalizations {
   /// No description provided for @cameraModeText.
   ///
   /// In en, this message translates to:
-  /// **'Text'**
+  /// **'TEXT'**
   String get cameraModeText;
 
   /// No description provided for @cameraAddSound.

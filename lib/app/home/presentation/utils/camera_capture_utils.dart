@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
@@ -11,6 +11,12 @@ class CameraRatioLetterbox {
 
   static double topHeight(double topPadding) => topPadding + 56.0;
 
+  static double tikTokTopChromeHeight(
+    double topPadding, {
+    bool photoMode = false,
+  }) =>
+      topPadding + (photoMode ? 96.0 : 28.0);
+
   static double bottomHeight({
     required bool useNativeAr,
     required bool filtersPanelOpen,
@@ -18,6 +24,16 @@ class CameraRatioLetterbox {
     if (filtersPanelOpen) return 220.0;
     return useNativeAr ? 268.0 : 210.0;
   }
+
+  static double tikTokBottomChromeHeight(
+    double bottomPadding, {
+    bool photoMode = false,
+  }) =>
+      bottomPadding + (photoMode ? 215.0 : 108.0);
+
+  static const double tikTokPreviewRadius = 22.0;
+  static const Duration chromeAnimDuration = Duration(milliseconds: 420);
+  static const Curve chromeAnimCurve = Curves.easeInOutCubic;
 
   static Size previewSize({
     required Size screenSize,
@@ -36,6 +52,32 @@ class CameraRatioLetterbox {
         (screenSize.height - top - bottom).clamp(1.0, screenSize.height);
     return Size(screenSize.width, midH);
   }
+}
+
+class TikTokPreviewClipper extends CustomClipper<Path> {
+  TikTokPreviewClipper({
+    required this.top,
+    required this.bottom,
+    this.radius = CameraRatioLetterbox.tikTokPreviewRadius,
+  });
+
+  final double top;
+  final double bottom;
+  final double radius;
+
+  @override
+  Path getClip(Size size) {
+    final midBottom = (size.height - bottom).clamp(top + 1.0, size.height);
+    final rect = Rect.fromLTRB(0, top, size.width, midBottom);
+    return Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+  }
+
+  @override
+  bool shouldReclip(covariant TikTokPreviewClipper oldClipper) =>
+      oldClipper.top != top ||
+      oldClipper.bottom != bottom ||
+      oldClipper.radius != radius;
 }
 
 class CameraCaptureUtils {

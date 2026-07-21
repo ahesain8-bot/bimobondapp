@@ -1037,20 +1037,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (!_useNativeArFilters || _isRecording || _showFilters) return;
     final currentId = ArFilterCatalog.items[_arFilterIndex].id;
     final current = ArFilterCatalog.effectCarouselIndex(currentId);
+    final count = ArFilterCatalog.effectItems.length;
+    if (count == 0) return;
     final velocity = details.primaryVelocity ?? 0;
     if (velocity < -80 || _arSwipeDrag < -36) {
-      final next = (current + 1).clamp(
-        0,
-        ArFilterCatalog.effectItems.length - 1,
-      );
+      final next = (current + 1) % count;
       _onArFilterSelected(
         ArFilterCatalog.indexOfId(ArFilterCatalog.effectItems[next].id),
       );
     } else if (velocity > 80 || _arSwipeDrag > 36) {
-      final prev = (current - 1).clamp(
-        0,
-        ArFilterCatalog.effectItems.length - 1,
-      );
+      final prev = (current - 1 + count) % count;
       _onArFilterSelected(
         ArFilterCatalog.indexOfId(ArFilterCatalog.effectItems[prev].id),
       );
@@ -1783,10 +1779,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       child: LayoutBuilder(
         builder: (context, constraints) {
           final screen = Size(constraints.maxWidth, constraints.maxHeight);
-          final Rect frame;
-          if (_layoutMode == CameraLayoutMode.off) {
-            frame = Offset.zero & screen;
-          } else {
+          final media = MediaQuery.of(context);
+
+          if (_layoutMode != CameraLayoutMode.off) {
             final mode = _layoutMode;
             final last = mode.cellCount - 1;
             final active = last < 0
@@ -1795,22 +1790,66 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                       ? 0
                       : (_layoutActiveCell > last ? last : _layoutActiveCell));
             final cell = mode.cellRect(screen, active);
-            frame = CameraLayoutComposer.previewFrameForCell(
+            final frame = CameraLayoutComposer.previewFrameForCell(
               screen: screen,
               cell: cell,
             );
+            return Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned(
+                  left: frame.left,
+                  top: frame.top,
+                  width: frame.width,
+                  height: frame.height,
+                  child: ArCameraPreview(key: _arPreviewKey),
+                ),
+              ],
+            );
           }
-          return Stack(
-            clipBehavior: Clip.hardEdge,
-            children: [
-              Positioned(
-                left: frame.left,
-                top: frame.top,
-                width: frame.width,
-                height: frame.height,
-                child: ArCameraPreview(key: _arPreviewKey),
-              ),
-            ],
+
+          final isPhoto = _studioMode == CameraStudioMode.photo;
+          final videoTop = CameraRatioLetterbox.tikTokTopChromeHeight(
+            media.padding.top,
+          );
+          final photoTop = CameraRatioLetterbox.tikTokTopChromeHeight(
+            media.padding.top,
+            photoMode: true,
+          );
+          final videoBottom = CameraRatioLetterbox.tikTokBottomChromeHeight(
+            media.padding.bottom,
+          );
+          final photoBottom = CameraRatioLetterbox.tikTokBottomChromeHeight(
+            media.padding.bottom,
+            photoMode: true,
+          );
+          final letterboxTop = CameraRatioLetterbox.topHeight(media.padding.top);
+          final letterboxBottom = CameraRatioLetterbox.bottomHeight(
+            useNativeAr: true,
+            filtersPanelOpen: _showFilters,
+          );
+
+          return TweenAnimationBuilder<double>(
+            duration: CameraRatioLetterbox.chromeAnimDuration,
+            curve: CameraRatioLetterbox.chromeAnimCurve,
+            tween: Tween<double>(
+              end: _ratioLetterboxed ? 0.0 : (isPhoto ? 1.0 : 0.0),
+            ),
+            builder: (context, t, child) {
+              final top = _ratioLetterboxed
+                  ? letterboxTop
+                  : (videoTop + (photoTop - videoTop) * t);
+              final bottom = _ratioLetterboxed
+                  ? letterboxBottom
+                  : (videoBottom + (photoBottom - videoBottom) * t);
+              return ClipPath(
+                clipper: TikTokPreviewClipper(top: top, bottom: bottom),
+                child: child,
+              );
+            },
+            child: SizedBox.expand(
+              child: ArCameraPreview(key: _arPreviewKey),
+            ),
           );
         },
       ),

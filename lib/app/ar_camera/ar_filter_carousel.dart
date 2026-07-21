@@ -1,6 +1,4 @@
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
-import 'package:bimobondapp/app/ar_camera/ar_filter_l10n.dart';
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -39,14 +37,14 @@ class ArFilterCarousel extends StatefulWidget {
   final bool showSideActions;
 
   final bool soloShutter;
-
   final VoidCallback? onConfirm;
   final VoidCallback? onCancel;
 
   static const inactiveSize = 52.0;
-  static const activeSize = 84.0;
-  static const itemGap = 14.0;
+  static const activeSize = 90.0;
+  static const itemGap = 12.0;
   static const itemStride = activeSize + itemGap;
+  static const _loopCopies = 200;
 
   @override
   State<ArFilterCarousel> createState() => _ArFilterCarouselState();
@@ -55,36 +53,40 @@ class ArFilterCarousel extends StatefulWidget {
 class _ArFilterCarouselState extends State<ArFilterCarousel> {
   late final ScrollController _controller;
   double _scrollOffset = 0;
-  int _lastHapticIndex = 0;
+  int _lastHapticReal = 0;
   bool _programmaticScroll = false;
 
   List<ArFilterItem> get _filters => widget.items;
+  int get _n => _filters.length;
+  int get _midBase => (ArFilterCarousel._loopCopies ~/ 2) * _n;
+  int get _itemCount => _n * ArFilterCarousel._loopCopies;
 
   @override
   void initState() {
     super.initState();
     _controller = ScrollController();
-    _lastHapticIndex = widget.selectedIndex;
+    _lastHapticReal = widget.selectedIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollTo(widget.selectedIndex, animated: false);
+      _scrollToReal(widget.selectedIndex, animated: false);
     });
   }
 
   @override
   void didUpdateWidget(covariant ArFilterCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.items != widget.items) {
-      _lastHapticIndex = widget.selectedIndex;
+    if (oldWidget.items != widget.items || _n == 0) {
+      _lastHapticReal = widget.selectedIndex;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _scrollTo(widget.selectedIndex, animated: false);
+        if (mounted) _scrollToReal(widget.selectedIndex, animated: false);
       });
       return;
     }
     if (oldWidget.selectedIndex == widget.selectedIndex) return;
     if (!_controller.hasClients) return;
-    final target = widget.selectedIndex * ArFilterCarousel.itemStride;
+    final target = _nearestLoopIndex(widget.selectedIndex) *
+        ArFilterCarousel.itemStride;
     if ((_controller.offset - target).abs() > 2) {
-      _scrollTo(widget.selectedIndex, animated: true);
+      _scrollToReal(widget.selectedIndex, animated: true);
     }
   }
 
@@ -94,12 +96,28 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     super.dispose();
   }
 
-  Future<void> _scrollTo(int index, {required bool animated}) async {
-    if (!_controller.hasClients) return;
-    final target = index
-        .clamp(0, _filters.length - 1)
-        .toDouble() *
-        ArFilterCarousel.itemStride;
+  int _realFromLoop(int loopIndex) {
+    if (_n == 0) return 0;
+    return ((loopIndex % _n) + _n) % _n;
+  }
+
+  int _nearestLoopIndex(int realIndex) {
+    final real = realIndex.clamp(0, _n - 1);
+    if (!_controller.hasClients || _n == 0) {
+      return _midBase + real;
+    }
+    final current = (_controller.offset / ArFilterCarousel.itemStride).round();
+    final currentReal = _realFromLoop(current);
+    var delta = real - currentReal;
+    if (delta > _n / 2) delta -= _n;
+    if (delta < -_n / 2) delta += _n;
+    return current + delta;
+  }
+
+  Future<void> _scrollToReal(int realIndex, {required bool animated}) async {
+    if (!_controller.hasClients || _n == 0) return;
+    final loop = _nearestLoopIndex(realIndex);
+    final target = loop * ArFilterCarousel.itemStride;
     _programmaticScroll = true;
     if (animated) {
       await _controller.animateTo(
@@ -114,12 +132,26 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
       setState(() => _scrollOffset = _controller.offset);
     }
     _programmaticScroll = false;
+    _recenterIfNearEdge();
   }
 
-  void _emit(int index) {
-    final clamped = index.clamp(0, _filters.length - 1);
+  void _recenterIfNearEdge() {
+    if (!_controller.hasClients || _n == 0) return;
+    final loop = (_controller.offset / ArFilterCarousel.itemStride).round();
+    final margin = _n * 20;
+    if (loop < margin || loop > _itemCount - margin) {
+      final real = _realFromLoop(loop);
+      _programmaticScroll = true;
+      _controller.jumpTo((_midBase + real) * ArFilterCarousel.itemStride);
+      _scrollOffset = _controller.offset;
+      _programmaticScroll = false;
+    }
+  }
+
+  void _emit(int realIndex) {
+    final clamped = realIndex.clamp(0, _n - 1);
     if (clamped == widget.selectedIndex) {
-      _scrollTo(clamped, animated: true);
+      _scrollToReal(clamped, animated: true);
       return;
     }
     HapticFeedback.selectionClick();
@@ -134,11 +166,12 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     final target = index * ArFilterCarousel.itemStride;
 
     if ((_controller.offset - target).abs() > 1.5) {
-      _scrollTo(index, animated: true).then((_) {
-        if (mounted) _emit(index);
+      _scrollToReal(real, animated: true).then((_) {
+        if (mounted) _emit(real);
       });
     } else {
-      _emit(index);
+      _recenterIfNearEdge();
+      _emit(real);
     }
   }
 
@@ -147,120 +180,82 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     widget.onShutterTap();
   }
 
-  double _sizeForIndex(int index) {
+  double _sizeForLoop(int loopIndex) {
     final center = _scrollOffset / ArFilterCarousel.itemStride;
-    final distance = (index - center).abs();
+    final distance = (loopIndex - center).abs();
     final t = (1.0 - distance).clamp(0.0, 1.0);
-
     final eased = Curves.easeOut.transform(t);
     return ArFilterCarousel.inactiveSize +
         (ArFilterCarousel.activeSize - ArFilterCarousel.inactiveSize) * eased;
   }
 
-  double _opacityForIndex(int index) {
+  double _opacityForLoop(int loopIndex) {
     final center = _scrollOffset / ArFilterCarousel.itemStride;
-    final distance = (index - center).abs();
-    return (1.0 - distance * 0.35).clamp(0.45, 1.0);
-  }
-
-  int get _visualIndex {
-    if (!_controller.hasClients && _scrollOffset == 0) {
-      return widget.selectedIndex;
-    }
-    return (_scrollOffset / ArFilterCarousel.itemStride)
-        .round()
-        .clamp(0, _filters.length - 1);
+    final distance = (loopIndex - center).abs();
+    return (1.0 - distance * 0.28).clamp(0.4, 1.0);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_n == 0) return const SizedBox.shrink();
+
     final screenWidth = MediaQuery.sizeOf(context).width;
     final sidePadding = (screenWidth - ArFilterCarousel.itemStride) / 2;
-    final visual = _visualIndex;
-    final visualItem = _filters[visual];
-    final l10n = AppLocalizations.of(context)!;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 16,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            child: Text(
-              visualItem.isOriginal ? '' : arFilterLabel(l10n, visualItem),
-              key: ValueKey(visualItem.id),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                height: 1.1,
-                shadows: [
-                  Shadow(
-                    color: Colors.black54,
-                    blurRadius: 6,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: widget.height ?? (ArFilterCarousel.activeSize + 8),
-          child: Stack(
+    return SizedBox(
+      height: widget.height ?? (ArFilterCarousel.activeSize + 8),
+      child: Stack(
             alignment: Alignment.center,
             children: [
               NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification.metrics.axis != Axis.horizontal) return false;
+                onNotification: (notification) {
+                  if (notification.metrics.axis != Axis.horizontal) {
+                    return false;
+                  }
 
-              if (notification is ScrollUpdateNotification ||
-                  notification is ScrollStartNotification) {
-                final next = _controller.hasClients
-                    ? _controller.offset
-                    : _scrollOffset;
-                final hapticIndex = (next / ArFilterCarousel.itemStride)
-                    .round()
-                    .clamp(0, _filters.length - 1);
-                if (hapticIndex != _lastHapticIndex) {
-                  _lastHapticIndex = hapticIndex;
-                  HapticFeedback.selectionClick();
-                }
-                if ((next - _scrollOffset).abs() > 0.2) {
-                  setState(() => _scrollOffset = next);
-                }
-              }
+                  if (notification is ScrollUpdateNotification ||
+                      notification is ScrollStartNotification) {
+                    final next = _controller.hasClients
+                        ? _controller.offset
+                        : _scrollOffset;
+                    final hapticReal = _realFromLoop(
+                      (next / ArFilterCarousel.itemStride).round(),
+                    );
+                    if (hapticReal != _lastHapticReal) {
+                      _lastHapticReal = hapticReal;
+                      HapticFeedback.selectionClick();
+                    }
+                    if ((next - _scrollOffset).abs() > 0.2) {
+                      setState(() => _scrollOffset = next);
+                    }
+                  }
 
-              if (notification is ScrollEndNotification) {
-                _onScrollEnd();
-              }
-              return false;
-            },
-            child: ListView.builder(
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              physics: widget.isRecording || widget.soloShutter
-                  ? const NeverScrollableScrollPhysics()
-                  : const _FilterSnapPhysics(
-                      itemExtent: ArFilterCarousel.itemStride,
-                      parent: BouncingScrollPhysics(),
-                    ),
-              padding: EdgeInsets.symmetric(horizontal: sidePadding),
-              itemCount: _filters.length,
-              itemBuilder: (context, index) {
-                final item = _filters[index];
-                final size = _sizeForIndex(index);
-                final opacity = _opacityForIndex(index);
-                final isCentered = (index - _scrollOffset / ArFilterCarousel.itemStride)
-                        .abs() <
-                    0.35;
+                  if (notification is ScrollEndNotification) {
+                    _onScrollEnd();
+                  }
+                  return false;
+                },
+                child: ListView.builder(
+                  controller: _controller,
+                  scrollDirection: Axis.horizontal,
+                  physics: widget.isRecording || widget.soloShutter
+                      ? const NeverScrollableScrollPhysics()
+                      : const _FilterSnapPhysics(
+                          itemExtent: ArFilterCarousel.itemStride,
+                          parent: BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                        ),
+                  padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                  itemCount: _itemCount,
+                  itemBuilder: (context, loopIndex) {
+                    final real = _realFromLoop(loopIndex);
+                    final item = _filters[real];
+                    final size = _sizeForLoop(loopIndex);
+                    final opacity = _opacityForLoop(loopIndex);
+                    final center =
+                        _scrollOffset / ArFilterCarousel.itemStride;
+                    final isCentered = (loopIndex - center).abs() < 0.35;
 
                 if (widget.soloShutter && !isCentered) {
                   return const SizedBox(width: ArFilterCarousel.itemStride);
@@ -301,12 +296,10 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                                 isRecording: widget.isRecording && isCentered,
                               ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+                    );
+                  },
+                ),
+              ),
               if (widget.showSideActions)
                 Positioned.fill(
                   child: Row(
@@ -330,8 +323,6 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                 ),
             ],
           ),
-        ),
-      ],
     );
   }
 }
@@ -385,16 +376,13 @@ class _FilterSnapPhysics extends ScrollPhysics {
   }
 
   double _targetPixels(ScrollMetrics position, double velocity) {
-    final maxPage =
-        (position.maxScrollExtent / itemExtent).round().clamp(0, 9999);
     var page = position.pixels / itemExtent;
     if (velocity < -toleranceFor(position).velocity) {
       page -= 0.35;
     } else if (velocity > toleranceFor(position).velocity) {
       page += 0.35;
     }
-    final clamped = page.round().clamp(0, maxPage);
-    return clamped * itemExtent;
+    return page.round() * itemExtent;
   }
 
   @override
@@ -403,9 +391,10 @@ class _FilterSnapPhysics extends ScrollPhysics {
     double velocity,
   ) {
     final tolerance = toleranceFor(position);
-    final target = _targetPixels(position, velocity);
+    final target = _targetPixels(position, velocity)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
 
-    if (target == position.pixels) {
+    if ((target - position.pixels).abs() < tolerance.distance) {
       return null;
     }
 
@@ -455,7 +444,6 @@ class _ShutterCircle extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-
           if (isRecording || progress > 0.001)
             SizedBox(
               width: ring,
@@ -480,7 +468,6 @@ class _ShutterCircle extends StatelessWidget {
               ),
             ),
           ),
-
           AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             width: inner,
@@ -513,9 +500,10 @@ class _FilterCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final emojiSize = 22 + (size - ArFilterCarousel.inactiveSize) /
-        (ArFilterCarousel.activeSize - ArFilterCarousel.inactiveSize) *
-        8;
+    final emojiSize = 20 +
+        (size - ArFilterCarousel.inactiveSize) /
+            (ArFilterCarousel.activeSize - ArFilterCarousel.inactiveSize) *
+            10;
 
     return SizedBox(
       width: size,

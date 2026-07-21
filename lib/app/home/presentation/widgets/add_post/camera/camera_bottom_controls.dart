@@ -22,7 +22,6 @@ class CameraBottomAction extends StatelessWidget {
   }
 }
 
-/// TikTok-style mode + duration bar above the shutter.
 class CameraModeDurationBar extends StatelessWidget {
   const CameraModeDurationBar({
     super.key,
@@ -55,23 +54,12 @@ class CameraModeDurationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <_ModeDurationItem>[
-      if (showText)
-        _ModeDurationItem(
-          label: textLabel,
-          selected: false,
-          onTap: onTextSelected,
-        ),
+    final items = <Widget>[
       _ModeDurationItem(
-        label: photoLabel,
-        selected: studioMode == CameraStudioMode.photo,
-        onTap: onPhotoSelected,
-      ),
-      _ModeDurationItem(
-        label: '15s',
+        label: duration10mLabel,
         selected:
-            studioMode == CameraStudioMode.video && selectedDuration == 15,
-        onTap: () => onDurationSelected(15),
+            studioMode == CameraStudioMode.video && selectedDuration == 180,
+        onTap: () => onDurationSelected(180),
       ),
       _ModeDurationItem(
         label: '60s',
@@ -80,11 +68,22 @@ class CameraModeDurationBar extends StatelessWidget {
         onTap: () => onDurationSelected(60),
       ),
       _ModeDurationItem(
-        label: duration10mLabel,
+        label: '15s',
         selected:
-            studioMode == CameraStudioMode.video && selectedDuration == 180,
-        onTap: () => onDurationSelected(180),
+            studioMode == CameraStudioMode.video && selectedDuration == 15,
+        onTap: () => onDurationSelected(15),
       ),
+      _ModeDurationItem(
+        label: photoLabel,
+        selected: studioMode == CameraStudioMode.photo,
+        onTap: onPhotoSelected,
+      ),
+      if (showText)
+        _ModeDurationItem(
+          label: textLabel,
+          selected: false,
+          onTap: onTextSelected,
+        ),
       if (showLive)
         _ModeDurationItem(
           label: liveLabel,
@@ -94,15 +93,19 @@ class CameraModeDurationBar extends StatelessWidget {
         ),
     ];
 
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 4),
-        itemBuilder: (context, index) => items[index],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      child: SizedBox(
+        height: 36,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(width: 2),
+              items[i],
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -128,10 +131,10 @@ class _ModeDurationItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: selected
-              ? Colors.white.withValues(alpha: 0.2)
+              ? Colors.white
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
@@ -141,18 +144,20 @@ class _ModeDurationItem extends StatelessWidget {
             color: selected
                 ? (isLive
                       ? LiveDetailsLayoutConstants.liveBadgeColor
-                      : Colors.white)
+                      : Colors.black)
                 : Colors.white,
-            fontSize: selected ? 16 : 15,
+            fontSize: selected ? 14 : 13,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
             letterSpacing: isLive && selected ? 0.5 : 0,
-            shadows: const [
-              Shadow(
-                color: Colors.black54,
-                blurRadius: 6,
-                offset: Offset(0, 1),
-              ),
-            ],
+            shadows: selected
+                ? null
+                : const [
+                    Shadow(
+                      color: Colors.black54,
+                      blurRadius: 6,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
           ),
         ),
       ),
@@ -160,7 +165,6 @@ class _ModeDurationItem extends StatelessWidget {
   }
 }
 
-/// Bottom workspace tabs: Post | Creative.
 class CameraWorkspaceTabs extends StatelessWidget {
   const CameraWorkspaceTabs({
     super.key,
@@ -177,21 +181,54 @@ class CameraWorkspaceTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _WorkspaceTab(
-          label: postLabel,
-          selected: selectedIndex == 0,
-          onTap: () => onSelected(0),
-        ),
-        const SizedBox(width: 28),
-        _WorkspaceTab(
-          label: creativeLabel,
-          selected: selectedIndex == 1,
-          onTap: () => onSelected(1),
-        ),
-      ],
+    final postTab = _WorkspaceTab(
+      label: postLabel,
+      selected: selectedIndex == 0,
+      onTap: () => onSelected(0),
+    );
+    final createTab = _WorkspaceTab(
+      label: creativeLabel,
+      selected: selectedIndex == 1,
+      onTap: () => onSelected(1),
+    );
+
+    return SizedBox(
+      width: double.infinity,
+      height: 36,
+      child: Row(
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      createTab,
+                      const SizedBox(width: 36),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          postTab,
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 36),
+                  createTab,
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -212,35 +249,24 @@ class _WorkspaceTab extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
-              shadows: const [
-                Shadow(
-                  color: Colors.black54,
-                  blurRadius: 6,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.white.withValues(alpha: 0.45),
+            fontSize: 15,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            letterSpacing: 0.6,
+            shadows: const [
+              Shadow(
+                color: Colors.black54,
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: selected ? 24 : 0,
-            height: 2,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -418,15 +444,15 @@ class CameraRecordButton extends StatelessWidget {
       onLongPressStart: isBusy ? null : onLongPressStart,
       onLongPressEnd: isBusy ? null : onLongPressEnd,
       child: SizedBox(
-        width: 84,
-        height: 84,
+        width: 94,
+        height: 94,
         child: Stack(
           alignment: Alignment.center,
           children: [
             if (isRecording)
               SizedBox(
-                width: 84,
-                height: 84,
+                width: 94,
+                height: 94,
                 child: CircularProgressIndicator(
                   value: progress.clamp(0, 1),
                   strokeWidth: 3,
@@ -435,8 +461,8 @@ class CameraRecordButton extends StatelessWidget {
                 ),
               ),
             Container(
-              width: 76,
-              height: 76,
+              width: 86,
+              height: 86,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 4.5),
@@ -447,11 +473,11 @@ class CameraRecordButton extends StatelessWidget {
             // "A circle cannot have a border radius" assert while recording.
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
-              width: isRecording ? 30 : 58,
-              height: isRecording ? 30 : 58,
+              width: isRecording ? 34 : 66,
+              height: isRecording ? 34 : 66,
               decoration: BoxDecoration(
                 color: innerColor,
-                borderRadius: BorderRadius.circular(isRecording ? 6 : 29),
+                borderRadius: BorderRadius.circular(isRecording ? 6 : 33),
               ),
             ),
           ],
@@ -537,8 +563,6 @@ class CameraCaptureControls extends StatelessWidget {
                 progress: recordProgress,
                 isPhotoMode: isPhotoMode,
                 onTap: onRecordTap,
-                // Photo mode also supports press-and-hold for a quick 15s
-                // video (TikTok-style), so long-press is enabled everywhere.
                 onLongPressStart: onLongPressStart,
                 onLongPressEnd: onLongPressEnd,
               ),

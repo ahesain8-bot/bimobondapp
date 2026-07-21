@@ -1,7 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
 import 'package:flutter/material.dart';
 
-/// Shared TikTok-style camera tool visuals.
 class CameraToolIcons {
   CameraToolIcons._();
 
@@ -51,9 +52,19 @@ class CameraToolIcons {
       ],
     );
   }
+
+  static BoxDecoration galleryThumbDecoration() {
+    return BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.95),
+        width: 1.5,
+      ),
+    );
+  }
 }
 
-/// Vertical side-rail tool: circle icon + caption below (legacy compact mode).
 class CameraRailTool extends StatelessWidget {
   const CameraRailTool({
     super.key,
@@ -145,7 +156,6 @@ class CameraRailTool extends StatelessWidget {
   }
 }
 
-/// TikTok side rail row: icon on the screen edge, label toward center.
 class CameraRailToolRow extends StatelessWidget {
   const CameraRailToolRow({
     super.key,
@@ -166,11 +176,8 @@ class CameraRailToolRow extends StatelessWidget {
   final bool active;
   final bool? showActiveBadge;
   final String? badge;
-  /// When true, icon sits on the physical start edge (left rail in RTL).
   final bool iconOnStartEdge;
   final Widget? customIcon;
-
-  /// Show the text caption beside the icon (used when the rail is expanded).
   final bool showLabel;
 
   @override
@@ -178,11 +185,9 @@ class CameraRailToolRow extends StatelessWidget {
     final iconWidget = Stack(
       clipBehavior: Clip.none,
       children: [
-        // Transparent icon — no solid container behind it (TikTok-style). Bold,
-        // pure-white glyph with a soft shadow so it stays legible on any scene.
         SizedBox(
-          width: 46,
-          height: 46,
+          width: 48,
+          height: 48,
           child: Center(
             child: customIcon ??
                 Icon(
@@ -242,40 +247,59 @@ class CameraRailToolRow extends StatelessWidget {
       ],
     );
 
-    final labelWidget = Flexible(
-      child: Text(
-        label,
-        style: CameraToolIcons.labelStyle.copyWith(fontSize: 13),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: iconOnStartEdge ? TextAlign.left : TextAlign.right,
+    final labelWidget = Text(
+      label,
+      style: CameraToolIcons.labelStyle.copyWith(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: iconOnStartEdge ? TextAlign.left : TextAlign.right,
+    );
+
+    final labelSlot = ClipRect(
+      child: AnimatedAlign(
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeInOutCubic,
+        alignment: iconOnStartEdge ? Alignment.centerLeft : Alignment.centerRight,
+        widthFactor: showLabel ? 1.0 : 0.0,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 360),
+          curve: Curves.easeInOutCubic,
+          opacity: showLabel ? 1 : 0,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: iconOnStartEdge ? 8 : 0,
+              right: iconOnStartEdge ? 0 : 8,
+            ),
+            child: labelWidget,
+          ),
+        ),
       ),
     );
 
-    // Icon hugs the screen edge; the caption (when shown) sits toward center.
     final rowChildren = <Widget>[
-      if (showLabel && !iconOnStartEdge) ...[
-        labelWidget,
-        const SizedBox(width: 10),
-      ],
+      if (!iconOnStartEdge) labelSlot,
       iconWidget,
-      if (showLabel && iconOnStartEdge) ...[
-        const SizedBox(width: 10),
-        labelWidget,
-      ],
+      if (iconOnStartEdge) labelSlot,
     ];
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 122,
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeInOutCubic,
+          alignment:
+              iconOnStartEdge ? Alignment.centerLeft : Alignment.centerRight,
           child: Row(
             mainAxisAlignment: iconOnStartEdge
                 ? MainAxisAlignment.start
                 : MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
             children: rowChildren,
           ),
         ),
@@ -284,7 +308,6 @@ class CameraRailToolRow extends StatelessWidget {
   }
 }
 
-/// Bottom-bar circular action (effects / upload).
 class CameraBottomTool extends StatelessWidget {
   const CameraBottomTool({
     super.key,
@@ -337,7 +360,6 @@ class CameraBottomTool extends StatelessWidget {
   }
 }
 
-/// Gallery upload square (TikTok-style thumbnail slot).
 class CameraGalleryTool extends StatelessWidget {
   const CameraGalleryTool({
     super.key,
@@ -350,12 +372,11 @@ class CameraGalleryTool extends StatelessWidget {
   final VoidCallback onTap;
   final String label;
   final IconData icon;
-  /// Bottom bar style: small square only (no caption under it).
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final size = compact ? 36.0 : 48.0;
+    final size = compact ? 40.0 : 48.0;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -363,9 +384,9 @@ class CameraGalleryTool extends StatelessWidget {
           ? Container(
               width: size,
               height: size,
-              decoration: CameraToolIcons.squareDecoration(),
+              decoration: CameraToolIcons.galleryThumbDecoration(),
               alignment: Alignment.center,
-              child: Icon(icon, color: Colors.white, size: 18),
+              child: Icon(icon, color: Colors.white, size: 20),
             )
           : SizedBox(
               width: 72,
@@ -394,7 +415,6 @@ class CameraGalleryTool extends StatelessWidget {
   }
 }
 
-/// Effects bottom button — shows selected effect preview when active.
 class CameraEffectsTool extends StatelessWidget {
   const CameraEffectsTool({
     super.key,
@@ -479,4 +499,325 @@ class CameraEffectsTool extends StatelessWidget {
     }
     return const Icon(Icons.auto_awesome, color: Colors.white, size: 24);
   }
+}
+
+class TikTokSideIcons {
+  TikTokSideIcons._();
+
+  static Widget flip({double size = 30}) => _Glyph(
+        size: size,
+        painter: _FlipPainter(),
+      );
+
+  static Widget flash({required bool enabled, double size = 30}) => _Glyph(
+        size: size,
+        painter: _FlashPainter(enabled: enabled),
+      );
+
+  static Widget timer({double size = 30}) => _Glyph(
+        size: size,
+        painter: _TimerPainter(),
+      );
+
+  static Widget layout({double size = 30}) => _Glyph(
+        size: size,
+        painter: _LayoutPainter(),
+      );
+
+  static Widget retouch({double size = 30}) => _Glyph(
+        size: size,
+        painter: _RetouchPainter(),
+      );
+
+  static Widget filters({double size = 30}) => _Glyph(
+        size: size,
+        painter: _FiltersPainter(),
+      );
+
+  static Widget speed({required String label, double size = 32}) => _Glyph(
+        size: size,
+        painter: _SpeedPainter(label: label),
+      );
+}
+
+class _Glyph extends StatelessWidget {
+  const _Glyph({required this.size, required this.painter});
+
+  final double size;
+  final CustomPainter painter;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: painter),
+    );
+  }
+}
+
+Paint _stroke(double size, {double factor = 0.085}) => Paint()
+  ..color = Colors.white
+  ..style = PaintingStyle.stroke
+  ..strokeWidth = size * factor
+  ..strokeCap = StrokeCap.round
+  ..strokeJoin = StrokeJoin.round;
+
+class _FlipPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = _stroke(size.width, factor: 0.09);
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width * 0.36;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r),
+      -2.35,
+      2.55,
+      false,
+      paint,
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r),
+      0.8,
+      2.55,
+      false,
+      paint,
+    );
+
+    final fill = Paint()..color = Colors.white;
+    // Top-right arrow head
+    canvas.drawPath(
+      Path()
+        ..moveTo(c.dx + r * 0.15, c.dy - r * 1.05)
+        ..lineTo(c.dx + r * 1.05, c.dy - r * 0.55)
+        ..lineTo(c.dx + r * 0.35, c.dy - r * 0.35)
+        ..close(),
+      fill,
+    );
+    // Bottom-left arrow head
+    canvas.drawPath(
+      Path()
+        ..moveTo(c.dx - r * 0.15, c.dy + r * 1.05)
+        ..lineTo(c.dx - r * 1.05, c.dy + r * 0.55)
+        ..lineTo(c.dx - r * 0.35, c.dy + r * 0.35)
+        ..close(),
+      fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _FlashPainter extends CustomPainter {
+  _FlashPainter({required this.enabled});
+
+  final bool enabled;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final bolt = Path()
+      ..moveTo(w * 0.58, h * 0.06)
+      ..lineTo(w * 0.30, h * 0.50)
+      ..lineTo(w * 0.48, h * 0.50)
+      ..lineTo(w * 0.40, h * 0.94)
+      ..lineTo(w * 0.72, h * 0.44)
+      ..lineTo(w * 0.54, h * 0.44)
+      ..close();
+    canvas.drawPath(bolt, Paint()..color = Colors.white);
+
+    if (!enabled) {
+      // TikTok-style diagonal slash through the bolt.
+      final slash = Paint()
+        ..color = Colors.white
+        ..strokeWidth = w * 0.11
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(
+        Offset(w * 0.18, h * 0.18),
+        Offset(w * 0.82, h * 0.82),
+        slash,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlashPainter oldDelegate) =>
+      oldDelegate.enabled != enabled;
+}
+
+class _TimerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = _stroke(size.width, factor: 0.09);
+    final w = size.width;
+    final h = size.height;
+    final c = Offset(w / 2, h * 0.56);
+    final r = w * 0.34;
+
+    // Stopwatch body
+    canvas.drawCircle(c, r, paint);
+    // Top crown
+    canvas.drawLine(
+      Offset(w * 0.42, h * 0.14),
+      Offset(w * 0.58, h * 0.14),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(w / 2, h * 0.14),
+      Offset(w / 2, c.dy - r),
+      paint,
+    );
+    // Side button
+    canvas.drawLine(
+      Offset(c.dx + r * 0.72, c.dy - r * 0.72),
+      Offset(c.dx + r * 1.05, c.dy - r * 1.05),
+      paint,
+    );
+    // Hands
+    canvas.drawLine(c, Offset(c.dx, c.dy - r * 0.55), paint);
+    canvas.drawLine(c, Offset(c.dx + r * 0.45, c.dy + r * 0.15), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _LayoutPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = _stroke(size.width, factor: 0.09);
+    final inset = size.width * 0.12;
+    final gap = size.width * 0.06;
+    final box = size.width - inset * 2;
+    final cell = (box - gap) / 2;
+
+    RRect cellRect(double dx, double dy) => RRect.fromRectAndRadius(
+          Rect.fromLTWH(inset + dx, inset + dy, cell, cell),
+          Radius.circular(size.width * 0.06),
+        );
+
+    canvas.drawRRect(cellRect(0, 0), paint);
+    canvas.drawRRect(cellRect(cell + gap, 0), paint);
+    canvas.drawRRect(cellRect(0, cell + gap), paint);
+    canvas.drawRRect(cellRect(cell + gap, cell + gap), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _RetouchPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = _stroke(size.width, factor: 0.085);
+    final w = size.width;
+    final h = size.height;
+
+    // Head
+    canvas.drawCircle(Offset(w * 0.42, h * 0.32), w * 0.18, paint);
+    // Shoulders / bust
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(w * 0.42, h * 0.92),
+        width: w * 0.62,
+        height: h * 0.55,
+      ),
+      3.6,
+      2.5,
+      false,
+      paint,
+    );
+    // Sparkle (4-point star)
+    final sx = w * 0.78;
+    final sy = h * 0.28;
+    final arm = w * 0.14;
+    canvas.drawLine(Offset(sx, sy - arm), Offset(sx, sy + arm), paint);
+    canvas.drawLine(Offset(sx - arm, sy), Offset(sx + arm, sy), paint);
+    final d = arm * 0.55;
+    canvas.drawLine(Offset(sx - d, sy - d), Offset(sx + d, sy + d), paint);
+    canvas.drawLine(Offset(sx + d, sy - d), Offset(sx - d, sy + d), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _FiltersPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = _stroke(size.width, factor: 0.085);
+    final r = size.width * 0.24;
+    final c1 = Offset(size.width * 0.34, size.height * 0.38);
+    final c2 = Offset(size.width * 0.66, size.height * 0.38);
+    final c3 = Offset(size.width * 0.50, size.height * 0.66);
+    canvas.drawCircle(c1, r, paint);
+    canvas.drawCircle(c2, r, paint);
+    canvas.drawCircle(c3, r, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SpeedPainter extends CustomPainter {
+  _SpeedPainter({required this.label});
+
+  final String label;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = _stroke(size.width, factor: 0.085);
+    final c = Offset(size.width / 2, size.height * 0.58);
+    final r = size.width * 0.38;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r),
+      3.55,
+      2.6,
+      false,
+      paint,
+    );
+    canvas.drawLine(
+      c,
+      Offset(c.dx + r * 0.5, c.dy - r * 0.55),
+      paint,
+    );
+    // Tick marks
+    for (final a in [3.7, 4.2, 4.7, 5.2, 5.7]) {
+      final inner = Offset(
+        c.dx + (r - size.width * 0.08) * math.cos(a),
+        c.dy + (r - size.width * 0.08) * math.sin(a),
+      );
+      final outer = Offset(
+        c.dx + r * math.cos(a),
+        c.dy + r * math.sin(a),
+      );
+      canvas.drawLine(inner, outer, paint);
+    }
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size.width * 0.26,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(
+      canvas,
+      Offset(c.dx - tp.width / 2, c.dy + r * 0.02),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpeedPainter oldDelegate) =>
+      oldDelegate.label != label;
 }

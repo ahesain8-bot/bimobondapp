@@ -178,13 +178,29 @@ class CameraStudioOverlay extends StatelessWidget {
     final hasActiveFilter = useNativeArFilters
         ? selectedArFilterId != 'none'
         : selectedFilter != AwesomeFilter.None;
-    // While the timer countdown (3-2-1) is running, hide every control so the
-    // frame is clean — only the camera preview + the countdown number show.
     final showControls = countdownValue == null;
-    // After a clip is recorded, swap the shutter + carousel for prominent
-    // Cancel / Next review buttons (TikTok-style bottom actions).
     final isReviewingDraft =
         hasDraftClips && !isRecording && onFinishRecording != null;
+
+    final topChromeHeight = ratioLetterboxed
+        ? CameraRatioLetterbox.topHeight(topPadding)
+        : CameraRatioLetterbox.tikTokTopChromeHeight(
+            topPadding,
+            photoMode: isPhotoMode,
+          );
+    final bottomChromeHeight = ratioLetterboxed
+        ? CameraRatioLetterbox.bottomHeight(
+            useNativeAr: useNativeArFilters,
+            filtersPanelOpen:
+                showLegacyFiltersPanel || showArColorFiltersPanel,
+          )
+        : CameraRatioLetterbox.tikTokBottomChromeHeight(
+            MediaQuery.paddingOf(context).bottom,
+            photoMode: isPhotoMode,
+          );
+    final controlsTop =
+        CameraRatioLetterbox.tikTokTopChromeHeight(topPadding) + 16.0;
+    final sideToolbarTop = controlsTop;
 
     return Stack(
       fit: StackFit.expand,
@@ -219,8 +235,26 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
             child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
           ),
+        ] else ...[
+          AnimatedPositioned(
+            duration: CameraRatioLetterbox.chromeAnimDuration,
+            curve: CameraRatioLetterbox.chromeAnimCurve,
+            left: 0,
+            right: 0,
+            top: 0,
+            height: topChromeHeight,
+            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
+          ),
+          AnimatedPositioned(
+            duration: CameraRatioLetterbox.chromeAnimDuration,
+            curve: CameraRatioLetterbox.chromeAnimCurve,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: bottomChromeHeight,
+            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
+          ),
         ],
-        // CamerAwesome / TFLite path — iOS and non-native fallback.
         if (!useNativeArFilters &&
             activeEffect != null &&
             activeEffect.requiresFaceDetection &&
@@ -241,21 +275,22 @@ class CameraStudioOverlay extends StatelessWidget {
           CameraCountdownOverlay(value: countdownValue!),
         if (showControls)
           SafeArea(
+            top: false,
             bottom: !(useNativeArFilters && !isLiveMode),
-            child: Column(
-              children: [
-                CameraTopBar(
-                  onClose: onClose,
-                  soundLabel: soundLabel ?? l10n.cameraOriginalSound,
-                  addSoundLabel: l10n.cameraAddSound,
-                  onSoundTap: onMusicTap,
-                  onClearSound: onClearSound,
-                  isLiveMode: isLiveMode,
-                  // Hide the sound pill while recording — it overlaps the
-                  // recording-seconds badge shown at the top center.
-                  showSound: !isRecording,
-                ),
-                const Spacer(),
+            child: Padding(
+              padding: EdgeInsets.only(top: controlsTop),
+              child: Column(
+                children: [
+                  CameraTopBar(
+                    onClose: onClose,
+                    soundLabel: soundLabel ?? l10n.cameraOriginalSound,
+                    addSoundLabel: l10n.cameraAddSound,
+                    onSoundTap: onMusicTap,
+                    onClearSound: onClearSound,
+                    isLiveMode: isLiveMode,
+                    showSound: !isRecording,
+                  ),
+                  const Spacer(),
                 if (!showLegacyFiltersPanel) ...[
                   if (!isLiveMode &&
                       !isRecording &&
@@ -285,49 +320,42 @@ class CameraStudioOverlay extends StatelessWidget {
                       onArFilterSelected != null &&
                       !showArColorFiltersPanel)
                     _BottomInsetPanel(
-                      bottomInset: MediaQuery.paddingOf(context).bottom,
-                      // Keep the shutter/carousel visible even after a clip is
-                      // recorded so press-and-hold keeps appending segments
-                      // (TikTok-style resume). The Cancel / Next review actions
-                      // move BELOW the shutter instead of replacing it.
+                      bottomInset: MediaQuery.paddingOf(context).bottom + 48,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const SizedBox(height: 4),
-                          ArFilterCarousel(
-                            items: ArFilterCatalog.effectItems,
-                            selectedIndex: ArFilterCatalog.effectCarouselIndex(
-                              selectedArFilterId,
+                          Transform.translate(
+                            offset: const Offset(0, -14),
+                            child: ArFilterCarousel(
+                              items: ArFilterCatalog.effectItems,
+                              selectedIndex:
+                                  ArFilterCatalog.effectCarouselIndex(
+                                selectedArFilterId,
+                              ),
+                              onSelected: (index) {
+                                final id =
+                                    ArFilterCatalog.effectItems[index].id;
+                                onArFilterSelected!(
+                                  ArFilterCatalog.indexOfId(id),
+                                );
+                              },
+                              isRecording: isRecording,
+                              isBusy: isBusy,
+                              recordProgress: selectedDuration == 0
+                                  ? 0
+                                  : recordSeconds / selectedDuration,
+                              isPhotoMode: isPhotoMode,
+                              onShutterTap: onRecordTap,
+                              onHoldStart: onLongPressStart,
+                              onHoldEnd: onLongPressEnd,
+                              showSideActions: isReviewingDraft,
+                              soloShutter: isRecording || isReviewingDraft,
+                              onCancel: onDiscardDraft,
+                              onConfirm: onFinishRecording,
                             ),
-                            onSelected: (index) {
-                              final id =
-                                  ArFilterCatalog.effectItems[index].id;
-                              onArFilterSelected!(
-                                ArFilterCatalog.indexOfId(id),
-                              );
-                            },
-                            isRecording: isRecording,
-                            isBusy: isBusy,
-                            recordProgress: selectedDuration == 0
-                                ? 0
-                                : recordSeconds / selectedDuration,
-                            isPhotoMode: isPhotoMode,
-                            onShutterTap: onRecordTap,
-                            onHoldStart: onLongPressStart,
-                            onHoldEnd: onLongPressEnd,
-                            // After a clip is recorded, flank the shutter with
-                            // ✗ (discard) / ✓ (next) — only ✓ opens the editor.
-                            showSideActions: isReviewingDraft,
-                            // While recording or reviewing, show only the
-                            // shutter (hide neighboring effect circles).
-                            soloShutter: isRecording || isReviewingDraft,
-                            onCancel: onDiscardDraft,
-                            onConfirm: onFinishRecording,
                           ),
-                          const SizedBox(height: 6),
-                          // Always reserve this row's height so the shutter/
-                          // carousel keeps the EXACT same vertical position in
-                          // every state (idle / recording / reviewing) — no jump.
+                          const SizedBox(height: 10),
                           SizedBox(
                             height: 44,
                             child: (isRecording || isReviewingDraft)
@@ -366,15 +394,13 @@ class CameraStudioOverlay extends StatelessWidget {
                                           )
                                         : null,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                         ],
                       ),
                     )
                   else if (!useNativeArFilters || isLiveMode) ...[
                     if (!isLiveMode) ...[
                       const SizedBox(height: 10),
-                      // Shutter stays visible so press-and-hold keeps appending
-                      // segments (resume); Cancel / Next show below it.
                       CameraCaptureControls(
                         isLiveMode: isLiveMode,
                         isPhotoMode: isPhotoMode,
@@ -426,36 +452,40 @@ class CameraStudioOverlay extends StatelessWidget {
                       ),
                     ],
                     if (!isReviewingDraft) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 10),
                       CameraWorkspaceTabs(
                         postLabel: l10n.cameraTabPost,
                         creativeLabel: l10n.cameraTabCreative,
                         selectedIndex: workspaceTabIndex,
                         onSelected: onWorkspaceTabSelected,
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: 10 + MediaQuery.paddingOf(context).bottom,
+                      ),
                     ],
                   ],
                 ] else
                   const SizedBox(height: 180),
               ],
             ),
+            ),
           ),
         if (showControls && !isRecording && !isReviewingDraft)
           Positioned.fill(
             child: Align(
-              alignment: isRtl ? Alignment.centerLeft : Alignment.centerRight,
+              alignment: isRtl ? Alignment.topLeft : Alignment.topRight,
               child: Padding(
                 padding: EdgeInsets.only(
-                  left: isRtl ? 10 : 0,
-                  right: isRtl ? 0 : 10,
-                  top: topPadding + 52,
+                  left: isRtl ? 18 : 0,
+                  right: isRtl ? 0 : 18,
+                  top: sideToolbarTop,
                   bottom: showLegacyFiltersPanel || showArColorFiltersPanel
                       ? 220
                       : (useNativeArFilters ? 228 : 168),
                 ),
                 child: CameraSideToolbar(
                   iconOnStartEdge: isRtl,
+                  showFlip: true,
                   onFlip: onFlip,
                   onFlash: onFlash,
                   onTimer: onTimerToggle,
@@ -514,8 +544,6 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
           ),
         ],
-        // Native AR — TikTok-style Filters sheet (color / white grades only).
-        // No dim scrim — live preview stays bright so filter changes are visible.
         if (showControls &&
             showArColorFiltersPanel &&
             onArFilterSelected != null &&
@@ -547,9 +575,6 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
           ),
         ],
-        // Only while actively recording. In the draft-review state the sound
-        // pill returns (showSound: !isRecording), so keeping the badge here
-        // would overlap it again — the review state has its own Next button.
         if (isRecording)
           CameraRecordingBadge(
             topPadding: topPadding,
@@ -598,8 +623,10 @@ class _BottomWorkspaceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 44,
+      width: double.infinity,
       child: Stack(
         alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
           CameraWorkspaceTabs(
             postLabel: postLabel,
@@ -611,7 +638,7 @@ class _BottomWorkspaceRow extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Padding(
-                padding: const EdgeInsets.only(left: 14),
+                padding: const EdgeInsets.only(left: 16),
                 child: CameraGalleryTool(
                   onTap: onUploadTap,
                   label: uploadLabel,
@@ -625,9 +652,6 @@ class _BottomWorkspaceRow extends StatelessWidget {
   }
 }
 
-/// Prominent Cancel / Next review actions shown after a clip is recorded —
-/// full-width pills that replace the shutter + carousel, matching the editor's
-/// bottom actions on the next screen.
 class _ReviewActionsRow extends StatelessWidget {
   const _ReviewActionsRow({
     required this.cancelLabel,
