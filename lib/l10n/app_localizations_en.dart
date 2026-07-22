@@ -1198,6 +1198,70 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get liveGiftLevelBanner => 'Send a Gift to activate your gifter level and rewards';
+
+  @override
+  String get liveGiftPinHint => 'Pin Gifts you like to the top';
+
+  @override
+  String get liveGiftPinAction => 'Pin';
+
+  @override
+  String get liveGiftUnpinAction => 'Unpin';
+
+  @override
+  String get liveGiftTabGifts => 'Gifts';
+
+  @override
+  String get liveGiftTabSongs => 'Songs';
+
+  @override
+  String get liveGiftTabInteractive => 'Interactive';
+
+  @override
+  String get liveGiftTabComingSoon => 'Coming soon';
+
+  @override
+  String get liveGiftSendAction => 'Send';
+
+  @override
+  String get liveGiftRecharge => 'Recharge';
+
+  @override
+  String get firstRechargeTitle => 'First recharge offer';
+
+  @override
+  String firstRechargeSubtitle(int days) {
+    return 'Rewards are only available with cash recharge. Offer ends in $days days.';
+  }
+
+  @override
+  String get firstRechargeRoseTitle => 'Get Rose x3 in your Backpack';
+
+  @override
+  String get firstRechargeRoseBody => 'Get 1 now and the rest after 24 hours, each available for 7 days';
+
+  @override
+  String get firstRechargeBonusTitle => 'Get bonus Coins';
+
+  @override
+  String get firstRechargeBonusBody => 'Use Coins on virtual items such as Gifts';
+
+  @override
+  String get firstRechargeGetCoins => 'Get Coins';
+
+  @override
+  String get firstRechargeGetCoinsHint => 'Recharge to get Gifts and bonus Coins.';
+
+  @override
+  String get firstRechargePolicy => 'By continuing, you agree to the Virtual Items Policy. You will also lose the extra bonus if you withdraw from this purchase.';
+
+  @override
+  String firstRechargeCta(String coins, String price) {
+    return 'Get $coins ($price)';
+  }
+
+  @override
   String get auctionGiftsTitle => 'Auction gifts';
 
   @override

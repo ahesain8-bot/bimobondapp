@@ -4,25 +4,37 @@ import 'dart:collection';
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:video_player/video_player.dart';
 
-/// Keeps fully initialized, paused [VideoPlayerController]s for upcoming feed
-/// videos.
+/// Keeps fully initialized, paused [VideoPlayerController]s for nearby feed
+/// videos (lookahead + lookbehind window).
 ///
-/// Initializing a network video (open connection, read metadata, buffer the
-/// first seconds) is what makes scrolling to the next post feel slow. This
-/// pool does that work while the user is still on the previous post, so the
-/// player can adopt a ready controller and start playback instantly.
+/// Initializing a network video is what makes scrolling feel slow. This pool
+/// does that work while the user is still on another post, so the player can
+/// adopt a ready controller and start playback instantly.
 class FeedVideoPrewarmer {
   FeedVideoPrewarmer._();
 
   static final FeedVideoPrewarmer instance = FeedVideoPrewarmer._();
 
-  /// Max controllers kept ready. Each one holds a platform decoder, so keep
-  /// this small: it matches the feed's two-post lookahead.
-  static const int _maxReady = 2;
+  /// Max controllers kept ready: 2 ahead + 2 behind.
+  /// Each holds a platform decoder — keep this small.
+  static const int _maxReady = 4;
 
   final LinkedHashMap<String, VideoPlayerController> _ready =
       LinkedHashMap<String, VideoPlayerController>();
   final Set<String> _inFlight = <String>{};
+  Set<String> _retainUrls = <String>{};
+
+  /// Restrict the pool to [urls] (current ±2 window). Controllers for other
+  /// URLs are disposed. Call after each [FeedMediaPreloader.preloadAround].
+  void retainOnly(Set<String> urls) {
+    _retainUrls = Set<String>.from(urls);
+    final toDrop = _ready.keys.where((u) => !urls.contains(u)).toList();
+    for (final url in toDrop) {
+      final controller = _ready.remove(url);
+      if (controller != null) unawaited(_disposeQuietly(controller));
+    }
+    _evictIfNeeded();
+  }
 
   /// Initializes a paused, muted controller for [url] and keeps it ready.
   Future<void> prewarm(String url) async {
@@ -54,6 +66,13 @@ class FeedVideoPrewarmer {
       await controller.setLooping(true);
       await controller.setVolume(0);
 
+      // Window may have moved while we were initializing.
+      if (_retainUrls.isNotEmpty && !_retainUrls.contains(url)) {
+        await _disposeQuietly(controller);
+        controller = null;
+        return;
+      }
+
       _ready[url] = controller;
       controller = null;
       _evictIfNeeded();
@@ -75,6 +94,7 @@ class FeedVideoPrewarmer {
 
   /// Disposes all pooled controllers (e.g. when leaving the feed).
   void clear() {
+    _retainUrls = <String>{};
     final controllers = _ready.values.toList();
     _ready.clear();
     for (final controller in controllers) {
@@ -84,8 +104,18 @@ class FeedVideoPrewarmer {
 
   void _evictIfNeeded() {
     while (_ready.length > _maxReady) {
-      final oldestUrl = _ready.keys.first;
-      final controller = _ready.remove(oldestUrl);
+      // Prefer evicting URLs outside the retain window first.
+      String? victim;
+      if (_retainUrls.isNotEmpty) {
+        for (final url in _ready.keys) {
+          if (!_retainUrls.contains(url)) {
+            victim = url;
+            break;
+          }
+        }
+      }
+      victim ??= _ready.keys.first;
+      final controller = _ready.remove(victim);
       if (controller != null) unawaited(_disposeQuietly(controller));
     }
   }

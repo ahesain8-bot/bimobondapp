@@ -40,7 +40,7 @@ class LiveDetailsLayoutConstants {
 
   static const double topBidRadius = 30;
   static const double giftSheetRadius = 32;
-  static const double giftSheetHeightFactor = 0.5;
+  static const double giftSheetHeightFactor = 0.55;
   static const int giftGridCrossCount = 4;
   static const double giftGridAspectRatio = 0.62;
   static const double giftSheetBlur = 30;

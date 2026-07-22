@@ -573,6 +573,43 @@
       }
     }
   },
+  "liveGiftLevelBanner": "Send a Gift to activate your gifter level and rewards",
+  "liveGiftPinHint": "Pin Gifts you like to the top",
+  "liveGiftPinAction": "Pin",
+  "liveGiftUnpinAction": "Unpin",
+  "liveGiftTabGifts": "Gifts",
+  "liveGiftTabSongs": "Songs",
+  "liveGiftTabInteractive": "Interactive",
+  "liveGiftTabComingSoon": "Coming soon",
+  "liveGiftSendAction": "Send",
+  "liveGiftRecharge": "Recharge",
+  "firstRechargeTitle": "First recharge offer",
+  "firstRechargeSubtitle": "Rewards are only available with cash recharge. Offer ends in {days} days.",
+  "@firstRechargeSubtitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "firstRechargeRoseTitle": "Get Rose x3 in your Backpack",
+  "firstRechargeRoseBody": "Get 1 now and the rest after 24 hours, each available for 7 days",
+  "firstRechargeBonusTitle": "Get bonus Coins",
+  "firstRechargeBonusBody": "Use Coins on virtual items such as Gifts",
+  "firstRechargeGetCoins": "Get Coins",
+  "firstRechargeGetCoinsHint": "Recharge to get Gifts and bonus Coins.",
+  "firstRechargePolicy": "By continuing, you agree to the Virtual Items Policy. You will also lose the extra bonus if you withdraw from this purchase.",
+  "firstRechargeCta": "Get {coins} ({price})",
+  "@firstRechargeCta": {
+    "placeholders": {
+      "coins": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
   "auctionGiftsTitle": "Auction gifts",
   "auctionGiftsEmpty": "No gifts sent on this auction yet",
   "auctionGiftsSummary": "{current} / {target} {currency}",

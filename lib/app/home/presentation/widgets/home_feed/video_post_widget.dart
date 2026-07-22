@@ -228,7 +228,10 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   }
 
   Widget _buildMediaItem(PostMediaEntity media, int index) {
-    final isActiveSlide = _playbackActive && _currentPage == index;
+    // Keep the player "active" while this page is visible. Do not tie this to
+    // [FeedPlaybackGate] — comments/sheets pause via the gate inside
+    // [CustomVideoPlayer]; flipping isActive would dispose and reload the video.
+    final isActiveSlide = widget.isActive && _currentPage == index;
     final hasImageSound =
         widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false;
     final videoController = _videoPlayerControllers.putIfAbsent(

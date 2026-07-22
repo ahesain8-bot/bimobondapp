@@ -158,7 +158,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   void _onFeedPlaybackGateChanged() {
     if (!_shouldPlay) {
-      _initGeneration++;
+      // Do not bump [_initGeneration]: that would orphan the existing
+      // controller listener and freeze the feed progress bar after resume.
       _isInitializing = false;
       final controller = _controller;
       if (_isControllerReady(controller)) {
@@ -179,6 +180,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     try {
       await controller.pause();
       await controller.setVolume(0);
+      _syncFeedProgress(force: true);
     } catch (_) {}
   }
 
@@ -187,13 +189,30 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     final controller = _controller;
     if (controller != null && _isControllerReady(controller)) {
       final generation = _initGeneration;
+      _rebindPlaybackListener(controller, generation);
       await _startPlayback(controller, generation, muted: _playbackMuted);
       if (mounted && identical(controller, _controller)) {
+        _syncFeedProgress();
         setState(() {});
       }
       return;
     }
     await _initController();
+  }
+
+  void _rebindPlaybackListener(
+    VideoPlayerController controller,
+    int generation,
+  ) {
+    final old = _playbackListener;
+    if (old != null) {
+      try {
+        controller.removeListener(old);
+      } catch (_) {}
+    }
+    final listener = _makePlaybackListener(controller, generation);
+    _playbackListener = listener;
+    controller.addListener(listener);
   }
 
   @override
@@ -566,8 +585,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     }
   }
 
-  void _syncFeedProgress() {
-    if (!mounted || !_shouldPlay) return;
+  void _syncFeedProgress({bool force = false}) {
+    if (!mounted) return;
+    if (!force && !_shouldPlay) return;
     final notifier = _progressNotifier;
     final controller = _controller;
     if (notifier == null ||
@@ -580,7 +600,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       notifier.updateFromPlayback(
         position: value.position,
         duration: value.duration,
-        isPlaying: value.isPlaying,
+        isPlaying: force ? false : value.isPlaying,
       );
     } catch (_) {}
   }

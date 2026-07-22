@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
@@ -38,6 +39,8 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
   late int _page;
   late bool _hasReachedMax;
 
+  final FeedMediaPreloader _mediaPreloader = FeedMediaPreloader();
+
   bool _isLoadingMore = false;
   int? _pendingLoadKey;
 
@@ -50,24 +53,31 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
     _hasReachedMax = widget.args.hasReachedMax;
     _pageController = PageController(initialPage: _currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _maybeLoadMore(_currentIndex);
+      if (!mounted) return;
+      _mediaPreloader.preloadPostsAround(context, _posts, _currentIndex);
+      _maybeLoadMore(_currentIndex);
     });
   }
 
   @override
   void dispose() {
+    _mediaPreloader.reset();
     _pageController.dispose();
     super.dispose();
   }
 
   void _onPageChanged(int index) {
     setState(() => _currentIndex = index);
+    _mediaPreloader.preloadPostsAround(context, _posts, index);
     _maybeLoadMore(index);
   }
 
   void _maybeLoadMore(int index) {
     if (_hasReachedMax || _isLoadingMore) return;
-    if (index < _posts.length - 2) return;
+    final threshold = _posts.length <= HomeLayoutConstants.feedPrefetchMinPosts
+        ? 0
+        : _posts.length - HomeLayoutConstants.feedPrefetchThresholdOffset;
+    if (index < threshold) return;
     _fetchNextPage();
   }
 
@@ -197,6 +207,9 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
       _isLoadingMore = false;
       _pendingLoadKey = null;
     });
+    if (mounted) {
+      _mediaPreloader.preloadPostsAround(context, _posts, _currentIndex);
+    }
   }
 
   void _onLikePostSuccess(LikePostSuccess state) {

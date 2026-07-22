@@ -2369,6 +2369,126 @@ abstract class AppLocalizations {
   /// **'×{count}'**
   String liveGiftOwned(int count);
 
+  /// No description provided for @liveGiftLevelBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a Gift to activate your gifter level and rewards'**
+  String get liveGiftLevelBanner;
+
+  /// No description provided for @liveGiftPinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin Gifts you like to the top'**
+  String get liveGiftPinHint;
+
+  /// No description provided for @liveGiftPinAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get liveGiftPinAction;
+
+  /// No description provided for @liveGiftUnpinAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get liveGiftUnpinAction;
+
+  /// No description provided for @liveGiftTabGifts.
+  ///
+  /// In en, this message translates to:
+  /// **'Gifts'**
+  String get liveGiftTabGifts;
+
+  /// No description provided for @liveGiftTabSongs.
+  ///
+  /// In en, this message translates to:
+  /// **'Songs'**
+  String get liveGiftTabSongs;
+
+  /// No description provided for @liveGiftTabInteractive.
+  ///
+  /// In en, this message translates to:
+  /// **'Interactive'**
+  String get liveGiftTabInteractive;
+
+  /// No description provided for @liveGiftTabComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get liveGiftTabComingSoon;
+
+  /// No description provided for @liveGiftSendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get liveGiftSendAction;
+
+  /// No description provided for @liveGiftRecharge.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge'**
+  String get liveGiftRecharge;
+
+  /// No description provided for @firstRechargeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'First recharge offer'**
+  String get firstRechargeTitle;
+
+  /// No description provided for @firstRechargeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards are only available with cash recharge. Offer ends in {days} days.'**
+  String firstRechargeSubtitle(int days);
+
+  /// No description provided for @firstRechargeRoseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Rose x3 in your Backpack'**
+  String get firstRechargeRoseTitle;
+
+  /// No description provided for @firstRechargeRoseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Get 1 now and the rest after 24 hours, each available for 7 days'**
+  String get firstRechargeRoseBody;
+
+  /// No description provided for @firstRechargeBonusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get bonus Coins'**
+  String get firstRechargeBonusTitle;
+
+  /// No description provided for @firstRechargeBonusBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Coins on virtual items such as Gifts'**
+  String get firstRechargeBonusBody;
+
+  /// No description provided for @firstRechargeGetCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Coins'**
+  String get firstRechargeGetCoins;
+
+  /// No description provided for @firstRechargeGetCoinsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge to get Gifts and bonus Coins.'**
+  String get firstRechargeGetCoinsHint;
+
+  /// No description provided for @firstRechargePolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'By continuing, you agree to the Virtual Items Policy. You will also lose the extra bonus if you withdraw from this purchase.'**
+  String get firstRechargePolicy;
+
+  /// No description provided for @firstRechargeCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Get {coins} ({price})'**
+  String firstRechargeCta(String coins, String price);
+
   /// No description provided for @auctionGiftsTitle.
   ///
   /// In en, this message translates to:
@@ -5480,7 +5600,7 @@ abstract class AppLocalizations {
   /// No description provided for @cameraBeauty.
   ///
   /// In en, this message translates to:
-  /// **'Beauty'**
+  /// **'Retouch'**
   String get cameraBeauty;
 
   /// No description provided for @cameraFilters.
@@ -5756,7 +5876,7 @@ abstract class AppLocalizations {
   /// No description provided for @cameraTabCreative.
   ///
   /// In en, this message translates to:
-  /// **'Creative'**
+  /// **'Create'**
   String get cameraTabCreative;
 
   /// No description provided for @cameraDuration10m.

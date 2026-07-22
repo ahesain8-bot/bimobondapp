@@ -573,6 +573,43 @@
       }
     }
   },
+  "liveGiftLevelBanner": "أرسل هدية لتفعيل مستوى المُهدي والمكافآت",
+  "liveGiftPinHint": "ثبّت الهدايا التي تفضلها في الأعلى",
+  "liveGiftPinAction": "تثبيت",
+  "liveGiftUnpinAction": "إلغاء التثبيت",
+  "liveGiftTabGifts": "هدايا",
+  "liveGiftTabSongs": "أغاني",
+  "liveGiftTabInteractive": "تفاعلي",
+  "liveGiftTabComingSoon": "قريباً",
+  "liveGiftSendAction": "إرسال",
+  "liveGiftRecharge": "شحن",
+  "firstRechargeTitle": "عرض الشحن الأول",
+  "firstRechargeSubtitle": "المكافآت متاحة فقط مع الشحن النقدي. ينتهي العرض خلال {days} أيام.",
+  "@firstRechargeSubtitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "firstRechargeRoseTitle": "احصل على 3 ورود في حقيبتك",
+  "firstRechargeRoseBody": "احصل على واحدة الآن والباقي بعد 24 ساعة، كل منها متاح لمدة 7 أيام",
+  "firstRechargeBonusTitle": "احصل على عملات إضافية",
+  "firstRechargeBonusBody": "استخدم العملات على عناصر افتراضية مثل الهدايا",
+  "firstRechargeGetCoins": "احصل على عملات",
+  "firstRechargeGetCoinsHint": "اشحن لتحصل على هدايا وعملات إضافية.",
+  "firstRechargePolicy": "بالمتابعة، فإنك توافق على سياسة العناصر الافتراضية. ستفقد أيضاً المكافأة الإضافية إذا انسحبت من هذا الشراء.",
+  "firstRechargeCta": "احصل على {coins} ({price})",
+  "@firstRechargeCta": {
+    "placeholders": {
+      "coins": {
+        "type": "String"
+      },
+      "price": {
+        "type": "String"
+      }
+    }
+  },
   "auctionGiftsTitle": "هدايا المزاد",
   "auctionGiftsEmpty": "لم تُرسل هدايا على هذا المزاد بعد",
   "auctionGiftsSummary": "{current} / {target} {currency}",

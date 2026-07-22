@@ -7,50 +7,93 @@ import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/widgets.dart';
 
-/// Warms caches for upcoming feed posts so the next page renders instantly
-/// when the user scrolls to it.
+/// Warms caches for nearby feed/profile posts so scrolling feels instant.
 ///
-/// For every upcoming post this:
-/// - downloads + decodes the first image slide (or video poster) and the
-///   author avatar into the image cache, and
-/// - pre-initializes a paused video controller via [FeedVideoPrewarmer], so
-///   [CustomVideoPlayer] adopts it and starts playback with no loading wait.
+/// Window: [currentIndex - lookbehind, currentIndex + lookahead] (excl. current
+/// for video warm — current is already playing). Images/avatars for the whole
+/// window are precached; videos are pre-initialized via [FeedVideoPrewarmer].
 class FeedMediaPreloader {
   FeedMediaPreloader();
 
-  /// How many posts ahead of the current one to preload.
-  static const int _lookahead = 2;
+  /// Posts ahead of the current index to preload when scrolling down.
+  static const int lookahead = 2;
+
+  /// Posts behind the current index to keep warm when scrolling back up.
+  static const int lookbehind = 2;
 
   final Set<String> _preloadedIds = <String>{};
 
-  /// Forget which posts were preloaded (e.g. after a feed refresh, since the
-  /// list content changed).
+  /// Forget which posts were preloaded (e.g. after a feed refresh).
   void reset() => _preloadedIds.clear();
 
-  /// Preloads media for the posts after [currentIndex].
+  /// Preloads media for feed items around [currentIndex] (±2).
   void preloadAround(
     BuildContext context,
     List<FeedItemEntity> items,
     int currentIndex,
   ) {
-    for (var offset = 1; offset <= _lookahead; offset++) {
-      final index = currentIndex + offset;
-      if (index < 0 || index >= items.length) continue;
+    preloadPostsAround(
+      context,
+      items.map((e) => e.post).toList(growable: false),
+      currentIndex,
+      idFor: (i) => items[i].id,
+    );
+  }
 
-      final item = items[index];
-      if (!_preloadedIds.add(item.id)) continue;
-      unawaited(_preloadPost(context, item.post));
+  /// Preloads media for a flat [PostEntity] list (profile viewer).
+  void preloadPostsAround(
+    BuildContext context,
+    List<PostEntity> posts,
+    int currentIndex, {
+    String Function(int index)? idFor,
+  }) {
+    if (posts.isEmpty || currentIndex < 0 || currentIndex >= posts.length) {
+      return;
     }
+
+    final start = (currentIndex - lookbehind).clamp(0, posts.length - 1);
+    final end = (currentIndex + lookahead).clamp(0, posts.length - 1);
+
+    final keepVideoUrls = <String>{};
+    final windowIds = <String>{};
+
+    for (var index = start; index <= end; index++) {
+      final post = posts[index];
+      final id = idFor?.call(index) ?? post.id;
+      windowIds.add(id);
+
+      final videoUrl = _firstSlideVideoUrl(post);
+      if (videoUrl != null) keepVideoUrls.add(videoUrl);
+
+      // Always refresh video keep-set; skip duplicate image work via id set.
+      if (!_preloadedIds.add(id)) {
+        // Still ensure video is warm (may have been evicted).
+        if (videoUrl != null && index != currentIndex) {
+          unawaited(FeedVideoPrewarmer.instance.prewarm(videoUrl));
+        }
+        continue;
+      }
+
+      unawaited(_preloadPost(context, post, warmVideo: index != currentIndex));
+    }
+
+    // Drop tracked ids outside the window so far scrolls can re-warm later.
+    _preloadedIds.removeWhere((id) => !windowIds.contains(id));
+    FeedVideoPrewarmer.instance.retainOnly(keepVideoUrls);
   }
 
   /// Feed post avatar renders at radius 24 (48px); precaching at the same
   /// size reuses the exact decoded image instead of decoding twice.
   static const double _avatarSize = 48;
 
-  Future<void> _preloadPost(BuildContext context, PostEntity post) async {
-    // Start the video download first: it is the slowest asset and the one
-    // that decides whether the next post plays instantly.
-    unawaited(_prefetchVideo(post));
+  Future<void> _preloadPost(
+    BuildContext context,
+    PostEntity post, {
+    required bool warmVideo,
+  }) async {
+    if (warmVideo) {
+      unawaited(_prefetchVideo(post));
+    }
 
     final firstSlide = _firstSlideImageUrl(post);
     if (firstSlide != null && context.mounted) {
@@ -74,9 +117,6 @@ class FeedMediaPreloader {
     }
   }
 
-  /// Pre-initializes a paused player for the next video instead of waiting
-  /// for a full file download: the controller opens the stream and buffers
-  /// the first seconds, so playback starts instantly regardless of length.
   Future<void> _prefetchVideo(PostEntity post) async {
     if (post.isAuctionable) return;
 
@@ -85,11 +125,7 @@ class FeedMediaPreloader {
     await FeedVideoPrewarmer.instance.prewarm(url);
   }
 
-  /// Video URL of the first slide (or the legacy post-level video), matching
-  /// what [CustomVideoPlayer] will resolve when the post becomes active.
   String? _firstSlideVideoUrl(PostEntity post) {
-    // Match VideoPostMediaItem: the post-level adaptive stream represents
-    // the first/primary video and is preferred when the API provides it.
     final hlsUrl = post.hlsUrl;
     if (hlsUrl != null && hlsUrl.isNotEmpty) {
       return MediaUtils.resolveAbsoluteUrl(hlsUrl);
@@ -112,8 +148,6 @@ class FeedMediaPreloader {
     return null;
   }
 
-  /// Image the post shows the moment it becomes visible: the first image
-  /// slide, or the poster for video/auction posts.
   String? _firstSlideImageUrl(PostEntity post) {
     if (post.isAuctionable) {
       return MediaUtils.resolvePostCoverUrl(post);
@@ -130,7 +164,6 @@ class FeedMediaPreloader {
       return MediaUtils.resolveVideoPosterUrl(post);
     }
 
-    // Media-less video post (legacy videoUrl field).
     return MediaUtils.resolveVideoPosterUrl(post);
   }
 }

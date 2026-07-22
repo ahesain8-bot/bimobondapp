@@ -37,8 +37,7 @@ class HomeLayoutConstants {
   static const Duration videoProgressDuration = Duration(seconds: 15);
 
   static const int feedPageSize = 10;
-  // Start loading the next 10 when the user reaches the second-to-last post,
-  // leaving one post visible while the request completes.
+  // Start loading the next page near the end so ±2 media preload stays fed.
   static const int feedPrefetchThresholdOffset = 2;
   static const int feedPrefetchMinPosts = 3;
 

@@ -7,10 +7,12 @@ import 'package:bimobondapp/app/gifts/domain/usecases/send_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
     as gifts_di;
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/first_recharge_offer_sheet.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
+import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
+import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -18,9 +20,11 @@ import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 typedef OnGiftSentCallback = void Function(GiftEntity gift);
+
+enum _GiftSheetTab { gifts, songs, interactive }
 
 String shortGiftName(String name) {
   const maxLen = LiveDetailsLayoutConstants.giftNameMaxLength;
@@ -74,17 +78,22 @@ class _LiveGiftSheetBody extends StatefulWidget {
 }
 
 class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
+  static const _sheetBg = Color(0xFF161618);
+  static const _footerBg = Color(0xFF121214);
+  static const _accent = LiveDetailsLayoutConstants.liveBadgeColor;
+
   final _getGifts = gifts_di.sl<GetGiftsUseCase>();
   final _getInventory = gifts_di.sl<GetGiftInventoryUseCase>();
   final _purchaseGift = gifts_di.sl<PurchaseGiftUseCase>();
   final _sendGift = gifts_di.sl<SendGiftUseCase>();
 
   List<GiftEntity> _catalog = [];
+  final Set<String> _pinnedIds = {};
   GiftInventoryEntity? _inventory;
   int? _selectedIndex;
+  _GiftSheetTab _tab = _GiftSheetTab.gifts;
   bool _loading = true;
   bool _busy = false;
-  bool _isPurchasing = false;
   String? _loadError;
 
   bool get _isLoggedIn => FirebaseAuth.instance.currentUser != null;
@@ -93,6 +102,22 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       widget.canSendToHost &&
       ((widget.postId != null && widget.postId!.isNotEmpty) ||
           (widget.receiverId != null && widget.receiverId!.isNotEmpty));
+
+  ColorScheme get _scheme => Theme.of(context).colorScheme;
+
+  List<GiftEntity> get _orderedCatalog {
+    if (_pinnedIds.isEmpty) return _catalog;
+    final pinned = <GiftEntity>[];
+    final rest = <GiftEntity>[];
+    for (final gift in _catalog) {
+      if (_pinnedIds.contains(gift.id)) {
+        pinned.add(gift);
+      } else {
+        rest.add(gift);
+      }
+    }
+    return [...pinned, ...rest];
+  }
 
   @override
   void initState() {
@@ -140,11 +165,12 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   }
 
   GiftEntity? get _selectedGift {
+    final ordered = _orderedCatalog;
     final index = _selectedIndex;
-    if (index == null || index < 0 || index >= _catalog.length) {
+    if (index == null || index < 0 || index >= ordered.length) {
       return null;
     }
-    return _catalog[index];
+    return ordered[index];
   }
 
   int _ownedQuantity(String giftId) => _inventory?.quantityFor(giftId) ?? 0;
@@ -155,20 +181,16 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     return balance >= gift.priceCoins;
   }
 
+  Future<void> _openRecharge() async {
+    final toppedUp = await FirstRechargeOfferSheet.show(context);
+    if (!mounted) return;
+    if (toppedUp == true) {
+      await _load();
+    }
+  }
+
   Future<bool> _offerTopUp() async {
-    final l10n = AppLocalizations.of(context)!;
-    var confirmed = false;
-    await PopupDialogs.showConfirmDialog(
-      context,
-      title: l10n.coinsInsufficientBalance,
-      message: '',
-      confirmLabel: l10n.walletTopUpButton,
-      cancelLabel: l10n.cancel,
-      onConfirm: () => confirmed = true,
-    );
-    if (!mounted || !confirmed) return false;
-    Navigator.pop(context);
-    context.push('/settings/wallet?tab=0');
+    await _openRecharge();
     return false;
   }
 
@@ -200,39 +222,6 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     );
   }
 
-  Future<void> _purchase(GiftEntity gift) async {
-    if (!_isLoggedIn) {
-      _showLoginRequired();
-      return;
-    }
-    if (!_canAfford(gift)) {
-      await _offerTopUp();
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _isPurchasing = true;
-    });
-    final purchased = await _purchaseGiftInternal(gift);
-    if (!mounted) return;
-
-    setState(() {
-      _busy = false;
-      _isPurchasing = false;
-    });
-
-    if (!purchased) return;
-
-    final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(l10n.liveGiftPurchaseSuccess(gift.name)),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
   Future<void> _send(GiftEntity gift) async {
     if (!_isLoggedIn) {
       _showLoginRequired();
@@ -261,7 +250,6 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
     setState(() {
       _busy = true;
-      _isPurchasing = needsPurchase;
     });
 
     if (needsPurchase) {
@@ -270,11 +258,9 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       if (!purchased) {
         setState(() {
           _busy = false;
-          _isPurchasing = false;
         });
         return;
       }
-      setState(() => _isPurchasing = false);
     }
 
     if (!mounted) return;
@@ -306,7 +292,6 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
         if (!mounted) return;
         setState(() => _busy = false);
         final onSent = widget.onGiftSent;
-        // Close gift picker first, then play TikTok-style animation on the live screen.
         Navigator.of(context).pop();
         onSent?.call(gift);
       },
@@ -320,19 +305,37 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     );
   }
 
+  void _togglePinSelected() {
+    final gift = _selectedGift;
+    if (gift == null) return;
+    setState(() {
+      if (_pinnedIds.contains(gift.id)) {
+        _pinnedIds.remove(gift.id);
+      } else {
+        _pinnedIds.add(gift.id);
+      }
+      // Keep selection on the same gift after reorder.
+      final ordered = _orderedCatalog;
+      _selectedIndex = ordered.indexWhere((g) => g.id == gift.id);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final selected = _selectedGift;
-    final owned = selected == null ? 0 : _ownedQuantity(selected.id);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final height =
+        MediaQuery.sizeOf(context).height *
+        LiveDetailsLayoutConstants.giftSheetHeightFactor;
 
     return Material(
-      color: const Color(0xFF161618),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      color: _sheetBg,
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(LiveDetailsLayoutConstants.giftSheetRadius),
+      ),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.46,
+        height: height.clamp(320.0, 560.0),
         child: Column(
           children: [
             const SizedBox(height: 10),
@@ -344,38 +347,47 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.liveSendGift,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
-                      ),
-                    ),
-                  ),
-                  if (_loading && _isLoggedIn)
-                    const GiftBalanceChipSkeleton()
-                  else
-                    _CoinBalanceChip(coins: _inventory?.balanceCoins ?? 0),
-                ],
-              ),
+            const SizedBox(height: 10),
+            _LevelBanner(onTap: _openRecharge),
+            _PinRow(
+              selected: _selectedGift != null,
+              isPinned:
+                  _selectedGift != null &&
+                  _pinnedIds.contains(_selectedGift!.id),
+              onPin: _selectedGift == null ? null : _togglePinSelected,
             ),
-            const SizedBox(height: 12),
-            Expanded(child: _buildGrid(l10n)),
-            if (_loading)
-              const GiftSheetFooterSkeleton()
-            else
-              _buildFooter(l10n, selected, owned, bottomInset),
+            Expanded(child: _buildTabBody(l10n)),
+            _BottomBar(
+              tab: _tab,
+              onTabChanged: (tab) => setState(() => _tab = tab),
+              onRecharge: _openRecharge,
+              balanceCoins: _inventory?.balanceCoins ?? 0,
+              loadingBalance: _loading && _isLoggedIn,
+              bottomInset: bottomInset,
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildTabBody(AppLocalizations l10n) {
+    switch (_tab) {
+      case _GiftSheetTab.gifts:
+        return _buildGrid(l10n);
+      case _GiftSheetTab.songs:
+      case _GiftSheetTab.interactive:
+        return Center(
+          child: Text(
+            l10n.liveGiftTabComingSoon,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+    }
   }
 
   Widget _buildGrid(AppLocalizations l10n) {
@@ -398,7 +410,11 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextButton(onPressed: _load, child: Text(l10n.liveGiftRetry)),
+              TextButton(
+                onPressed: _load,
+                style: TextButton.styleFrom(foregroundColor: _accent),
+                child: Text(l10n.liveGiftRetry),
+              ),
             ],
           ),
         ),
@@ -416,97 +432,280 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       );
     }
 
+    final ordered = _orderedCatalog;
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+        crossAxisCount: LiveDetailsLayoutConstants.giftGridCrossCount,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
         childAspectRatio: 0.78,
       ),
-      itemCount: _catalog.length,
+      itemCount: ordered.length,
       itemBuilder: (context, index) {
-        final gift = _catalog[index];
-        return _buildGiftTile(
-          l10n: l10n,
+        final gift = ordered[index];
+        return _GiftTile(
           gift: gift,
-          index: index,
+          isSelected: _selectedIndex == index,
+          isPinned: _pinnedIds.contains(gift.id),
           owned: _ownedQuantity(gift.id),
+          busy: _busy && _selectedIndex == index,
+          accent: _scheme.primary,
+          sendLabel: l10n.liveGiftSendAction,
+          onSelect: _busy
+              ? null
+              : () {
+                  setState(() => _selectedIndex = index);
+                  GiftLottieCache.instance.prefetch([gift.animationUrl]);
+                },
+          onSend: _busy || !_canSend ? null : () => _send(gift),
         );
       },
     );
   }
+}
 
-  Widget _buildGiftTile({
-    required AppLocalizations l10n,
-    required GiftEntity gift,
-    required int index,
-    required int owned,
-  }) {
-    final isSelected = _selectedIndex == index;
+class _LevelBanner extends StatelessWidget {
+  const _LevelBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final muted = Colors.white.withValues(alpha: 0.72);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(LucideIcons.gift, size: 14, color: muted),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    l10n.liveGiftLevelBanner,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                DirectionalChevronIcon(
+                  size: 16,
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PinRow extends StatelessWidget {
+  const _PinRow({
+    required this.selected,
+    required this.isPinned,
+    required this.onPin,
+  });
+
+  final bool selected;
+  final bool isPinned;
+  final VoidCallback? onPin;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final accent = Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 12, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              l10n.liveGiftPinHint,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.45),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onPin,
+            style: TextButton.styleFrom(
+              foregroundColor: selected
+                  ? accent
+                  : Colors.white.withValues(alpha: 0.28),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              isPinned ? l10n.liveGiftUnpinAction : l10n.liveGiftPinAction,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GiftTile extends StatelessWidget {
+  const _GiftTile({
+    required this.gift,
+    required this.isSelected,
+    required this.isPinned,
+    required this.owned,
+    required this.busy,
+    required this.accent,
+    required this.sendLabel,
+    required this.onSelect,
+    required this.onSend,
+  });
+
+  final GiftEntity gift;
+  final bool isSelected;
+  final bool isPinned;
+  final int owned;
+  final bool busy;
+  final Color accent;
+  final String sendLabel;
+  final VoidCallback? onSelect;
+  final VoidCallback? onSend;
+
+  static const double _footerSlotHeight = 24;
+  static const double _metaSlotHeight = 16;
+
+  @override
+  Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
+    final priceStyle = TextStyle(
+      color: Colors.white.withValues(alpha: isSelected ? 0.9 : 0.55),
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+    );
 
     return GestureDetector(
-      onTap: _busy
-          ? null
-          : () {
-              setState(() => _selectedIndex = index);
-              GiftLottieCache.instance.prefetch([_catalog[index].animationUrl]);
-            },
+      onTap: onSelect,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? Colors.white.withValues(alpha: 0.85)
-                : Colors.transparent,
-            width: 1.5,
-          ),
+              ? const Color(0xFFFE2C55).withValues(alpha: 0.22)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+              padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
               child: Column(
                 children: [
+                  // Same icon slot for selected + unselected → stable cell size.
                   Expanded(
                     child: Center(
                       child: _GiftIcon(
                         gift: gift,
                         isSelected: isSelected,
-                        size: isSelected ? 36 : 32,
+                        size: 36,
                       ),
                     ),
                   ),
-                  Text(
-                    shortGiftName(gift.name),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(
-                        alpha: isSelected ? 0.95 : 0.7,
-                      ),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                  SizedBox(
+                    height: _metaSlotHeight,
+                    child: Center(
+                      child: isSelected
+                          ? AppCoinAmount(
+                              iconSize: 10,
+                              spacing: 2,
+                              text: gift.priceCoinsLabel(locale),
+                              style: priceStyle,
+                            )
+                          : Text(
+                              shortGiftName(gift.name),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  AppCoinAmount(
-                    iconSize: 10,
-                    spacing: 2,
-                    text: gift.priceCoinsLabel(locale),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  SizedBox(
+                    height: _footerSlotHeight,
+                    width: double.infinity,
+                    child: isSelected
+                        ? FilledButton(
+                            onPressed: busy ? null : onSend,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFFE2C55),
+                              disabledBackgroundColor: const Color(
+                                0xFFFE2C55,
+                              ).withValues(alpha: 0.55),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, _footerSlotHeight),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            child: busy
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    sendLabel,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                          )
+                        : Center(
+                            child: AppCoinAmount(
+                              iconSize: 10,
+                              spacing: 2,
+                              text: gift.priceCoinsLabel(locale),
+                              style: priceStyle,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -534,130 +733,192 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
                   ),
                 ),
               ),
+            if (isPinned)
+              Positioned(
+                top: 4,
+                left: 4,
+                child: Icon(
+                  LucideIcons.pin,
+                  size: 11,
+                  color: accent.withValues(alpha: 0.95),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildFooter(
-    AppLocalizations l10n,
-    GiftEntity? selected,
-    int owned,
-    double bottomInset,
-  ) {
-    String primaryLabel;
-    VoidCallback? onPrimary;
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.tab,
+    required this.onTabChanged,
+    required this.onRecharge,
+    required this.balanceCoins,
+    required this.loadingBalance,
+    required this.bottomInset,
+  });
 
-    if (selected == null) {
-      primaryLabel = l10n.liveSelectGift;
-    } else if (_busy) {
-      primaryLabel = _isPurchasing ? l10n.liveGiftBuying : l10n.liveGiftSending;
-    } else if (_canSend) {
-      primaryLabel = l10n.liveSendToHost;
-      onPrimary = () => _send(selected);
-    } else if (owned > 0) {
-      primaryLabel = l10n.liveGiftBuyMore;
-      onPrimary = () => _purchase(selected);
-    } else {
-      primaryLabel = l10n.liveGiftBuy(
-        selected.priceCoinsLabel(Localizations.localeOf(context)),
-      );
-      onPrimary = () => _purchase(selected);
-    }
+  final _GiftSheetTab tab;
+  final ValueChanged<_GiftSheetTab> onTabChanged;
+  final VoidCallback onRecharge;
+  final int balanceCoins;
+  final bool loadingBalance;
+  final double bottomInset;
 
-    final canTap = selected != null && !_busy && onPrimary != null;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final accent = Theme.of(context).colorScheme.primary;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomInset),
+      padding: EdgeInsets.fromLTRB(8, 6, 12, 8 + bottomInset),
       decoration: BoxDecoration(
-        color: const Color(0xFF121214),
+        color: _LiveGiftSheetBodyState._footerBg,
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
       ),
       child: Row(
         children: [
-          if (selected != null) ...[
-            _GiftIcon(gift: selected, isSelected: true, size: 28),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    shortGiftName(selected.name),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  AppCoinAmount(
-                    iconSize: 11,
-                    spacing: 3,
-                    text: selected.priceCoinsLabel(
-                      Localizations.localeOf(context),
-                    ),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else
-            Expanded(
-              child: Text(
-                l10n.liveSelectGift,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.45),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+          Expanded(
+            child: Row(
+              children: [
+                _TabChip(
+                  label: l10n.liveGiftTabGifts,
+                  selected: tab == _GiftSheetTab.gifts,
+                  onTap: () => onTabChanged(_GiftSheetTab.gifts),
                 ),
-              ),
-            ),
-          const SizedBox(width: 12),
-          SizedBox(
-            height: 40,
-            child: FilledButton(
-              onPressed: canTap ? onPrimary : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFE2C55),
-                disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
-                foregroundColor: Colors.white,
-                disabledForegroundColor: Colors.white.withValues(alpha: 0.35),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                _TabChip(
+                  label: l10n.liveGiftTabSongs,
+                  selected: tab == _GiftSheetTab.songs,
+                  onTap: () => onTabChanged(_GiftSheetTab.songs),
                 ),
-              ),
-              child: _busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      primaryLabel,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
+                _TabChip(
+                  label: l10n.liveGiftTabInteractive,
+                  selected: tab == _GiftSheetTab.interactive,
+                  onTap: () => onTabChanged(_GiftSheetTab.interactive),
+                ),
+              ],
             ),
           ),
+          if (loadingBalance)
+            const GiftBalanceChipSkeleton()
+          else
+            _RechargeButton(
+              coins: balanceCoins,
+              accent: accent,
+              onTap: onRecharge,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _TabChip extends StatelessWidget {
+  const _TabChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: selected ? 0.95 : 0.45),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: selected ? 10 : 0,
+              height: 3,
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.85)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RechargeButton extends StatelessWidget {
+  const _RechargeButton({
+    required this.coins,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final int coins;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context);
+    final label = LocaleFormatUtils.localizeDigits(coins.toString(), locale);
+
+    return Material(
+      color: Colors.white.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 7, 8, 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppCoinIcon(size: 14),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                l10n.liveGiftRecharge,
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+              DirectionalChevronIcon(
+                size: 14,
+                color: Colors.white.withValues(alpha: 0.55),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -695,44 +956,9 @@ class _GiftIcon extends StatelessWidget {
         height: iconSize,
         fit: BoxFit.contain,
         errorBuilder: (context, error, stackTrace) =>
-            Text('🎁', style: TextStyle(fontSize: iconSize)),
+            Icon(LucideIcons.gift, size: iconSize * 0.7, color: Colors.white70),
       );
     }
     return Text(icon, style: TextStyle(fontSize: iconSize));
-  }
-}
-
-class _CoinBalanceChip extends StatelessWidget {
-  const _CoinBalanceChip({required this.coins});
-
-  final int coins;
-
-  @override
-  Widget build(BuildContext context) {
-    final locale = Localizations.localeOf(context);
-    final label = LocaleFormatUtils.localizeDigits(coins.toString(), locale);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const AppCoinIcon(size: 14),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

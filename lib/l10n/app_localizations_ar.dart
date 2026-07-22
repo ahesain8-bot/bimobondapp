@@ -1198,6 +1198,70 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get liveGiftLevelBanner => 'أرسل هدية لتفعيل مستوى المُهدي والمكافآت';
+
+  @override
+  String get liveGiftPinHint => 'ثبّت الهدايا التي تفضلها في الأعلى';
+
+  @override
+  String get liveGiftPinAction => 'تثبيت';
+
+  @override
+  String get liveGiftUnpinAction => 'إلغاء التثبيت';
+
+  @override
+  String get liveGiftTabGifts => 'هدايا';
+
+  @override
+  String get liveGiftTabSongs => 'أغاني';
+
+  @override
+  String get liveGiftTabInteractive => 'تفاعلي';
+
+  @override
+  String get liveGiftTabComingSoon => 'قريباً';
+
+  @override
+  String get liveGiftSendAction => 'إرسال';
+
+  @override
+  String get liveGiftRecharge => 'شحن';
+
+  @override
+  String get firstRechargeTitle => 'عرض الشحن الأول';
+
+  @override
+  String firstRechargeSubtitle(int days) {
+    return 'المكافآت متاحة فقط مع الشحن النقدي. ينتهي العرض خلال $days أيام.';
+  }
+
+  @override
+  String get firstRechargeRoseTitle => 'احصل على 3 ورود في حقيبتك';
+
+  @override
+  String get firstRechargeRoseBody => 'احصل على واحدة الآن والباقي بعد 24 ساعة، كل منها متاح لمدة 7 أيام';
+
+  @override
+  String get firstRechargeBonusTitle => 'احصل على عملات إضافية';
+
+  @override
+  String get firstRechargeBonusBody => 'استخدم العملات على عناصر افتراضية مثل الهدايا';
+
+  @override
+  String get firstRechargeGetCoins => 'احصل على عملات';
+
+  @override
+  String get firstRechargeGetCoinsHint => 'اشحن لتحصل على هدايا وعملات إضافية.';
+
+  @override
+  String get firstRechargePolicy => 'بالمتابعة، فإنك توافق على سياسة العناصر الافتراضية. ستفقد أيضاً المكافأة الإضافية إذا انسحبت من هذا الشراء.';
+
+  @override
+  String firstRechargeCta(String coins, String price) {
+    return 'احصل على $coins ($price)';
+  }
+
+  @override
   String get auctionGiftsTitle => 'هدايا المزاد';
 
   @override
