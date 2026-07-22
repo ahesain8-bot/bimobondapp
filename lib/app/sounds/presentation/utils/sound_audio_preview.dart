@@ -1,27 +1,33 @@
 import 'dart:async';
 
-import 'package:video_player/video_player.dart';
+import 'package:audio_session/audio_session.dart';
+import 'package:just_audio/just_audio.dart';
 
+/// Audio-only preview / studio music bed.
+///
+/// Uses [just_audio] (no Flutter video texture) so it can play under the
+/// media-studio [VideoPlayer] without freezing the preview on Android — two
+/// [VideoPlayerController]s fighting for ExoPlayer/surfaces caused that freeze.
 class SoundAudioPreview {
   SoundAudioPreview._();
 
-  static VideoPlayerController? _controller;
+  static AudioPlayer? _player;
+  static StreamSubscription<PlayerState>? _stateSub;
   static String? _playingId;
-  static Duration _loopStart = Duration.zero;
-  static Duration _loopEnd = Duration.zero;
-  static bool _loop = false;
+  static bool _sessionReady = false;
+  static int _generation = 0;
 
   static String? get playingId => _playingId;
 
   static bool isPlaying(String soundId) =>
-      _playingId == soundId && (_controller?.value.isPlaying ?? false);
+      _playingId == soundId && (_player?.playing ?? false);
 
   static Future<void> toggle(String soundId, String audioUrl) async {
-    if (_playingId == soundId && _controller != null) {
-      if (_controller!.value.isPlaying) {
-        await _controller!.pause();
+    if (_playingId == soundId && _player != null) {
+      if (_player!.playing) {
+        await _player!.pause();
       } else {
-        await _controller!.play();
+        await _player!.play();
       }
       return;
     }
@@ -45,70 +51,101 @@ class SoundAudioPreview {
     if (soundId.isEmpty || url.isEmpty) return;
 
     await stop();
+    await _ensureMixableSession();
 
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    final generation = ++_generation;
+    final player = AudioPlayer(
+      handleInterruptions: false,
+      androidApplyAudioAttributes: false,
+      // Don't request audio focus — that pauses the studio VideoPlayer on Android.
+      handleAudioSessionActivation: false,
     );
-    _controller = controller;
+    _player = player;
     _playingId = soundId;
-    _loop = loop;
-    _loopStart = startOffset < Duration.zero ? Duration.zero : startOffset;
-    _loopEnd = _loopStart +
-        (window <= Duration.zero ? const Duration(seconds: 15) : window);
+
+    final start = startOffset < Duration.zero ? Duration.zero : startOffset;
+    final win =
+        window <= Duration.zero ? const Duration(seconds: 15) : window;
+    final end = start + win;
 
     try {
-      await controller.initialize();
-      final trackEnd = controller.value.duration;
-      if (_loopStart > Duration.zero &&
-          trackEnd > Duration.zero &&
-          _loopStart < trackEnd) {
-        await controller.seekTo(_loopStart);
-      } else {
-        _loopStart = Duration.zero;
+      await player.setAudioSource(
+        ClippingAudioSource(
+          child: AudioSource.uri(Uri.parse(url)),
+          start: start,
+          end: end,
+        ),
+      );
+      if (generation != _generation || _player != player) {
+        await player.dispose();
+        return;
       }
-      if (trackEnd > Duration.zero && _loopEnd > trackEnd) {
-        _loopEnd = trackEnd;
-      }
-      controller.setLooping(false);
-      controller.addListener(_onTick);
-      await controller.play();
-    } catch (_) {
-      await stop();
-    }
-  }
 
-  static void _onTick() {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-    if (!controller.value.isPlaying) return;
-    final pos = controller.value.position;
-    final end = _loopEnd > _loopStart ? _loopEnd : controller.value.duration;
-    if (end > Duration.zero && pos >= end - const Duration(milliseconds: 80)) {
-      if (_loop) {
-        unawaited(controller.seekTo(_loopStart));
+      await player.setLoopMode(loop ? LoopMode.one : LoopMode.off);
+
+      if (!loop) {
+        _stateSub = player.playerStateStream.listen((state) {
+          if (state.processingState == ProcessingState.completed) {
+            unawaited(stop());
+          }
+        });
+      }
+
+      await player.play();
+      if (generation != _generation || _player != player) {
+        await player.dispose();
+      }
+    } catch (_) {
+      if (_player == player) {
+        await stop();
       } else {
-        // End of the selected preview window — stop (do not seek/loop).
-        unawaited(stop());
+        try {
+          await player.dispose();
+        } catch (_) {}
       }
     }
   }
 
   static Future<void> stop() async {
-    final controller = _controller;
-    _controller = null;
+    _generation++;
+    final player = _player;
+    final sub = _stateSub;
+    _player = null;
+    _stateSub = null;
     _playingId = null;
-    _loopStart = Duration.zero;
-    _loopEnd = Duration.zero;
-    _loop = false;
-    if (controller != null) {
-      controller.removeListener(_onTick);
-      try {
-        await controller.pause();
-      } catch (_) {}
-      try {
-        await controller.dispose();
-      } catch (_) {}
+    await sub?.cancel();
+    if (player == null) return;
+    try {
+      await player.stop();
+    } catch (_) {}
+    try {
+      await player.dispose();
+    } catch (_) {}
+  }
+
+  /// Let music share the session with the studio video player (mixWithOthers).
+  static Future<void> _ensureMixableSession() async {
+    if (_sessionReady) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(
+        const AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.mixWithOthers,
+          avAudioSessionMode: AVAudioSessionMode.defaultMode,
+          androidAudioAttributes: AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.music,
+            usage: AndroidAudioUsage.media,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
+          androidWillPauseWhenDucked: false,
+        ),
+      );
+      _sessionReady = true;
+    } catch (_) {
+      // Playback may still work with the platform default session.
     }
   }
 }

@@ -61,7 +61,8 @@ class SoundLocalCatalogStore {
   }
 
   static List<SoundEntity> _decodeList(List<String>? raw) {
-    if (raw == null || raw.isEmpty) return const [];
+    // Always return a growable list — callers mutate (pushRecent / favorites).
+    if (raw == null || raw.isEmpty) return <SoundEntity>[];
     final out = <SoundEntity>[];
     for (final item in raw) {
       try {

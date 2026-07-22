@@ -6,8 +6,8 @@ import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.d
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_trim_widgets.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:pro_video_editor/pro_video_editor.dart';
-import 'package:video_player/video_player.dart';
 
 /// Result of the trim sheet: which part of the track starts playing and
 /// whether the video's own audio should be muted when the music is mixed in.
@@ -29,6 +29,9 @@ class SoundTrimResult {
 /// TikTok-style trimmer: pick which part of [sound] starts playing.
 /// Drag the selection to move it; drag the side handles to shorten/lengthen.
 /// Confirm with Use to apply the selected period.
+///
+/// Uses [just_audio] (not [VideoPlayer]) so opening this sheet never freezes
+/// the media-studio video ExoPlayer sitting underneath.
 class SoundTrimSheet extends StatefulWidget {
   const SoundTrimSheet({
     super.key,
@@ -80,7 +83,8 @@ class SoundTrimSheet extends StatefulWidget {
 }
 
 class _SoundTrimSheetState extends State<SoundTrimSheet> {
-  VideoPlayerController? _player;
+  AudioPlayer? _player;
+  StreamSubscription<Duration>? _positionSub;
   List<double> _bars = const [];
   Duration _track = Duration.zero;
   Duration _window = Duration.zero;
@@ -89,6 +93,7 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
   bool _playing = false;
   bool _muteOriginal = false;
   bool _applying = false;
+  bool _ready = false;
 
   static const _minWindow = Duration(seconds: 7);
   static const _maxWindow = Duration(seconds: 15);
@@ -108,15 +113,20 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
 
       if (audio != null) {
         try {
-          final controller = VideoPlayerController.file(audio);
-          await controller.initialize();
-          _player = controller;
-          if (controller.value.duration > Duration.zero) {
-            track = controller.value.duration;
+          final player = AudioPlayer(
+            handleInterruptions: false,
+            androidApplyAudioAttributes: false,
+            handleAudioSessionActivation: false,
+          );
+          final duration = await player.setFilePath(audio.path);
+          if (duration != null && duration > Duration.zero) {
+            track = duration;
           }
-          controller.addListener(_onPlayerTick);
+          _player = player;
+          _ready = true;
+          _positionSub = player.positionStream.listen(_onPosition);
         } catch (_) {
-          _player = null;
+          await _disposePlayer();
         }
 
         try {
@@ -129,6 +139,27 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
           _bars = data.leftChannel.toList(growable: false);
         } catch (_) {
           _bars = const [];
+        }
+      } else {
+        // Fall back to network URL if local cache failed.
+        try {
+          final url = widget.sound.resolvedAudioUrl.trim();
+          if (url.isNotEmpty) {
+            final player = AudioPlayer(
+              handleInterruptions: false,
+              androidApplyAudioAttributes: false,
+              handleAudioSessionActivation: false,
+            );
+            final duration = await player.setUrl(url);
+            if (duration != null && duration > Duration.zero) {
+              track = duration;
+            }
+            _player = player;
+            _ready = true;
+            _positionSub = player.positionStream.listen(_onPosition);
+          }
+        } catch (_) {
+          await _disposePlayer();
         }
       }
 
@@ -173,28 +204,30 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
     return value > maxW ? maxW : value;
   }
 
-  void _onPlayerTick() {
-    final player = _player;
-    if (player == null) return;
-    if (_playing) {
-      final pos = player.value.position;
-      if (pos >= _offset + _window || pos < _offset) {
-        player.seekTo(_offset);
-      }
+  void _onPosition(Duration pos) {
+    if (!_playing) return;
+    final end = _offset + _window;
+    if (pos >= end || pos < _offset) {
+      unawaited(_player?.seek(_offset) ?? Future<void>.value());
     }
-    if (mounted) setState(() {});
+  }
+
+  Future<void> _seekToOffset() async {
+    try {
+      await _player?.seek(_offset);
+    } catch (_) {}
   }
 
   Future<void> _togglePlay() async {
     final player = _player;
-    if (player == null) return;
+    if (player == null || !_ready) return;
     if (_playing) {
       await player.pause();
-      setState(() => _playing = false);
+      if (mounted) setState(() => _playing = false);
     } else {
-      await player.seekTo(_offset);
+      await player.seek(_offset);
       await player.play();
-      setState(() => _playing = true);
+      if (mounted) setState(() => _playing = true);
     }
   }
 
@@ -203,7 +236,7 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
     if (maxOffset <= Duration.zero) return;
     final newMicros = (leftFrac * _track.inMicroseconds).round();
     setState(() => _offset = _clampOffset(Duration(microseconds: newMicros)));
-    _player?.seekTo(_offset);
+    unawaited(_seekToOffset());
   }
 
   /// Drag left handle: change start; keep end fixed when possible.
@@ -226,12 +259,14 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
       window = _clampWindow(end);
     }
     final maxStart = _track - window;
-    if (start > maxStart) start = maxStart < Duration.zero ? Duration.zero : maxStart;
+    if (start > maxStart) {
+      start = maxStart < Duration.zero ? Duration.zero : maxStart;
+    }
     setState(() {
       _offset = start;
       _window = window;
     });
-    _player?.seekTo(_offset);
+    unawaited(_seekToOffset());
   }
 
   /// Drag right handle: change end; keep start fixed when possible.
@@ -257,7 +292,7 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
           _offset = start < Duration.zero ? Duration.zero : start;
           _window = window;
         });
-        _player?.seekTo(_offset);
+        unawaited(_seekToOffset());
         return;
       }
     }
@@ -274,9 +309,8 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
       muteOriginal: _muteOriginal,
     );
 
-    final player = _player;
     try {
-      await player?.pause();
+      await _player?.pause();
       _playing = false;
     } catch (_) {}
 
@@ -297,15 +331,26 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
     }
   }
 
+  Future<void> _disposePlayer() async {
+    final sub = _positionSub;
+    final player = _player;
+    _positionSub = null;
+    _player = null;
+    _ready = false;
+    await sub?.cancel();
+    if (player != null) {
+      try {
+        await player.stop();
+      } catch (_) {}
+      try {
+        await player.dispose();
+      } catch (_) {}
+    }
+  }
+
   @override
   void dispose() {
-    _player?.removeListener(_onPlayerTick);
-    final player = _player;
-    _player = null;
-    try {
-      player?.pause();
-    } catch (_) {}
-    player?.dispose();
+    unawaited(_disposePlayer());
     super.dispose();
   }
 
@@ -313,7 +358,7 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
   Widget build(BuildContext context) {
     return SoundTrimSheetBody(
       loading: _loading,
-      canPlay: _player != null && !_applying,
+      canPlay: _ready && !_applying,
       playing: _playing,
       bars: _bars,
       track: _track,

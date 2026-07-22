@@ -100,13 +100,17 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       final controller = _videoController;
       if (controller != null && controller.value.isInitialized) {
         if (oldWidget.muted != widget.muted) {
-          controller.setVolume(widget.muted ? 0 : 1);
+          unawaited(controller.setVolume(widget.muted ? 0.0 : 1.0));
         }
         if (oldWidget.paused != widget.paused) {
           if (widget.paused) {
-            controller.pause();
+            unawaited(controller.pause());
           } else {
-            controller.play();
+            // Re-assert volume after resume — some platforms reset it on play.
+            unawaited(() async {
+              await controller.setVolume(widget.muted ? 0.0 : 1.0);
+              await controller.play();
+            }());
           }
         }
       }

@@ -37,9 +37,18 @@ class NativeVideoProcessor {
       final resultPath = await ProVideoEditor.instance.renderVideoToFile(
         outPath,
         VideoRenderData(
-          videoSegments: [VideoSegment(video: EditorVideo.file(input))],
+          videoSegments: [
+            VideoSegment(
+              video: EditorVideo.file(input),
+              // 0 = mute original mic/camera audio; music still comes from
+              // [audioTracks] below (TikTok "Mute original sound").
+              volume: keepOriginalAudio ? 1.0 : 0.0,
+            ),
+          ],
           outputFormat: VideoOutputFormat.mp4,
-          enableAudio: keepOriginalAudio,
+          // Keep the audio pipeline on so custom tracks are mixed in even when
+          // the video's own track is silenced via [VideoSegment.volume].
+          enableAudio: true,
           audioTracks: [
             VideoAudioTrack(
               path: audio.path,
