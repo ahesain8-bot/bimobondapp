@@ -89,6 +89,8 @@ dependencies:
   google_mlkit_face_detection: ^0.13.2
   crop_your_image: ^2.0.0
   google_fonts: ^8.2.0
+  just_audio: ^0.10.6
+  audio_session: ^0.2.4
 
 dev_dependencies:
   flutter_test:

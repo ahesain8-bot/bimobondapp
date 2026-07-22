@@ -88,13 +88,18 @@ class MediaStudioTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
       child: Row(
         children: [
           IconButton(
             onPressed: onBack,
-            icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+            // LTR: <  |  RTL: >  (points toward the back/edge in both locales)
+            icon: Icon(
+              isRtl ? LucideIcons.chevronRight : LucideIcons.chevronLeft,
+              color: Colors.white,
+            ),
           ),
           Expanded(
             child: Center(

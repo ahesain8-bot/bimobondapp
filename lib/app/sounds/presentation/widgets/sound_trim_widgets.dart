@@ -3,7 +3,7 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// X / play chrome for the sound trim sheet.
+/// X / play / confirm chrome for the sound trim sheet.
 class SoundTrimHeader extends StatelessWidget {
   const SoundTrimHeader({
     super.key,
@@ -12,6 +12,7 @@ class SoundTrimHeader extends StatelessWidget {
     required this.enabled,
     required this.onClose,
     required this.onTogglePlay,
+    this.onConfirm,
   });
 
   final bool canPlay;
@@ -19,6 +20,7 @@ class SoundTrimHeader extends StatelessWidget {
   final bool enabled;
   final VoidCallback onClose;
   final VoidCallback onTogglePlay;
+  final VoidCallback? onConfirm;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,16 @@ class SoundTrimHeader extends StatelessWidget {
             icon: Icon(
               playing ? LucideIcons.pause : LucideIcons.play,
               color: iconColor,
+              size: 24,
+            ),
+          ),
+        if (onConfirm != null)
+          IconButton(
+            onPressed: enabled ? onConfirm : null,
+            tooltip: AppLocalizations.of(context)!.soundUseThis,
+            icon: Icon(
+              LucideIcons.check,
+              color: SoundPickerTheme.accentOf(context),
               size: 24,
             ),
           ),
@@ -185,6 +197,7 @@ class SoundTrimSheetBody extends StatelessWidget {
                 enabled: canConfirm,
                 onClose: onClose,
                 onTogglePlay: onTogglePlay,
+                onConfirm: onConfirm,
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -218,25 +231,25 @@ class SoundTrimSheetBody extends StatelessWidget {
                   onChanged: onMuteChanged,
                 ),
               ],
-              // const SizedBox(height: 12),
-              // Padding(
-              //   padding: const EdgeInsets.symmetric(horizontal: 12),
-              //   child: SizedBox(
-              //     width: double.infinity,
-              //     child: FilledButton(
-              //       onPressed: canConfirm ? onConfirm : null,
-              //       style: FilledButton.styleFrom(
-              //         backgroundColor: SoundPickerTheme.accentOf(context),
-              //         foregroundColor: scheme.onPrimary,
-              //         minimumSize: const Size.fromHeight(48),
-              //         shape: RoundedRectangleBorder(
-              //           borderRadius: BorderRadius.circular(12),
-              //         ),
-              //       ),
-              //       child: Text(l10n.soundUseThis),
-              //     ),
-              //   ),
-              // ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: canConfirm ? onConfirm : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SoundPickerTheme.accentOf(context),
+                      foregroundColor: scheme.onPrimary,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(l10n.soundUseThis),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

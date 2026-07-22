@@ -101,18 +101,14 @@ class SoundPickerSheet extends StatefulWidget {
     );
     await SoundAudioPreview.stop();
     if (!context.mounted) return null;
-    if (trim == null) {
-      return SoundPickResult(
-        sound: sound,
-        offset: restorePeriod ? initialOffset : Duration.zero,
-        window: restorePeriod
-            ? (initialWindow ?? const Duration(seconds: 15))
-            : const Duration(seconds: 15),
-        soundSegmentId: sound.defaultSegment?.id,
-      );
-    }
+    // X / dismiss cancels the whole pick — mute + trim only apply via Use.
+    if (trim == null) return null;
 
-    await SoundLocalCatalogStore.pushRecent(sound);
+    try {
+      await SoundLocalCatalogStore.pushRecent(sound);
+    } catch (_) {
+      // Recent catalog is best-effort — never block applying the sound.
+    }
     return SoundPickResult(
       sound: sound,
       offset: trim.offset,

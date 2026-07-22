@@ -192,38 +192,27 @@ class CameraWorkspaceTabs extends StatelessWidget {
       onTap: () => onSelected(1),
     );
 
+    // Stack + directional align so RTL doesn't flip Create under the upload
+    // button (Row would reverse and collide with gallery on the start edge).
     return SizedBox(
       width: double.infinity,
       height: 36,
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: IgnorePointer(
-                child: Opacity(
-                  opacity: 0,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      createTab,
-                      const SizedBox(width: 36),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
           postTab,
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(width: 36),
-                  createTab,
-                ],
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              alignment: AlignmentDirectional.centerStart,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 36),
+                  child: createTab,
+                ),
               ),
             ),
           ),

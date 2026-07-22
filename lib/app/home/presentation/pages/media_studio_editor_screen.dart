@@ -27,6 +27,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/stories/story_camera_e
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_file.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_pick_result.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/app_assets.dart';
@@ -84,6 +85,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   /// Mute the video's own audio when mixing the selected music in.
   bool _muteOriginalAudio = false;
+
+  /// Bumped after sound picker/trim closes so [MediaStudioPreview] remounts a
+  /// fresh ExoPlayer if Android left the previous one frozen.
+  int _previewEpoch = 0;
 
   /// Length of the video generated from a still photo when music is added.
   static const _photoMusicMaxSeconds = 15;
@@ -735,36 +740,43 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   Future<void> _pickSound() async {
     final hasVideo = _states.any((s) => s.isVideo);
-    // Pause the studio video while the sound picker (and its own
-    // VideoPlayer-based audio preview) is open — two players at once
-    // freeze the preview on Android after the sheet closes.
+    // Pause the studio video while the sound picker / trimmer is open.
     setState(() => _subEditorOpen = true);
     await _syncStudioSoundPreview();
-    final picked = await SoundPickerSheet.show(
-      context,
-      initialSelection: _selectedSound,
-      initialOffset: _soundStartOffset,
-      initialWindow: _soundWindow,
-      allowMuteOnTrim: hasVideo,
-    );
+    if (!mounted) return;
+
+    SoundPickResult? picked;
+    try {
+      picked = await SoundPickerSheet.show(
+        context,
+        initialSelection: _selectedSound,
+        initialOffset: _soundStartOffset,
+        initialWindow: _soundWindow,
+        allowMuteOnTrim: hasVideo,
+      );
+    } catch (_) {
+      picked = null;
+    }
     if (!mounted) return;
     await SoundAudioPreview.stop();
-    setState(() => _subEditorOpen = false);
-    if (picked == null) {
-      unawaited(_syncStudioSoundPreview());
-      return;
-    }
-    if (picked.cleared) {
-      _clearSound();
-      return;
-    }
-    final sound = picked.sound;
-    if (sound == null) {
-      unawaited(_syncStudioSoundPreview());
-      return;
-    }
+    // Let modal / trim audio fully tear down before remounting video.
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
 
     setState(() {
+      _subEditorOpen = false;
+      // Fresh VideoPlayer — recovers if a prior ExoPlayer surface froze.
+      _previewEpoch++;
+      if (picked == null) return;
+      if (picked.cleared) {
+        _selectedSound = null;
+        _soundStartOffset = Duration.zero;
+        _soundWindow = const Duration(seconds: 15);
+        _muteOriginalAudio = false;
+        return;
+      }
+      final sound = picked.sound;
+      if (sound == null) return;
       _selectedSound = sound;
       _soundStartOffset = picked.offset;
       _soundWindow = picked.window > Duration.zero
@@ -772,8 +784,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
     });
-    // Resume video first, then start the studio music bed under it.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+
+    // Start music bed after the remounted video has had a frame to init.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
       if (mounted) unawaited(_syncStudioSoundPreview());
     });
   }
@@ -1148,8 +1162,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
     final previewWidget = RepaintBoundary(
       child: MediaStudioPreview(
-        // Stable key — do NOT key on beauty preview path (that blinks).
-        key: ValueKey('studio-preview-$_currentIndex'),
+        // Epoch remounts after sound UI so a frozen ExoPlayer is replaced.
+        key: ValueKey('studio-preview-$_currentIndex-$_previewEpoch'),
         file: previewFile,
         isVideo: currentItem.isVideo,
         arFilterId: selectedColorId,
