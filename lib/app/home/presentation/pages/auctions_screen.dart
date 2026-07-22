@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:bimobondapp/app/auctions/domain/usecases/get_active_auctions_usecase.dart';
+import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
+    as auctions_di;
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
 import 'package:bimobondapp/app/categories/presentation/utils/category_lookup.dart';
 import 'package:bimobondapp/app/categories/domain/usecases/get_categories_usecase.dart';
@@ -20,6 +23,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auctions_sear
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as posts_di;
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
@@ -27,6 +31,7 @@ import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -150,7 +155,9 @@ class AuctionsScreenState extends State<AuctionsScreen> {
   Future<void> _loadCategories() async {
     setState(() => _isLoadingCategories = true);
 
-    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final result = await categories_di.sl<GetCategoriesUseCase>()(
+      const GetCategoriesParams.flat(),
+    );
 
     if (!mounted) return;
     setState(() {
@@ -280,6 +287,45 @@ class AuctionsScreenState extends State<AuctionsScreen> {
       _postAuctionsErrorMessage = null;
     });
 
+    final search = _searchQuery.trim();
+    final useActiveEndpoint = search.isEmpty &&
+        !_filters.hasUserFilters &&
+        _filters.liveStatus != AuctionLiveStatusFilter.ended;
+
+    if (useActiveEndpoint) {
+      final result = await auctions_di.sl<GetActiveAuctionsUseCase>()(
+        NoParams(),
+      );
+      if (!mounted) return;
+
+      final loaded = result.fold<bool>(
+        (_) => false,
+        (auctions) {
+          final mapped = auctions
+              .where((a) => !a.isEnded)
+              .map((a) => AuctionItem.fromAuction(a))
+              .where((item) {
+                if (_filters.liveStatus == AuctionLiveStatusFilter.live) {
+                  return item.isLive;
+                }
+                return true;
+              })
+              .toList();
+          setState(() {
+            _postAuctionItems
+              ..clear()
+              ..addAll(mapped);
+            _postAuctionsLoadFailed = false;
+            _postAuctionsErrorMessage = null;
+            _isLoadingPostAuctions = false;
+          });
+          return true;
+        },
+      );
+      if (loaded) return;
+      // Fall back to feed filters if /auctions/active fails.
+    }
+
     final useCase = posts_di.sl<GetFeedUseCase>();
     final postsById = <String, PostEntity>{};
     var page = 1;
@@ -288,7 +334,6 @@ class AuctionsScreenState extends State<AuctionsScreen> {
     var loadFailed = false;
 
     while (hasMore && page <= 10) {
-      final search = _searchQuery.trim();
       final result = await useCase(
         _filters.toFeedParams(
           page: page,
@@ -360,11 +405,20 @@ class AuctionsScreenState extends State<AuctionsScreen> {
     });
   }
 
-  void _openAuction(AuctionItem item) {
+  Future<void> _openAuction(AuctionItem item) async {
     final post = item.post;
     if (post != null) {
       openPost(context, post);
+      return;
     }
+    final postId = item.id;
+    if (postId.isEmpty) return;
+    final result = await posts_di.sl<GetPostByIdUseCase>()(postId);
+    if (!mounted) return;
+    result.fold(
+      (failure) => PopupDialogs.showErrorDialog(context, failure.message),
+      (loaded) => openPost(context, loaded),
+    );
   }
 
   bool _isEndedPost(PostEntity post) => AuctionSearchFilters.isPostEnded(post);

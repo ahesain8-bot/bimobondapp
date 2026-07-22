@@ -10,15 +10,31 @@ class CategoriesRepositoryImpl implements CategoriesRepository {
 
   final CategoriesRemoteDataSource remoteDataSource;
 
-  Failure _mapException(Object e) => FailureMapper.from(e);
+  CategoriesQuery _toRemote(CategoriesListQuery query) => CategoriesQuery(
+        search: query.search,
+        parentId: query.parentId,
+        flat: query.flat,
+        isMain: query.isMain,
+      );
 
   @override
-  Future<Either<Failure, List<CategoryEntity>>> getCategories() async {
+  Future<Either<Failure, List<CategoryEntity>>> getCategories([
+    CategoriesListQuery query = const CategoriesListQuery(),
+  ]) async {
     try {
-      final categories = await remoteDataSource.getCategories();
+      final categories = await remoteDataSource.getCategories(_toRemote(query));
       return Right(categories);
     } catch (e) {
-      return Left(_mapException(e));
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, CategoryEntity>> getCategoryById(String id) async {
+    try {
+      return Right(await remoteDataSource.getCategoryById(id));
+    } catch (e) {
+      return Left(FailureMapper.from(e));
     }
   }
 }

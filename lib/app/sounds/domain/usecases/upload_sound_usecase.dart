@@ -17,6 +17,7 @@ class UploadSoundUseCase implements UseCase<SoundEntity, UploadSoundParams> {
       audio: params.audio,
       duration: params.duration,
       name: params.name,
+      cover: params.cover,
     );
   }
 }
@@ -26,9 +27,11 @@ class UploadSoundParams {
     required this.audio,
     required this.duration,
     this.name,
+    this.cover,
   });
 
   final File audio;
   final int duration;
   final String? name;
+  final File? cover;
 }

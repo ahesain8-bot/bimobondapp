@@ -91,7 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsTile(
                 icon: LucideIcons.lock,
                 title: l10n.settingsPrivacy,
-                onTap: () => _openPlaceholder(context, l10n.settingsPrivacy),
+                onTap: () => context.pushNamed('privacy_settings'),
               ),
               _SettingsTile(
                 icon: LucideIcons.shield,

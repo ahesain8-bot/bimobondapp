@@ -254,6 +254,72 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, void>> sendOtp({
+    required String type,
+    String? email,
+    String? phoneNumber,
+  }) async {
+    try {
+      await remoteDataSource.sendOtp(
+        type: type,
+        email: email,
+        phoneNumber: phoneNumber,
+      );
+      return const Right(null);
+    } on AppException catch (e) {
+      return Left(FailureMapper.from(e));
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> verifyOtp({
+    required String type,
+    required String code,
+    String? email,
+    String? phoneNumber,
+  }) async {
+    try {
+      await remoteDataSource.verifyOtp(
+        type: type,
+        code: code,
+        email: email,
+        phoneNumber: phoneNumber,
+      );
+      return const Right(null);
+    } on AppException catch (e) {
+      return Left(FailureMapper.from(e));
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> resetPassword({
+    required String type,
+    required String code,
+    required String newPassword,
+    String? email,
+    String? phoneNumber,
+  }) async {
+    try {
+      await remoteDataSource.resetPassword(
+        type: type,
+        code: code,
+        newPassword: newPassword,
+        email: email,
+        phoneNumber: phoneNumber,
+      );
+      return const Right(null);
+    } on AppException catch (e) {
+      return Left(FailureMapper.from(e));
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
   Future<void> logout() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId != null) {

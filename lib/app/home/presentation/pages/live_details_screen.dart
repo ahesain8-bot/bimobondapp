@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:ui';
 
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
@@ -26,6 +26,7 @@ import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dar
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import 'package:bimobondapp/app/auctions/domain/usecases/cancel_auction_usecase.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
@@ -172,11 +173,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (postId != null) {
       _commentsBloc = di.sl<CommentsBloc>();
       _commentsBloc!.add(
-        FetchCommentsRequested(
-          postId: postId,
-          isRefresh: true,
-          sort: 'oldest',
-        ),
+        FetchCommentsRequested(postId: postId, isRefresh: true, sort: 'oldest'),
       );
     }
 
@@ -210,10 +207,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     // Post room: newComment events (comment list + gift comments).
     _newCommentSub = _auctionSocket!.onNewComment.listen(_onRealtimeComment);
     // Auction room: auctionUpdated with lastComment / lastGift / totals.
-    _auctionUpdatedSub =
-        _auctionSocket!.onAuctionUpdated.listen(_onRealtimeAuctionUpdate);
-    _socketConnectionSub =
-        _auctionSocket!.onConnectionChanged.listen((connected) {
+    _auctionUpdatedSub = _auctionSocket!.onAuctionUpdated.listen(
+      _onRealtimeAuctionUpdate,
+    );
+    _socketConnectionSub = _auctionSocket!.onConnectionChanged.listen((
+      connected,
+    ) {
       if (connected && mounted) {
         unawaited(_ensureAuctionRoomsJoined());
       }
@@ -228,10 +227,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (post == null || socket == null || post.id.isEmpty) return;
 
     final auctionId = _auctionRoomId;
-    await socket.ensureJoined(
-      postId: post.id,
-      auctionId: auctionId,
-    );
+    await socket.ensureJoined(postId: post.id, auctionId: auctionId);
     _joinedPostId = post.id;
     _joinedAuctionId = auctionId;
   }
@@ -387,25 +383,24 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       _playGiftAnimation(
         animationUrl: (gift['animationUrl'] ?? gift['animation_url'])
             ?.toString(),
-        thumbnailUrl: (gift['thumbnailUrl'] ??
-                gift['thumbnail_url'] ??
-                gift['imageUrl'])
-            ?.toString(),
+        thumbnailUrl:
+            (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
+                ?.toString(),
         giftName: gift['name']?.toString(),
         senderName: _displaySenderName(
-          fullName: (gift['senderFullName'] ??
-                  gift['senderName'] ??
-                  gift['fullName'] ??
-                  gift['nameSender'])
-              ?.toString(),
+          fullName:
+              (gift['senderFullName'] ??
+                      gift['senderName'] ??
+                      gift['fullName'] ??
+                      gift['nameSender'])
+                  ?.toString(),
           username: (gift['senderUsername'] ?? gift['username'])?.toString(),
         ),
       );
     }
 
-    final target = payload.targetPriceCoins ??
-        widget.post?.auction?.targetPriceCoins ??
-        0;
+    final target =
+        payload.targetPriceCoins ?? widget.post?.auction?.targetPriceCoins ?? 0;
     if (target > 0 && _highestBidCoins >= target) {
       if (!_isAuctionFinished) {
         _completeAuction();
@@ -422,9 +417,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final postId = widget.post?.id;
     final auctionId = _auctionId;
 
-    if (payload.postId != null &&
-        postId != null &&
-        payload.postId == postId) {
+    if (payload.postId != null && postId != null && payload.postId == postId) {
       return true;
     }
 
@@ -453,11 +446,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final postId = widget.post?.id;
     if (postId == null) return;
     _commentsBloc?.add(
-      FetchCommentsRequested(
-        postId: postId,
-        isRefresh: true,
-        sort: 'oldest',
-      ),
+      FetchCommentsRequested(postId: postId, isRefresh: true, sort: 'oldest'),
     );
   }
 
@@ -512,8 +501,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     final endedByStatusOrDate = AuctionSearchFilters.isPostEnded(post!);
     final targetCoins = auction.targetPriceCoins;
-    final targetReached =
-        targetCoins > 0 && _highestBidCoins >= targetCoins;
+    final targetReached = targetCoins > 0 && _highestBidCoins >= targetCoins;
 
     if (endedByStatusOrDate || targetReached) {
       _isAuctionFinished = true;
@@ -620,7 +608,47 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       onPromote: post.canBePromoted
           ? () => context.pushNamed('promote_post', extra: post)
           : null,
+      onCancelAuction: _canCancelAuction ? _confirmCancelAuction : null,
       onDelete: _confirmDeletePost,
+    );
+  }
+
+  bool get _canCancelAuction {
+    final auction = widget.post?.auction;
+    if (auction == null) return false;
+    final id = auction.id;
+    if (id == null || id.isEmpty) return false;
+    final status = auction.status?.trim().toUpperCase() ?? '';
+    return status.isEmpty || status == 'ACTIVE' || status == 'LIVE';
+  }
+
+  Future<void> _confirmCancelAuction() async {
+    final auctionId = widget.post?.auction?.id;
+    if (!_checkAuth() || !_isPostOwner() || auctionId == null) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    await PopupDialogs.showConfirmDialog(
+      context,
+      title: l10n.auctionCancelTitle,
+      message: l10n.auctionCancelMessage,
+      cancelLabel: l10n.cancel,
+      confirmLabel: l10n.auctionCancelAction,
+      destructive: true,
+      onConfirm: () async {
+        final result = await auctions_di.sl<CancelAuctionUseCase>()(
+          CancelAuctionParams(auctionId),
+        );
+        if (!mounted) return;
+        result.fold(
+          (failure) => PopupDialogs.showErrorDialog(context, failure.message),
+          (_) {
+            setState(() => _isAuctionFinished = true);
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(l10n.auctionCancelSuccess)));
+          },
+        );
+      },
     );
   }
 
@@ -768,10 +796,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     await Future<void>.delayed(const Duration(milliseconds: 80));
     if (!mounted) return;
 
-    final animationUrl =
-        gift.animationUrl?.trim().isNotEmpty == true
-            ? gift.animationUrl
-            : gift.displayImageUrl;
+    final animationUrl = gift.animationUrl?.trim().isNotEmpty == true
+        ? gift.animationUrl
+        : gift.displayImageUrl;
     final authState = context.read<AuthBloc>().state;
     final me = authState is AuthSuccess ? authState.user : null;
     _playGiftAnimation(
@@ -787,11 +814,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final postId = widget.post?.id;
     if (postId != null) {
       _commentsBloc?.add(
-        FetchCommentsRequested(
-          postId: postId,
-          isRefresh: true,
-          sort: 'oldest',
-        ),
+        FetchCommentsRequested(postId: postId, isRefresh: true, sort: 'oldest'),
       );
     }
     context.read<PostsBloc>().add(
@@ -1217,9 +1240,6 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
   Widget _wrapAuctionLtr(Widget child) {
     if (!_isAuctionPost) return child;
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: child,
-    );
+    return Directionality(textDirection: TextDirection.ltr, child: child);
   }
 }

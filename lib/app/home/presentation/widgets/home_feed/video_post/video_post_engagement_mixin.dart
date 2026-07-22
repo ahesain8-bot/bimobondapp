@@ -52,9 +52,15 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
 
   void recordViewIfNeeded() {
     if (!engagementPlaybackActive || widget.post.isStory) return;
+    final campaignId = widget.post.isPromoted || widget.post.isAd
+        ? widget.post.promotion?.id
+        : null;
     PostViewRecorder.recordIfNeeded(
       postId: widget.post.id,
       isOwner: isPostOwner(),
+      campaignId: (campaignId != null && campaignId.isNotEmpty)
+          ? campaignId
+          : null,
     );
   }
 

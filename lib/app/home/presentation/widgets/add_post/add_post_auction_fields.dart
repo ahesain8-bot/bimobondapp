@@ -43,7 +43,6 @@ AddPostAuctionDateParts parseAddPostAuctionDateTime(DateTime dateTime) {
 class AddPostAuctionFields extends StatelessWidget {
   const AddPostAuctionFields({
     required this.itemNameController,
-    required this.startingPriceController,
     required this.targetPriceController,
     required this.startDate,
     required this.endDate,
@@ -53,7 +52,6 @@ class AddPostAuctionFields extends StatelessWidget {
   });
 
   final TextEditingController itemNameController;
-  final TextEditingController startingPriceController;
   final TextEditingController targetPriceController;
   final DateTime startDate;
   final DateTime endDate;
@@ -122,50 +120,18 @@ class AddPostAuctionFields extends StatelessWidget {
                   fillColor: fieldFill,
                 ),
                 const SizedBox(height: AppSizes.p20),
-                CustomText(
-                  l10n.auctionsFiltersPriceRange,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  variant: TextVariant.secondary,
-                ),
-                const SizedBox(height: AppSizes.p10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _AuctionTextField(
-                        controller: startingPriceController,
-                        label: l10n.auctionsFiltersMinPrice,
-                        hint: '0',
-                        icon: LucideIcons.banknote,
-                        fillColor: fieldFill,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'[0-9.,]'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSizes.p12),
-                    Expanded(
-                      child: _AuctionTextField(
-                        controller: targetPriceController,
-                        label: l10n.auctionsFiltersMaxPrice,
-                        hint: '0',
-                        icon: LucideIcons.target,
-                        fillColor: fieldFill,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'[0-9.,]'),
-                          ),
-                        ],
-                      ),
+                _AuctionTextField(
+                  controller: targetPriceController,
+                  label: l10n.auctionTargetPriceLabel,
+                  hint: '0',
+                  icon: LucideIcons.target,
+                  fillColor: fieldFill,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'[0-9.,]'),
                     ),
                   ],
                 ),

@@ -229,6 +229,8 @@ class MediaStudioExportResult {
     this.beautyEnabled = false,
     this.arFilterId,
     this.sound,
+    this.soundOffset = Duration.zero,
+    this.soundWindow = const Duration(seconds: 15),
   });
 
   final List<File> files;
@@ -239,6 +241,8 @@ class MediaStudioExportResult {
   final String? arFilterId;
   /// Sound chosen in the studio (may differ from the caller's initial sound).
   final SoundEntity? sound;
+  final Duration soundOffset;
+  final Duration soundWindow;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.

@@ -67,3 +67,7 @@ class EmailOtpVerifiedState extends AuthState {
   @override
   List<Object> get props => [email];
 }
+
+class PasswordResetSuccessState extends AuthState {
+  const PasswordResetSuccessState();
+}

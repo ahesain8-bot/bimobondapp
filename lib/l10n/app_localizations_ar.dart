@@ -200,6 +200,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resendCode => 'إعادة إرسال';
 
   @override
+  String resendCodeIn(int seconds) {
+    return 'إعادة الإرسال خلال $secondsث';
+  }
+
+  @override
   String get back => 'رجوع';
 
   @override
@@ -233,19 +238,40 @@ class AppLocalizationsAr extends AppLocalizations {
   String get forgotPasswordTitle => 'نسيت كلمة المرور';
 
   @override
-  String get forgotPasswordSubtitle => 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.';
+  String get forgotPasswordSubtitle => 'أدخل بريدك الإلكتروني وسنرسل لك رمزًا مكونًا من 6 أرقام لإعادة تعيين كلمة المرور.';
 
   @override
-  String get forgotPasswordButton => 'إرسال رابط إعادة التعيين';
+  String get forgotPasswordButton => 'إرسال رمز إعادة التعيين';
 
   @override
-  String get forgotPasswordSuccess => 'تم إرسال بريد إعادة تعيين كلمة المرور. تحقق من صندوق الوارد ومجلد البريد العشوائي.';
+  String get forgotPasswordSuccess => 'إذا كان هناك حساب بهذا البريد، تم إرسال رمز إعادة التعيين.';
 
   @override
-  String get forgotPasswordFailed => 'فشل إرسال بريد إعادة التعيين. يرجى المحاولة مرة أخرى.';
+  String get forgotPasswordFailed => 'فشل إرسال رمز إعادة التعيين. يرجى المحاولة مرة أخرى.';
 
   @override
   String get forgotPasswordUserNotFound => 'لا يوجد حساب مرتبط بهذا البريد الإلكتروني.';
+
+  @override
+  String get resetPasswordTitle => 'إعادة تعيين كلمة المرور';
+
+  @override
+  String get resetPasswordSubtitle => 'أدخل الرمز المكون من 6 أرقام المرسل إلى';
+
+  @override
+  String get resetPasswordButton => 'إعادة تعيين كلمة المرور';
+
+  @override
+  String get resetPasswordSuccess => 'تمت إعادة تعيين كلمة المرور بنجاح. يرجى تسجيل الدخول.';
+
+  @override
+  String get newPasswordLabel => 'كلمة المرور الجديدة';
+
+  @override
+  String get otpSentSuccess => 'تم إرسال رمز التحقق.';
+
+  @override
+  String get otpVerifiedSuccess => 'تم التحقق من البريد الإلكتروني بنجاح.';
 
   @override
   String get loginFailed => 'فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.';
@@ -812,6 +838,141 @@ class AppLocalizationsAr extends AppLocalizations {
   String get auctionFinishedBadge => 'انتهى';
 
   @override
+  String get auctionCancelAction => 'إلغاء المزاد';
+
+  @override
+  String get auctionCancelTitle => 'إلغاء هذا المزاد؟';
+
+  @override
+  String get auctionCancelMessage => 'قد يتم استرداد مساهمات الهدايا إذا كان الضمان مفعّلاً. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get auctionCancelSuccess => 'تم إلغاء المزاد';
+
+  @override
+  String get auctionSellerRequiredTitle => 'يلزم توثيق البائع';
+
+  @override
+  String get auctionSellerRequiredMessage => 'أكمل توثيق البائع قبل استضافة المزادات.';
+
+  @override
+  String get auctionSellerPendingMessage => 'توثيق البائع قيد المراجعة.';
+
+  @override
+  String get auctionSellerRejectedMessage => 'تم رفض توثيق البائع. يرجى إعادة الإرسال.';
+
+  @override
+  String get auctionSellerCompleteAction => 'إكمال التوثيق';
+
+  @override
+  String get sellerVerificationTitle => 'توثيق البائع';
+
+  @override
+  String get sellerVerificationSubtitle => 'ارفع جواز سفرك وبيانات العنوان لاستضافة المزادات.';
+
+  @override
+  String get sellerVerificationSubtitleSimple => 'أدخل رقم الهوية وارفع صورة جواز السفر.';
+
+  @override
+  String get sellerVerificationIdentitySection => 'الهوية';
+
+  @override
+  String get sellerVerificationPassportSection => 'جواز السفر';
+
+  @override
+  String get sellerVerificationContactSection => 'التواصل والعنوان';
+
+  @override
+  String get sellerVerificationFullLegalName => 'الاسم القانوني الكامل';
+
+  @override
+  String get sellerVerificationDateOfBirth => 'تاريخ الميلاد';
+
+  @override
+  String get sellerVerificationNationality => 'الجنسية';
+
+  @override
+  String get sellerVerificationNationalId => 'رقم الهوية';
+
+  @override
+  String get sellerVerificationNationalIdOptional => 'الرقم الوطني (اختياري)';
+
+  @override
+  String get sellerVerificationNationalIdRequired => 'رقم الهوية مطلوب';
+
+  @override
+  String get sellerVerificationPassportNumber => 'رقم جواز السفر';
+
+  @override
+  String get sellerVerificationPassportCountry => 'بلد جواز السفر';
+
+  @override
+  String get sellerVerificationPassportExpiry => 'تاريخ انتهاء الجواز';
+
+  @override
+  String get sellerVerificationPassportFront => 'صورة وجه جواز السفر';
+
+  @override
+  String get sellerVerificationPassportPhoto => 'صورة جواز السفر';
+
+  @override
+  String get sellerVerificationPassportBackOptional => 'ظهر الجواز (اختياري)';
+
+  @override
+  String get sellerVerificationSelfieOptional => 'صورة شخصية (اختياري)';
+
+  @override
+  String get sellerVerificationContactPhone => 'رقم الهاتف';
+
+  @override
+  String get sellerVerificationAddressLine1 => 'العنوان سطر 1';
+
+  @override
+  String get sellerVerificationAddressLine2Optional => 'العنوان سطر 2 (اختياري)';
+
+  @override
+  String get sellerVerificationCity => 'المدينة';
+
+  @override
+  String get sellerVerificationRegionOptional => 'المنطقة / المحافظة (اختياري)';
+
+  @override
+  String get sellerVerificationCountry => 'الدولة';
+
+  @override
+  String get sellerVerificationPostalOptional => 'الرمز البريدي (اختياري)';
+
+  @override
+  String get sellerVerificationPickDate => 'اختر التاريخ';
+
+  @override
+  String get sellerVerificationTapToUpload => 'اضغط للرفع';
+
+  @override
+  String get sellerVerificationUploading => 'جاري الرفع…';
+
+  @override
+  String get sellerVerificationUploaded => 'تم الرفع';
+
+  @override
+  String get sellerVerificationSubmit => 'إرسال للمراجعة';
+
+  @override
+  String get sellerVerificationSubmitted => 'تم إرسال التوثيق. سنراجعه قريبًا.';
+
+  @override
+  String get sellerVerificationDobRequired => 'تاريخ الميلاد مطلوب';
+
+  @override
+  String get sellerVerificationExpiryRequired => 'تاريخ انتهاء الجواز مطلوب';
+
+  @override
+  String get sellerVerificationExpiryFuture => 'يجب ألا يكون جواز السفر منتهيًا';
+
+  @override
+  String get sellerVerificationPassportFrontRequired => 'صورة جواز السفر مطلوبة';
+
+  @override
   String get auctionTimeLeft => 'الوقت المتبقي';
 
   @override
@@ -911,6 +1072,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get liveTopBid => 'أعلى سعر';
+
+  @override
+  String get liveTargetPrice => 'السعر المستهدف';
 
   @override
   String get currencyUsd => 'دولار';
@@ -1333,6 +1497,33 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postReportSubmitted => 'شكرًا على الإبلاغ. سنراجع هذا المنشور.';
 
   @override
+  String get postReportReasonSpam => 'بريد مزعج';
+
+  @override
+  String get postReportReasonHarassment => 'تحرش أو تنمر';
+
+  @override
+  String get postReportReasonHateSpeech => 'خطاب كراهية';
+
+  @override
+  String get postReportReasonViolence => 'عنف أو محتوى خطير';
+
+  @override
+  String get postReportReasonNudity => 'عري أو محتوى جنسي';
+
+  @override
+  String get postReportReasonFalseInfo => 'معلومات مضللة';
+
+  @override
+  String get postReportReasonScam => 'احتيال أو نصب';
+
+  @override
+  String get postReportReasonCopyright => 'انتهاك حقوق النشر';
+
+  @override
+  String get postReportReasonOther => 'أخرى';
+
+  @override
   String get postNotInterestedApplied => 'سنعرض منشورات أقل من هذا النوع';
 
   @override
@@ -1457,6 +1648,42 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsPrivacy => 'الخصوصية';
+
+  @override
+  String get privacyPrivateAccount => 'حساب خاص';
+
+  @override
+  String get privacyPrivateAccountSubtitle => 'المتابعون المقبولون فقط يمكنهم رؤية منشوراتك وقصصك.';
+
+  @override
+  String get privacyWhoCanMessage => 'من يمكنه مراسلتك';
+
+  @override
+  String get privacyMessageEveryone => 'الجميع';
+
+  @override
+  String get privacyMessageFollowers => 'من تتابعهم';
+
+  @override
+  String get privacyMessageFriends => 'الأصدقاء';
+
+  @override
+  String get privacyMessageNobody => 'لا أحد';
+
+  @override
+  String get privacyAllowComments => 'السماح بالتعليقات';
+
+  @override
+  String get privacyAllowCommentsSubtitle => 'يمكن للآخرين التعليق على منشوراتك.';
+
+  @override
+  String get privacyUpdated => 'تم تحديث إعدادات الخصوصية';
+
+  @override
+  String get privacySectionAccount => 'خصوصية الحساب';
+
+  @override
+  String get privacySectionInteractions => 'التفاعلات';
 
   @override
   String get settingsSectionContent => 'المحتوى والعرض';

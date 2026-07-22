@@ -59,7 +59,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       },
       (_) {
         PopupDialogs.showSuccessDialog(context, l10n.forgotPasswordSuccess);
-        context.pop();
+        context.pushNamed(
+          'reset_password',
+          queryParameters: {'email': _emailController.text.trim()},
+        );
       },
     );
 

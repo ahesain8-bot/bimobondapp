@@ -454,6 +454,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             beautyEnabled: _states.any((s) => s.beautyEnabled),
             arFilterId: primaryArFilterIdFromStates(_states),
             sound: _selectedSound,
+            soundOffset: _soundStartOffset,
+            soundWindow: _soundWindow,
           ),
         );
         return;
@@ -467,6 +469,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               file: files.first,
               type: widget.items.first.type,
               sound: _selectedSound,
+              soundOffset: _soundStartOffset,
+              soundWindow: _soundWindow,
               onRetake: () => context.pop(),
             ),
           ),
@@ -482,6 +486,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           'type': type,
           'isStory': false,
           'initialSound': _selectedSound,
+          'initialSoundOffset': _soundStartOffset,
+          'initialSoundWindow': _soundWindow,
           'filterName': primaryFilterNameFromStates(_states),
           'filterCategory': primaryFilterCategoryFromStates(_states).name,
           'effectSlug': primaryEffectSlugFromStates(_states),

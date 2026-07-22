@@ -19,6 +19,8 @@ class StoryCameraEditor extends StatefulWidget {
     required this.type,
     required this.onRetake,
     this.sound,
+    this.soundOffset = Duration.zero,
+    this.soundWindow = const Duration(seconds: 15),
     super.key,
   });
 
@@ -26,6 +28,8 @@ class StoryCameraEditor extends StatefulWidget {
   final String type;
   final VoidCallback onRetake;
   final SoundEntity? sound;
+  final Duration soundOffset;
+  final Duration soundWindow;
 
   @override
   State<StoryCameraEditor> createState() => _StoryCameraEditorState();
@@ -43,6 +47,37 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
   Future<void> _share() async {
     FocusScope.of(context).unfocus();
     final caption = _captionController.text.trim();
+    final sound = widget.sound;
+    String? soundSegmentId;
+    String? soundId;
+    int? startMs;
+    int? endMs;
+
+    if (sound != null && sound.id.isNotEmpty) {
+      final trackMs = sound.duration > 0 ? sound.duration * 1000 : 0;
+      final customClip = trackMs > 0 &&
+          (widget.soundOffset > Duration.zero ||
+              (widget.soundWindow > Duration.zero &&
+                  widget.soundWindow.inMilliseconds < trackMs));
+
+      if (customClip) {
+        final clip = SoundEntity.clipRangeMs(
+          durationSeconds: sound.duration,
+          offset: widget.soundOffset,
+          window: widget.soundWindow,
+        );
+        soundId = sound.id;
+        startMs = clip.startMs;
+        endMs = clip.endMs;
+      } else {
+        final defaultId = sound.defaultSegment?.id.trim();
+        if (defaultId != null && defaultId.isNotEmpty) {
+          soundSegmentId = defaultId;
+        } else {
+          soundId = sound.id;
+        }
+      }
+    }
 
     if (!mounted) return;
     context.read<PostsBloc>().add(
@@ -56,7 +91,10 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
         status: 'PUBLISHED',
         isStory: true,
         files: [widget.file],
-        soundId: widget.sound?.id,
+        soundId: soundId,
+        soundSegmentId: soundSegmentId,
+        startMs: startMs,
+        endMs: endMs,
       ),
     );
   }

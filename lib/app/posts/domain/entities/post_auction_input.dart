@@ -4,15 +4,16 @@ class PostAuctionInput extends Equatable {
   const PostAuctionInput({
     required this.itemName,
     this.itemImageUrl,
-    required this.startingPrice,
     required this.targetPrice,
     required this.startedAt,
     required this.endedAt,
+    this.startingPrice,
   });
 
   final String itemName;
   final String? itemImageUrl;
-  final double startingPrice;
+  /// Optional; omit/null clears low starting price (API default 0).
+  final double? startingPrice;
   final double targetPrice;
   final DateTime startedAt;
   final DateTime endedAt;
@@ -31,8 +32,9 @@ class PostAuctionInput extends Equatable {
   Map<String, dynamic> toJson() => {
         'itemName': itemName,
         if (itemImageUrl != null) 'itemImageUrl': itemImageUrl,
-        'startingPrice': startingPrice,
         'targetPrice': targetPrice,
+        if (startingPrice != null && startingPrice! > 0)
+          'startingPrice': startingPrice,
         'startedAt': startedAt.toUtc().toIso8601String(),
         'endedAt': endedAt.toUtc().toIso8601String(),
       };

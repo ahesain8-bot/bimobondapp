@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bimobondapp/app/auth/presentation/utils/otp_resend_cooldown.dart';
 import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
@@ -29,9 +30,18 @@ class OtpVerificationScreen extends StatefulWidget {
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+class _OtpVerificationScreenState extends State<OtpVerificationScreen>
+    with OtpResendCooldownMixin {
   final TextEditingController otpController = TextEditingController();
+  late String _verificationId;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _verificationId = widget.verificationId;
+    startResendCooldown();
+  }
 
   void _onSubmitPressed() {
     final code = otpController.text.trim();
@@ -40,9 +50,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         _isSubmitting = true;
       });
       context.read<AuthBloc>().add(
-        SubmitOtpEvent(verificationId: widget.verificationId, smsCode: code),
+        SubmitOtpEvent(verificationId: _verificationId, smsCode: code),
       );
     }
+  }
+
+  void _onResendPressed() {
+    if (!canResendCode) return;
+    context.read<AuthBloc>().add(
+      VerifyPhoneEvent(phoneNumber: widget.phoneNumber),
+    );
   }
 
   String _getLocalizedMessage(AppLocalizations l10n, String key) {
@@ -60,14 +77,23 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       case 'signupFailed':
         return l10n.signupFailed;
       default:
-        return key; // fallback
+        return key;
     }
+  }
+
+  @override
+  void dispose() {
+    otpController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final resendLabel = canResendCode
+        ? l10n.resendCode
+        : l10n.resendCodeIn(resendSecondsLeft);
 
     return Scaffold(
       appBar: AppBar(
@@ -89,13 +115,22 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       ),
       body: BlocListener<AuthBloc, AuthState>(
         listenWhen: (previous, current) =>
-            current is AuthFailure || current is AuthSuccess,
+            current is AuthFailure ||
+            current is AuthSuccess ||
+            current is PhoneCodeSentState,
         listener: (context, state) {
+          if (state is PhoneCodeSentState) {
+            setState(() => _verificationId = state.verificationId);
+            startResendCooldown();
+            PopupDialogs.showSuccessDialog(context, l10n.otpSentSuccess);
+            return;
+          }
+
           if (!_isSubmitting) return;
 
           if (state is AuthFailure) {
             _isSubmitting = false;
-            String message = state.messageKey != null
+            final message = state.messageKey != null
                 ? _getLocalizedMessage(l10n, state.messageKey!)
                 : state.message;
             PopupDialogs.showErrorDialog(context, message);
@@ -115,7 +150,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(AppSizes.p24),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -149,7 +184,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   hintText: '000000',
                   icon: Icons.lock_outline_rounded,
                   keyboardType: TextInputType.number,
-                  // maxLength: 6, // If CustomTextField supports it
                 ),
                 const SizedBox(height: AppSizes.p32),
                 BlocBuilder<AuthBloc, AuthState>(
@@ -164,9 +198,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 const SizedBox(height: AppSizes.p24),
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      // Implement resend logic if needed
-                    },
+                    onPressed: canResendCode ? _onResendPressed : null,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -176,8 +208,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                           fontSize: 14,
                         ),
                         CustomText(
-                          l10n.resendCode,
-                          color: theme.colorScheme.primary,
+                          resendLabel,
+                          color: canResendCode
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.45,
+                                ),
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),

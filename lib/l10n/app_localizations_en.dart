@@ -200,6 +200,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resendCode => 'Resend';
 
   @override
+  String resendCodeIn(int seconds) {
+    return 'Resend in ${seconds}s';
+  }
+
+  @override
   String get back => 'Back';
 
   @override
@@ -233,19 +238,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forgotPasswordTitle => 'Forgot Password';
 
   @override
-  String get forgotPasswordSubtitle => 'Enter your email address and we\'ll send you a link to reset your password.';
+  String get forgotPasswordSubtitle => 'Enter your email and we\'ll send a 6-digit code to reset your password.';
 
   @override
-  String get forgotPasswordButton => 'Send Reset Link';
+  String get forgotPasswordButton => 'Send Reset Code';
 
   @override
-  String get forgotPasswordSuccess => 'Password reset email sent. Check your inbox and spam folder.';
+  String get forgotPasswordSuccess => 'If an account exists for that email, a reset code was sent.';
 
   @override
-  String get forgotPasswordFailed => 'Failed to send reset email. Please try again.';
+  String get forgotPasswordFailed => 'Failed to send reset code. Please try again.';
 
   @override
   String get forgotPasswordUserNotFound => 'No account found with this email address.';
+
+  @override
+  String get resetPasswordTitle => 'Reset Password';
+
+  @override
+  String get resetPasswordSubtitle => 'Enter the 6-digit code sent to';
+
+  @override
+  String get resetPasswordButton => 'Reset Password';
+
+  @override
+  String get resetPasswordSuccess => 'Password reset successfully. Please sign in.';
+
+  @override
+  String get newPasswordLabel => 'New Password';
+
+  @override
+  String get otpSentSuccess => 'Verification code sent.';
+
+  @override
+  String get otpVerifiedSuccess => 'Email verified successfully.';
 
   @override
   String get loginFailed => 'Login failed. Please try again.';
@@ -812,6 +838,141 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auctionFinishedBadge => 'Finished';
 
   @override
+  String get auctionCancelAction => 'Cancel auction';
+
+  @override
+  String get auctionCancelTitle => 'Cancel this auction?';
+
+  @override
+  String get auctionCancelMessage => 'Gift contributions may be refunded if escrow is enabled. This cannot be undone.';
+
+  @override
+  String get auctionCancelSuccess => 'Auction cancelled';
+
+  @override
+  String get auctionSellerRequiredTitle => 'Seller verification required';
+
+  @override
+  String get auctionSellerRequiredMessage => 'Complete seller verification before hosting auctions.';
+
+  @override
+  String get auctionSellerPendingMessage => 'Your seller verification is still under review.';
+
+  @override
+  String get auctionSellerRejectedMessage => 'Your seller verification was rejected. Please resubmit.';
+
+  @override
+  String get auctionSellerCompleteAction => 'Complete verification';
+
+  @override
+  String get sellerVerificationTitle => 'Seller verification';
+
+  @override
+  String get sellerVerificationSubtitle => 'Upload your passport and address details to host auctions.';
+
+  @override
+  String get sellerVerificationSubtitleSimple => 'Enter your ID number and upload a passport photo.';
+
+  @override
+  String get sellerVerificationIdentitySection => 'Identity';
+
+  @override
+  String get sellerVerificationPassportSection => 'Passport';
+
+  @override
+  String get sellerVerificationContactSection => 'Contact & address';
+
+  @override
+  String get sellerVerificationFullLegalName => 'Full legal name';
+
+  @override
+  String get sellerVerificationDateOfBirth => 'Date of birth';
+
+  @override
+  String get sellerVerificationNationality => 'Nationality';
+
+  @override
+  String get sellerVerificationNationalId => 'ID number';
+
+  @override
+  String get sellerVerificationNationalIdOptional => 'National ID (optional)';
+
+  @override
+  String get sellerVerificationNationalIdRequired => 'ID number is required';
+
+  @override
+  String get sellerVerificationPassportNumber => 'Passport number';
+
+  @override
+  String get sellerVerificationPassportCountry => 'Passport country';
+
+  @override
+  String get sellerVerificationPassportExpiry => 'Passport expiry date';
+
+  @override
+  String get sellerVerificationPassportFront => 'Passport front photo';
+
+  @override
+  String get sellerVerificationPassportPhoto => 'Passport photo';
+
+  @override
+  String get sellerVerificationPassportBackOptional => 'Passport back (optional)';
+
+  @override
+  String get sellerVerificationSelfieOptional => 'Selfie (optional)';
+
+  @override
+  String get sellerVerificationContactPhone => 'Contact phone';
+
+  @override
+  String get sellerVerificationAddressLine1 => 'Address line 1';
+
+  @override
+  String get sellerVerificationAddressLine2Optional => 'Address line 2 (optional)';
+
+  @override
+  String get sellerVerificationCity => 'City';
+
+  @override
+  String get sellerVerificationRegionOptional => 'Region / state (optional)';
+
+  @override
+  String get sellerVerificationCountry => 'Country';
+
+  @override
+  String get sellerVerificationPostalOptional => 'Postal code (optional)';
+
+  @override
+  String get sellerVerificationPickDate => 'Select date';
+
+  @override
+  String get sellerVerificationTapToUpload => 'Tap to upload';
+
+  @override
+  String get sellerVerificationUploading => 'Uploading…';
+
+  @override
+  String get sellerVerificationUploaded => 'Uploaded';
+
+  @override
+  String get sellerVerificationSubmit => 'Submit for review';
+
+  @override
+  String get sellerVerificationSubmitted => 'Verification submitted. We\'ll review it soon.';
+
+  @override
+  String get sellerVerificationDobRequired => 'Date of birth is required';
+
+  @override
+  String get sellerVerificationExpiryRequired => 'Passport expiry date is required';
+
+  @override
+  String get sellerVerificationExpiryFuture => 'Passport must not be expired';
+
+  @override
+  String get sellerVerificationPassportFrontRequired => 'Passport photo is required';
+
+  @override
   String get auctionTimeLeft => 'Time left';
 
   @override
@@ -911,6 +1072,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get liveTopBid => 'Highest price';
+
+  @override
+  String get liveTargetPrice => 'Target price';
 
   @override
   String get currencyUsd => 'USD';
@@ -1333,6 +1497,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postReportSubmitted => 'Thanks for reporting. We\'ll review this post.';
 
   @override
+  String get postReportReasonSpam => 'Spam';
+
+  @override
+  String get postReportReasonHarassment => 'Harassment or bullying';
+
+  @override
+  String get postReportReasonHateSpeech => 'Hate speech';
+
+  @override
+  String get postReportReasonViolence => 'Violence or dangerous content';
+
+  @override
+  String get postReportReasonNudity => 'Nudity or sexual content';
+
+  @override
+  String get postReportReasonFalseInfo => 'False information';
+
+  @override
+  String get postReportReasonScam => 'Scam or fraud';
+
+  @override
+  String get postReportReasonCopyright => 'Copyright infringement';
+
+  @override
+  String get postReportReasonOther => 'Other';
+
+  @override
   String get postNotInterestedApplied => 'We\'ll show fewer posts like this';
 
   @override
@@ -1457,6 +1648,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPrivacy => 'Privacy';
+
+  @override
+  String get privacyPrivateAccount => 'Private account';
+
+  @override
+  String get privacyPrivateAccountSubtitle => 'Only approved followers can see your posts and stories.';
+
+  @override
+  String get privacyWhoCanMessage => 'Who can message you';
+
+  @override
+  String get privacyMessageEveryone => 'Everyone';
+
+  @override
+  String get privacyMessageFollowers => 'People you follow';
+
+  @override
+  String get privacyMessageFriends => 'Friends';
+
+  @override
+  String get privacyMessageNobody => 'No one';
+
+  @override
+  String get privacyAllowComments => 'Allow comments';
+
+  @override
+  String get privacyAllowCommentsSubtitle => 'People can comment on your posts.';
+
+  @override
+  String get privacyUpdated => 'Privacy settings updated';
+
+  @override
+  String get privacySectionAccount => 'Account privacy';
+
+  @override
+  String get privacySectionInteractions => 'Interactions';
 
   @override
   String get settingsSectionContent => 'Content & display';

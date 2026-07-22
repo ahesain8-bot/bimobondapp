@@ -130,10 +130,7 @@ class _SoundDetailScreenState extends State<SoundDetailScreen> {
       return;
     }
     popSoundDetail(context);
-    context.pushNamed(
-      'add_post_camera',
-      extra: {'initialSound': sound},
-    );
+    context.pushNamed('add_post_camera', extra: {'initialSound': sound});
   }
 
   void _addToStory(SoundEntity sound) {
@@ -144,10 +141,7 @@ class _SoundDetailScreenState extends State<SoundDetailScreen> {
     popSoundDetail(context);
     context.pushNamed(
       'add_post_camera',
-      extra: {
-        'initialSound': sound,
-        'isStory': true,
-      },
+      extra: {'initialSound': sound, 'isStory': true},
     );
   }
 
@@ -197,11 +191,13 @@ class _SoundDetailScreenState extends State<SoundDetailScreen> {
                   SoundDetailTopBar(
                     searchController: _searchController,
                     onBack: () => popSoundDetail(context),
-                    onShare: sound == null ? () {} : () => unawaited(_share(sound)),
+                    onShare: sound == null
+                        ? () {}
+                        : () => unawaited(_share(sound)),
                   ),
                   Expanded(
                     child: _loading && _detail == null
-                        ? const Center(child: CustomLoadingWidget())
+                        ? const Center(child: CustomLoadingWidget(size: 40))
                         : _error != null && _detail == null
                             ? _buildError(l10n, scheme)
                             : _buildBody(l10n, scheme),
@@ -234,9 +230,7 @@ class _SoundDetailScreenState extends State<SoundDetailScreen> {
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: scheme.onSurface.withValues(alpha: 0.65),
-              ),
+              style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.65)),
             ),
             const SizedBox(height: AppSizes.p16),
             FilledButton(

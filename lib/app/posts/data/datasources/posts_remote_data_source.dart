@@ -41,7 +41,11 @@ abstract class PostsRemoteDataSource {
     int page = 1,
     int limit = 20,
   });
-  Future<int> recordPostView(String postId, {int? watchedDuration});
+  Future<int> recordPostView(
+    String postId, {
+    int? watchedDuration,
+    String? campaignId,
+  });
   Future<bool> toggleSave(String postId);
   Future<bool> toggleRepost(String postId, {String? quote});
   Future<RepostsPageModel> getPostReposts(
@@ -55,6 +59,17 @@ abstract class PostsRemoteDataSource {
   });
   Future<PostModel> updatePost(String postId, Map<String, dynamic> data);
   Future<bool> deletePost(String postId);
+  Future<void> markPostNotInterested(String postId);
+  Future<void> undoPostNotInterested(String postId);
+  Future<void> reportPost(
+    String postId, {
+    required String reason,
+    String? details,
+  });
+  Future<Map<String, dynamic>> sharePost(
+    String postId, {
+    String channel = 'EXTERNAL',
+  });
 
   // Comments
   Future<List<CommentModel>> getComments(
@@ -480,11 +495,18 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
   }
 
   @override
-  Future<int> recordPostView(String postId, {int? watchedDuration}) async {
+  Future<int> recordPostView(
+    String postId, {
+    int? watchedDuration,
+    String? campaignId,
+  }) async {
     try {
       final body = <String, dynamic>{};
       if (watchedDuration != null) {
         body['watchedDuration'] = watchedDuration;
+      }
+      if (campaignId != null && campaignId.isNotEmpty) {
+        body['campaignId'] = campaignId;
       }
 
       final response = await apiClient.dio.post(
@@ -510,6 +532,98 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       throw ServerException(
         message:
             _extractErrorMessage(response.data) ?? 'Failed to record view',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> markPostNotInterested(String postId) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiConstants.postNotInterested(postId),
+        options: Options(headers: await _requiredAuthHeaders()),
+      );
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw ServerException(
+          message: _extractErrorMessage(response.data) ??
+              'Failed to mark not interested',
+        );
+      }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> undoPostNotInterested(String postId) async {
+    try {
+      final response = await apiClient.dio.delete(
+        ApiConstants.postNotInterested(postId),
+        options: Options(headers: await _requiredAuthHeaders()),
+      );
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw ServerException(
+          message: _extractErrorMessage(response.data) ??
+              'Failed to undo not interested',
+        );
+      }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> reportPost(
+    String postId, {
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'reason': reason,
+        if (details != null && details.isNotEmpty) 'details': details,
+      };
+      final response = await apiClient.dio.post(
+        ApiConstants.reportPost(postId),
+        data: body,
+        options: Options(headers: await _requiredAuthHeaders()),
+      );
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw ServerException(
+          message:
+              _extractErrorMessage(response.data) ?? 'Failed to report post',
+        );
+      }
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> sharePost(
+    String postId, {
+    String channel = 'EXTERNAL',
+  }) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiConstants.sharePost(postId),
+        data: {'channel': channel},
+        options: Options(headers: await _requiredAuthHeaders()),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          final nested = data['data'];
+          if (nested is Map<String, dynamic>) return nested;
+          return data;
+        }
+        return {'postId': postId, 'channel': channel};
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to share post',
       );
     } catch (e) {
       throw DioHandler.handle(e);

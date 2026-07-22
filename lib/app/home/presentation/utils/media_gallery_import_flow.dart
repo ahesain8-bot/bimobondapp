@@ -14,12 +14,16 @@ class CameraMediaPickResult {
     required this.type,
     this.filterName,
     this.sound,
+    this.soundOffset = Duration.zero,
+    this.soundWindow = const Duration(seconds: 15),
   });
 
   final List<File> files;
   final String type;
   final String? filterName;
   final SoundEntity? sound;
+  final Duration soundOffset;
+  final Duration soundWindow;
 }
 
 /// Runs gallery items through the media studio editor, then opens add post.
@@ -92,6 +96,8 @@ class MediaGalleryImportFlow {
       'type': resolvePostType(edited.files),
       'isStory': isStory,
       'initialSound': edited.sound ?? initialSound,
+      'initialSoundOffset': edited.soundOffset,
+      'initialSoundWindow': edited.soundWindow,
       if (edited.filterName != null) 'filterName': edited.filterName,
       'filterCategory': edited.filterCategory.name,
       if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,

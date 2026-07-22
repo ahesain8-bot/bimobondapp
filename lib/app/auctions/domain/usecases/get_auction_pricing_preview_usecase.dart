@@ -7,15 +7,23 @@ import 'package:equatable/equatable.dart';
 
 class AuctionPricingPreviewParams extends Equatable {
   const AuctionPricingPreviewParams({
-    required this.targetCoins,
-    this.startingPrice = 0,
-  });
+    this.targetCoins,
+    this.targetPrice,
+  }) : assert(
+          (targetCoins != null) != (targetPrice != null),
+          'Provide exactly one of targetCoins or targetPrice',
+        );
 
-  final int targetCoins;
-  final double startingPrice;
+  /// Convenience for coin-based preview (wallet / coins hub).
+  const AuctionPricingPreviewParams.coins(int coins)
+      : targetCoins = coins,
+        targetPrice = null;
+
+  final int? targetCoins;
+  final double? targetPrice;
 
   @override
-  List<Object?> get props => [targetCoins, startingPrice];
+  List<Object?> get props => [targetCoins, targetPrice];
 }
 
 class GetAuctionPricingPreviewUseCase
@@ -30,7 +38,7 @@ class GetAuctionPricingPreviewUseCase
   ) {
     return repository.getPricingPreview(
       targetCoins: params.targetCoins,
-      startingPrice: params.startingPrice,
+      targetPrice: params.targetPrice,
     );
   }
 }

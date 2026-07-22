@@ -38,7 +38,9 @@ Future<void> navigateFromNotification(
     case 'COMMENT_REPLY':
     case 'COMMENT_LIKE':
       final postId =
-          notification.postId ?? notification.comment?.postId ?? notification.post?.id;
+          notification.postId ??
+          notification.comment?.postId ??
+          notification.post?.id;
       if (postId == null || postId.isEmpty) return;
       final commentId = notification.commentId ?? notification.comment?.id;
       if (post != null) {

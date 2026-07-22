@@ -9,6 +9,7 @@ import 'package:bimobondapp/app/posts/domain/entities/toggle_like_params.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/entities/update_post_params.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/mark_post_not_interested_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_save_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_repost_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/entities/toggle_repost_params.dart';
@@ -17,6 +18,9 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/stories/domain/entities/story_entities.dart';
+import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
+import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/media_upload_utils.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -31,6 +35,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   final GetMyRepostsUseCase getMyRepostsUseCase;
   final UpdatePostUsecase updatePostUsecase;
   final DeletePostUsecase deletePostUsecase;
+  final MarkPostNotInterestedUseCase markPostNotInterestedUseCase;
+  final CreateStoryUseCase createStoryUseCase;
+  final GetStoryRingsUseCase getStoryRingsUseCase;
+  final DeleteStoryUseCase deleteStoryUseCase;
 
   PostsBloc({
     required this.createPostUseCase,
@@ -42,6 +50,10 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     required this.getMyRepostsUseCase,
     required this.updatePostUsecase,
     required this.deletePostUsecase,
+    required this.markPostNotInterestedUseCase,
+    required this.createStoryUseCase,
+    required this.getStoryRingsUseCase,
+    required this.deleteStoryUseCase,
   }) : super(PostsInitial()) {
     on<UploadMediaRequestedEvent>(_onUploadMediaRequested);
     on<CreatePostRequestedEvent>(_onCreatePostRequested);
@@ -57,11 +69,16 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     on<HidePostFromFeedEvent>(_onHidePostFromFeed);
   }
 
-  void _onHidePostFromFeed(
+  Future<void> _onHidePostFromFeed(
     HidePostFromFeedEvent event,
     Emitter<PostsState> emit,
-  ) {
+  ) async {
+    // Optimistically remove from feed; sync preference with the API.
     emit(PostHiddenFromFeedState(event.postId));
+    if (!event.syncApi) return;
+    await markPostNotInterestedUseCase(
+      MarkPostNotInterestedParams(event.postId),
+    );
   }
 
   Future<void> _onUpdatePostRequested(
@@ -86,6 +103,14 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     DeletePostRequestedEvent event,
     Emitter<PostsState> emit,
   ) async {
+    if (event.isStory) {
+      final result = await deleteStoryUseCase(event.postId);
+      result.fold(
+        (failure) => emit(PostsFailure(failure.message)),
+        (_) => emit(DeletePostSuccess(event.postId)),
+      );
+      return;
+    }
     final result = await deletePostUsecase(event.postId);
     result.fold(
       (failure) => emit(PostsFailure(failure.message)),
@@ -222,6 +247,36 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         auction = auction.copyWith(itemImageUrl: coverUrl);
       }
 
+      if (event.isStory) {
+        final storyResult = await createStoryUseCase(
+          CreateStoryInput(
+            type: event.type,
+            videoUrl: videoUrl,
+            thumbnailUrl: thumbnailUrl,
+            description: event.description,
+            categoryId: event.categoryId,
+            status: event.status,
+            privacyStatus: event.privacyStatus,
+            media: mediaEntities,
+            soundId: event.soundId,
+            soundSegmentId: event.soundSegmentId,
+            startMs: event.startMs,
+            endMs: event.endMs,
+            newSound: event.newSound,
+            filterName: event.filterName,
+            filterCategory: event.filterCategory,
+            effectSlug: event.effectSlug,
+            beautyEnabled: event.beautyEnabled,
+            location: event.location,
+          ),
+        );
+        storyResult.fold(
+          (failure) => emit(PostsFailure(failure.message)),
+          (story) => emit(CreatePostSuccess(story.toPostEntity())),
+        );
+        return;
+      }
+
       final result = await createPostUseCase(
         CreatePostParams(
           type: event.type,
@@ -234,11 +289,14 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           allowComments: event.allowComments,
           allowDuets: event.allowDuets,
           allowStitch: event.allowStitch,
-          isStory: event.isStory ? true : null,
           isAuctionable: event.isAuctionable,
           auction: event.isAuctionable ? auction : null,
           media: mediaEntities,
           soundId: event.soundId,
+          soundSegmentId: event.soundSegmentId,
+          startMs: event.startMs,
+          endMs: event.endMs,
+          newSound: event.newSound,
           filterName: event.filterName,
           filterCategory: event.filterCategory,
           effectSlug: event.effectSlug,
@@ -311,23 +369,24 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     FetchStoriesRequestedEvent event,
     Emitter<PostsState> emit,
   ) async {
-    final result = await getFeedUseCase(
-      GetFeedParams(
-        page: event.page,
-        limit: event.limit,
-        isStory: true,
-        activeStory: true,
-      ),
-    );
+    final result = await getStoryRingsUseCase(NoParams());
 
     result.fold(
       (failure) => emit(PostsFailure(failure.message)),
-      (items) => emit(
-        StoriesLoadSuccess(
-          stories: items.map((item) => item.post).toList(),
-          hasReachedMax: items.length < event.limit,
-        ),
-      ),
+      (rings) {
+        final stories = <PostEntity>[];
+        for (final ring in rings) {
+          for (final story in ring.stories) {
+            stories.add(story.toPostEntity());
+          }
+        }
+        emit(
+          StoriesLoadSuccess(
+            stories: stories,
+            hasReachedMax: true,
+          ),
+        );
+      },
     );
   }
 
@@ -348,6 +407,37 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     Emitter<PostsState> emit,
   ) async {
     emit(PostsLoading());
+    if (event.isStory == true) {
+      final storyResult = await createStoryUseCase(
+        CreateStoryInput(
+          type: event.type,
+          videoUrl: event.videoUrl,
+          hlsUrl: event.hlsUrl,
+          thumbnailUrl: event.thumbnailUrl,
+          animatedCoverUrl: event.animatedCoverUrl,
+          description: event.description,
+          categoryId: event.categoryId,
+          status: event.status,
+          duration: event.duration,
+          videoWidth: event.videoWidth,
+          videoHeight: event.videoHeight,
+          privacyStatus: event.privacyStatus,
+          locationId: event.locationId,
+          location: event.location,
+          soundId: event.soundId,
+          soundSegmentId: event.soundSegmentId,
+          startMs: event.startMs,
+          endMs: event.endMs,
+          newSound: event.newSound,
+          media: event.media,
+        ),
+      );
+      storyResult.fold(
+        (failure) => emit(PostsFailure(failure.message)),
+        (story) => emit(CreatePostSuccess(story.toPostEntity())),
+      );
+      return;
+    }
     final result = await createPostUseCase(
       CreatePostParams(
         type: event.type,
@@ -366,13 +456,16 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         allowComments: event.allowComments,
         allowDuets: event.allowDuets,
         allowStitch: event.allowStitch,
-        isStory: event.isStory,
         isAuctionable: event.isAuctionable,
         auction: event.auction,
         locationId: event.locationId,
         location: event.location,
         playlistId: event.playlistId,
         soundId: event.soundId,
+        soundSegmentId: event.soundSegmentId,
+        startMs: event.startMs,
+        endMs: event.endMs,
+        newSound: event.newSound,
         originalPostId: event.originalPostId,
         media: event.media,
       ),

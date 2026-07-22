@@ -10,9 +10,25 @@ class NotificationSocketEvent {
 
   static const notification = 'notification';
   static const unreadCount = 'notificationUnreadCount';
+  static const chatUpdated = 'chatUpdated';
+  static const storyUpdated = 'storyUpdated';
   static const joinUser = 'joinUser';
   static const leaveUser = 'leaveUser';
   static const joinedUser = 'joinedUser';
+  static const joinStoryUser = 'joinStoryUser';
+  static const leaveStoryUser = 'leaveStoryUser';
+}
+
+class StorySocketUpdate {
+  const StorySocketUpdate({
+    required this.userId,
+    required this.storyId,
+    required this.action,
+  });
+
+  final String userId;
+  final String storyId;
+  final String action;
 }
 
 class NotificationSocketService {
@@ -20,9 +36,17 @@ class NotificationSocketService {
   final _notificationController =
       StreamController<NotificationModel>.broadcast();
   final _unreadCountController = StreamController<int>.broadcast();
+  final _chatUpdatedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _storyUpdatedController =
+      StreamController<StorySocketUpdate>.broadcast();
 
   Stream<NotificationModel> get onNotification => _notificationController.stream;
   Stream<int> get onUnreadCount => _unreadCountController.stream;
+  Stream<Map<String, dynamic>> get onChatUpdated =>
+      _chatUpdatedController.stream;
+  Stream<StorySocketUpdate> get onStoryUpdated =>
+      _storyUpdatedController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -43,11 +67,30 @@ class NotificationSocketService {
     _socket!
       ..on(NotificationSocketEvent.notification, _handleNotification)
       ..on(NotificationSocketEvent.unreadCount, _handleUnreadCount)
+      ..on(NotificationSocketEvent.chatUpdated, _handleChatUpdated)
+      ..on(NotificationSocketEvent.storyUpdated, _handleStoryUpdated)
       ..onConnect((_) {
+        // Docs: joinUser after login for inbox + storyUpdated mirror.
         _socket?.emit(NotificationSocketEvent.joinUser, {'userId': userId});
       });
 
     _socket!.connect();
+  }
+
+  void joinStoryUser(String ownerUserId) {
+    if (ownerUserId.isEmpty) return;
+    _socket?.emit(
+      NotificationSocketEvent.joinStoryUser,
+      {'userId': ownerUserId},
+    );
+  }
+
+  void leaveStoryUser(String ownerUserId) {
+    if (ownerUserId.isEmpty) return;
+    _socket?.emit(
+      NotificationSocketEvent.leaveStoryUser,
+      {'userId': ownerUserId},
+    );
   }
 
   void _handleNotification(dynamic data) {
@@ -71,8 +114,31 @@ class NotificationSocketService {
     }
   }
 
+  void _handleChatUpdated(dynamic data) {
+    if (data is Map) {
+      _chatUpdatedController.add(Map<String, dynamic>.from(data));
+    }
+  }
+
+  void _handleStoryUpdated(dynamic data) {
+    if (data is! Map) return;
+    final userId = data['userId']?.toString() ?? '';
+    final storyId = data['storyId']?.toString() ?? '';
+    final action = data['action']?.toString() ?? '';
+    if (userId.isEmpty || storyId.isEmpty) return;
+    _storyUpdatedController.add(
+      StorySocketUpdate(
+        userId: userId,
+        storyId: storyId,
+        action: action,
+      ),
+    );
+  }
+
   void leaveAndDisconnect(String userId) {
-    _socket?.emit(NotificationSocketEvent.leaveUser, {'userId': userId});
+    if (userId.isNotEmpty) {
+      _socket?.emit(NotificationSocketEvent.leaveUser, {'userId': userId});
+    }
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
@@ -82,5 +148,7 @@ class NotificationSocketService {
     leaveAndDisconnect('');
     _notificationController.close();
     _unreadCountController.close();
+    _chatUpdatedController.close();
+    _storyUpdatedController.close();
   }
 }

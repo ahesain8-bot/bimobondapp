@@ -71,6 +71,15 @@ class AuctionDetailsEntity extends Equatable {
     this.winner,
     required this.giftTransactions,
     this.pricing,
+    this.postId,
+    this.liveId,
+    this.itemImageUrl,
+    this.startingPrice = 0,
+    this.escrowEnabled = false,
+    this.fulfillmentStatus,
+    this.startedAt,
+    this.endedAt,
+    this.giftCount = 0,
   });
 
   final String id;
@@ -85,6 +94,37 @@ class AuctionDetailsEntity extends Equatable {
   final AuctionUserEntity? winner;
   final List<AuctionGiftTransactionEntity> giftTransactions;
   final AuctionPricingEntity? pricing;
+  final String? postId;
+  final String? liveId;
+  final String? itemImageUrl;
+  final double startingPrice;
+  final bool escrowEnabled;
+  final String? fulfillmentStatus;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
+  final int giftCount;
+
+  bool get isActive {
+    final s = status.trim().toUpperCase();
+    return s == 'ACTIVE' || s == 'LIVE';
+  }
+
+  bool get isEnded {
+    switch (status.trim().toUpperCase()) {
+      case 'COMPLETED':
+      case 'CANCELLED':
+      case 'CANCELED':
+      case 'BANNED':
+      case 'SETTLED':
+      case 'DISPUTED':
+      case 'ENDED':
+      case 'FINISHED':
+      case 'CLOSED':
+        return true;
+      default:
+        return false;
+    }
+  }
 
   double get progressPercent {
     if (pricing != null && pricing!.progressPercent > 0) {
@@ -113,5 +153,14 @@ class AuctionDetailsEntity extends Equatable {
         winner,
         giftTransactions,
         pricing,
+        postId,
+        liveId,
+        itemImageUrl,
+        startingPrice,
+        escrowEnabled,
+        fulfillmentStatus,
+        startedAt,
+        endedAt,
+        giftCount,
       ];
 }

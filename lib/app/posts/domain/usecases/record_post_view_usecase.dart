@@ -15,6 +15,7 @@ class RecordPostViewUseCase implements UseCase<int, RecordPostViewParams> {
     return repository.recordPostView(
       params.postId,
       watchedDuration: params.watchedDuration,
+      campaignId: params.campaignId,
     );
   }
 }
@@ -23,6 +24,7 @@ class RecordPostViewParams extends Equatable {
   const RecordPostViewParams({
     required this.postId,
     this.watchedDuration,
+    this.campaignId,
   });
 
   final String postId;
@@ -30,6 +32,9 @@ class RecordPostViewParams extends Equatable {
   /// Optional watch time in seconds.
   final int? watchedDuration;
 
+  /// Required for promoted/ad feed impressions (`promotion.id`).
+  final String? campaignId;
+
   @override
-  List<Object?> get props => [postId, watchedDuration];
+  List<Object?> get props => [postId, watchedDuration, campaignId];
 }

@@ -1,6 +1,5 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
-import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/onboarding/interest_selection_view.dart';
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
 import 'package:bimobondapp/app/categories/domain/usecases/get_categories_usecase.dart';
@@ -54,7 +53,9 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
     });
 
     final categoriesResult =
-        await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+        await categories_di.sl<GetCategoriesUseCase>()(
+          const GetCategoriesParams.tree(),
+        );
 
     if (!mounted) return;
 
@@ -111,11 +112,7 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
     });
   }
 
-  bool get _canSkip {
-    if (widget.isEditMode) return false;
-    final authState = context.read<AuthBloc>().state;
-    return authState is AuthSuccess && authState.user.needsInterests != true;
-  }
+  bool get _canSkip => false; // Onboarding after signup requires ≥ 3 interests.
 
   void _cycleCategory(String categoryId) {
     setState(() {
