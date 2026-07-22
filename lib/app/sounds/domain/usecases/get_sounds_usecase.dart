@@ -17,6 +17,7 @@ class GetSoundsUseCase implements UseCase<SoundsPageEntity, GetSoundsParams> {
       search: params.search,
       sort: params.sort,
       creatorId: params.creatorId,
+      groupId: params.groupId,
     );
   }
 }
@@ -28,6 +29,7 @@ class GetSoundsParams {
     this.search,
     this.sort = SoundSort.trending,
     this.creatorId,
+    this.groupId,
   });
 
   final int page;
@@ -35,4 +37,5 @@ class GetSoundsParams {
   final String? search;
   final SoundSort sort;
   final String? creatorId;
+  final String? groupId;
 }

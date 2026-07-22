@@ -107,8 +107,11 @@ class ChatSocketService {
     }
   }
 
-  void joinChat(String chatId) {
-    _socket?.emit(ChatSocketEvent.joinChat, {'chatId': chatId});
+  void joinChat(String chatId, {required String userId}) {
+    _socket?.emit(ChatSocketEvent.joinChat, {
+      'chatId': chatId,
+      'userId': userId,
+    });
   }
 
   void leaveChat(String chatId) {

@@ -250,6 +250,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         type: MediaGalleryImportFlow.resolvePostType(result.files),
         filterName: result.filterName ?? _activeFilterName,
         sound: result.sound ?? _selectedSound,
+        soundOffset: result.soundOffset,
+        soundWindow: result.soundWindow,
       ),
     );
   }

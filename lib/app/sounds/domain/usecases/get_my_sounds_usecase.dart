@@ -12,13 +12,25 @@ class GetMySoundsUseCase
 
   @override
   Future<Either<Failure, SoundsPageEntity>> call(GetMySoundsParams params) {
-    return repository.getMySounds(page: params.page, limit: params.limit);
+    return repository.getMySounds(
+      page: params.page,
+      limit: params.limit,
+      search: params.search,
+      sort: params.sort,
+    );
   }
 }
 
 class GetMySoundsParams {
-  const GetMySoundsParams({this.page = 1, this.limit = 20});
+  const GetMySoundsParams({
+    this.page = 1,
+    this.limit = 20,
+    this.search,
+    this.sort = SoundSort.recent,
+  });
 
   final int page;
   final int limit;
+  final String? search;
+  final SoundSort sort;
 }

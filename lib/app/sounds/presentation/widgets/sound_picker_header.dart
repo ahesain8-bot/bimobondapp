@@ -1,5 +1,4 @@
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -9,6 +8,7 @@ class SoundPickerHeader extends StatelessWidget {
   const SoundPickerHeader({
     super.key,
     required this.tabController,
+    required this.tabLabels,
     required this.showSearch,
     required this.searchController,
     required this.uploading,
@@ -18,6 +18,7 @@ class SoundPickerHeader extends StatelessWidget {
   });
 
   final TabController tabController;
+  final List<String> tabLabels;
   final bool showSearch;
   final TextEditingController searchController;
   final bool uploading;
@@ -57,10 +58,7 @@ class SoundPickerHeader extends StatelessWidget {
                   indicatorWeight: 3,
                   dividerColor: Colors.transparent,
                   tabs: [
-                    Tab(text: l10n.soundTabHot),
-                    Tab(text: l10n.soundTabForYou),
-                    Tab(text: l10n.soundTabFavorites),
-                    Tab(text: l10n.soundTabRecent),
+                    for (final label in tabLabels) Tab(text: label),
                   ],
                 ),
               ),
@@ -76,10 +74,13 @@ class SoundPickerHeader extends StatelessWidget {
                 onPressed: uploading ? null : onPickFromDevice,
                 tooltip: l10n.soundPickFromFiles,
                 icon: uploading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CustomLoadingWidget(size: 20),
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: onSurface.withValues(alpha: 0.87),
+                        ),
                       )
                     : Icon(
                         LucideIcons.folderOpen,

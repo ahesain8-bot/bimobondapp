@@ -11,9 +11,11 @@ import 'package:bimobondapp/app/auth/presentation/pages/signup_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/otp_verification_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/email_otp_verification_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/forgot_password_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/reset_password_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/email_verification_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/splash_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/personal_info_screen.dart';
+import 'package:bimobondapp/app/auth/presentation/pages/privacy_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/admin_user_activity_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_wallpaper_settings_screen.dart';
@@ -51,6 +53,7 @@ import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart
 import 'package:bimobondapp/app/home/presentation/pages/camera_effect_test_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/posts_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/ended_auctions_screen.dart';
+import 'package:bimobondapp/app/seller_verification/presentation/pages/seller_verification_screen.dart';
 import 'package:bimobondapp/app/promotions/presentation/pages/promote_post_screen.dart';
 import 'package:bimobondapp/app/promotions/presentation/pages/promoted_post_insights_screen.dart';
 import 'package:bimobondapp/app/promotions/presentation/pages/promoted_posts_screen.dart';
@@ -158,6 +161,14 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/reset-password',
+        name: 'reset_password',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return ResetPasswordScreen(email: email);
+        },
+      ),
+      GoRoute(
         path: '/email-verification',
         name: 'email_verification',
         builder: (context, state) {
@@ -168,12 +179,21 @@ class AppRouter {
       GoRoute(
         path: '/personal-info',
         name: 'personal_info',
-        builder: (context, state) => const PersonalInfoScreen(),
+        builder: (context, state) {
+          final isOnboarding =
+              state.uri.queryParameters['onboarding'] == '1';
+          return PersonalInfoScreen(isOnboarding: isOnboarding);
+        },
       ),
       GoRoute(
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/privacy',
+        name: 'privacy_settings',
+        builder: (context, state) => const PrivacySettingsScreen(),
       ),
       GoRoute(
         path: '/settings/chat-wallpaper',
@@ -481,12 +501,28 @@ class AppRouter {
             initialType: extra?['type'] as String?,
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
+            initialSoundOffset: extra?['initialSoundOffset'] is Duration
+                ? extra!['initialSoundOffset'] as Duration
+                : Duration(
+                    milliseconds: extra?['initialSoundOffsetMs'] as int? ?? 0,
+                  ),
+            initialSoundWindow: extra?['initialSoundWindow'] is Duration
+                ? extra!['initialSoundWindow'] as Duration
+                : Duration(
+                    milliseconds:
+                        extra?['initialSoundWindowMs'] as int? ?? 15000,
+                  ),
             initialFilterName: extra?['filterName'] as String?,
             initialFilterCategory: extra?['filterCategory'] as String?,
             initialEffectSlug: extra?['effectSlug'] as String?,
             initialBeautyEnabled: extra?['beautyEnabled'] as bool? ?? false,
           );
         },
+      ),
+      GoRoute(
+        path: '/seller-verification',
+        name: 'seller_verification',
+        builder: (context, state) => const SellerVerificationScreen(),
       ),
       GoRoute(
         path: '/sounds/:id',

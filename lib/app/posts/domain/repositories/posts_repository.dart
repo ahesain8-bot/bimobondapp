@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_share_result.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/user_repost_entity.dart';
@@ -40,6 +41,10 @@ abstract class PostsRepository {
     PostInlineLocationInput? location,
     String? playlistId,
     String? soundId,
+    String? soundSegmentId,
+    int? startMs,
+    int? endMs,
+    Map<String, dynamic>? newSound,
     String? originalPostId,
     List<PostMediaEntity>? media,
     String? filterName,
@@ -96,6 +101,7 @@ abstract class PostsRepository {
   Future<Either<Failure, int>> recordPostView(
     String postId, {
     int? watchedDuration,
+    String? campaignId,
   });
   Future<Either<Failure, bool>> toggleSave(String postId);
   Future<Either<Failure, bool>> toggleRepost(String postId, {String? quote});
@@ -115,6 +121,17 @@ abstract class PostsRepository {
     String? privacyStatus,
   });
   Future<Either<Failure, bool>> deletePost(String postId);
+  Future<Either<Failure, void>> markPostNotInterested(String postId);
+  Future<Either<Failure, void>> undoPostNotInterested(String postId);
+  Future<Either<Failure, void>> reportPost(
+    String postId, {
+    required String reason,
+    String? details,
+  });
+  Future<Either<Failure, PostShareResult>> sharePost(
+    String postId, {
+    String channel = 'EXTERNAL',
+  });
 
   // Comments
   Future<Either<Failure, List<CommentEntity>>> getComments(

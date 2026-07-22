@@ -27,20 +27,19 @@ class AuctionCard extends StatelessWidget {
   final VoidCallback onOpen;
   final bool showBidButton;
 
-  String _formatHostEarnings(AppLocalizations l10n, Locale locale) {
-    final auctionEntity = auction.post?.auction;
-    final highest = auctionEntity?.displayHighestPriceCoins ??
-        auction.giftTotalCoins + (auctionEntity?.startingPriceCoins ?? 0);
+  String _formatHighestPrice(AppLocalizations l10n, Locale locale) {
+    final highest = auction.highestPriceCoins > 0
+        ? auction.highestPriceCoins
+        : auction.giftTotalCoins;
     final amount = formatAuctionPricingCoins(highest, locale);
     return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
   }
 
-  String _formatBidderSpend(Locale locale) {
-    final auctionEntity = auction.post?.auction;
-    return formatAuctionPricingCoins(
-      auctionEntity?.displayBidderSpendCoins ?? auction.giftTotalCoins,
-      locale,
-    );
+  String _formatTargetPrice(Locale locale) {
+    final target = auction.targetPriceCoins > 0
+        ? auction.targetPriceCoins
+        : (auction.post?.auction?.displayBidderSpendCoins.round() ?? 0);
+    return formatAuctionPricingCoins(target, locale);
   }
 
   @override
@@ -49,6 +48,9 @@ class AuctionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final locale = Localizations.localeOf(context);
     final isDark = theme.brightness == Brightness.dark;
+    final countdownStart =
+        auction.startedAt ?? auction.post?.auction?.startedAt;
+    final countdownEnd = auction.endedAt ?? auction.post?.auction?.endedAt;
 
     final cardBorderColor = isDark
         ? Colors.white10
@@ -118,7 +120,7 @@ class AuctionCard extends StatelessWidget {
                     child: AuctionStatusBadge(auction: auction),
                   ),
                   // Glassmorphic Countdown overlay at bottom-start
-                  if (auction.post?.auction != null)
+                  if (countdownStart != null && countdownEnd != null)
                     Positioned.directional(
                       textDirection: Directionality.of(context),
                       bottom: AppSizes.p12,
@@ -152,8 +154,8 @@ class AuctionCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: AppSizes.p4),
                                 AuctionCardCountdownStat(
-                                  startedAt: auction.post!.auction!.startedAt,
-                                  endedAt: auction.post!.auction!.endedAt,
+                                  startedAt: countdownStart,
+                                  endedAt: countdownEnd,
                                   isMinimal: true,
                                 ),
                               ],
@@ -190,16 +192,12 @@ class AuctionCard extends StatelessWidget {
                             textAlign: TextAlign.start,
                             fontSize: 13,
                             variant: TextVariant.secondary,
-                            // maxLines: 1,
-                            // overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ],
                     ),
                     const SizedBox(height: AppSizes.p12),
-                    // High-end segmented container for prices
-                    if (auction.post?.auction != null)
-                      Container(
+                    Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSizes.p12,
                           vertical: AppSizes.p10,
@@ -216,16 +214,12 @@ class AuctionCard extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            // Target (coins)
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   CustomText(
-                                    l10n.auctionTargetPrice(
-                                      _formatBidderSpend(locale),
-                                      l10n.coinsUnit,
-                                    ),
+                                    l10n.liveTargetPrice,
                                     fontSize: 11,
                                     variant: TextVariant.secondary,
                                   ),
@@ -235,7 +229,7 @@ class AuctionCard extends StatelessWidget {
                                       const AppCoinIcon(size: 13),
                                       const SizedBox(width: 4),
                                       Text(
-                                        _formatBidderSpend(locale),
+                                        _formatTargetPrice(locale),
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
@@ -248,14 +242,12 @@ class AuctionCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            // Divider line
                             Container(
                               height: 28,
                               width: 1.0,
                               color: theme.primaryColor.withValues(alpha: 0.08),
                             ),
                             const SizedBox(width: AppSizes.p12),
-                            // Highest Bid
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -272,7 +264,7 @@ class AuctionCard extends StatelessWidget {
                                       AppCoinAmount(
                                         iconSize: 13,
                                         spacing: 4,
-                                        text: _formatHostEarnings(l10n, locale),
+                                        text: _formatHighestPrice(l10n, locale),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
@@ -286,9 +278,7 @@ class AuctionCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                      )
-                    else
-                      const SizedBox.shrink(),
+                      ),
                     if (showBidButton) ...[
                       const SizedBox(height: AppSizes.p16),
                       SizedBox(

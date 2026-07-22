@@ -2,20 +2,24 @@ import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// After signup flows that should always land on interests first
-/// (e.g. email verification pending before AuthSuccess has `needsInterests`).
+/// After email/password (or other) signup — always land on interests onboarding.
 void navigateAfterSignUp(
   BuildContext context, {
+  UserEntity? user,
   String? pendingVerificationEmail,
 }) {
   navigateAfterAuth(
     context,
+    user: user,
     forceInterests: true,
     pendingVerificationEmail: pendingVerificationEmail,
   );
 }
 
-/// Post-auth routing: interests onboarding when required, else home / email verify.
+/// Post-auth routing (auth + user-interests docs):
+/// 1. New user with incomplete profile → edit profile
+/// 2. New user / `needsInterests` / forced signup → interests (min 3)
+/// 3. Otherwise → home
 void navigateAfterAuth(
   BuildContext context, {
   UserEntity? user,
@@ -23,8 +27,21 @@ void navigateAfterAuth(
   bool forceInterests = false,
 }) {
   final email = pendingVerificationEmail?.trim();
-  final needsInterests = forceInterests || user?.needsInterests == true;
 
+  final forceProfileSetup =
+      user?.isNewUser == true && user?.isProfileIncomplete == true;
+  if (forceProfileSetup) {
+    context.goNamed(
+      'personal_info',
+      queryParameters: {'onboarding': '1'},
+    );
+    return;
+  }
+
+  final needsInterests =
+      forceInterests ||
+      user?.needsInterests == true ||
+      user?.isNewUser == true;
   if (needsInterests) {
     context.goNamed(
       'interest_selection',

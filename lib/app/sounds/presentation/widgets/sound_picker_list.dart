@@ -39,7 +39,7 @@ class SoundPickerList extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     if (loading) {
-      return const Center(child: CustomLoadingWidget());
+      return const Center(child: CustomLoadingWidget(size: 40));
     }
 
     if (showError && error != null) {
@@ -55,10 +55,7 @@ class SoundPickerList extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              TextButton(
-                onPressed: onRetry,
-                child: Text(l10n.liveGiftRetry),
-              ),
+              TextButton(onPressed: onRetry, child: Text(l10n.liveGiftRetry)),
             ],
           ),
         ),

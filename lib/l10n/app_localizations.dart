@@ -473,6 +473,12 @@ abstract class AppLocalizations {
   /// **'Resend'**
   String get resendCode;
 
+  /// No description provided for @resendCodeIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend in {seconds}s'**
+  String resendCodeIn(int seconds);
+
   /// No description provided for @back.
   ///
   /// In en, this message translates to:
@@ -542,25 +548,25 @@ abstract class AppLocalizations {
   /// No description provided for @forgotPasswordSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Enter your email address and we\'ll send you a link to reset your password.'**
+  /// **'Enter your email and we\'ll send a 6-digit code to reset your password.'**
   String get forgotPasswordSubtitle;
 
   /// No description provided for @forgotPasswordButton.
   ///
   /// In en, this message translates to:
-  /// **'Send Reset Link'**
+  /// **'Send Reset Code'**
   String get forgotPasswordButton;
 
   /// No description provided for @forgotPasswordSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Password reset email sent. Check your inbox and spam folder.'**
+  /// **'If an account exists for that email, a reset code was sent.'**
   String get forgotPasswordSuccess;
 
   /// No description provided for @forgotPasswordFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to send reset email. Please try again.'**
+  /// **'Failed to send reset code. Please try again.'**
   String get forgotPasswordFailed;
 
   /// No description provided for @forgotPasswordUserNotFound.
@@ -568,6 +574,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No account found with this email address.'**
   String get forgotPasswordUserNotFound;
+
+  /// No description provided for @resetPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Password'**
+  String get resetPasswordTitle;
+
+  /// No description provided for @resetPasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 6-digit code sent to'**
+  String get resetPasswordSubtitle;
+
+  /// No description provided for @resetPasswordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Password'**
+  String get resetPasswordButton;
+
+  /// No description provided for @resetPasswordSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset successfully. Please sign in.'**
+  String get resetPasswordSuccess;
+
+  /// No description provided for @newPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New Password'**
+  String get newPasswordLabel;
+
+  /// No description provided for @otpSentSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification code sent.'**
+  String get otpSentSuccess;
+
+  /// No description provided for @otpVerifiedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified successfully.'**
+  String get otpVerifiedSuccess;
 
   /// No description provided for @loginFailed.
   ///
@@ -1661,6 +1709,276 @@ abstract class AppLocalizations {
   /// **'Finished'**
   String get auctionFinishedBadge;
 
+  /// No description provided for @auctionCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel auction'**
+  String get auctionCancelAction;
+
+  /// No description provided for @auctionCancelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this auction?'**
+  String get auctionCancelTitle;
+
+  /// No description provided for @auctionCancelMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift contributions may be refunded if escrow is enabled. This cannot be undone.'**
+  String get auctionCancelMessage;
+
+  /// No description provided for @auctionCancelSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction cancelled'**
+  String get auctionCancelSuccess;
+
+  /// No description provided for @auctionSellerRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seller verification required'**
+  String get auctionSellerRequiredTitle;
+
+  /// No description provided for @auctionSellerRequiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete seller verification before hosting auctions.'**
+  String get auctionSellerRequiredMessage;
+
+  /// No description provided for @auctionSellerPendingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your seller verification is still under review.'**
+  String get auctionSellerPendingMessage;
+
+  /// No description provided for @auctionSellerRejectedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your seller verification was rejected. Please resubmit.'**
+  String get auctionSellerRejectedMessage;
+
+  /// No description provided for @auctionSellerCompleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete verification'**
+  String get auctionSellerCompleteAction;
+
+  /// No description provided for @sellerVerificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seller verification'**
+  String get sellerVerificationTitle;
+
+  /// No description provided for @sellerVerificationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload your passport and address details to host auctions.'**
+  String get sellerVerificationSubtitle;
+
+  /// No description provided for @sellerVerificationSubtitleSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your ID number and upload a passport photo.'**
+  String get sellerVerificationSubtitleSimple;
+
+  /// No description provided for @sellerVerificationIdentitySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get sellerVerificationIdentitySection;
+
+  /// No description provided for @sellerVerificationPassportSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport'**
+  String get sellerVerificationPassportSection;
+
+  /// No description provided for @sellerVerificationContactSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact & address'**
+  String get sellerVerificationContactSection;
+
+  /// No description provided for @sellerVerificationFullLegalName.
+  ///
+  /// In en, this message translates to:
+  /// **'Full legal name'**
+  String get sellerVerificationFullLegalName;
+
+  /// No description provided for @sellerVerificationDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth'**
+  String get sellerVerificationDateOfBirth;
+
+  /// No description provided for @sellerVerificationNationality.
+  ///
+  /// In en, this message translates to:
+  /// **'Nationality'**
+  String get sellerVerificationNationality;
+
+  /// No description provided for @sellerVerificationNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID number'**
+  String get sellerVerificationNationalId;
+
+  /// No description provided for @sellerVerificationNationalIdOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID (optional)'**
+  String get sellerVerificationNationalIdOptional;
+
+  /// No description provided for @sellerVerificationNationalIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'ID number is required'**
+  String get sellerVerificationNationalIdRequired;
+
+  /// No description provided for @sellerVerificationPassportNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport number'**
+  String get sellerVerificationPassportNumber;
+
+  /// No description provided for @sellerVerificationPassportCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport country'**
+  String get sellerVerificationPassportCountry;
+
+  /// No description provided for @sellerVerificationPassportExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport expiry date'**
+  String get sellerVerificationPassportExpiry;
+
+  /// No description provided for @sellerVerificationPassportFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport front photo'**
+  String get sellerVerificationPassportFront;
+
+  /// No description provided for @sellerVerificationPassportPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport photo'**
+  String get sellerVerificationPassportPhoto;
+
+  /// No description provided for @sellerVerificationPassportBackOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport back (optional)'**
+  String get sellerVerificationPassportBackOptional;
+
+  /// No description provided for @sellerVerificationSelfieOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Selfie (optional)'**
+  String get sellerVerificationSelfieOptional;
+
+  /// No description provided for @sellerVerificationContactPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact phone'**
+  String get sellerVerificationContactPhone;
+
+  /// No description provided for @sellerVerificationAddressLine1.
+  ///
+  /// In en, this message translates to:
+  /// **'Address line 1'**
+  String get sellerVerificationAddressLine1;
+
+  /// No description provided for @sellerVerificationAddressLine2Optional.
+  ///
+  /// In en, this message translates to:
+  /// **'Address line 2 (optional)'**
+  String get sellerVerificationAddressLine2Optional;
+
+  /// No description provided for @sellerVerificationCity.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get sellerVerificationCity;
+
+  /// No description provided for @sellerVerificationRegionOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Region / state (optional)'**
+  String get sellerVerificationRegionOptional;
+
+  /// No description provided for @sellerVerificationCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get sellerVerificationCountry;
+
+  /// No description provided for @sellerVerificationPostalOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Postal code (optional)'**
+  String get sellerVerificationPostalOptional;
+
+  /// No description provided for @sellerVerificationPickDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get sellerVerificationPickDate;
+
+  /// No description provided for @sellerVerificationTapToUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to upload'**
+  String get sellerVerificationTapToUpload;
+
+  /// No description provided for @sellerVerificationUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading…'**
+  String get sellerVerificationUploading;
+
+  /// No description provided for @sellerVerificationUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get sellerVerificationUploaded;
+
+  /// No description provided for @sellerVerificationSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit for review'**
+  String get sellerVerificationSubmit;
+
+  /// No description provided for @sellerVerificationSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification submitted. We\'ll review it soon.'**
+  String get sellerVerificationSubmitted;
+
+  /// No description provided for @sellerVerificationDobRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth is required'**
+  String get sellerVerificationDobRequired;
+
+  /// No description provided for @sellerVerificationExpiryRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport expiry date is required'**
+  String get sellerVerificationExpiryRequired;
+
+  /// No description provided for @sellerVerificationExpiryFuture.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport must not be expired'**
+  String get sellerVerificationExpiryFuture;
+
+  /// No description provided for @sellerVerificationPassportFrontRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport photo is required'**
+  String get sellerVerificationPassportFrontRequired;
+
   /// No description provided for @auctionTimeLeft.
   ///
   /// In en, this message translates to:
@@ -1834,6 +2152,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Highest price'**
   String get liveTopBid;
+
+  /// No description provided for @liveTargetPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Target price'**
+  String get liveTargetPrice;
 
   /// No description provided for @currencyUsd.
   ///
@@ -2603,6 +2927,60 @@ abstract class AppLocalizations {
   /// **'Thanks for reporting. We\'ll review this post.'**
   String get postReportSubmitted;
 
+  /// No description provided for @postReportReasonSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam'**
+  String get postReportReasonSpam;
+
+  /// No description provided for @postReportReasonHarassment.
+  ///
+  /// In en, this message translates to:
+  /// **'Harassment or bullying'**
+  String get postReportReasonHarassment;
+
+  /// No description provided for @postReportReasonHateSpeech.
+  ///
+  /// In en, this message translates to:
+  /// **'Hate speech'**
+  String get postReportReasonHateSpeech;
+
+  /// No description provided for @postReportReasonViolence.
+  ///
+  /// In en, this message translates to:
+  /// **'Violence or dangerous content'**
+  String get postReportReasonViolence;
+
+  /// No description provided for @postReportReasonNudity.
+  ///
+  /// In en, this message translates to:
+  /// **'Nudity or sexual content'**
+  String get postReportReasonNudity;
+
+  /// No description provided for @postReportReasonFalseInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'False information'**
+  String get postReportReasonFalseInfo;
+
+  /// No description provided for @postReportReasonScam.
+  ///
+  /// In en, this message translates to:
+  /// **'Scam or fraud'**
+  String get postReportReasonScam;
+
+  /// No description provided for @postReportReasonCopyright.
+  ///
+  /// In en, this message translates to:
+  /// **'Copyright infringement'**
+  String get postReportReasonCopyright;
+
+  /// No description provided for @postReportReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get postReportReasonOther;
+
   /// No description provided for @postNotInterestedApplied.
   ///
   /// In en, this message translates to:
@@ -2842,6 +3220,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Privacy'**
   String get settingsPrivacy;
+
+  /// No description provided for @privacyPrivateAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Private account'**
+  String get privacyPrivateAccount;
+
+  /// No description provided for @privacyPrivateAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only approved followers can see your posts and stories.'**
+  String get privacyPrivateAccountSubtitle;
+
+  /// No description provided for @privacyWhoCanMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Who can message you'**
+  String get privacyWhoCanMessage;
+
+  /// No description provided for @privacyMessageEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone'**
+  String get privacyMessageEveryone;
+
+  /// No description provided for @privacyMessageFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'People you follow'**
+  String get privacyMessageFollowers;
+
+  /// No description provided for @privacyMessageFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends'**
+  String get privacyMessageFriends;
+
+  /// No description provided for @privacyMessageNobody.
+  ///
+  /// In en, this message translates to:
+  /// **'No one'**
+  String get privacyMessageNobody;
+
+  /// No description provided for @privacyAllowComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow comments'**
+  String get privacyAllowComments;
+
+  /// No description provided for @privacyAllowCommentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People can comment on your posts.'**
+  String get privacyAllowCommentsSubtitle;
+
+  /// No description provided for @privacyUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy settings updated'**
+  String get privacyUpdated;
+
+  /// No description provided for @privacySectionAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account privacy'**
+  String get privacySectionAccount;
+
+  /// No description provided for @privacySectionInteractions.
+  ///
+  /// In en, this message translates to:
+  /// **'Interactions'**
+  String get privacySectionInteractions;
 
   /// No description provided for @settingsSectionContent.
   ///

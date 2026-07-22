@@ -2,6 +2,10 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
 import 'package:bimobondapp/app/home/presentation/utils/active_stories_registry.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
+import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart'
+    as stories_di;
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
 import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
@@ -45,8 +49,7 @@ Future<bool?> openUserActiveStoriesOrProfile(
     }
   }
 
-  final stories =
-      auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(userId);
+  final stories = await _resolveActiveStories(userId);
   if (stories.isNotEmpty) {
     await context.pushFromFeed(
       'stories_viewer',
@@ -89,9 +92,9 @@ Future<bool?> openUserStoryOrProfile(
     }
   }
 
-  if (userHasUnseenActiveStories(userId)) {
-    final stories =
-        auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(userId);
+  final stories = await _resolveActiveStories(userId);
+  if (stories.isNotEmpty &&
+      !auth_di.sl<ViewedStoriesStore>().isGroupFullyViewed(stories)) {
     await context.pushFromFeed(
       'stories_viewer',
       extra: {
@@ -117,7 +120,7 @@ Future<void> openUserActiveStories(BuildContext context, String userId) async {
   final id = userId.trim();
   if (id.isEmpty) return;
 
-  final stories = auth_di.sl<ActiveStoriesRegistry>().activeStoriesFor(id);
+  final stories = await _resolveActiveStories(id);
   if (stories.isEmpty) return;
 
   await context.pushFromFeed(
@@ -126,5 +129,22 @@ Future<void> openUserActiveStories(BuildContext context, String userId) async {
       'stories': stories,
       'initialIndex': 0,
     },
+  );
+}
+
+Future<List<PostEntity>> _resolveActiveStories(String userId) async {
+  final registry = auth_di.sl<ActiveStoriesRegistry>();
+  final cached = registry.activeStoriesFor(userId);
+  if (cached.isNotEmpty) return cached;
+
+  final result = await stories_di.sl<GetUserStoriesUseCase>()(
+    GetUserStoriesParams(userId: userId, activeOnly: true, limit: 50),
+  );
+  return result.fold(
+    (_) => const [],
+    (page) => page.stories
+        .where((s) => s.isActive)
+        .map((s) => s.toPostEntity())
+        .toList(),
   );
 }

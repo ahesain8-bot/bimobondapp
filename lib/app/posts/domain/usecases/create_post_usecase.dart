@@ -38,6 +38,10 @@ class CreatePostUseCase implements UseCase<PostEntity, CreatePostParams> {
       location: params.location,
       playlistId: params.playlistId,
       soundId: params.soundId,
+      soundSegmentId: params.soundSegmentId,
+      startMs: params.startMs,
+      endMs: params.endMs,
+      newSound: params.newSound,
       originalPostId: params.originalPostId,
       media: params.media,
       filterName: params.filterName,
@@ -72,6 +76,10 @@ class CreatePostParams extends Equatable {
   final PostInlineLocationInput? location;
   final String? playlistId;
   final String? soundId;
+  final String? soundSegmentId;
+  final int? startMs;
+  final int? endMs;
+  final Map<String, dynamic>? newSound;
   final String? originalPostId;
   final List<PostMediaEntity>? media;
   final String? filterName;
@@ -103,6 +111,10 @@ class CreatePostParams extends Equatable {
     this.location,
     this.playlistId,
     this.soundId,
+    this.soundSegmentId,
+    this.startMs,
+    this.endMs,
+    this.newSound,
     this.originalPostId,
     this.media,
     this.filterName,
@@ -136,6 +148,10 @@ class CreatePostParams extends Equatable {
     location,
     playlistId,
     soundId,
+    soundSegmentId,
+    startMs,
+    endMs,
+    newSound,
     originalPostId,
     media,
     filterName,

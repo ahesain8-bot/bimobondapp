@@ -131,6 +131,21 @@ class AuctionSearchFilters extends Equatable {
       case 'FINISHED':
       case 'COMPLETED':
       case 'CLOSED':
+      case 'CANCELLED':
+      case 'CANCELED':
+      case 'BANNED':
+      case 'SETTLED':
+      case 'DISPUTED':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  static bool isAuctionStatusActive(String? status) {
+    switch (status?.trim().toUpperCase()) {
+      case 'ACTIVE':
+      case 'LIVE':
         return true;
       default:
         return false;
@@ -141,6 +156,10 @@ class AuctionSearchFilters extends Equatable {
     if (isPostEnded(post)) return false;
     final auction = post.auction;
     if (auction == null) return false;
+    final status = auction.status?.trim() ?? '';
+    if (status.isNotEmpty && !isAuctionStatusActive(status)) {
+      return false;
+    }
     final now = DateTime.now().toUtc();
     final startedAt = auction.startedAt.toUtc();
     final endedAt = auction.endedAt.toUtc();
@@ -211,8 +230,9 @@ class AuctionSearchFilters extends Equatable {
   String? _auctionStatusForApi() {
     return switch (liveStatus) {
       AuctionLiveStatusFilter.any => null,
-      AuctionLiveStatusFilter.live => 'LIVE',
-      AuctionLiveStatusFilter.ended => 'ENDED',
+      // Backend auction.status values (not LIVE/ENDED).
+      AuctionLiveStatusFilter.live => 'ACTIVE',
+      AuctionLiveStatusFilter.ended => 'COMPLETED',
     };
   }
 

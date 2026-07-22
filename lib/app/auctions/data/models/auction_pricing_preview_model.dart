@@ -11,20 +11,41 @@ class AuctionPricingPreviewModel extends AuctionPricingPreviewEntity {
   });
 
   factory AuctionPricingPreviewModel.fromJson(Map<String, dynamic> json) {
-    final data = json['data'];
-    if (data is Map<String, dynamic>) {
-      return AuctionPricingPreviewModel.fromJson(data);
-    }
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : json;
 
-    final pricingRaw = json['pricing'];
+    final resolved = data['resolved'] is Map
+        ? Map<String, dynamic>.from(data['resolved'] as Map)
+        : data;
+    final pricingRaw = data['pricing'];
+    final pricing = pricingRaw is Map
+        ? AuctionPricingEntity.fromJson(pricingRaw)
+        : const AuctionPricingEntity();
+
+    final targetPriceCoins = _readInt(
+      resolved['targetPriceCoins'] ??
+          data['targetPriceCoins'] ??
+          data['targetCoins'],
+    );
+    final targetPrice = _readDouble(
+      resolved['targetPrice'] ??
+          data['targetPrice'] ??
+          pricing.targetPrice,
+    );
+    final currencyCode = (resolved['currencyCode'] ??
+            data['currencyCode'] ??
+            pricing.currencyCode ??
+            'USD')
+        .toString()
+        .toUpperCase();
+
     return AuctionPricingPreviewModel(
-      targetPriceCoins: _readInt(json['targetPriceCoins'] ?? json['targetCoins']),
-      targetPrice: _readDouble(json['targetPrice']),
-      currencyCode: (json['currencyCode'] ?? 'USD').toString().toUpperCase(),
-      currentTotalCoins: _readInt(json['currentTotalCoins']),
-      pricing: pricingRaw != null
-          ? AuctionPricingEntity.fromJson(pricingRaw)
-          : const AuctionPricingEntity(),
+      targetPriceCoins: targetPriceCoins,
+      targetPrice: targetPrice,
+      currencyCode: currencyCode,
+      currentTotalCoins: _readInt(data['currentTotalCoins']),
+      pricing: pricing,
     );
   }
 

@@ -7,6 +7,9 @@ import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_phone_usecase.
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_google_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/get_profile_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/send_otp_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/verify_otp_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/reset_password_usecase.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
@@ -23,6 +26,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignInWithGoogleUseCase signInWithGoogleUseCase;
   final UpdateProfileUseCase updateProfileUseCase;
   final GetProfileUseCase getProfileUseCase;
+  final SendOtpUseCase sendOtpUseCase;
+  final VerifyOtpUseCase verifyOtpUseCase;
+  final ResetPasswordUseCase resetPasswordUseCase;
 
   AuthBloc({
     required this.authRepository,
@@ -33,6 +39,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required this.signInWithGoogleUseCase,
     required this.updateProfileUseCase,
     required this.getProfileUseCase,
+    required this.sendOtpUseCase,
+    required this.verifyOtpUseCase,
+    required this.resetPasswordUseCase,
   }) : super(AuthInitial()) {
     on<CheckAuthStatusEvent>(_onCheckAuthStatus);
     on<LoginSubmittedEvent>(_onLoginSubmitted);
@@ -45,6 +54,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<FetchProfileEvent>(_onFetchProfile);
     on<LogoutRequestedEvent>(_onLogoutRequested);
     on<SignUpWithEmailEvent>(_onSignUpWithEmail);
+    on<SendEmailOtpEvent>(_onSendEmailOtp);
+    on<VerifyEmailOtpEvent>(_onVerifyEmailOtp);
+    on<ResetPasswordRequestedEvent>(_onResetPassword);
   }
 
   Future<void> _onFetchProfile(
@@ -100,9 +112,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
     result.fold(
       (failure) => emit(
-        const AuthFailure(
-          message: 'Login failed. Please try again.',
-          messageKey: 'loginFailed',
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Login failed. Please try again.',
+          messageKey: failure.message.isNotEmpty ? null : 'loginFailed',
         ),
       ),
       (user) => emit(AuthSuccess(user: user)),
@@ -163,9 +177,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
     result.fold(
       (failure) => emit(
-        const AuthFailure(
-          message: 'Invalid OTP code',
-          messageKey: 'invalidOtpCode',
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Invalid OTP code',
+          messageKey: failure.message.isNotEmpty ? null : 'invalidOtpCode',
         ),
       ),
       (user) => emit(AuthSuccess(user: user)),
@@ -218,12 +234,85 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
     result.fold(
       (failure) => emit(
-        const AuthFailure(
-          message: 'Signup failed. Please try again.',
-          messageKey: 'signupFailed',
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Signup failed. Please try again.',
+          messageKey: failure.message.isNotEmpty ? null : 'signupFailed',
         ),
       ),
-      (user) => emit(EmailVerificationSentState(email: event.email)),
+      // Docs flow A: Firebase create + /auth/login → navigate by onboarding flags.
+      (user) => emit(AuthSuccess(user: user)),
+    );
+  }
+
+  Future<void> _onSendEmailOtp(
+    SendEmailOtpEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    final result = await sendOtpUseCase(
+      SendOtpParams(type: 'EMAIL', email: event.email),
+    );
+    result.fold(
+      (failure) => emit(
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Failed to send OTP',
+        ),
+      ),
+      (_) => emit(EmailOtpSentState(email: event.email)),
+    );
+  }
+
+  Future<void> _onVerifyEmailOtp(
+    VerifyEmailOtpEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    final result = await verifyOtpUseCase(
+      VerifyOtpParams(
+        type: 'EMAIL',
+        email: event.email,
+        code: event.otpCode,
+      ),
+    );
+    result.fold(
+      (failure) => emit(
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Invalid OTP code',
+          messageKey: failure.message.isNotEmpty ? null : 'invalidOtpCode',
+        ),
+      ),
+      (_) => emit(EmailOtpVerifiedState(email: event.email)),
+    );
+  }
+
+  Future<void> _onResetPassword(
+    ResetPasswordRequestedEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    final result = await resetPasswordUseCase(
+      ResetPasswordParams(
+        type: 'EMAIL',
+        email: event.email,
+        code: event.code,
+        newPassword: event.newPassword,
+      ),
+    );
+    result.fold(
+      (failure) => emit(
+        AuthFailure(
+          message: failure.message.isNotEmpty
+              ? failure.message
+              : 'Password reset failed',
+        ),
+      ),
+      (_) => emit(const PasswordResetSuccessState()),
     );
   }
 }

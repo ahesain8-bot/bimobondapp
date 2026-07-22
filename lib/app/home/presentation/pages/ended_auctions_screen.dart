@@ -17,7 +17,6 @@ import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as posts_di;
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
-import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
@@ -108,7 +107,9 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
   }
 
   Future<void> _loadCategories() async {
-    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final result = await categories_di.sl<GetCategoriesUseCase>()(
+      const GetCategoriesParams.flat(),
+    );
     if (!mounted) return;
     result.fold((_) {}, (categories) {
       setState(() {

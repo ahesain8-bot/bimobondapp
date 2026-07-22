@@ -18,6 +18,9 @@ class UserEntity extends Equatable {
   final bool? isPrivate;
   final bool? allowComments;
   final bool? allowDirectMsgs;
+  /// Who can start a DM: EVERYONE | FOLLOWERS | FRIENDS | NOBODY.
+  final String? messagePermission;
+  final bool? isProfileLocked;
   final String? language;
   final String? theme;
   final String? gender;
@@ -60,6 +63,8 @@ class UserEntity extends Equatable {
     this.isPrivate,
     this.allowComments,
     this.allowDirectMsgs,
+    this.messagePermission,
+    this.isProfileLocked,
     this.language,
     this.theme,
     this.gender,
@@ -85,6 +90,14 @@ class UserEntity extends Equatable {
     this.deviceToken,
   });
 
+  /// Resolved DM policy for UI (syncs legacy [allowDirectMsgs]).
+  String get resolvedMessagePermission {
+    final raw = messagePermission?.trim().toUpperCase();
+    if (raw != null && raw.isNotEmpty) return raw;
+    if (allowDirectMsgs == false) return 'NOBODY';
+    return 'EVERYONE';
+  }
+
   @override
   List<Object?> get props => [
     id,
@@ -104,6 +117,8 @@ class UserEntity extends Equatable {
     isPrivate,
     allowComments,
     allowDirectMsgs,
+    messagePermission,
+    isProfileLocked,
     language,
     theme,
     gender,

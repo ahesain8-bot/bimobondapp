@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/home/presentation/utils/post_options_actions.dart';
 import 'package:bimobondapp/app/home/presentation/utils/post_share_destinations.dart';
 import 'package:bimobondapp/app/home/presentation/utils/post_share_people.dart';
+import 'package:bimobondapp/app/home/presentation/utils/post_share_tracker.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/core/utils/app_assets.dart';
@@ -25,6 +26,7 @@ class PostOptionsSheet {
     VoidCallback? onEdit,
     VoidCallback? onPromote,
     VoidCallback? onDelete,
+    VoidCallback? onCancelAuction,
     VoidCallback? onRepost,
     bool isReposted = false,
   }) {
@@ -40,6 +42,7 @@ class PostOptionsSheet {
           onEdit: onEdit,
           onPromote: onPromote,
           onDelete: onDelete,
+          onCancelAuction: onCancelAuction,
           onRepost: onRepost,
           isReposted: isReposted,
         ),
@@ -55,6 +58,7 @@ class _PostOptionsSheetContent extends StatefulWidget {
     this.onEdit,
     this.onPromote,
     this.onDelete,
+    this.onCancelAuction,
     this.onRepost,
     this.isReposted = false,
   });
@@ -64,6 +68,7 @@ class _PostOptionsSheetContent extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onPromote;
   final VoidCallback? onDelete;
+  final VoidCallback? onCancelAuction;
   final VoidCallback? onRepost;
   final bool isReposted;
 
@@ -82,8 +87,6 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
   final Set<String> _sentTo = {};
   bool _sending = false;
   String _query = '';
-
-  String get _link => PostShareLink.forPost(widget.post);
 
   @override
   void initState() {
@@ -150,6 +153,13 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     }
 
     if (!mounted) return;
+    if (sentCount > 0) {
+      await PostShareTracker.trackAndResolveLink(
+        widget.post,
+        channel: 'CHAT',
+      );
+    }
+    if (!mounted) return;
     setState(() => _sending = false);
     if (sentCount > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,7 +168,14 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     }
   }
 
-  List<_CircleAction> _buildAppActions(AppLocalizations l10n, String link) {
+  Future<String> _trackedLink(String channel) {
+    return PostShareTracker.trackAndResolveLink(
+      widget.post,
+      channel: channel,
+    );
+  }
+
+  List<_CircleAction> _buildAppActions(AppLocalizations l10n) {
     return [
       if (!widget.isOwner && widget.onRepost != null)
         _CircleAction(
@@ -175,7 +192,11 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         label: l10n.postShareWhatsApp,
         background: const Color(0xFF25D366),
         assetPath: AppAssets.shareWhatsAppIcon,
-        onTap: () => PostShareDestinations.whatsApp(link),
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.whatsApp(link);
+        },
       ),
       _CircleAction(
         label: l10n.postShareCopyLink,
@@ -183,6 +204,8 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         icon: LucideIcons.link,
         iconColor: Colors.white,
         onTap: () async {
+          final link = await _trackedLink('COPY_LINK');
+          if (!mounted) return;
           await PostShareDestinations.copyLink(link);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -194,20 +217,32 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         label: l10n.postShareTelegram,
         background: const Color(0xFF2AABEE),
         assetPath: AppAssets.shareTelegramIcon,
-        onTap: () => PostShareDestinations.telegram(link),
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.telegram(link);
+        },
       ),
       _CircleAction(
         label: l10n.postShareMessenger,
         background: const Color(0xFF0084FF),
         assetPath: AppAssets.shareMessengerIcon,
-        onTap: () => PostShareDestinations.messenger(link),
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.messenger(link);
+        },
       ),
       _CircleAction(
         label: l10n.postShareMore,
         background: Theme.of(context).colorScheme.surfaceContainerHighest,
         icon: LucideIcons.ellipsis,
         iconColor: Theme.of(context).colorScheme.onSurface,
-        onTap: () => PostShareDestinations.systemShare(link),
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.systemShare(link);
+        },
       ),
     ];
   }
@@ -292,6 +327,17 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           onTap: () {
             Navigator.pop(context);
             widget.onEdit!();
+          },
+        ),
+      if (widget.isOwner && widget.onCancelAuction != null)
+        _CircleAction(
+          label: l10n.auctionCancelAction,
+          background: mutedBg,
+          icon: LucideIcons.ban,
+          iconColor: onSurface,
+          onTap: () {
+            Navigator.pop(context);
+            widget.onCancelAuction!();
           },
         ),
       if (widget.isOwner && widget.onDelete != null)
@@ -413,7 +459,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final actions = PostOptionsActions(context, widget.post);
-    final appActions = _buildAppActions(l10n, _link);
+    final appActions = _buildAppActions(l10n);
     final optionActions = _buildOptionActions(actions);
 
     return Padding(

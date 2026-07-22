@@ -45,6 +45,10 @@ class CreatePostRequestedEvent extends PostsEvent {
   final PostInlineLocationInput? location;
   final String? playlistId;
   final String? soundId;
+  final String? soundSegmentId;
+  final int? startMs;
+  final int? endMs;
+  final Map<String, dynamic>? newSound;
   final String? originalPostId;
   final List<PostMediaEntity>? media;
 
@@ -72,6 +76,10 @@ class CreatePostRequestedEvent extends PostsEvent {
     this.location,
     this.playlistId,
     this.soundId,
+    this.soundSegmentId,
+    this.startMs,
+    this.endMs,
+    this.newSound,
     this.originalPostId,
     this.media,
   });
@@ -101,6 +109,10 @@ class CreatePostRequestedEvent extends PostsEvent {
     location,
     playlistId,
     soundId,
+    soundSegmentId,
+    startMs,
+    endMs,
+    newSound,
     originalPostId,
     media,
   ];
@@ -120,6 +132,10 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final PostAuctionInput? auction;
   final List<File> files;
   final String? soundId;
+  final String? soundSegmentId;
+  final int? startMs;
+  final int? endMs;
+  final Map<String, dynamic>? newSound;
   final String? filterName;
   final String? filterCategory;
   final String? effectSlug;
@@ -140,6 +156,10 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     this.auction,
     required this.files,
     this.soundId,
+    this.soundSegmentId,
+    this.startMs,
+    this.endMs,
+    this.newSound,
     this.filterName,
     this.filterCategory,
     this.effectSlug,
@@ -162,6 +182,10 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     auction,
     files,
     soundId,
+    soundSegmentId,
+    startMs,
+    endMs,
+    newSound,
     filterName,
     filterCategory,
     effectSlug,
@@ -234,20 +258,24 @@ class UpdatePostRequestedEvent extends PostsEvent {
 
 class DeletePostRequestedEvent extends PostsEvent {
   final String postId;
+  final bool isStory;
 
-  const DeletePostRequestedEvent(this.postId);
+  const DeletePostRequestedEvent(this.postId, {this.isStory = false});
 
   @override
-  List<Object?> get props => [postId];
+  List<Object?> get props => [postId, isStory];
 }
 
 class HidePostFromFeedEvent extends PostsEvent {
-  const HidePostFromFeedEvent(this.postId);
+  const HidePostFromFeedEvent(this.postId, {this.syncApi = true});
 
   final String postId;
 
+  /// When false, only remove locally (e.g. after report already marked NI).
+  final bool syncApi;
+
   @override
-  List<Object?> get props => [postId];
+  List<Object?> get props => [postId, syncApi];
 }
 
 class FetchFeedRequestedEvent extends PostsEvent {

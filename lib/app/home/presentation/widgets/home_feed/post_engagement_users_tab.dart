@@ -8,6 +8,9 @@ import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_likes_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_views_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
+import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
+import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart'
+    as stories_di;
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
@@ -32,6 +35,7 @@ class PostEngagementUsersTab extends StatefulWidget {
     this.hideFollowButton = false,
     this.showMessageButton = false,
     this.showLikedHeart = false,
+    this.isStory = false,
   });
 
   final String postId;
@@ -48,6 +52,9 @@ class PostEngagementUsersTab extends StatefulWidget {
 
   /// Instagram-style: show a heart on viewers who also liked the story.
   final bool showLikedHeart;
+
+  /// When true, views are loaded from `GET /stories/:id/viewers`.
+  final bool isStory;
 
   @override
   State<PostEngagementUsersTab> createState() => _PostEngagementUsersTabState();
@@ -263,13 +270,23 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
   }
 
   Future<void> _loadViews({required bool refresh, required bool loadMore}) async {
-    final result = await posts_di.sl<GetPostViewsUseCase>()(
-      GetPostViewsParams(
-        postId: widget.postId,
-        page: _page,
-        limit: _pageSize,
-      ),
-    );
+    final result = widget.isStory
+        ? await stories_di.sl<GetStoryViewersUseCase>()(
+            GetStoryViewersParams(
+              storyId: widget.postId,
+              page: _page,
+              limit: _pageSize,
+            ),
+          ).then(
+            (either) => either.map((page) => page.toPostViewsPage()),
+          )
+        : await posts_di.sl<GetPostViewsUseCase>()(
+            GetPostViewsParams(
+              postId: widget.postId,
+              page: _page,
+              limit: _pageSize,
+            ),
+          );
 
     if (!mounted) return;
 

@@ -15,8 +15,13 @@ import 'package:go_router/go_router.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
   final UserEntity? user;
+  final bool isOnboarding;
 
-  const PersonalInfoScreen({super.key, this.user});
+  const PersonalInfoScreen({
+    super.key,
+    this.user,
+    this.isOnboarding = false,
+  });
 
   @override
   State<PersonalInfoScreen> createState() => _PersonalInfoScreenState();
@@ -217,6 +222,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             context,
             l10n.profileUpdatedSuccessfully,
           );
+          if (widget.isOnboarding) {
+            // Signup onboarding: profile first, then mandatory interests (min 3).
+            context.goNamed('interest_selection');
+            return;
+          }
           if (context.canPop()) {
             context.pop();
           }

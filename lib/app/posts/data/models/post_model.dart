@@ -65,6 +65,29 @@ class PostModel extends PostEntity {
     return PostSoundEntity(id: id, name: 'Original Sound');
   }
 
+  /// API returns nested `soundSegment.sound` (feed/detail), not top-level `sound`.
+  static PostSoundEntity? _parseSound(Map<String, dynamic> json) {
+    final direct = json['sound'];
+    if (direct is Map) {
+      return PostSoundEntity.fromJson(Map<String, dynamic>.from(direct));
+    }
+
+    final segment = json['soundSegment'];
+    if (segment is Map) {
+      final map = Map<String, dynamic>.from(segment);
+      final nested = map['sound'];
+      if (nested is Map) {
+        return PostSoundEntity.fromJson(Map<String, dynamic>.from(nested));
+      }
+      if (map['audioUrl'] != null || map['name'] != null) {
+        return PostSoundEntity.fromJson(map);
+      }
+      return _soundFromId(map['soundId'] ?? map['id']);
+    }
+
+    return _soundFromId(json['soundId'] ?? json['soundSegmentId']);
+  }
+
   static String? _normalizeUrl(String? url) {
     if (url == null || url.isEmpty) return url;
     return MediaUtils.resolveAbsoluteUrl(url);
@@ -171,9 +194,7 @@ class PostModel extends PostEntity {
               Map<String, dynamic>.from(json['location'] as Map),
             )
           : null,
-      sound: json['sound'] is Map<String, dynamic>
-          ? PostSoundEntity.fromJson(json['sound'] as Map<String, dynamic>)
-          : _soundFromId(json['soundId']),
+      sound: _parseSound(json),
       filterName: _parseFilterName(json),
     );
   }

@@ -185,13 +185,21 @@ class InterestSelectionView extends StatelessWidget {
                             spacing: AppSizes.p10,
                             runSpacing: AppSizes.p10,
                             children: [
-                              for (final category in categories)
+                              for (final category in categories) ...[
                                 InterestCategoryChip(
                                   label: category.name,
                                   icon: categoryIconForSlug(category.slug),
                                   preference: _preferenceFor(category.id),
                                   onTap: () => onCategoryCycled(category.id),
                                 ),
+                                for (final child in category.children)
+                                  InterestCategoryChip(
+                                    label: child.name,
+                                    icon: categoryIconForSlug(child.slug),
+                                    preference: _preferenceFor(child.id),
+                                    onTap: () => onCategoryCycled(child.id),
+                                  ),
+                              ],
                             ],
                           ),
                       ],

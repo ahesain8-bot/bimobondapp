@@ -19,6 +19,10 @@ import 'package:bimobondapp/app/wallets/presentation/di/wallets_injector.dart'
     as wallets_di;
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
+import 'package:bimobondapp/app/seller_verification/presentation/di/seller_verification_injector.dart'
+    as seller_verification_di;
+import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart'
+    as stories_di;
 import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
     as chats_di;
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
@@ -64,6 +68,8 @@ void main() async {
   await wallets_di.initWallets();
   await gifts_di.initGifts();
   await auctions_di.initAuctions();
+  await seller_verification_di.initSellerVerification();
+  await stories_di.initStories();
   await camera_studio_di.initCameraStudio();
   // Use the bundled filter/effect catalog at launch (local, no network). The
   // add-post camera refreshes it from the API when it actually opens, so the

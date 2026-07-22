@@ -93,6 +93,21 @@ class VerifyEmailOtpEvent extends AuthEvent {
   List<Object> get props => [email, otpCode];
 }
 
+class ResetPasswordRequestedEvent extends AuthEvent {
+  final String email;
+  final String code;
+  final String newPassword;
+
+  const ResetPasswordRequestedEvent({
+    required this.email,
+    required this.code,
+    required this.newPassword,
+  });
+
+  @override
+  List<Object> get props => [email, code, newPassword];
+}
+
 class FetchProfileEvent extends AuthEvent {
   const FetchProfileEvent();
 

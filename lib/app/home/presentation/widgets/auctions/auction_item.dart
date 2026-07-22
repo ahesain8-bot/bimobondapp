@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/auctions/domain/entities/auction_details_entity.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -10,6 +11,8 @@ class AuctionItem {
     required this.imageUrl,
     required this.giftTotalCoins,
     required this.giftCount,
+    this.highestPriceCoins = 0,
+    this.targetPriceCoins = 0,
     this.ownerUsername,
     this.ownerFullName,
     this.ownerAvatarUrl,
@@ -19,7 +22,10 @@ class AuctionItem {
     this.isLive = false,
     this.isEnded = false,
     this.countdown,
+    this.startedAt,
+    this.endedAt,
     this.post,
+    this.auctionId,
   });
 
   final String id;
@@ -28,6 +34,9 @@ class AuctionItem {
   final String imageUrl;
   final int giftTotalCoins;
   final int giftCount;
+  /// Current highest price (starting + gifts, or gifts when starting is 0).
+  final int highestPriceCoins;
+  final int targetPriceCoins;
   final String? ownerUsername;
   final String? ownerFullName;
   final String? ownerAvatarUrl;
@@ -37,7 +46,58 @@ class AuctionItem {
   final bool isLive;
   final bool isEnded;
   final String? countdown;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
   final PostEntity? post;
+  final String? auctionId;
+
+  factory AuctionItem.fromAuction(
+    AuctionDetailsEntity auction, {
+    String? categoryLabel,
+    String? categorySlug,
+  }) {
+    final now = DateTime.now().toUtc();
+    final startedAt = auction.startedAt?.toUtc() ?? now;
+    final endedAt = auction.endedAt?.toUtc();
+    final isEnded = auction.isEnded ||
+        (endedAt != null && !endedAt.isAfter(now));
+    final isLive = !isEnded && auction.isActive;
+    final countdown = isEnded || endedAt == null
+        ? null
+        : formatAuctionCountdown(now, startedAt, endedAt);
+    final ownerHandle = auction.host.username?.trim();
+    final hasOwnerHandle = ownerHandle != null && ownerHandle.isNotEmpty;
+    final image = auction.itemImageUrl?.trim();
+    final targetCoins = auction.pricing?.estimatedBidderSpendCoins?.round() ??
+        auction.targetPriceCoins;
+
+    return AuctionItem(
+      id: auction.postId?.isNotEmpty == true ? auction.postId! : auction.id,
+      auctionId: auction.id,
+      title: auction.itemName.isNotEmpty ? auction.itemName : 'Auction',
+      subtitle: '',
+      imageUrl: image != null && image.isNotEmpty
+          ? MediaUtils.resolveAbsoluteUrl(image)
+          : '',
+      giftTotalCoins: auction.currentTotalCoins,
+      giftCount: auction.giftCount,
+      highestPriceCoins: auction.displayHighestPriceCoins,
+      targetPriceCoins: targetCoins,
+      ownerUsername: hasOwnerHandle ? ownerHandle : null,
+      ownerFullName: auction.host.fullName?.trim().isNotEmpty == true
+          ? auction.host.fullName!.trim()
+          : null,
+      ownerAvatarUrl: auction.host.avatarUrl,
+      ownerUserId: auction.host.id,
+      categorySlug: categorySlug,
+      categoryLabel: categoryLabel,
+      isLive: isLive,
+      isEnded: isEnded,
+      countdown: countdown,
+      startedAt: startedAt,
+      endedAt: endedAt,
+    );
+  }
 
   factory AuctionItem.fromPost(
     PostEntity post, {
@@ -59,6 +119,7 @@ class AuctionItem {
 
     return AuctionItem(
       id: post.id,
+      auctionId: auction.id,
       title: auction.itemName,
       subtitle: post.description?.trim().isNotEmpty == true
           ? post.description!.trim()
@@ -66,6 +127,8 @@ class AuctionItem {
       imageUrl: resolveAuctionPostImageUrl(post),
       giftTotalCoins: auction.currentTotalCoins,
       giftCount: auction.giftCount,
+      highestPriceCoins: auction.displayHighestPriceCoins,
+      targetPriceCoins: auction.displayBidderSpendCoins.round(),
       ownerUsername: hasOwnerHandle ? ownerHandle : null,
       ownerFullName: owner?.fullName?.trim().isNotEmpty == true
           ? owner!.fullName!.trim()
@@ -77,6 +140,8 @@ class AuctionItem {
       isLive: isLive,
       isEnded: isEnded,
       countdown: countdown,
+      startedAt: startedAt,
+      endedAt: endedAt,
       post: post,
     );
   }
