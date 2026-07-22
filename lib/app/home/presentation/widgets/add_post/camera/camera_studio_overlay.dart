@@ -15,6 +15,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_mode.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_tool_icons.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_top_bar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_photo_editor_panel.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,21 @@ class CameraStudioOverlay extends StatelessWidget {
     required this.selectedSpeed,
     required this.studioMode,
     required this.showFilters,
+    this.showPhotoEditor = false,
     required this.beautyEnabled,
+    this.photoEditorTab = MediaPhotoEditorTab.face,
+    this.photoEditorTool = MediaPhotoEditorTool.magic,
+    this.photoEditorMagicOn = false,
+    this.photoEditorAdjustments = const {},
+    this.onPhotoEditorTabChanged,
+    this.onPhotoEditorToolSelected,
+    this.onPhotoEditorMagicToggled,
+    this.onPhotoEditorAdjustmentChanged,
+    this.onPhotoEditorReset,
+    this.photoEditorColorFilterId = 'none',
+    this.photoEditorColorFilterIntensity = 1.0,
+    this.onPhotoEditorColorFilterSelected,
+    this.onPhotoEditorColorFilterIntensityChanged,
     required this.timerEnabled,
     this.flashEnabled = false,
     required this.isRecording,
@@ -71,6 +86,9 @@ class CameraStudioOverlay extends StatelessWidget {
     this.selectedLayoutMode = CameraLayoutMode.off,
     this.layoutPickerOpen = false,
     this.onLayoutModeSelected,
+    this.speedPickerOpen = false,
+    this.onSpeedSelected,
+    this.onDismissToolPopups,
     this.layoutCellPhotos = const [],
     this.layoutActiveCellIndex = 0,
     this.onLayoutCellDelete,
@@ -100,7 +118,22 @@ class CameraStudioOverlay extends StatelessWidget {
   final double selectedSpeed;
   final CameraStudioMode studioMode;
   final bool showFilters;
+  final bool showPhotoEditor;
   final bool beautyEnabled;
+  final MediaPhotoEditorTab photoEditorTab;
+  final MediaPhotoEditorTool photoEditorTool;
+  final bool photoEditorMagicOn;
+  final Map<MediaPhotoEditorTool, double> photoEditorAdjustments;
+  final ValueChanged<MediaPhotoEditorTab>? onPhotoEditorTabChanged;
+  final ValueChanged<MediaPhotoEditorTool>? onPhotoEditorToolSelected;
+  final VoidCallback? onPhotoEditorMagicToggled;
+  final void Function(MediaPhotoEditorTool tool, double value)?
+      onPhotoEditorAdjustmentChanged;
+  final VoidCallback? onPhotoEditorReset;
+  final String photoEditorColorFilterId;
+  final double photoEditorColorFilterIntensity;
+  final ValueChanged<String>? onPhotoEditorColorFilterSelected;
+  final ValueChanged<double>? onPhotoEditorColorFilterIntensityChanged;
   final bool timerEnabled;
   final bool flashEnabled;
   final bool isRecording;
@@ -140,6 +173,9 @@ class CameraStudioOverlay extends StatelessWidget {
   final CameraLayoutMode selectedLayoutMode;
   final bool layoutPickerOpen;
   final ValueChanged<CameraLayoutMode>? onLayoutModeSelected;
+  final bool speedPickerOpen;
+  final ValueChanged<double>? onSpeedSelected;
+  final VoidCallback? onDismissToolPopups;
   final List<String?> layoutCellPhotos;
   final int layoutActiveCellIndex;
   final ValueChanged<int>? onLayoutCellDelete;
@@ -172,6 +208,9 @@ class CameraStudioOverlay extends StatelessWidget {
         showFilters && !useNativeArFilters && !isLiveMode;
     final showArColorFiltersPanel =
         showFilters && useNativeArFilters && !isLiveMode;
+    final showRetouchPanel = showPhotoEditor && !isLiveMode;
+    final showBottomSheet =
+        showLegacyFiltersPanel || showArColorFiltersPanel || showRetouchPanel;
     final selectedArFilterId = ArFilterCatalog
         .items[arFilterIndex.clamp(0, ArFilterCatalog.items.length - 1)]
         .id;
@@ -191,8 +230,7 @@ class CameraStudioOverlay extends StatelessWidget {
     final bottomChromeHeight = ratioLetterboxed
         ? CameraRatioLetterbox.bottomHeight(
             useNativeAr: useNativeArFilters,
-            filtersPanelOpen:
-                showLegacyFiltersPanel || showArColorFiltersPanel,
+            filtersPanelOpen: showBottomSheet,
           )
         : CameraRatioLetterbox.tikTokBottomChromeHeight(
             MediaQuery.paddingOf(context).bottom,
@@ -216,45 +254,10 @@ class CameraStudioOverlay extends StatelessWidget {
               onImportCell: onLayoutCellImport,
             ),
           ),
-        if (ratioLetterboxed) ...[
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            height: CameraRatioLetterbox.topHeight(topPadding),
-            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: CameraRatioLetterbox.bottomHeight(
-              useNativeAr: useNativeArFilters,
-              filtersPanelOpen:
-                  showLegacyFiltersPanel || showArColorFiltersPanel,
-            ),
-            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
-          ),
-        ] else ...[
-          AnimatedPositioned(
-            duration: CameraRatioLetterbox.chromeAnimDuration,
-            curve: CameraRatioLetterbox.chromeAnimCurve,
-            left: 0,
-            right: 0,
-            top: 0,
-            height: topChromeHeight,
-            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
-          ),
-          AnimatedPositioned(
-            duration: CameraRatioLetterbox.chromeAnimDuration,
-            curve: CameraRatioLetterbox.chromeAnimCurve,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: bottomChromeHeight,
-            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
-          ),
-        ],
+        TikTokChromeBarsOverlay(
+          topHeight: topChromeHeight,
+          bottomHeight: bottomChromeHeight,
+        ),
         if (!useNativeArFilters &&
             activeEffect != null &&
             activeEffect.requiresFaceDetection &&
@@ -291,7 +294,7 @@ class CameraStudioOverlay extends StatelessWidget {
                     showSound: !isRecording,
                   ),
                   const Spacer(),
-                if (!showLegacyFiltersPanel) ...[
+                if (!showLegacyFiltersPanel && !showRetouchPanel) ...[
                   if (!isLiveMode &&
                       !isRecording &&
                       !isReviewingDraft &&
@@ -318,12 +321,32 @@ class CameraStudioOverlay extends StatelessWidget {
                   if (useNativeArFilters &&
                       !isLiveMode &&
                       onArFilterSelected != null &&
-                      !showArColorFiltersPanel)
+                      !showArColorFiltersPanel &&
+                      !showRetouchPanel)
                     _BottomInsetPanel(
                       bottomInset: MediaQuery.paddingOf(context).bottom + 48,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (isRecording)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: Text(
+                                _formatRecordClock(recordSeconds),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.6,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black54,
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 4),
                           Transform.translate(
                             offset: const Offset(0, -14),
@@ -349,8 +372,11 @@ class CameraStudioOverlay extends StatelessWidget {
                               onShutterTap: onRecordTap,
                               onHoldStart: onLongPressStart,
                               onHoldEnd: onLongPressEnd,
-                              showSideActions: isReviewingDraft,
-                              soloShutter: isRecording || isReviewingDraft,
+                              showSideActions: isReviewingDraft ||
+                                  (isRecording && recordSeconds >= 1),
+                              soloShutter: isRecording ||
+                                  isReviewingDraft ||
+                                  selectedLayoutMode != CameraLayoutMode.off,
                               onCancel: onDiscardDraft,
                               onConfirm: onFinishRecording,
                             ),
@@ -470,16 +496,28 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
             ),
           ),
+        if (showControls &&
+            !isRecording &&
+            !isReviewingDraft &&
+            (layoutPickerOpen || speedPickerOpen) &&
+            onDismissToolPopups != null)
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: onDismissToolPopups,
+              behavior: HitTestBehavior.opaque,
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
         if (showControls && !isRecording && !isReviewingDraft)
           Positioned.fill(
             child: Align(
               alignment: isRtl ? Alignment.topLeft : Alignment.topRight,
               child: Padding(
                 padding: EdgeInsets.only(
-                  left: isRtl ? 18 : 0,
-                  right: isRtl ? 0 : 18,
+                  left: isRtl ? 10 : 0,
+                  right: isRtl ? 0 : 10,
                   top: sideToolbarTop,
-                  bottom: showLegacyFiltersPanel || showArColorFiltersPanel
+                  bottom: showBottomSheet
                       ? 220
                       : (useNativeArFilters ? 228 : 168),
                 ),
@@ -495,11 +533,12 @@ class CameraStudioOverlay extends StatelessWidget {
                   onFilters: onFiltersToggle,
                   onSpeed: onSpeedTap,
                   flashEnabled: flashEnabled,
-                  beautyEnabled: beautyEnabled,
+                  beautyEnabled: beautyEnabled || showRetouchPanel,
                   filtersEnabled: showFilters || hasActiveFilter,
                   timerEnabled: timerEnabled,
                   speedLabel: '${selectedSpeed}x',
                   showSpeed: studioMode == CameraStudioMode.video,
+                  speedEnabled: selectedLayoutMode == CameraLayoutMode.off,
                   showAspectRatio: studioMode != CameraStudioMode.video,
                   aspectRatioEnabled:
                       selectedLayoutMode == CameraLayoutMode.off,
@@ -507,6 +546,9 @@ class CameraStudioOverlay extends StatelessWidget {
                   selectedLayoutMode: selectedLayoutMode,
                   layoutPickerOpen: layoutPickerOpen,
                   onLayoutModeSelected: onLayoutModeSelected,
+                  speedPickerOpen: speedPickerOpen,
+                  selectedSpeed: selectedSpeed,
+                  onSpeedSelected: onSpeedSelected,
                   offLabel: l10n.settingsOff,
                   labels: CameraSideToolbarLabels(
                     flash: l10n.cameraFlash,
@@ -522,6 +564,46 @@ class CameraStudioOverlay extends StatelessWidget {
               ),
             ),
           ),
+        if (showControls &&
+            showRetouchPanel &&
+            onPhotoEditorTabChanged != null &&
+            onPhotoEditorToolSelected != null &&
+            onPhotoEditorMagicToggled != null &&
+            onPhotoEditorAdjustmentChanged != null &&
+            onPhotoEditorReset != null) ...[
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: onBeautyTap,
+              behavior: HitTestBehavior.opaque,
+              child: const ColoredBox(color: Colors.transparent),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: GestureDetector(
+              onTap: () {},
+              child: MediaPhotoEditorPanel(
+                l10n: l10n,
+                tab: photoEditorTab,
+                selectedTool: photoEditorTool,
+                magicOn: photoEditorMagicOn,
+                adjustmentValues: photoEditorAdjustments,
+                onTabChanged: onPhotoEditorTabChanged!,
+                onToolSelected: onPhotoEditorToolSelected!,
+                onMagicToggled: onPhotoEditorMagicToggled!,
+                onAdjustmentChanged: onPhotoEditorAdjustmentChanged!,
+                onReset: onPhotoEditorReset!,
+                selectedColorFilterId: photoEditorColorFilterId,
+                colorFilterIntensity: photoEditorColorFilterIntensity,
+                onColorFilterSelected: onPhotoEditorColorFilterSelected,
+                onColorFilterIntensityChanged:
+                    onPhotoEditorColorFilterIntensityChanged,
+              ),
+            ),
+          ),
+        ],
         if (showControls && showLegacyFiltersPanel) ...[
           Positioned.fill(
             child: CameraFiltersScrim(onDismiss: onFiltersToggle),
@@ -575,14 +657,15 @@ class CameraStudioOverlay extends StatelessWidget {
             ),
           ),
         ],
-        if (isRecording)
-          CameraRecordingBadge(
-            topPadding: topPadding,
-            label: '${l10n.cameraRecording} ${recordSeconds}s',
-          ),
       ],
     );
   }
+}
+
+String _formatRecordClock(int seconds) {
+  final m = (seconds ~/ 60).toString().padLeft(2, '0');
+  final s = (seconds % 60).toString().padLeft(2, '0');
+  return '$m:$s';
 }
 
 class _BottomInsetPanel extends StatelessWidget {

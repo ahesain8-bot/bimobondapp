@@ -18,7 +18,7 @@ class CameraStudioConstants {
   ];
 
   static const durationOptions = [15, 60, 180];
-  static const speedOptions = [0.5, 1.0, 2.0, 3.0];
+  static const speedOptions = [0.3, 0.5, 1.0, 2.0, 3.0];
   static const studioModes = [
     CameraStudioMode.photo,
     CameraStudioMode.video,

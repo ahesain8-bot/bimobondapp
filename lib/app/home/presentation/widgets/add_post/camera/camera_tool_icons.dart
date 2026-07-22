@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 class CameraToolIcons {
   CameraToolIcons._();
 
+  /// Vertical gap between side-rail tool rows (camera + media editor).
+  static const double railRowSpacing = 6.0;
+
   static const labelStyle = TextStyle(
     color: Colors.white,
     fontSize: 12,
@@ -168,6 +171,7 @@ class CameraRailToolRow extends StatelessWidget {
     this.iconOnStartEdge = true,
     this.customIcon,
     this.showLabel = false,
+    this.rowSpacing,
   });
 
   final IconData icon;
@@ -179,6 +183,7 @@ class CameraRailToolRow extends StatelessWidget {
   final bool iconOnStartEdge;
   final Widget? customIcon;
   final bool showLabel;
+  final double? rowSpacing;
 
   @override
   Widget build(BuildContext context) {
@@ -194,13 +199,6 @@ class CameraRailToolRow extends StatelessWidget {
                   icon,
                   color: Colors.white,
                   size: 30,
-                  shadows: const [
-                    Shadow(
-                      color: Colors.black87,
-                      blurRadius: 10,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
                 ),
           ),
         ),
@@ -286,7 +284,9 @@ class CameraRailToolRow extends StatelessWidget {
     ];
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(
+        bottom: rowSpacing ?? CameraToolIcons.railRowSpacing,
+      ),
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show Color, Offset, Size;
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_layout_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -24,11 +25,24 @@ class CameraLayoutVideoComposer {
 
     final count = math.min(fracs.length, cellPaths.length);
 
-    // Recorders leave a black frame (and sometimes a short black tail) on the
-    // last frame of each clip. Trimming every cell to the SHORTEST clip minus a
-    // small epsilon removes that trailing black frame and keeps the grid cells
-    // in sync so no cell goes black while the others are still playing.
-    final endTime = await _sharedEndTime(cellPaths.take(count));
+    // Equalize + strip recorder black tails in Kotlin BEFORE compose.
+    // Do NOT use VideoSegment.endTime here — pro_video_editor appends a ~120ms
+    // transparent flush tail when clips end before their source, which becomes
+    // a full-screen black blink on every preview loop.
+    final maxMs = await _sharedMaxDurationMs(cellPaths.take(count));
+    final normalized = <String>[];
+    for (var i = 0; i < count; i++) {
+      final path = cellPaths[i];
+      if (maxMs == null) {
+        normalized.add(path);
+        continue;
+      }
+      final out = await ArCameraBridge.trimVideoTail(
+        path,
+        maxDurationMs: maxMs,
+      );
+      normalized.add((out != null && out.isNotEmpty) ? out : path);
+    }
 
     final layers = <VideoLayer>[];
     for (var i = 0; i < count; i++) {
@@ -41,8 +55,7 @@ class CameraLayoutVideoComposer {
         VideoLayer(
           clips: [
             VideoSegment(
-              video: EditorVideo.file(cellPaths[i]),
-              endTime: endTime,
+              video: EditorVideo.file(normalized[i]),
               // Keep mic from the first cell only to avoid stacked noise.
               volume: i == 0 ? null : 0,
             ),
@@ -78,6 +91,18 @@ class CameraLayoutVideoComposer {
       if (!await output.exists() || await output.length() == 0) {
         throw StateError('layout_video_compose_failed');
       }
+
+      // Safety: drop any residual end flash (orientation preserved in Kotlin).
+      final trimmedPath = await ArCameraBridge.trimVideoTail(
+        output.path,
+        trimMs: 80,
+      );
+      if (trimmedPath != null && trimmedPath.isNotEmpty) {
+        final trimmed = File(trimmedPath);
+        if (await trimmed.exists() && await trimmed.length() > 0) {
+          return trimmed;
+        }
+      }
       return output;
     } catch (e, st) {
       debugPrint('Layout video compose failed: $e\n$st');
@@ -85,10 +110,8 @@ class CameraLayoutVideoComposer {
     }
   }
 
-  /// Returns the clean end time shared by every cell clip: the shortest clip
-  /// duration minus a small black-tail epsilon. Returns null (no trim) if the
-  /// durations can't be read or are too short to trim safely.
-  static Future<Duration?> _sharedEndTime(Iterable<String> paths) async {
+  /// Shortest clip duration minus a black-tail epsilon (ms).
+  static Future<int?> _sharedMaxDurationMs(Iterable<String> paths) async {
     try {
       var minMs = 1 << 62;
       for (final path in paths) {
@@ -101,14 +124,14 @@ class CameraLayoutVideoComposer {
       }
       if (minMs == 1 << 62) return null;
 
-      // Drop the trailing black frame(s): ~120ms, but never more than 20% of
-      // the shortest clip, and only when the clip is long enough to matter.
-      final epsilon = math.min(120, (minMs * 0.2).round());
+      // Drop trailing black frame(s) from recorder (~200ms), never more than
+      // 20% of the shortest clip.
+      final epsilon = math.min(200, (minMs * 0.2).round());
       final endMs = minMs - epsilon;
       if (endMs < 300) return null;
-      return Duration(milliseconds: endMs);
+      return endMs;
     } catch (e) {
-      debugPrint('Layout video end-time probe failed: $e');
+      debugPrint('Layout video duration probe failed: $e');
       return null;
     }
   }

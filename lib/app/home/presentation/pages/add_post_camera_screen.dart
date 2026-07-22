@@ -29,6 +29,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_mode.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_studio_sheets.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_photo_editor_panel.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
@@ -67,10 +68,24 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   CameraState? _cameraState;
   // Preserve native preview identity across layout mode changes to avoid a
   // brief native re-init ("blink") when the preview widget moves.
-  static const _arPreviewKey = ValueKey<String>('ar-camera-preview');
+  final GlobalKey _arPreviewKey = GlobalKey(debugLabel: 'ar-camera-preview');
   bool _pendingVideoStart = false;
   bool _returnToPhotoAfterVideo = false;
   bool _showFilters = false;
+  bool _showPhotoEditor = false;
+  MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
+  MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
+  bool _photoEditorMagicOn = false;
+  final Map<MediaPhotoEditorTool, double> _photoAdjustments = {
+    MediaPhotoEditorTool.saturation: 0.0,
+    MediaPhotoEditorTool.brightness: 0.0,
+    MediaPhotoEditorTool.contrast: 0.0,
+    MediaPhotoEditorTool.exposure: 0.0,
+    MediaPhotoEditorTool.whiteBalance: 0.0,
+    MediaPhotoEditorTool.highlights: 0.0,
+    MediaPhotoEditorTool.shadows: 0.0,
+    MediaPhotoEditorTool.nose: 0.0,
+  };
   bool _catalogLoading = true;
   bool _filtersReady = false;
   bool _beautyEnabled = false;
@@ -79,18 +94,28 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _flashEnabled = false;
   bool _ratioLetterboxed = false;
   bool _layoutPickerOpen = false;
+  bool _speedPickerOpen = false;
   CameraLayoutMode _layoutMode = CameraLayoutMode.off;
   List<String?> _layoutCellPhotos = const [];
   int _layoutActiveCell = 0;
+  /// TikTok layout: max seconds for the next cell = min of prior cell lengths.
+  int? _layoutCellCapSeconds;
   bool _isRecording = false;
   bool _isBusy = false;
   bool _isProcessingCapture = false;
   bool _isCapturingPhoto = false;
   bool _showShutterFlash = false;
+  bool _recordingFinalizeInFlight = false;
 
   /// True while a photo-mode press-and-hold is recording a quick video.
   bool _quickVideoMode = false;
   static const _quickVideoMaxSeconds = 15;
+
+  /// Finger is down on a hold-to-record gesture (survives shutter rebuilds).
+  bool _holdRecordActive = false;
+
+  /// Hold ended before native start finished — stop as soon as recording arms.
+  bool _stopWhenRecordReady = false;
 
   int _recordSeconds = 0;
   final List<String> _videoSegments = [];
@@ -111,7 +136,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _initialFilterApplied = false;
   double _selectedZoom = CameraStudioConstants.zoomSteps[1].value;
   int _selectedDuration = CameraStudioConstants.durationOptions.first;
-  double _selectedSpeed = CameraStudioConstants.speedOptions[1];
+  double _selectedSpeed = 1.0;
   String? _selectedEffectSlug;
   CameraStudioMode _studioMode = CameraStudioMode.video;
   SoundEntity? _selectedSound;
@@ -161,6 +186,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
     if (_useNativeArFilters) {
       _isFrontCamera = true;
+      ArCameraBridge.installPlatformCallbacks();
+      ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
       ArCameraBridge.setFilter(ArFilterCatalog.items[_arFilterIndex].id);
     }
@@ -196,6 +223,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(SoundAudioPreview.stop());
     _clearLayoutCapture();
     if (_useNativeArFilters) {
+      ArCameraBridge.clearPlatformCallbacks();
+      ArCameraBridge.clearRetouchAdjustments();
       unawaited(ArCameraBridge.setPreviewLetterbox(topPx: 0, bottomPx: 0));
     }
     for (final path in _videoSegments) {
@@ -270,19 +299,150 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         arFilterId: arId,
         arColorCategoryId: category,
         arFilterIntensity: _arFilterIntensity,
-        beautyEnabled: arId == 'whitening',
+        beautyEnabled: arId == 'whitening' || _photoEditorMagicOn,
         alreadyBaked: true,
         effectSlug: ArFilterCatalog.isColorFilter(arId) || arId == 'none'
             ? null
             : arId,
+        faceSaturation: _photoAdj(MediaPhotoEditorTool.saturation),
+        faceBrightness: _photoAdj(MediaPhotoEditorTool.brightness),
+        faceContrast: _photoAdj(MediaPhotoEditorTool.contrast),
+        faceExposure: _photoAdj(MediaPhotoEditorTool.exposure),
+        faceWhiteBalance: _photoAdj(MediaPhotoEditorTool.whiteBalance),
+        faceHighlights: _photoAdj(MediaPhotoEditorTool.highlights),
+        faceShadows: _photoAdj(MediaPhotoEditorTool.shadows),
+        faceNose: _photoAdj(MediaPhotoEditorTool.nose),
       );
     }
     return MediaEditorSeed(
       filterName: _activeFilterName,
       effectSlug: _selectedEffectSlug,
-      beautyEnabled: _beautyEnabled,
+      beautyEnabled: _beautyEnabled || _photoEditorMagicOn,
       filterCategory: _filterCategory,
+      faceSaturation: _photoAdj(MediaPhotoEditorTool.saturation),
+      faceBrightness: _photoAdj(MediaPhotoEditorTool.brightness),
+      faceContrast: _photoAdj(MediaPhotoEditorTool.contrast),
+      faceExposure: _photoAdj(MediaPhotoEditorTool.exposure),
+      faceWhiteBalance: _photoAdj(MediaPhotoEditorTool.whiteBalance),
+      faceHighlights: _photoAdj(MediaPhotoEditorTool.highlights),
+      faceShadows: _photoAdj(MediaPhotoEditorTool.shadows),
+      faceNose: _photoAdj(MediaPhotoEditorTool.nose),
     );
+  }
+
+  double _photoAdj(MediaPhotoEditorTool tool) =>
+      _photoAdjustments[tool] ?? 0.0;
+
+  void _syncRetouchToNative() {
+    if (!_useNativeArFilters) return;
+    ArCameraBridge.setRetouchAdjustments(
+      saturation: _photoAdj(MediaPhotoEditorTool.saturation),
+      brightness: _photoAdj(MediaPhotoEditorTool.brightness),
+      contrast: _photoAdj(MediaPhotoEditorTool.contrast),
+      exposure: _photoAdj(MediaPhotoEditorTool.exposure),
+      whiteBalance: _photoAdj(MediaPhotoEditorTool.whiteBalance),
+      highlights: _photoAdj(MediaPhotoEditorTool.highlights),
+      shadows: _photoAdj(MediaPhotoEditorTool.shadows),
+      nose: _photoAdj(MediaPhotoEditorTool.nose),
+    );
+  }
+
+  void _togglePhotoEditor() {
+    setState(() {
+      if (_showPhotoEditor) {
+        _showPhotoEditor = false;
+        return;
+      }
+      _showPhotoEditor = true;
+      _showFilters = false;
+      _layoutPickerOpen = false;
+      _speedPickerOpen = false;
+      if (_useNativeArFilters &&
+          ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
+        _photoEditorMagicOn = true;
+      }
+    });
+    if (_useNativeArFilters) {
+      _syncRetouchToNative();
+    }
+    if (_ratioLetterboxed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_syncNativePreviewLetterbox());
+      });
+    }
+  }
+
+  void _onPhotoEditorMagicToggled() {
+    final next = !_photoEditorMagicOn;
+    setState(() {
+      _photoEditorMagicOn = next;
+      if (_useNativeArFilters) {
+        if (next) {
+          _arFilterIndex = ArFilterCatalog.indexOfId('whitening');
+          _arColorCategoryId = 'portrait';
+        } else if (ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
+          _arFilterIndex = 0;
+        }
+      }
+    });
+    if (_useNativeArFilters) {
+      final id = ArFilterCatalog.items[_arFilterIndex].id;
+      final intensity =
+          ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
+      ArCameraBridge.setFilter(id, intensity: intensity);
+    } else {
+      unawaited(_applyBeauty(next));
+    }
+  }
+
+  void _onPhotoEditorAdjustmentChanged(
+    MediaPhotoEditorTool tool,
+    double value,
+  ) {
+    setState(() => _photoAdjustments[tool] = value);
+    _syncRetouchToNative();
+  }
+
+  void _resetPhotoEditor() {
+    setState(() {
+      for (final key in _photoAdjustments.keys) {
+        _photoAdjustments[key] = 0.0;
+      }
+      _photoEditorTool = MediaPhotoEditorTool.magic;
+      _photoEditorMagicOn = false;
+      if (_useNativeArFilters) {
+        final currentId = ArFilterCatalog.items[_arFilterIndex].id;
+        if (currentId == 'whitening' || ArFilterCatalog.isColorFilter(currentId)) {
+          _arFilterIndex = 0;
+        }
+      }
+    });
+    if (_useNativeArFilters) {
+      ArCameraBridge.clearRetouchAdjustments();
+      ArCameraBridge.setFilter('none');
+    } else {
+      unawaited(_applyBeauty(false));
+    }
+  }
+
+  void _onMakeupFilmFilterSelected(String id) {
+    if (!_useNativeArFilters) return;
+    setState(() {
+      if (id == 'none') {
+        final current = ArFilterCatalog.items[_arFilterIndex].id;
+        if (ArFilterCatalog.isColorFilter(current)) {
+          _arFilterIndex = 0;
+        }
+      } else {
+        _arFilterIndex = ArFilterCatalog.indexOfId(id);
+        _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        _photoEditorMagicOn = false;
+      }
+    });
+    final applied = ArFilterCatalog.items[_arFilterIndex].id;
+    final intensity =
+        ArFilterCatalog.isColorFilter(applied) ? _arFilterIntensity : 1.0;
+    ArCameraBridge.setFilter(applied, intensity: intensity);
   }
 
   Future<void> _reapplySelectedFilter() async {
@@ -563,9 +723,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _layoutMode == CameraLayoutMode.off && _videoSegments.isNotEmpty;
 
   /// Max recording length: 15s for a photo-mode quick video, otherwise the
-  /// duration selected in the video mode bar.
-  int get _effectiveMaxRecordSeconds =>
-      _quickVideoMode ? _quickVideoMaxSeconds : _selectedDuration;
+  /// duration selected in the video mode bar. In layout mode, prior cells
+  /// further cap the take (shortest previous cell length).
+  int get _effectiveMaxRecordSeconds {
+    final base = _quickVideoMode ? _quickVideoMaxSeconds : _selectedDuration;
+    final layoutCap = _layoutCellCapSeconds;
+    if (_layoutMode != CameraLayoutMode.off && layoutCap != null) {
+      return layoutCap.clamp(1, base);
+    }
+    return base;
+  }
 
   /// Stops a photo-mode quick video and opens the editor with the clip.
   Future<void> _finishQuickVideo() async {
@@ -624,22 +791,18 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_useNativeArFilters) {
       try {
         final path = await ArCameraBridge.stopRecording();
-        if (!mounted) return;
-        if (path != null && path.isNotEmpty) {
-          if (_layoutMode != CameraLayoutMode.off) {
-            setState(() => _isBusy = false);
-            await _handleLayoutVideo(File(path));
-            return;
-          }
-          _videoSegments.add(path);
-          _segmentSpeeds.add(_currentSegmentSpeed);
+        if (!mounted) {
+          setState(() => _isBusy = false);
+          return;
         }
-        setState(() => _isBusy = false);
-        if (autoFinish && _videoSegments.isNotEmpty) {
-          await _finishMultiClipVideo();
-        }
+        await _completeRecordingSegment(
+          path ?? '',
+          autoFinish: autoFinish,
+        );
       } catch (_) {
-        if (mounted) setState(() => _isBusy = false);
+        if (mounted) {
+          setState(() => _isBusy = false);
+        }
       }
       return;
     }
@@ -656,6 +819,80 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       onAnalysisOnlyMode: (_) async {},
     );
     if (mounted) setState(() => _isBusy = false);
+  }
+
+  void _onNativeRecordingAutoStopped(String path) {
+    if (!mounted || path.isEmpty) return;
+    unawaited(
+      _completeRecordingSegment(
+        path,
+        autoFinish: _layoutMode == CameraLayoutMode.off,
+      ),
+    );
+  }
+
+  /// Finalizes a stopped clip: layout cell, multi-clip segment, or quick video.
+  Future<void> _completeRecordingSegment(
+    String path, {
+    bool autoFinish = false,
+  }) async {
+    if (_recordingFinalizeInFlight) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isBusy = false;
+        });
+      }
+      return;
+    }
+    if (path.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isBusy = false;
+        });
+      }
+      return;
+    }
+
+    _recordingFinalizeInFlight = true;
+    _recordTimer?.cancel();
+    try {
+      if (!mounted) return;
+
+      if (_layoutMode != CameraLayoutMode.off) {
+        final mode = _layoutMode;
+        final index = _layoutActiveCell;
+        if (index >= 0 &&
+            index < mode.cellCount &&
+            index < _layoutCellPhotos.length &&
+            _layoutCellPhotos[index] != null) {
+          setState(() {
+            _isRecording = false;
+            _isBusy = false;
+          });
+          return;
+        }
+        setState(() {
+          _isRecording = false;
+          _isBusy = false;
+        });
+        await _handleLayoutVideo(File(path));
+        return;
+      }
+
+      setState(() {
+        _isRecording = false;
+        _isBusy = false;
+      });
+      _videoSegments.add(path);
+      _segmentSpeeds.add(_currentSegmentSpeed);
+      if (autoFinish && _videoSegments.isNotEmpty) {
+        await _finishMultiClipVideo();
+      }
+    } finally {
+      _recordingFinalizeInFlight = false;
+    }
   }
 
   Future<void> _finishMultiClipVideo() async {
@@ -776,6 +1013,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   /// records at the new speed — like TikTok. Otherwise it just updates the
   /// speed applied to the next segment.
   void _onSpeedSelected(double speed) {
+    if (_speedPickerOpen) {
+      setState(() => _speedPickerOpen = false);
+    }
     if (speed == _selectedSpeed) return;
     if (_isRecording &&
         _layoutMode == CameraLayoutMode.off &&
@@ -784,6 +1024,35 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     } else {
       setState(() => _selectedSpeed = speed);
     }
+  }
+
+  void _toggleSpeedPicker() {
+    if (_layoutMode != CameraLayoutMode.off) return;
+    setState(() {
+      _speedPickerOpen = !_speedPickerOpen;
+      if (_speedPickerOpen) {
+        _layoutPickerOpen = false;
+        _showPhotoEditor = false;
+      }
+    });
+  }
+
+  void _dismissToolPopups() {
+    if (!_layoutPickerOpen && !_speedPickerOpen) return;
+    setState(() {
+      _layoutPickerOpen = false;
+      _speedPickerOpen = false;
+    });
+  }
+
+  void _toggleLayoutPicker() {
+    setState(() {
+      _layoutPickerOpen = !_layoutPickerOpen;
+      if (_layoutPickerOpen) {
+        _speedPickerOpen = false;
+        _showPhotoEditor = false;
+      }
+    });
   }
 
   Future<void> _splitSegmentForSpeedChange(double speed) async {
@@ -823,6 +1092,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   void _discardVideoDraft() {
     _recordTimer?.cancel();
+    _holdRecordActive = false;
+    _stopWhenRecordReady = false;
     for (final path in _videoSegments) {
       try {
         File(path).deleteSync();
@@ -850,7 +1121,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       topInset: media.padding.top,
       letterboxed: true,
       useNativeAr: _useNativeArFilters,
-      filtersPanelOpen: _showFilters,
+      filtersPanelOpen: _showFilters || _showPhotoEditor,
     );
     return CameraCaptureUtils.cropToFillCenterViewport(
       file: file,
@@ -870,18 +1141,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       return;
     }
 
-    // Instant feedback — skip in layout mode (full-screen white flash feels wrong
-    // while filling grid cells; normal single photo still gets the shutter blink).
-    if (_layoutMode == CameraLayoutMode.off) {
+    // Native AR uses a GPU snapshot — white shutter flash only adds a visible blink.
+    if (!_useNativeArFilters && _layoutMode == CameraLayoutMode.off) {
       unawaited(_playShutterFlash());
     }
 
     if (_useNativeArFilters) {
       _isCapturingPhoto = true;
       try {
-        if (_ratioLetterboxed) {
-          await _syncNativePreviewLetterbox(letterboxed: true);
-        }
         final media = MediaQuery.of(context);
         final dpr = media.devicePixelRatio;
         final path = await ArCameraBridge.takePhoto(
@@ -892,7 +1159,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           letterboxBottomPx: _ratioLetterboxed
               ? (CameraRatioLetterbox.bottomHeight(
                           useNativeAr: true,
-                          filtersPanelOpen: _showFilters,
+                          filtersPanelOpen: _showFilters || _showPhotoEditor,
                         ) *
                         dpr)
                     .round()
@@ -948,7 +1215,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Future<void> _beginVideoRecording() async {
     if (_isBusy || _isRecording) return;
-    if (_recordSeconds >= _selectedDuration) return;
+    if (_recordSeconds >= _effectiveMaxRecordSeconds) return;
 
     if (_useNativeArFilters) {
       // Camera preview is already live — never show "Starting camera..." here.
@@ -971,14 +1238,21 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           letterboxBottomPx: _ratioLetterboxed
               ? (CameraRatioLetterbox.bottomHeight(
                           useNativeAr: true,
-                          filtersPanelOpen: _showFilters,
+                          filtersPanelOpen: _showFilters || _showPhotoEditor,
                         ) *
                         dpr)
                     .round()
               : 0,
+          maxDurationMs: _layoutMode != CameraLayoutMode.off
+              ? _effectiveMaxRecordSeconds * 1000
+              : null,
         );
         if (!mounted) return;
         _startRecordTimer(resume: _shouldResumeRecordTimer);
+        if (_stopWhenRecordReady) {
+          _stopWhenRecordReady = false;
+          unawaited(_pauseRecordingSegment());
+        }
       } catch (_) {
         _quickVideoMode = false;
       }
@@ -1001,6 +1275,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         _appliedFilterId = null;
         await _reapplySelectedFilter();
         _startRecordTimer(resume: _shouldResumeRecordTimer);
+        if (_stopWhenRecordReady) {
+          _stopWhenRecordReady = false;
+          unawaited(_pauseRecordingSegment());
+        }
       },
       onVideoRecordingMode: (_) async {},
       onPreparingCamera: (_) async {},
@@ -1034,7 +1312,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _onArPreviewSwipeEnd(DragEndDetails details) {
-    if (!_useNativeArFilters || _isRecording || _showFilters) return;
+    if (!_useNativeArFilters || _isRecording || _showFilters || _showPhotoEditor) {
+      return;
+    }
     final currentId = ArFilterCatalog.items[_arFilterIndex].id;
     final current = ArFilterCatalog.effectCarouselIndex(currentId);
     final count = ArFilterCatalog.effectItems.length;
@@ -1218,8 +1498,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       if (!_isPinchingZoom) {
         _isPinchingZoom = true;
         _pinchBaseZoom = _selectedZoom;
-        if (_layoutPickerOpen) {
-          setState(() => _layoutPickerOpen = false);
+        if (_layoutPickerOpen || _speedPickerOpen) {
+          setState(() {
+            _layoutPickerOpen = false;
+            _speedPickerOpen = false;
+          });
         }
       }
       final next =
@@ -1336,12 +1619,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
     _layoutCellPhotos = const [];
     _layoutActiveCell = 0;
-  }
-
-  void _toggleLayoutPicker() {
-    setState(() {
-      _layoutPickerOpen = !_layoutPickerOpen;
-    });
+    _layoutCellCapSeconds = null;
   }
 
   void _toggleRatioLetterbox() {
@@ -1363,7 +1641,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final top = CameraRatioLetterbox.topHeight(media.padding.top);
     final bottom = CameraRatioLetterbox.bottomHeight(
       useNativeAr: true,
-      filtersPanelOpen: _showFilters,
+      filtersPanelOpen: _showFilters || _showPhotoEditor,
     );
     await ArCameraBridge.setPreviewLetterbox(
       topPx: (top * dpr).round(),
@@ -1378,15 +1656,17 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
     setState(() {
       _layoutMode = mode;
-      _layoutPickerOpen = false;
-      if (mode == CameraLayoutMode.off) return;
-      // Live has no grid capture — fall back to photo. Photo/video keep mode.
-      if (_studioMode == CameraStudioMode.live) {
-        _studioMode = CameraStudioMode.photo;
+      _speedPickerOpen = false;
+      if (mode != CameraLayoutMode.off) {
+        // Live has no grid capture — fall back to photo. Photo/video keep mode.
+        if (_studioMode == CameraStudioMode.live) {
+          _studioMode = CameraStudioMode.photo;
+        }
+        _layoutActiveCell = 0;
+        _layoutCellPhotos = List<String?>.filled(mode.cellCount, null);
+        _layoutCellCapSeconds = null;
+        _recordSeconds = 0;
       }
-      _layoutActiveCell = 0;
-      _layoutCellPhotos = List<String?>.filled(mode.cellCount, null);
-      _recordSeconds = 0;
     });
   }
 
@@ -1442,13 +1722,23 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final mode = _layoutMode;
     if (mode == CameraLayoutMode.off) return;
 
-    final index = _layoutActiveCell.clamp(0, mode.cellCount - 1);
+    // Cap later cells to the shortest take so far (TikTok layout rule).
+    final recordedSecs = _recordSeconds.clamp(1, 600);
+    final prevCap = _layoutCellCapSeconds;
+    _layoutCellCapSeconds =
+        prevCap == null ? recordedSecs : (recordedSecs < prevCap ? recordedSecs : prevCap);
+
     final next = List<String?>.from(_layoutCellPhotos);
     if (next.length != mode.cellCount) {
       next
         ..clear()
         ..addAll(List<String?>.filled(mode.cellCount, null));
     }
+    final emptyIndex = next.indexWhere((p) => p == null);
+    final index = (_layoutActiveCell >= 0 && _layoutActiveCell < mode.cellCount)
+        ? _layoutActiveCell
+        : emptyIndex;
+    if (index < 0 || next[index] != null) return;
     next[index] = raw.path;
     final filled = next.whereType<String>().length;
 
@@ -1500,8 +1790,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     setState(() {
       _layoutCellPhotos = next;
       // Advance to the first still-empty frame (handles gaps left by delete).
-      _layoutActiveCell = next.indexWhere((p) => p == null);
+      final nextEmpty = next.indexWhere((p) => p == null);
+      _layoutActiveCell = nextEmpty < 0 ? mode.cellCount : nextEmpty;
       _recordSeconds = 0;
+      _isRecording = false;
+      _isBusy = false;
     });
   }
 
@@ -1688,7 +1981,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         return;
       }
       if (_isBusy) return;
-      if (_recordSeconds >= _selectedDuration) return;
+      if (_recordSeconds >= _effectiveMaxRecordSeconds) return;
       _startRecordingWithOptionalTimer();
     }
   }
@@ -1698,17 +1991,26 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_countdownValue != null) return;
     if (_isBusy || _isRecording) return;
 
+    _holdRecordActive = true;
+    _stopWhenRecordReady = false;
+
     if (_studioMode == CameraStudioMode.photo) {
       // Photo mode: press-and-hold records a TikTok-style quick video
       // (auto-stops at 15s, releasing early stops sooner). Skip while a
       // layout grid is active — that flow captures per-cell clips itself.
-      if (_layoutMode != CameraLayoutMode.off) return;
+      if (_layoutMode != CameraLayoutMode.off) {
+        _holdRecordActive = false;
+        return;
+      }
       _quickVideoMode = true;
       unawaited(_beginVideoRecording());
       return;
     }
 
-    if (_recordSeconds >= _selectedDuration) return;
+    if (_recordSeconds >= _effectiveMaxRecordSeconds) {
+      _holdRecordActive = false;
+      return;
+    }
     _startRecordingWithOptionalTimer();
   }
 
@@ -1717,16 +2019,37 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
     // Photo-mode quick video: releasing finishes and opens the editor.
     if (_quickVideoMode) {
+      _holdRecordActive = false;
+      _stopWhenRecordReady = false;
       unawaited(_finishQuickVideo());
       return;
     }
 
-    if (_studioMode == CameraStudioMode.photo) return;
-    // Timed countdown keeps running after release (step-back selfie).
-    if (_countdownValue != null) return;
-    if (_isRecording) {
-      unawaited(_pauseRecordingSegment());
+    if (_studioMode == CameraStudioMode.photo) {
+      _holdRecordActive = false;
+      return;
     }
+    // Timed countdown keeps running after release (step-back selfie).
+    if (_countdownValue != null) {
+      _holdRecordActive = false;
+      return;
+    }
+
+    final wasHolding = _holdRecordActive;
+    _holdRecordActive = false;
+
+    if (_isRecording) {
+      _stopWhenRecordReady = false;
+      unawaited(_pauseRecordingSegment());
+    } else if (wasHolding) {
+      // Start still in flight (or shutter rebuilt mid-hold) — stop once armed.
+      _stopWhenRecordReady = true;
+    }
+  }
+
+  void _onHoldPointerLift(PointerEvent event) {
+    if (!_holdRecordActive) return;
+    _onRecordHoldEnd();
   }
 
   @override
@@ -1755,20 +2078,25 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (_useNativeArFilters)
-            _buildNativeArCameraBody(l10n, filters)
-          else
-            _buildCamerAwesomeBody(l10n, filters),
-          if (_showShutterFlash)
-            const IgnorePointer(child: ColoredBox(color: Color(0xE6FFFFFF))),
-          if (_isProcessingCapture)
-            CameraAppLoading(message: l10n.promoteProcessing),
-          if (_isBusy && !_isProcessingCapture)
-            CameraAppLoading(message: l10n.cameraStarting),
-        ],
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerUp: _onHoldPointerLift,
+        onPointerCancel: _onHoldPointerLift,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_useNativeArFilters)
+              _buildNativeArCameraBody(l10n, filters)
+            else
+              _buildCamerAwesomeBody(l10n, filters),
+            if (_showShutterFlash)
+              const IgnorePointer(child: ColoredBox(color: Color(0xE6FFFFFF))),
+            if (_isProcessingCapture)
+              CameraAppLoading(message: l10n.promoteProcessing),
+            if (_isBusy && !_isProcessingCapture)
+              CameraAppLoading(message: l10n.promoteProcessing),
+          ],
+        ),
       ),
     );
   }
@@ -1780,8 +2108,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         builder: (context, constraints) {
           final screen = Size(constraints.maxWidth, constraints.maxHeight);
           final media = MediaQuery.of(context);
+          final layoutOn = _layoutMode != CameraLayoutMode.off;
 
-          if (_layoutMode != CameraLayoutMode.off) {
+          Rect? layoutFrame;
+          Offset layoutShift = Offset.zero;
+          if (layoutOn) {
             final mode = _layoutMode;
             final last = mode.cellCount - 1;
             final active = last < 0
@@ -1790,22 +2121,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                       ? 0
                       : (_layoutActiveCell > last ? last : _layoutActiveCell));
             final cell = mode.cellRect(screen, active);
-            final frame = CameraLayoutComposer.previewFrameForCell(
+            layoutFrame = CameraLayoutComposer.previewFrameForCell(
               screen: screen,
               cell: cell,
             );
-            return Stack(
-              clipBehavior: Clip.hardEdge,
-              children: [
-                Positioned(
-                  left: frame.left,
-                  top: frame.top,
-                  width: frame.width,
-                  height: frame.height,
-                  child: ArCameraPreview(key: _arPreviewKey),
-                ),
-              ],
-            );
+            layoutShift =
+                layoutFrame.center - Offset(screen.width / 2, screen.height / 2);
           }
 
           final isPhoto = _studioMode == CameraStudioMode.photo;
@@ -1826,9 +2147,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           final letterboxTop = CameraRatioLetterbox.topHeight(media.padding.top);
           final letterboxBottom = CameraRatioLetterbox.bottomHeight(
             useNativeAr: true,
-            filtersPanelOpen: _showFilters,
+            filtersPanelOpen: _showFilters || _showPhotoEditor,
           );
 
+          // Keep ArCameraPreview at a fixed full-screen layout size. Layout mode
+          // only changes clip + translate — resizing SurfaceView blacks it out.
           return TweenAnimationBuilder<double>(
             duration: CameraRatioLetterbox.chromeAnimDuration,
             curve: CameraRatioLetterbox.chromeAnimCurve,
@@ -1836,6 +2159,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               end: _ratioLetterboxed ? 0.0 : (isPhoto ? 1.0 : 0.0),
             ),
             builder: (context, t, child) {
+              if (layoutFrame != null) {
+                return ClipPath(
+                  clipper: RectPreviewClipper(layoutFrame),
+                  child: Transform.translate(
+                    offset: layoutShift,
+                    child: child,
+                  ),
+                );
+              }
               final top = _ratioLetterboxed
                   ? letterboxTop
                   : (videoTop + (photoTop - videoTop) * t);
@@ -1847,7 +2179,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 child: child,
               );
             },
-            child: SizedBox.expand(
+            child: SizedBox(
+              width: screen.width,
+              height: screen.height,
               child: ArCameraPreview(key: _arPreviewKey),
             ),
           );
@@ -1886,9 +2220,33 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           selectedSpeed: _selectedSpeed,
           studioMode: _studioMode,
           showFilters: _showFilters,
+          showPhotoEditor: _showPhotoEditor,
           beautyEnabled:
               _beautyEnabled ||
+              _photoEditorMagicOn ||
+              _photoAdjustments.values.any((v) => v.abs() > 0.02) ||
               ArFilterCatalog.items[_arFilterIndex].id == 'whitening',
+          photoEditorTab: _photoEditorTab,
+          photoEditorTool: _photoEditorTool,
+          photoEditorMagicOn: _photoEditorMagicOn,
+          photoEditorAdjustments: _photoAdjustments,
+          onPhotoEditorTabChanged: (tab) =>
+              setState(() => _photoEditorTab = tab),
+          onPhotoEditorToolSelected: (tool) =>
+              setState(() => _photoEditorTool = tool),
+          onPhotoEditorMagicToggled: _onPhotoEditorMagicToggled,
+          onPhotoEditorAdjustmentChanged: _onPhotoEditorAdjustmentChanged,
+          onPhotoEditorReset: _resetPhotoEditor,
+          photoEditorColorFilterId: () {
+            final id = ArFilterCatalog.items[_arFilterIndex].id;
+            return ArFilterCatalog.isColorFilter(id) ? id : 'none';
+          }(),
+          photoEditorColorFilterIntensity: _arFilterIntensity,
+          onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
+          onPhotoEditorColorFilterIntensityChanged: (value) {
+            setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
+            ArCameraBridge.setFilterIntensity(_arFilterIntensity);
+          },
           timerEnabled: _timerEnabled,
           flashEnabled: _flashEnabled,
           isRecording: _isRecording,
@@ -1922,25 +2280,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           onRecordTap: _onRecordTap,
           onFlip: _flipCamera,
           onFlash: _toggleFlash,
-          onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
-            context,
-            selectedSpeed: _selectedSpeed,
-            onSelected: _onSpeedSelected,
-          ),
-          onBeautyTap: () {
-            if (ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
-              _onArFilterSelected(0);
-            } else {
-              _onArFilterSelected(ArFilterCatalog.indexOfId('whitening'));
-              setState(() {
-                _arColorCategoryId = 'portrait';
-                _showFilters = true;
-              });
-            }
-          },
+          onSpeedTap: _toggleSpeedPicker,
+          onBeautyTap: _togglePhotoEditor,
           onFiltersToggle: () {
             final next = !_showFilters;
-            setState(() => _showFilters = next);
+            setState(() {
+              _showFilters = next;
+              if (next) _showPhotoEditor = false;
+            });
             if (_ratioLetterboxed) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 unawaited(_syncNativePreviewLetterbox());
@@ -1960,6 +2307,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           selectedLayoutMode: _layoutMode,
           layoutPickerOpen: _layoutPickerOpen,
           onLayoutModeSelected: _onLayoutModeSelected,
+          speedPickerOpen: _speedPickerOpen,
+          onSpeedSelected: _onSpeedSelected,
+          onDismissToolPopups: _dismissToolPopups,
           layoutCellPhotos: _layoutCellPhotos,
           layoutActiveCellIndex: _layoutActiveCell,
           onLayoutCellDelete: _deleteLayoutCell,
@@ -2041,7 +2391,31 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 selectedSpeed: _selectedSpeed,
                 studioMode: _studioMode,
                 showFilters: _showFilters && _filtersReady,
-                beautyEnabled: _beautyEnabled,
+                showPhotoEditor: _showPhotoEditor,
+                beautyEnabled: _beautyEnabled ||
+                    _photoEditorMagicOn ||
+                    _photoAdjustments.values.any((v) => v.abs() > 0.02),
+                photoEditorTab: _photoEditorTab,
+                photoEditorTool: _photoEditorTool,
+                photoEditorMagicOn: _photoEditorMagicOn,
+                photoEditorAdjustments: _photoAdjustments,
+                onPhotoEditorTabChanged: (tab) =>
+                    setState(() => _photoEditorTab = tab),
+                onPhotoEditorToolSelected: (tool) =>
+                    setState(() => _photoEditorTool = tool),
+                onPhotoEditorMagicToggled: _onPhotoEditorMagicToggled,
+                onPhotoEditorAdjustmentChanged: _onPhotoEditorAdjustmentChanged,
+                onPhotoEditorReset: _resetPhotoEditor,
+                photoEditorColorFilterId: () {
+                  final id = ArFilterCatalog.items[_arFilterIndex].id;
+                  return ArFilterCatalog.isColorFilter(id) ? id : 'none';
+                }(),
+                photoEditorColorFilterIntensity: _arFilterIntensity,
+                onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
+                onPhotoEditorColorFilterIntensityChanged: (value) {
+                  setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
+                  ArCameraBridge.setFilterIntensity(_arFilterIntensity);
+                },
                 timerEnabled: _timerEnabled,
                 flashEnabled: _flashEnabled,
                 isRecording: _isRecording,
@@ -2081,14 +2455,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 onRecordTap: _onRecordTap,
                 onFlip: _flipCamera,
                 onFlash: _toggleFlash,
-                onSpeedTap: () => CameraStudioSheets.showSpeedPicker(
-                  context,
-                  selectedSpeed: _selectedSpeed,
-                  onSelected: _onSpeedSelected,
-                ),
-                onBeautyTap: () => _applyBeauty(!_beautyEnabled),
-                onFiltersToggle: () =>
-                    setState(() => _showFilters = !_showFilters),
+                onSpeedTap: _toggleSpeedPicker,
+                onBeautyTap: _togglePhotoEditor,
+                onFiltersToggle: () => setState(() {
+                  _showFilters = !_showFilters;
+                  if (_showFilters) _showPhotoEditor = false;
+                }),
                 onTimerToggle: _openCountdownSheet,
                 onMusicTap: _pickSound,
                 onClearSound: _selectedSound == null ? null : _clearSound,
@@ -2099,6 +2471,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 selectedLayoutMode: _layoutMode,
                 layoutPickerOpen: _layoutPickerOpen,
                 onLayoutModeSelected: _onLayoutModeSelected,
+                speedPickerOpen: _speedPickerOpen,
+                onSpeedSelected: _onSpeedSelected,
+                onDismissToolPopups: _dismissToolPopups,
                 layoutCellPhotos: _layoutCellPhotos,
                 layoutActiveCellIndex: _layoutActiveCell,
                 onLayoutCellDelete: _deleteLayoutCell,

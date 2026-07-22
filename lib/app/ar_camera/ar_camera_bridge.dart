@@ -8,6 +8,25 @@ class ArCameraBridge {
 
   static const _channel = MethodChannel(ArCameraConstants.channelName);
 
+  static void Function(String path)? onRecordingAutoStopped;
+
+  /// Registers platform → Dart callbacks (e.g. layout max-duration auto-stop).
+  static void installPlatformCallbacks() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onRecordingAutoStopped') {
+        final path = call.arguments?.toString();
+        if (path != null && path.isNotEmpty) {
+          onRecordingAutoStopped?.call(path);
+        }
+      }
+    });
+  }
+
+  static void clearPlatformCallbacks() {
+    onRecordingAutoStopped = null;
+    _channel.setMethodCallHandler(null);
+  }
+
   static Future<void> warmup() async {
     await _channel.invokeMethod<void>('warmup');
   }
@@ -45,10 +64,13 @@ class ArCameraBridge {
   static Future<void> startRecording({
     int? letterboxTopPx,
     int? letterboxBottomPx,
+    int? maxDurationMs,
   }) async {
     await _channel.invokeMethod<void>('startRecording', {
       if (letterboxTopPx != null) 'letterboxTopPx': letterboxTopPx,
       if (letterboxBottomPx != null) 'letterboxBottomPx': letterboxBottomPx,
+      if (maxDurationMs != null && maxDurationMs > 0)
+        'maxDurationMs': maxDurationMs,
     });
   }
 
@@ -64,6 +86,25 @@ class ArCameraBridge {
       'paths': paths,
     });
     return path;
+  }
+
+  /// Remux-trims [path]. Prefer [maxDurationMs] (keep first N ms) for layout
+  /// cell equalization; otherwise drop [trimMs] from the end.
+  /// Always preserves orientation hint (needed for correct cell cover crop).
+  static Future<String?> trimVideoTail(
+    String path, {
+    int trimMs = 120,
+    int? maxDurationMs,
+  }) async {
+    try {
+      return await _channel.invokeMethod<String>('trimVideoTail', {
+        'path': path,
+        'trimMs': trimMs,
+        if (maxDurationMs != null) 'maxDurationMs': maxDurationMs,
+      });
+    } catch (_) {
+      return path;
+    }
   }
 
   static Future<bool> flipCamera() async {
@@ -84,6 +125,34 @@ class ArCameraBridge {
       'topPx': topPx,
       'bottomPx': bottomPx,
     });
+  }
+
+  /// Live retouch preview on native camera (Face tab sliders, -1…1 → -100…100).
+  static void setRetouchAdjustments({
+    double saturation = 0,
+    double brightness = 0,
+    double contrast = 0,
+    double exposure = 0,
+    double whiteBalance = 0,
+    double highlights = 0,
+    double shadows = 0,
+    double nose = 0,
+  }) {
+    int level(double v) => (v * 100).round().clamp(-100, 100);
+    _channel.invokeMethod<void>('setRetouchAdjustments', {
+      'saturationLevel': level(saturation),
+      'brightnessLevel': level(brightness),
+      'contrastLevel': level(contrast),
+      'exposureLevel': level(exposure),
+      'whiteBalanceLevel': level(whiteBalance),
+      'highlightsLevel': level(highlights),
+      'shadowsLevel': level(shadows),
+      'noseLevel': level(nose),
+    });
+  }
+
+  static void clearRetouchAdjustments() {
+    _channel.invokeMethod<void>('clearRetouchAdjustments');
   }
 
   static Future<void> setZoom(double zoom) async {

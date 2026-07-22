@@ -55,6 +55,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var uIntensity = 0
     private var uLut = 0
     private var uHasLut = 0
+    private var uRetouchSaturation = 0
+    private var uRetouchBrightness = 0
+    private var uRetouchContrast = 0
+    private var uRetouchExposure = 0
+    private var uRetouchWhiteBalance = 0
+    private var uRetouchHighlights = 0
+    private var uRetouchShadows = 0
+    private var uRetouchNose = 0
+    private var uNoseWingL = 0
+    private var uNoseWingR = 0
+    private var uNoseRadius = 0
 
     private var lutTextureId = 0
 
@@ -80,6 +91,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesULut = 0
     private var oesUHasLut = 0
     private var oesUIntensity = 0
+    private var oesURetouchSaturation = 0
+    private var oesURetouchBrightness = 0
+    private var oesURetouchContrast = 0
+    private var oesURetouchExposure = 0
+    private var oesURetouchWhiteBalance = 0
+    private var oesURetouchHighlights = 0
+    private var oesURetouchShadows = 0
+    private var oesURetouchNose = 0
+    private var oesUNoseWingL = 0
+    private var oesUNoseWingR = 0
+    private var oesUNoseRadius = 0
 
     private val texMatrixGl = FloatArray(9)
     private var texMatrixReady = false
@@ -129,10 +151,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (bitmap == null) {
             wantLut = false
             pendingLut = null
+            // Drop any frame captured while LUT was active so photo
+            // after "clear filter" cannot reuse the graded snapshot.
+            clearLastCapturedFrame()
             return
         }
         pendingLut = bitmap
         wantLut = true
+        // Drop previous (unfiltered / other filter) buffer until a fresh graded frame lands.
+        clearLastCapturedFrame()
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -152,6 +179,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uIntensity = GLES20.glGetUniformLocation(program, "uIntensity")
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uHasLut = GLES20.glGetUniformLocation(program, "uHasLut")
+        uRetouchSaturation = GLES20.glGetUniformLocation(program, "uRetouchSaturation")
+        uRetouchBrightness = GLES20.glGetUniformLocation(program, "uRetouchBrightness")
+        uRetouchContrast = GLES20.glGetUniformLocation(program, "uRetouchContrast")
+        uRetouchExposure = GLES20.glGetUniformLocation(program, "uRetouchExposure")
+        uRetouchWhiteBalance = GLES20.glGetUniformLocation(program, "uRetouchWhiteBalance")
+        uRetouchHighlights = GLES20.glGetUniformLocation(program, "uRetouchHighlights")
+        uRetouchShadows = GLES20.glGetUniformLocation(program, "uRetouchShadows")
+        uRetouchNose = GLES20.glGetUniformLocation(program, "uRetouchNose")
+        uNoseWingL = GLES20.glGetUniformLocation(program, "uNoseWingL")
+        uNoseWingR = GLES20.glGetUniformLocation(program, "uNoseWingR")
+        uNoseRadius = GLES20.glGetUniformLocation(program, "uNoseRadius")
 
         val textures = IntArray(3)
         GLES20.glGenTextures(3, textures, 0)
@@ -195,6 +233,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         oesULut = GLES20.glGetUniformLocation(oesProgram, "uLut")
         oesUHasLut = GLES20.glGetUniformLocation(oesProgram, "uHasLut")
         oesUIntensity = GLES20.glGetUniformLocation(oesProgram, "uIntensity")
+        oesURetouchSaturation = GLES20.glGetUniformLocation(oesProgram, "uRetouchSaturation")
+        oesURetouchBrightness = GLES20.glGetUniformLocation(oesProgram, "uRetouchBrightness")
+        oesURetouchContrast = GLES20.glGetUniformLocation(oesProgram, "uRetouchContrast")
+        oesURetouchExposure = GLES20.glGetUniformLocation(oesProgram, "uRetouchExposure")
+        oesURetouchWhiteBalance = GLES20.glGetUniformLocation(oesProgram, "uRetouchWhiteBalance")
+        oesURetouchHighlights = GLES20.glGetUniformLocation(oesProgram, "uRetouchHighlights")
+        oesURetouchShadows = GLES20.glGetUniformLocation(oesProgram, "uRetouchShadows")
+        oesURetouchNose = GLES20.glGetUniformLocation(oesProgram, "uRetouchNose")
+        oesUNoseWingL = GLES20.glGetUniformLocation(oesProgram, "uNoseWingL")
+        oesUNoseWingR = GLES20.glGetUniformLocation(oesProgram, "uNoseWingR")
+        oesUNoseRadius = GLES20.glGetUniformLocation(oesProgram, "uNoseRadius")
 
         val st = SurfaceTexture(oesTextureId)
         cameraSurfaceTexture = st
@@ -265,6 +314,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
         GLES20.glUniform2f(uViewSize, captureViewport[2].toFloat(), captureViewport[3].toFloat())
         GLES20.glUniform2f(uTexSize, textureWidth.toFloat(), textureHeight.toFloat())
+        bindRetouchUniforms(
+            uRetouchSaturation,
+            uRetouchBrightness,
+            uRetouchContrast,
+            uRetouchExposure,
+            uRetouchWhiteBalance,
+            uRetouchHighlights,
+            uRetouchShadows,
+            uRetouchNose,
+            uNoseWingL,
+            uNoseWingR,
+            uNoseRadius,
+        )
 
         GLES20.glEnableVertexAttribArray(aPosition)
         GLES20.glVertexAttribPointer(aPosition, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
@@ -324,6 +386,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             oesUTexSize,
             dw.toFloat().coerceAtLeast(1f),
             dh.toFloat().coerceAtLeast(1f),
+        )
+        bindRetouchUniforms(
+            oesURetouchSaturation,
+            oesURetouchBrightness,
+            oesURetouchContrast,
+            oesURetouchExposure,
+            oesURetouchWhiteBalance,
+            oesURetouchHighlights,
+            oesURetouchShadows,
+            oesURetouchNose,
+            oesUNoseWingL,
+            oesUNoseWingR,
+            oesUNoseRadius,
         )
 
         GLES20.glEnableVertexAttribArray(oesAPosition)
@@ -483,7 +558,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var captureRowBuf: ByteArray? = null
     private var captureBufBytes = 0
     private var lastCaptureMs = 0L
-    private val captureMinIntervalMs = 33L
+    /** ~10fps readback — enough for instant shutter, light on GPU. */
+    private val captureMinIntervalMs = 100L
 
     @Volatile
     var forceCaptureNextFrame: Boolean = false
@@ -505,6 +581,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         lastCapturedFrame = null
         if (frame == null || frame.isRecycled) return null
         return frame
+    }
+
+    fun clearLastCapturedFrame() = synchronized(captureLock) {
+        val frame = lastCapturedFrame
+        lastCapturedFrame = null
+        if (frame != null && !frame.isRecycled) {
+            try {
+                frame.recycle()
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun ensureCaptureBuffers(bytes: Int, rowBytes: Int) {
@@ -780,6 +867,37 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         return shader
     }
 
+    private fun bindRetouchUniforms(
+        locSaturation: Int,
+        locBrightness: Int,
+        locContrast: Int,
+        locExposure: Int,
+        locWhiteBalance: Int,
+        locHighlights: Int,
+        locShadows: Int,
+        locNose: Int,
+        locWingL: Int,
+        locWingR: Int,
+        locRadius: Int,
+    ) {
+        val adj = LiveRetouchState.adjustments
+        if (locSaturation >= 0) GLES20.glUniform1f(locSaturation, adj.saturation)
+        if (locBrightness >= 0) GLES20.glUniform1f(locBrightness, adj.brightness)
+        if (locContrast >= 0) GLES20.glUniform1f(locContrast, adj.contrast)
+        if (locExposure >= 0) GLES20.glUniform1f(locExposure, adj.exposure)
+        if (locWhiteBalance >= 0) GLES20.glUniform1f(locWhiteBalance, adj.whiteBalance)
+        if (locHighlights >= 0) GLES20.glUniform1f(locHighlights, adj.highlights)
+        if (locShadows >= 0) GLES20.glUniform1f(locShadows, adj.shadows)
+        if (locNose >= 0) GLES20.glUniform1f(locNose, adj.nose)
+        if (locWingL >= 0) {
+            GLES20.glUniform2fv(locWingL, 1, LiveRetouchState.noseWingL, 0)
+        }
+        if (locWingR >= 0) {
+            GLES20.glUniform2fv(locWingR, 1, LiveRetouchState.noseWingR, 0)
+        }
+        if (locRadius >= 0) GLES20.glUniform1f(locRadius, LiveRetouchState.noseRadius)
+    }
+
     companion object {
         private const val TAG = "FaceWarpRenderer"
 
@@ -800,6 +918,86 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             }
         """
 
+        private const val RETOUCH_UNIFORMS = """
+            uniform float uRetouchSaturation;
+            uniform float uRetouchBrightness;
+            uniform float uRetouchContrast;
+            uniform float uRetouchExposure;
+            uniform float uRetouchWhiteBalance;
+            uniform float uRetouchHighlights;
+            uniform float uRetouchShadows;
+            uniform float uRetouchNose;
+            uniform vec2 uNoseWingL;
+            uniform vec2 uNoseWingR;
+            uniform float uNoseRadius;
+        """
+
+        private const val RETOUCH_FUNCTIONS = """
+            float retouchLuma(vec3 c) {
+                return dot(c, vec3(0.2126, 0.7152, 0.0722));
+            }
+
+            vec3 applyRetouchColor(vec3 col) {
+                float ev = uRetouchExposure;
+                if (abs(ev) > 0.01) {
+                    col *= pow(2.0, ev);
+                }
+                float wb = uRetouchWhiteBalance;
+                if (abs(wb) > 0.01) {
+                    float k = wb * 0.3;
+                    col.r *= (1.0 + k);
+                    col.b *= (1.0 - k);
+                }
+                float c = uRetouchContrast;
+                if (abs(c) > 0.01) {
+                    float alpha = 1.0 + c * 0.5;
+                    col = (col - 0.5) * alpha + 0.5;
+                }
+                float b = uRetouchBrightness;
+                if (abs(b) > 0.01) {
+                    col += b * (60.0 / 255.0);
+                }
+                float hl = uRetouchHighlights;
+                float sh = uRetouchShadows;
+                if (abs(hl) > 0.01 || abs(sh) > 0.01) {
+                    float l = retouchLuma(col);
+                    float hlW = l * l;
+                    float shW = (1.0 - l) * (1.0 - l);
+                    col += hl * (70.0 / 255.0) * hlW + sh * (70.0 / 255.0) * shW;
+                }
+                float sat = uRetouchSaturation;
+                if (abs(sat) > 0.01) {
+                    float l = retouchLuma(col);
+                    float factor = sat >= 0.0 ? (1.0 + sat * 0.85) : max(1.0 + sat, 0.0);
+                    col = mix(vec3(l), col, factor);
+                }
+                return clamp(col, 0.0, 1.0);
+            }
+
+            vec2 retouchWingDisp(vec2 uv, vec2 wing, float shiftX, float radius) {
+                if (radius <= 0.001) return uv;
+                vec2 d = uv - wing;
+                float rmax2 = radius * radius;
+                float dist2 = dot(d, d);
+                if (dist2 >= rmax2) return uv;
+                float d2 = shiftX * shiftX;
+                float f = (rmax2 - dist2) / (rmax2 - dist2 + d2);
+                f = f * f;
+                return uv - vec2(f * shiftX, 0.0);
+            }
+
+            vec2 applyRetouchNoseWarp(vec2 uv) {
+                if (abs(uRetouchNose) < 0.01 || uNoseRadius <= 0.001) return uv;
+                float k = 0.28 * (-uRetouchNose);
+                float tipX = (uNoseWingL.x + uNoseWingR.x) * 0.5;
+                float shiftL = (tipX - uNoseWingL.x) * k;
+                float shiftR = (tipX - uNoseWingR.x) * k;
+                uv = retouchWingDisp(uv, uNoseWingL, shiftL, uNoseRadius);
+                uv = retouchWingDisp(uv, uNoseWingR, shiftR, uNoseRadius);
+                return uv;
+            }
+        """
+
         private const val OES_FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
             precision highp float;
@@ -812,6 +1010,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform vec2 uViewSize;
             uniform vec2 uTexSize;
             uniform float uIntensity;
+            $RETOUCH_UNIFORMS
+            $RETOUCH_FUNCTIONS
 
             vec3 applyLut(vec3 texColor) {
                 float blueColor = texColor.b * 63.0;
@@ -849,11 +1049,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 vec2 d = fillCenter(vTexCoord);
                 vec2 uv = (uTexTransform * vec3(d, 1.0)).xy;
                 vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
+                st = applyRetouchNoseWarp(st);
                 vec3 col = texture2D(uTexture, st).rgb;
                 if (uHasLut > 0.5) {
                     vec3 graded = applyLut(clamp(col, 0.0, 1.0));
                     col = mix(col, graded, clamp(uIntensity, 0.0, 1.0));
                 }
+                col = applyRetouchColor(col);
                 gl_FragColor = vec4(col, 1.0);
             }
         """
@@ -874,6 +1076,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uIntensity;
             uniform sampler2D uLut;
             uniform float uHasLut;
+            $RETOUCH_UNIFORMS
+            $RETOUCH_FUNCTIONS
 
             // 512x512 lookup LUT sampling (8x8 tiles of 64x64 = 64^3 cube).
             // Mirrors LutStore.kt so live preview and the baked photo match.
@@ -1001,6 +1205,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     tc = applyBulge(tc, uBulge2, uTexSize);
                 }
 
+                tc = applyRetouchNoseWarp(tc);
+
                 vec4 sourceColor;
                 if (uFilterType == 0) {
                     sourceColor = texture2D(uTexture, tc);
@@ -1083,6 +1289,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     vec3 base = texture2D(uTexture, tc).rgb;
                     col = mix(base, col, clamp(uIntensity, 0.0, 1.0));
                 }
+
+                col = applyRetouchColor(col);
 
                 gl_FragColor = vec4(col, sourceColor.a);
             }

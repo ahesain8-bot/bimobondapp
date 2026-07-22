@@ -1,6 +1,9 @@
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_layout_picker.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_speed_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_tool_icons.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class CameraSideToolbarLabels {
@@ -70,6 +73,7 @@ class CameraSideToolbar extends StatefulWidget {
     required this.timerEnabled,
     required this.speedLabel,
     this.showSpeed = true,
+    this.speedEnabled = true,
     this.showAspectRatio = true,
     this.aspectRatioEnabled = true,
     required this.labels,
@@ -77,6 +81,9 @@ class CameraSideToolbar extends StatefulWidget {
     this.selectedLayoutMode = CameraLayoutMode.off,
     this.layoutPickerOpen = false,
     this.onLayoutModeSelected,
+    this.speedPickerOpen = false,
+    this.selectedSpeed = 1.0,
+    this.onSpeedSelected,
     this.offLabel = 'Off',
     this.iconOnStartEdge = true,
     this.collapsedCount = 6,
@@ -97,6 +104,7 @@ class CameraSideToolbar extends StatefulWidget {
   final bool timerEnabled;
   final String speedLabel;
   final bool showSpeed;
+  final bool speedEnabled;
   final bool showAspectRatio;
   final bool aspectRatioEnabled;
   final CameraSideToolbarLabels labels;
@@ -104,6 +112,9 @@ class CameraSideToolbar extends StatefulWidget {
   final CameraLayoutMode selectedLayoutMode;
   final bool layoutPickerOpen;
   final ValueChanged<CameraLayoutMode>? onLayoutModeSelected;
+  final bool speedPickerOpen;
+  final double selectedSpeed;
+  final ValueChanged<double>? onSpeedSelected;
   final String offLabel;
   final bool iconOnStartEdge;
   final int collapsedCount;
@@ -116,13 +127,23 @@ class CameraSideToolbar extends StatefulWidget {
 class _CameraSideToolbarState extends State<CameraSideToolbar> {
   bool _expanded = false;
 
-  static const _rowStride = 56.0;
+  static const _rowStride = 54.0;
   static const _layoutRowIndex = 4;
+  static const _speedRowIndex = 6;
   static const _iconRailWidth = 48.0;
   static const _popupGap = 10.0;
   static const _popupHeight = 244.0;
+  static const _speedPopupHeight = 220.0;
 
   bool get _layoutActive => widget.selectedLayoutMode != CameraLayoutMode.off;
+
+  @override
+  void didUpdateWidget(covariant CameraSideToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.speedPickerOpen && !oldWidget.speedPickerOpen && !_expanded) {
+      _expanded = true;
+    }
+  }
 
   List<_SideToolItem> get _allTools => [
         if (widget.showFlip)
@@ -140,7 +161,6 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           active: widget.flashEnabled,
           showActiveBadge: false,
           iconOnly: true,
-          customIcon: TikTokSideIcons.flash(enabled: widget.flashEnabled),
         ),
         const _SideToolItem(
           icon: Icons.remove,
@@ -163,7 +183,7 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           active: _layoutActive || widget.layoutPickerOpen,
           showActiveBadge: _layoutActive,
           layoutMode: widget.selectedLayoutMode,
-          customIcon: TikTokSideIcons.layout(),
+          customIcon: _railSvg(AppAssets.cameraLayoutIcon),
         ),
         _SideToolItem(
           icon: Icons.face_retouching_natural,
@@ -179,15 +199,16 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           onTap: widget.onFilters,
           active: widget.filtersEnabled,
           showActiveBadge: false,
-          customIcon: TikTokSideIcons.filters(),
+          customIcon: _railSvg(AppAssets.cameraFiltersIcon),
         ),
         if (widget.showSpeed)
           _SideToolItem(
             icon: LucideIcons.gauge,
             label: widget.labels.speed,
             badge: widget.speedLabel,
-            onTap: widget.onSpeed,
-            customIcon: TikTokSideIcons.speed(label: widget.speedLabel),
+            onTap: widget.speedEnabled ? widget.onSpeed : _noop,
+            active: widget.speedPickerOpen,
+            dimmed: !widget.speedEnabled,
           ),
         if (widget.showAspectRatio)
           _SideToolItem(
@@ -200,6 +221,16 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
       ];
 
   static void _noop() {}
+
+  static Widget _railSvg(String asset, {double size = 30}) {
+    return SvgPicture.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+    );
+  }
 
   bool get _hasMore {
     final toolCount = _allTools.where((t) => !t.isSeparator).length;
@@ -287,6 +318,22 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
                 onSelected: widget.onLayoutModeSelected!,
               ),
             ),
+          if (widget.showSpeed &&
+              widget.speedPickerOpen &&
+              widget.onSpeedSelected != null)
+            Positioned(
+              top: _speedPopupTop,
+              left: widget.iconOnStartEdge
+                  ? _iconRailWidth + _popupGap
+                  : null,
+              right: widget.iconOnStartEdge
+                  ? null
+                  : _iconRailWidth + _popupGap,
+              child: CameraSpeedPickerPopup(
+                selectedSpeed: widget.selectedSpeed,
+                onSelected: widget.onSpeedSelected!,
+              ),
+            ),
         ],
       ),
     );
@@ -294,6 +341,11 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
 
   double get _layoutPopupTop =>
       _layoutRowIndex * _rowStride + (_rowStride / 2) - (_popupHeight / 2);
+
+  double get _speedPopupTop =>
+      _speedRowIndex * _rowStride +
+      (_rowStride / 2) -
+      (_speedPopupHeight / 2);
 
   Widget _buildToolRow(_SideToolItem tool) {
     final row = CameraRailToolRow(
@@ -304,8 +356,10 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
       showActiveBadge: tool.showActiveBadge,
       badge: tool.customIcon != null ? null : tool.badge,
       iconOnStartEdge: widget.iconOnStartEdge,
-      showLabel:
-          _expanded && !tool.iconOnly && !widget.layoutPickerOpen,
+      showLabel: _expanded &&
+          !tool.iconOnly &&
+          !widget.layoutPickerOpen &&
+          !widget.speedPickerOpen,
       customIcon: tool.layoutMode != null &&
               tool.layoutMode != CameraLayoutMode.off
           ? CameraLayoutIcon(
@@ -322,8 +376,8 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
   }
 }
 
-class _SideRailSeparator extends StatelessWidget {
-  const _SideRailSeparator({required this.iconOnStartEdge});
+class CameraSideRailSeparator extends StatelessWidget {
+  const CameraSideRailSeparator({super.key, required this.iconOnStartEdge});
 
   final bool iconOnStartEdge;
 
@@ -335,8 +389,8 @@ class _SideRailSeparator extends StatelessWidget {
         width: 26,
         height: 1.2,
         margin: EdgeInsets.only(
-          top: 4,
-          bottom: 12,
+          top: 2,
+          bottom: 8,
           left: iconOnStartEdge ? 11 : 0,
           right: iconOnStartEdge ? 0 : 11,
         ),
@@ -346,17 +400,23 @@ class _SideRailSeparator extends StatelessWidget {
   }
 }
 
+class _SideRailSeparator extends CameraSideRailSeparator {
+  const _SideRailSeparator({required super.iconOnStartEdge});
+}
+
 class CameraRailExpandButton extends StatelessWidget {
   const CameraRailExpandButton({
     super.key,
     required this.expanded,
     required this.onTap,
     this.iconOnStartEdge = true,
+    this.compact = false,
   });
 
   final bool expanded;
   final VoidCallback onTap;
   final bool iconOnStartEdge;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -367,7 +427,7 @@ class CameraRailExpandButton extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: EdgeInsets.only(
-            top: 4,
+            top: compact ? 0 : 4,
             left: iconOnStartEdge ? 12 : 0,
             right: iconOnStartEdge ? 0 : 12,
           ),

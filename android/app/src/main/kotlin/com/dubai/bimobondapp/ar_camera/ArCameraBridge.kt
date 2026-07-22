@@ -697,7 +697,9 @@ object ArCameraBridge {
                 gl?.ensureGlInitialized()
                 gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
                 gl?.setLutIntensity(filterIntensity)
-                gl?.setCaptureEnabled(false)
+                // Throttled shutter buffer (see FaceWarpRenderer.captureMinIntervalMs).
+                gl?.setCaptureMaxEdge(1080)
+                gl?.setCaptureEnabled(true)
 
                 val alreadyOnOes = ArCameraController.isBoundToOes()
                 android.util.Log.i(
@@ -778,14 +780,17 @@ object ArCameraBridge {
                 // filter is an instant LUT swap with zero blink/rebind.
                 awaitFirstGlFrame = false
                 oesTransitionPending = false
-                gl?.setCaptureEnabled(false)
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 if (ArCameraController.isBoundToOes()) {
                     ArCameraController.setPreferOesBinding(true)
                     gl?.setOesEnabled(true)
                     gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
+                    // Warm one shutter buffer while staying on OES without a filter.
+                    gl?.setCaptureMaxEdge(1080)
+                    gl?.setCaptureEnabled(true)
                     showGlHidePreview()
                 } else {
+                    gl?.setCaptureEnabled(false)
                     ArCameraController.setPreferOesBinding(false)
                     gl?.setOesEnabled(false)
                     ArCameraController.ensurePreviewViewBound()

@@ -164,6 +164,14 @@ class MediaItemEditState {
       arFilterId: arId,
       arColorCategoryId: seed.arColorCategoryId ?? 'portrait',
       arFilterIntensity: seed.arFilterIntensity,
+      faceSaturation: seed.faceSaturation,
+      faceBrightness: seed.faceBrightness,
+      faceContrast: seed.faceContrast,
+      faceExposure: seed.faceExposure,
+      faceWhiteBalance: seed.faceWhiteBalance,
+      faceHighlights: seed.faceHighlights,
+      faceShadows: seed.faceShadows,
+      faceNose: seed.faceNose,
       alreadyBaked: seed.alreadyBaked,
       bakedArFilterId: seed.alreadyBaked ? arId : 'none',
     );
@@ -244,6 +252,14 @@ class MediaEditorSeed {
     this.arColorCategoryId,
     this.arFilterIntensity = 1.0,
     this.alreadyBaked = false,
+    this.faceSaturation = 0,
+    this.faceBrightness = 0,
+    this.faceContrast = 0,
+    this.faceExposure = 0,
+    this.faceWhiteBalance = 0,
+    this.faceHighlights = 0,
+    this.faceShadows = 0,
+    this.faceNose = 0,
   });
 
   final String? filterName;
@@ -254,6 +270,14 @@ class MediaEditorSeed {
   final String? arColorCategoryId;
   final double arFilterIntensity;
   final bool alreadyBaked;
+  final double faceSaturation;
+  final double faceBrightness;
+  final double faceContrast;
+  final double faceExposure;
+  final double faceWhiteBalance;
+  final double faceHighlights;
+  final double faceShadows;
+  final double faceNose;
 
   Map<String, dynamic> toExtra() => {
         if (filterName != null) 'filterName': filterName,
@@ -264,6 +288,14 @@ class MediaEditorSeed {
         if (arColorCategoryId != null) 'arColorCategoryId': arColorCategoryId,
         'arFilterIntensity': arFilterIntensity,
         'alreadyBaked': alreadyBaked,
+        'faceSaturation': faceSaturation,
+        'faceBrightness': faceBrightness,
+        'faceContrast': faceContrast,
+        'faceExposure': faceExposure,
+        'faceWhiteBalance': faceWhiteBalance,
+        'faceHighlights': faceHighlights,
+        'faceShadows': faceShadows,
+        'faceNose': faceNose,
       };
 
   static MediaEditorSeed? fromExtra(Object? raw) {
@@ -283,6 +315,14 @@ class MediaEditorSeed {
       arColorCategoryId: map['arColorCategoryId'] as String?,
       arFilterIntensity: (map['arFilterIntensity'] as num?)?.toDouble() ?? 1.0,
       alreadyBaked: map['alreadyBaked'] as bool? ?? false,
+      faceSaturation: (map['faceSaturation'] as num?)?.toDouble() ?? 0,
+      faceBrightness: (map['faceBrightness'] as num?)?.toDouble() ?? 0,
+      faceContrast: (map['faceContrast'] as num?)?.toDouble() ?? 0,
+      faceExposure: (map['faceExposure'] as num?)?.toDouble() ?? 0,
+      faceWhiteBalance: (map['faceWhiteBalance'] as num?)?.toDouble() ?? 0,
+      faceHighlights: (map['faceHighlights'] as num?)?.toDouble() ?? 0,
+      faceShadows: (map['faceShadows'] as num?)?.toDouble() ?? 0,
+      faceNose: (map['faceNose'] as num?)?.toDouble() ?? 0,
     );
   }
 }

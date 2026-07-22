@@ -1,4 +1,3 @@
-import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:flutter/material.dart';
 
 class ArColorFilterMatrix {
@@ -23,14 +22,7 @@ class ArColorFilterMatrix {
   }
 
   static List<double>? matrixFor(String? filterId) {
-    if (filterId == null || filterId == 'none') return null;
-    for (final category in ArFilterCatalog.colorCatalog.categories) {
-      for (final filter in category.filters) {
-        if (filter.id == filterId && filter.hasValidMatrix) {
-          return filter.colorMatrix;
-        }
-      }
-    }
+    // Color filters are LUT-only — GPU PNG path, no colorMatrix in catalog.
     return null;
   }
 

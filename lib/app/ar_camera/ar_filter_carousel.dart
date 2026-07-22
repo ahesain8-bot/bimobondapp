@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ArFilterCarousel extends StatefulWidget {
   const ArFilterCarousel({
@@ -38,11 +39,11 @@ class ArFilterCarousel extends StatefulWidget {
   final VoidCallback? onConfirm;
   final VoidCallback? onCancel;
 
-  static const inactiveSize = 52.0;
-  static const activeSize = 90.0;
-  static const itemGap = 12.0;
-  static const itemStride = activeSize + itemGap;
+  static const inactiveSize = 48.0;
+  static const activeSize = 86.0;
+  static const itemStride = 72.0;
   static const _loopCopies = 200;
+  static double get visibleSpan => 4 * itemStride + inactiveSize;
 
   @override
   State<ArFilterCarousel> createState() => _ArFilterCarouselState();
@@ -59,14 +60,25 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   int get _midBase => (ArFilterCarousel._loopCopies ~/ 2) * _n;
   int get _itemCount => _n * ArFilterCarousel._loopCopies;
 
+  double get _effectiveScrollOffset =>
+      _controller.hasClients ? _controller.offset : _scrollOffset;
+
   @override
   void initState() {
     super.initState();
-    _controller = ScrollController();
+    _controller = ScrollController()..addListener(_syncScrollOffsetFromController);
     _lastHapticReal = widget.selectedIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToReal(widget.selectedIndex, animated: false);
     });
+  }
+
+  void _syncScrollOffsetFromController() {
+    if (!_controller.hasClients) return;
+    final next = _controller.offset;
+    if ((next - _scrollOffset).abs() > 0.01) {
+      setState(() => _scrollOffset = next);
+    }
   }
 
   @override
@@ -79,8 +91,25 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
       });
       return;
     }
-    if (oldWidget.selectedIndex == widget.selectedIndex) return;
-    if (!_controller.hasClients) return;
+
+    // Solo shutter replaces the list — re-anchor when coming back to carousel.
+    final resyncCarousel = (oldWidget.isRecording && !widget.isRecording) ||
+        (oldWidget.soloShutter && !widget.soloShutter);
+    if (resyncCarousel) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollToReal(widget.selectedIndex, animated: false);
+      });
+    }
+
+    if (oldWidget.selectedIndex == widget.selectedIndex && !resyncCarousel) {
+      return;
+    }
+    if (!_controller.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollToReal(widget.selectedIndex, animated: false);
+      });
+      return;
+    }
     final target = _nearestLoopIndex(widget.selectedIndex) *
         ArFilterCarousel.itemStride;
     if ((_controller.offset - target).abs() > 2) {
@@ -90,6 +119,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
 
   @override
   void dispose() {
+    _controller.removeListener(_syncScrollOffsetFromController);
     _controller.dispose();
     super.dispose();
   }
@@ -113,7 +143,15 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   }
 
   Future<void> _scrollToReal(int realIndex, {required bool animated}) async {
-    if (!_controller.hasClients || _n == 0) return;
+    if (_n == 0) return;
+    if (!_controller.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scrollToReal(realIndex, animated: animated);
+        }
+      });
+      return;
+    }
     final loop = _nearestLoopIndex(realIndex);
     final target = loop * ArFilterCarousel.itemStride;
     _programmaticScroll = true;
@@ -172,12 +210,12 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   }
 
   void _onActiveTap() {
-    if (widget.isBusy) return;
+    if (widget.isBusy && !widget.isRecording) return;
     widget.onShutterTap();
   }
 
   double _sizeForLoop(int loopIndex) {
-    final center = _scrollOffset / ArFilterCarousel.itemStride;
+    final center = _effectiveScrollOffset / ArFilterCarousel.itemStride;
     final distance = (loopIndex - center).abs();
     final t = (1.0 - distance).clamp(0.0, 1.0);
     final eased = Curves.easeOut.transform(t);
@@ -186,9 +224,11 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   }
 
   double _opacityForLoop(int loopIndex) {
-    final center = _scrollOffset / ArFilterCarousel.itemStride;
+    final center = _effectiveScrollOffset / ArFilterCarousel.itemStride;
     final distance = (loopIndex - center).abs();
-    return (1.0 - distance * 0.28).clamp(0.4, 1.0);
+    // Hide anything past the 2nd neighbor (no 3rd peek).
+    if (distance > 2.05) return 0.0;
+    return (1.0 - distance * 0.22).clamp(0.45, 1.0);
   }
 
   @override
@@ -197,128 +237,214 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final sidePadding = (screenWidth - ArFilterCarousel.itemStride) / 2;
+    final clipWidth = ArFilterCarousel.visibleSpan.clamp(0.0, screenWidth);
+    final rowHeight = widget.height ?? (ArFilterCarousel.activeSize + 8);
+
+    // Solo modes (recording, draft review, layout grid) always show one fixed
+    // shutter — never rely on carousel scroll math (which can render opacity 0
+    // until the user taps and syncs offset).
+    if (widget.soloShutter) {
+      return SizedBox(
+        height: rowHeight,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(
+              child: GestureDetector(
+                onTap: _onActiveTap,
+                onLongPressStart:
+                    widget.isBusy ? null : widget.onHoldStart,
+                onLongPressEnd: widget.onHoldEnd,
+                child: _ShutterCircle(
+                  size: ArFilterCarousel.activeSize,
+                  isActive: true,
+                  isRecording: widget.isRecording,
+                  isPhotoMode: widget.isPhotoMode,
+                  progress: widget.recordProgress,
+                ),
+              ),
+            ),
+            if (widget.showSideActions) _buildRightSideActions(),
+          ],
+        ),
+      );
+    }
 
     return SizedBox(
-      height: widget.height ?? (ArFilterCarousel.activeSize + 8),
+      height: rowHeight,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification.metrics.axis != Axis.horizontal) {
-                return false;
-              }
+          Center(
+            child: SizedBox(
+              width: clipWidth,
+              height: rowHeight,
+              child: ClipRect(
+                child: OverflowBox(
+                  maxWidth: screenWidth,
+                  minWidth: screenWidth,
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: screenWidth,
+                    height: rowHeight,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.metrics.axis != Axis.horizontal) {
+                          return false;
+                        }
 
-              if (notification is ScrollUpdateNotification ||
-                  notification is ScrollStartNotification) {
-                final next =
-                    _controller.hasClients ? _controller.offset : _scrollOffset;
-                final hapticReal = _realFromLoop(
-                  (next / ArFilterCarousel.itemStride).round(),
-                );
-                if (hapticReal != _lastHapticReal) {
-                  _lastHapticReal = hapticReal;
-                  HapticFeedback.selectionClick();
-                }
-                if ((next - _scrollOffset).abs() > 0.2) {
-                  setState(() => _scrollOffset = next);
-                }
-              }
-
-              if (notification is ScrollEndNotification) {
-                _onScrollEnd();
-              }
-              return false;
-            },
-            child: ListView.builder(
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              physics: widget.isRecording || widget.soloShutter
-                  ? const NeverScrollableScrollPhysics()
-                  : const _FilterSnapPhysics(
-                      itemExtent: ArFilterCarousel.itemStride,
-                      parent: BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                    ),
-              padding: EdgeInsets.symmetric(horizontal: sidePadding),
-              itemCount: _itemCount,
-              itemBuilder: (context, loopIndex) {
-                final real = _realFromLoop(loopIndex);
-                final item = _filters[real];
-                final size = _sizeForLoop(loopIndex);
-                final opacity = _opacityForLoop(loopIndex);
-                final center = _scrollOffset / ArFilterCarousel.itemStride;
-                final isCentered = (loopIndex - center).abs() < 0.35;
-
-                if (widget.soloShutter && !isCentered) {
-                  return const SizedBox(width: ArFilterCarousel.itemStride);
-                }
-
-                return SizedBox(
-                  width: ArFilterCarousel.itemStride,
-                  child: Center(
-                    child: Opacity(
-                      opacity: opacity,
-                      child: GestureDetector(
-                        onTap: () {
-                          if (isCentered) {
-                            _onActiveTap();
-                          } else {
-                            _scrollToReal(real, animated: true).then((_) {
-                              if (mounted) _emit(real);
-                            });
+                        if (notification is ScrollUpdateNotification ||
+                            notification is ScrollStartNotification) {
+                          final next = _controller.hasClients
+                              ? _controller.offset
+                              : _scrollOffset;
+                          final hapticReal = _realFromLoop(
+                            (next / ArFilterCarousel.itemStride).round(),
+                          );
+                          if (hapticReal != _lastHapticReal) {
+                            _lastHapticReal = hapticReal;
+                            HapticFeedback.selectionClick();
                           }
-                        },
-                        onLongPressStart: isCentered && !widget.isBusy
-                            ? widget.onHoldStart
-                            : null,
-                        onLongPressEnd: isCentered ? widget.onHoldEnd : null,
-                        child: item.isOriginal && isCentered
-                            ? _ShutterCircle(
-                                size: size,
-                                isActive: true,
-                                isRecording:
-                                    widget.isRecording && isCentered,
-                                isPhotoMode: widget.isPhotoMode,
-                                progress: widget.recordProgress,
-                              )
-                            : _FilterCircle(
-                                emoji: item.emoji,
-                                size: size,
-                                isActive: isCentered,
-                                isRecording:
-                                    widget.isRecording && isCentered,
+                          if ((next - _scrollOffset).abs() > 0.2) {
+                            setState(() => _scrollOffset = next);
+                          }
+                        }
+
+                        if (notification is ScrollEndNotification) {
+                          _onScrollEnd();
+                        }
+                        return false;
+                      },
+                      child: ListView.builder(
+                        controller: _controller,
+                        scrollDirection: Axis.horizontal,
+                        physics: widget.isRecording || widget.soloShutter
+                            ? const NeverScrollableScrollPhysics()
+                            : const _FilterSnapPhysics(
+                                itemExtent: ArFilterCarousel.itemStride,
+                                parent: BouncingScrollPhysics(
+                                  parent: AlwaysScrollableScrollPhysics(),
+                                ),
                               ),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: sidePadding),
+                        itemCount: _itemCount,
+                        itemBuilder: (context, loopIndex) {
+                          final real = _realFromLoop(loopIndex);
+                          final item = _filters[real];
+                          final size = _sizeForLoop(loopIndex);
+                          final opacity = _opacityForLoop(loopIndex);
+                          final center =
+                              _effectiveScrollOffset / ArFilterCarousel.itemStride;
+                          final isCentered =
+                              (loopIndex - center).abs() < 0.35;
+
+                          if (widget.soloShutter && !isCentered) {
+                            return const SizedBox(
+                              width: ArFilterCarousel.itemStride,
+                            );
+                          }
+
+                          if (opacity <= 0) {
+                            return const SizedBox(
+                              width: ArFilterCarousel.itemStride,
+                            );
+                          }
+
+                          return SizedBox(
+                            width: ArFilterCarousel.itemStride,
+                            child: Center(
+                              child: Opacity(
+                                opacity: opacity,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (isCentered) {
+                                      _onActiveTap();
+                                    } else {
+                                      _scrollToReal(real, animated: true)
+                                          .then((_) {
+                                        if (mounted) _emit(real);
+                                      });
+                                    }
+                                  },
+                                  onLongPressStart:
+                                      isCentered && !widget.isBusy
+                                          ? widget.onHoldStart
+                                          : null,
+                                  onLongPressEnd: isCentered
+                                      ? widget.onHoldEnd
+                                      : null,
+                                  child: item.isOriginal && isCentered
+                                      ? _ShutterCircle(
+                                          size: size,
+                                          isActive: true,
+                                          isRecording: widget.isRecording &&
+                                              isCentered,
+                                          isPhotoMode: widget.isPhotoMode,
+                                          progress: widget.recordProgress,
+                                        )
+                                      : _FilterCircle(
+                                          emoji: item.emoji,
+                                          size: size,
+                                          isActive: isCentered,
+                                          isRecording: widget.isRecording &&
+                                              isCentered,
+                                        ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          if (widget.showSideActions)
-            Positioned.fill(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _SideAction(
-                    icon: Icons.close,
-                    background: Colors.black.withValues(alpha: 0.5),
-                    onTap: widget.onCancel,
-                  ),
-                  const SizedBox(
-                    width: ArFilterCarousel.activeSize + 56,
-                  ),
-                  _SideAction(
-                    icon: Icons.check,
-                    background: const Color(0xFFFE2C55),
-                    onTap: widget.onConfirm,
-                  ),
-                ],
+                ),
               ),
             ),
+          ),
+          if (widget.showSideActions) _buildRightSideActions(),
         ],
+      ),
+    );
+  }
+
+  /// Delete + confirm sit clear of the centered shutter (no overlap).
+  Widget _buildRightSideActions() {
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final shutterRight =
+              constraints.maxWidth / 2 + ArFilterCarousel.activeSize / 2;
+          return Stack(
+            children: [
+              Positioned(
+                left: shutterRight + 22,
+                top: 0,
+                bottom: 0,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SideAction(
+                      icon: LucideIcons.delete,
+                      size: 28,
+                      iconSize: 24,
+                      background: Colors.transparent,
+                      onTap: widget.onCancel,
+                    ),
+                    const SizedBox(width: 12),
+                    _SideAction(
+                      icon: LucideIcons.circleCheck,
+                      size: 40,
+                      iconSize: 26,
+                      background: const Color(0xFFFE2C55),
+                      onTap: widget.onConfirm,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -329,28 +455,33 @@ class _SideAction extends StatelessWidget {
     required this.icon,
     required this.background,
     required this.onTap,
+    this.size = 48,
+    this.iconSize = 24,
   });
 
   final IconData icon;
   final Color background;
   final VoidCallback? onTap;
+  final double size;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: background,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.85),
-            width: 2,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: background,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(icon, color: Colors.white, size: iconSize),
           ),
         ),
-        child: Icon(icon, color: Colors.white, size: 26),
       ),
     );
   }
@@ -434,6 +565,7 @@ class _ShutterCircle extends StatelessWidget {
     final ring = size;
     final outer = size * 0.90;
     final inner = isRecording ? size * 0.36 : size * 0.68;
+    final showProgress = isRecording || progress > 0.001;
 
     return SizedBox(
       width: ring,
@@ -441,17 +573,6 @@ class _ShutterCircle extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (isRecording || progress > 0.001)
-            SizedBox(
-              width: ring,
-              height: ring,
-              child: CircularProgressIndicator(
-                value: progress.clamp(0, 1),
-                strokeWidth: 4,
-                color: const Color(0xFFFE2C55),
-                backgroundColor: Colors.white24,
-              ),
-            ),
           Container(
             width: outer,
             height: outer,
@@ -465,6 +586,17 @@ class _ShutterCircle extends StatelessWidget {
               ),
             ),
           ),
+          if (showProgress)
+            SizedBox(
+              width: outer,
+              height: outer,
+              child: CircularProgressIndicator(
+                value: progress.clamp(0, 1),
+                strokeWidth: 4.5,
+                color: const Color(0xFFFE2C55),
+                backgroundColor: Colors.transparent,
+              ),
+            ),
           AnimatedContainer(
             duration: const Duration(milliseconds: 120),
             width: inner,
