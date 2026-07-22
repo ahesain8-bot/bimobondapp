@@ -27,9 +27,12 @@ import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/cancel_auction_usecase.dart';
+import 'package:bimobondapp/app/auctions/domain/usecases/get_active_auctions_usecase.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
+import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dart';
+import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/widgets/auction_gifts_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
@@ -58,12 +61,15 @@ class LiveDetailsScreen extends StatefulWidget {
   final int index;
   final PostEntity? post;
   final bool embeddedInFeed;
+  /// Real auction UUID when known from navigation (never the post id).
+  final String? auctionId;
 
   const LiveDetailsScreen({
     super.key,
     this.index = 0,
     this.post,
     this.embeddedInFeed = false,
+    this.auctionId,
   });
 
   @override
@@ -95,6 +101,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   String? _joinedPostId;
   String? _lastGiftPlayedKey;
   DateTime? _lastGiftPlayedAt;
+  /// Resolved auction UUID when `post.auction.id` is missing from feed payload.
+  String? _resolvedAuctionId;
+  Completer<String?>? _auctionIdResolveCompleter;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -188,11 +197,94 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     _syncAuctionFinishedState();
     _recordPostViewIfNeeded();
     unawaited(_startAuctionRealtime());
+    if (_isAuctionPost) {
+      unawaited(_ensureGiftAuctionId());
+    }
   }
 
   String? get _auctionId => _auctionRoomId;
 
   bool get _isAuctionPost => widget.post != null && widget.post!.isAuctionable;
+
+  /// Real auction UUID for gift/API calls — never the post id.
+  String? get _giftAuctionId {
+    final fromPost = widget.post?.auction?.id?.trim();
+    if (fromPost != null && fromPost.isNotEmpty) return fromPost;
+    final fromRoute = widget.auctionId?.trim();
+    if (fromRoute != null && fromRoute.isNotEmpty) return fromRoute;
+    final resolved = _resolvedAuctionId?.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    return null;
+  }
+
+  /// Socket room id: prefer auction UUID; some backends also accept post id.
+  String? get _auctionRoomId {
+    final fromAuction = _giftAuctionId;
+    if (fromAuction != null) return fromAuction;
+    if (_isAuctionPost) return widget.post?.id;
+    return null;
+  }
+
+  /// Resolves a real auction UUID when feed omitted `auction.id`.
+  /// Tries active auctions by postId, then a full post fetch.
+  Future<String?> _ensureGiftAuctionId() async {
+    final existing = _giftAuctionId;
+    if (existing != null && existing.isNotEmpty) return existing;
+
+    final inFlight = _auctionIdResolveCompleter;
+    if (inFlight != null) return inFlight.future;
+
+    final postId = widget.post?.id.trim();
+    if (postId == null || postId.isEmpty) return null;
+
+    final completer = Completer<String?>();
+    _auctionIdResolveCompleter = completer;
+
+    try {
+      String? found;
+
+      final activeResult = await auctions_di.sl<GetActiveAuctionsUseCase>()(
+        NoParams(),
+      );
+      if (!mounted) {
+        completer.complete(null);
+        return null;
+      }
+      activeResult.fold((_) {}, (auctions) {
+        for (final auction in auctions) {
+          if (auction.postId == postId && auction.id.isNotEmpty) {
+            found = auction.id;
+            break;
+          }
+        }
+      });
+
+      if (found == null || found!.isEmpty) {
+        final postResult = await di.sl<GetPostByIdUseCase>()(postId);
+        if (!mounted) {
+          completer.complete(null);
+          return null;
+        }
+        postResult.fold((_) {}, (post) {
+          final id = post.auction?.id?.trim();
+          if (id != null && id.isNotEmpty) found = id;
+        });
+      }
+
+      if (found != null && found!.isNotEmpty && mounted) {
+        setState(() => _resolvedAuctionId = found);
+      }
+      completer.complete(found);
+      return found;
+    } catch (_) {
+      completer.complete(null);
+      return null;
+    } finally {
+      if (identical(_auctionIdResolveCompleter, completer)) {
+        _auctionIdResolveCompleter = null;
+      }
+    }
+  }
 
   Future<void> _startAuctionRealtime() async {
     final post = widget.post;
@@ -230,14 +322,6 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     await socket.ensureJoined(postId: post.id, auctionId: auctionId);
     _joinedPostId = post.id;
     _joinedAuctionId = auctionId;
-  }
-
-  /// Real auction UUID when present; otherwise post id as backend fallback.
-  String? get _auctionRoomId {
-    final fromAuction = widget.post?.auction?.id?.trim();
-    if (fromAuction != null && fromAuction.isNotEmpty) return fromAuction;
-    if (_isAuctionPost) return widget.post?.id;
-    return null;
   }
 
   void _stopAuctionRealtime() {
@@ -786,7 +870,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   }
 
   void _showAuctionGiftsSheet() {
-    final auctionId = _auctionId;
+    final auctionId = _giftAuctionId;
     if (auctionId == null || auctionId.isEmpty) return;
     AuctionGiftsSheet.show(context, auctionId: auctionId);
   }
@@ -826,7 +910,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       ),
     );
 
-    final auctionId = _auctionId;
+    final auctionId = _giftAuctionId;
     if (_isAuctionPost && auctionId != null && auctionId.isNotEmpty) {
       await _refreshAuctionGiftTotal(auctionId);
     } else {
@@ -859,7 +943,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
   bool get _canSendGiftToHost => widget.post == null || !_isPostOwner();
 
-  void _showGiftSheet() {
+  Future<void> _showGiftSheet() async {
     if (!_canSendGiftToHost) {
       final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(
@@ -869,11 +953,26 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     }
 
     final post = widget.post;
+    String? auctionId;
+    if (_isAuctionPost) {
+      auctionId = await _ensureGiftAuctionId();
+      if (!mounted) return;
+      if (auctionId == null || auctionId.isEmpty) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.liveGiftNoRecipient)),
+        );
+        return;
+      }
+    }
+    final isAuctionGift = auctionId != null && auctionId.isNotEmpty;
+
     LiveGiftSheet.show(
       context,
-      postId: post?.id,
-      receiverId: post?.userId,
-      auctionId: _isAuctionPost ? _auctionId : null,
+      postId: isAuctionGift ? null : post?.id,
+      // Prefer nested user.id — feed sometimes omits top-level userId.
+      receiverId: _hostUserId ?? post?.userId,
+      auctionId: isAuctionGift ? auctionId : null,
       canSendToHost: _canSendGiftToHost,
       onGiftSent: _refreshAfterGift,
     );

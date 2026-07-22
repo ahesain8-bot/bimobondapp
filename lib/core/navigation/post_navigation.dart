@@ -90,6 +90,7 @@ void openPost(
   PostEntity post, {
   bool openComments = false,
   String? highlightCommentId,
+  String? auctionId,
 }) {
   // Stop catalog/detail sound preview so it doesn't play under the post.
   SoundAudioPreview.stop();
@@ -100,11 +101,16 @@ void openPost(
     highlightCommentId: highlightCommentId,
   );
 
+  final resolvedAuctionId =
+      auctionId?.trim().isNotEmpty == true
+          ? auctionId!.trim()
+          : post.auction?.id?.trim();
+
   // Sound detail (and similar) sit on an imperative fullscreen route. Pushing
   // via GoRouter would open the post underneath that overlay.
   if (_isOnImperativeOverlay(context)) {
     final page = post.isAuctionable
-        ? LiveDetailsScreen(post: post)
+        ? LiveDetailsScreen(post: post, auctionId: resolvedAuctionId)
         : PostDetailScreen(
             post: post,
             openCommentsOnLoad: openComments,
@@ -117,7 +123,14 @@ void openPost(
   }
 
   if (post.isAuctionable) {
-    context.pushFromFeed('live_details', extra: {'post': post});
+    context.pushFromFeed(
+      'live_details',
+      extra: {
+        'post': post,
+        if (resolvedAuctionId != null && resolvedAuctionId.isNotEmpty)
+          'auctionId': resolvedAuctionId,
+      },
+    );
     return;
   }
   context.pushFromFeed('post_detail', extra: args);

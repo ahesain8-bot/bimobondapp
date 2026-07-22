@@ -15,10 +15,11 @@ abstract class GiftsRemoteDataSource {
   });
   Future<GiftInventoryModel?> sendGift({
     required String giftId,
-    int quantity = 1,
+    required String receiverId,
     String? postId,
-    String? receiverId,
     String? auctionId,
+    String? liveId,
+    String? message,
   });
 }
 
@@ -162,24 +163,30 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   @override
   Future<GiftInventoryModel?> sendGift({
     required String giftId,
-    int quantity = 1,
+    required String receiverId,
     String? postId,
-    String? receiverId,
     String? auctionId,
+    String? liveId,
+    String? message,
   }) async {
     try {
-      final data = <String, dynamic>{'giftId': giftId};
-      if (quantity > 1) {
-        data['quantity'] = quantity;
-      }
+      // Docs: send consumes exactly 1 inventory unit. Body requires giftId +
+      // receiverId; auction/live may override receiver server-side.
+      final data = <String, dynamic>{
+        'giftId': giftId,
+        'receiverId': receiverId,
+      };
       if (postId != null && postId.isNotEmpty) {
         data['postId'] = postId;
       }
-      if (receiverId != null && receiverId.isNotEmpty) {
-        data['receiverId'] = receiverId;
-      }
       if (auctionId != null && auctionId.isNotEmpty) {
         data['auctionId'] = auctionId;
+      }
+      if (liveId != null && liveId.isNotEmpty) {
+        data['liveId'] = liveId;
+      }
+      if (message != null && message.trim().isNotEmpty) {
+        data['message'] = message.trim();
       }
 
       final response = await apiClient.dio.post(
@@ -190,10 +197,10 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;
         if (body is Map<String, dynamic>) {
-          return GiftInventoryModel.fromApiResponse(body);
+          return GiftInventoryModel.fromSendResponse(body);
         }
         if (body is Map) {
-          return GiftInventoryModel.fromApiResponse(
+          return GiftInventoryModel.fromSendResponse(
             Map<String, dynamic>.from(body),
           );
         }

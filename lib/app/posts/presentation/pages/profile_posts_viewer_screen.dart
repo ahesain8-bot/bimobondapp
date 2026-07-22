@@ -309,7 +309,11 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
           itemBuilder: (context, index) {
             final post = _posts[index];
             if (post.isAuctionable) {
-              return LiveDetailsScreen(post: post, embeddedInFeed: true);
+              return LiveDetailsScreen(
+                post: post,
+                embeddedInFeed: true,
+                auctionId: post.auction?.id,
+              );
             }
             return VideoPostWidget(
               key: ValueKey('profile_post_${post.id}'),

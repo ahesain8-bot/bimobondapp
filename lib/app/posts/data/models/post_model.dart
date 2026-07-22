@@ -88,6 +88,27 @@ class PostModel extends PostEntity {
     return _soundFromId(json['soundId'] ?? json['soundSegmentId']);
   }
 
+  /// Nested `auction` plus top-level `auctionId` when the nested object omits id.
+  static PostAuctionEntity? _parseAuction(Map<String, dynamic> json) {
+    final topLevelId = json['auctionId']?.toString().trim();
+    final raw = json['auction'];
+    if (raw is Map) {
+      final map = Map<String, dynamic>.from(raw);
+      final nestedId = (map['id'] ?? map['auctionId'])?.toString().trim();
+      if ((nestedId == null || nestedId.isEmpty) &&
+          topLevelId != null &&
+          topLevelId.isNotEmpty) {
+        map['id'] = topLevelId;
+      }
+      return PostAuctionEntity.fromJson(map);
+    }
+    // Feed sometimes sends only `auctionId` without a nested `auction` object.
+    if (topLevelId != null && topLevelId.isNotEmpty) {
+      return PostAuctionEntity.fromJson({'id': topLevelId});
+    }
+    return null;
+  }
+
   static String? _normalizeUrl(String? url) {
     if (url == null || url.isEmpty) return url;
     return MediaUtils.resolveAbsoluteUrl(url);
@@ -181,9 +202,7 @@ class PostModel extends PostEntity {
       mentions: MentionRefModel.listFromJson(json['mentions']),
       isAuctionable: json['isAuctionable'] == true,
       isStory: parsePostIsStory(json['isStory']),
-      auction: json['auction'] is Map<String, dynamic>
-          ? PostAuctionEntity.fromJson(json['auction'] as Map<String, dynamic>)
-          : null,
+      auction: _parseAuction(json),
       isPromoted: PostModel._parseBoolField(json['isPromoted']),
       isAd: PostModel._parseBoolField(json['isAd']),
       promotion: json['promotion'] is Map<String, dynamic>

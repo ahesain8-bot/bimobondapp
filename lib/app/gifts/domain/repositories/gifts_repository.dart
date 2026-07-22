@@ -11,9 +11,10 @@ abstract class GiftsRepository {
   });
   Future<Either<Failure, GiftInventoryEntity?>> sendGift({
     required String giftId,
-    int quantity,
+    required String receiverId,
     String? postId,
-    String? receiverId,
     String? auctionId,
+    String? liveId,
+    String? message,
   });
 }

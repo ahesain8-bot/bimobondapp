@@ -14,10 +14,11 @@ class SendGiftUseCase implements UseCase<GiftInventoryEntity?, SendGiftParams> {
   Future<Either<Failure, GiftInventoryEntity?>> call(SendGiftParams params) {
     return repository.sendGift(
       giftId: params.giftId,
-      quantity: params.quantity,
-      postId: params.postId,
       receiverId: params.receiverId,
+      postId: params.postId,
       auctionId: params.auctionId,
+      liveId: params.liveId,
+      message: params.message,
     );
   }
 }
@@ -25,18 +26,22 @@ class SendGiftUseCase implements UseCase<GiftInventoryEntity?, SendGiftParams> {
 class SendGiftParams extends Equatable {
   const SendGiftParams({
     required this.giftId,
-    this.quantity = 1,
+    required this.receiverId,
     this.postId,
-    this.receiverId,
     this.auctionId,
+    this.liveId,
+    this.message,
   });
 
   final String giftId;
-  final int quantity;
+  /// Required by API; overridden to host for live/auction on the server.
+  final String receiverId;
   final String? postId;
-  final String? receiverId;
   final String? auctionId;
+  final String? liveId;
+  final String? message;
 
   @override
-  List<Object?> get props => [giftId, quantity, postId, receiverId, auctionId];
+  List<Object?> get props =>
+      [giftId, receiverId, postId, auctionId, liveId, message];
 }

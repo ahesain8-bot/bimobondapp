@@ -96,7 +96,7 @@ class PostAuctionEntity extends Equatable {
     );
 
     return PostAuctionEntity(
-      id: json['id']?.toString(),
+      id: (json['id'] ?? json['auctionId'])?.toString(),
       itemName: json['itemName']?.toString() ?? '',
       itemImageUrl: imageUrl == null || imageUrl.toString() == 'null'
           ? null
@@ -125,6 +125,40 @@ class PostAuctionEntity extends Equatable {
       endedAt: json['endedAt'] != null
           ? DateTime.parse(json['endedAt'].toString())
           : DateTime.now(),
+    );
+  }
+
+  PostAuctionEntity copyWith({
+    String? id,
+    String? itemName,
+    String? itemImageUrl,
+    double? startingPrice,
+    double? targetPrice,
+    int? startingPriceCoins,
+    int? targetPriceCoins,
+    int? currentTotalCoins,
+    String? currencyCode,
+    int? giftCount,
+    String? status,
+    AuctionPricingEntity? pricing,
+    DateTime? startedAt,
+    DateTime? endedAt,
+  }) {
+    return PostAuctionEntity(
+      id: id ?? this.id,
+      itemName: itemName ?? this.itemName,
+      itemImageUrl: itemImageUrl ?? this.itemImageUrl,
+      startingPrice: startingPrice ?? this.startingPrice,
+      targetPrice: targetPrice ?? this.targetPrice,
+      startingPriceCoins: startingPriceCoins ?? this.startingPriceCoins,
+      targetPriceCoins: targetPriceCoins ?? this.targetPriceCoins,
+      currentTotalCoins: currentTotalCoins ?? this.currentTotalCoins,
+      currencyCode: currencyCode ?? this.currencyCode,
+      giftCount: giftCount ?? this.giftCount,
+      status: status ?? this.status,
+      pricing: pricing ?? this.pricing,
+      startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
     );
   }
 

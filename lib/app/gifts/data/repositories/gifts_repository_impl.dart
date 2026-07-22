@@ -76,18 +76,20 @@ class GiftsRepositoryImpl implements GiftsRepository {
   @override
   Future<Either<Failure, GiftInventoryEntity?>> sendGift({
     required String giftId,
-    int quantity = 1,
+    required String receiverId,
     String? postId,
-    String? receiverId,
     String? auctionId,
+    String? liveId,
+    String? message,
   }) async {
     try {
       final inventory = await remoteDataSource.sendGift(
         giftId: giftId,
-        quantity: quantity,
-        postId: postId,
         receiverId: receiverId,
+        postId: postId,
         auctionId: auctionId,
+        liveId: liveId,
+        message: message,
       );
       return Right(inventory);
     } catch (e) {

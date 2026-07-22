@@ -407,8 +407,9 @@ class AuctionsScreenState extends State<AuctionsScreen> {
 
   Future<void> _openAuction(AuctionItem item) async {
     final post = item.post;
+    final auctionId = item.auctionId?.trim();
     if (post != null) {
-      openPost(context, post);
+      openPost(context, post, auctionId: auctionId);
       return;
     }
     final postId = item.id;
@@ -417,7 +418,7 @@ class AuctionsScreenState extends State<AuctionsScreen> {
     if (!mounted) return;
     result.fold(
       (failure) => PopupDialogs.showErrorDialog(context, failure.message),
-      (loaded) => openPost(context, loaded),
+      (loaded) => openPost(context, loaded, auctionId: auctionId),
     );
   }
 

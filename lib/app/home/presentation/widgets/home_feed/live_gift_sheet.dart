@@ -98,10 +98,16 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
   bool get _isLoggedIn => FirebaseAuth.instance.currentUser != null;
 
-  bool get _canSend =>
-      widget.canSendToHost &&
-      ((widget.postId != null && widget.postId!.isNotEmpty) ||
-          (widget.receiverId != null && widget.receiverId!.isNotEmpty));
+  bool get _canSend {
+    if (!widget.canSendToHost) return false;
+    final receiverId = widget.receiverId?.trim() ?? '';
+    final hasAuction = widget.auctionId?.trim().isNotEmpty == true;
+    final hasPost = widget.postId?.trim().isNotEmpty == true;
+    // Auction/live: server overrides receiver, but body still needs a value.
+    if (hasAuction) return receiverId.isNotEmpty;
+    if (receiverId.isEmpty) return false;
+    return hasPost || receiverId.isNotEmpty;
+  }
 
   ColorScheme get _scheme => Theme.of(context).colorScheme;
 
@@ -265,12 +271,26 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
     if (!mounted) return;
 
+    final receiverId = widget.receiverId?.trim() ?? '';
+    if (receiverId.isEmpty) {
+      PopupDialogs.showErrorDialog(
+        context,
+        AppLocalizations.of(context)!.liveGiftNoRecipient,
+      );
+      setState(() => _busy = false);
+      return;
+    }
+
+    final auctionId = widget.auctionId?.trim();
+    final hasAuction = auctionId != null && auctionId.isNotEmpty;
+
     final result = await _sendGift(
       SendGiftParams(
         giftId: gift.id,
-        postId: widget.postId,
-        receiverId: widget.receiverId,
-        auctionId: widget.auctionId,
+        receiverId: receiverId,
+        // Auction: send auctionId only. Post gifts: send postId.
+        postId: hasAuction ? null : widget.postId,
+        auctionId: hasAuction ? auctionId : null,
       ),
     );
     if (!mounted) return;
@@ -281,13 +301,14 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
         PopupDialogs.showErrorDialog(context, failure.message);
       },
       (inventoryUpdate) async {
+        // Docs: refresh inventory after send. Prefer senderInventory merge,
+        // then always re-fetch for accurate qty + wallet balance.
         if (inventoryUpdate != null) {
           _applyInventoryUpdate(inventoryUpdate);
-        } else {
-          final inventoryResult = await _getInventory(NoParams());
-          if (!mounted) return;
-          inventoryResult.fold((_) {}, _applyInventoryUpdate);
         }
+        final inventoryResult = await _getInventory(NoParams());
+        if (!mounted) return;
+        inventoryResult.fold((_) {}, _applyInventoryUpdate);
 
         if (!mounted) return;
         setState(() => _busy = false);

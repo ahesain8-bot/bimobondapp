@@ -272,7 +272,13 @@ class AppRouter {
             return const Scaffold(body: Center(child: Text('Post not found')));
           }
           if (args.post.isAuctionable) {
-            return LiveDetailsScreen(post: args.post);
+            final auctionId = args.post.auction?.id?.trim();
+            return LiveDetailsScreen(
+              post: args.post,
+              auctionId: auctionId != null && auctionId.isNotEmpty
+                  ? auctionId
+                  : null,
+            );
           }
           return PostDetailScreen(
             post: args.post,
@@ -414,7 +420,12 @@ class AppRouter {
           final extra = state.extra as Map<String, dynamic>?;
           final index = extra?['index'] as int? ?? 0;
           final post = extra?['post'] as PostEntity?;
-          return LiveDetailsScreen(index: index, post: post);
+          final auctionId = extra?['auctionId']?.toString();
+          return LiveDetailsScreen(
+            index: index,
+            post: post,
+            auctionId: auctionId,
+          );
         },
       ),
       GoRoute(

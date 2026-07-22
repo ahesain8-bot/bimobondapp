@@ -124,6 +124,30 @@ class GiftInventoryModel extends GiftInventoryEntity {
     );
   }
 
+  /// Parses `POST /gifts/send` 201 body:
+  /// `{ ..., "senderInventory": { "giftId": "...", "quantity": 4 } }`.
+  factory GiftInventoryModel.fromSendResponse(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is Map) {
+      return GiftInventoryModel.fromSendResponse(
+        Map<String, dynamic>.from(data),
+      );
+    }
+
+    final raw = json['senderInventory'] ?? json['inventory'];
+    if (raw is Map) {
+      final item = GiftInventoryItemModel.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
+      return GiftInventoryModel(
+        balanceCoins: 0,
+        items: item.giftId.isEmpty ? const [] : [item],
+      );
+    }
+
+    return GiftInventoryModel.fromApiResponse(json);
+  }
+
   /// Applies a partial server update (e.g. after purchase) onto existing state.
   static GiftInventoryModel merge(
     GiftInventoryEntity? current,
