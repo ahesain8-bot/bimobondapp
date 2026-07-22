@@ -15,7 +15,6 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
-import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -82,7 +81,9 @@ class _FeedAuctionCategoriesCache {
   }
 
   static Future<List<CategoryEntity>> _load() async {
-    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final result = await categories_di.sl<GetCategoriesUseCase>()(
+      const GetCategoriesParams.flat(),
+    );
     return result.fold((_) => <CategoryEntity>[], (list) => list);
   }
 }

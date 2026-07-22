@@ -15,6 +15,9 @@ import 'package:bimobondapp/app/posts/domain/usecases/record_post_view_usecase.d
 import 'package:bimobondapp/app/posts/domain/usecases/get_replies_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_comment_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/delete_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/mark_post_not_interested_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/report_post_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/share_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_my_reposts_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_reposts_usecase.dart';
@@ -58,6 +61,9 @@ Future<void> initPosts() async {
   sl.registerLazySingleton(() => GetMyRepostsUseCase(sl()));
   sl.registerLazySingleton(() => UpdatePostUsecase(sl()));
   sl.registerLazySingleton(() => DeletePostUsecase(sl()));
+  sl.registerLazySingleton(() => MarkPostNotInterestedUseCase(sl()));
+  sl.registerLazySingleton(() => ReportPostUseCase(sl()));
+  sl.registerLazySingleton(() => SharePostUseCase(sl()));
 
   // Comments Use Cases
   sl.registerLazySingleton(() => GetCommentsUsecase(sl()));
@@ -79,6 +85,10 @@ Future<void> initPosts() async {
       getMyRepostsUseCase: sl(),
       updatePostUsecase: sl(),
       deletePostUsecase: sl(),
+      markPostNotInterestedUseCase: sl(),
+      createStoryUseCase: sl(),
+      getStoryRingsUseCase: sl(),
+      deleteStoryUseCase: sl(),
     ),
   );
 

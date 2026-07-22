@@ -39,6 +39,24 @@ abstract class AuthRemoteDataSource {
   });
   Future<void> syncDeviceRegistration();
   Future<void> forgotPassword({required String email});
+  Future<void> sendOtp({
+    required String type,
+    String? email,
+    String? phoneNumber,
+  });
+  Future<void> verifyOtp({
+    required String type,
+    required String code,
+    String? email,
+    String? phoneNumber,
+  });
+  Future<void> resetPassword({
+    required String type,
+    required String code,
+    required String newPassword,
+    String? email,
+    String? phoneNumber,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -338,6 +356,79 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return;
     }
     throw ServerException(message: 'Forgot password failed');
+  });
+
+  Map<String, dynamic> _otpBody({
+    required String type,
+    String? email,
+    String? phoneNumber,
+    String? code,
+    String? newPassword,
+  }) {
+    final body = <String, dynamic>{'type': type};
+    if (email != null && email.isNotEmpty) body['email'] = email;
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      body['phoneNumber'] = phoneNumber;
+    }
+    if (code != null) body['code'] = code;
+    if (newPassword != null) body['newPassword'] = newPassword;
+    return body;
+  }
+
+  @override
+  Future<void> sendOtp({
+    required String type,
+    String? email,
+    String? phoneNumber,
+  }) => _execute(() async {
+    final response = await apiClient.dio.post(
+      ApiConstants.sendOtp,
+      data: _otpBody(type: type, email: email, phoneNumber: phoneNumber),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) return;
+    throw ServerException(message: 'Failed to send OTP');
+  });
+
+  @override
+  Future<void> verifyOtp({
+    required String type,
+    required String code,
+    String? email,
+    String? phoneNumber,
+  }) => _execute(() async {
+    final response = await apiClient.dio.post(
+      ApiConstants.verifyOtp,
+      data: _otpBody(
+        type: type,
+        email: email,
+        phoneNumber: phoneNumber,
+        code: code,
+      ),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) return;
+    throw ServerException(message: 'OTP verification failed');
+  });
+
+  @override
+  Future<void> resetPassword({
+    required String type,
+    required String code,
+    required String newPassword,
+    String? email,
+    String? phoneNumber,
+  }) => _execute(() async {
+    final response = await apiClient.dio.post(
+      ApiConstants.resetPassword,
+      data: _otpBody(
+        type: type,
+        email: email,
+        phoneNumber: phoneNumber,
+        code: code,
+        newPassword: newPassword,
+      ),
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) return;
+    throw ServerException(message: 'Password reset failed');
   });
 
   String _googleSignInMessage(GoogleSignInException error) {

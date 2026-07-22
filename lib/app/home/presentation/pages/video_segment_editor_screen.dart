@@ -25,14 +25,21 @@ class VideoSegmentEditorScreen extends StatefulWidget {
     required File file,
     List<VideoTrimSegment> initialSegments = const [],
   }) {
-    return Navigator.of(context).push<List<VideoTrimSegment>>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => VideoSegmentEditorScreen(
-          file: file,
-          initialSegments: initialSegments,
-        ),
-      ),
+    return showModalBottomSheet<List<VideoTrimSegment>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      useSafeArea: true,
+      builder: (ctx) {
+        final height = MediaQuery.sizeOf(ctx).height * 0.92;
+        return SizedBox(
+          height: height,
+          child: VideoSegmentEditorScreen(
+            file: file,
+            initialSegments: initialSegments,
+          ),
+        );
+      },
     );
   }
 

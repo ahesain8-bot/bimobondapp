@@ -11,6 +11,7 @@ import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_share_result.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_views_page_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
@@ -160,8 +161,6 @@ class PostsRepositoryImpl implements PostsRepository {
       final queryParams = {
         'page': page,
         'limit': limit,
-        'isStory': isStory,
-        if (activeStory) 'activeStory': true,
         if (categoryId != null) 'categoryId': categoryId,
         if (type != null) 'type': type,
         if (hashtag != null) 'hashtag': hashtag,
@@ -227,6 +226,10 @@ class PostsRepositoryImpl implements PostsRepository {
     PostInlineLocationInput? location,
     String? playlistId,
     String? soundId,
+    String? soundSegmentId,
+    int? startMs,
+    int? endMs,
+    Map<String, dynamic>? newSound,
     String? originalPostId,
     List<PostMediaEntity>? media,
     String? filterName,
@@ -257,8 +260,23 @@ class PostsRepositoryImpl implements PostsRepository {
         if (auction != null) 'auction': auction.toJson(),
         if (locationId != null) 'locationId': locationId,
         if (location != null) 'location': location.toJson(),
-        if (playlistId != null) 'playlistId': playlistId,
-        if (soundId != null) 'soundId': soundId,
+        if (playlistId != null && playlistId.isNotEmpty) 'playlistId': playlistId,
+        if (soundSegmentId != null && soundSegmentId.isNotEmpty)
+          'soundSegmentId': soundSegmentId,
+        if (soundId != null &&
+            soundId.isNotEmpty &&
+            (soundSegmentId == null || soundSegmentId.isEmpty))
+          'soundId': soundId,
+        if (startMs != null &&
+            (soundSegmentId == null || soundSegmentId.isEmpty))
+          'startMs': startMs,
+        if (endMs != null &&
+            (soundSegmentId == null || soundSegmentId.isEmpty))
+          'endMs': endMs,
+        if (newSound != null &&
+            (soundSegmentId == null || soundSegmentId.isEmpty) &&
+            (soundId == null || soundId.isEmpty))
+          'newSound': newSound,
         if (originalPostId != null) 'originalPostId': originalPostId,
         if (media != null)
           'media': media
@@ -376,13 +394,69 @@ class PostsRepositoryImpl implements PostsRepository {
   Future<Either<Failure, int>> recordPostView(
     String postId, {
     int? watchedDuration,
+    String? campaignId,
   }) async {
     try {
       final count = await remoteDataSource.recordPostView(
         postId,
         watchedDuration: watchedDuration,
+        campaignId: campaignId,
       );
       return Right(count);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> markPostNotInterested(String postId) async {
+    try {
+      await remoteDataSource.markPostNotInterested(postId);
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> undoPostNotInterested(String postId) async {
+    try {
+      await remoteDataSource.undoPostNotInterested(postId);
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> reportPost(
+    String postId, {
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      await remoteDataSource.reportPost(
+        postId,
+        reason: reason,
+        details: details,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, PostShareResult>> sharePost(
+    String postId, {
+    String channel = 'EXTERNAL',
+  }) async {
+    try {
+      final json = await remoteDataSource.sharePost(
+        postId,
+        channel: channel,
+      );
+      return Right(PostShareResult.fromJson(json));
     } catch (e) {
       return Left(FailureMapper.from(e));
     }

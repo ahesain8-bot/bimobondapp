@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_seller_eligibility_usecase.dart';
+import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
+    as auctions_di;
 import 'package:bimobondapp/app/categories/domain/entities/category_entity.dart';
 import 'package:bimobondapp/app/categories/domain/usecases/get_categories_usecase.dart';
 import 'package:bimobondapp/app/categories/presentation/di/categories_injector.dart'
@@ -49,6 +52,8 @@ class AddPostScreen extends StatefulWidget {
     this.initialType,
     this.isStory = false,
     this.initialSound,
+    this.initialSoundOffset = Duration.zero,
+    this.initialSoundWindow = const Duration(seconds: 15),
     this.initialFilterName,
     this.initialFilterCategory,
     this.initialEffectSlug,
@@ -59,6 +64,8 @@ class AddPostScreen extends StatefulWidget {
   final String? initialType;
   final bool isStory;
   final SoundEntity? initialSound;
+  final Duration initialSoundOffset;
+  final Duration initialSoundWindow;
   final String? initialFilterName;
   final String? initialFilterCategory;
   final String? initialEffectSlug;
@@ -78,8 +85,6 @@ class _AddPostScreenState extends State<AddPostScreen>
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _auctionItemNameController =
       TextEditingController();
-  final TextEditingController _startingPriceController =
-      TextEditingController();
   final TextEditingController _targetPriceController = TextEditingController();
   String _privacyStatus = 'PUBLIC';
   final List<CategoryEntity> _categories = [];
@@ -94,6 +99,7 @@ class _AddPostScreenState extends State<AddPostScreen>
   SoundEntity? _selectedSound;
   Duration _soundStartOffset = Duration.zero;
   Duration _soundWindow = const Duration(seconds: 15);
+  String? _pickedSoundSegmentId;
   AddPostLocationSelection? _selectedLocation;
 
   @override
@@ -107,6 +113,10 @@ class _AddPostScreenState extends State<AddPostScreen>
       const Duration(days: AddPostLayoutConstants.defaultAuctionDurationDays),
     );
     _selectedSound = widget.initialSound;
+    _soundStartOffset = widget.initialSoundOffset;
+    _soundWindow = widget.initialSoundWindow > Duration.zero
+        ? widget.initialSoundWindow
+        : const Duration(seconds: 15);
     _loadCategories();
     if (widget.isStory &&
         (widget.initialFiles == null || widget.initialFiles!.isEmpty)) {
@@ -127,7 +137,9 @@ class _AddPostScreenState extends State<AddPostScreen>
 
   Future<void> _loadCategories() async {
     setState(() => _isLoadingCategories = true);
-    final result = await categories_di.sl<GetCategoriesUseCase>()(NoParams());
+    final result = await categories_di.sl<GetCategoriesUseCase>()(
+      const GetCategoriesParams.flat(),
+    );
     if (!mounted) return;
     setState(() {
       _isLoadingCategories = false;
@@ -144,7 +156,6 @@ class _AddPostScreenState extends State<AddPostScreen>
     SoundAudioPreview.stop();
     _descriptionController.dispose();
     _auctionItemNameController.dispose();
-    _startingPriceController.dispose();
     _targetPriceController.dispose();
     super.dispose();
   }
@@ -191,7 +202,14 @@ class _AddPostScreenState extends State<AddPostScreen>
 
     setState(() {
       _selectedFiles = edited.files;
-      if (edited.sound != null) _selectedSound = edited.sound;
+      if (edited.sound != null) {
+        _selectedSound = edited.sound;
+        _soundStartOffset = edited.soundOffset;
+        _soundWindow = edited.soundWindow > Duration.zero
+            ? edited.soundWindow
+            : const Duration(seconds: 15);
+        _pickedSoundSegmentId = edited.sound?.defaultSegment?.id;
+      }
       _updateType();
     });
   }
@@ -238,7 +256,14 @@ class _AddPostScreenState extends State<AddPostScreen>
         final toAdd = edited.files.take(remaining).toList();
         setState(() {
           _selectedFiles = [..._selectedFiles, ...toAdd];
-          if (edited.sound != null) _selectedSound = edited.sound;
+          if (edited.sound != null) {
+            _selectedSound = edited.sound;
+            _soundStartOffset = edited.soundOffset;
+            _soundWindow = edited.soundWindow > Duration.zero
+                ? edited.soundWindow
+                : const Duration(seconds: 15);
+            _pickedSoundSegmentId = edited.sound?.defaultSegment?.id;
+          }
           _updateType();
         });
       },
@@ -266,7 +291,14 @@ class _AddPostScreenState extends State<AddPostScreen>
     final toAdd = result.files.take(remaining).toList();
     setState(() {
       _selectedFiles = [..._selectedFiles, ...toAdd];
-      if (result.sound != null) _selectedSound = result.sound;
+      if (result.sound != null) {
+        _selectedSound = result.sound;
+        _soundStartOffset = result.soundOffset;
+        _soundWindow = result.soundWindow > Duration.zero
+            ? result.soundWindow
+            : const Duration(seconds: 15);
+        _pickedSoundSegmentId = result.sound?.defaultSegment?.id;
+      }
       _updateType();
     });
   }
@@ -283,17 +315,9 @@ class _AddPostScreenState extends State<AddPostScreen>
       return null;
     }
 
-    final startingPrice = double.tryParse(_startingPriceController.text.trim());
     final targetPrice = double.tryParse(_targetPriceController.text.trim());
-    if (startingPrice == null ||
-        startingPrice <= 0 ||
-        targetPrice == null ||
-        targetPrice <= 0) {
+    if (targetPrice == null || targetPrice <= 0) {
       PopupDialogs.showErrorDialog(context, l10n.auctionInvalidPrice);
-      return null;
-    }
-    if (targetPrice <= startingPrice) {
-      PopupDialogs.showErrorDialog(context, l10n.auctionTargetBelowStart);
       return null;
     }
     if (!_auctionEndDate.isAfter(_auctionStartDate)) {
@@ -303,7 +327,6 @@ class _AddPostScreenState extends State<AddPostScreen>
 
     return PostAuctionInput(
       itemName: itemName,
-      startingPrice: startingPrice,
       targetPrice: targetPrice,
       startedAt: _auctionStartDate,
       endedAt: _auctionEndDate,
@@ -311,56 +334,6 @@ class _AddPostScreenState extends State<AddPostScreen>
   }
 
   int get _maxFilesLimit => widget.isStory ? 1 : _maxFiles;
-
-  void _onCreatePost() {
-    final l10n = AppLocalizations.of(context)!;
-    if (_selectedFiles.isEmpty) {
-      PopupDialogs.showErrorDialog(context, l10n.pleaseSelectMediaFirst);
-      return;
-    }
-
-    PostAuctionInput? auction;
-    if (!widget.isStory) {
-      auction = _buildAuctionInput(l10n);
-      if (_isAuction && auction == null) return;
-
-      if (_selectedCategory == null) {
-        PopupDialogs.showErrorDialog(
-          context,
-          l10n.fieldIsRequired(l10n.categoryLabel),
-        );
-        return;
-      }
-    }
-
-    // Stop any leftover sound preview before upload/processing starts.
-    SoundAudioPreview.stop();
-
-    context.read<PostsBloc>().add(
-      CreatePostWithMediaRequestedEvent(
-        type: _type,
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        categoryId: widget.isStory ? null : _selectedCategory!.id,
-        privacyStatus: _privacyStatus,
-        allowComments: _allowComments,
-        allowDuets: widget.isStory ? false : _allowDuets,
-        allowStitch: widget.isStory ? false : _allowStitch,
-        status: 'PUBLISHED',
-        isStory: widget.isStory,
-        isAuctionable: widget.isStory ? false : _isAuction,
-        auction: widget.isStory ? null : auction,
-        files: _selectedFiles,
-        soundId: _selectedSound?.id,
-        filterName: widget.initialFilterName,
-        filterCategory: widget.initialFilterCategory,
-        effectSlug: widget.initialEffectSlug,
-        beautyEnabled: widget.initialBeautyEnabled ? true : null,
-        location: _buildLocationInput(),
-      ),
-    );
-  }
 
   PostInlineLocationInput? _buildLocationInput() {
     final selection = _selectedLocation;
@@ -401,6 +374,186 @@ class _AddPostScreenState extends State<AddPostScreen>
     setState(() => _selectedLocation = null);
   }
 
+  void _onAuctionToggle(bool enabled) {
+    setState(() => _isAuction = enabled);
+  }
+
+  /// Last gate before publishing an auction post.
+  Future<bool> _ensureSellerCanCreateAuction() async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await auctions_di.sl<GetAuctionSellerEligibilityUseCase>()(
+      NoParams(),
+    );
+    if (!mounted) return false;
+
+    return await result.fold(
+      (failure) async {
+        PopupDialogs.showErrorDialog(context, failure.message);
+        return false;
+      },
+      (eligibility) async {
+        if (eligibility.canCreateAuction) return true;
+
+        final status = eligibility.status.toUpperCase();
+        if (status == 'PENDING') {
+          PopupDialogs.showErrorDialog(
+            context,
+            l10n.auctionSellerPendingMessage,
+            title: l10n.auctionSellerRequiredTitle,
+          );
+          return false;
+        }
+
+        final message = status == 'REJECTED'
+            ? (eligibility.rejectionReason?.trim().isNotEmpty == true
+                ? eligibility.rejectionReason!
+                : l10n.auctionSellerRejectedMessage)
+            : (eligibility.message?.trim().isNotEmpty == true
+                ? eligibility.message!
+                : l10n.auctionSellerRequiredMessage);
+
+        var openedForm = false;
+        await PopupDialogs.showConfirmDialog(
+          context,
+          title: l10n.auctionSellerRequiredTitle,
+          message: message,
+          cancelLabel: l10n.cancel,
+          confirmLabel: l10n.auctionSellerCompleteAction,
+          onConfirm: () {
+            openedForm = true;
+          },
+        );
+        if (!mounted || !openedForm) return false;
+
+        final submitted = await context.pushNamed<bool>('seller_verification');
+        if (!mounted) return false;
+        if (submitted == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.sellerVerificationSubmitted)),
+          );
+        }
+
+        // Re-check after verification (usually PENDING until admin approves).
+        final recheck = await auctions_di.sl<GetAuctionSellerEligibilityUseCase>()(
+          NoParams(),
+        );
+        if (!mounted) return false;
+        return recheck.fold(
+          (failure) {
+            PopupDialogs.showErrorDialog(context, failure.message);
+            return false;
+          },
+          (again) {
+            if (again.canCreateAuction) return true;
+            if (again.status.toUpperCase() == 'PENDING') {
+              PopupDialogs.showErrorDialog(
+                context,
+                l10n.auctionSellerPendingMessage,
+                title: l10n.auctionSellerRequiredTitle,
+              );
+            }
+            return false;
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _onCreatePost() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_selectedFiles.isEmpty) {
+      PopupDialogs.showErrorDialog(context, l10n.pleaseSelectMediaFirst);
+      return;
+    }
+
+    PostAuctionInput? auction;
+    if (!widget.isStory) {
+      auction = _buildAuctionInput(l10n);
+      if (_isAuction && auction == null) return;
+
+      if (_selectedCategory == null) {
+        PopupDialogs.showErrorDialog(
+          context,
+          l10n.fieldIsRequired(l10n.categoryLabel),
+        );
+        return;
+      }
+    }
+
+    if (!widget.isStory && _isAuction) {
+      final allowed = await _ensureSellerCanCreateAuction();
+      if (!allowed || !mounted) return;
+    }
+
+    // Stop any leftover sound preview before upload/processing starts.
+    SoundAudioPreview.stop();
+
+    final sound = _selectedSound;
+    String? soundSegmentId;
+    String? soundId;
+    int? startMs;
+    int? endMs;
+
+    if (sound != null && sound.id.isNotEmpty) {
+      final trackMs = sound.duration > 0 ? sound.duration * 1000 : 0;
+      final customClip = trackMs > 0 &&
+          (_soundStartOffset > Duration.zero ||
+              (_soundWindow > Duration.zero &&
+                  _soundWindow.inMilliseconds < trackMs));
+
+      if (customClip) {
+        // Find-or-create clip on the server (mutually exclusive with soundSegmentId).
+        final clip = SoundEntity.clipRangeMs(
+          durationSeconds: sound.duration,
+          offset: _soundStartOffset,
+          window: _soundWindow,
+        );
+        soundId = sound.id;
+        startMs = clip.startMs;
+        endMs = clip.endMs;
+      } else {
+        final pickedId = _pickedSoundSegmentId?.trim();
+        final defaultId = sound.defaultSegment?.id.trim();
+        if (pickedId != null && pickedId.isNotEmpty) {
+          soundSegmentId = pickedId;
+        } else if (defaultId != null && defaultId.isNotEmpty) {
+          // Prefer existing default segment (posts API recommended path).
+          soundSegmentId = defaultId;
+        } else {
+          soundId = sound.id;
+        }
+      }
+    }
+
+    context.read<PostsBloc>().add(
+      CreatePostWithMediaRequestedEvent(
+        type: _type,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        categoryId: widget.isStory ? null : _selectedCategory!.id,
+        privacyStatus: _privacyStatus,
+        allowComments: _allowComments,
+        allowDuets: widget.isStory ? false : _allowDuets,
+        allowStitch: widget.isStory ? false : _allowStitch,
+        status: 'PUBLISHED',
+        isStory: widget.isStory,
+        isAuctionable: widget.isStory ? false : _isAuction,
+        auction: widget.isStory ? null : auction,
+        files: _selectedFiles,
+        soundId: soundId,
+        soundSegmentId: soundSegmentId,
+        startMs: startMs,
+        endMs: endMs,
+        filterName: widget.initialFilterName,
+        filterCategory: widget.initialFilterCategory,
+        effectSlug: widget.initialEffectSlug,
+        beautyEnabled: widget.initialBeautyEnabled ? true : null,
+        location: _buildLocationInput(),
+      ),
+    );
+  }
+
   Future<void> _showSoundPicker() async {
     final picked = await SoundPickerSheet.show(
       context,
@@ -414,6 +567,7 @@ class _AddPostScreenState extends State<AddPostScreen>
         _selectedSound = null;
         _soundStartOffset = Duration.zero;
         _soundWindow = const Duration(seconds: 15);
+        _pickedSoundSegmentId = null;
       });
       return;
     }
@@ -425,6 +579,7 @@ class _AddPostScreenState extends State<AddPostScreen>
       _soundWindow = picked.window > Duration.zero
           ? picked.window
           : const Duration(seconds: 15);
+      _pickedSoundSegmentId = picked.soundSegmentId;
     });
   }
 
@@ -438,7 +593,10 @@ class _AddPostScreenState extends State<AddPostScreen>
       preview: sound,
     );
     if (picked != null && mounted) {
-      setState(() => _selectedSound = picked);
+      setState(() {
+        _selectedSound = picked;
+        _pickedSoundSegmentId = picked.defaultSegment?.id;
+      });
     }
   }
 
@@ -731,7 +889,7 @@ class _AddPostScreenState extends State<AddPostScreen>
           trailing: Switch.adaptive(
             value: _isAuction,
             activeTrackColor: theme.colorScheme.primary,
-            onChanged: (value) => setState(() => _isAuction = value),
+            onChanged: _onAuctionToggle,
           ),
         ),
       ],
@@ -820,8 +978,6 @@ class _AddPostScreenState extends State<AddPostScreen>
                                   child: AddPostAuctionFields(
                                     itemNameController:
                                         _auctionItemNameController,
-                                    startingPriceController:
-                                        _startingPriceController,
                                     targetPriceController:
                                         _targetPriceController,
                                     startDate: _auctionStartDate,

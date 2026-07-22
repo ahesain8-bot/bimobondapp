@@ -47,10 +47,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         return BlocConsumer<AuthBloc, AuthState>(
           listenWhen: (previous, current) =>
-              current is AuthFailure ||
-              current is AuthSuccess ||
-              current is EmailVerificationSentState ||
-              current is EmailOtpSentState,
+              current is AuthFailure || current is AuthSuccess,
           listener: (context, state) {
             if (!_isSubmitting) return;
 
@@ -62,7 +59,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               PopupDialogs.showErrorDialog(context, message);
             } else if (state is AuthSuccess) {
               setState(() => _isSubmitting = false);
-              navigateAfterSignUp(context);
+              navigateAfterAuth(context, user: state.user);
             }
           },
           builder: (context, state) {

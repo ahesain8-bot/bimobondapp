@@ -29,6 +29,11 @@ class AppAssets {
   static const String feedLiveIcon = '$iconsPath/live-svgrepo-com.svg';
   static const String commentIcon = '$iconsPath/comment-3-svgrepo-com.svg';
   static const String shareArrowIcon = '$iconsPath/share-arrow-svgrepo-com.svg';
+  static const String cameraLayoutIcon = '$iconsPath/layout-1-svgrepo-com.svg';
+  static const String cameraFiltersIcon = '$iconsPath/filters-svgrepo-com.svg';
+  static const String cameraShareIcon = '$iconsPath/share-svgrepo-com.svg';
+  static const String cameraStickerIcon =
+      '$iconsPath/sticker-smile-square-svgrepo-com.svg';
 
   static const String shareMessengerIcon = '$iconsPath/share_messenger.svg';
   static const String shareFacebookIcon = '$iconsPath/share_facebook.svg';

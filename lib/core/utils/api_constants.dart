@@ -2,13 +2,12 @@ class ApiConstants {
   static const String baseUrl = 'http://134.209.2.225';
   static const String apiKey =
       'YOUR_API_KEY'; // Replace with your ReqRes API Key
-  static const String login = '/login';
   static const String backendLogin = '/auth/login';
   static const String authMe = '/auth/me';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
   static const String forgotPassword = '/auth/forgot-password';
-  static const String register = '/register';
+  static const String resetPassword = '/auth/reset-password';
   static const String updateProfile = '/users/me';
   static const String updateUserLocation = '/users/me/location';
   static const String userLocationHistory = '/users/me/locations/history';
@@ -41,7 +40,16 @@ class ApiConstants {
   static String toggleSave(String postId) => '/posts/$postId/save';
   static String toggleRepost(String postId) => '/posts/$postId/repost';
   static String postReposts(String postId) => '/posts/$postId/reposts';
+  static String deleteRepost(String repostId) => '/posts/reposts/$repostId';
+  static String postNotInterested(String postId) =>
+      '/posts/$postId/not-interested';
+  static String reportPost(String postId) => '/posts/$postId/report';
+  static String sharePost(String postId) => '/posts/$postId/share';
+  static String postMentions(String postId) => '/posts/$postId/mentions';
   static const String myReposts = '/users/me/reposts';
+  static const String myLikedPosts = '/users/me/liked-posts';
+  static const String mySavedPosts = '/users/me/saved-posts';
+  static String userVideos(String userId) => '/users/$userId/videos';
 
   // Comments
   static String getComments(String postId) => '/posts/$postId/comments';
@@ -55,6 +63,7 @@ class ApiConstants {
       '/posts/comments/$commentId/likes';
 
   static const String categories = '/categories';
+  static String categoryById(String id) => '/categories/$id';
 
   static const String gifts = '/gifts';
   static const String giftsInventory = '/gifts/inventory';
@@ -67,7 +76,44 @@ class ApiConstants {
   static const String walletsTopUp = '/wallets/top-up';
 
   static String auctionById(String auctionId) => '/auctions/$auctionId';
+  static const String auctions = '/auctions';
+  static const String auctionsActive = '/auctions/active';
   static const String auctionsPricingPreview = '/auctions/pricing/preview';
+  static const String auctionsSellerEligibility =
+      '/auctions/seller-eligibility';
+  static String auctionCancel(String auctionId) =>
+      '/auctions/$auctionId/cancel';
+  static String auctionFulfillment(String auctionId) =>
+      '/auctions/$auctionId/fulfillment';
+  static String auctionFulfillmentShip(String auctionId) =>
+      '/auctions/$auctionId/fulfillment/ship';
+  static String auctionFulfillmentReceive(String auctionId) =>
+      '/auctions/$auctionId/fulfillment/receive';
+  static String auctionFulfillmentAccept(String auctionId) =>
+      '/auctions/$auctionId/fulfillment/accept';
+  static String auctionFulfillmentDispute(String auctionId) =>
+      '/auctions/$auctionId/fulfillment/dispute';
+  static const String myAuctions = '/users/me/auctions';
+  static String liveAuctions(String liveId) => '/lives/$liveId/auctions';
+  static String liveAuctionsActive(String liveId) =>
+      '/lives/$liveId/auctions/active';
+  static String liveCreateAuction(String liveId) => '/lives/$liveId/auctions';
+
+  // Seller verification (required to host auctions)
+  static const String sellerVerification = '/seller-verification';
+  static const String sellerVerificationEligibility =
+      '/seller-verification/eligibility';
+  static const String sellerVerificationMe = '/seller-verification/me';
+  static const String sellerVerificationUpload = '/seller-verification/upload';
+
+  // Stories (ephemeral; separate from posts)
+  static const String stories = '/stories';
+  static const String storiesRings = '/stories/rings';
+  static const String storiesMe = '/stories/me';
+  static String storiesByUser(String userId) => '/stories/user/$userId';
+  static String storyById(String storyId) => '/stories/$storyId';
+  static String storyView(String storyId) => '/stories/$storyId/view';
+  static String storyViewers(String storyId) => '/stories/$storyId/viewers';
 
   static const String cameraStudioCatalog = '/camera-studio/catalog';
   static const String cameraStudioEffectPlacementSchema =
@@ -99,6 +145,10 @@ class ApiConstants {
   static String userFollowers(String userId) => '/users/$userId/followers';
   static String userFollowing(String userId) => '/users/$userId/following';
   static String userById(String userId) => '/users/$userId';
+  static String userFollowStatus(String userId) =>
+      '/users/$userId/follow-status';
+  static String blockUser(String userId) => '/users/$userId/block';
+  static const String myBlocks = '/users/me/blocks';
   static String adminUserActivity(String userId) =>
       '/users/admin/$userId/activity';
 
@@ -111,9 +161,14 @@ class ApiConstants {
 
   static const String sounds = '/sounds';
   static const String soundsTrending = '/sounds/trending';
+  static const String soundsGroups = '/sounds/groups';
   static const String soundsMine = '/sounds/mine';
   static const String soundsUpload = '/sounds/upload';
+  static const String soundsFromOriginal = '/sounds/from-original';
   static String soundById(String id) => '/sounds/$id';
+  static String soundGroupById(String id) => '/sounds/groups/$id';
+  static String soundSegments(String id) => '/sounds/$id/segments';
+  static String soundSegmentById(String id) => '/sounds/segments/$id';
 
   // Search history
   static const String searchHistory = '/users/me/search-history';

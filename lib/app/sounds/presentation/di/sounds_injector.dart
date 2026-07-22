@@ -2,10 +2,13 @@ import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' show sl
 import 'package:bimobondapp/app/sounds/data/datasources/sounds_remote_data_source.dart';
 import 'package:bimobondapp/app/sounds/data/repositories/sounds_repository_impl.dart';
 import 'package:bimobondapp/app/sounds/domain/repositories/sounds_repository.dart';
+import 'package:bimobondapp/app/sounds/domain/usecases/create_sound_usecases.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/get_my_sounds_usecase.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/get_sound_detail_usecase.dart';
+import 'package:bimobondapp/app/sounds/domain/usecases/get_sound_groups_usecase.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/get_sounds_usecase.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/get_trending_sounds_usecase.dart';
+import 'package:bimobondapp/app/sounds/domain/usecases/sound_segments_usecases.dart';
 import 'package:bimobondapp/app/sounds/domain/usecases/upload_sound_usecase.dart';
 
 export 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' show sl;
@@ -21,7 +24,13 @@ Future<void> initSounds() async {
 
   sl.registerLazySingleton(() => GetTrendingSoundsUseCase(sl()));
   sl.registerLazySingleton(() => GetSoundsUseCase(sl()));
+  sl.registerLazySingleton(() => GetSoundGroupsUseCase(sl()));
   sl.registerLazySingleton(() => GetMySoundsUseCase(sl()));
   sl.registerLazySingleton(() => GetSoundDetailUseCase(sl()));
+  sl.registerLazySingleton(() => GetSoundSegmentsUseCase(sl()));
+  sl.registerLazySingleton(() => CreateSoundSegmentUseCase(sl()));
+  sl.registerLazySingleton(() => GetSoundSegmentDetailUseCase(sl()));
   sl.registerLazySingleton(() => UploadSoundUseCase(sl()));
+  sl.registerLazySingleton(() => CreateSoundFromUrlUseCase(sl()));
+  sl.registerLazySingleton(() => CreateSoundFromOriginalUseCase(sl()));
 }

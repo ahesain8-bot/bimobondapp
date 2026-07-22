@@ -16,4 +16,5 @@ Future<void> initCategories() async {
   );
 
   sl.registerLazySingleton(() => GetCategoriesUseCase(sl()));
+  sl.registerLazySingleton(() => GetCategoryByIdUseCase(sl()));
 }

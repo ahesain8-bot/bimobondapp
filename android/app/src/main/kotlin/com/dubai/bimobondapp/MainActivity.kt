@@ -9,11 +9,14 @@ import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
 import com.dubai.bimobondapp.ar_camera.ArColorGradeBaker
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
+import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
+import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class MainActivity : FlutterActivity() {
 
@@ -21,6 +24,8 @@ class MainActivity : FlutterActivity() {
         const val AR_CAMERA_CHANNEL = "com.dubai.bimobondapp/ar_camera"
         const val AR_CAMERA_VIEW_TYPE = "ar-camera-preview"
     }
+
+    private var arCameraChannel: MethodChannel? = null
 
     private val beautyExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "beauty-filter").apply { isDaemon = true }
@@ -40,6 +45,7 @@ class MainActivity : FlutterActivity() {
         )
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AR_CAMERA_CHANNEL)
+            .also { arCameraChannel = it }
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "warmup" -> {
@@ -160,13 +166,22 @@ class MainActivity : FlutterActivity() {
                         if (top != null && bottom != null) {
                             ArCameraBridge.setPreviewLetterbox(top, bottom)
                         }
-                        ArCameraController.startRecording { ok, error ->
-                            if (ok) {
-                                result.success(null)
-                            } else {
-                                result.error("record_start_failed", error ?: "unknown", null)
-                            }
-                        }
+                        val maxDurationMs = when (val raw = call.argument<Any>("maxDurationMs")) {
+                            is Int -> raw.toLong()
+                            is Long -> raw
+                            is Double -> raw.toLong()
+                            else -> 0L
+                        }.coerceAtLeast(0L)
+                        ArCameraController.startRecording(
+                            onResult = { ok, error ->
+                                if (ok) {
+                                    result.success(null)
+                                } else {
+                                    result.error("record_start_failed", error ?: "unknown", null)
+                                }
+                            },
+                            maxDurationMs = maxDurationMs,
+                        )
                     }
                     "stopRecording" -> {
                         ArCameraController.stopRecording { path, error ->
@@ -186,6 +201,68 @@ class MainActivity : FlutterActivity() {
                                 result.success(path)
                             } else {
                                 result.error("merge_failed", error ?: "unknown", null)
+                            }
+                        }
+                    }
+                    "trimVideoTail" -> {
+                        val path = call.argument<String>("path")
+                        if (path.isNullOrBlank()) {
+                            result.error("invalid_args", "path required", null)
+                            return@setMethodCallHandler
+                        }
+                        val trimMs = when (val raw = call.argument<Any>("trimMs")) {
+                            is Int -> raw.toLong()
+                            is Long -> raw
+                            is Double -> raw.toLong()
+                            else -> 120L
+                        }.coerceIn(40L, 500L)
+                        val maxDurationMs = when (val raw = call.argument<Any>("maxDurationMs")) {
+                            is Int -> raw.toLong()
+                            is Long -> raw
+                            is Double -> raw.toLong()
+                            else -> null
+                        }
+                        Executors.newSingleThreadExecutor { r ->
+                            Thread(r, "ar-video-tail-trim").apply { isDaemon = true }
+                        }.execute {
+                            try {
+                                val input = java.io.File(path)
+                                val trimmed = if (maxDurationMs != null && maxDurationMs > 0L) {
+                                    com.dubai.bimobondapp.ar_camera.ArVideoTailTrimmer.trimToDuration(
+                                        input = input,
+                                        maxDurationUs = maxDurationMs * 1000L,
+                                    )
+                                } else {
+                                    com.dubai.bimobondapp.ar_camera.ArVideoTailTrimmer.trimEnd(
+                                        input = input,
+                                        trimUs = trimMs * 1000L,
+                                    )
+                                }
+                                val finalPath = if (
+                                    trimmed != null &&
+                                    trimmed.absolutePath != input.absolutePath &&
+                                    trimmed.exists()
+                                ) {
+                                    try {
+                                        if (input.exists()) input.delete()
+                                        if (trimmed.renameTo(input)) {
+                                            input.absolutePath
+                                        } else {
+                                            trimmed.copyTo(input, overwrite = true)
+                                            trimmed.delete()
+                                            input.absolutePath
+                                        }
+                                    } catch (_: Exception) {
+                                        trimmed.absolutePath
+                                    }
+                                } else {
+                                    trimmed?.absolutePath ?: path
+                                }
+                                runOnUiThread { result.success(finalPath) }
+                            } catch (t: Throwable) {
+                                runOnUiThread {
+                                    result.error("trim_failed", t.message ?: "unknown", null)
+                                }
                             }
                         }
                     }
@@ -213,6 +290,33 @@ class MainActivity : FlutterActivity() {
                         ArCameraBridge.setPreviewLetterbox(top, bottom)
                         result.success(null)
                     }
+                    "setRetouchAdjustments" -> {
+                        fun level(key: String): Int =
+                            when (val raw = call.argument<Any>(key)) {
+                                is Int -> raw
+                                is Long -> raw.toInt()
+                                is Double -> raw.roundToInt()
+                                is Float -> raw.toInt()
+                                else -> 0
+                            }.coerceIn(-100, 100)
+                        LiveRetouchState.adjustments = LiveRetouchAdjustments.fromLevels(
+                            saturation = level("saturationLevel"),
+                            brightness = level("brightnessLevel"),
+                            contrast = level("contrastLevel"),
+                            exposure = level("exposureLevel"),
+                            whiteBalance = level("whiteBalanceLevel"),
+                            highlights = level("highlightsLevel"),
+                            shadows = level("shadowsLevel"),
+                            nose = level("noseLevel"),
+                        )
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
+                    "clearRetouchAdjustments" -> {
+                        LiveRetouchState.clear()
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
                     "setZoom" -> {
                         val zoom = (call.argument<Double>("zoom") ?: 0.0).toFloat()
                         ArCameraController.setLinearZoom(zoom) { ok, error ->
@@ -231,6 +335,12 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        ArCameraController.onRecordingAutoStopped = { path ->
+            runOnUiThread {
+                arCameraChannel?.invokeMethod("onRecordingAutoStopped", path)
+            }
+        }
     }
 
     /** Prefetch CameraX provider + MediaPipe so + → camera isn't cold-starting. */
@@ -269,6 +379,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        ArCameraController.onRecordingAutoStopped = null
         CountdownTonePlayer.release()
         super.onDestroy()
     }

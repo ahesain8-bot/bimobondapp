@@ -86,9 +86,7 @@ class PostAuctionEntity extends Equatable {
           startingPrice.round(),
     );
     final targetPriceCoins = _readInt(
-      json['targetPriceCoins'] ??
-          json['targetPriceUsd'] ??
-          targetPrice.round(),
+      json['targetPriceCoins'] ?? json['targetPriceUsd'] ?? targetPrice.round(),
     );
     final currentTotalCoins = _readInt(
       json['currentTotalCoins'] ??
@@ -132,19 +130,19 @@ class PostAuctionEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        itemName,
-        itemImageUrl,
-        startingPrice,
-        targetPrice,
-        startingPriceCoins,
-        targetPriceCoins,
-        currentTotalCoins,
-        currencyCode,
-        giftCount,
-        status,
-        pricing,
-        startedAt,
-        endedAt,
-      ];
+    id,
+    itemName,
+    itemImageUrl,
+    startingPrice,
+    targetPrice,
+    startingPriceCoins,
+    targetPriceCoins,
+    currentTotalCoins,
+    currencyCode,
+    giftCount,
+    status,
+    pricing,
+    startedAt,
+    endedAt,
+  ];
 }

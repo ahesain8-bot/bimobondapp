@@ -2,8 +2,6 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// TikTok-style top bar: sound pill (center), close (right).
-/// Camera flip now lives in the side toolbar.
 class CameraTopBar extends StatelessWidget {
   const CameraTopBar({
     super.key,
@@ -11,6 +9,7 @@ class CameraTopBar extends StatelessWidget {
     required this.soundLabel,
     this.onSoundTap,
     this.onClearSound,
+    this.onFlip,
     this.isLiveMode = false,
     this.addSoundLabel = 'Add sound',
     this.showSound = true,
@@ -20,11 +19,9 @@ class CameraTopBar extends StatelessWidget {
   final String soundLabel;
   final VoidCallback? onSoundTap;
   final VoidCallback? onClearSound;
+  final VoidCallback? onFlip;
   final bool isLiveMode;
   final String addSoundLabel;
-
-  /// While recording, the sound pill overlaps the recording-seconds badge, so
-  /// the camera hides it (pass false).
   final bool showSound;
 
   @override
@@ -34,12 +31,13 @@ class CameraTopBar extends StatelessWidget {
     final canClear = !isLiveMode && onClearSound != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
       child: Row(
         children: [
-          // Balances the close button on the right so the sound pill stays
-          // centered — flip moved to the side toolbar.
-          const SizedBox(width: 48),
+          _TopCircleButton(
+            icon: LucideIcons.x,
+            onTap: onClose,
+          ),
           Expanded(
             child: showSound
                 ? Center(
@@ -104,10 +102,14 @@ class CameraTopBar extends StatelessWidget {
                   )
                 : const SizedBox.shrink(),
           ),
-          _TopCircleButton(
-            icon: LucideIcons.x,
-            onTap: onClose,
-          ),
+          if (onFlip != null)
+            _TopCircleButton(
+              icon: LucideIcons.switchCamera,
+              onTap: onFlip!,
+              customIcon: TikTokSideIcons.flip(size: 26),
+            )
+          else
+            const SizedBox(width: 48),
         ],
       ),
     );
@@ -115,21 +117,24 @@ class CameraTopBar extends StatelessWidget {
 }
 
 class _TopCircleButton extends StatelessWidget {
-  const _TopCircleButton({required this.icon, required this.onTap});
+  const _TopCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.customIcon,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        margin: const EdgeInsets.all(4),
-        decoration: CameraToolIcons.circleDecoration(),
-        child: Icon(icon, color: Colors.white, size: 20),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: customIcon ?? Icon(icon, color: Colors.white, size: 26),
       ),
     );
   }

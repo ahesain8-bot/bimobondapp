@@ -68,7 +68,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     _currentUserId = event.currentUserId;
 
     await socketService.connect();
-    socketService.joinChat(event.chatId);
+    socketService.joinChat(event.chatId, userId: event.currentUserId);
 
     _messageSub?.cancel();
     _typingSub?.cancel();

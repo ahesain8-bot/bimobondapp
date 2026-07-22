@@ -280,6 +280,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       isOwner: _isOwner(post),
       watchedDuration: _kStorySegmentDuration.inSeconds,
       checkStoryHistory: true,
+      isStory: true,
     );
     if (!mounted || serverCount == null) return;
 
@@ -405,7 +406,9 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       confirmLabel: l10n.deleteAction,
       destructive: true,
       onConfirm: () {
-        context.read<PostsBloc>().add(DeletePostRequestedEvent(post.id));
+        context.read<PostsBloc>().add(
+          DeletePostRequestedEvent(post.id, isStory: true),
+        );
       },
     ).whenComplete(() {
       if (mounted) _resumeProgress();

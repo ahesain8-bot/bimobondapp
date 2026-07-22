@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_side_toolbar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_tool_icons.dart';
 import 'package:bimobondapp/core/constants/lives_layout_constants.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter/material.dart';
@@ -76,14 +78,12 @@ class MediaStudioTopBar extends StatelessWidget {
     required this.soundLabel,
     required this.onBack,
     required this.onSoundTap,
-    required this.onSettingsTap,
     this.onClearSound,
   });
 
   final String soundLabel;
   final VoidCallback onBack;
   final VoidCallback onSoundTap;
-  final VoidCallback onSettingsTap;
   final VoidCallback? onClearSound;
 
   @override
@@ -105,10 +105,8 @@ class MediaStudioTopBar extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: onSettingsTap,
-            icon: const Icon(LucideIcons.settings, color: Colors.white),
-          ),
+          // Balance the back button so the sound pill stays centered.
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -122,6 +120,7 @@ class MediaStudioSideTool {
     required this.onTap,
     this.active = false,
     this.useAa = false,
+    this.customIcon,
   });
 
   final IconData icon;
@@ -129,20 +128,22 @@ class MediaStudioSideTool {
   final VoidCallback onTap;
   final bool active;
   final bool useAa;
+  final Widget? customIcon;
 }
 
-/// Right-rail (LTR) / left-rail (RTL) edit tools — icon column.
+/// Right-rail (LTR) / left-rail (RTL) edit tools — same expand behaviour as
+/// the camera [CameraSideToolbar].
 class MediaStudioSideRail extends StatefulWidget {
   const MediaStudioSideRail({
     super.key,
     required this.tools,
     this.collapsedCount = 8,
-    this.showLabels = false,
+    this.iconOnStartEdge = false,
   });
 
   final List<MediaStudioSideTool> tools;
   final int collapsedCount;
-  final bool showLabels;
+  final bool iconOnStartEdge;
 
   @override
   State<MediaStudioSideRail> createState() => _MediaStudioSideRailState();
@@ -151,136 +152,209 @@ class MediaStudioSideRail extends StatefulWidget {
 class _MediaStudioSideRailState extends State<MediaStudioSideRail> {
   bool _expanded = false;
 
-  @override
-  Widget build(BuildContext context) {
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-    final visible = _expanded || widget.tools.length <= widget.collapsedCount
-        ? widget.tools
-        : widget.tools.take(widget.collapsedCount).toList(growable: false);
-    final hasMore = widget.tools.length > widget.collapsedCount;
+  /// Pinned at top — same as camera (flip + flash); here Settings + Share.
+  static const _pinnedCount = 2;
 
-    return Padding(
-      padding: EdgeInsetsDirectional.only(
-        end: isRtl ? 0 : 10,
-        start: isRtl ? 10 : 0,
-      ),
-      child: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final tool in visible)
-              _SideRailButton(
-                tool: tool,
-                showLabel: widget.showLabels,
-                onTap: tool.onTap,
-              ),
-            if (hasMore)
-              _SideRailButton(
-                tool: MediaStudioSideTool(
-                  icon: _expanded
-                      ? LucideIcons.chevronUp
-                      : LucideIcons.chevronDown,
-                  label: '',
-                  onTap: () => setState(() => _expanded = !_expanded),
-                ),
-                showLabel: false,
-                onTap: () => setState(() => _expanded = !_expanded),
-              ),
-          ],
-        ),
-      ),
-    );
+  /// Tool row: 48px icon + [CameraToolIcons.railRowSpacing] gap.
+  static const _toolRowHeight = 48.0 + CameraToolIcons.railRowSpacing;
+
+  /// Separator line + vertical margins (see [CameraSideRailSeparator]).
+  static const _separatorBlockHeight = 11.0;
+
+  /// Expand chevron tap target below the last tool.
+  static const _expandBlockHeight = 28.0;
+
+  bool get _hasMore => widget.tools.length > widget.collapsedCount;
+
+  double _maxScrollHeight(BoxConstraints constraints) {
+    if (!constraints.hasBoundedHeight) return double.infinity;
+    final reserved =
+        _pinnedCount * _toolRowHeight +
+        _separatorBlockHeight +
+        (_hasMore ? _expandBlockHeight : 0);
+    return (constraints.maxHeight - reserved).clamp(0.0, constraints.maxHeight);
   }
-}
-
-class _SideRailButton extends StatelessWidget {
-  const _SideRailButton({
-    required this.tool,
-    required this.onTap,
-    this.showLabel = false,
-  });
-
-  final MediaStudioSideTool tool;
-  final VoidCallback onTap;
-  final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
+    final pinned = widget.tools.take(_pinnedCount).toList(growable: false);
+    final scrollableEnd =
+        widget.collapsedCount.clamp(_pinnedCount, widget.tools.length);
+    final scrollable = widget.tools
+        .skip(_pinnedCount)
+        .take(scrollableEnd - _pinnedCount)
+        .toList(growable: false);
+    final overflow = widget.tools.length > widget.collapsedCount
+        ? widget.tools.skip(widget.collapsedCount).toList(growable: false)
+        : const <MediaStudioSideTool>[];
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Tooltip(
-        message: tool.label,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: SizedBox(
-            width: 44,
+      padding: EdgeInsets.only(
+        left: widget.iconOnStartEdge ? 10 : 0,
+        right: widget.iconOnStartEdge ? 0 : 10,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Directionality(
+            textDirection: TextDirection.ltr,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: widget.iconOnStartEdge
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.end,
               children: [
-                SizedBox(
-                  height: 28,
-                  child: tool.useAa
-                      ? Text(
-                          'Aa',
-                          style: TextStyle(
-                            color: tool.active
-                                ? const Color(0xFFFE2C55)
-                                : Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
-                            shadows: const [
-                              Shadow(
-                                color: Colors.black54,
-                                blurRadius: 6,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Icon(
-                          tool.icon,
-                          color: tool.active
-                              ? const Color(0xFFFE2C55)
-                              : Colors.white,
-                          size: 26,
-                          shadows: const [
-                            Shadow(
-                              color: Colors.black54,
-                              blurRadius: 6,
-                              offset: Offset(0, 1),
-                            ),
-                          ],
-                        ),
+                for (var i = 0; i < pinned.length; i++)
+                  _buildToolRow(
+                    pinned[i],
+                    trimBottomSpacing: i == pinned.length - 1,
+                  ),
+                CameraSideRailSeparator(
+                  iconOnStartEdge: widget.iconOnStartEdge,
                 ),
-                if (showLabel && tool.label.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    tool.label,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      shadows: const [
-                        Shadow(
-                          color: Colors.black54,
-                          blurRadius: 4,
-                          offset: Offset(0, 1),
-                        ),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: _maxScrollHeight(constraints),
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: widget.iconOnStartEdge
+                          ? CrossAxisAlignment.start
+                          : CrossAxisAlignment.end,
+                      children: [
+                        for (var i = 0; i < scrollable.length; i++)
+                          _buildToolRow(
+                            scrollable[i],
+                            trimBottomSpacing: i == scrollable.length - 1 &&
+                                _hasMore &&
+                                !_expanded,
+                          ),
+                        if (overflow.isNotEmpty)
+                          ClipRect(
+                            child: AnimatedAlign(
+                              duration: const Duration(milliseconds: 480),
+                              curve: Curves.easeInOutCubic,
+                              alignment: widget.iconOnStartEdge
+                                  ? Alignment.topLeft
+                                  : Alignment.topRight,
+                              heightFactor: _expanded ? 1.0 : 0.0,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: widget.iconOnStartEdge
+                                    ? CrossAxisAlignment.start
+                                    : CrossAxisAlignment.end,
+                                children: [
+                                  for (var i = 0; i < overflow.length; i++)
+                                    _buildToolRow(
+                                      overflow[i],
+                                      trimBottomSpacing:
+                                          i == overflow.length - 1 &&
+                                              _hasMore,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                ],
+                ),
+                if (_hasMore)
+                  CameraRailExpandButton(
+                    expanded: _expanded,
+                    iconOnStartEdge: widget.iconOnStartEdge,
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    compact: true,
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildToolRow(
+    MediaStudioSideTool tool, {
+    bool trimBottomSpacing = false,
+  }) {
+    if (tool.useAa) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: trimBottomSpacing ? 0 : CameraToolIcons.railRowSpacing,
+        ),
+        child: GestureDetector(
+          onTap: tool.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 420),
+            curve: Curves.easeInOutCubic,
+            alignment: widget.iconOnStartEdge
+                ? Alignment.centerLeft
+                : Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: widget.iconOnStartEdge
+                  ? MainAxisAlignment.start
+                  : MainAxisAlignment.end,
+              children: [
+                if (!widget.iconOnStartEdge && _expanded)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      tool.label,
+                      style: CameraToolIcons.labelStyle.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Text(
+                      'Aa',
+                      style: TextStyle(
+                        color: tool.active
+                            ? const Color(0xFFFE2C55)
+                            : Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+                if (widget.iconOnStartEdge && _expanded)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(
+                      tool.label,
+                      style: CameraToolIcons.labelStyle.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
         ),
-      ),
+      );
+    }
+
+    return CameraRailToolRow(
+      icon: tool.icon,
+      label: tool.label,
+      onTap: tool.onTap,
+      active: tool.active,
+      showActiveBadge: false,
+      iconOnStartEdge: widget.iconOnStartEdge,
+      showLabel: _expanded,
+      customIcon: tool.customIcon,
+      rowSpacing: trimBottomSpacing ? 0 : null,
     );
   }
 }
@@ -442,7 +516,7 @@ class MediaStudioBottomActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
       child: Row(
         children: [
           Expanded(

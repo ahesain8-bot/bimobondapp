@@ -10,6 +10,9 @@ import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_phone_usecase.
 import 'package:bimobondapp/app/auth/domain/usecases/sign_in_with_google_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/forgot_password_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/send_otp_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/verify_otp_usecase.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/reset_password_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/get_admin_user_activity_usecase.dart';
 import 'package:bimobondapp/app/auth/domain/usecases/get_user_by_id_usecase.dart';
 
@@ -89,6 +92,9 @@ Future<void> initAuth() async {
   sl.registerLazySingleton(() => GetUserByIdUseCase(sl()));
   sl.registerLazySingleton(() => GetAdminUserActivityUseCase(sl()));
   sl.registerLazySingleton(() => ForgotPasswordUseCase(sl()));
+  sl.registerLazySingleton(() => SendOtpUseCase(sl()));
+  sl.registerLazySingleton(() => VerifyOtpUseCase(sl()));
+  sl.registerLazySingleton(() => ResetPasswordUseCase(sl()));
 
   // Bloc
   sl.registerFactory(
@@ -101,6 +107,9 @@ Future<void> initAuth() async {
       signInWithGoogleUseCase: sl(),
       updateProfileUseCase: sl(),
       getProfileUseCase: sl(),
+      sendOtpUseCase: sl(),
+      verifyOtpUseCase: sl(),
+      resetPasswordUseCase: sl(),
     ),
   );
 }

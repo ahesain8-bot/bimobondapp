@@ -15,6 +15,15 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
     super.winner,
     required super.giftTransactions,
     super.pricing,
+    super.postId,
+    super.liveId,
+    super.itemImageUrl,
+    super.startingPrice,
+    super.escrowEnabled,
+    super.fulfillmentStatus,
+    super.startedAt,
+    super.endedAt,
+    super.giftCount,
   });
 
   factory AuctionDetailsModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +50,11 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
           data['currentTotalUsd'] ??
           data['giftTotalUsd'],
     );
+    final giftTransactions = _parseTransactions(data['giftTransactions']);
+    final countRaw = data['_count'];
+    final giftCount = countRaw is Map
+        ? _readInt(countRaw['giftTransactions'] ?? countRaw['gifts'])
+        : giftTransactions.length;
 
     return AuctionDetailsModel(
       id: data['id']?.toString() ?? '',
@@ -55,10 +69,19 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
       winner: data['winner'] is Map
           ? _parseUser(Map<String, dynamic>.from(data['winner'] as Map))
           : null,
-      giftTransactions: _parseTransactions(data['giftTransactions']),
+      giftTransactions: giftTransactions,
       pricing: data['pricing'] is Map
           ? AuctionPricingEntity.fromJson(data['pricing'])
           : null,
+      postId: data['postId']?.toString(),
+      liveId: data['liveId']?.toString(),
+      itemImageUrl: data['itemImageUrl']?.toString(),
+      startingPrice: startingPrice,
+      escrowEnabled: data['escrowEnabled'] == true,
+      fulfillmentStatus: data['fulfillmentStatus']?.toString(),
+      startedAt: DateTime.tryParse(data['startedAt']?.toString() ?? ''),
+      endedAt: DateTime.tryParse(data['endedAt']?.toString() ?? ''),
+      giftCount: giftCount,
     );
   }
 

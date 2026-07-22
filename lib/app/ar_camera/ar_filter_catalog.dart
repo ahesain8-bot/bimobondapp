@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_bundled_catalog.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 
 class ArFilterItem {
@@ -55,7 +56,8 @@ class ArFilterCatalog {
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
   ];
 
-  static ArColorFilterCatalog colorCatalog = ArColorFilterCatalog.bundled();
+  static ArColorFilterCatalog colorCatalog =
+      ArColorFilterBundledCatalog.catalog;
 
   static void updateColorCatalog(ArColorFilterCatalog catalog) {
     colorCatalog = catalog;

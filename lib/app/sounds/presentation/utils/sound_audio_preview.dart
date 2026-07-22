@@ -9,6 +9,7 @@ class SoundAudioPreview {
   static String? _playingId;
   static Duration _loopStart = Duration.zero;
   static Duration _loopEnd = Duration.zero;
+  static bool _loop = false;
 
   static String? get playingId => _playingId;
 
@@ -28,23 +29,30 @@ class SoundAudioPreview {
     await playAt(soundId, audioUrl);
   }
 
-  /// Plays [audioUrl] from [startOffset] for up to [window] (default 15s),
-  /// then stops. Does not loop — leftover looping was causing music to keep
-  /// playing after the picker closed / during capture & upload.
+  /// Plays [audioUrl] from [startOffset] for up to [window] (default 15s).
+  ///
+  /// When [loop] is false (picker preview), playback stops at the window end.
+  /// When [loop] is true (media-studio bed), the window restarts so music keeps
+  /// playing under the looping video preview.
   static Future<void> playAt(
     String soundId,
     String audioUrl, {
     Duration startOffset = Duration.zero,
     Duration window = const Duration(seconds: 15),
+    bool loop = false,
   }) async {
     final url = audioUrl.trim();
     if (soundId.isEmpty || url.isEmpty) return;
 
     await stop();
 
-    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     _controller = controller;
     _playingId = soundId;
+    _loop = loop;
     _loopStart = startOffset < Duration.zero ? Duration.zero : startOffset;
     _loopEnd = _loopStart +
         (window <= Duration.zero ? const Duration(seconds: 15) : window);
@@ -77,8 +85,12 @@ class SoundAudioPreview {
     final pos = controller.value.position;
     final end = _loopEnd > _loopStart ? _loopEnd : controller.value.duration;
     if (end > Duration.zero && pos >= end - const Duration(milliseconds: 80)) {
-      // End of the selected preview window — stop (do not seek/loop).
-      unawaited(stop());
+      if (_loop) {
+        unawaited(controller.seekTo(_loopStart));
+      } else {
+        // End of the selected preview window — stop (do not seek/loop).
+        unawaited(stop());
+      }
     }
   }
 
@@ -88,6 +100,7 @@ class SoundAudioPreview {
     _playingId = null;
     _loopStart = Duration.zero;
     _loopEnd = Duration.zero;
+    _loop = false;
     if (controller != null) {
       controller.removeListener(_onTick);
       try {

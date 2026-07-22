@@ -1,9 +1,8 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
-import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_ar_effects_layer.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effects_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/gallery_ar_effects_layer.dart';
@@ -63,6 +62,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
   Size _mediaSize = Size.zero;
   bool _videoFailed = false;
   bool _isVideoLoading = false;
+  File? _loopPoster;
 
   bool get _treatAsVideo =>
       widget.isVideo || VideoThumbnailUtils.isVideoFile(widget.file);
@@ -83,6 +83,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
     if (oldWidget.file.path != widget.file.path) {
       _videoController?.dispose();
       _videoController = null;
+      _loopPoster = null;
       _videoFailed = false;
       if (_treatAsVideo) {
         _initVideo();
@@ -153,7 +154,12 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       _videoFailed = false;
     });
 
-    final controller = VideoPlayerController.file(widget.file);
+    // mixWithOthers so studio soundtrack (SoundAudioPreview) can play under
+    // the looping video without ExoPlayer stealing focus / freezing frames.
+    final controller = VideoPlayerController.file(
+      widget.file,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     _videoController = controller;
 
     void onUpdate() {
@@ -191,6 +197,9 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         _mediaSize = controller.value.size;
         _isVideoLoading = false;
       });
+      // Poster sits behind the player so ExoPlayer's loop seek (or a 1-frame
+      // black tail) doesn't flash the black ColoredBox behind the texture.
+      unawaited(_loadLoopPoster());
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -201,42 +210,24 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
     }
   }
 
+  Future<void> _loadLoopPoster() async {
+    try {
+      final thumb = await VideoThumbnailUtils.generateThumbnailFile(
+        widget.file,
+        maxHeight: 720,
+      );
+      if (!mounted || thumb == null) return;
+      setState(() => _loopPoster = thumb);
+    } catch (_) {}
+  }
+
   Future<void> _loadImageSize() async {
     if (VideoThumbnailUtils.isVideoFile(widget.file)) {
       _initVideo();
       return;
     }
-
-    try {
-      final bytes = await widget.file.readAsBytes();
-      final decoded = CameraCaptureUtils.decodeNormalized(bytes);
-      if (decoded != null) {
-        if (!mounted) return;
-        setState(() {
-          _mediaSize = Size(
-            decoded.width.toDouble(),
-            decoded.height.toDouble(),
-          );
-        });
-        return;
-      }
-
-      final codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      if (!mounted) {
-        frame.image.dispose();
-        return;
-      }
-      setState(() {
-        _mediaSize = Size(
-          frame.image.width.toDouble(),
-          frame.image.height.toDouble(),
-        );
-      });
-      frame.image.dispose();
-    } catch (_) {
-      if (mounted) setState(() => _videoFailed = true);
-    }
+    // Do NOT decode the full photo here — that races Image.file and causes a
+    // black flash. Effects use layout size; Image.file paints immediately.
   }
 
   @override
@@ -272,38 +263,55 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           !controller.value.isInitialized) {
         media = _VideoFallbackThumb(file: widget.file);
       } else {
+        final poster = _loopPoster;
         media = ColoredBox(
           color: Colors.black,
-          child: SizedBox.expand(
-            child: FittedBox(
-              fit: BoxFit.cover,
-              clipBehavior: Clip.hardEdge,
-              child: SizedBox(
-                width: controller.value.size.width,
-                height: controller.value.size.height,
-                child: VideoPlayer(controller),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (poster != null)
+                Image.file(
+                  poster,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  filterQuality: FilterQuality.low,
+                ),
+              FittedBox(
+                fit: BoxFit.cover,
+                clipBehavior: Clip.hardEdge,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
+                ),
               ),
-            ),
+            ],
           ),
         );
       }
     } else {
-      media = ColoredBox(
-        color: Colors.black,
-        child: Image.file(
-          widget.file,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          gaplessPlayback: true,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (_, _, _) => const ColoredBox(
-            color: Colors.black,
-            child: Center(
-              child: Icon(LucideIcons.imageOff, color: Colors.white38),
+      media = LayoutBuilder(
+        builder: (context, constraints) {
+          // Decode at display size only — no full-res decode, no black wait.
+          final dpr = MediaQuery.of(context).devicePixelRatio;
+          const maxDecodeEdge = 720;
+          final targetW = (constraints.maxWidth * dpr).round().clamp(1, maxDecodeEdge);
+          return Image.file(
+            widget.file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.low,
+            cacheWidth: targetW,
+            errorBuilder: (_, _, _) => const ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: Icon(LucideIcons.imageOff, color: Colors.white38),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
     }
 
@@ -317,14 +325,14 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       fit: StackFit.expand,
       children: [
         SizedBox.expand(child: media),
-        if (activeEffect != null &&
-            activeEffect.requiresFaceDetection &&
-            _mediaSize != Size.zero)
+        if (activeEffect != null && activeEffect.requiresFaceDetection)
           GalleryArEffectsLayer(
             file: widget.file,
             isVideo: _treatAsVideo,
             effect: activeEffect,
-            mediaSize: _mediaSize,
+            mediaSize: _mediaSize == Size.zero
+                ? MediaQuery.sizeOf(context)
+                : _mediaSize,
             previewFit: BoxFit.cover,
           ),
         if (activeEffect != null && activeEffect.isScreenEffect)

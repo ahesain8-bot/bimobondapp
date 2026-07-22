@@ -150,6 +150,11 @@ class FaceWarpGlView @JvmOverloads constructor(
         return renderer.copyLastCapturedFrame()
     }
 
+    fun clearLastCapturedFrame() {
+        if (!glInitialized) return
+        renderer.clearLastCapturedFrame()
+    }
+
     fun releaseGl() {
         if (!glInitialized) return
         queueEvent {

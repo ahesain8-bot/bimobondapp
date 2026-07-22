@@ -98,7 +98,6 @@ class _EmailSignUpScreenState extends State<EmailSignUpScreen> {
           listenWhen: (previous, current) =>
               current is AuthFailure ||
               current is AuthSuccess ||
-              current is EmailVerificationSentState ||
               current is EmailOtpSentState,
           listener: (context, state) {
             if (!_isSubmitting) return;
@@ -109,15 +108,9 @@ class _EmailSignUpScreenState extends State<EmailSignUpScreen> {
                   ? localizeAuthMessage(l10n, state.messageKey!)
                   : state.message;
               PopupDialogs.showErrorDialog(context, message);
-            } else if (state is EmailVerificationSentState) {
-              setState(() => _isSubmitting = false);
-              navigateAfterSignUp(
-                context,
-                pendingVerificationEmail: state.email,
-              );
             } else if (state is AuthSuccess) {
               setState(() => _isSubmitting = false);
-              navigateAfterSignUp(context);
+              navigateAfterSignUp(context, user: state.user);
             } else if (state is EmailOtpSentState) {
               setState(() => _isSubmitting = false);
               context.pushNamed(

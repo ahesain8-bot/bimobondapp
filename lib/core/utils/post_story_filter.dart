@@ -14,12 +14,14 @@ bool parsePostIsStory(dynamic value) {
 List<PostEntity> excludeStoryPosts(List<PostEntity> posts) =>
     posts.where((post) => !post.isStory).toList();
 
-/// Stories disappear 24 hours after creation.
+/// Stories disappear after TTL (default 24h, max 7 days on API).
 const Duration storyLifetime = Duration(hours: 24);
+const Duration storyMaxLifetime = Duration(hours: 168);
 
 bool isStoryStillActive(PostEntity post) {
   if (!post.isStory) return false;
-  return DateTime.now().difference(post.createdAt) < storyLifetime;
+  // Soft client guard aligned with API max TTL; rings already filter expired.
+  return DateTime.now().difference(post.createdAt) < storyMaxLifetime;
 }
 
 Duration storyTimeRemaining(PostEntity post) {

@@ -1,10 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:bimobondapp/app/auth/presentation/utils/post_signup_navigation.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/auth/presentation/utils/otp_resend_cooldown.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/custom_text_field.dart';
@@ -13,6 +10,9 @@ import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 class EmailOtpVerificationScreen extends StatefulWidget {
   final String email;
@@ -24,10 +24,17 @@ class EmailOtpVerificationScreen extends StatefulWidget {
       _EmailOtpVerificationScreenState();
 }
 
-class _EmailOtpVerificationScreenState
-    extends State<EmailOtpVerificationScreen> {
+class _EmailOtpVerificationScreenState extends State<EmailOtpVerificationScreen>
+    with OtpResendCooldownMixin {
   final TextEditingController otpController = TextEditingController();
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Screen opens after an OTP was already sent.
+    startResendCooldown();
+  }
 
   void _onSubmitPressed() {
     final code = otpController.text.trim();
@@ -46,6 +53,11 @@ class _EmailOtpVerificationScreenState
     }
   }
 
+  void _onResendPressed() {
+    if (!canResendCode) return;
+    context.read<AuthBloc>().add(SendEmailOtpEvent(email: widget.email));
+  }
+
   String _getLocalizedMessage(AppLocalizations l10n, String key) {
     switch (key) {
       case 'loginFailed':
@@ -61,7 +73,7 @@ class _EmailOtpVerificationScreenState
       case 'signupFailed':
         return l10n.signupFailed;
       default:
-        return key; // fallback
+        return key;
     }
   }
 
@@ -75,6 +87,9 @@ class _EmailOtpVerificationScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final resendLabel = canResendCode
+        ? l10n.resendCode
+        : l10n.resendCodeIn(resendSecondsLeft);
 
     return Scaffold(
       appBar: AppBar(
@@ -96,19 +111,33 @@ class _EmailOtpVerificationScreenState
       ),
       body: BlocListener<AuthBloc, AuthState>(
         listenWhen: (previous, current) =>
-            current is AuthFailure || current is AuthSuccess,
+            current is AuthFailure ||
+            current is EmailOtpVerifiedState ||
+            current is EmailOtpSentState,
         listener: (context, state) {
-          if (!_isSubmitting) return;
-
           if (state is AuthFailure) {
-            _isSubmitting = false;
-            String message = state.messageKey != null
+            if (_isSubmitting) {
+              setState(() => _isSubmitting = false);
+            }
+            final message = state.messageKey != null
                 ? _getLocalizedMessage(l10n, state.messageKey!)
                 : state.message;
             PopupDialogs.showErrorDialog(context, message);
-          } else if (state is AuthSuccess) {
-            _isSubmitting = false;
-            navigateAfterAuth(context, user: state.user);
+            return;
+          }
+
+          if (state is EmailOtpVerifiedState) {
+            setState(() => _isSubmitting = false);
+            PopupDialogs.showSuccessDialog(context, l10n.otpVerifiedSuccess);
+            if (context.canPop()) {
+              context.pop();
+            }
+            return;
+          }
+
+          if (state is EmailOtpSentState) {
+            startResendCooldown();
+            PopupDialogs.showSuccessDialog(context, l10n.otpSentSuccess);
           }
         },
         child: SafeArea(
@@ -122,7 +151,7 @@ class _EmailOtpVerificationScreenState
                   child: Container(
                     padding: const EdgeInsets.all(AppSizes.p24),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -170,11 +199,7 @@ class _EmailOtpVerificationScreenState
                 const SizedBox(height: AppSizes.p24),
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      context.read<AuthBloc>().add(
-                        SendEmailOtpEvent(email: widget.email),
-                      );
-                    },
+                    onPressed: canResendCode ? _onResendPressed : null,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -184,8 +209,12 @@ class _EmailOtpVerificationScreenState
                           fontSize: 14,
                         ),
                         CustomText(
-                          l10n.resendCode,
-                          color: theme.colorScheme.primary,
+                          resendLabel,
+                          color: canResendCode
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.45,
+                                ),
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),

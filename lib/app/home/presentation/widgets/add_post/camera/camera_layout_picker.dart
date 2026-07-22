@@ -90,9 +90,9 @@ class CameraLayoutPickerPopup extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.55),
+          color: const Color(0xFF5A5A5A).withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -101,7 +101,8 @@ class CameraLayoutPickerPopup extends StatelessWidget {
               onTap: () => onSelected(CameraLayoutMode.off),
               behavior: HitTestBehavior.opaque,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Text(
                   offLabel,
                   style: TextStyle(
@@ -198,56 +199,68 @@ class _LayoutIconPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
 
-    final r = Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3);
-    canvas.drawRect(r, paint);
+    final r = RRect.fromRectAndRadius(
+      Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(r, paint);
+    final bounds = r.outerRect;
 
     switch (mode) {
       case CameraLayoutMode.horizontal2:
         canvas.drawLine(
-          Offset(r.left, r.center.dy),
-          Offset(r.right, r.center.dy),
+          Offset(bounds.left, bounds.center.dy),
+          Offset(bounds.right, bounds.center.dy),
           paint,
         );
       case CameraLayoutMode.vertical2:
         canvas.drawLine(
-          Offset(r.center.dx, r.top),
-          Offset(r.center.dx, r.bottom),
+          Offset(bounds.center.dx, bounds.top),
+          Offset(bounds.center.dx, bounds.bottom),
           paint,
         );
       case CameraLayoutMode.horizontal3:
-        final y1 = r.top + r.height / 3;
-        final y2 = r.top + r.height * 2 / 3;
-        canvas.drawLine(Offset(r.left, y1), Offset(r.right, y1), paint);
-        canvas.drawLine(Offset(r.left, y2), Offset(r.right, y2), paint);
-      case CameraLayoutMode.grid2x2:
+        final y1 = bounds.top + bounds.height / 3;
+        final y2 = bounds.top + bounds.height * 2 / 3;
         canvas.drawLine(
-          Offset(r.center.dx, r.top),
-          Offset(r.center.dx, r.bottom),
+          Offset(bounds.left, y1),
+          Offset(bounds.right, y1),
           paint,
         );
         canvas.drawLine(
-          Offset(r.left, r.center.dy),
-          Offset(r.right, r.center.dy),
+          Offset(bounds.left, y2),
+          Offset(bounds.right, y2),
+          paint,
+        );
+      case CameraLayoutMode.grid2x2:
+        canvas.drawLine(
+          Offset(bounds.center.dx, bounds.top),
+          Offset(bounds.center.dx, bounds.bottom),
+          paint,
+        );
+        canvas.drawLine(
+          Offset(bounds.left, bounds.center.dy),
+          Offset(bounds.right, bounds.center.dy),
           paint,
         );
       case CameraLayoutMode.grid3x2:
-        // 2 columns x 3 rows: one vertical split + two horizontal splits.
-        final rowH = r.height / 3;
+        final rowH = bounds.height / 3;
         canvas.drawLine(
-          Offset(r.center.dx, r.top),
-          Offset(r.center.dx, r.bottom),
+          Offset(bounds.center.dx, bounds.top),
+          Offset(bounds.center.dx, bounds.bottom),
           paint,
         );
         canvas.drawLine(
-          Offset(r.left, r.top + rowH),
-          Offset(r.right, r.top + rowH),
+          Offset(bounds.left, bounds.top + rowH),
+          Offset(bounds.right, bounds.top + rowH),
           paint,
         );
         canvas.drawLine(
-          Offset(r.left, r.top + rowH * 2),
-          Offset(r.right, r.top + rowH * 2),
+          Offset(bounds.left, bounds.top + rowH * 2),
+          Offset(bounds.right, bounds.top + rowH * 2),
           paint,
         );
       case CameraLayoutMode.off:

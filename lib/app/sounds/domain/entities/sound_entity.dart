@@ -43,6 +43,52 @@ class SoundCreatorEntity extends Equatable {
   List<Object?> get props => [id, username, fullName, avatarUrl, isVerified];
 }
 
+class SoundSegmentEntity extends Equatable {
+  const SoundSegmentEntity({
+    required this.id,
+    required this.startMs,
+    required this.endMs,
+    this.label,
+    this.useCount = 0,
+    this.isDefault = false,
+  });
+
+  final String id;
+  final int startMs;
+  final int endMs;
+  final String? label;
+  final int useCount;
+  final bool isDefault;
+
+  int get durationMs {
+    final d = endMs - startMs;
+    return d < 0 ? 0 : d;
+  }
+
+  factory SoundSegmentEntity.fromJson(Map<String, dynamic> json) {
+    return SoundSegmentEntity(
+      id: json['id']?.toString() ?? '',
+      startMs: _parseSoundInt(json['startMs']),
+      endMs: _parseSoundInt(json['endMs']),
+      label: json['label']?.toString(),
+      useCount: _parseSoundInt(json['useCount']),
+      isDefault: json['isDefault'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'startMs': startMs,
+        'endMs': endMs,
+        if (label != null) 'label': label,
+        'useCount': useCount,
+        'isDefault': isDefault,
+      };
+
+  @override
+  List<Object?> get props => [id, startMs, endMs, label, useCount, isDefault];
+}
+
 class SoundEntity extends Equatable {
   const SoundEntity({
     required this.id,
@@ -55,9 +101,15 @@ class SoundEntity extends Equatable {
     this.isOriginal = false,
     this.isActive = true,
     this.originalSoundId,
+    this.creatorId,
     this.createdAt,
+    this.updatedAt,
     this.creator,
     this.postCount,
+    this.segmentCount,
+    this.waveformPeaks,
+    this.defaultSegment,
+    this.sortOrder,
   });
 
   final String id;
@@ -70,9 +122,15 @@ class SoundEntity extends Equatable {
   final bool isOriginal;
   final bool isActive;
   final String? originalSoundId;
+  final String? creatorId;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
   final SoundCreatorEntity? creator;
   final int? postCount;
+  final int? segmentCount;
+  final List<double>? waveformPeaks;
+  final SoundSegmentEntity? defaultSegment;
+  final int? sortOrder;
 
   String get resolvedAudioUrl => MediaUtils.resolveAbsoluteUrl(audioUrl);
 
@@ -80,6 +138,26 @@ class SoundEntity extends Equatable {
     final url = coverUrl;
     if (url == null || url.isEmpty) return null;
     return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  /// Clip range for attach: `[startMs, endMs)` clamped to track length (min 1s).
+  static ({int startMs, int endMs}) clipRangeMs({
+    required int durationSeconds,
+    required Duration offset,
+    required Duration window,
+  }) {
+    final maxMs = durationSeconds > 0 ? durationSeconds * 1000 : 15000;
+    final minLen = 1000;
+    var start = offset.inMilliseconds;
+    if (start < 0) start = 0;
+    if (start > maxMs - minLen) start = (maxMs - minLen).clamp(0, maxMs);
+    var end = (offset + window).inMilliseconds;
+    if (end > maxMs) end = maxMs;
+    if (end - start < minLen) {
+      end = (start + minLen).clamp(0, maxMs);
+      if (end - start < minLen) start = (end - minLen).clamp(0, maxMs);
+    }
+    return (startMs: start, endMs: end);
   }
 
   Map<String, dynamic> toJson() => {
@@ -93,7 +171,12 @@ class SoundEntity extends Equatable {
         'isOriginal': isOriginal,
         'isActive': isActive,
         if (originalSoundId != null) 'originalSoundId': originalSoundId,
+        if (creatorId != null) 'creatorId': creatorId,
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+        if (waveformPeaks != null) 'waveformPeaks': waveformPeaks,
+        if (defaultSegment != null) 'defaultSegment': defaultSegment!.toJson(),
+        if (sortOrder != null) 'sortOrder': sortOrder,
         if (creator != null)
           'creator': {
             'id': creator!.id,
@@ -102,20 +185,32 @@ class SoundEntity extends Equatable {
             if (creator!.avatarUrl != null) 'avatarUrl': creator!.avatarUrl,
             'isVerified': creator!.isVerified,
           },
-        if (postCount != null) '_count': {'posts': postCount},
+        if (postCount != null || segmentCount != null)
+          '_count': {
+            if (postCount != null) 'posts': postCount,
+            if (segmentCount != null) 'segments': segmentCount,
+          },
       };
 
   factory SoundEntity.fromJson(Map<String, dynamic> json) {
     final count = json['_count'];
     int? postsCount;
+    int? segmentsCount;
     if (count is Map) {
-      postsCount = _parseSoundInt(count['posts']);
+      postsCount = count['posts'] != null ? _parseSoundInt(count['posts']) : null;
+      segmentsCount =
+          count['segments'] != null ? _parseSoundInt(count['segments']) : null;
     }
 
     DateTime? createdAt;
     final rawCreated = json['createdAt'];
     if (rawCreated is String && rawCreated.isNotEmpty) {
       createdAt = DateTime.tryParse(rawCreated);
+    }
+    DateTime? updatedAt;
+    final rawUpdated = json['updatedAt'];
+    if (rawUpdated is String && rawUpdated.isNotEmpty) {
+      updatedAt = DateTime.tryParse(rawUpdated);
     }
 
     SoundCreatorEntity? creator;
@@ -124,6 +219,22 @@ class SoundEntity extends Equatable {
       creator = SoundCreatorEntity.fromJson(
         Map<String, dynamic>.from(rawCreator),
       );
+    }
+
+    SoundSegmentEntity? defaultSegment;
+    final rawDefault = json['defaultSegment'];
+    if (rawDefault is Map) {
+      defaultSegment = SoundSegmentEntity.fromJson(
+        Map<String, dynamic>.from(rawDefault),
+      );
+    }
+
+    List<double>? peaks;
+    final rawPeaks = json['waveformPeaks'];
+    if (rawPeaks is List) {
+      peaks = rawPeaks
+          .map((e) => e is num ? e.toDouble() : double.tryParse('$e') ?? 0)
+          .toList();
     }
 
     return SoundEntity(
@@ -137,9 +248,15 @@ class SoundEntity extends Equatable {
       isOriginal: json['isOriginal'] == true,
       isActive: json['isActive'] != false,
       originalSoundId: json['originalSoundId']?.toString(),
+      creatorId: json['creatorId']?.toString(),
       createdAt: createdAt,
+      updatedAt: updatedAt,
       creator: creator,
       postCount: postsCount,
+      segmentCount: segmentsCount,
+      waveformPeaks: peaks,
+      defaultSegment: defaultSegment,
+      sortOrder: json['sortOrder'] != null ? _parseSoundInt(json['sortOrder']) : null,
     );
   }
 
@@ -155,10 +272,148 @@ class SoundEntity extends Equatable {
     isOriginal,
     isActive,
     originalSoundId,
+    creatorId,
     createdAt,
+    updatedAt,
     creator,
     postCount,
+    segmentCount,
+    waveformPeaks,
+    defaultSegment,
+    sortOrder,
   ];
+}
+
+class SoundGroupEntity extends Equatable {
+  const SoundGroupEntity({
+    required this.id,
+    required this.name,
+    this.slug,
+    this.iconUrl,
+    this.sortOrder = 0,
+    this.isActive = true,
+    this.soundCount = 0,
+    this.sounds = const [],
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String name;
+  final String? slug;
+  final String? iconUrl;
+  final int sortOrder;
+  final bool isActive;
+  final int soundCount;
+  final List<SoundEntity> sounds;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  String? get resolvedIconUrl {
+    final url = iconUrl;
+    if (url == null || url.isEmpty) return null;
+    return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  factory SoundGroupEntity.fromJson(Map<String, dynamic> json) {
+    final sounds = <SoundEntity>[];
+    final rawSounds = json['sounds'];
+    if (rawSounds is List) {
+      for (final item in rawSounds) {
+        if (item is Map) {
+          sounds.add(SoundEntity.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
+    DateTime? createdAt;
+    final rawCreated = json['createdAt'];
+    if (rawCreated is String && rawCreated.isNotEmpty) {
+      createdAt = DateTime.tryParse(rawCreated);
+    }
+    DateTime? updatedAt;
+    final rawUpdated = json['updatedAt'];
+    if (rawUpdated is String && rawUpdated.isNotEmpty) {
+      updatedAt = DateTime.tryParse(rawUpdated);
+    }
+
+    return SoundGroupEntity(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      slug: json['slug']?.toString(),
+      iconUrl: json['iconUrl']?.toString(),
+      sortOrder: _parseSoundInt(json['sortOrder']),
+      isActive: json['isActive'] != false,
+      soundCount: _parseSoundInt(json['soundCount']),
+      sounds: sounds,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        name,
+        slug,
+        iconUrl,
+        sortOrder,
+        isActive,
+        soundCount,
+        sounds,
+        createdAt,
+        updatedAt,
+      ];
+}
+
+class SoundsSegmentsPageEntity extends Equatable {
+  const SoundsSegmentsPageEntity({
+    required this.segments,
+    required this.page,
+    required this.totalPages,
+    required this.total,
+  });
+
+  final List<SoundSegmentEntity> segments;
+  final int page;
+  final int totalPages;
+  final int total;
+
+  factory SoundsSegmentsPageEntity.fromJson(Map<String, dynamic> json) {
+    final rawData = json['data'];
+    final list = rawData is List ? rawData : json['segments'];
+    final segments = <SoundSegmentEntity>[];
+    if (list is List) {
+      for (final item in list) {
+        if (item is Map) {
+          segments.add(
+            SoundSegmentEntity.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+
+    final meta = json['meta'];
+    if (meta is Map) {
+      final map = Map<String, dynamic>.from(meta);
+      return SoundsSegmentsPageEntity(
+        segments: segments,
+        page: _parseSoundInt(map['page'], fallback: 1),
+        totalPages: _parseSoundInt(map['totalPages'], fallback: 1),
+        total: _parseSoundInt(map['total']),
+      );
+    }
+
+    return SoundsSegmentsPageEntity(
+      segments: segments,
+      page: _parseSoundInt(json['page'], fallback: 1),
+      totalPages: _parseSoundInt(json['totalPages'], fallback: 1),
+      total: _parseSoundInt(json['total']),
+    );
+  }
+
+  @override
+  List<Object?> get props => [segments, page, totalPages, total];
 }
 
 class SoundsPageEntity extends Equatable {
@@ -224,6 +479,8 @@ class SoundPostPreviewEntity extends Equatable {
     this.likeCount = 0,
     this.username,
     this.avatarUrl,
+    this.soundSegmentId,
+    this.soundSegment,
   });
 
   final String id;
@@ -235,6 +492,8 @@ class SoundPostPreviewEntity extends Equatable {
   final int likeCount;
   final String? username;
   final String? avatarUrl;
+  final String? soundSegmentId;
+  final SoundSegmentEntity? soundSegment;
 
   bool get isVideo {
     if (type.toUpperCase() == 'IMAGE') return false;
@@ -285,6 +544,14 @@ class SoundPostPreviewEntity extends Equatable {
         ? json['type'].toString()
         : (_resolvePostPreviewVideo(json) != null ? 'VIDEO' : 'IMAGE');
 
+    SoundSegmentEntity? segment;
+    final rawSegment = json['soundSegment'];
+    if (rawSegment is Map) {
+      segment = SoundSegmentEntity.fromJson(
+        Map<String, dynamic>.from(rawSegment),
+      );
+    }
+
     return SoundPostPreviewEntity(
       id: json['id']?.toString() ?? '',
       type: type,
@@ -295,6 +562,8 @@ class SoundPostPreviewEntity extends Equatable {
       likeCount: _parseSoundInt(json['likeCount']),
       username: username,
       avatarUrl: avatarUrl,
+      soundSegmentId: json['soundSegmentId']?.toString(),
+      soundSegment: segment,
     );
   }
 
@@ -309,6 +578,8 @@ class SoundPostPreviewEntity extends Equatable {
     likeCount,
     username,
     avatarUrl,
+    soundSegmentId,
+    soundSegment,
   ];
 }
 
@@ -444,11 +715,13 @@ class SoundDetailEntity extends Equatable {
     required this.sound,
     required this.posts,
     this.originalSound,
+    this.segments = const [],
   });
 
   final SoundEntity sound;
   final List<SoundPostPreviewEntity> posts;
   final SoundEntity? originalSound;
+  final List<SoundSegmentEntity> segments;
 
   factory SoundDetailEntity.fromJson(Map<String, dynamic> json) {
     SoundEntity? originalSound;
@@ -473,13 +746,72 @@ class SoundDetailEntity extends Equatable {
       }
     }
 
+    final segments = <SoundSegmentEntity>[];
+    final rawSegments = json['segments'];
+    if (rawSegments is List) {
+      for (final item in rawSegments) {
+        if (item is Map) {
+          segments.add(
+            SoundSegmentEntity.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+
     return SoundDetailEntity(
       sound: SoundEntity.fromJson(json),
       posts: posts,
       originalSound: originalSound,
+      segments: segments,
     );
   }
 
   @override
-  List<Object?> get props => [sound, posts, originalSound];
+  List<Object?> get props => [sound, posts, originalSound, segments];
+}
+
+/// Detail for `GET /sounds/segments/:segmentId`.
+class SoundSegmentDetailEntity extends Equatable {
+  const SoundSegmentDetailEntity({
+    required this.segment,
+    this.sound,
+    this.posts = const [],
+  });
+
+  final SoundSegmentEntity segment;
+  final SoundEntity? sound;
+  final List<SoundPostPreviewEntity> posts;
+
+  factory SoundSegmentDetailEntity.fromJson(Map<String, dynamic> json) {
+    final segmentJson = json['segment'] is Map
+        ? Map<String, dynamic>.from(json['segment'] as Map)
+        : json;
+
+    SoundEntity? sound;
+    final rawSound = json['sound'];
+    if (rawSound is Map) {
+      sound = SoundEntity.fromJson(Map<String, dynamic>.from(rawSound));
+    }
+
+    final posts = <SoundPostPreviewEntity>[];
+    final rawPosts = json['posts'];
+    if (rawPosts is List) {
+      for (final item in rawPosts) {
+        if (item is Map) {
+          posts.add(
+            SoundPostPreviewEntity.fromJson(Map<String, dynamic>.from(item)),
+          );
+        }
+      }
+    }
+
+    return SoundSegmentDetailEntity(
+      segment: SoundSegmentEntity.fromJson(segmentJson),
+      sound: sound,
+      posts: posts,
+    );
+  }
+
+  @override
+  List<Object?> get props => [segment, sound, posts];
 }

@@ -8,6 +8,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/media_crop_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/video_segment_editor_screen.dart';
+import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_color_lut.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
@@ -28,12 +29,14 @@ import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.da
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_file.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
@@ -69,8 +72,6 @@ class MediaStudioEditorScreen extends StatefulWidget {
 
 class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     with FeedPlaybackBlocker {
-  static const _maxFiles = 5;
-
   late List<MediaItemEditState> _states;
   late int _currentIndex;
   SoundEntity? _selectedSound;
@@ -163,8 +164,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   /// adjustments or a LUT color grade).
   bool get _hasPreviewEdits => _hasFaceEdits || _needsColorLutPreview;
 
-  int get _maxFilesLimit => widget.isStory ? 1 : _maxFiles;
-
   @override
   void initState() {
     super.initState();
@@ -185,6 +184,33 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     if (_hasPreviewEdits) {
       _scheduleFacePreview();
     }
+    if (_selectedSound != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_syncStudioSoundPreview());
+      });
+    }
+  }
+
+  /// Keeps the selected track audible under the studio preview (video or photo).
+  /// Stops while a sub-editor / sound picker is open so players don't fight.
+  Future<void> _syncStudioSoundPreview() async {
+    final sound = _selectedSound;
+    if (sound == null || _subEditorOpen || _isProcessing) {
+      await SoundAudioPreview.stop();
+      return;
+    }
+    final url = sound.resolvedAudioUrl;
+    if (url.isEmpty) {
+      await SoundAudioPreview.stop();
+      return;
+    }
+    await SoundAudioPreview.playAt(
+      sound.id,
+      url,
+      startOffset: _soundStartOffset,
+      window: _soundWindow,
+      loop: true,
+    );
   }
 
   @override
@@ -232,22 +258,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       beautyEnabled: _beautyEnabled,
       effectSlug: _hasActiveEffect ? _arFilterId : null,
     );
-  }
-
-  void _selectIndex(int index) {
-    if (index == _currentIndex || index < 0 || index >= _states.length) {
-      return;
-    }
-    _saveUiToCurrentState();
-    _smoothDebounce?.cancel();
-    _clearFacePreview();
-    setState(() {
-      _currentIndex = index;
-      _applyStateToUi(_states[_currentIndex]);
-    });
-    if (_hasPreviewEdits) {
-      _scheduleFacePreview();
-    }
   }
 
   Future<File> _exportCurrentWithColorIfNeeded(MediaItemEditState state) async {
@@ -444,6 +454,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             beautyEnabled: _states.any((s) => s.beautyEnabled),
             arFilterId: primaryArFilterIdFromStates(_states),
             sound: _selectedSound,
+            soundOffset: _soundStartOffset,
+            soundWindow: _soundWindow,
           ),
         );
         return;
@@ -457,6 +469,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               file: files.first,
               type: widget.items.first.type,
               sound: _selectedSound,
+              soundOffset: _soundStartOffset,
+              soundWindow: _soundWindow,
               onRetake: () => context.pop(),
             ),
           ),
@@ -472,6 +486,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           'type': type,
           'isStory': false,
           'initialSound': _selectedSound,
+          'initialSoundOffset': _soundStartOffset,
+          'initialSoundWindow': _soundWindow,
           'filterName': primaryFilterNameFromStates(_states),
           'filterCategory': primaryFilterCategoryFromStates(_states).name,
           'effectSlug': primaryEffectSlugFromStates(_states),
@@ -664,7 +680,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _adjustments[key] = 0.0;
       }
       _photoEditorTool = MediaPhotoEditorTool.magic;
+      // Clear Makeup Film grade if one is applied.
+      if (ArFilterCatalog.isColorFilter(_arFilterId)) {
+        _arFilterId = 'none';
+      }
       _applyPhotoBeautyLook();
+      _saveUiToCurrentState();
     });
     _clearFacePreview();
   }
@@ -673,7 +694,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     setState(() {
       _arFilterId = id;
       if (ArFilterCatalog.isColorFilter(id)) {
-        _showPhotoEditor = false;
+        // Keep retouch sheet open when picking Film grades from Makeup.
+        if (_showPhotoEditor) {
+          _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        } else {
+          _showPhotoEditor = false;
+        }
       }
       _saveUiToCurrentState();
     });
@@ -687,8 +713,33 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
   }
 
+  void _onMakeupFilmFilterSelected(String id) {
+    setState(() {
+      _arFilterId = id;
+      if (id == 'none') {
+        // Keep category for Makeup UI; clear only the grade.
+      } else {
+        _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        _magicOn = false;
+      }
+      _saveUiToCurrentState();
+    });
+    if (!_currentState.isVideo) {
+      if (_hasPreviewEdits) {
+        _scheduleFacePreview();
+      } else {
+        _clearFacePreview();
+      }
+    }
+  }
+
   Future<void> _pickSound() async {
     final hasVideo = _states.any((s) => s.isVideo);
+    // Pause the studio video while the sound picker (and its own
+    // VideoPlayer-based audio preview) is open — two players at once
+    // freeze the preview on Android after the sheet closes.
+    setState(() => _subEditorOpen = true);
+    await _syncStudioSoundPreview();
     final picked = await SoundPickerSheet.show(
       context,
       initialSelection: _selectedSound,
@@ -696,13 +747,22 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       initialWindow: _soundWindow,
       allowMuteOnTrim: hasVideo,
     );
-    if (!mounted || picked == null) return;
+    if (!mounted) return;
+    await SoundAudioPreview.stop();
+    setState(() => _subEditorOpen = false);
+    if (picked == null) {
+      unawaited(_syncStudioSoundPreview());
+      return;
+    }
     if (picked.cleared) {
       _clearSound();
       return;
     }
     final sound = picked.sound;
-    if (sound == null) return;
+    if (sound == null) {
+      unawaited(_syncStudioSoundPreview());
+      return;
+    }
 
     setState(() {
       _selectedSound = sound;
@@ -712,18 +772,20 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
     });
-    // Preview only inside the picker/trim sheets — stop once the user continues.
-    await SoundAudioPreview.stop();
+    // Resume video first, then start the studio music bed under it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_syncStudioSoundPreview());
+    });
   }
 
   void _clearSound() {
-    unawaited(SoundAudioPreview.stop());
     setState(() {
       _selectedSound = null;
       _soundStartOffset = Duration.zero;
       _soundWindow = const Duration(seconds: 15);
       _muteOriginalAudio = false;
     });
+    unawaited(_syncStudioSoundPreview());
   }
 
   Future<void> _shareCurrent() async {
@@ -798,12 +860,16 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           : const [],
     );
     setState(() => _subEditorOpen = true);
+    unawaited(_syncStudioSoundPreview());
     final result = await MediaTextEditorOverlay.show(
       context,
       initial: initial,
       background: background,
     );
-    if (mounted) setState(() => _subEditorOpen = false);
+    if (mounted) {
+      setState(() => _subEditorOpen = false);
+      unawaited(_syncStudioSoundPreview());
+    }
     return result;
   }
 
@@ -853,26 +919,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     });
   }
 
-  Future<void> _addMedia() async {
-    final remaining = _maxFilesLimit - _states.length;
-    if (remaining <= 0) {
-      final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.fieldIsRequired('Maximum $_maxFilesLimit')),
-        ),
-      );
-      return;
-    }
-    final picked = await MediaGalleryPicker.pickMixed(limit: remaining);
-    if (!mounted || picked.isEmpty) return;
-    setState(() {
-      _states.addAll(picked.map(MediaItemEditState.fromItem));
-      _currentIndex = _states.length - 1;
-      _applyStateToUi(_states[_currentIndex]);
-    });
-  }
-
   Future<void> _showSettingsSheet(AppLocalizations l10n) async {
     await GlassBottomSheet.showActions<void>(
       context,
@@ -912,20 +958,43 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   }
 
   List<MediaStudioSideTool> _sideTools(AppLocalizations l10n) {
-    final beautyActive =
-        _showPhotoEditor || _magicOn || _hasFaceEdits || _beautyEnabled;
+    final filtersActive = _showFilters || _hasActiveColorFilter;
     return [
+      // 1. Settings
+      MediaStudioSideTool(
+        icon: LucideIcons.settings,
+        label: 'Settings',
+        onTap: _isProcessing ? () {} : () => _showSettingsSheet(l10n),
+      ),
+      // 2. Share
       MediaStudioSideTool(
         icon: LucideIcons.share2,
         label: l10n.mediaEditorShare,
+        customIcon: _sideRailSvg(AppAssets.cameraShareIcon),
         onTap: _isProcessing ? () {} : _shareCurrent,
       ),
+      // 3. Video edit
       MediaStudioSideTool(
-        icon: LucideIcons.wandSparkles,
-        label: l10n.cameraEffects,
-        active: beautyActive,
-        onTap: _isProcessing ? () {} : () => _togglePhotoEditor(l10n),
+        icon: LucideIcons.clapperboard,
+        label: l10n.mediaEditorEdit,
+        active: _currentState.trimSegments.isNotEmpty,
+        onTap: _isProcessing
+            ? () {}
+            : () {
+                if (_currentState.isVideo) {
+                  _openTrimEditor();
+                } else {
+                  _showComingSoon(l10n);
+                }
+              },
       ),
+      // 4. Templates
+      MediaStudioSideTool(
+        icon: LucideIcons.layoutTemplate,
+        label: 'Templates',
+        onTap: _isProcessing ? () {} : () => _showComingSoon(l10n),
+      ),
+      // 5. Aa
       MediaStudioSideTool(
         icon: LucideIcons.type,
         label: l10n.mediaEditorText,
@@ -933,27 +1002,70 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         active: _currentState.textOverlays.isNotEmpty,
         onTap: _isProcessing ? () {} : () => _addText(l10n),
       ),
+      // 6. Stickers
+      MediaStudioSideTool(
+        icon: LucideIcons.sticker,
+        label: l10n.mediaEditorStickers,
+        customIcon: _sideRailSvg(AppAssets.cameraStickerIcon),
+        onTap: _isProcessing ? () {} : () => _showComingSoon(l10n),
+      ),
+      // 7. Filters (same panel as camera screen)
+      MediaStudioSideTool(
+        icon: LucideIcons.blend,
+        label: l10n.cameraFilters,
+        active: filtersActive,
+        customIcon: _sideRailFiltersIcon(),
+        onTap: _isProcessing
+            ? () {}
+            : () {
+                setState(() {
+                  _showFilters = !_showFilters;
+                  if (_showFilters) _showPhotoEditor = false;
+                });
+              },
+      ),
+      // 8. Crop
+      MediaStudioSideTool(
+        icon: LucideIcons.crop,
+        label: l10n.mediaEditorCrop,
+        active: _currentState.croppedFile != null,
+        onTap: _isProcessing ? () {} : () => _openCrop(l10n),
+      ),
+      // Overflow (expand ▼): Voice
+      MediaStudioSideTool(
+        icon: LucideIcons.mic,
+        label: 'Voice',
+        onTap: _isProcessing ? () {} : () => _showComingSoon(l10n),
+      ),
+      // Video only — below Voice
       if (_currentState.isVideo)
         MediaStudioSideTool(
-          icon: LucideIcons.scissors,
-          label: l10n.mediaEditorTrim,
-          active: _currentState.trimSegments.isNotEmpty,
-          onTap: _isProcessing ? () {} : _openTrimEditor,
-        ),
-      if (!_currentState.isVideo)
-        MediaStudioSideTool(
-          icon: LucideIcons.crop,
-          label: l10n.mediaEditorCrop,
-          active: _currentState.croppedFile != null,
-          onTap: _isProcessing ? () {} : () => _openCrop(l10n),
+          icon: LucideIcons.captions,
+          label: 'Captions',
+          onTap: _isProcessing ? () {} : () => _showComingSoon(l10n),
         ),
     ];
+  }
+
+  Widget _sideRailFiltersIcon() {
+    return _sideRailSvg(AppAssets.cameraFiltersIcon);
+  }
+
+  Widget _sideRailSvg(String asset) {
+    return SvgPicture.asset(
+      asset,
+      width: 30,
+      height: 30,
+      fit: BoxFit.contain,
+      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+    );
   }
 
   Future<void> _openTrimEditor() async {
     final state = _currentState;
     if (!state.isVideo) return;
     setState(() => _subEditorOpen = true);
+    unawaited(_syncStudioSoundPreview());
     final result = await VideoSegmentEditorScreen.show(
       context,
       file: state.sourceFile,
@@ -961,6 +1073,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     );
     if (!mounted) return;
     setState(() => _subEditorOpen = false);
+    unawaited(_syncStudioSoundPreview());
     if (result == null) return;
     setState(() {
       _states[_currentIndex] = _states[_currentIndex].copyWith(
@@ -1022,6 +1135,35 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
         ? _smoothPreviewFile!
         : _currentState.sourceFile;
+    final isPhoto = !currentItem.isVideo;
+    final previewChrome = CameraRatioLetterbox.tikTokChromeHeights(
+      context,
+      photoMode: isPhoto,
+    );
+    final controlsTop = CameraRatioLetterbox.controlsTopInset(context);
+    final showBottomSheet = _showPhotoEditor || _showFilters;
+    final sideRailBottom = showBottomSheet
+        ? 220.0 + MediaQuery.paddingOf(context).bottom
+        : previewChrome.bottom + 72.0;
+
+    final previewWidget = RepaintBoundary(
+      child: MediaStudioPreview(
+        // Stable key — do NOT key on beauty preview path (that blinks).
+        key: ValueKey('studio-preview-$_currentIndex'),
+        file: previewFile,
+        isVideo: currentItem.isVideo,
+        arFilterId: selectedColorId,
+        arFilterIntensity: _arFilterIntensity,
+        // Photos: the grade is baked into previewFile via the native LUT.
+        // Videos: still previewed with the matrix path (matches export).
+        applyArColorPreview: currentItem.isVideo ? _needsColorLutPreview : false,
+        paused: _subEditorOpen,
+        muted: _selectedSound != null && _muteOriginalAudio,
+        trimSegments: currentItem.isVideo
+            ? _currentState.trimSegments
+            : const [],
+      ),
+    );
 
     return PopScope(
       canPop: _leaving,
@@ -1034,114 +1176,175 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            RepaintBoundary(
-              child: MediaStudioPreview(
-                // Stable key — do NOT key on beauty preview path (that blinks).
-                key: ValueKey('studio-preview-$_currentIndex'),
-                file: previewFile,
-                isVideo: currentItem.isVideo,
-                arFilterId: selectedColorId,
-                arFilterIntensity: _arFilterIntensity,
-                // Photos: the grade is baked into previewFile via the native LUT.
-                // Videos: still previewed with the matrix path (matches export).
-                applyArColorPreview: currentItem.isVideo
-                    ? _needsColorLutPreview
-                    : false,
-                paused: _subEditorOpen,
-                trimSegments: currentItem.isVideo
-                    ? _currentState.trimSegments
-                    : const [],
-              ),
+            TikTokPhotoPreviewClip(
+              topHeight: previewChrome.top,
+              bottomHeight: previewChrome.bottom,
+              child: previewWidget,
             ),
             if (_currentState.textOverlays.isNotEmpty)
               Positioned.fill(
-                child: MediaTextOverlayLayer(
-                  key: ValueKey('text-overlays-$_currentIndex'),
-                  overlays: _currentState.textOverlays,
-                  onChanged: _moveOverlay,
-                  onEdit: _editText,
+                child: TikTokPhotoPreviewClip(
+                  topHeight: previewChrome.top,
+                  bottomHeight: previewChrome.bottom,
+                  child: MediaTextOverlayLayer(
+                    key: ValueKey('text-overlays-$_currentIndex'),
+                    overlays: _currentState.textOverlays,
+                    onChanged: _moveOverlay,
+                    onEdit: _editText,
+                  ),
                 ),
               ),
-            SafeArea(
-              child: Column(
+            TikTokChromeBarsOverlay(
+              topHeight: previewChrome.top,
+              bottomHeight: previewChrome.bottom,
+              animated: false,
+            ),
+            Positioned.fill(
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  MediaStudioTopBar(
-                    soundLabel: soundLabel,
-                    onBack: _isProcessing ? () {} : _requestExit,
-                    onSoundTap: _isProcessing ? () {} : _pickSound,
-                    onClearSound: _selectedSound == null || _isProcessing
-                        ? null
-                        : _clearSound,
-                    onSettingsTap: _isProcessing
-                        ? () {}
-                        : () => _showSettingsSheet(l10n),
-                  ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: 8,
-                          bottom: 8,
-                          right: isRtl ? null : 0,
-                          left: isRtl ? 0 : null,
-                          child: MediaStudioSideRail(tools: _sideTools(l10n)),
-                        ),
-                      ],
+                  Positioned(
+                    top: controlsTop,
+                    left: 0,
+                    right: 0,
+                    child: MediaStudioTopBar(
+                      soundLabel: soundLabel,
+                      onBack: _isProcessing ? () {} : _requestExit,
+                      onSoundTap: _isProcessing ? () {} : _pickSound,
+                      onClearSound: _selectedSound == null || _isProcessing
+                          ? null
+                          : _clearSound,
                     ),
                   ),
-                  if (_showPhotoEditor)
-                    MediaPhotoEditorPanel(
-                      l10n: l10n,
-                      tab: _photoEditorTab,
-                      selectedTool: _photoEditorTool,
-                      magicOn: _magicOn,
-                      adjustmentValues: _adjustments,
-                      onTabChanged: (tab) =>
-                          setState(() => _photoEditorTab = tab),
-                      onToolSelected: _onPhotoEditorToolSelected,
-                      onMagicToggled: _onMagicToggled,
-                      onAdjustmentChanged: _onAdjustmentChanged,
-                      onReset: _resetPhotoEditor,
-                    )
-                  else if (_showFilters)
-                    ArColorFiltersPanel(
-                      selectedFilterId: selectedColorId,
-                      selectedCategoryId: _arColorCategoryId,
-                      intensity: _arFilterIntensity,
-                      onCategorySelected: (id) => setState(() {
-                        _arColorCategoryId = id;
-                        _saveUiToCurrentState();
-                      }),
-                      onFilterSelected: _selectArFilter,
-                      onIntensityChanged: (value) {
-                        setState(() {
-                          _arFilterIntensity = value;
-                          _saveUiToCurrentState();
-                        });
-                        if (!_currentState.isVideo && _needsColorLutPreview) {
-                          _scheduleFacePreview();
-                        }
-                      },
-                      onClear: () => _selectArFilter('none'),
-                      onApply: () => setState(() => _showFilters = false),
+                  Positioned(
+                    top: controlsTop,
+                    bottom: sideRailBottom,
+                    right: isRtl ? null : 0,
+                    left: isRtl ? 0 : null,
+                    child: MediaStudioSideRail(
+                      tools: _sideTools(l10n),
+                      collapsedCount: 8,
+                      iconOnStartEdge: isRtl,
                     ),
-                  if (!_showPhotoEditor) ...[
-                    MediaStudioClipDock(
-                      items:
-                          _states.map((s) => s.item).toList(growable: false),
-                      selectedIndex: _currentIndex,
-                      onSelected: _selectIndex,
-                      onAdd: _isProcessing ? () {} : _addMedia,
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_showPhotoEditor)
+                            MediaPhotoEditorPanel(
+                              l10n: l10n,
+                              tab: _photoEditorTab,
+                              selectedTool: _photoEditorTool,
+                              magicOn: _magicOn,
+                              adjustmentValues: _adjustments,
+                              onTabChanged: (tab) =>
+                                  setState(() => _photoEditorTab = tab),
+                              onToolSelected: _onPhotoEditorToolSelected,
+                              onMagicToggled: _onMagicToggled,
+                              onAdjustmentChanged: _onAdjustmentChanged,
+                              onReset: _resetPhotoEditor,
+                              selectedColorFilterId: selectedColorId,
+                              colorFilterIntensity: _arFilterIntensity,
+                              onColorFilterSelected:
+                                  _onMakeupFilmFilterSelected,
+                              onColorFilterIntensityChanged: (value) {
+                                setState(() {
+                                  _arFilterIntensity = value;
+                                  _saveUiToCurrentState();
+                                });
+                                if (!_currentState.isVideo &&
+                                    _needsColorLutPreview) {
+                                  _scheduleFacePreview();
+                                }
+                              },
+                            )
+                          else
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 280),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) {
+                                final slide = Tween<Offset>(
+                                  begin: const Offset(0, 0.12),
+                                  end: Offset.zero,
+                                ).animate(animation);
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: slide,
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: _showFilters
+                                  ? KeyedSubtree(
+                                      key: const ValueKey('filters-sheet'),
+                                      child: ArColorFiltersPanel(
+                                        selectedFilterId: selectedColorId,
+                                        selectedCategoryId: _arColorCategoryId,
+                                        intensity: _arFilterIntensity,
+                                        onCategorySelected: (id) =>
+                                            setState(() {
+                                          _arColorCategoryId = id;
+                                          _saveUiToCurrentState();
+                                        }),
+                                        onFilterSelected: _selectArFilter,
+                                        onIntensityChanged: (value) {
+                                          setState(() {
+                                            _arFilterIntensity = value;
+                                            _saveUiToCurrentState();
+                                          });
+                                          if (!_currentState.isVideo &&
+                                              _needsColorLutPreview) {
+                                            _scheduleFacePreview();
+                                          }
+                                        },
+                                        onClear: () =>
+                                            _selectArFilter('none'),
+                                        onApply: () => setState(
+                                          () => _showFilters = false,
+                                        ),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(
+                                      key: ValueKey('filters-closed'),
+                                    ),
+                            ),
+                          // Hide Next / Your Story while filters (or photo editor)
+                          // sheet is open — slide + fade so the sheet sits cleanly.
+                          ClipRect(
+                            child: AnimatedAlign(
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeInOutCubic,
+                              alignment: Alignment.topCenter,
+                              heightFactor:
+                                  (_showFilters || _showPhotoEditor) ? 0 : 1,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOut,
+                                opacity:
+                                    (_showFilters || _showPhotoEditor) ? 0 : 1,
+                                child: MediaStudioBottomActions(
+                                  yourStoryLabel: l10n.messagesYourStory,
+                                  nextLabel: l10n.nextAction,
+                                  avatarUrl: avatarUrl,
+                                  enabled: !_isProcessing,
+                                  onYourStory: _onYourStory,
+                                  onNext: _onNext,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    MediaStudioBottomActions(
-                      yourStoryLabel: l10n.messagesYourStory,
-                      nextLabel: l10n.nextAction,
-                      avatarUrl: avatarUrl,
-                      enabled: !_isProcessing,
-                      onYourStory: _onYourStory,
-                      onNext: _onNext,
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),

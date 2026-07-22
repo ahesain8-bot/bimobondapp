@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' show Size;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
@@ -11,6 +11,12 @@ class CameraRatioLetterbox {
 
   static double topHeight(double topPadding) => topPadding + 56.0;
 
+  static double tikTokTopChromeHeight(
+    double topPadding, {
+    bool photoMode = false,
+  }) =>
+      topPadding + (photoMode ? 96.0 : 28.0);
+
   static double bottomHeight({
     required bool useNativeAr,
     required bool filtersPanelOpen,
@@ -18,6 +24,16 @@ class CameraRatioLetterbox {
     if (filtersPanelOpen) return 220.0;
     return useNativeAr ? 268.0 : 210.0;
   }
+
+  static double tikTokBottomChromeHeight(
+    double bottomPadding, {
+    bool photoMode = false,
+  }) =>
+      bottomPadding + (photoMode ? 215.0 : 108.0);
+
+  static const double tikTokPreviewRadius = 22.0;
+  static const Duration chromeAnimDuration = Duration(milliseconds: 420);
+  static const Curve chromeAnimCurve = Curves.easeInOutCubic;
 
   static Size previewSize({
     required Size screenSize,
@@ -36,6 +52,149 @@ class CameraRatioLetterbox {
         (screenSize.height - top - bottom).clamp(1.0, screenSize.height);
     return Size(screenSize.width, midH);
   }
+
+  /// TikTok preview chrome insets — matches camera photo or video mode.
+  static ({double top, double bottom}) tikTokChromeHeights(
+    BuildContext context, {
+    required bool photoMode,
+  }) {
+    final padding = MediaQuery.paddingOf(context);
+    return (
+      top: tikTokTopChromeHeight(padding.top, photoMode: photoMode),
+      bottom: tikTokBottomChromeHeight(padding.bottom, photoMode: photoMode),
+    );
+  }
+
+  /// Side rail / top bar row — same offset as [CameraStudioOverlay].
+  static double controlsTopInset(BuildContext context) =>
+      tikTokTopChromeHeight(MediaQuery.paddingOf(context).top) + 16.0;
+}
+
+/// Clips preview media to the rounded rect between top/bottom chrome bars.
+class TikTokPhotoPreviewClip extends StatelessWidget {
+  const TikTokPhotoPreviewClip({
+    super.key,
+    required this.topHeight,
+    required this.bottomHeight,
+    required this.child,
+  });
+
+  final double topHeight;
+  final double bottomHeight;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipPath(
+      clipper: TikTokPreviewClipper(top: topHeight, bottom: bottomHeight),
+      child: child,
+    );
+  }
+}
+
+/// Black bars above and below the TikTok-style preview window.
+class TikTokChromeBarsOverlay extends StatelessWidget {
+  const TikTokChromeBarsOverlay({
+    super.key,
+    required this.topHeight,
+    required this.bottomHeight,
+    this.animated = true,
+  });
+
+  final double topHeight;
+  final double bottomHeight;
+  final bool animated;
+
+  static const _bar = ColoredBox(color: Color(0xFF000000));
+
+  @override
+  Widget build(BuildContext context) {
+    if (animated) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          AnimatedPositioned(
+            duration: CameraRatioLetterbox.chromeAnimDuration,
+            curve: CameraRatioLetterbox.chromeAnimCurve,
+            left: 0,
+            right: 0,
+            top: 0,
+            height: topHeight,
+            child: const IgnorePointer(child: _bar),
+          ),
+          AnimatedPositioned(
+            duration: CameraRatioLetterbox.chromeAnimDuration,
+            curve: CameraRatioLetterbox.chromeAnimCurve,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: bottomHeight,
+            child: const IgnorePointer(child: _bar),
+          ),
+        ],
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: topHeight,
+          child: const IgnorePointer(child: _bar),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: bottomHeight,
+          child: const IgnorePointer(child: _bar),
+        ),
+      ],
+    );
+  }
+}
+
+class TikTokPreviewClipper extends CustomClipper<Path> {
+  TikTokPreviewClipper({
+    required this.top,
+    required this.bottom,
+    this.radius = CameraRatioLetterbox.tikTokPreviewRadius,
+  });
+
+  final double top;
+  final double bottom;
+  final double radius;
+
+  @override
+  Path getClip(Size size) {
+    final midBottom = (size.height - bottom).clamp(top + 1.0, size.height);
+    final rect = Rect.fromLTRB(0, top, size.width, midBottom);
+    return Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+  }
+
+  @override
+  bool shouldReclip(covariant TikTokPreviewClipper oldClipper) =>
+      oldClipper.top != top ||
+      oldClipper.bottom != bottom ||
+      oldClipper.radius != radius;
+}
+
+/// Clips to an absolute [rect] in the child's coordinate space.
+class RectPreviewClipper extends CustomClipper<Path> {
+  RectPreviewClipper(this.rect);
+
+  final Rect rect;
+
+  @override
+  Path getClip(Size size) => Path()..addRect(rect);
+
+  @override
+  bool shouldReclip(covariant RectPreviewClipper oldClipper) =>
+      oldClipper.rect != rect;
 }
 
 class CameraCaptureUtils {

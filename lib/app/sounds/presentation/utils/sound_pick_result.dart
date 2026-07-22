@@ -9,6 +9,7 @@ class SoundPickResult {
     this.muteOriginal = false,
     this.didTrim = false,
     this.needsTrim = false,
+    this.soundSegmentId,
   }) : cleared = false;
 
   /// User chose to remove the currently selected music.
@@ -19,6 +20,7 @@ class SoundPickResult {
         muteOriginal = false,
         didTrim = false,
         needsTrim = false,
+        soundSegmentId = null,
         cleared = true;
 
   final SoundEntity? sound;
@@ -36,6 +38,20 @@ class SoundPickResult {
   /// after the catalog sheet closes (avoids nested modal apply bugs).
   final bool needsTrim;
 
+  /// Optional pre-resolved segment id from the API.
+  final String? soundSegmentId;
+
   /// True when the user removed music instead of picking a track.
   final bool cleared;
+
+  /// Attach range for post/story create (`endMs` exclusive).
+  ({int startMs, int endMs})? get clipRangeMs {
+    final s = sound;
+    if (s == null || cleared) return null;
+    return SoundEntity.clipRangeMs(
+      durationSeconds: s.duration,
+      offset: offset,
+      window: window,
+    );
+  }
 }
