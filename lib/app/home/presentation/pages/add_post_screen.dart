@@ -18,6 +18,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_sett
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_settings_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/add_post_tag_button.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/post_sound_attach.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
@@ -54,6 +55,8 @@ class AddPostScreen extends StatefulWidget {
     this.initialSound,
     this.initialSoundOffset = Duration.zero,
     this.initialSoundWindow = const Duration(seconds: 15),
+    this.initialSoundDidTrim = false,
+    this.initialSoundSegmentId,
     this.initialFilterName,
     this.initialFilterCategory,
     this.initialEffectSlug,
@@ -66,6 +69,8 @@ class AddPostScreen extends StatefulWidget {
   final SoundEntity? initialSound;
   final Duration initialSoundOffset;
   final Duration initialSoundWindow;
+  final bool initialSoundDidTrim;
+  final String? initialSoundSegmentId;
   final String? initialFilterName;
   final String? initialFilterCategory;
   final String? initialEffectSlug;
@@ -99,6 +104,7 @@ class _AddPostScreenState extends State<AddPostScreen>
   SoundEntity? _selectedSound;
   Duration _soundStartOffset = Duration.zero;
   Duration _soundWindow = const Duration(seconds: 15);
+  bool _soundDidTrim = false;
   String? _pickedSoundSegmentId;
   AddPostLocationSelection? _selectedLocation;
 
@@ -117,6 +123,11 @@ class _AddPostScreenState extends State<AddPostScreen>
     _soundWindow = widget.initialSoundWindow > Duration.zero
         ? widget.initialSoundWindow
         : const Duration(seconds: 15);
+    _soundDidTrim =
+        widget.initialSoundDidTrim || widget.initialSoundOffset > Duration.zero;
+    final initialSeg = widget.initialSoundSegmentId?.trim();
+    _pickedSoundSegmentId =
+        (initialSeg != null && initialSeg.isNotEmpty) ? initialSeg : null;
     _loadCategories();
     if (widget.isStory &&
         (widget.initialFiles == null || widget.initialFiles!.isEmpty)) {
@@ -208,7 +219,11 @@ class _AddPostScreenState extends State<AddPostScreen>
         _soundWindow = edited.soundWindow > Duration.zero
             ? edited.soundWindow
             : const Duration(seconds: 15);
-        _pickedSoundSegmentId = edited.sound?.defaultSegment?.id;
+        _soundDidTrim =
+            edited.soundDidTrim || edited.soundOffset > Duration.zero;
+        final seg = edited.soundSegmentId?.trim();
+        _pickedSoundSegmentId =
+            (seg != null && seg.isNotEmpty) ? seg : _pickedSoundSegmentId;
       }
       _updateType();
     });
@@ -262,7 +277,11 @@ class _AddPostScreenState extends State<AddPostScreen>
             _soundWindow = edited.soundWindow > Duration.zero
                 ? edited.soundWindow
                 : const Duration(seconds: 15);
-            _pickedSoundSegmentId = edited.sound?.defaultSegment?.id;
+            _soundDidTrim =
+                edited.soundDidTrim || edited.soundOffset > Duration.zero;
+            final seg = edited.soundSegmentId?.trim();
+            _pickedSoundSegmentId =
+                (seg != null && seg.isNotEmpty) ? seg : _pickedSoundSegmentId;
           }
           _updateType();
         });
@@ -297,7 +316,10 @@ class _AddPostScreenState extends State<AddPostScreen>
         _soundWindow = result.soundWindow > Duration.zero
             ? result.soundWindow
             : const Duration(seconds: 15);
-        _pickedSoundSegmentId = result.sound?.defaultSegment?.id;
+        _soundDidTrim = result.soundDidTrim || result.soundOffset > Duration.zero;
+        final seg = result.soundSegmentId?.trim();
+        _pickedSoundSegmentId =
+            (seg != null && seg.isNotEmpty) ? seg : null;
       }
       _updateType();
     });
@@ -489,41 +511,13 @@ class _AddPostScreenState extends State<AddPostScreen>
     SoundAudioPreview.stop();
 
     final sound = _selectedSound;
-    String? soundSegmentId;
-    String? soundId;
-    int? startMs;
-    int? endMs;
-
-    if (sound != null && sound.id.isNotEmpty) {
-      final trackMs = sound.duration > 0 ? sound.duration * 1000 : 0;
-      final customClip = trackMs > 0 &&
-          (_soundStartOffset > Duration.zero ||
-              (_soundWindow > Duration.zero &&
-                  _soundWindow.inMilliseconds < trackMs));
-
-      if (customClip) {
-        // Find-or-create clip on the server (mutually exclusive with soundSegmentId).
-        final clip = SoundEntity.clipRangeMs(
-          durationSeconds: sound.duration,
-          offset: _soundStartOffset,
-          window: _soundWindow,
-        );
-        soundId = sound.id;
-        startMs = clip.startMs;
-        endMs = clip.endMs;
-      } else {
-        final pickedId = _pickedSoundSegmentId?.trim();
-        final defaultId = sound.defaultSegment?.id.trim();
-        if (pickedId != null && pickedId.isNotEmpty) {
-          soundSegmentId = pickedId;
-        } else if (defaultId != null && defaultId.isNotEmpty) {
-          // Prefer existing default segment (posts API recommended path).
-          soundSegmentId = defaultId;
-        } else {
-          soundId = sound.id;
-        }
-      }
-    }
+    final attach = PostSoundAttach.resolve(
+      sound: sound,
+      soundSegmentId: _pickedSoundSegmentId,
+      offset: _soundStartOffset,
+      window: _soundWindow,
+      didTrim: _soundDidTrim,
+    );
 
     context.read<PostsBloc>().add(
       CreatePostWithMediaRequestedEvent(
@@ -541,10 +535,11 @@ class _AddPostScreenState extends State<AddPostScreen>
         isAuctionable: widget.isStory ? false : _isAuction,
         auction: widget.isStory ? null : auction,
         files: _selectedFiles,
-        soundId: soundId,
-        soundSegmentId: soundSegmentId,
-        startMs: startMs,
-        endMs: endMs,
+        // Exactly one of soundSegmentId | soundId | newSound (see post-sounds.md).
+        soundId: attach.soundId,
+        soundSegmentId: attach.soundSegmentId,
+        startMs: attach.startMs,
+        endMs: attach.endMs,
         filterName: widget.initialFilterName,
         filterCategory: widget.initialFilterCategory,
         effectSlug: widget.initialEffectSlug,
@@ -567,6 +562,7 @@ class _AddPostScreenState extends State<AddPostScreen>
         _selectedSound = null;
         _soundStartOffset = Duration.zero;
         _soundWindow = const Duration(seconds: 15);
+        _soundDidTrim = false;
         _pickedSoundSegmentId = null;
       });
       return;
@@ -579,7 +575,13 @@ class _AddPostScreenState extends State<AddPostScreen>
       _soundWindow = picked.window > Duration.zero
           ? picked.window
           : const Duration(seconds: 15);
-      _pickedSoundSegmentId = picked.soundSegmentId;
+      _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
+      // Only keep an explicit segment id (e.g. “use this sound”), not the
+      // default full-track segment — that path uses soundId (Mode B).
+      final seg = picked.soundSegmentId?.trim();
+      final defaultId = sound.defaultSegment?.id.trim();
+      _pickedSoundSegmentId =
+          (seg != null && seg.isNotEmpty && seg != defaultId) ? seg : null;
     });
   }
 
@@ -595,7 +597,8 @@ class _AddPostScreenState extends State<AddPostScreen>
     if (picked != null && mounted) {
       setState(() {
         _selectedSound = picked;
-        _pickedSoundSegmentId = picked.defaultSegment?.id;
+        _soundDidTrim = false;
+        _pickedSoundSegmentId = null;
       });
     }
   }

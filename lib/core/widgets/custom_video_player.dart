@@ -26,6 +26,10 @@ class CustomVideoPlayerController {
     await _state?._togglePlayback();
   }
 
+  Future<void> setMuted(bool muted) async {
+    await _state?._setMuted(muted);
+  }
+
   void _attach(_CustomVideoPlayerState state) => _state = state;
 
   void _detach(_CustomVideoPlayerState state) {
@@ -40,6 +44,8 @@ class CustomVideoPlayer extends StatefulWidget {
     this.posterUrl,
     this.isActive = true,
     this.respectFeedPlaybackGate = true,
+    /// When true, video track stays silent (external soundtrack is playing).
+    this.muteAudio = false,
     this.controller,
     this.onPlaybackChanged,
     this.onLongPress,
@@ -51,6 +57,9 @@ class CustomVideoPlayer extends StatefulWidget {
 
   /// When false, playback is not paused by [FeedPlaybackGate] (e.g. auction detail).
   final bool respectFeedPlaybackGate;
+
+  /// Force-mute the video's own audio (e.g. while a library sound plays).
+  final bool muteAudio;
   final CustomVideoPlayerController? controller;
   final VoidCallback? onPlaybackChanged;
   final VoidCallback? onLongPress;
@@ -344,6 +353,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
       _generatedPosterBytes = null;
       _posterGenerationStarted = false;
       _maybeGeneratePoster();
+    }
+    if (oldWidget.muteAudio != widget.muteAudio) {
+      unawaited(_setMuted(widget.muteAudio || _playbackMuted));
     }
     if (oldWidget.url != widget.url) {
       _generatedPosterBytes = null;
@@ -668,7 +680,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
       return false;
     }
 
-    final wantMuted = muted ?? _playbackMuted;
+    final wantMuted = widget.muteAudio || (muted ?? _playbackMuted);
     try {
       if (!_isControllerReady(controller)) return false;
       await controller.setVolume(wantMuted ? 0 : 1);
@@ -815,7 +827,22 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
     _progressNotifier?.reset();
   }
 
+  Future<void> _setMuted(bool muted) async {
+    final controller = _controller;
+    if (controller == null || !_isControllerReady(controller)) {
+      _playbackMuted = muted || widget.muteAudio;
+      return;
+    }
+    try {
+      final wantMuted = muted || widget.muteAudio;
+      await controller.setVolume(wantMuted ? 0 : 1);
+      _playbackMuted = wantMuted;
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
   Future<void> _toggleMute() async {
+    if (widget.muteAudio) return;
     final controller = _controller;
     if (controller == null || !_isControllerReady(controller)) return;
     try {

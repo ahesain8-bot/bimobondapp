@@ -48,6 +48,7 @@ class AddPostCameraScreen extends StatefulWidget {
     super.key,
     this.isStory = false,
     this.initialSound,
+    this.initialSoundSegmentId,
     this.returnMediaOnDone = false,
     this.initialFilterName,
     this.initialFilterCategory,
@@ -55,6 +56,8 @@ class AddPostCameraScreen extends StatefulWidget {
 
   final bool isStory;
   final SoundEntity? initialSound;
+  /// Mode A clip id when reusing another post’s exact segment.
+  final String? initialSoundSegmentId;
   final bool returnMediaOnDone;
   final String? initialFilterName;
   final CameraFilterCategory? initialFilterCategory;
@@ -142,6 +145,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   SoundEntity? _selectedSound;
   Duration _soundStartOffset = Duration.zero;
   Duration _soundWindow = const Duration(seconds: 15);
+  bool _soundDidTrim = false;
+  String? _pickedSoundSegmentId;
   bool _muteOriginalAudio = false;
   File? _storyCapturedFile;
   String? _storyCapturedType;
@@ -167,6 +172,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void initState() {
     super.initState();
     _selectedSound = widget.initialSound;
+    _pickedSoundSegmentId = widget.initialSoundSegmentId?.trim().isNotEmpty == true
+        ? widget.initialSoundSegmentId!.trim()
+        : null;
     if (widget.initialFilterName != null &&
         CameraFilterCatalog.isUsableFilterName(widget.initialFilterName)) {
       _selectedFilter = CameraFilterCatalog.filterByName(
@@ -281,6 +289,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         sound: result.sound ?? _selectedSound,
         soundOffset: result.soundOffset,
         soundWindow: result.soundWindow,
+        soundDidTrim: result.soundDidTrim || _soundDidTrim,
+        soundSegmentId: result.soundSegmentId ?? _pickedSoundSegmentId,
       ),
     );
   }
@@ -509,6 +519,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         'type': MediaGalleryImportFlow.resolvePostType(edited.files),
         'isStory': false,
         'initialSound': edited.sound ?? _selectedSound,
+        'initialSoundOffset': edited.soundOffset,
+        'initialSoundWindow': edited.soundWindow,
+        'initialSoundDidTrim': edited.soundDidTrim || _soundDidTrim,
+        'initialSoundSegmentId':
+            edited.soundSegmentId ?? _pickedSoundSegmentId,
         if (edited.filterName != null) 'filterName': edited.filterName,
         'filterCategory': edited.filterCategory.name,
         if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
@@ -538,6 +553,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           ? picked.window
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
+      _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
+      final seg = picked.soundSegmentId?.trim();
+      final defaultId = sound.defaultSegment?.id.trim();
+      _pickedSoundSegmentId =
+          (seg != null && seg.isNotEmpty && seg != defaultId) ? seg : null;
     });
     // Preview only inside the picker/trim sheets — stop once the user continues.
     await SoundAudioPreview.stop();
@@ -550,6 +570,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _soundStartOffset = Duration.zero;
       _soundWindow = const Duration(seconds: 15);
       _muteOriginalAudio = false;
+      _soundDidTrim = false;
+      _pickedSoundSegmentId = null;
     });
   }
 
@@ -2065,6 +2087,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         file: _storyCapturedFile!,
         type: _storyCapturedType!,
         sound: _selectedSound,
+        soundOffset: _soundStartOffset,
+        soundWindow: _soundWindow,
+        soundDidTrim: _soundDidTrim,
+        soundSegmentId: _pickedSoundSegmentId,
         onRetake: _retakeStory,
       );
     }

@@ -454,6 +454,7 @@ class AppRouter {
           return AddPostCameraScreen(
             isStory: extra?['isStory'] as bool? ?? false,
             initialSound: extra?['initialSound'] as SoundEntity?,
+            initialSoundSegmentId: extra?['initialSoundSegmentId'] as String?,
             returnMediaOnDone: extra?['returnMediaOnDone'] as bool? ?? false,
             initialFilterName: extra?['initialFilterName'] as String?,
             initialFilterCategory: CameraFilterCategory.values
@@ -523,6 +524,8 @@ class AppRouter {
                     milliseconds:
                         extra?['initialSoundWindowMs'] as int? ?? 15000,
                   ),
+            initialSoundDidTrim: extra?['initialSoundDidTrim'] as bool? ?? false,
+            initialSoundSegmentId: extra?['initialSoundSegmentId'] as String?,
             initialFilterName: extra?['filterName'] as String?,
             initialFilterCategory: extra?['filterCategory'] as String?,
             initialEffectSlug: extra?['effectSlug'] as String?,

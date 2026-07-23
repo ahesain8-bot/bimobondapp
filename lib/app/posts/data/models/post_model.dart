@@ -67,25 +67,64 @@ class PostModel extends PostEntity {
 
   /// API returns nested `soundSegment.sound` (feed/detail), not top-level `sound`.
   static PostSoundEntity? _parseSound(Map<String, dynamic> json) {
+    final segment = json['soundSegment'];
+    Map<String, dynamic>? segmentMap;
+    if (segment is Map) {
+      segmentMap = Map<String, dynamic>.from(segment);
+    }
+
+    int? startMs;
+    int? endMs;
+    String? segmentId;
+    if (segmentMap != null) {
+      segmentId = segmentMap['id']?.toString();
+      startMs = segmentMap['startMs'] is int
+          ? segmentMap['startMs'] as int
+          : int.tryParse(segmentMap['startMs']?.toString() ?? '');
+      endMs = segmentMap['endMs'] is int
+          ? segmentMap['endMs'] as int
+          : int.tryParse(segmentMap['endMs']?.toString() ?? '');
+    }
+    segmentId ??= json['soundSegmentId']?.toString();
+
+    PostSoundEntity? withSegment(PostSoundEntity sound) {
+      if (segmentId == null && startMs == null && endMs == null) return sound;
+      return PostSoundEntity(
+        id: sound.id,
+        name: sound.name,
+        author: sound.author,
+        duration: sound.duration,
+        useCount: sound.useCount,
+        audioUrl: sound.audioUrl,
+        segmentId: segmentId ?? sound.segmentId,
+        startMs: startMs ?? sound.startMs,
+        endMs: endMs ?? sound.endMs,
+      );
+    }
+
     final direct = json['sound'];
     if (direct is Map) {
-      return PostSoundEntity.fromJson(Map<String, dynamic>.from(direct));
+      return withSegment(
+        PostSoundEntity.fromJson(Map<String, dynamic>.from(direct)),
+      );
     }
 
-    final segment = json['soundSegment'];
-    if (segment is Map) {
-      final map = Map<String, dynamic>.from(segment);
-      final nested = map['sound'];
+    if (segmentMap != null) {
+      final nested = segmentMap['sound'];
       if (nested is Map) {
-        return PostSoundEntity.fromJson(Map<String, dynamic>.from(nested));
+        return withSegment(
+          PostSoundEntity.fromJson(Map<String, dynamic>.from(nested)),
+        );
       }
-      if (map['audioUrl'] != null || map['name'] != null) {
-        return PostSoundEntity.fromJson(map);
+      if (segmentMap['audioUrl'] != null || segmentMap['name'] != null) {
+        return withSegment(PostSoundEntity.fromJson(segmentMap));
       }
-      return _soundFromId(map['soundId'] ?? map['id']);
+      final fallback = _soundFromId(segmentMap['soundId'] ?? segmentMap['id']);
+      return fallback == null ? null : withSegment(fallback);
     }
 
-    return _soundFromId(json['soundId'] ?? json['soundSegmentId']);
+    final byId = _soundFromId(json['soundId'] ?? json['soundSegmentId']);
+    return byId == null ? null : withSegment(byId);
   }
 
   /// Nested `auction` plus top-level `auctionId` when the nested object omits id.

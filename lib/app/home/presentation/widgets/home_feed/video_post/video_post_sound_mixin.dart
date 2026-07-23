@@ -1,6 +1,7 @@
 part of '../video_post_widget.dart';
 
-/// Post soundtrack playback for image slides (video slides use [CustomVideoPlayer]).
+/// Post soundtrack playback for image slides and for videos that attach a
+/// library sound via `soundId` (video track is muted; this plays the track).
 mixin VideoPostSoundMixin on State<VideoPostWidget> {
   VideoPlayerController? _postSoundController;
   VoidCallback? _postSoundListener;
@@ -10,9 +11,23 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
   bool get soundPlaybackActive;
   List<PostMediaEntity> get soundDisplayMedia;
 
+  bool get _hasExternalSoundtrack =>
+      widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false;
+
+  Duration? get _segmentStart {
+    final ms = widget.post.sound?.startMs;
+    if (ms == null || ms <= 0) return null;
+    return Duration(milliseconds: ms);
+  }
+
+  Duration? get _segmentEnd {
+    final ms = widget.post.sound?.endMs;
+    if (ms == null || ms <= 0) return null;
+    return Duration(milliseconds: ms);
+  }
+
   bool get canTogglePlayback =>
-      isSlideVideo(soundCurrentPage) ||
-      (widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false);
+      isSlideVideo(soundCurrentPage) || _hasExternalSoundtrack;
 
   bool isPostPlaybackActive() {
     if (isSlideVideo(soundCurrentPage)) {
@@ -40,6 +55,15 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
 
     if (isSlideVideo(soundCurrentPage)) {
       await soundVideoControllers[soundCurrentPage]?.togglePlayback();
+      final playing =
+          soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
+      if (_hasExternalSoundtrack) {
+        if (playing) {
+          await _resumePostSound();
+        } else {
+          await pausePostSound();
+        }
+      }
     } else {
       final controller = _postSoundController;
       if (controller != null && controller.value.isInitialized) {
@@ -66,6 +90,18 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     } catch (_) {}
   }
 
+  Future<void> _resumePostSound() async {
+    final controller = _postSoundController;
+    if (controller != null && controller.value.isInitialized) {
+      try {
+        await controller.setVolume(1);
+        if (!controller.value.isPlaying) await controller.play();
+        return;
+      } catch (_) {}
+    }
+    await syncPostSoundPlayback();
+  }
+
   Future<void> stopPostSound() async {
     final controller = _postSoundController;
     final listener = _postSoundListener;
@@ -81,8 +117,15 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     } catch (_) {}
   }
 
+  Future<void> _seekToSegmentStart(VideoPlayerController controller) async {
+    final start = _segmentStart ?? Duration.zero;
+    try {
+      await controller.seekTo(start);
+    } catch (_) {}
+  }
+
   Future<void> syncPostSoundPlayback() async {
-    if (!soundPlaybackActive || isSlideVideo(soundCurrentPage)) {
+    if (!soundPlaybackActive) {
       await stopPostSound();
       return;
     }
@@ -91,6 +134,14 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     if (audioUrl == null || audioUrl.isEmpty) {
       await stopPostSound();
       return;
+    }
+
+    // Videos with an attached library sound: keep video muted and play this
+    // track. Image slides also use this path.
+    if (isSlideVideo(soundCurrentPage)) {
+      unawaited(
+        soundVideoControllers[soundCurrentPage]?.setMuted(true),
+      );
     }
 
     final existing = _postSoundController;
@@ -109,13 +160,20 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(audioUrl),
       videoPlayerOptions: VideoPlayerOptions(
-        mixWithOthers: false,
+        mixWithOthers: true,
         allowBackgroundPlayback: false,
       ),
     );
     _postSoundController = controller;
     void onSoundPlaybackChanged() {
-      if (!mounted) return;
+      if (!mounted || _postSoundController != controller) return;
+      final end = _segmentEnd;
+      if (end != null &&
+          controller.value.isInitialized &&
+          controller.value.isPlaying &&
+          controller.value.position >= end) {
+        unawaited(_seekToSegmentStart(controller));
+      }
       setState(() {});
     }
 
@@ -124,11 +182,16 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
 
     try {
       await controller.initialize();
-      await controller.setLooping(true);
+      // Loop the full file only when there is no segment window; otherwise
+      // we manually wrap at endMs → startMs (see listener above).
+      final hasWindow = widget.post.sound?.hasSegmentWindow ?? false;
+      await controller.setLooping(!hasWindow);
       await controller.setVolume(1);
+      if (hasWindow) {
+        await _seekToSegmentStart(controller);
+      }
       if (!mounted ||
           !soundPlaybackActive ||
-          isSlideVideo(soundCurrentPage) ||
           _postSoundController != controller) {
         await controller.dispose();
         return;

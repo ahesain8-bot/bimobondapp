@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/post_sound_attach.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -21,6 +22,8 @@ class StoryCameraEditor extends StatefulWidget {
     this.sound,
     this.soundOffset = Duration.zero,
     this.soundWindow = const Duration(seconds: 15),
+    this.soundDidTrim = false,
+    this.soundSegmentId,
     super.key,
   });
 
@@ -30,6 +33,8 @@ class StoryCameraEditor extends StatefulWidget {
   final SoundEntity? sound;
   final Duration soundOffset;
   final Duration soundWindow;
+  final bool soundDidTrim;
+  final String? soundSegmentId;
 
   @override
   State<StoryCameraEditor> createState() => _StoryCameraEditorState();
@@ -47,37 +52,13 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
   Future<void> _share() async {
     FocusScope.of(context).unfocus();
     final caption = _captionController.text.trim();
-    final sound = widget.sound;
-    String? soundSegmentId;
-    String? soundId;
-    int? startMs;
-    int? endMs;
-
-    if (sound != null && sound.id.isNotEmpty) {
-      final trackMs = sound.duration > 0 ? sound.duration * 1000 : 0;
-      final customClip = trackMs > 0 &&
-          (widget.soundOffset > Duration.zero ||
-              (widget.soundWindow > Duration.zero &&
-                  widget.soundWindow.inMilliseconds < trackMs));
-
-      if (customClip) {
-        final clip = SoundEntity.clipRangeMs(
-          durationSeconds: sound.duration,
-          offset: widget.soundOffset,
-          window: widget.soundWindow,
-        );
-        soundId = sound.id;
-        startMs = clip.startMs;
-        endMs = clip.endMs;
-      } else {
-        final defaultId = sound.defaultSegment?.id.trim();
-        if (defaultId != null && defaultId.isNotEmpty) {
-          soundSegmentId = defaultId;
-        } else {
-          soundId = sound.id;
-        }
-      }
-    }
+    final attach = PostSoundAttach.resolve(
+      sound: widget.sound,
+      soundSegmentId: widget.soundSegmentId,
+      offset: widget.soundOffset,
+      window: widget.soundWindow,
+      didTrim: widget.soundDidTrim,
+    );
 
     if (!mounted) return;
     context.read<PostsBloc>().add(
@@ -91,10 +72,11 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
         status: 'PUBLISHED',
         isStory: true,
         files: [widget.file],
-        soundId: soundId,
-        soundSegmentId: soundSegmentId,
-        startMs: startMs,
-        endMs: endMs,
+        // Exactly one of soundSegmentId | soundId | newSound (see post-sounds.md).
+        soundId: attach.soundId,
+        soundSegmentId: attach.soundSegmentId,
+        startMs: attach.startMs,
+        endMs: attach.endMs,
       ),
     );
   }

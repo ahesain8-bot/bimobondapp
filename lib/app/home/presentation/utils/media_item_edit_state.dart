@@ -231,6 +231,8 @@ class MediaStudioExportResult {
     this.sound,
     this.soundOffset = Duration.zero,
     this.soundWindow = const Duration(seconds: 15),
+    this.soundDidTrim = false,
+    this.soundSegmentId,
   });
 
   final List<File> files;
@@ -243,6 +245,8 @@ class MediaStudioExportResult {
   final SoundEntity? sound;
   final Duration soundOffset;
   final Duration soundWindow;
+  final bool soundDidTrim;
+  final String? soundSegmentId;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.

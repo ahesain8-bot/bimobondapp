@@ -88,6 +88,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   /// Mute the video's own audio when mixing the selected music in.
   bool _muteOriginalAudio = false;
 
+  /// True when the user confirmed a trim range (Mode B2: soundId + ms).
+  bool _soundDidTrim = false;
+
+  /// Explicit clip id for Mode A (“use this sound”), when known.
+  String? _pickedSoundSegmentId;
+
   /// Bumped after sound picker/trim closes so [MediaStudioPreview] remounts a
   /// fresh ExoPlayer if Android left the previous one frozen.
   int _previewEpoch = 0;
@@ -420,24 +426,27 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return results;
   }
 
-  /// Bakes the selected music track into every exported file so the uploaded
-  /// media actually contains the sound (TikTok-style). Videos get the track
-  /// muxed in; still photos are turned into a short music video.
+  /// Bakes the selected music track into exported **photos** only (turns them
+  /// into a short music video). Videos skip remux — library sounds attach via
+  /// `soundId` and are mixed at playback, which avoids a full re-encode.
   Future<void> _bakeMusicInto(List<File> results) async {
     final sound = _selectedSound;
     if (sound == null) return;
     final audioUrl = sound.resolvedAudioUrl;
     if (audioUrl.isEmpty) return;
 
+    final hasPhoto = results.asMap().entries.any((e) {
+      final i = e.key;
+      return i < _states.length && !_states[i].isVideo;
+    });
+    if (!hasPhoto) return;
+
     final audio = await SoundLocalFile.resolve(audioUrl);
     if (audio == null) return;
 
-    // Photo + music → 15s clip from the chosen start (TikTok-style).
+    // Use the chosen trim window (capped), not a forced 15s encode.
     final trackSeconds = sound.duration > 0 ? sound.duration : 0;
     var photoSeconds = _soundWindow.inSeconds.clamp(1, _photoMusicMaxSeconds);
-    if (photoSeconds < _photoMusicMaxSeconds) {
-      photoSeconds = _photoMusicMaxSeconds;
-    }
     if (trackSeconds > 0) {
       final remaining = trackSeconds - _soundStartOffset.inSeconds;
       if (remaining > 0 && remaining < photoSeconds) {
@@ -450,25 +459,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
     for (var i = 0; i < results.length; i++) {
       final isVideo = i < _states.length ? _states[i].isVideo : false;
+      if (isVideo) continue;
       final file = results[i];
       try {
-        final File? withMusic;
-        if (isVideo) {
-          withMusic = await NativeVideoProcessor.muxAudioIntoVideo(
-            file,
-            audio: audio,
-            startOffset: _soundStartOffset,
-            audioEnd: _soundStartOffset + _soundWindow,
-            keepOriginalAudio: !_muteOriginalAudio,
-          );
-        } else {
-          withMusic = await NativeVideoProcessor.renderImageWithMusic(
-            file,
-            audio: audio,
-            duration: photoDuration,
-            startOffset: _soundStartOffset,
-          );
-        }
+        final withMusic = await NativeVideoProcessor.renderImageWithMusic(
+          file,
+          audio: audio,
+          duration: photoDuration,
+          startOffset: _soundStartOffset,
+        );
         if (withMusic != null) results[i] = withMusic;
       } catch (e, st) {
         debugPrint('Music bake failed for ${file.path}: $e\n$st');
@@ -497,6 +496,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             sound: _selectedSound,
             soundOffset: _soundStartOffset,
             soundWindow: _soundWindow,
+            soundDidTrim: _soundDidTrim,
+            soundSegmentId: _pickedSoundSegmentId,
           ),
         );
         return;
@@ -512,6 +513,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               sound: _selectedSound,
               soundOffset: _soundStartOffset,
               soundWindow: _soundWindow,
+              soundDidTrim: _soundDidTrim,
+              soundSegmentId: _pickedSoundSegmentId,
               onRetake: () => context.pop(),
             ),
           ),
@@ -529,6 +532,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           'initialSound': _selectedSound,
           'initialSoundOffset': _soundStartOffset,
           'initialSoundWindow': _soundWindow,
+          'initialSoundDidTrim': _soundDidTrim,
+          'initialSoundSegmentId': _pickedSoundSegmentId,
           'filterName': primaryFilterNameFromStates(_states),
           'filterCategory': primaryFilterCategoryFromStates(_states).name,
           'effectSlug': primaryEffectSlugFromStates(_states),
@@ -809,6 +814,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _soundStartOffset = Duration.zero;
         _soundWindow = const Duration(seconds: 15);
         _muteOriginalAudio = false;
+        _soundDidTrim = false;
+        _pickedSoundSegmentId = null;
         return;
       }
       final sound = picked.sound;
@@ -819,7 +826,19 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           ? picked.window
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
+      _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
+      final seg = picked.soundSegmentId?.trim();
+      final defaultId = sound.defaultSegment?.id.trim();
+      _pickedSoundSegmentId =
+          (seg != null && seg.isNotEmpty && seg != defaultId) ? seg : null;
     });
+
+    // Warm the track in disk cache (photo→music export / preview).
+    final selected = _selectedSound;
+    final prefetchUrl = selected?.resolvedAudioUrl;
+    if (prefetchUrl != null && prefetchUrl.isNotEmpty) {
+      unawaited(SoundLocalFile.resolve(prefetchUrl));
+    }
 
     // Start music bed after the remounted video has had a frame to init.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -834,6 +853,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       _soundStartOffset = Duration.zero;
       _soundWindow = const Duration(seconds: 15);
       _muteOriginalAudio = false;
+      _soundDidTrim = false;
+      _pickedSoundSegmentId = null;
     });
     unawaited(_syncStudioSoundPreview());
   }

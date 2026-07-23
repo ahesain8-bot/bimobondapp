@@ -18,6 +18,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_duration_probe.dart';
 import 'package:bimobondapp/app/stories/domain/entities/story_entities.dart';
 import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
@@ -218,6 +219,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       final List<PostMediaEntity> mediaEntities = [];
       String? videoUrl;
       String? thumbnailUrl;
+      File? primaryVideoFile;
 
       for (int i = 0; i < event.files.length; i++) {
         final file = event.files[i];
@@ -225,6 +227,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
 
         if (isVideo) {
           thumbnailUrl ??= await _uploadVideoThumbnail(file);
+          primaryVideoFile ??= file;
 
           final url = await _uploadMediaFile(file);
           videoUrl ??= url;
@@ -247,6 +250,15 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         auction = auction.copyWith(itemImageUrl: coverUrl);
       }
 
+      // No library sound: register the recorded video audio as an original
+      // `newSound` so the post gets a reusable sound entity.
+      final newSound = await _resolveNewSound(
+        event: event,
+        videoUrl: videoUrl,
+        thumbnailUrl: thumbnailUrl,
+        primaryVideoFile: primaryVideoFile,
+      );
+
       if (event.isStory) {
         final storyResult = await createStoryUseCase(
           CreateStoryInput(
@@ -262,7 +274,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
             soundSegmentId: event.soundSegmentId,
             startMs: event.startMs,
             endMs: event.endMs,
-            newSound: event.newSound,
+            newSound: newSound,
             filterName: event.filterName,
             filterCategory: event.filterCategory,
             effectSlug: event.effectSlug,
@@ -296,7 +308,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           soundSegmentId: event.soundSegmentId,
           startMs: event.startMs,
           endMs: event.endMs,
-          newSound: event.newSound,
+          newSound: newSound,
           filterName: event.filterName,
           filterCategory: event.filterCategory,
           effectSlug: event.effectSlug,
@@ -314,14 +326,52 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     }
   }
 
+  /// Builds inline `newSound` for original recorded video audio when the
+  /// client did not attach a library `soundId` / segment / explicit newSound.
+  Future<Map<String, dynamic>?> _resolveNewSound({
+    required CreatePostWithMediaRequestedEvent event,
+    required String? videoUrl,
+    required String? thumbnailUrl,
+    required File? primaryVideoFile,
+  }) async {
+    final existing = event.newSound;
+    if (existing != null) return existing;
+
+    final hasLibrarySound =
+        (event.soundId != null && event.soundId!.trim().isNotEmpty) ||
+        (event.soundSegmentId != null &&
+            event.soundSegmentId!.trim().isNotEmpty);
+    if (hasLibrarySound) return null;
+
+    final url = videoUrl?.trim();
+    final file = primaryVideoFile;
+    if (url == null || url.isEmpty || file == null) return null;
+
+    try {
+      final duration = await SoundDurationProbe.probeSeconds(file);
+      return {
+        'audioUrl': url,
+        'duration': duration < 1 ? 1 : duration,
+        if (thumbnailUrl != null && thumbnailUrl.trim().isNotEmpty)
+          'coverUrl': thumbnailUrl.trim(),
+      };
+    } catch (_) {
+      // Still attempt create with a safe minimum duration.
+      return {
+        'audioUrl': url,
+        'duration': 1,
+        if (thumbnailUrl != null && thumbnailUrl.trim().isNotEmpty)
+          'coverUrl': thumbnailUrl.trim(),
+      };
+    }
+  }
+
   Future<void> _onFetchFeedRequested(
     FetchFeedRequestedEvent event,
     Emitter<PostsState> emit,
   ) async {
-    final usingCursor =
-        event.cursor != null && event.cursor!.trim().isNotEmpty;
-    final isFirstPage =
-        event.isRefresh || (!usingCursor && event.page <= 1);
+    final usingCursor = event.cursor != null && event.cursor!.trim().isNotEmpty;
+    final isFirstPage = event.isRefresh || (!usingCursor && event.page <= 1);
     if (isFirstPage) {
       emit(PostsLoading());
     }
@@ -383,23 +433,15 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   ) async {
     final result = await getStoryRingsUseCase(NoParams());
 
-    result.fold(
-      (failure) => emit(PostsFailure(failure.message)),
-      (rings) {
-        final stories = <PostEntity>[];
-        for (final ring in rings) {
-          for (final story in ring.stories) {
-            stories.add(story.toPostEntity());
-          }
+    result.fold((failure) => emit(PostsFailure(failure.message)), (rings) {
+      final stories = <PostEntity>[];
+      for (final ring in rings) {
+        for (final story in ring.stories) {
+          stories.add(story.toPostEntity());
         }
-        emit(
-          StoriesLoadSuccess(
-            stories: stories,
-            hasReachedMax: true,
-          ),
-        );
-      },
-    );
+      }
+      emit(StoriesLoadSuccess(stories: stories, hasReachedMax: true));
+    });
   }
 
   Future<void> _onUploadMediaRequested(

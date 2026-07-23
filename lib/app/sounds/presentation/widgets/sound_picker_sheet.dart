@@ -531,15 +531,14 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     await SoundAudioPreview.stop();
     await SoundLocalCatalogStore.pushRecent(sound);
     if (!mounted) return;
+    // Catalog tap → Mode B (`soundId`). Do not send defaultSegment as
+    // `soundSegmentId` (that is Mode A — “use this sound” / explicit clip).
     Navigator.of(context).pop(
       SoundPickResult(
         sound: sound,
         offset: offset,
         muteOriginal: muteOriginal,
         didTrim: didTrim,
-        soundSegmentId: (!didTrim && offset == Duration.zero)
-            ? sound.defaultSegment?.id
-            : null,
       ),
     );
   }

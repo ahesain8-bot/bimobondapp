@@ -283,13 +283,16 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
     final auctionId = widget.auctionId?.trim();
     final hasAuction = auctionId != null && auctionId.isNotEmpty;
+    final postId = widget.postId?.trim();
+    final hasPost = postId != null && postId.isNotEmpty;
 
     final result = await _sendGift(
       SendGiftParams(
         giftId: gift.id,
         receiverId: receiverId,
-        // Auction: send auctionId only. Post gifts: send postId.
-        postId: hasAuction ? null : widget.postId,
+        // postId creates the gift comment (newComment). auctionId drives
+        // auction progress (auctionUpdated). Send both on auction posts.
+        postId: hasPost ? postId : null,
         auctionId: hasAuction ? auctionId : null,
       ),
     );
