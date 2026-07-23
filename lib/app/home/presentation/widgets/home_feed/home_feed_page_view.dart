@@ -26,6 +26,9 @@ class HomeFeedPageView extends StatelessWidget {
     return PageView.builder(
       controller: controller,
       scrollDirection: Axis.vertical,
+      // Don't keep adjacent page States alive with live decoders — that
+      // exhausts Android MediaCodec. Scroll-back uses the prewarmer pool.
+      allowImplicitScrolling: false,
       physics: const OnePageScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),

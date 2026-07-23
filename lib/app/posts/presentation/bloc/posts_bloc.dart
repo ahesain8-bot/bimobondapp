@@ -318,7 +318,11 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     FetchFeedRequestedEvent event,
     Emitter<PostsState> emit,
   ) async {
-    if (event.page == 1) {
+    final usingCursor =
+        event.cursor != null && event.cursor!.trim().isNotEmpty;
+    final isFirstPage =
+        event.isRefresh || (!usingCursor && event.page <= 1);
+    if (isFirstPage) {
       emit(PostsLoading());
     }
 
@@ -326,6 +330,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       GetFeedParams(
         page: event.page,
         limit: event.limit,
+        cursor: event.cursor,
         categoryId: event.categoryId,
         type: event.type,
         hashtag: event.hashtag,
@@ -336,6 +341,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         isSaved: event.isSaved,
         isStory: event.isStory,
         contentType: event.contentType,
+        auctionQuery: event.auctionQuery,
         privacyStatus: event.privacyStatus,
         from: event.from,
         latitude: event.latitude,
@@ -348,18 +354,24 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       (failure) => emit(
         PostsFailure(failure.message, profileLoadKey: event.profileLoadKey),
       ),
-      (items) {
-        final hasReachedMax = items.length < event.limit;
+      (page) {
         if (event.profileLoadKey != null) {
           emit(
             ProfilePostsLoadSuccess(
-              posts: items.map((item) => item.post).toList(),
-              hasReachedMax: hasReachedMax,
+              posts: page.items.map((item) => item.post).toList(),
+              hasReachedMax: page.hasReachedMax,
               profileLoadKey: event.profileLoadKey!,
             ),
           );
         } else {
-          emit(FeedLoadSuccess(items: items, hasReachedMax: hasReachedMax));
+          emit(
+            FeedLoadSuccess(
+              items: page.items,
+              hasReachedMax: page.hasReachedMax,
+              nextCursor: page.nextCursor,
+              isFirstPage: isFirstPage,
+            ),
+          );
         }
       },
     );

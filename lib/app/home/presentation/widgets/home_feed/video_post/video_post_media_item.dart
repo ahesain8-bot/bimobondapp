@@ -36,12 +36,10 @@ class VideoPostMediaItem extends StatelessWidget {
     final isVideo =
         MediaUtils.isVideo(mediaUrl, mediaType: media.mediaType) ||
         post.type == 'VIDEO';
-    // Prefer the adaptive HLS rendition for the post's primary video. Keep
-    // each item's own URL for later carousel slides, because the post-level
-    // HLS URL represents only the primary video.
-    final hlsUrl = post.hlsUrl?.trim();
-    final playbackUrl = isVideo && index == 0 && hlsUrl?.isNotEmpty == true
-        ? MediaUtils.resolveAbsoluteUrl(hlsUrl!)
+    // Prefer progressive (cacheable) for the primary slide so scroll-back
+    // can play from disk. Fall back to HLS only when no MP4/WebM exists.
+    final playbackUrl = isVideo && index == 0
+        ? (MediaUtils.resolveCacheableFeedVideoUrl(post) ?? mediaUrl)
         : mediaUrl;
 
     Widget child = isVideo

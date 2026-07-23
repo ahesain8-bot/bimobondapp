@@ -12,10 +12,11 @@ import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth
 import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
     as notifications_di;
 import 'package:bimobondapp/app/notifications/presentation/services/notification_coordinator.dart';
-import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'package:bimobondapp/core/services/app_location_service.dart';
+import 'package:bimobondapp/core/services/feed_video_disk_prefetcher.dart';
 import 'package:bimobondapp/core/services/feed_video_prewarmer.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -38,14 +39,14 @@ class HomeFeedScreen extends StatefulWidget {
 class HomeFeedScreenState extends State<HomeFeedScreen> {
   final PageController _pageController = PageController();
   final List<FeedItemEntity> _feedItems = [];
-  int _feedPage = 1;
+  String? _nextCursor;
   bool _hasReachedMax = false;
   bool _isLoadingMore = false;
   int _currentPostIndex = 0;
   bool _awaitingInitialFeed = true;
   bool _feedLoadFailed = false;
   String? _feedErrorMessage;
-  bool _expectingFeedPage1 = false;
+  bool _expectingInitialFeed = false;
   HomeFeedTab _selectedFeedTab = HomeFeedTab.forYou;
   Completer<void>? _pullRefreshCompleter;
   final FeedVideoProgressNotifier _feedVideoProgress =
@@ -100,8 +101,8 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _loadTabData() {
-    // Cached coordinates are still included by _fetchFeed when available.
-    // Fresh location and notification network work start after page 1.
+    // Location is resolved after first paint; do not send lat/lng on home
+    // (disables server Redis cache per feed-performance guide).
     _fetchFeed(refresh: true);
   }
 
@@ -120,37 +121,37 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
     _feedVideoProgress.dispose();
     _pageController.dispose();
     FeedVideoPrewarmer.instance.clear();
+    FeedVideoDiskPrefetcher.instance.clear();
     super.dispose();
   }
 
   void _fetchFeed({bool refresh = false}) {
     if (refresh) {
-      _feedPage = 1;
+      _nextCursor = null;
       _hasReachedMax = false;
       _feedLoadFailed = false;
       _feedErrorMessage = null;
-      _expectingFeedPage1 = true;
+      _expectingInitialFeed = true;
       if (_feedItems.isEmpty && mounted) {
         setState(() => _awaitingInitialFeed = true);
       }
     } else if (_hasReachedMax) {
       return;
-    } else if (_feedPage == 1) {
-      _expectingFeedPage1 = true;
+    } else if (_feedItems.isEmpty) {
+      _expectingInitialFeed = true;
     }
-
-    final viewerLocation = auth_di.sl<UserLocationStore>().viewerCoordinates;
 
     context.read<PostsBloc>().add(
       FetchFeedRequestedEvent(
-        page: _feedPage,
+        // Cursor pagination: first/refresh omit cursor; load-more passes nextCursor.
+        cursor: refresh ? null : _nextCursor,
         limit: HomeLayoutConstants.feedPageSize,
         isRefresh: refresh,
         isStory: false,
         sort: _selectedFeedTab.feedSort,
         from: _selectedFeedTab.feedFrom,
-        latitude: viewerLocation?.latitude,
-        longitude: viewerLocation?.longitude,
+        // Auctions belong on the Auctions tab only.
+        auctionQuery: const FeedAuctionQuery(isAuctionable: false),
       ),
     );
   }
@@ -172,21 +173,26 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _loadMorePosts() {
-    if (_isLoadingMore || _hasReachedMax) return;
+    if (_isLoadingMore || _hasReachedMax || _nextCursor == null) return;
     setState(() => _isLoadingMore = true);
-    _feedPage++;
     _fetchFeed();
   }
 
   void _mergeFeedItems(List<FeedItemEntity> incoming, {required bool replace}) {
+    // Belt-and-suspenders if the API still returns auction posts.
+    final nonAuctions = incoming
+        .where((item) => !item.post.isAuctionable)
+        .toList(growable: false);
     if (replace) {
       _feedItems
         ..clear()
-        ..addAll(incoming);
+        ..addAll(nonAuctions);
       return;
     }
     final existingIds = _feedItems.map((item) => item.id).toSet();
-    _feedItems.addAll(incoming.where((item) => !existingIds.contains(item.id)));
+    _feedItems.addAll(
+      nonAuctions.where((item) => !existingIds.contains(item.id)),
+    );
   }
 
   Future<void> _onPullToRefresh() async {
@@ -230,30 +236,32 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
     final theme = Theme.of(context);
 
     if (state is FeedLoadSuccess) {
-      final loadedPage = _feedPage;
+      final isFirstPage = state.isFirstPage;
       final countBefore = _feedItems.length;
       setState(() {
         _feedLoadFailed = false;
         _feedErrorMessage = null;
-        if (loadedPage == 1) {
+        if (isFirstPage) {
           _awaitingInitialFeed = false;
-          _expectingFeedPage1 = false;
+          _expectingInitialFeed = false;
         }
-        _mergeFeedItems(state.items, replace: loadedPage == 1);
-        if (loadedPage == 1) {
+        _mergeFeedItems(state.items, replace: isFirstPage);
+        _nextCursor = state.nextCursor;
+        if (isFirstPage) {
           _currentPostIndex = 0;
         } else if (_currentPostIndex >= _feedItems.length) {
           _currentPostIndex = _feedItems.length - 1;
         }
         final added = _feedItems.length - countBefore;
-        if (loadedPage > 1 && (state.items.isEmpty || added == 0)) {
+        if (!isFirstPage && (state.items.isEmpty || added == 0)) {
           _hasReachedMax = true;
+          _nextCursor = null;
         } else {
           _hasReachedMax = state.hasReachedMax;
         }
         _isLoadingMore = false;
       });
-      if (loadedPage == 1) {
+      if (isFirstPage) {
         _completePullRefreshIfPending();
         _mediaPreloader.reset();
         if (_selectedFeedTab == HomeFeedTab.forYou) {
@@ -277,7 +285,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
         if (index != -1) {
           _feedItems.removeAt(index);
           if (_feedItems.isEmpty) {
-            _feedPage = 1;
+            _nextCursor = null;
             _hasReachedMax = false;
           } else if (index > 0 && _pageController.hasClients) {
             _pageController.jumpToPage(index - 1);
@@ -292,7 +300,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
         if (index != -1) {
           _feedItems.removeAt(index);
           if (_feedItems.isEmpty) {
-            _feedPage = 1;
+            _nextCursor = null;
             _hasReachedMax = false;
           } else if (_pageController.hasClients) {
             final next = index.clamp(0, _feedItems.length - 1);
@@ -303,27 +311,24 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       });
     } else if (state is PostsFailure) {
       // Ignore unrelated PostsBloc failures (likes, stories, profile grids, etc.).
-      final isFeedPage1Failure =
-          _expectingFeedPage1 && state.profileLoadKey == null;
+      final isFeedInitialFailure =
+          _expectingInitialFeed && state.profileLoadKey == null;
       setState(() {
-        if (isFeedPage1Failure) {
+        if (isFeedInitialFailure) {
           _awaitingInitialFeed = false;
-          _expectingFeedPage1 = false;
+          _expectingInitialFeed = false;
           if (_feedItems.isEmpty) {
             _feedLoadFailed = true;
             _feedErrorMessage = state.message;
           }
         }
-        if (_isLoadingMore && _feedPage > 1) {
-          _feedPage--;
-        }
         _isLoadingMore = false;
       });
-      if (isFeedPage1Failure) {
+      if (isFeedInitialFailure) {
         _completePullRefreshIfPending();
       }
       // Prefer in-place retry UI when the feed is empty; snackbar when content remains.
-      if (isFeedPage1Failure && _feedItems.isNotEmpty) {
+      if (isFeedInitialFailure && _feedItems.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(state.message),

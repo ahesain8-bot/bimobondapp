@@ -2,6 +2,9 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_bar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
@@ -40,6 +43,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
   late bool _hasReachedMax;
 
   final FeedMediaPreloader _mediaPreloader = FeedMediaPreloader();
+  final FeedVideoProgressNotifier _videoProgress = FeedVideoProgressNotifier();
 
   bool _isLoadingMore = false;
   int? _pendingLoadKey;
@@ -62,12 +66,14 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
   @override
   void dispose() {
     _mediaPreloader.reset();
+    _videoProgress.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
   void _onPageChanged(int index) {
     setState(() => _currentIndex = index);
+    _videoProgress.reset();
     _mediaPreloader.preloadPostsAround(context, _posts, index);
     _maybeLoadMore(index);
   }
@@ -298,35 +304,70 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
-        body: PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          physics: const OnePageScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          itemCount: _posts.length,
-          onPageChanged: _onPageChanged,
-          itemBuilder: (context, index) {
-            final post = _posts[index];
-            if (post.isAuctionable) {
-              return LiveDetailsScreen(
-                post: post,
-                embeddedInFeed: true,
-                auctionId: post.auction?.id,
-              );
-            }
-            return VideoPostWidget(
-              key: ValueKey('profile_post_${post.id}'),
-              post: post,
-              isActive: index == _currentIndex,
-              respectFeedPlaybackGate: false,
-              // TikTok-style: likes/comments rise up when opening from profile.
-              animateChromeEntrance: true,
-              bottomPadding: HomeLayoutConstants.feedPostBottomPadding,
-              pageController: _pageController,
-              pageIndex: index,
-            );
-          },
+        body: FeedVideoProgressScope(
+          notifier: _videoProgress,
+          child: _posts.isEmpty
+              ? const SizedBox.shrink()
+              : Builder(
+                  builder: (context) {
+                    final current = _posts[_currentIndex.clamp(
+                      0,
+                      _posts.length - 1,
+                    )];
+                    final showVideoProgress =
+                        !current.isAuctionable && feedPostHasVideo(current);
+                    final safeBottom = MediaQuery.paddingOf(context).bottom;
+                    final contentBottom =
+                        safeBottom +
+                        ProfileLayoutConstants.postsViewerBottomPadding;
+
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        PageView.builder(
+                          controller: _pageController,
+                          scrollDirection: Axis.vertical,
+                          allowImplicitScrolling: false,
+                          physics: const OnePageScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                          itemCount: _posts.length,
+                          onPageChanged: _onPageChanged,
+                          itemBuilder: (context, index) {
+                            final post = _posts[index];
+                            if (post.isAuctionable) {
+                              return LiveDetailsScreen(
+                                post: post,
+                                embeddedInFeed: true,
+                                auctionId: post.auction?.id,
+                              );
+                            }
+                            return VideoPostWidget(
+                              key: ValueKey('profile_post_${post.id}'),
+                              post: post,
+                              isActive: index == _currentIndex,
+                              respectFeedPlaybackGate: false,
+                              // TikTok-style: likes/comments rise up when
+                              // opening from profile.
+                              animateChromeEntrance: true,
+                              bottomPadding: contentBottom,
+                              pageController: _pageController,
+                              pageIndex: index,
+                            );
+                          },
+                        ),
+                        if (showVideoProgress)
+                          Positioned(
+                            key: ValueKey(_posts[_currentIndex].id),
+                            left: 0,
+                            right: 0,
+                            bottom: safeBottom,
+                            child: const FeedVideoProgressBar(),
+                          ),
+                      ],
+                    );
+                  },
+                ),
         ),
       ),
     );

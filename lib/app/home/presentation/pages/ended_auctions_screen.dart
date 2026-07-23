@@ -176,15 +176,15 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
       );
 
       var shouldContinue = false;
-      result.fold((_) => hasMore = false, (feedItems) {
-        lastPageSize = feedItems.length;
-        for (final feedItem in feedItems) {
+      result.fold((_) => hasMore = false, (page) {
+        lastPageSize = page.items.length;
+        for (final feedItem in page.items) {
           final post = feedItem.post;
           if (!_shouldIncludeEndedPost(post)) continue;
           final item = _toAuctionItem(post);
           byId[item.id] = item;
         }
-        shouldContinue = feedItems.length >= 30;
+        shouldContinue = !page.hasReachedMax && page.items.length >= 30;
       });
 
       pagesLoaded++;

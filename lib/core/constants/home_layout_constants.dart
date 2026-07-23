@@ -14,6 +14,7 @@ class HomeLayoutConstants {
   static const double liveIconSize = 28;
   static const double feedTopBarHeight = 44;
   static const double feedTopTabsTopPadding = 16;
+
   /// Gap between the feed top bar (Following / For You) and overlay content.
   static const double feedTopBarBottomGap = 12;
   static const double feedOverlayHorizontalPadding = 8;
@@ -34,6 +35,10 @@ class HomeLayoutConstants {
   static const double tabUnselectedFontSize = 16;
 
   static const double progressBarMinHeight = 1.5;
+  static const double progressBarScrubHeight = 4.0;
+
+  /// Tall hit target so the thin bar is easy to grab for seeking.
+  static const double progressBarHitHeight = 28.0;
   static const Duration videoProgressDuration = Duration(seconds: 15);
 
   static const int feedPageSize = 10;

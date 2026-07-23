@@ -102,6 +102,8 @@ class AuctionSearchFilters extends Equatable {
       categoryId: categoryIds.length == 1 ? categoryIds.first : null,
       search: search,
       isStory: false,
+      // Auctions need nested auction payloads omitted from slim feed cards.
+      detail: true,
       auctionQuery: _toAuctionQuery(),
     );
   }

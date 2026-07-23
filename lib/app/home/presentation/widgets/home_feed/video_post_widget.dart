@@ -88,6 +88,7 @@ class VideoPostWidget extends StatefulWidget {
 
 class _VideoPostWidgetState extends State<VideoPostWidget>
     with
+        WidgetsBindingObserver,
         TickerProviderStateMixin,
         VideoPostSoundMixin,
         VideoPostEngagementMixin {
@@ -150,6 +151,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.respectFeedPlaybackGate) {
       FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
     }
@@ -183,6 +185,19 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         if (mounted) showComments();
       });
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_playbackActive) {
+        unawaited(syncPostSoundPlayback());
+      }
+      return;
+    }
+    // Locked / backgrounded — stop image soundtrack immediately.
+    unawaited(pausePostSound());
+    unawaited(SoundAudioPreview.stop());
   }
 
   void _onFeedPlaybackGateChanged() {
@@ -256,6 +271,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
     _detachRouteListener();
     unawaited(stopPostSound());

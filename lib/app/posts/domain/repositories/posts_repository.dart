@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_page_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
@@ -60,9 +61,11 @@ abstract class PostsRepository {
     HashtagSort sort = HashtagSort.name,
   });
 
-  Future<Either<Failure, List<FeedItemEntity>>> getFeed({
+  Future<Either<Failure, FeedPageEntity>> getFeed({
     int page = 1,
     int limit = 10,
+    String? cursor,
+    bool detail = false,
     String? categoryId,
     String? type,
     String? hashtag,
