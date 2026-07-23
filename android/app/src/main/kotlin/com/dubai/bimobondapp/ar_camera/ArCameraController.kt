@@ -333,8 +333,7 @@ object ArCameraController {
         lastCaptureBitmap = null
         val filter = ArCameraBridge.currentFilter
         if (!filter.isPngOverlay() &&
-            !filter.isDistortion() &&
-            !filter.isBeauty()
+            !filter.isDistortion()
         ) {
             cachedSnapshot = null
             FaceLandmarkSmoother.reset()
@@ -572,7 +571,6 @@ object ArCameraController {
         val front = ArCameraBridge.isFrontCamera
         if (front &&
             (ArCameraBridge.currentFilter.isPngOverlay() ||
-                ArCameraBridge.currentFilter.isColorGrade() ||
                 ArCameraBridge.currentFilter.useShader())
         ) {
             val mirrored = ImageProxyBitmapUtils.mirrorHorizontally(selfie)
@@ -738,17 +736,11 @@ object ArCameraController {
 
         fun bakePreviewFrame(): Bitmap? {
             val filter = ArCameraBridge.currentFilter
-            val intensity = ArCameraBridge.filterIntensity
             val base = safeCopyBitmap(lastCaptureBitmap) ?: return null
             return try {
                 when {
                     filter.isPngOverlay() -> {
                         ArCameraBridge.faceOverlay?.composeOnto(base) ?: base
-                    }
-                    filter.isColorGrade() -> {
-                        val baked = ArColorGradeBaker.apply(base, filter, intensity)
-                        if (baked !== base) base.recycle()
-                        baked
                     }
                     else -> base
                 }
@@ -777,8 +769,7 @@ object ArCameraController {
             }
         }
 
-        // OES / color-grade preview: capture a FRESH GL frame with current LUT state
-        // (LUT on = filter baked, LUT off after ban = clean).
+        // OES preview path (legacy): grab a fresh GL frame when still bound to OES.
         if (boundToOes) {
             takePhotoFromGl(::deliver, ::saveBaked)
             return
@@ -871,7 +862,7 @@ object ArCameraController {
             if (exec != null) exec.execute(work) else work.run()
         }
 
-        // Instant path: save the already-warm live preview frame (includes current LUT).
+        // Instant path: save the already-warm live preview frame.
         val immediate = try {
             gl.copyLastFilteredFrame()
         } catch (_: Exception) {
@@ -1216,7 +1207,6 @@ object ArCameraController {
         onDone: (Bitmap?) -> Unit,
     ) {
         val filter = ArCameraBridge.currentFilter
-        val intensity = ArCameraBridge.filterIntensity
 
         fun bakeAnalysisFrame(): Bitmap? {
             val base = safeCopyBitmap(lastCaptureBitmap) ?: return null
@@ -1224,11 +1214,6 @@ object ArCameraController {
                 when {
                     filter.isPngOverlay() -> {
                         ArCameraBridge.faceOverlay?.composeOnto(base) ?: base
-                    }
-                    filter.isColorGrade() -> {
-                        val baked = ArColorGradeBaker.apply(base, filter, intensity)
-                        if (baked !== base) base.recycle()
-                        baked
                     }
                     else -> base
                 }
@@ -1324,15 +1309,7 @@ object ArCameraController {
         if (!recordingPixelCopyBusy.compareAndSet(false, true)) return false
         lastRecordCopyMs = now
 
-        val baked = try {
-            if (filter.isColorGrade()) {
-                ArColorGradeBaker.apply(displayBmp, filter, ArCameraBridge.filterIntensity)
-            } else {
-                displayBmp
-            }
-        } catch (_: Exception) {
-            displayBmp
-        }
+        val baked = displayBmp
         if (baked !== displayBmp && !displayBmp.isRecycled) {
             displayBmp.recycle()
         }
@@ -1480,15 +1457,6 @@ object ArCameraController {
             when {
                 filter.isPngOverlay() -> {
                     ArCameraBridge.faceOverlay?.composeOnto(source) ?: source
-                }
-                filter.isColorGrade() -> {
-                    val baked = ArColorGradeBaker.apply(
-                        source,
-                        filter,
-                        ArCameraBridge.filterIntensity,
-                    )
-                    if (baked !== source) source.recycle()
-                    baked
                 }
                 else -> source
             }
@@ -1692,9 +1660,8 @@ object ArCameraController {
             boundToOes = false
             ArCameraBridge.applyCurrentFilter()
 
-            if (!ArCameraBridge.currentFilter.usesGpuPreview()) {
-                requestPreviewRebind()
-            }
+            // Color-grade OES path removed; always rebind PreviewView after camera switch.
+            requestPreviewRebind()
         }
     }
 
@@ -2086,10 +2053,7 @@ object ArCameraController {
             val filter = ArCameraBridge.currentFilter
             frameCounter++
 
-            if (boundToOes && filter.usesGpuPreview()) {
-                imageProxy.close()
-                return
-            }
+            // OES color-grade path removed — analysis always processes when not hardware-recording.
 
             if (hardwareRecording) {
                 // Normal/hardware path: drop frames (zero CPU).
@@ -2145,7 +2109,7 @@ object ArCameraController {
             }
 
             val needsFace =
-                filter.isDistortion() || filter.isBeauty() || filter.isPngOverlay()
+                filter.isDistortion() || filter.isPngOverlay()
             // Stickers/glasses: detect every frame so overlays stick like TikTok (no catch-up lag).
             // Beauty/distortion keep throttling to protect GPU warp path FPS.
             val detectEvery = when {
@@ -2175,7 +2139,7 @@ object ArCameraController {
                     ImageProxyBitmapUtils.orient(rawBitmap, rotation, mirrorInOrient)
                 }
                 else -> {
-                    val edge = if (filter.isColorGrade()) RECORD_GL_EDGE else GL_MAX_EDGE
+                    val edge = GL_MAX_EDGE
                     ImageProxyBitmapUtils.orientScaled(rawBitmap, rotation, mirrorInOrient, edge)
                 }
             }
@@ -2258,7 +2222,7 @@ object ArCameraController {
 
                     val glInput = ImageProxyBitmapUtils.scaleToMaxDimension(
                         display,
-                        if (filter.isColorGrade()) RECORD_GL_EDGE else GL_MAX_EDGE,
+                        GL_MAX_EDGE,
                         filter = true,
                     )
                     val snapshotForGl = if (

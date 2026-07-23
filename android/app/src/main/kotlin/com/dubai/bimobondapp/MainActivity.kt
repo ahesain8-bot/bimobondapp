@@ -7,7 +7,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
-import com.dubai.bimobondapp.ar_camera.ArColorGradeBaker
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
@@ -93,38 +92,6 @@ class MainActivity : FlutterActivity() {
                             } catch (t: Throwable) {
                                 runOnUiThread {
                                     result.error("beauty_failed", t.message ?: "unknown", null)
-                                }
-                            }
-                        }
-                    }
-                    "applyColorLut" -> {
-                        val path = call.argument<String>("path")
-                        val filterId = call.argument<String>("filter") ?: "none"
-                        if (path.isNullOrBlank()) {
-                            result.error("invalid_args", "path required", null)
-                            return@setMethodCallHandler
-                        }
-                        val intensity =
-                            (call.argument<Any>("intensity") as? Number)?.toFloat() ?: 1f
-                        val maxEdge = when (val raw = call.argument<Any>("maxEdge")) {
-                            is Int -> raw
-                            is Long -> raw.toInt()
-                            is Double -> raw.toInt()
-                            else -> null
-                        }
-                        beautyExecutor.execute {
-                            try {
-                                val out = ArColorGradeBaker.applyToFile(
-                                    context = this@MainActivity.applicationContext,
-                                    inputPath = path,
-                                    filterId = filterId,
-                                    intensity = intensity,
-                                    maxEdge = maxEdge,
-                                )
-                                runOnUiThread { result.success(out) }
-                            } catch (t: Throwable) {
-                                runOnUiThread {
-                                    result.error("lut_failed", t.message ?: "unknown", null)
                                 }
                             }
                         }

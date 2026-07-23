@@ -1,40 +1,18 @@
 import 'dart:convert';
 
 // =============================================================================
-// COLOR / BEAUTY FILTERS CATALOG — Backend API Contract + App Model
+// BEAUTY FILTERS CATALOG — Backend API Contract + App Model
 // =============================================================================
 //
-// DASHBOARD / DYNAMIC (beauty — new approach):
-//   Filters are TikTok-style beauty presets. Dashboard sends numbers + thumbnail
-//   — NO .cube, NO lutUrl, NO LUT PNG for API filters.
+// Filters are TikTok-style beauty presets. Dashboard sends numbers + thumbnail.
+// NO .cube, NO lutUrl, NO LUT PNG.
 //
-// APP STATIC (offline):
-//   Bundled LUT filters still live in ar_color_filter_bundled_catalog.dart for
-//   local testing. Soft Glow is the beauty test entry (type: "beauty").
+// ENDPOINT: GET /camera-studio/color-filters
+// Offline: ar_color_filter_bundled_catalog.dart
 //
-// ENDPOINT
-//   GET /camera-studio/color-filters
-//   Optional wrapper: { "data": { …catalog… } }
-//
-// ── DASHBOARD — REQUIRED FIELDS ONLY (beauty) ───────────────────────────────
-//
-// Filter — FLAT object, 7 beauty values required:
-//   • id, label, type ("beauty"), thumbnailUrl
-//   • smooth, whiten, brighten, blush, lipTint, lipStrength, defaultIntensity
-//
-// {
-//   "id": "soft_glow",
-//   "label": "Soft Glow",
-//   "type": "beauty",
-//   "thumbnailUrl": "https://cdn.example.com/thumbs/soft_glow.jpg",
-//   "smooth": 0.65,
-//   "whiten": 0.55,
-//   "brighten": 0.40,
-//   "blush": 0.25,
-//   "lipTint": "#E8527A",
-//   "lipStrength": 0.45,
-//   "defaultIntensity": 0.7
-// }
+ // Required filter fields (flat):
+//   id, label, type ("beauty"), thumbnailUrl (or emoji offline),
+//   smooth, whiten, brighten, blush, lipTint, lipStrength, defaultIntensity
 //
 // =============================================================================
 
@@ -140,17 +118,13 @@ class ArColorFilterCategoryModel {
 }
 
 enum ArColorFilterRenderType {
-  beauty,
-  lut;
+  beauty;
 
   static ArColorFilterRenderType fromJson(dynamic raw) {
-    final s = raw?.toString().toLowerCase();
-    if (s == 'beauty') return ArColorFilterRenderType.beauty;
-    if (s == 'lut') return ArColorFilterRenderType.lut;
-    return ArColorFilterRenderType.lut;
+    return ArColorFilterRenderType.beauty;
   }
 
-  String toJson() => name;
+  String toJson() => 'beauty';
 }
 
 class ArBeautyFilterParams {
@@ -205,9 +179,7 @@ class ArColorFilterItemModel {
   const ArColorFilterItemModel({
     required this.id,
     required this.label,
-    this.type = ArColorFilterRenderType.lut,
-    this.lutUrl,
-    this.lutAsset,
+    this.type = ArColorFilterRenderType.beauty,
     this.thumbnailUrl,
     this.emoji,
     this.previewColorHex,
@@ -219,116 +191,65 @@ class ArColorFilterItemModel {
   final String id;
   final String label;
   final ArColorFilterRenderType type;
-
-  /// Bundled / CDN LUT (static offline filters only).
-  final String? lutUrl;
-  final String? lutAsset;
-
   final String? thumbnailUrl;
   final String? emoji;
   final String? previewColorHex;
-
-  /// Beauty: first intensity when picked (0…1).
   final double defaultIntensity;
-
-  /// Beauty shader params (required when [type] is beauty).
   final ArBeautyFilterParams? params;
   final int sortOrder;
 
-  bool get isBeauty => type == ArColorFilterRenderType.beauty;
-  bool get isLut => type == ArColorFilterRenderType.lut;
+  bool get isBeauty => true;
 
-  /// Prefer [type]; kept for older call sites that still read renderType.
   ArColorFilterRenderType get renderType => type;
 
   factory ArColorFilterItemModel.fromJson(Map<String, dynamic> json) {
-    final lutUrl = json['lutUrl']?.toString();
-    final lutAsset = json['lutAsset']?.toString();
-    final typeRaw = json['type'] ?? json['renderType'];
-    final hasBeautyKeys = json.containsKey('smooth') ||
-        json.containsKey('whiten') ||
-        json.containsKey('defaultIntensity') ||
-        json['params'] is Map;
-
-    final type = typeRaw != null
-        ? ArColorFilterRenderType.fromJson(typeRaw)
-        : (hasBeautyKeys
-            ? ArColorFilterRenderType.beauty
-            : ArColorFilterRenderType.lut);
-
-    ArBeautyFilterParams? params;
-    if (type == ArColorFilterRenderType.beauty) {
-      final paramsRaw = json['params'];
-      final source = paramsRaw is Map
-          ? Map<String, dynamic>.from(paramsRaw)
-          : json;
-      params = ArBeautyFilterParams.fromJson(source);
-    }
+    final paramsRaw = json['params'];
+    final source = paramsRaw is Map
+        ? Map<String, dynamic>.from(paramsRaw)
+        : json;
 
     return ArColorFilterItemModel(
       id: json['id']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
-      type: type,
-      lutUrl: lutUrl,
-      lutAsset: lutAsset,
+      type: ArColorFilterRenderType.beauty,
       thumbnailUrl: json['thumbnailUrl']?.toString(),
       emoji: json['emoji']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
       defaultIntensity:
           _readDouble01(json['defaultIntensity'], fallback: 0.7),
-      params: params,
+      params: ArBeautyFilterParams.fromJson(source),
       sortOrder: _readInt(json['sortOrder']),
     );
   }
 
   Map<String, dynamic> toJson() {
-    if (type == ArColorFilterRenderType.beauty) {
-      final p = params ?? ArBeautyFilterParams.defaults;
-      return {
-        'id': id,
-        'label': label,
-        'type': 'beauty',
-        if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
-        'smooth': p.smooth,
-        'whiten': p.whiten,
-        'brighten': p.brighten,
-        'blush': p.blush,
-        'lipTint': p.lipTint,
-        'lipStrength': p.lipStrength,
-        'defaultIntensity': defaultIntensity,
-        if (sortOrder != 0) 'sortOrder': sortOrder,
-      };
-    }
+    final p = params ?? ArBeautyFilterParams.defaults;
     return {
       'id': id,
       'label': label,
-      'type': 'lut',
-      if (lutUrl != null) 'lutUrl': lutUrl,
-      if (lutAsset != null) 'lutAsset': lutAsset,
+      'type': 'beauty',
       if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
       if (emoji != null) 'emoji': emoji,
       if (previewColorHex != null) 'previewColorHex': previewColorHex,
-      'sortOrder': sortOrder,
+      'smooth': p.smooth,
+      'whiten': p.whiten,
+      'brighten': p.brighten,
+      'blush': p.blush,
+      'lipTint': p.lipTint,
+      'lipStrength': p.lipStrength,
+      'defaultIntensity': defaultIntensity,
+      if (sortOrder != 0) 'sortOrder': sortOrder,
     };
   }
 
   bool get hasValidBeauty =>
-      isBeauty &&
       id.trim().isNotEmpty &&
       label.trim().isNotEmpty &&
       ((thumbnailUrl ?? '').trim().isNotEmpty ||
           (emoji ?? '').trim().isNotEmpty);
-
-  bool get hasValidLut =>
-      (lutUrl != null && lutUrl!.isNotEmpty) ||
-      (lutAsset != null && lutAsset!.isNotEmpty);
-
-  String? get bundledLutPath =>
-      lutAsset != null && lutAsset!.isNotEmpty ? 'assets/luts/$lutAsset' : null;
 }
 
 extension ArColorFilterCatalogBeautySanitize on ArColorFilterCatalog {
-  /// Keeps dashboard beauty filters that have required fields.
   ArColorFilterCatalog withValidBeautyOnly() {
     return ArColorFilterCatalog(
       version: version,

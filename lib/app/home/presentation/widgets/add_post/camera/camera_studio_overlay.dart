@@ -104,7 +104,7 @@ class CameraStudioOverlay extends StatelessWidget {
     this.useNativeArFilters = false,
     this.arFilterIndex = 0,
     this.onArFilterSelected,
-    this.arColorCategoryId = 'portrait',
+    this.arColorCategoryId = 'beauty',
     this.onArColorCategorySelected,
     this.arFilterIntensity = 1.0,
     this.onArFilterIntensityChanged,

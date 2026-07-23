@@ -11,7 +11,6 @@ import 'package:bimobondapp/app/home/presentation/pages/media_crop_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/video_segment_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
-import 'package:bimobondapp/app/home/presentation/utils/media_color_lut.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_skin_smooth.dart';
@@ -102,7 +101,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   static const _photoMusicMaxSeconds = 15;
 
   String _arFilterId = 'none';
-  String _arColorCategoryId = 'portrait';
+  String _arColorCategoryId = 'beauty';
   double _arFilterIntensity = 1.0;
   bool _alreadyBaked = false;
   String _bakedFilterId = 'none';
@@ -168,18 +167,11 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   bool get _hasActiveColorFilter => ArFilterCatalog.isColorFilter(_arFilterId);
 
-  /// True when a color grade needs to be applied in the editor because it isn't
-  /// already baked into the source pixels (gallery import, or the user changed
-  /// away from the baked id). We bake it natively via the PNG LUT — no matrix.
-  bool get _needsColorLutPreview {
-    if (!_hasActiveColorFilter) return false;
-    if (!_alreadyBaked) return true;
-    return _arFilterId != _bakedFilterId;
-  }
+  /// Color LUT bake removed — beauty presets are live-retouch only (no still bake).
+  bool get _needsColorFilterPreview => false;
 
-  /// Any photo edit that requires a native-baked preview file (tone/geometry
-  /// adjustments or a LUT color grade).
-  bool get _hasPreviewEdits => _hasFaceEdits || _needsColorLutPreview;
+  /// Any photo edit that requires a native-baked preview file (tone/geometry).
+  bool get _hasPreviewEdits => _hasFaceEdits || _needsColorFilterPreview;
 
   @override
   void initState() {
@@ -401,19 +393,13 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return edited ?? file;
   }
 
-  /// Bakes the color grade onto a photo using the native PNG-LUT engine (the
-  /// same lookup the live camera uses). Full resolution — no [maxEdge].
+  /// LUT bake removed — return the input file unchanged.
   Future<File> _bakeColorFilterToFile(
     File input,
     String filterId,
     double intensity,
   ) async {
-    final out = await MediaColorLut.apply(
-      input: input,
-      filterId: filterId,
-      intensity: intensity,
-    );
-    return out ?? input;
+    return input;
   }
 
   Future<List<File>> _exportAll() async {
@@ -557,7 +543,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _magicOn = false;
       } else {
         _arFilterId = 'whitening';
-        _arColorCategoryId = 'portrait';
+        _arColorCategoryId = 'beauty';
         _magicOn = true;
         _showFilters = false;
       }
@@ -569,7 +555,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     // Magic = brighten/beauty grade only. Smooth = separate skin-clear pass.
     if (_magicOn) {
       _arFilterId = 'whitening';
-      _arColorCategoryId = 'portrait';
+      _arColorCategoryId = 'beauty';
       _arFilterIntensity = 0.8;
     } else if (_arFilterId == 'whitening') {
       _arFilterId = 'none';
@@ -680,25 +666,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
     }
 
-    if (_needsColorLutPreview) {
-      final graded = await MediaColorLut.apply(
-        input: working,
-        filterId: _arFilterId,
-        intensity: _arFilterIntensity,
-        maxEdge: 960,
-      );
-      if (gen != _smoothGen) {
-        _deleteTemp(graded, source);
-        if (produced) _deleteTemp(working, source);
-        return;
-      }
-      if (graded != null) {
-        if (produced) _deleteTemp(working, source);
-        working = graded;
-        produced = true;
-      }
-    }
-
     if (!mounted || gen != _smoothGen) {
       if (produced) _deleteTemp(working, source);
       return;
@@ -742,7 +709,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       if (ArFilterCatalog.isColorFilter(id)) {
         // Keep retouch sheet open when picking Film grades from Makeup.
         if (_showPhotoEditor) {
-          _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+          _arColorCategoryId = 'beauty';
         } else {
           _showPhotoEditor = false;
         }
@@ -765,7 +732,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       if (id == 'none') {
         // Keep category for Makeup UI; clear only the grade.
       } else {
-        _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        _arColorCategoryId = 'beauty';
         _magicOn = false;
       }
       _saveUiToCurrentState();
@@ -938,7 +905,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       arFilterId: selectedColorId,
       arFilterIntensity: _arFilterIntensity,
       applyArColorPreview: _currentState.isVideo
-          ? _needsColorLutPreview
+          ? _needsColorFilterPreview
           : false,
       muted: _currentState.isVideo,
       trimSegments: _currentState.isVideo
@@ -1249,7 +1216,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         arFilterIntensity: _arFilterIntensity,
         // Photos: the grade is baked into previewFile via the native LUT.
         // Videos: still previewed with the matrix path (matches export).
-        applyArColorPreview: currentItem.isVideo ? _needsColorLutPreview : false,
+        applyArColorPreview: currentItem.isVideo ? _needsColorFilterPreview : false,
         paused: _subEditorOpen,
         muted: _selectedSound != null && _muteOriginalAudio,
         trimSegments: currentItem.isVideo
@@ -1387,7 +1354,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                   _saveUiToCurrentState();
                                 });
                                 if (!_currentState.isVideo &&
-                                    _needsColorLutPreview) {
+                                    _needsColorFilterPreview) {
                                   _scheduleFacePreview();
                                 }
                               },
@@ -1429,7 +1396,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                             _saveUiToCurrentState();
                                           });
                                           if (!_currentState.isVideo &&
-                                              _needsColorLutPreview) {
+                                              _needsColorFilterPreview) {
                                             _scheduleFacePreview();
                                           }
                                         },

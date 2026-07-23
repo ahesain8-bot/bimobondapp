@@ -156,7 +156,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _isFrontCamera = false;
   int _workspaceTabIndex = 0;
   int _arFilterIndex = 0;
-  String _arColorCategoryId = 'portrait';
+  String _arColorCategoryId = 'beauty';
   double _arFilterIntensity = 1.0;
   double _arSwipeDrag = 0;
   double _pinchBaseZoom = CameraStudioConstants.zoomSteps[1].value;
@@ -306,7 +306,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       final arId = ArFilterCatalog.items[_arFilterIndex].id;
       final category = ArFilterCatalog.isColorFilter(arId)
           ? _arColorCategoryId
-          : 'portrait';
+          : 'beauty';
       return MediaEditorSeed(
         arFilterId: arId,
         arColorCategoryId: category,
@@ -391,7 +391,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       if (_useNativeArFilters) {
         if (next) {
           _arFilterIndex = ArFilterCatalog.indexOfId('whitening');
-          _arColorCategoryId = 'portrait';
+          _arColorCategoryId = 'beauty';
         } else if (ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
           _arFilterIndex = 0;
         }
@@ -447,7 +447,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         }
       } else {
         _arFilterIndex = ArFilterCatalog.indexOfId(id);
-        _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        _arColorCategoryId = 'beauty';
         _photoEditorMagicOn = false;
       }
     });
