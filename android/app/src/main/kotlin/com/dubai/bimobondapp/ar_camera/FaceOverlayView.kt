@@ -240,40 +240,11 @@ class FaceOverlayView @JvmOverloads constructor(
         for (snapshot in snapshots) {
             when (currentFilter) {
                 FilterType.NONE -> drawBox(canvas, snapshot)
-                FilterType.WHITENING -> drawLipstick(canvas, snapshot, "#E91E63", 45)
-                FilterType.WARM -> drawLipstick(canvas, snapshot, "#E64A19", 40)
                 else -> if (currentFilter.isPngOverlay()) {
                     drawConfiguredStickers(canvas, snapshot, extrapolate = true)
                 }
             }
         }
-    }
-
-    private fun drawLipstick(canvas: Canvas, snapshot: FaceLandmarkSnapshot, colorHex: String, alphaValue: Int) {
-        if (snapshot.landmarks.size < 300) return
-
-        val path = android.graphics.Path()
-        val startPt = mapPoint(snapshot.landmarks[61].x, snapshot.landmarks[61].y)
-        path.moveTo(startPt[0], startPt[1])
-
-        for (idx in MediaPipeLandmarkIndices.UPPER_LIP) {
-            val pt = mapPoint(snapshot.landmarks[idx].x, snapshot.landmarks[idx].y)
-            path.lineTo(pt[0], pt[1])
-        }
-
-        for (i in MediaPipeLandmarkIndices.LOWER_LIP.indices.reversed()) {
-            val idx = MediaPipeLandmarkIndices.LOWER_LIP[i]
-            val pt = mapPoint(snapshot.landmarks[idx].x, snapshot.landmarks[idx].y)
-            path.lineTo(pt[0], pt[1])
-        }
-        path.close()
-
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = Color.parseColor(colorHex)
-            alpha = alphaValue
-        }
-        canvas.drawPath(path, paint)
     }
 
     private fun mapPoint(x: Float, y: Float): FloatArray {

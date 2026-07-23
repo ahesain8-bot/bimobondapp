@@ -35,7 +35,7 @@ enum MediaPhotoEditorTab {
 }
 
 /// Film color-grade category shown under Makeup.
-const String kMediaPhotoEditorFilmCategoryId = 'film';
+const String kMediaPhotoEditorFilmCategoryId = 'beauty';
 
 /// Bottom panel: Face / Makeup tabs + circular tools (Magic + adjustments / Film filters).
 class MediaPhotoEditorPanel extends StatefulWidget {

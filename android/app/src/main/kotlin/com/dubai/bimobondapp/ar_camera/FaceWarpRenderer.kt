@@ -50,11 +50,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var uNosePull = 0
     private var uViewSize = 0
     private var uTexSize = 0
-    private var uLipRect = 0
-    private var uBeauty = 0
-    private var uIntensity = 0
-    private var uLut = 0
-    private var uHasLut = 0
     private var uRetouchSaturation = 0
     private var uRetouchBrightness = 0
     private var uRetouchContrast = 0
@@ -66,15 +61,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var uNoseWingL = 0
     private var uNoseWingR = 0
     private var uNoseRadius = 0
-
-    private var lutTextureId = 0
-
-    @Volatile
-    private var pendingLut: Bitmap? = null
-
-    @Volatile
-    private var wantLut = false
-    private var lutReady = false
 
     private var oesProgram = 0
     private var oesTextureId = 0
@@ -88,9 +74,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUTexTransform = 0
     private var oesUViewSize = 0
     private var oesUTexSize = 0
-    private var oesULut = 0
-    private var oesUHasLut = 0
-    private var oesUIntensity = 0
     private var oesURetouchSaturation = 0
     private var oesURetouchBrightness = 0
     private var oesURetouchContrast = 0
@@ -123,9 +106,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var cameraBufH = 0
 
     @Volatile
-    var lutIntensity = 1f
-
-    @Volatile
     var onCameraSurfaceReady: ((SurfaceTexture) -> Unit)? = null
 
     @Volatile
@@ -147,21 +127,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         warpParams = params
     }
 
-    fun setLut(bitmap: Bitmap?) {
-        if (bitmap == null) {
-            wantLut = false
-            pendingLut = null
-            // Drop any frame captured while LUT was active so photo
-            // after "clear filter" cannot reuse the graded snapshot.
-            clearLastCapturedFrame()
-            return
-        }
-        pendingLut = bitmap
-        wantLut = true
-        // Drop previous (unfiltered / other filter) buffer until a fresh graded frame lands.
-        clearLastCapturedFrame()
-    }
-
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         program = buildProgram(VERTEX_SHADER, FRAGMENT_SHADER)
         aPosition = GLES20.glGetAttribLocation(program, "aPosition")
@@ -174,11 +139,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uNosePull = GLES20.glGetUniformLocation(program, "uNosePull")
         uViewSize = GLES20.glGetUniformLocation(program, "uViewSize")
         uTexSize = GLES20.glGetUniformLocation(program, "uTexSize")
-        uLipRect = GLES20.glGetUniformLocation(program, "uLipRect")
-        uBeauty = GLES20.glGetUniformLocation(program, "uBeauty")
-        uIntensity = GLES20.glGetUniformLocation(program, "uIntensity")
-        uLut = GLES20.glGetUniformLocation(program, "uLut")
-        uHasLut = GLES20.glGetUniformLocation(program, "uHasLut")
         uRetouchSaturation = GLES20.glGetUniformLocation(program, "uRetouchSaturation")
         uRetouchBrightness = GLES20.glGetUniformLocation(program, "uRetouchBrightness")
         uRetouchContrast = GLES20.glGetUniformLocation(program, "uRetouchContrast")
@@ -191,8 +151,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uNoseWingR = GLES20.glGetUniformLocation(program, "uNoseWingR")
         uNoseRadius = GLES20.glGetUniformLocation(program, "uNoseRadius")
 
-        val textures = IntArray(3)
-        GLES20.glGenTextures(3, textures, 0)
+        val textures = IntArray(2)
+        GLES20.glGenTextures(2, textures, 0)
         textureId = textures[0]
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
@@ -200,14 +160,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
 
-        lutTextureId = textures[1]
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-
-        oesTextureId = textures[2]
+        oesTextureId = textures[1]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR,
@@ -230,9 +183,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         oesUTexTransform = GLES20.glGetUniformLocation(oesProgram, "uTexTransform")
         oesUViewSize = GLES20.glGetUniformLocation(oesProgram, "uViewSize")
         oesUTexSize = GLES20.glGetUniformLocation(oesProgram, "uTexSize")
-        oesULut = GLES20.glGetUniformLocation(oesProgram, "uLut")
-        oesUHasLut = GLES20.glGetUniformLocation(oesProgram, "uHasLut")
-        oesUIntensity = GLES20.glGetUniformLocation(oesProgram, "uIntensity")
         oesURetouchSaturation = GLES20.glGetUniformLocation(oesProgram, "uRetouchSaturation")
         oesURetouchBrightness = GLES20.glGetUniformLocation(oesProgram, "uRetouchBrightness")
         oesURetouchContrast = GLES20.glGetUniformLocation(oesProgram, "uRetouchContrast")
@@ -249,7 +199,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         cameraSurfaceTexture = st
         onCameraSurfaceReady?.invoke(st)
 
-        lutReady = false
         texMatrixReady = false
     }
 
@@ -258,8 +207,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        uploadPendingLut()
-
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
@@ -296,20 +243,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
         GLES20.glUniform1i(uTexture, 0)
 
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
-        GLES20.glUniform1i(uLut, 1)
-        GLES20.glUniform1f(uHasLut, if (lutReady && wantLut) 1f else 0f)
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-
         GLES20.glUniform1i(uFilterType, params.filterType)
         GLES20.glUniform4fv(uBulge1, 1, params.bulge1, 0)
         GLES20.glUniform4fv(uBulge2, 1, params.bulge2, 0)
         GLES20.glUniform4fv(uNoseRect, 1, params.noseRect, 0)
         GLES20.glUniform1f(uNosePull, params.nosePull)
-        GLES20.glUniform4fv(uLipRect, 1, params.lipRect, 0)
-        GLES20.glUniform1f(uBeauty, params.beauty)
-        GLES20.glUniform1f(uIntensity, params.intensity.coerceIn(0f, 1f))
 
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
         GLES20.glUniform2f(uViewSize, captureViewport[2].toFloat(), captureViewport[3].toFloat())
@@ -350,14 +288,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
         GLES20.glUniform1i(oesUTexture, 0)
 
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
-        GLES20.glUniform1i(oesULut, 1)
-        GLES20.glUniform1f(oesUHasLut, if (lutReady && wantLut) 1f else 0f)
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-
         GLES20.glUniformMatrix4fv(oesUStMatrix, 1, false, stMatrix, 0)
-        GLES20.glUniform1f(oesUIntensity, lutIntensity.coerceIn(0f, 1f))
 
         // Y-flip (GL vs Android). Required — without this the preview is upside-down.
         if (!texMatrixReady) {
@@ -771,8 +702,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
         pendingBitmap?.recycle()
         pendingBitmap = null
-        pendingLut = null
-        lutReady = false
         oesEnabled = false
         texMatrixReady = false
         captureScratchBitmap?.recycle()
@@ -791,10 +720,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
             textureId = 0
         }
-        if (lutTextureId != 0) {
-            GLES20.glDeleteTextures(1, intArrayOf(lutTextureId), 0)
-            lutTextureId = 0
-        }
         if (oesTextureId != 0) {
             GLES20.glDeleteTextures(1, intArrayOf(oesTextureId), 0)
             oesTextureId = 0
@@ -807,17 +732,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glDeleteProgram(oesProgram)
             oesProgram = 0
         }
-    }
-
-    private fun uploadPendingLut() {
-        val bitmap = pendingLut ?: return
-        pendingLut = null
-        if (bitmap.isRecycled) return
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
-        lutReady = true
-
     }
 
     private fun uploadPendingBitmap() {
@@ -1003,34 +917,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             precision highp float;
             varying vec2 vTexCoord;
             uniform samplerExternalOES uTexture;
-            uniform sampler2D uLut;
-            uniform float uHasLut;
             uniform mat4 uStMatrix;
             uniform mat3 uTexTransform;
             uniform vec2 uViewSize;
             uniform vec2 uTexSize;
-            uniform float uIntensity;
             $RETOUCH_UNIFORMS
             $RETOUCH_FUNCTIONS
-
-            vec3 applyLut(vec3 texColor) {
-                float blueColor = texColor.b * 63.0;
-                vec2 quad1;
-                quad1.y = floor(floor(blueColor) / 8.0);
-                quad1.x = floor(blueColor) - (quad1.y * 8.0);
-                vec2 quad2;
-                quad2.y = floor(ceil(blueColor) / 8.0);
-                quad2.x = ceil(blueColor) - (quad2.y * 8.0);
-                vec2 texPos1;
-                texPos1.x = (quad1.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
-                texPos1.y = (quad1.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
-                vec2 texPos2;
-                texPos2.x = (quad2.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
-                texPos2.y = (quad2.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
-                vec4 newColor1 = texture2D(uLut, texPos1);
-                vec4 newColor2 = texture2D(uLut, texPos2);
-                return mix(newColor1, newColor2, fract(blueColor)).rgb;
-            }
 
             // Same as PreviewView FILL_CENTER: fill the view, crop overflow, keep aspect.
             vec2 fillCenter(vec2 uv) {
@@ -1051,10 +943,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
                 st = applyRetouchNoseWarp(st);
                 vec3 col = texture2D(uTexture, st).rgb;
-                if (uHasLut > 0.5) {
-                    vec3 graded = applyLut(clamp(col, 0.0, 1.0));
-                    col = mix(col, graded, clamp(uIntensity, 0.0, 1.0));
-                }
                 col = applyRetouchColor(col);
                 gl_FragColor = vec4(col, 1.0);
             }
@@ -1071,34 +959,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uNosePull;
             uniform vec2 uViewSize;
             uniform vec2 uTexSize;
-            uniform vec4 uLipRect;
-            uniform float uBeauty;
-            uniform float uIntensity;
-            uniform sampler2D uLut;
-            uniform float uHasLut;
             $RETOUCH_UNIFORMS
             $RETOUCH_FUNCTIONS
-
-            // 512x512 lookup LUT sampling (8x8 tiles of 64x64 = 64^3 cube).
-            // Mirrors LutStore.kt so live preview and the baked photo match.
-            vec3 applyLut(vec3 texColor) {
-                float blueColor = texColor.b * 63.0;
-                vec2 quad1;
-                quad1.y = floor(floor(blueColor) / 8.0);
-                quad1.x = floor(blueColor) - (quad1.y * 8.0);
-                vec2 quad2;
-                quad2.y = floor(ceil(blueColor) / 8.0);
-                quad2.x = ceil(blueColor) - (quad2.y * 8.0);
-                vec2 texPos1;
-                texPos1.x = (quad1.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
-                texPos1.y = (quad1.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
-                vec2 texPos2;
-                texPos2.x = (quad2.x * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.r);
-                texPos2.y = (quad2.y * 0.125) + 0.5/512.0 + ((0.125 - 1.0/512.0) * texColor.g);
-                vec4 newColor1 = texture2D(uLut, texPos1);
-                vec4 newColor2 = texture2D(uLut, texPos2);
-                return mix(newColor1, newColor2, fract(blueColor)).rgb;
-            }
 
             vec2 centerCrop(vec2 uv) {
                 float viewAspect = uViewSize.x / uViewSize.y;
@@ -1141,53 +1003,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return center + (center - blur) * 0.55;
             }
 
-            float luma(vec3 c) {
-                return dot(c, vec3(0.299, 0.587, 0.114));
-            }
-
-            // Edge-aware skin smoothing: blur skin tones while preserving strong
-            // edges (eyes, brows, lips) using a luminance-weighted average.
-            vec3 smoothSkin(vec2 tc, vec2 texSize, vec3 orig, float strength) {
-                if (strength <= 0.0) return orig;
-                vec2 px = vec2(1.0 / texSize.x, 1.0 / texSize.y) * 2.0;
-                float centerL = luma(orig);
-                vec3 sum = orig;
-                float wsum = 1.0;
-                for (int i = 0; i < 12; i++) {
-                    vec2 o;
-                    if (i == 0) o = vec2( 1.0,  0.0);
-                    else if (i == 1) o = vec2(-1.0,  0.0);
-                    else if (i == 2) o = vec2( 0.0,  1.0);
-                    else if (i == 3) o = vec2( 0.0, -1.0);
-                    else if (i == 4) o = vec2( 1.0,  1.0);
-                    else if (i == 5) o = vec2(-1.0,  1.0);
-                    else if (i == 6) o = vec2( 1.0, -1.0);
-                    else if (i == 7) o = vec2(-1.0, -1.0);
-                    else if (i == 8) o = vec2( 2.0,  0.0);
-                    else if (i == 9) o = vec2(-2.0,  0.0);
-                    else if (i == 10) o = vec2( 0.0,  2.0);
-                    else o = vec2( 0.0, -2.0);
-                    vec3 s = texture2D(uTexture, tc + o * px).rgb;
-                    float w = exp(-abs(luma(s) - centerL) * 8.0);
-                    sum += s * w;
-                    wsum += w;
-                }
-                vec3 blurred = sum / wsum;
-                return mix(orig, blurred, strength);
-            }
-
-            float lipMask(vec2 tc, vec3 c) {
-                if (uLipRect.z <= uLipRect.x) return 0.0;
-                vec2 lipCenter = (uLipRect.xy + uLipRect.zw) * 0.5;
-                vec2 lipHalf = max((uLipRect.zw - uLipRect.xy) * 0.5, vec2(0.001));
-                vec2 d = (tc - lipCenter) / lipHalf;
-                float inside = 1.0 - smoothstep(0.7, 1.0, length(d));
-                // Redness test isolates lips from surrounding skin.
-                float redness = c.r - (c.g + c.b) * 0.5;
-                float red = smoothstep(0.02, 0.14, redness);
-                return inside * red;
-            }
-
             void main() {
                 vec2 tc = centerCrop(vTexCoord);
 
@@ -1215,81 +1030,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 }
 
                 vec3 col = sourceColor.rgb;
-
-                // Skin smoothing for beauty grades (whitening / rosy).
-                if (uBeauty > 0.0) {
-                    col = smoothSkin(tc, uTexSize, col, uBeauty);
-                }
-
-                if (uHasLut > 0.5) {
-                    // Professional path: sample the color grade from the LUT.
-                    col = applyLut(clamp(col, 0.0, 1.0));
-                } else if (uFilterType == 4) { // Beauty / skin smooth
-                    vec3 b = pow(col, vec3(0.90));
-                    b = mix(b, b + vec3(0.04, 0.03, 0.03), 0.55);
-                    b = mix(b, vec3(luma(b)), 0.04);
-                    col = clamp(b, 0.0, 1.0);
-                    float lm = lipMask(tc, sourceColor.rgb);
-                    col = mix(col, clamp(col * vec3(1.18, 0.82, 0.88), 0.0, 1.0), lm * 0.38);
-                } else if (uFilterType == 5) { // Warm / Peach
-                    vec3 w = vec3(col.r * 1.10, col.g * 1.03, col.b * 0.88);
-                    w = pow(w, vec3(0.95));
-                    col = clamp(w, 0.0, 1.0);
-                } else if (uFilterType == 6) { // Black & White (film)
-                    float g = luma(col);
-                    g = clamp((g - 0.5) * 1.22 + 0.5, 0.0, 1.0);
-                    col = vec3(g);
-                } else if (uFilterType == 7) { // Cool
-                    vec3 cc = vec3(col.r * 0.92, col.g * 1.0, col.b * 1.12);
-                    cc = clamp((cc - 0.5) * 1.06 + 0.5, 0.0, 1.0);
-                    col = cc;
-                } else if (uFilterType == 8) { // Vintage / Film
-                    vec3 v = col;
-                    v = clamp((v - 0.5) * 0.90 + 0.5, 0.0, 1.0);
-                    v = vec3(
-                        v.r * 1.06 + 0.04,
-                        v.g * 1.01 + 0.02,
-                        v.b * 0.86
-                    );
-                    // Subtle vignette.
-                    float vg = distance(vTexCoord, vec2(0.5));
-                    v *= 1.0 - smoothstep(0.55, 0.95, vg) * 0.35;
-                    col = clamp(v, 0.0, 1.0);
-                } else if (uFilterType == 9) { // Rosy
-                    vec3 r = pow(col, vec3(0.92));
-                    r = mix(r, r * vec3(1.04, 0.97, 0.98), 0.45);
-                    r += vec3(0.02, 0.01, 0.015);
-                    col = clamp(r, 0.0, 1.0);
-                    float lm = lipMask(tc, sourceColor.rgb);
-                    col = mix(col, clamp(col * vec3(1.22, 0.78, 0.84), 0.0, 1.0), lm * 0.42);
-                } else if (uFilterType == 10) { // Clarendon (IG)
-                    vec3 c = clamp((col - 0.5) * 1.18 + 0.5, 0.0, 1.0);
-                    c.r = c.r * 1.04 + 0.01;
-                    c.b = c.b * 1.08 + 0.02;
-                    c.g = c.g * 1.02;
-                    col = clamp(c, 0.0, 1.0);
-                } else if (uFilterType == 11) { // Valencia (IG)
-                    vec3 v = col;
-                    v = mix(v, v * vec3(1.14, 1.06, 0.86), 0.72);
-                    v = pow(v, vec3(0.94));
-                    v = v * 0.94 + 0.06;
-                    col = clamp(v, 0.0, 1.0);
-                } else if (uFilterType == 12) { // Ludwig (IG)
-                    vec3 l = pow(col, vec3(0.91));
-                    l = mix(l, vec3(luma(l)), 0.06);
-                    l = l * 1.04 + 0.035;
-                    l = mix(l, l * vec3(1.02, 1.0, 1.01), 0.5);
-                    col = clamp(l, 0.0, 1.0);
-                    float lm = lipMask(tc, sourceColor.rgb);
-                    col = mix(col, clamp(col * vec3(1.12, 0.86, 0.90), 0.0, 1.0), lm * 0.28);
-                }
-
-                // Intensity: blend unfiltered look back in (TikTok-style strength).
-                if (uFilterType >= 4 && uIntensity < 0.999) {
-                    vec3 base = texture2D(uTexture, tc).rgb;
-                    col = mix(base, col, clamp(uIntensity, 0.0, 1.0));
-                }
-
                 col = applyRetouchColor(col);
 
                 gl_FragColor = vec4(col, sourceColor.a);

@@ -53,10 +53,6 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
     }
 
-    fun setLutIntensity(intensity: Float) {
-        renderer.lutIntensity = intensity
-    }
-
     fun setOnFramePresented(callback: (() -> Unit)?) {
         renderer.onFramePresented = callback
     }
@@ -74,14 +70,6 @@ class FaceWarpGlView @JvmOverloads constructor(
         queueEvent {
             renderer.setWarpParams(params)
         }
-    }
-
-    fun submitLut(bitmap: Bitmap?) {
-        ensureGlInitialized()
-        queueEvent {
-            renderer.setLut(bitmap)
-        }
-        requestRender()
     }
 
     fun setRenderModeSafe(mode: Int) {

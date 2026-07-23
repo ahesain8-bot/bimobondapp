@@ -169,21 +169,6 @@ class ArCameraBridge {
     );
   }
 
-  static Future<String?> applyColorLut({
-    required String path,
-    required String filter,
-    double intensity = 1.0,
-    int? maxEdge,
-  }) async {
-    final out = await _channel.invokeMethod<String>('applyColorLut', {
-      'path': path,
-      'filter': filter,
-      'intensity': intensity.clamp(0.0, 1.0),
-      if (maxEdge != null) 'maxEdge': maxEdge,
-    });
-    return out;
-  }
-
   static Future<String?> applyBeauty({
     required String path,
     int saturationLevel = 0,
