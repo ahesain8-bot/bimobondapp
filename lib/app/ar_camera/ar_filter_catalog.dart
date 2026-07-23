@@ -56,6 +56,7 @@ class ArFilterCatalog {
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
   ];
 
+  /// Static bundled catalog (beauty + LUT) is primary.
   static ArColorFilterCatalog colorCatalog =
       ArColorFilterBundledCatalog.catalog;
 
@@ -64,6 +65,21 @@ class ArFilterCatalog {
     _colorItemsCache = null;
     _colorCategoriesCache = null;
   }
+
+  static void restoreBundledColorCatalog() {
+    colorCatalog = ArColorFilterBundledCatalog.catalog;
+    _colorItemsCache = null;
+    _colorCategoriesCache = null;
+  }
+
+  static ArColorFilterItemModel? colorFilterById(String id) =>
+      colorCatalog.findFilter(id);
+
+  static bool isLutColorFilter(String id) =>
+      colorFilterById(id)?.isLut ?? false;
+
+  static bool isBeautyColorFilter(String id) =>
+      colorFilterById(id)?.isBeauty ?? false;
 
   static List<ArFilterItem>? _colorItemsCache;
   static List<ArColorFilterCategory>? _colorCategoriesCache;

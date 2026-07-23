@@ -516,18 +516,10 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   }
 
   Future<void> _onSoundTap(SoundEntity sound) async {
-    final alreadySelected = _selected?.id == sound.id;
-    if (alreadySelected) {
-      await SoundAudioPreview.stop();
-      if (!mounted) return;
-      Navigator.of(context).pop(SoundPickResult(sound: sound, needsTrim: true));
-      return;
-    }
-
+    // Selecting a track applies it and returns to camera/editor.
+    // Trim stays optional via the scissors action.
     setState(() => _selected = sound);
-    await SoundAudioPreview.stop();
-    if (!mounted) return;
-    await SoundAudioPreview.playAt(sound.id, sound.resolvedAudioUrl);
+    await _confirm(sound);
   }
 
   Future<void> _confirm(
