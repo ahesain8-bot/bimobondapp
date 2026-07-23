@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filters_panel.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
+    as camera_studio_di;
+import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/home/presentation/pages/media_crop_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/video_segment_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
@@ -95,7 +99,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   String _arFilterId = 'none';
   String _arColorCategoryId = 'portrait';
-  double _arFilterIntensity = 1.0;
+  double _arFilterIntensity = 0.55;
   bool _alreadyBaked = false;
   String _bakedFilterId = 'none';
   bool _showFilters = false;
@@ -186,6 +190,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     _applyStateToUi(_states[_currentIndex]);
     // Warm fancy fonts in the background so Aa opens without a hitch.
     unawaited(MediaTextFontStyles.preload());
+    // Gallery upload may skip the camera screen — still load API color filters.
+    unawaited(_ensureColorCatalogLoaded());
     if (_hasPreviewEdits) {
       _scheduleFacePreview();
     }
@@ -193,6 +199,21 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_syncStudioSoundPreview());
       });
+    }
+  }
+
+  Future<void> _ensureColorCatalogLoaded() async {
+    await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded();
+    if (!mounted) return;
+    setState(() {
+      final categories = ArFilterCatalog.colorCategories;
+      if (categories.isNotEmpty &&
+          !categories.any((c) => c.id == _arColorCategoryId)) {
+        _arColorCategoryId = categories.first.id;
+      }
+    });
+    if (_needsColorLutPreview && !_currentState.isVideo) {
+      _scheduleFacePreview();
     }
   }
 
@@ -626,8 +647,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         highlights: _adj(MediaPhotoEditorTool.highlights),
         shadows: _adj(MediaPhotoEditorTool.shadows),
         nose: _adj(MediaPhotoEditorTool.nose),
-        // Fast live preview. Export uses full resolution (no maxEdge).
-        maxEdge: 960,
+        // Preview bake: sharp enough for HD QA. Export still uses full resolution.
+        maxEdge: 1920,
       );
       if (gen != _smoothGen) {
         _deleteTemp(adjusted, source);
@@ -644,7 +665,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         input: working,
         filterId: _arFilterId,
         intensity: _arFilterIntensity,
-        maxEdge: 960,
+        maxEdge: 1920,
       );
       if (gen != _smoothGen) {
         _deleteTemp(graded, source);
@@ -699,6 +720,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     setState(() {
       _arFilterId = id;
       if (ArFilterCatalog.isColorFilter(id)) {
+        final model = ArFilterCatalog.colorFilterModelForId(id);
+        _arFilterIntensity =
+            model?.isBeauty == true ? model!.defaultIntensity : 0.55;
         // Keep retouch sheet open when picking Film grades from Makeup.
         if (_showPhotoEditor) {
           _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
@@ -708,6 +732,22 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
       _saveUiToCurrentState();
     });
+    // Keep native remote LUT URL / beauty params in sync for bake / export paths.
+    if (ArFilterCatalog.isColorFilter(id)) {
+      final beauty = MediaColorLut.beautyParamsForId(id);
+      final model = ArFilterCatalog.colorFilterModelForId(id);
+      final intensity = model?.isBeauty == true
+          ? model!.defaultIntensity
+          : _arFilterIntensity;
+      ArCameraBridge.setFilter(
+        id,
+        intensity: intensity,
+        lutUrl: beauty == null ? ArFilterCatalog.pngLutUrlForId(id) : null,
+        beautyParams: beauty,
+      );
+    } else if (id == 'none') {
+      ArCameraBridge.setFilter('none');
+    }
     // Rebuild the native LUT-baked preview for the newly selected grade (photos).
     if (!_currentState.isVideo) {
       if (_hasPreviewEdits) {
@@ -726,9 +766,25 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       } else {
         _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
         _magicOn = false;
+        if (ArFilterCatalog.isColorFilter(id)) {
+          final model = ArFilterCatalog.colorFilterModelForId(id);
+          _arFilterIntensity =
+              model?.isBeauty == true ? model!.defaultIntensity : 0.55;
+        }
       }
       _saveUiToCurrentState();
     });
+    if (ArFilterCatalog.isColorFilter(id)) {
+      final beauty = MediaColorLut.beautyParamsForId(id);
+      ArCameraBridge.setFilter(
+        id,
+        intensity: _arFilterIntensity,
+        lutUrl: beauty == null ? ArFilterCatalog.pngLutUrlForId(id) : null,
+        beautyParams: beauty,
+      );
+    } else if (id == 'none') {
+      ArCameraBridge.setFilter('none');
+    }
     if (!_currentState.isVideo) {
       if (_hasPreviewEdits) {
         _scheduleFacePreview();
@@ -1314,6 +1370,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                             _arFilterIntensity = value;
                                             _saveUiToCurrentState();
                                           });
+                                          ArCameraBridge.setFilterIntensity(
+                                            value,
+                                          );
                                           if (!_currentState.isVideo &&
                                               _needsColorLutPreview) {
                                             _scheduleFacePreview();

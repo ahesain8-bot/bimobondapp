@@ -35,10 +35,18 @@ class ArCameraBridge {
     await _channel.invokeMethod<void>('prepareShaderPipeline');
   }
 
-  static void setFilter(String filter, {double intensity = 1.0}) {
+  static void setFilter(
+    String filter, {
+    double intensity = 1.0,
+    String? lutUrl,
+    Map<String, dynamic>? beautyParams,
+  }) {
     _channel.invokeMethod<void>('setFilter', {
       'filter': filter,
       'intensity': intensity,
+      if (lutUrl != null && lutUrl.trim().isNotEmpty) 'lutUrl': lutUrl.trim(),
+      if (beautyParams != null && beautyParams.isNotEmpty)
+        'beautyParams': beautyParams,
     });
   }
 
@@ -174,12 +182,17 @@ class ArCameraBridge {
     required String filter,
     double intensity = 1.0,
     int? maxEdge,
+    String? lutUrl,
+    Map<String, dynamic>? beautyParams,
   }) async {
     final out = await _channel.invokeMethod<String>('applyColorLut', {
       'path': path,
       'filter': filter,
       'intensity': intensity.clamp(0.0, 1.0),
       if (maxEdge != null) 'maxEdge': maxEdge,
+      if (lutUrl != null && lutUrl.trim().isNotEmpty) 'lutUrl': lutUrl.trim(),
+      if (beautyParams != null && beautyParams.isNotEmpty)
+        'beautyParams': beautyParams,
     });
     return out;
   }

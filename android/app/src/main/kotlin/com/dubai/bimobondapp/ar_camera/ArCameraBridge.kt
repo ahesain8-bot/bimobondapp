@@ -32,7 +32,11 @@ object ArCameraBridge {
     var currentFilter: FilterType = FilterType.NONE
 
     @Volatile
-    var filterIntensity: Float = 1f
+    var filterIntensity: Float = 0.55f
+
+    /** HTTPS PNG LUT for dynamic filters (`FilterType.REMOTE_LUT`). */
+    @Volatile
+    var remoteLutUrl: String? = null
 
     @Volatile
     var warpViewWidth: Int = 0
@@ -124,6 +128,16 @@ object ArCameraBridge {
         val gl = warpGlView ?: return
         val ctx = hostActivity?.applicationContext ?: return
         val gen = ++lutSubmitGen
+        // DYNAMIC remote LUT download — temporarily disabled.
+        // val remoteUrl = remoteLutUrl?.trim().orEmpty()
+        // if (remoteUrl.isNotEmpty()) {
+        //     lutExecutor.execute {
+        //         val bmp = LutStore.bitmapFromUrl(remoteUrl)
+        //         if (gen != lutSubmitGen) return@execute
+        //         if (bmp != null) gl.submitLut(bmp) else gl.submitLut(null)
+        //     }
+        //     return
+        // }
         val asset = currentFilter.lutAsset()
         if (asset == null) {
             gl.submitLut(null)
@@ -136,6 +150,58 @@ object ArCameraBridge {
 
             if (bmp != null) gl.submitLut(bmp)
         }
+    }
+
+    private fun isPngLutUrl(url: String?): String? {
+        val u = url?.trim().orEmpty()
+        if (u.isEmpty()) return null
+        val path = u.substringBefore('?').lowercase()
+        return if (path.endsWith(".png")) u else null
+    }
+
+    fun setFilter(
+        name: String,
+        intensity: Float? = null,
+        lutUrl: String? = null,
+        beautyParams: Map<*, *>? = null,
+    ) {
+        if (intensity != null) {
+            filterIntensity = intensity.coerceIn(0f, 1f)
+        }
+        // DYNAMIC lutUrl / REMOTE_LUT — temporarily disabled (static bundled only).
+        remoteLutUrl = null
+        val resolved = FilterType.fromId(name)
+        val previous = currentFilter
+        currentFilter = resolved
+
+        if (resolved.isParamBeauty()) {
+            BeautyPresetState.applyFromMap(beautyParams)
+            // Defaults if Flutter didn't send a map (e.g. Soft Glow seed).
+            if (!BeautyPresetState.active) {
+                BeautyPresetState.apply(
+                    smooth = 0.65f,
+                    whiten = 0.55f,
+                    brighten = 0.40f,
+                    blush = 0.25f,
+                    lipTintHex = "#E8527A",
+                    lipStrength = 0.45f,
+                )
+            }
+        } else {
+            BeautyPresetState.clear()
+        }
+
+        android.util.Log.i(
+            "ArFilterTap",
+            "setFilter name=$name type=$currentFilter prev=$previous " +
+                "beauty=${BeautyPresetState.active} intensity=$filterIntensity " +
+                "boundToOes=${ArCameraController.isBoundToOes()}",
+        )
+
+        if (previous != currentFilter) {
+            ArCameraController.onFilterChanged()
+        }
+        applyCurrentFilter()
     }
 
     fun updateWarpViewSize(width: Int, height: Int) {
@@ -182,32 +248,6 @@ object ArCameraBridge {
         lp.gravity = android.view.Gravity.CENTER_HORIZONTAL or android.view.Gravity.TOP
         view.layoutParams = lp
         view.requestLayout()
-    }
-
-    fun setFilter(name: String, intensity: Float? = null) {
-        if (intensity != null) {
-            filterIntensity = intensity.coerceIn(0f, 1f)
-        }
-        val type = FilterType.fromId(name)
-        val previous = currentFilter
-        currentFilter = type
-
-        android.util.Log.i(
-            "ArFilterTap",
-            "setFilter name=$name type=$type prev=$previous " +
-                "intensity=$filterIntensity " +
-                "boundToOes=${ArCameraController.isBoundToOes()} " +
-                "preferOes pending check " +
-                "glVis=${warpGlView?.visibility} previewVis=${previewView?.visibility} " +
-                "glSize=${warpGlView?.width}x${warpGlView?.height} " +
-                "previewSize=${previewView?.width}x${previewView?.height} " +
-                "letterbox=${letterboxTopPx}/${letterboxBottomPx}",
-        )
-
-        if (previous != type) {
-            ArCameraController.onFilterChanged()
-        }
-        applyCurrentFilter()
     }
 
     fun updateFilterIntensity(intensity: Float) {
@@ -631,10 +671,12 @@ object ArCameraBridge {
 
     fun onGlFramePresented() {
         if (!awaitFirstGlFrame) return
-        // Empty GL clears before CameraX OES surface is live — do not count them.
-        if (!oesSurfaceLive) return
+        // OES color path: ignore empty GL clears until CameraX surface is live.
+        // Distortion (bitmap warp) never sets oesSurfaceLive — must reveal on first frame
+        // or eyes/lips/nose stay invisible while PreviewView shows the raw camera.
+        if (currentFilter.usesGpuPreview() && !oesSurfaceLive) return
 
-        if (oesRevealFramesLeft > 0) {
+        if (oesRevealFramesLeft > 0 && currentFilter.usesGpuPreview()) {
             oesRevealFramesLeft--
             android.util.Log.i(
                 "ArFilterTap",
@@ -653,7 +695,8 @@ object ArCameraBridge {
             android.util.Log.i(
                 "ArFilterTap",
                 "onGlFramePresented REVEAL +${oesDiagElapsedMs()}ms " +
-                    "boundToOes=${ArCameraController.isBoundToOes()} oesLive=$oesSurfaceLive",
+                    "boundToOes=${ArCameraController.isBoundToOes()} oesLive=$oesSurfaceLive " +
+                    "filter=$currentFilter",
             )
             diagVis("beforeReveal")
             revealGlDropFreeze()
@@ -698,7 +741,7 @@ object ArCameraBridge {
                 gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
                 gl?.setLutIntensity(filterIntensity)
                 // Throttled shutter buffer (see FaceWarpRenderer.captureMinIntervalMs).
-                gl?.setCaptureMaxEdge(1080)
+                gl?.setCaptureMaxEdge(1920)
                 gl?.setCaptureEnabled(true)
 
                 val alreadyOnOes = ArCameraController.isBoundToOes()
@@ -735,14 +778,21 @@ object ArCameraBridge {
             }
 
             useShader -> {
+                // Distortion (eyes/lips/nose): leave OES so ImageAnalysis + bitmap warp run.
                 oesTransitionPending = false
+                oesRevealFramesLeft = 0
+                gl?.onCameraSurfaceReady = null
                 gl?.setOesEnabled(false)
                 ArCameraController.setPreferOesBinding(false)
 
-                ArCameraController.ensurePreviewViewBound()
+                if (ArCameraController.isBoundToOes()) {
+                    ArCameraController.forcePreviewViewRebind()
+                } else {
+                    ArCameraController.ensurePreviewViewBound()
+                }
                 gl?.ensureGlInitialized()
                 gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
-                gl?.setCaptureEnabled(type.isDistortion())
+                gl?.setCaptureEnabled(type.isDistortion() || type.isParamBeauty())
 
                 val alreadyOnGl =
                     gl != null &&
@@ -786,7 +836,7 @@ object ArCameraBridge {
                     gl?.setOesEnabled(true)
                     gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
                     // Warm one shutter buffer while staying on OES without a filter.
-                    gl?.setCaptureMaxEdge(1080)
+                    gl?.setCaptureMaxEdge(1920)
                     gl?.setCaptureEnabled(true)
                     showGlHidePreview()
                 } else {
@@ -868,7 +918,7 @@ object ArCameraBridge {
         hostActivity = null
         lifecycleOwner = null
         currentFilter = FilterType.NONE
-        filterIntensity = 1f
+        filterIntensity = 0.55f
         awaitFirstGlFrame = false
         oesTransitionPending = false
         oesSurfaceLive = false

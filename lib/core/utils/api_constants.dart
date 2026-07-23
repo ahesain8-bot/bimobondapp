@@ -116,10 +116,13 @@ class ApiConstants {
   static String storyViewers(String storyId) => '/stories/$storyId/viewers';
 
   static const String cameraStudioCatalog = '/camera-studio/catalog';
+  static const String cameraStudioColorFilters = '/camera-studio/color-filters';
   static const String cameraStudioEffectPlacementSchema =
       '/camera-studio/effect-placement/schema';
 
   static String get cameraStudioCatalogUrl => '$baseUrl$cameraStudioCatalog';
+  static String get cameraStudioColorFiltersUrl =>
+      '$baseUrl$cameraStudioColorFilters';
 
   // Chats
   static const String chats = '/chats';

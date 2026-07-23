@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 import 'package:bimobondapp/app/camera_studio/data/models/camera_studio_catalog_model.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
@@ -7,6 +8,7 @@ import 'package:dio/dio.dart';
 
 abstract class CameraStudioRemoteDataSource {
   Future<CameraStudioCatalogModel> getCatalog();
+  Future<ArColorFilterCatalog> getColorFilters();
   Future<Map<String, dynamic>> getEffectPlacementSchema();
 }
 
@@ -41,6 +43,32 @@ class CameraStudioRemoteDataSourceImpl implements CameraStudioRemoteDataSource {
         message:
             _extractErrorMessage(response.data) ??
             'Failed to load camera studio catalog',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<ArColorFilterCatalog> getColorFilters() async {
+    try {
+      final response =
+          await apiClient.dio.get(ApiConstants.cameraStudioColorFilters);
+      if (response.statusCode == 200) {
+        final body = response.data;
+        if (body is Map<String, dynamic>) {
+          return ArColorFilterCatalog.fromJson(body).withValidBeautyOnly();
+        }
+        if (body is Map) {
+          return ArColorFilterCatalog.fromJson(
+            Map<String, dynamic>.from(body),
+          ).withValidBeautyOnly();
+        }
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ??
+            'Failed to load color filters',
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);

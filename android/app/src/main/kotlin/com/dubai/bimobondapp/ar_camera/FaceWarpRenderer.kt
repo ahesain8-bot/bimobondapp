@@ -53,6 +53,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var uLipRect = 0
     private var uBeauty = 0
     private var uIntensity = 0
+    private var uSoftWhiten = 0
+    private var uSoftBrighten = 0
+    private var uSoftBlush = 0
+    private var uLipTint = 0
+    private var uLipStrength = 0
+    private var uCheek1 = 0
+    private var uCheek2 = 0
     private var uLut = 0
     private var uHasLut = 0
     private var uRetouchSaturation = 0
@@ -177,6 +184,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uLipRect = GLES20.glGetUniformLocation(program, "uLipRect")
         uBeauty = GLES20.glGetUniformLocation(program, "uBeauty")
         uIntensity = GLES20.glGetUniformLocation(program, "uIntensity")
+        uSoftWhiten = GLES20.glGetUniformLocation(program, "uSoftWhiten")
+        uSoftBrighten = GLES20.glGetUniformLocation(program, "uSoftBrighten")
+        uSoftBlush = GLES20.glGetUniformLocation(program, "uSoftBlush")
+        uLipTint = GLES20.glGetUniformLocation(program, "uLipTint")
+        uLipStrength = GLES20.glGetUniformLocation(program, "uLipStrength")
+        uCheek1 = GLES20.glGetUniformLocation(program, "uCheek1")
+        uCheek2 = GLES20.glGetUniformLocation(program, "uCheek2")
         uLut = GLES20.glGetUniformLocation(program, "uLut")
         uHasLut = GLES20.glGetUniformLocation(program, "uHasLut")
         uRetouchSaturation = GLES20.glGetUniformLocation(program, "uRetouchSaturation")
@@ -310,6 +324,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform4fv(uLipRect, 1, params.lipRect, 0)
         GLES20.glUniform1f(uBeauty, params.beauty)
         GLES20.glUniform1f(uIntensity, params.intensity.coerceIn(0f, 1f))
+        GLES20.glUniform1f(uSoftWhiten, params.softWhiten)
+        GLES20.glUniform1f(uSoftBrighten, params.softBrighten)
+        GLES20.glUniform1f(uSoftBlush, params.softBlush)
+        GLES20.glUniform3fv(uLipTint, 1, params.lipTintRgb, 0)
+        GLES20.glUniform1f(uLipStrength, params.lipStrength)
+        GLES20.glUniform4fv(uCheek1, 1, params.cheek1, 0)
+        GLES20.glUniform4fv(uCheek2, 1, params.cheek2, 0)
 
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, captureViewport, 0)
         GLES20.glUniform2f(uViewSize, captureViewport[2].toFloat(), captureViewport[3].toFloat())
@@ -548,7 +569,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     }
 
     @Volatile
-    var captureMaxEdge: Int = 960
+    var captureMaxEdge: Int = 1920
 
     private val captureLock = Any()
     private var lastCapturedFrame: Bitmap? = null
@@ -813,11 +834,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         val bitmap = pendingLut ?: return
         pendingLut = null
         if (bitmap.isRecycled) return
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        if (bitmap.width != 512 || bitmap.height != 512) {
+            android.util.Log.e(TAG, "LUT rejected: ${bitmap.width}x${bitmap.height} (need 512x512)")
+            wantLut = false
+            lutReady = false
+            return
+        }
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTextureId)
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         lutReady = true
-
     }
 
     private fun uploadPendingBitmap() {
@@ -1074,6 +1101,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform vec4 uLipRect;
             uniform float uBeauty;
             uniform float uIntensity;
+            uniform float uSoftWhiten;
+            uniform float uSoftBrighten;
+            uniform float uSoftBlush;
+            uniform vec3 uLipTint;
+            uniform float uLipStrength;
+            uniform vec4 uCheek1;
+            uniform vec4 uCheek2;
             uniform sampler2D uLut;
             uniform float uHasLut;
             $RETOUCH_UNIFORMS
@@ -1188,6 +1222,25 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return inside * red;
             }
 
+            float softLipMask(vec2 tc) {
+                // Geometry-only lip region (no redness paint) — sticks to lipRect.
+                if (uLipRect.z <= uLipRect.x) return 0.0;
+                vec2 lipCenter = (uLipRect.xy + uLipRect.zw) * 0.5;
+                vec2 lipHalf = max((uLipRect.zw - uLipRect.xy) * 0.5, vec2(0.001));
+                // Slightly tighten so tint stays on lips, not chin/skin.
+                lipHalf *= 0.92;
+                vec2 d = (tc - lipCenter) / lipHalf;
+                float ell = length(d);
+                return 1.0 - smoothstep(0.45, 0.92, ell);
+            }
+
+            float cheekMask(vec2 tc, vec4 cheek) {
+                if (cheek.z < 0.0001) return 0.0;
+                vec2 d = (tc - cheek.xy) / max(cheek.zw, vec2(0.001));
+                float inside = 1.0 - smoothstep(0.35, 1.05, length(d));
+                return inside;
+            }
+
             void main() {
                 vec2 tc = centerCrop(vTexCoord);
 
@@ -1215,6 +1268,39 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 }
 
                 vec3 col = sourceColor.rgb;
+                float i = clamp(uIntensity, 0.0, 1.0);
+
+                // Soft Glow catalog beauty (TikTok-style params).
+                if (uFilterType == 26) {
+                    float sm = clamp(uBeauty * i, 0.0, 1.0);
+                    if (sm > 0.001) {
+                        col = smoothSkin(tc, uTexSize, col, sm);
+                    }
+                    float w = clamp(uSoftWhiten * i, 0.0, 1.0);
+                    float br = clamp(uSoftBrighten * i, 0.0, 1.0);
+                    float bl = clamp(uSoftBlush * i, 0.0, 1.0);
+                    float ls = clamp(uLipStrength * i, 0.0, 1.0);
+
+                    // Neutral whiten + brighten (no pink cast on whole face).
+                    vec3 lifted = pow(col, vec3(1.0 - w * 0.18));
+                    lifted = mix(lifted, lifted + vec3(0.06), w * 0.55);
+                    lifted = mix(lifted, vec3(luma(lifted)), w * 0.08);
+                    lifted = lifted + vec3(br * 0.12);
+                    col = clamp(lifted, 0.0, 1.0);
+
+                    // Soft cheek blush only (not lip tint color).
+                    float cm = max(cheekMask(tc, uCheek1), cheekMask(tc, uCheek2));
+                    vec3 blushCol = vec3(0.92, 0.42, 0.52);
+                    col = mix(col, mix(col, blushCol, 0.40), cm * bl * 0.45);
+
+                    // Lip tint locked to lipRect — soft multiply-like blend.
+                    float lm = softLipMask(tc);
+                    vec3 lipCol = mix(col, uLipTint, 0.62);
+                    col = mix(col, clamp(lipCol, 0.0, 1.0), lm * ls * 0.75);
+
+                    gl_FragColor = vec4(clamp(col, 0.0, 1.0), sourceColor.a);
+                    return;
+                }
 
                 // Skin smoothing for beauty grades (whitening / rosy).
                 if (uBeauty > 0.0) {
@@ -1222,8 +1308,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 }
 
                 if (uHasLut > 0.5) {
-                    // Professional path: sample the color grade from the LUT.
-                    col = applyLut(clamp(col, 0.0, 1.0));
+                    vec3 graded = applyLut(clamp(col, 0.0, 1.0));
+                    col = mix(col, graded, clamp(uIntensity, 0.0, 1.0));
                 } else if (uFilterType == 4) { // Beauty / skin smooth
                     vec3 b = pow(col, vec3(0.90));
                     b = mix(b, b + vec3(0.04, 0.03, 0.03), 0.55);
@@ -1284,8 +1370,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     col = mix(col, clamp(col * vec3(1.12, 0.86, 0.90), 0.0, 1.0), lm * 0.28);
                 }
 
-                // Intensity: blend unfiltered look back in (TikTok-style strength).
-                if (uFilterType >= 4 && uIntensity < 0.999) {
+                // Intensity for legacy matrix grades only. LUT path already mixed above —
+                // applying again would crush strength / look wrong for film PNGs.
+                if (uHasLut < 0.5 && uFilterType >= 4 && uFilterType <= 12 && uIntensity < 0.999) {
                     vec3 base = texture2D(uTexture, tc).rgb;
                     col = mix(base, col, clamp(uIntensity, 0.0, 1.0));
                 }

@@ -56,11 +56,19 @@ class ArFilterCatalog {
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
   ];
 
+  // STATIC catalog (bundled LUT filters).
   static ArColorFilterCatalog colorCatalog =
       ArColorFilterBundledCatalog.catalog;
 
+  // DYNAMIC API — temporarily disabled.
   static void updateColorCatalog(ArColorFilterCatalog catalog) {
-    colorCatalog = catalog;
+    // colorCatalog = catalog;
+    // _colorItemsCache = null;
+    // _colorCategoriesCache = null;
+  }
+
+  static void restoreBundledColorCatalog() {
+    colorCatalog = ArColorFilterBundledCatalog.catalog;
     _colorItemsCache = null;
     _colorCategoriesCache = null;
   }
@@ -75,7 +83,9 @@ class ArFilterCatalog {
               id: filter.id,
               label: filter.label,
               emoji: filter.emoji ?? '',
-              thumbnailUrl: filter.thumbnailUrl,
+              thumbnailUrl: (filter.thumbnailUrl ?? '').isEmpty
+                  ? null
+                  : filter.thumbnailUrl,
               previewColorHex: filter.previewColorHex,
             ),
       ];
@@ -110,7 +120,33 @@ class ArFilterCatalog {
   static bool isColorFilter(String id) =>
       colorItems.any((item) => item.id == id);
 
+  static ArColorFilterItemModel? colorFilterModelForId(String id) {
+    for (final category in colorCatalog.categories) {
+      for (final filter in category.filters) {
+        if (filter.id == id) return filter;
+      }
+    }
+    return null;
+  }
+
+  static String? pngLutUrlForId(String id) {
+    for (final category in colorCatalog.categories) {
+      for (final filter in category.filters) {
+        if (filter.id != id) continue;
+        final url = filter.lutUrl?.trim();
+        if (url != null &&
+            url.isNotEmpty &&
+            url.split('?').first.toLowerCase().endsWith('.png')) {
+          return url;
+        }
+        return null;
+      }
+    }
+    return null;
+  }
+
   static List<ArFilterItem> colorItemsForCategory(String categoryId) {
+    if (colorCategories.isEmpty) return const [];
     final category = colorCategories.firstWhere(
       (c) => c.id == categoryId,
       orElse: () => colorCategories.first,

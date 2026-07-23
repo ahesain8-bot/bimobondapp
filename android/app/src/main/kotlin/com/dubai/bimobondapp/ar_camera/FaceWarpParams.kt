@@ -12,6 +12,15 @@ data class FaceWarpParams(
     val beauty: Float = 0f,
 
     val intensity: Float = 1f,
+
+    /** Soft Glow catalog params (used when filterType == FILTER_SOFT_GLOW). */
+    val softWhiten: Float = 0f,
+    val softBrighten: Float = 0f,
+    val softBlush: Float = 0f,
+    val lipTintRgb: FloatArray = floatArrayOf(0.91f, 0.32f, 0.48f),
+    val lipStrength: Float = 0f,
+    val cheek1: FloatArray = floatArrayOf(0f, 0f, 0f, 0f),
+    val cheek2: FloatArray = floatArrayOf(0f, 0f, 0f, 0f),
 ) {
     companion object {
         const val FILTER_NONE = 0
@@ -40,6 +49,7 @@ data class FaceWarpParams(
         const val FILTER_YOU_CAN_DO_IT = 23
         const val FILTER_SMOOTH_SAILING = 24
         const val FILTER_WELL_SEE = 25
+        const val FILTER_SOFT_GLOW = 26
 
         val INACTIVE = FaceWarpParams(
             filterType = FILTER_NONE,
@@ -80,6 +90,9 @@ object FaceWarpParamsBuilder {
         FilterType.YOU_CAN_DO_IT -> FaceWarpParams.FILTER_YOU_CAN_DO_IT
         FilterType.SMOOTH_SAILING -> FaceWarpParams.FILTER_SMOOTH_SAILING
         FilterType.WELL_SEE -> FaceWarpParams.FILTER_WELL_SEE
+        FilterType.SOFT_GLOW -> FaceWarpParams.FILTER_SOFT_GLOW
+        // LUT-only grade: no distortion/beauty filter-code side effects.
+        FilterType.REMOTE_LUT -> FaceWarpParams.FILTER_NONE
         else -> FaceWarpParams.FILTER_NONE
     }
 
@@ -209,6 +222,36 @@ object FaceWarpParamsBuilder {
                 )
             }
 
+            FilterType.SOFT_GLOW -> {
+                val lipRect = snapshot?.let { computeLipRect(it, imageWidth, imageHeight) }
+                    ?: floatArrayOf(0f, 0f, 0f, 0f)
+                val cheek1 = snapshot?.let {
+                    cheekBulge(it, MediaPipeLandmarkIndices.LEFT_CHEEK, faceWidth, imageWidth, imageHeight)
+                } ?: floatArrayOf(0f, 0f, 0f, 0f)
+                val cheek2 = snapshot?.let {
+                    cheekBulge(it, MediaPipeLandmarkIndices.RIGHT_CHEEK, faceWidth, imageWidth, imageHeight)
+                } ?: floatArrayOf(0f, 0f, 0f, 0f)
+                val preset = BeautyPresetState
+                val smooth = if (preset.active) preset.smooth else 0.65f
+                FaceWarpParams(
+                    filterType = FaceWarpParams.FILTER_SOFT_GLOW,
+                    bulge1 = floatArrayOf(0f, 0f, 0f, 0f),
+                    bulge2 = floatArrayOf(0f, 0f, 0f, 0f),
+                    noseRect = floatArrayOf(0f, 0f, 0f, 0f),
+                    nosePull = 0f,
+                    lipRect = lipRect,
+                    beauty = smooth,
+                    intensity = ArCameraBridge.filterIntensity.coerceIn(0f, 1f),
+                    softWhiten = if (preset.active) preset.whiten else 0.55f,
+                    softBrighten = if (preset.active) preset.brighten else 0.40f,
+                    softBlush = if (preset.active) preset.blush else 0.25f,
+                    lipTintRgb = floatArrayOf(preset.lipTintR, preset.lipTintG, preset.lipTintB),
+                    lipStrength = if (preset.active) preset.lipStrength else 0.45f,
+                    cheek1 = cheek1,
+                    cheek2 = cheek2,
+                )
+            }
+
             else -> {
 
                 val lipRect = snapshot?.let { computeLipRect(it, imageWidth, imageHeight) }
@@ -231,6 +274,25 @@ object FaceWarpParamsBuilder {
                 )
             }
         }
+    }
+
+    private fun cheekBulge(
+        snapshot: FaceLandmarkSnapshot,
+        landmarkIdx: Int,
+        faceWidth: Float,
+        imageWidth: Int,
+        imageHeight: Int,
+    ): FloatArray {
+        val p = snapshot.landmarks.getOrNull(landmarkIdx) ?: return floatArrayOf(0f, 0f, 0f, 0f)
+        val uv = FaceCoordinateMapper.toWarpUv(
+            p.x,
+            p.y,
+            imageWidth,
+            imageHeight,
+            isFrontCamera = ArCameraBridge.isFrontCamera,
+        )
+        val r = FaceCoordinateMapper.toWarpRadiusX(faceWidth * 0.13f, imageWidth)
+        return floatArrayOf(uv[0], uv[1], r, r * 0.75f)
     }
 
     private fun computeLipRect(

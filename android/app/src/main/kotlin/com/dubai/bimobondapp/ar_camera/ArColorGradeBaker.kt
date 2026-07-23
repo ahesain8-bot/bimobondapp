@@ -15,11 +15,17 @@ object ArColorGradeBaker {
         filterId: String,
         intensity: Float,
         maxEdge: Int? = null,
+        lutUrl: String? = null,
     ): String? {
-        val filter = FilterType.fromId(filterId)
-        val asset = filter.lutAsset() ?: return null
         val t = intensity.coerceIn(0f, 1f)
         if (t <= 0.001f) return null
+
+        // val remote = resolvePngLutUrl(lutUrl)
+        val filter = FilterType.fromId(filterId)
+        val asset = filter.lutAsset()
+        // DYNAMIC remote URL bake — temporarily disabled (static bundled only).
+        // if (remote == null && asset == null) return null
+        if (asset == null) return null
 
         val decoded = BitmapFactory.decodeFile(inputPath) ?: return null
         val source = if (maxEdge != null && maxEdge > 0) {
@@ -28,6 +34,11 @@ object ArColorGradeBaker {
             decoded
         }
 
+        // val graded = if (remote != null) {
+        //     LutStore.applyFromUrl(source, remote, t)
+        // } else {
+        //     LutStore.apply(context, source, asset!!, t)
+        // }
         val graded = LutStore.apply(context, source, asset, t)
         val applied = graded !== source
 
@@ -49,6 +60,19 @@ object ArColorGradeBaker {
         }
     }
 
+    private fun resolvePngLutUrl(explicit: String?): String? {
+        val candidates = listOf(
+            explicit?.trim().orEmpty(),
+            ArCameraBridge.remoteLutUrl?.trim().orEmpty(),
+        )
+        for (u in candidates) {
+            if (u.isEmpty()) continue
+            val path = u.substringBefore('?').lowercase()
+            if (path.endsWith(".png")) return u
+        }
+        return null
+    }
+
     private fun downscale(src: Bitmap, maxEdge: Int): Bitmap {
         val longest = maxOf(src.width, src.height)
         if (longest <= maxEdge) return src
@@ -65,6 +89,12 @@ object ArColorGradeBaker {
         if (!filter.isColorGrade() || source.isRecycled) return source
         val t = intensity.coerceIn(0f, 1f)
         if (t <= 0.001f) return source
+
+        // val remote = ArCameraBridge.remoteLutUrl?.trim().orEmpty()
+        // DYNAMIC remote URL — temporarily disabled.
+        // if (remote.isNotEmpty()) {
+        //     return LutStore.applyFromUrl(source, remote, t)
+        // }
 
         val ctx = ArCameraBridge.hostActivity?.applicationContext ?: return source
         val asset = filter.lutAsset() ?: return source

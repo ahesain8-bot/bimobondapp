@@ -3,6 +3,8 @@ package com.dubai.bimobondapp.ar_camera
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import java.net.HttpURLConnection
+import java.net.URL
 
 object LutStore {
 
@@ -32,17 +34,55 @@ object LutStore {
         return loaded
     }
 
+    /** Downloads a 512×512 LUT PNG from [url] (cached by URL). */
+    @Synchronized
+    fun bitmapFromUrl(url: String): Bitmap? {
+        val key = url.trim()
+        if (key.isEmpty()) return null
+        if (bitmapCache.containsKey(key)) return bitmapCache[key]
+        val loaded = try {
+            val conn = (URL(key).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10_000
+                readTimeout = 15_000
+                instanceFollowRedirects = true
+            }
+            conn.inputStream.use { input ->
+                BitmapFactory.decodeStream(input)?.let {
+                    if (it.config == Bitmap.Config.ARGB_8888) it
+                    else it.copy(Bitmap.Config.ARGB_8888, false)
+                }
+            }
+        } catch (_: Throwable) {
+            null
+        }
+        bitmapCache[key] = loaded
+        return loaded
+    }
+
     @Synchronized
     private fun pixels(context: Context, asset: String): IntArray? {
         if (pixelCache.containsKey(asset)) return pixelCache[asset]
         val bmp = bitmap(context, asset)
-        val out = if (bmp != null && bmp.width == DIM && bmp.height == DIM) {
+        val out = pixelsFromBitmap(bmp)
+        pixelCache[asset] = out
+        return out
+    }
+
+    @Synchronized
+    private fun pixelsFromUrl(url: String): IntArray? {
+        val key = "px:$url"
+        if (pixelCache.containsKey(key)) return pixelCache[key]
+        val out = pixelsFromBitmap(bitmapFromUrl(url))
+        pixelCache[key] = out
+        return out
+    }
+
+    private fun pixelsFromBitmap(bmp: Bitmap?): IntArray? {
+        return if (bmp != null && bmp.width == DIM && bmp.height == DIM) {
             IntArray(DIM * DIM).also { bmp.getPixels(it, 0, DIM, 0, 0, DIM, DIM) }
         } else {
             null
         }
-        pixelCache[asset] = out
-        return out
     }
 
     fun apply(
@@ -54,7 +94,21 @@ object LutStore {
         val t = intensity.coerceIn(0f, 1f)
         if (t <= 0.001f || source.isRecycled) return source
         val lut = pixels(context, asset) ?: return source
+        return applyPixels(source, lut, t)
+    }
 
+    fun applyFromUrl(
+        source: Bitmap,
+        url: String,
+        intensity: Float,
+    ): Bitmap {
+        val t = intensity.coerceIn(0f, 1f)
+        if (t <= 0.001f || source.isRecycled) return source
+        val lut = pixelsFromUrl(url) ?: return source
+        return applyPixels(source, lut, t)
+    }
+
+    private fun applyPixels(source: Bitmap, lut: IntArray, t: Float): Bitmap {
         val w = source.width
         val h = source.height
         val px = IntArray(w * h)

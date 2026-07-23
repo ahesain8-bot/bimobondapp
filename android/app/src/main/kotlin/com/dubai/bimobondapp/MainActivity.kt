@@ -8,9 +8,12 @@ import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
 import com.dubai.bimobondapp.ar_camera.ArColorGradeBaker
+import com.dubai.bimobondapp.ar_camera.BeautyPresetState
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
+import com.dubai.bimobondapp.ar_camera.FilterType
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
+import com.dubai.bimobondapp.ar_camera.SoftGlowBaker
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -106,6 +109,8 @@ class MainActivity : FlutterActivity() {
                         }
                         val intensity =
                             (call.argument<Any>("intensity") as? Number)?.toFloat() ?: 1f
+                        val lutUrl = call.argument<String>("lutUrl")
+                        val beautyParams = call.argument<Map<*, *>>("beautyParams")
                         val maxEdge = when (val raw = call.argument<Any>("maxEdge")) {
                             is Int -> raw
                             is Long -> raw.toInt()
@@ -114,13 +119,38 @@ class MainActivity : FlutterActivity() {
                         }
                         beautyExecutor.execute {
                             try {
-                                val out = ArColorGradeBaker.applyToFile(
-                                    context = this@MainActivity.applicationContext,
-                                    inputPath = path,
-                                    filterId = filterId,
-                                    intensity = intensity,
-                                    maxEdge = maxEdge,
-                                )
+                                val out = if (FilterType.fromId(filterId).isParamBeauty()) {
+                                    if (beautyParams != null) {
+                                        BeautyPresetState.applyFromMap(beautyParams)
+                                    }
+                                    SoftGlowBaker.applyToFile(
+                                        context = this@MainActivity.applicationContext,
+                                        inputPath = path,
+                                        intensity = intensity,
+                                        maxEdge = maxEdge,
+                                        smooth = (beautyParams?.get("smooth") as? Number)?.toFloat()
+                                            ?: BeautyPresetState.smooth,
+                                        whiten = (beautyParams?.get("whiten") as? Number)?.toFloat()
+                                            ?: BeautyPresetState.whiten,
+                                        brighten = (beautyParams?.get("brighten") as? Number)?.toFloat()
+                                            ?: BeautyPresetState.brighten,
+                                        blush = (beautyParams?.get("blush") as? Number)?.toFloat()
+                                            ?: BeautyPresetState.blush,
+                                        lipTintHex = beautyParams?.get("lipTint")?.toString()
+                                            ?: "#E8527A",
+                                        lipStrength = (beautyParams?.get("lipStrength") as? Number)?.toFloat()
+                                            ?: BeautyPresetState.lipStrength,
+                                    )
+                                } else {
+                                    ArColorGradeBaker.applyToFile(
+                                        context = this@MainActivity.applicationContext,
+                                        inputPath = path,
+                                        filterId = filterId,
+                                        intensity = intensity,
+                                        maxEdge = maxEdge,
+                                        lutUrl = lutUrl,
+                                    )
+                                }
                                 runOnUiThread { result.success(out) }
                             } catch (t: Throwable) {
                                 runOnUiThread {
@@ -132,7 +162,9 @@ class MainActivity : FlutterActivity() {
                     "setFilter" -> {
                         val filter = call.argument<String>("filter") ?: "none"
                         val intensity = call.argument<Double>("intensity")?.toFloat()
-                        ArCameraBridge.setFilter(filter, intensity)
+                        val lutUrl = call.argument<String>("lutUrl")
+                        val beautyParams = call.argument<Map<*, *>>("beautyParams")
+                        ArCameraBridge.setFilter(filter, intensity, lutUrl, beautyParams)
                         result.success(null)
                     }
                     "setFilterIntensity" -> {

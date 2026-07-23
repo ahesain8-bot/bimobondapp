@@ -39,28 +39,38 @@
 -keep class com.google.mlkit.** { *; }
 -dontwarn com.google.mlkit.**
 
-# MediaPipe Face Landmarker
+# MediaPipe + TFLite + protobuf (release face landmarks / glasses / dog / etc.)
+# R8 must not rename these — createFromOptions fails silently otherwise.
+-keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*, Exceptions
+
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
 -keep class com.google.mediapipe.** { *; }
+-keepclassmembers class com.google.mediapipe.** { *; }
 -dontwarn com.google.mediapipe.**
 
-# MediaPipe parses its .task graph config via protobuf-lite, which relies on
-# field/class names at runtime. R8 obfuscation breaks this → createFromOptions
-# fails silently and ALL face effects (dog, glasses, big eyes, lips, nose, jaw)
-# stop working in release. Keep protobuf + generated messages intact.
 -keep class com.google.protobuf.** { *; }
+-keepclassmembers class com.google.protobuf.** { *; }
 -keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
 -keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
     <fields>;
+    <methods>;
 }
 -dontwarn com.google.protobuf.**
 
-# AutoValue-generated classes used by MediaPipe tasks options/results.
+-keep class com.google.flatbuffers.** { *; }
+-dontwarn com.google.flatbuffers.**
+
 -keep class com.google.auto.value.** { *; }
 -dontwarn com.google.auto.value.**
 
-# FlatBuffers (TFLite model container inside the .task bundle).
--keep class com.google.flatbuffers.** { *; }
--dontwarn com.google.flatbuffers.**
+-keep class org.tensorflow.** { *; }
+-dontwarn org.tensorflow.**
+
+-keep class com.google.android.gms.tflite.** { *; }
+-dontwarn com.google.android.gms.tflite.**
 
 # OpenCV
 -keep class org.opencv.** { *; }

@@ -31,7 +31,11 @@ enum class FilterType {
     URBAN_COWBOY,
     YOU_CAN_DO_IT,
     SMOOTH_SAILING,
-    WELL_SEE;
+    WELL_SEE,
+    /** Beauty test preset (Soft Glow) — uses whitening LUT + beauty shader path. */
+    SOFT_GLOW,
+    /** Dynamic color grade from API `lutUrl` (PNG). No bundled asset. */
+    REMOTE_LUT;
 
     fun isDistortion(): Boolean =
         this == BIG_EYES || this == BIG_LIPS || this == LONG_NOSE
@@ -48,12 +52,15 @@ enum class FilterType {
             this == NAH || this == ONCE_UPON_A_TIME || this == PASSING_BY ||
             this == SERENITY || this == UNDENIABLE_2 || this == UNDENIABLE ||
             this == URBAN_COWBOY || this == YOU_CAN_DO_IT || this == SMOOTH_SAILING ||
-            this == WELL_SEE
+            this == WELL_SEE || this == REMOTE_LUT
+
+    /** Catalog-driven beauty (smooth/whiten/blush/lips) — bitmap shader, no LUT. */
+    fun isParamBeauty(): Boolean = this == SOFT_GLOW
 
     fun isBeauty(): Boolean =
-        this == WHITENING || this == ROSY || this == LUDWIG
+        this == WHITENING || this == ROSY || this == LUDWIG || isParamBeauty()
 
-    fun useShader(): Boolean = isDistortion() || isColorGrade()
+    fun useShader(): Boolean = isDistortion() || isColorGrade() || isParamBeauty()
 
     fun usesGpuPreview(): Boolean = isColorGrade()
 
@@ -80,6 +87,7 @@ enum class FilterType {
         YOU_CAN_DO_IT -> "you_can_do_it.png"
         SMOOTH_SAILING -> "smooth_sailing.png"
         WELL_SEE -> "well_see.png"
+        SOFT_GLOW -> null
         else -> null
     }
 
@@ -115,6 +123,7 @@ enum class FilterType {
             "you_can_do_it" -> YOU_CAN_DO_IT
             "smooth_sailing" -> SMOOTH_SAILING
             "well_see" -> WELL_SEE
+            "soft_glow" -> SOFT_GLOW
             else -> NONE
         }
     }

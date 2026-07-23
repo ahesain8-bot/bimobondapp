@@ -43,7 +43,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
+                // Non-optimize: MediaPipe Face Landmarker + protobuf break under R8 optimize.
+                getDefaultProguardFile("proguard-android.txt"),
                 "proguard-rules.pro",
             )
         }

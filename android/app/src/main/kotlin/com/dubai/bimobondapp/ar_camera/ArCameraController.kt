@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.os.Handler
@@ -52,9 +53,9 @@ object ArCameraController {
     private const val PNG_RECORD_INTERVAL_MS = 66L
     private const val GL_MAX_EDGE = 1280
     private const val CAPTURE_MAX_EDGE = 1920
-    /** Fast preview JPEG for instant Flutter navigation (hi-res upgrades in background). */
-    private const val INSTANT_CAPTURE_EDGE = 1080
-    private const val INSTANT_JPEG_QUALITY = 85
+    /** Editor / capture JPEG — keep near full frame, not a soft preview. */
+    private const val INSTANT_CAPTURE_EDGE = 1920
+    private const val INSTANT_JPEG_QUALITY = 95
     private const val INSTANT_GL_POLL_MS = 96L
     private const val INSTANT_GL_COLD_POLL_MS = 400L
     private const val OES_PHOTO_WARM_INTERVAL_MS = 80L
@@ -777,9 +778,13 @@ object ArCameraController {
             }
         }
 
-        // OES / color-grade preview: capture a FRESH GL frame with current LUT state
-        // (LUT on = filter baked, LUT off after ban = clean).
+        // Color grades: hi-res clean ImageCapture — editor bakes LUT so intensity
+        // stays editable (GL snapshot would lock a soft/harsh graded frame).
         if (boundToOes) {
+            if (filter.isColorGrade()) {
+                takePhotoWithImageCapture(::deliver)
+                return
+            }
             takePhotoFromGl(::deliver, ::saveBaked)
             return
         }
@@ -1481,6 +1486,23 @@ object ArCameraController {
                 filter.isPngOverlay() -> {
                     ArCameraBridge.faceOverlay?.composeOnto(source) ?: source
                 }
+                filter.isParamBeauty() -> {
+                    val ctx = ArCameraBridge.hostActivity?.applicationContext
+                        ?: return source
+                    val tmp = File(ctx.cacheDir, "sg_in_${System.currentTimeMillis()}.jpg")
+                    FileOutputStream(tmp).use { source.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                    val outPath = SoftGlowBaker.applyToFile(
+                        context = ctx,
+                        inputPath = tmp.absolutePath,
+                        intensity = ArCameraBridge.filterIntensity,
+                    )
+                    tmp.delete()
+                    if (outPath.isNullOrBlank()) return source
+                    val baked = BitmapFactory.decodeFile(outPath) ?: return source
+                    File(outPath).delete()
+                    if (baked !== source) source.recycle()
+                    baked
+                }
                 filter.isColorGrade() -> {
                     val baked = ArColorGradeBaker.apply(
                         source,
@@ -1699,10 +1721,27 @@ object ArCameraController {
     }
 
     fun ensureOesPreviewBound() {
+        // Distortion / sticker modes must not get pulled back onto OES mid-transition.
+        if (!preferOesBinding) {
+            android.util.Log.i(
+                "ArCameraOES",
+                "ensureOes: skip preferOes=false +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            return
+        }
+        if (!ArCameraBridge.currentFilter.usesGpuPreview() &&
+            ArCameraBridge.currentFilter != FilterType.NONE
+        ) {
+            android.util.Log.i(
+                "ArCameraOES",
+                "ensureOes: skip filter=${ArCameraBridge.currentFilter} +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            return
+        }
         if (boundToOes) {
             android.util.Log.i(
                 "ArCameraOES",
-                "ensureOes: alreadyBound +${ArCameraBridge.oesDiagElapsedMs()}ms",
+                "ensureOes: already bound +${ArCameraBridge.oesDiagElapsedMs()}ms",
             )
             return
         }
@@ -1734,7 +1773,7 @@ object ArCameraController {
                     "ArCameraOES",
                     "ensureOes: surfaceReady → rebind +${ArCameraBridge.oesDiagElapsedMs()}ms",
                 )
-                if (!boundToOes) requestPreviewRebind()
+                if (!boundToOes && preferOesBinding) requestPreviewRebind()
             }
         }
     }
@@ -2146,11 +2185,10 @@ object ArCameraController {
 
             val needsFace =
                 filter.isDistortion() || filter.isBeauty() || filter.isPngOverlay()
-            // Stickers/glasses: detect every frame so overlays stick like TikTok (no catch-up lag).
-            // Beauty/distortion keep throttling to protect GPU warp path FPS.
+            // Stickers + Soft Glow: every frame so lips/blush stick (no catch-up lag).
+            // Other beauty/distortion keep throttling to protect GPU warp path FPS.
             val detectEvery = when {
-                // Stickers: every other frame — enough stickiness, much less MediaPipe load.
-                filter.isPngOverlay() -> 2
+                filter.isPngOverlay() || filter.isParamBeauty() -> 1
                 needsFace -> 3
                 else -> 4
             }
@@ -2210,7 +2248,9 @@ object ArCameraController {
                     if (detectBitmap !== oriented) detectBitmap.recycle()
                     if (raw != null) {
                         noFaceStreak = 0
-                        if (filter.isPngOverlay()) {
+                        // Soft Glow lips/blush must track raw landmarks — smoothing causes
+                        // pink blob to lag behind the mouth when the face moves.
+                        if (filter.isPngOverlay() || filter.isParamBeauty()) {
                             cachedSnapshot = raw
                         } else {
                             cachedSnapshot = FaceLandmarkSmoother.smooth(raw)

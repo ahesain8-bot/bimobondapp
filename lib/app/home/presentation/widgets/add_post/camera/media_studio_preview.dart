@@ -296,18 +296,20 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
     } else {
       media = LayoutBuilder(
         builder: (context, constraints) {
-          // Decode at display size only — no full-res decode, no black wait.
+          // Decode sharp enough for editor QA (was 720 — looked soft on HD uploads).
           final dpr = MediaQuery.of(context).devicePixelRatio;
-          const maxDecodeEdge = 720;
-          final targetW = (constraints.maxWidth * dpr).round().clamp(1, maxDecodeEdge);
+          const maxDecodeEdge = 2048;
+          final displayLongest = (constraints.biggest.longestSide * dpr)
+              .round()
+              .clamp(1, maxDecodeEdge);
           return Image.file(
             widget.file,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             width: double.infinity,
             height: double.infinity,
             gaplessPlayback: true,
-            filterQuality: FilterQuality.low,
-            cacheWidth: targetW,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: displayLongest,
             errorBuilder: (_, _, _) => const ColoredBox(
               color: Colors.black,
               child: Center(

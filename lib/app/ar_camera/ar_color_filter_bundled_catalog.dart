@@ -1,7 +1,7 @@
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 
 /// App-only offline color-filter seed (not for backend handoff).
-/// LUT PNGs live in assets/luts/. Replaced at runtime when the API responds.
+/// Static LUT PNGs in assets/luts/.
 class ArColorFilterBundledCatalog {
   ArColorFilterBundledCatalog._();
 

@@ -86,6 +86,10 @@ class StickerCameraOverlay(private val appContext: Context) {
             val canvas = frame.overlayCanvas
             canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
             val size: Size = frame.size
+            // Match live FaceOverlayView: front-camera selfie is X-mirrored.
+            // Baking without this flip puts glasses/moustache on the opposite side
+            // of the face in the file (live OK, editor playback wrong).
+            val mirrorX = isFrontCamera
             drawStickers(
                 canvas = canvas,
                 snapshot = snap,
@@ -94,9 +98,7 @@ class StickerCameraOverlay(private val appContext: Context) {
                 destH = size.height,
                 imgW = imgW,
                 imgH = imgH,
-                // VideoCapture MIRROR_MODE_ON_FRONT_ONLY mirrors the buffer after
-                // overlay blend — draw in analysis space without an extra X flip.
-                mirrorX = false,
+                mirrorX = mirrorX,
             )
             true
         }

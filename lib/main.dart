@@ -44,6 +44,7 @@ import 'package:bimobondapp/app/notifications/presentation/di/notifications_inje
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -71,10 +72,10 @@ void main() async {
   await seller_verification_di.initSellerVerification();
   await stories_di.initStories();
   await camera_studio_di.initCameraStudio();
-  // Use the bundled filter/effect catalog at launch (local, no network). The
-  // add-post camera refreshes it from the API when it actually opens, so the
-  // two catalog requests no longer run on every cold start.
+  // CamerAwesome legacy filter/effect seed at launch (local, no network).
+  // Static AR color filters (bundled) enabled; dynamic API color-filters off.
   CameraStudioCatalogLoader.applyBundledCatalog();
+  ArFilterCatalog.restoreBundledColorCatalog();
   await chats_di.initChats();
   await notifications_di.initNotifications();
   runApp(const MyApp());

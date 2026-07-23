@@ -11,6 +11,7 @@ import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dar
 import 'package:bimobondapp/app/home/presentation/utils/camera_layout_composer.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_layout_video_composer.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_studio_permissions.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_color_lut.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
@@ -152,7 +153,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   int _workspaceTabIndex = 0;
   int _arFilterIndex = 0;
   String _arColorCategoryId = 'portrait';
-  double _arFilterIntensity = 1.0;
+  double _arFilterIntensity = 0.55;
   double _arSwipeDrag = 0;
   double _pinchBaseZoom = CameraStudioConstants.zoomSteps[1].value;
   bool _isPinchingZoom = false;
@@ -189,7 +190,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.installPlatformCallbacks();
       ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
-      ArCameraBridge.setFilter(ArFilterCatalog.items[_arFilterIndex].id);
+      _applyNativeArFilter(ArFilterCatalog.items[_arFilterIndex].id);
     }
     unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
     unawaited(_loadCatalog());
@@ -201,6 +202,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
     if (!mounted) return;
     final categories = CameraFilterCatalog.filterCategories;
+    final arColorCategories = ArFilterCatalog.colorCategories;
     setState(() {
       _catalogLoading = false;
       _filtersReady = CameraFilterCatalog.hasCatalog;
@@ -212,6 +214,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         _filterCategory =
             CameraFilterCatalog.categoryFromSlug(_filterCategorySlug) ??
             CameraFilterCategory.trending;
+      }
+      if (arColorCategories.isNotEmpty &&
+          !arColorCategories.any((c) => c.id == _arColorCategoryId)) {
+        _arColorCategoryId = arColorCategories.first.id;
       }
     });
   }
@@ -302,7 +308,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         arColorCategoryId: category,
         arFilterIntensity: _arFilterIntensity,
         beautyEnabled: arId == 'whitening' || _photoEditorMagicOn,
-        alreadyBaked: true,
+        // Color LUT: keep clean capture; studio bakes so intensity can go full bright.
+        alreadyBaked: !ArFilterCatalog.isColorFilter(arId),
         effectSlug: ArFilterCatalog.isColorFilter(arId) || arId == 'none'
             ? null
             : arId,
@@ -391,7 +398,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       final id = ArFilterCatalog.items[_arFilterIndex].id;
       final intensity =
           ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
-      ArCameraBridge.setFilter(id, intensity: intensity);
+      _applyNativeArFilter(id, intensity: intensity);
     } else {
       unawaited(_applyBeauty(next));
     }
@@ -439,12 +446,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         _arFilterIndex = ArFilterCatalog.indexOfId(id);
         _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
         _photoEditorMagicOn = false;
+        if (ArFilterCatalog.isColorFilter(id)) {
+          _arFilterIntensity = 0.55;
+        }
       }
     });
     final applied = ArFilterCatalog.items[_arFilterIndex].id;
     final intensity =
-        ArFilterCatalog.isColorFilter(applied) ? _arFilterIntensity : 1.0;
-    ArCameraBridge.setFilter(applied, intensity: intensity);
+        ArFilterCatalog.isColorFilter(applied) ? 0.55 : 1.0;
+    _applyNativeArFilter(applied, intensity: intensity);
   }
 
   Future<void> _reapplySelectedFilter() async {
@@ -1289,18 +1299,40 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
   }
 
+  void _applyNativeArFilter(String id, {double? intensity}) {
+    final i = intensity ??
+        (ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0);
+    final beauty = MediaColorLut.beautyParamsForId(id);
+    ArCameraBridge.setFilter(
+      id,
+      intensity: i,
+      lutUrl: beauty == null ? ArFilterCatalog.pngLutUrlForId(id) : null,
+      beautyParams: beauty,
+    );
+  }
+
   void _onArFilterSelected(int index) {
     final clamped = index.clamp(0, ArFilterCatalog.items.length - 1);
     final id = ArFilterCatalog.items[clamped].id;
-    final intensity = ArFilterCatalog.isColorFilter(id)
-        ? _arFilterIntensity
-        : 1.0;
+    final isColor = ArFilterCatalog.isColorFilter(id);
+    if (isColor) {
+      final model = ArFilterCatalog.colorFilterModelForId(id);
+      final intensity = model?.isBeauty == true
+          ? model!.defaultIntensity
+          : 0.55;
+      setState(() {
+        _arFilterIndex = clamped;
+        _arFilterIntensity = intensity;
+      });
+      _applyNativeArFilter(id, intensity: intensity);
+      return;
+    }
     if (clamped == _arFilterIndex) {
-      ArCameraBridge.setFilter(id, intensity: intensity);
+      _applyNativeArFilter(id, intensity: 1.0);
       return;
     }
     setState(() => _arFilterIndex = clamped);
-    ArCameraBridge.setFilter(id, intensity: intensity);
+    _applyNativeArFilter(id, intensity: 1.0);
   }
 
   void _onArColorCategorySelected(String categoryId) {
