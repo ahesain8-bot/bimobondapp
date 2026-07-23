@@ -2,31 +2,25 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/core/services/feed_video_disk_prefetcher.dart';
 import 'package:bimobondapp/core/services/feed_video_prewarmer.dart';
+import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/widgets.dart';
 
-/// Warms caches for nearby feed/profile posts so scrolling feels instant.
-///
-/// Window: [currentIndex - lookbehind, currentIndex + lookahead] (excl. current
-/// for video warm — current is already playing). Images/avatars for the whole
-/// window are precached; videos are pre-initialized via [FeedVideoPrewarmer].
+/// Caches media for [currentIndex] ±2 so scroll up/down does not reload.
 class FeedMediaPreloader {
   FeedMediaPreloader();
 
-  /// Posts ahead of the current index to preload when scrolling down.
+  /// Exactly ±2 around the current post.
   static const int lookahead = 2;
-
-  /// Posts behind the current index to keep warm when scrolling back up.
   static const int lookbehind = 2;
 
   final Set<String> _preloadedIds = <String>{};
 
-  /// Forget which posts were preloaded (e.g. after a feed refresh).
   void reset() => _preloadedIds.clear();
 
-  /// Preloads media for feed items around [currentIndex] (±2).
   void preloadAround(
     BuildContext context,
     List<FeedItemEntity> items,
@@ -40,7 +34,6 @@ class FeedMediaPreloader {
     );
   }
 
-  /// Preloads media for a flat [PostEntity] list (profile viewer).
   void preloadPostsAround(
     BuildContext context,
     List<PostEntity> posts,
@@ -54,8 +47,36 @@ class FeedMediaPreloader {
     final start = (currentIndex - lookbehind).clamp(0, posts.length - 1);
     final end = (currentIndex + lookahead).clamp(0, posts.length - 1);
 
-    final keepVideoUrls = <String>{};
     final windowIds = <String>{};
+    final diskUrlsOrdered = <String>[];
+    final warmUrls = <String>{};
+
+    void consider(int index, {required bool preferFirst}) {
+      if (index < 0 || index >= posts.length || index == currentIndex) return;
+      final post = posts[index];
+      if (post.isAuctionable) return;
+      final url = _firstSlideVideoUrl(post);
+      if (url == null || !AppMediaCacheManager.canDiskCacheVideo(url)) return;
+      warmUrls.add(url);
+      if (preferFirst) {
+        diskUrlsOrdered.remove(url);
+        diskUrlsOrdered.insert(0, url);
+      } else if (!diskUrlsOrdered.contains(url)) {
+        diskUrlsOrdered.add(url);
+      }
+    }
+
+    // Download priority: ±1 first, then ±2. Include current so park/retain
+    // keeps the just-left clip until it falls out of the window.
+    final currentUrl = _firstSlideVideoUrl(posts[currentIndex]);
+    if (currentUrl != null &&
+        AppMediaCacheManager.canDiskCacheVideo(currentUrl)) {
+      warmUrls.add(currentUrl);
+    }
+    consider(currentIndex + 1, preferFirst: true);
+    consider(currentIndex - 1, preferFirst: true);
+    consider(currentIndex + 2, preferFirst: false);
+    consider(currentIndex - 2, preferFirst: false);
 
     for (var index = start; index <= end; index++) {
       final post = posts[index];
@@ -63,45 +84,56 @@ class FeedMediaPreloader {
       windowIds.add(id);
 
       final videoUrl = _firstSlideVideoUrl(post);
-      if (videoUrl != null) keepVideoUrls.add(videoUrl);
+      final shouldWarmDecoder =
+          index != currentIndex &&
+          videoUrl != null &&
+          warmUrls.contains(videoUrl);
 
-      // Always refresh video keep-set; skip duplicate image work via id set.
       if (!_preloadedIds.add(id)) {
-        // Still ensure video is warm (may have been evicted).
-        if (videoUrl != null && index != currentIndex) {
+        if (shouldWarmDecoder) {
           unawaited(FeedVideoPrewarmer.instance.prewarm(videoUrl));
         }
         continue;
       }
 
-      unawaited(_preloadPost(context, post, warmVideo: index != currentIndex));
+      unawaited(
+        _preloadPost(
+          context,
+          post,
+          warmDecoder: shouldWarmDecoder,
+        ),
+      );
     }
 
-    // Drop tracked ids outside the window so far scrolls can re-warm later.
     _preloadedIds.removeWhere((id) => !windowIds.contains(id));
-    FeedVideoPrewarmer.instance.retainOnly(keepVideoUrls);
+
+    FeedVideoPrewarmer.instance.retainOnly(warmUrls);
+    FeedVideoDiskPrefetcher.instance.setWarmUrls(warmUrls);
+    FeedVideoDiskPrefetcher.instance.retainOnly(warmUrls);
+    FeedVideoDiskPrefetcher.instance.enqueueAll(diskUrlsOrdered);
+
+    for (final url in diskUrlsOrdered) {
+      unawaited(FeedVideoPrewarmer.instance.prewarm(url));
+    }
   }
 
-  /// Feed post avatar renders at radius 24 (48px); precaching at the same
-  /// size reuses the exact decoded image instead of decoding twice.
   static const double _avatarSize = 48;
 
   Future<void> _preloadPost(
     BuildContext context,
     PostEntity post, {
-    required bool warmVideo,
+    required bool warmDecoder,
   }) async {
-    if (warmVideo) {
-      unawaited(_prefetchVideo(post));
+    if (warmDecoder) {
+      final url = _firstSlideVideoUrl(post);
+      if (url != null) unawaited(FeedVideoPrewarmer.instance.prewarm(url));
     }
 
     final firstSlide = _firstSlideImageUrl(post);
     if (firstSlide != null && context.mounted) {
       try {
         await precacheSafeNetworkImage(context, firstSlide);
-      } catch (_) {
-        // Best-effort: the post still loads normally when displayed.
-      }
+      } catch (_) {}
     }
 
     final avatar = post.user?.avatarUrl;
@@ -117,35 +149,8 @@ class FeedMediaPreloader {
     }
   }
 
-  Future<void> _prefetchVideo(PostEntity post) async {
-    if (post.isAuctionable) return;
-
-    final url = _firstSlideVideoUrl(post);
-    if (url == null) return;
-    await FeedVideoPrewarmer.instance.prewarm(url);
-  }
-
   String? _firstSlideVideoUrl(PostEntity post) {
-    final hlsUrl = post.hlsUrl;
-    if (hlsUrl != null && hlsUrl.isNotEmpty) {
-      return MediaUtils.resolveAbsoluteUrl(hlsUrl);
-    }
-
-    final media = post.media;
-    if (media.isNotEmpty) {
-      final first = media.first;
-      final url = MediaUtils.resolveAbsoluteUrl(first.url);
-      final isVideo =
-          MediaUtils.isVideo(url, mediaType: first.mediaType) ||
-          post.type == 'VIDEO';
-      return isVideo && url.isNotEmpty ? url : null;
-    }
-
-    final videoUrl = post.videoUrl;
-    if (videoUrl != null && videoUrl.isNotEmpty) {
-      return MediaUtils.resolveAbsoluteUrl(videoUrl);
-    }
-    return null;
+    return MediaUtils.resolveCacheableFeedVideoUrl(post);
   }
 
   String? _firstSlideImageUrl(PostEntity post) {

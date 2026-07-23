@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 class OnePageScrollPhysics extends ScrollPhysics {
   const OnePageScrollPhysics({super.parent});
 
-  // A near-critically-damped spring gives the full-screen feed a softer
-  // settle without the bounce or oscillation of the platform default.
+  // Softer settle for full-screen feed swipes (less snappy, less jank).
   static const SpringDescription _softSpring = SpringDescription(
-    mass: 1,
-    stiffness: 170,
-    damping: 25,
+    mass: 1.05,
+    stiffness: 140,
+    damping: 26,
   );
 
   @override

@@ -105,10 +105,12 @@ class AuctionDetailsEntity extends Equatable {
   final int giftCount;
 
   bool get isActive {
+    if (isEnded) return false;
     final s = status.trim().toUpperCase();
     return s == 'ACTIVE' || s == 'LIVE';
   }
 
+  /// Ended by terminal status, or because [endedAt] is in the past.
   bool get isEnded {
     switch (status.trim().toUpperCase()) {
       case 'COMPLETED':
@@ -122,8 +124,11 @@ class AuctionDetailsEntity extends Equatable {
       case 'CLOSED':
         return true;
       default:
-        return false;
+        break;
     }
+    final end = endedAt?.toUtc();
+    if (end == null) return false;
+    return !end.isAfter(DateTime.now().toUtc());
   }
 
   double get progressPercent {

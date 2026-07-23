@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_view_model.dart';
 import 'package:bimobondapp/app/posts/data/models/feed_item_model.dart';
+import 'package:bimobondapp/app/posts/data/models/feed_remote_page.dart';
 import 'package:bimobondapp/app/posts/data/models/hashtag_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/data/models/repost_model.dart';
@@ -22,7 +23,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 abstract class PostsRemoteDataSource {
   Future<PostModel> createPost(Map<String, dynamic> postData);
   Future<String> uploadMedia(File file);
-  Future<List<FeedItemModel>> getFeed(Map<String, dynamic> queryParams);
+  Future<FeedRemotePage> getFeed(Map<String, dynamic> queryParams);
   Future<HashtagsPageModel> getHashtags({
     int page = 1,
     int limit = 20,
@@ -94,6 +95,9 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
   final ApiClient apiClient;
 
   PostsRemoteDataSourceImpl({required this.apiClient});
+
+  /// Feed payloads can be large; allow longer than the default API client.
+  static const Duration _feedRequestTimeout = Duration(seconds: 30);
 
   /// Firebase token when available; otherwise relies on [ApiClient] AUTH_TOKEN.
   Future<Map<String, dynamic>> _optionalAuthHeaders() async {
@@ -261,7 +265,7 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
   }
 
   @override
-  Future<List<FeedItemModel>> getFeed(Map<String, dynamic> queryParams) async {
+  Future<FeedRemotePage> getFeed(Map<String, dynamic> queryParams) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       final Map<String, dynamic> headers = {};
@@ -276,16 +280,44 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       final response = await apiClient.dio.get(
         endpoint,
         queryParameters: queryParams,
-        options: Options(headers: headers),
+        options: Options(
+          headers: headers,
+          sendTimeout: _feedRequestTimeout,
+          receiveTimeout: _feedRequestTimeout,
+        ),
       );
 
       if (response.statusCode == 200) {
         final raw = response.data['data'];
-        if (raw is! List) return const [];
-        return raw
-            .whereType<Map>()
-            .map((e) => FeedItemModel.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
+        final items = raw is! List
+            ? const <FeedItemModel>[]
+            : raw
+                .whereType<Map>()
+                .map(
+                  (e) => FeedItemModel.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList();
+
+        final limit = int.tryParse('${queryParams['limit']}') ?? items.length;
+        final meta = response.data is Map ? response.data['meta'] : null;
+        String? nextCursor;
+        final bool hasReachedMax;
+        if (meta is Map && meta.containsKey('nextCursor')) {
+          final rawCursor = meta['nextCursor'];
+          nextCursor = rawCursor?.toString();
+          if (nextCursor != null && nextCursor.isEmpty) nextCursor = null;
+          hasReachedMax = nextCursor == null;
+        } else {
+          // Legacy page clients / responses without cursor meta.
+          hasReachedMax = items.length < limit;
+          nextCursor = null;
+        }
+
+        return FeedRemotePage(
+          items: items,
+          nextCursor: nextCursor,
+          hasReachedMax: hasReachedMax,
+        );
       } else {
         throw ServerException(message: 'Failed to fetch feed');
       }

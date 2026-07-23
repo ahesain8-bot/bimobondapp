@@ -1,21 +1,24 @@
-import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_page_entity.dart';
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 
-class GetFeedUseCase implements UseCase<List<FeedItemEntity>, GetFeedParams> {
+class GetFeedUseCase implements UseCase<FeedPageEntity, GetFeedParams> {
   GetFeedUseCase(this.repository);
 
   final PostsRepository repository;
 
   @override
-  Future<Either<Failure, List<FeedItemEntity>>> call(GetFeedParams params) {
+  Future<Either<Failure, FeedPageEntity>> call(GetFeedParams params) {
     return repository.getFeed(
       page: params.page,
       limit: params.limit,
+      cursor: params.cursor,
+      detail: params.detail,
       categoryId: params.categoryId,
       type: params.type,
       hashtag: params.hashtag,
@@ -41,6 +44,8 @@ class GetFeedParams extends Equatable {
   const GetFeedParams({
     this.page = 1,
     this.limit = 10,
+    this.cursor,
+    this.detail = false,
     this.categoryId,
     this.type,
     this.hashtag,
@@ -62,6 +67,12 @@ class GetFeedParams extends Equatable {
 
   final int page;
   final int limit;
+
+  /// When set, uses cursor pagination (preferred for home feed).
+  final String? cursor;
+
+  /// Heavy cards (`auction` / `sound` / `location`). Never enable on home feed.
+  final bool detail;
   final String? categoryId;
   final String? type;
   final String? hashtag;
@@ -84,6 +95,8 @@ class GetFeedParams extends Equatable {
   List<Object?> get props => [
     page,
     limit,
+    cursor,
+    detail,
     categoryId,
     type,
     hashtag,

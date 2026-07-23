@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/app/posts/data/models/feed_item_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_page_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/hashtag_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
@@ -136,9 +137,11 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<Either<Failure, List<FeedItemEntity>>> getFeed({
+  Future<Either<Failure, FeedPageEntity>> getFeed({
     int page = 1,
     int limit = 10,
+    String? cursor,
+    bool detail = false,
     String? categoryId,
     String? type,
     String? hashtag,
@@ -158,9 +161,15 @@ class PostsRepositoryImpl implements PostsRepository {
     double? radiusKm,
   }) async {
     try {
-      final queryParams = {
-        'page': page,
+      // Cursor mode (home feed): send cursor, never bump page.
+      // Legacy page mode: send page when cursor is absent.
+      final queryParams = <String, dynamic>{
         'limit': limit,
+        if (cursor != null && cursor.isNotEmpty)
+          'cursor': cursor
+        else
+          'page': page,
+        if (detail) 'detail': 1,
         if (categoryId != null) 'categoryId': categoryId,
         if (type != null) 'type': type,
         if (hashtag != null) 'hashtag': hashtag,
@@ -179,12 +188,18 @@ class PostsRepositoryImpl implements PostsRepository {
         ...?auctionQuery?.toQueryParams(),
       };
 
-      final items = await remoteDataSource.getFeed(queryParams);
-      final withLikes = _applyFeedItemLikes(items);
+      final pageResult = await remoteDataSource.getFeed(queryParams);
+      final withLikes = _applyFeedItemLikes(pageResult.items);
       final filtered = isStory
           ? _onlyStoryFeedItems(withLikes)
           : _excludeStoryFeedItems(withLikes);
-      return Right(filtered);
+      return Right(
+        FeedPageEntity(
+          items: filtered,
+          nextCursor: pageResult.nextCursor,
+          hasReachedMax: pageResult.hasReachedMax,
+        ),
+      );
     } catch (e) {
       return Left(FailureMapper.from(e));
     }

@@ -51,6 +51,44 @@ class AuctionItem {
   final PostEntity? post;
   final String? auctionId;
 
+  /// True when status is terminal or [endedAt] has passed (re-evaluated now).
+  bool get isEndedNow {
+    if (isEnded) return true;
+    final end = endedAt?.toUtc();
+    if (end == null) return false;
+    return !end.isAfter(DateTime.now().toUtc());
+  }
+
+  AuctionItem copyWith({
+    bool? isLive,
+    bool? isEnded,
+    String? countdown,
+  }) {
+    return AuctionItem(
+      id: id,
+      title: title,
+      subtitle: subtitle,
+      imageUrl: imageUrl,
+      giftTotalCoins: giftTotalCoins,
+      giftCount: giftCount,
+      highestPriceCoins: highestPriceCoins,
+      targetPriceCoins: targetPriceCoins,
+      ownerUsername: ownerUsername,
+      ownerFullName: ownerFullName,
+      ownerAvatarUrl: ownerAvatarUrl,
+      ownerUserId: ownerUserId,
+      categorySlug: categorySlug,
+      categoryLabel: categoryLabel,
+      isLive: isLive ?? this.isLive,
+      isEnded: isEnded ?? this.isEnded,
+      countdown: countdown,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      post: post,
+      auctionId: auctionId,
+    );
+  }
+
   factory AuctionItem.fromAuction(
     AuctionDetailsEntity auction, {
     String? categoryLabel,

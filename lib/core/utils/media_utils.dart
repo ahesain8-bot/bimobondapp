@@ -90,6 +90,41 @@ class MediaUtils {
     return null;
   }
 
+  /// Feed playback URL that prefers progressive files (MP4/WebM) so scroll
+  /// up/down can reuse [AppMediaCacheManager] disk cache. HLS only if needed.
+  static String? resolveCacheableFeedVideoUrl(PostEntity post) {
+    final progressive = <String>[];
+
+    final direct = post.videoUrl;
+    if (direct != null && direct.isNotEmpty) {
+      final resolved = resolveAbsoluteUrl(direct);
+      if (!_isHlsPath(resolved)) progressive.add(resolved);
+    }
+
+    for (final item in post.media) {
+      if (item.url.isEmpty) continue;
+      if (item.mediaType.toUpperCase() == 'VIDEO' ||
+          isVideo(item.url, mediaType: item.mediaType)) {
+        final resolved = resolveAbsoluteUrl(item.url);
+        if (!_isHlsPath(resolved)) progressive.add(resolved);
+      }
+    }
+
+    for (final url in progressive) {
+      if (url.isNotEmpty) return url;
+    }
+
+    final hls = post.hlsUrl;
+    if (hls != null && hls.isNotEmpty) {
+      return resolveAbsoluteUrl(hls);
+    }
+    return null;
+  }
+
+  static bool _isHlsPath(String url) {
+    return url.toLowerCase().split('?').first.endsWith('.m3u8');
+  }
+
   /// Poster image for a video post (API thumbnail or first image in media).
   static String? resolveVideoPosterUrl(PostEntity post) {
     final videoUrl = resolveVideoUrl(post);

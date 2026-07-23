@@ -35,6 +35,9 @@ class ProfileLayoutConstants {
 
   static const int postsPageSize = 10;
 
+  /// Extra gap above the home-indicator for profile fullscreen posts.
+  static const double postsViewerBottomPadding = 24;
+
   /// Feed API sort: newest posts first (`LATEST`).
   static const String postsSortNewestFirst = 'LATEST';
   static const double scrollLoadMoreThreshold = 200;

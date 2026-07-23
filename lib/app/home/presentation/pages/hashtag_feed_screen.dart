@@ -96,8 +96,8 @@ class _HashtagFeedScreenState extends State<HashtagFeedScreen> {
           _isLoadingMore = false;
         });
       },
-      (items) {
-        final posts = items.map((item) => item.post).toList();
+      (page) {
+        final posts = page.items.map((item) => item.post).toList();
         setState(() {
           if (refresh) {
             _posts
@@ -109,7 +109,7 @@ class _HashtagFeedScreenState extends State<HashtagFeedScreen> {
             _posts.addAll(posts.where((p) => !existingIds.contains(p.id)));
             _page++;
           }
-          _hasReachedMax = posts.length < 30;
+          _hasReachedMax = page.hasReachedMax;
           _isLoading = false;
           _isLoadingMore = false;
         });

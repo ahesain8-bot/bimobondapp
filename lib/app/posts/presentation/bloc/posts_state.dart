@@ -32,11 +32,19 @@ class CreatePostSuccess extends PostsState {
 class FeedLoadSuccess extends PostsState {
   final List<FeedItemEntity> items;
   final bool hasReachedMax;
+  final String? nextCursor;
+  /// True when this response is a first page / refresh (no cursor was sent).
+  final bool isFirstPage;
 
-  const FeedLoadSuccess({required this.items, this.hasReachedMax = false});
+  const FeedLoadSuccess({
+    required this.items,
+    this.hasReachedMax = false,
+    this.nextCursor,
+    this.isFirstPage = true,
+  });
 
   @override
-  List<Object?> get props => [items, hasReachedMax];
+  List<Object?> get props => [items, hasReachedMax, nextCursor, isFirstPage];
 }
 
 class StoriesLoadSuccess extends PostsState {

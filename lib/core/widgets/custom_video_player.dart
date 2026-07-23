@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/services/feed_video_disk_prefetcher.dart';
 import 'package:bimobondapp/core/services/feed_video_prewarmer.dart';
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -58,7 +59,8 @@ class CustomVideoPlayer extends StatefulWidget {
   State<CustomVideoPlayer> createState() => _CustomVideoPlayerState();
 }
 
-class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
+class _CustomVideoPlayerState extends State<CustomVideoPlayer>
+    with WidgetsBindingObserver {
   static const Duration _initTimeout = Duration(seconds: 20);
 
   VideoPlayerController? _controller;
@@ -77,6 +79,16 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   /// always better than flashing the thumbnail during brief buffering).
   bool _hasEverPlayed = false;
   int _initGeneration = 0;
+  int _seekGeneration = 0;
+
+  /// One silent MediaCodec recovery per video before showing the error UI.
+  bool _codecRetryAttempted = false;
+
+  /// True when this open came from park/disk — never flash the loader.
+  bool _openedFromCache = false;
+
+  /// False while the phone is locked / app backgrounded — stops audio then.
+  bool _appInForeground = true;
   Uint8List? _generatedPosterBytes;
   bool _posterGenerationStarted = false;
 
@@ -99,9 +111,35 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     return text.contains('audiotrack') ||
         text.contains('audioflinger') ||
         text.contains('mediacodecaudiorenderer') ||
-        text.contains('exoplaybackexception') ||
+        (text.contains('exoplaybackexception') && text.contains('audio')) ||
         text.contains('error -12') ||
         text.contains('audio/3gpp');
+  }
+
+  bool _isVideoCodecFailure(Object? error) {
+    final text = error?.toString().toLowerCase() ?? '';
+    if (_isAudioFailure(error)) return false;
+    return text.contains('mediacodec') ||
+        text.contains('videorenderer') ||
+        text.contains('decoder init') ||
+        text.contains('videoerror') ||
+        text.contains('format_supported') ||
+        (text.contains('exoplayer') && text.contains('video'));
+  }
+
+  String _userFacingError(Object? error) {
+    if (_isVideoCodecFailure(error)) {
+      return 'Couldn\'t play this video. Tap Retry.';
+    }
+    if (_isAudioFailure(error)) {
+      return 'Playing without sound on this device';
+    }
+    final text = error?.toString() ?? 'Video playback failed';
+    // Strip raw PlatformException noise for the UI.
+    if (text.contains('PlatformException') || text.length > 120) {
+      return 'Couldn\'t play this video. Tap Retry.';
+    }
+    return text;
   }
 
   bool get isPlaying {
@@ -116,6 +154,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   bool get _shouldPlay =>
       widget.isActive &&
+      _appInForeground &&
       (!widget.respectFeedPlaybackGate || FeedPlaybackGate.instance.allowed);
 
   bool _ownsController(VideoPlayerController? controller) {
@@ -146,6 +185,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.respectFeedPlaybackGate) {
       FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
     }
@@ -153,6 +193,29 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     _maybeGeneratePoster();
     if (_shouldPlay) {
       unawaited(_initController());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final inForeground = state == AppLifecycleState.resumed;
+    if (inForeground == _appInForeground) return;
+    _appInForeground = inForeground;
+
+    if (!inForeground) {
+      // Lock screen / app switch: stop audio even if still initializing.
+      _isInitializing = false;
+      unawaited(SoundAudioPreview.stop());
+      unawaited(_suspendPlayback());
+      if (mounted) setState(() {});
+      return;
+    }
+
+    if (_shouldPlay && !_userPaused) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_shouldPlay || _userPaused) return;
+        unawaited(_resumePlayback());
+      });
     }
   }
 
@@ -175,6 +238,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   }
 
   Future<void> _suspendPlayback() async {
+    _progressNotifier?.unbindSeekHandler(this);
     final controller = _controller;
     if (controller == null || !_isControllerReady(controller)) return;
     try {
@@ -190,6 +254,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (controller != null && _isControllerReady(controller)) {
       final generation = _initGeneration;
       _rebindPlaybackListener(controller, generation);
+      _progressNotifier?.bindSeekHandler(this, _seekFeedTo);
       await _startPlayback(controller, generation, muted: _playbackMuted);
       if (mounted && identical(controller, _controller)) {
         _syncFeedProgress();
@@ -198,6 +263,40 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       return;
     }
     await _initController();
+  }
+
+  Future<void> _seekFeedTo(
+    Duration position, {
+    required bool resumePlayback,
+  }) async {
+    final controller = _controller;
+    if (!_shouldPlay || controller == null || !_isControllerReady(controller)) {
+      return;
+    }
+    final generation = ++_seekGeneration;
+    try {
+      await controller.seekTo(position);
+      if (!mounted ||
+          generation != _seekGeneration ||
+          !identical(controller, _controller)) {
+        return;
+      }
+      if (resumePlayback && !_userPaused && _shouldPlay) {
+        await _startPlayback(
+          controller,
+          _initGeneration,
+          muted: _playbackMuted,
+        );
+      } else if (!resumePlayback) {
+        try {
+          await controller.pause();
+        } catch (_) {}
+      }
+      if (resumePlayback) {
+        _syncFeedProgress(force: true);
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   void _rebindPlaybackListener(
@@ -252,6 +351,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       _playbackMuted = false;
       _userPaused = false;
       _hasEverPlayed = false;
+      _codecRetryAttempted = false;
+      _openedFromCache = false;
       _maybeGeneratePoster();
       if (_shouldPlay) {
         unawaited(_initController());
@@ -268,8 +369,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           unawaited(_resumePlayback());
         });
       } else {
-        _resetFeedProgress();
-        unawaited(_releasePlayer());
+        // Soft-pause while the page is still mounted; dispose parks for reuse.
+        _progressNotifier?.unbindSeekHandler(this);
+        unawaited(_suspendPlayback());
       }
     } else if (oldWidget.isActive == widget.isActive &&
         widget.isActive &&
@@ -304,18 +406,6 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     }
   }
 
-  /// Completed disk-cache copy of [url], or null. HLS playlists are always
-  /// streamed (a cached .m3u8 still points at network segments).
-  Future<File?> _cachedVideoFile(String url) async {
-    if (url.toLowerCase().split('?').first.endsWith('.m3u8')) return null;
-    try {
-      final info = await AppMediaCacheManager.instance.getFileFromCache(url);
-      final file = info?.file;
-      if (file != null && await file.exists()) return file;
-    } catch (_) {}
-    return null;
-  }
-
   VoidCallback _makePlaybackListener(
     VideoPlayerController controller,
     int generation,
@@ -331,8 +421,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
             unawaited(_startPlayback(controller, generation, muted: true));
             return;
           }
-          setState(() => _errorMessage = description);
-          _syncFeedProgress();
+          unawaited(_handlePlaybackFailure(description));
         } else {
           if (mounted) setState(() {});
           _syncFeedProgress();
@@ -340,6 +429,38 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         }
       } catch (_) {}
     };
+  }
+
+  Future<void> _handlePlaybackFailure(Object error) async {
+    if (!mounted) return;
+
+    // Free other decoders, then retry once — usually clears MediaCodec errors.
+    if (_isVideoCodecFailure(error) && !_codecRetryAttempted) {
+      _codecRetryAttempted = true;
+      debugPrint(
+        'Video codec failure — clearing warm pool and retrying: $error',
+      );
+      FeedVideoPrewarmer.instance.clear();
+      FeedVideoDiskPrefetcher.instance.clear();
+      final detached = _detachControllerSync();
+      if (detached != null) {
+        unawaited(_disposeController(detached.$1, detached.$2));
+      }
+      if (mounted) {
+        setState(() {
+          _errorMessage = null;
+          _isInitializing = false;
+        });
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!mounted || !_shouldPlay) return;
+      await _initController();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _errorMessage = _userFacingError(error));
+    _syncFeedProgress();
   }
 
   /// Takes ownership of an already-initialized [controller] (from the
@@ -372,48 +493,67 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     if (!_shouldPlay || _isInitializing) return;
 
     final url = _resolvedUrl;
-    final generation = ++_initGeneration;
-
     if (url.isEmpty) {
       if (!mounted) return;
       setState(() => _errorMessage = 'No video URL');
       return;
     }
 
-    _isInitializing = true;
-    _userPaused = false;
-    _hasEverPlayed = false;
-    if (mounted) setState(() => _errorMessage = null);
-
-    final previous = _detachControllerSync();
-    if (previous != null) {
-      unawaited(_disposeController(previous.$1, previous.$2));
-    }
-
-    // Adopt a controller the prewarmer already initialized and buffered —
-    // playback starts instantly, with no init or network wait.
+    // Adopt parked controller first — zero loading flash on scroll up/down.
     final prewarmed = FeedVideoPrewarmer.instance.take(url);
     if (prewarmed != null) {
       if (prewarmed.value.isInitialized && !prewarmed.value.hasError) {
+        final generation = ++_initGeneration;
+        final previous = _detachControllerSync();
+        if (previous != null) {
+          unawaited(_parkController(previous.$1, previous.$2));
+        }
+        _openedFromCache = true;
+        _userPaused = false;
+        _errorMessage = null;
+        try {
+          if (prewarmed.value.position > Duration.zero ||
+              prewarmed.value.isPlaying) {
+            _hasEverPlayed = true;
+          }
+        } catch (_) {
+          _hasEverPlayed = true;
+        }
+        FeedVideoDiskPrefetcher.instance.setPlayingUrl(url);
         await _attachAndPlay(prewarmed, generation);
         return;
       }
       unawaited(prewarmed.dispose());
     }
 
-    // Play from the local copy when the feed preloader already downloaded
-    // this video — startup is instant, with no network buffering.
-    final cachedFile = await _cachedVideoFile(url);
-    if (!mounted || generation != _initGeneration || !_shouldPlay) {
-      _isInitializing = false;
-      return;
+    final generation = ++_initGeneration;
+    _isInitializing = true;
+    _openedFromCache = false;
+    _userPaused = false;
+    // Keep last frame / poster feel — don't force poster flash on reopen.
+    if (mounted) setState(() => _errorMessage = null);
+
+    final previous = _detachControllerSync();
+    if (previous != null) {
+      unawaited(_parkController(previous.$1, previous.$2));
     }
+
+    FeedVideoDiskPrefetcher.instance.setPlayingUrl(url);
 
     final options = VideoPlayerOptions(
       mixWithOthers: false,
       allowBackgroundPlayback: false,
     );
-    final controller = cachedFile != null
+
+    final cachedFile = await AppMediaCacheManager.getCachedVideoFile(url);
+    if (!mounted || generation != _initGeneration || !_shouldPlay) {
+      _isInitializing = false;
+      return;
+    }
+
+    var usedFile = cachedFile != null;
+    if (usedFile) _openedFromCache = true;
+    var controller = cachedFile != null
         ? VideoPlayerController.file(cachedFile, videoPlayerOptions: options)
         : VideoPlayerController.networkUrl(
             Uri.parse(url),
@@ -421,7 +561,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           );
     _controller = controller;
 
-    final listener = _makePlaybackListener(controller, generation);
+    var listener = _makePlaybackListener(controller, generation);
     _playbackListener = listener;
     controller.addListener(listener);
 
@@ -460,26 +600,56 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         }
       }
     } catch (e) {
-      debugPrint('Video player initialization error: $e');
-      if (_isAudioFailure(e) &&
-          controller.value.isInitialized &&
-          mounted &&
-          generation == _initGeneration) {
-        final ok = await _startPlayback(controller, generation, muted: true);
-        if (ok) return;
-      }
+      Object error = e;
+      debugPrint('Video player initialization error: $error');
       await _disposeController(controller, listener);
-      if (_controller == controller) {
+      if (identical(_controller, controller)) {
         _controller = null;
         _playbackListener = null;
       }
-      if (!mounted || generation != _initGeneration) return;
-      setState(() {
-        _errorMessage = _isAudioFailure(e)
-            ? 'Playing without sound on this device'
-            : e.toString();
+
+      // Corrupt disk entry → drop and retry from network once.
+      if (usedFile &&
+          mounted &&
+          generation == _initGeneration &&
+          _shouldPlay) {
+        await AppMediaCacheManager.removeCachedVideoFile(url);
+        usedFile = false;
+        controller = VideoPlayerController.networkUrl(
+          Uri.parse(url),
+          videoPlayerOptions: options,
+        );
+        _controller = controller;
+        listener = _makePlaybackListener(controller, generation);
+        _playbackListener = listener;
+        controller.addListener(listener);
+        try {
+          await controller.initialize().timeout(_initTimeout);
+          await controller.setLooping(true);
+          if (!mounted || generation != _initGeneration || !_shouldPlay) {
+            await _disposeController(controller, listener);
+            return;
+          }
+          if (mounted) setState(() => _isInitializing = false);
+          await _startPlayback(controller, generation, muted: false);
+          return;
+        } catch (e2) {
+          debugPrint('Network fallback failed: $e2');
+          await _disposeController(controller, listener);
+          if (identical(_controller, controller)) {
+            _controller = null;
+            _playbackListener = null;
+          }
+          error = e2;
+        }
+      }
+
+      if (!mounted || generation != _initGeneration) {
         _isInitializing = false;
-      });
+        return;
+      }
+      _isInitializing = false;
+      await _handlePlaybackFailure(error);
     } finally {
       if (generation == _initGeneration) {
         _isInitializing = false;
@@ -511,6 +681,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       }
       _userPaused = false;
       _hasEverPlayed = true;
+      FeedVideoDiskPrefetcher.instance.markPlaybackSettled();
       setState(() => _errorMessage = null);
       _syncFeedProgress();
       _notifyPlaybackChanged();
@@ -572,16 +743,47 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     await controller.dispose();
   }
 
-  Future<void> _releasePlayer() async {
+  Future<void> _releasePlayer({bool park = false}) async {
     _initGeneration++;
     _isInitializing = false;
     _playbackMuted = false;
     _userPaused = false;
-    _hasEverPlayed = false;
+    if (!park) _hasEverPlayed = false;
+    final url = _resolvedUrl;
     final detached = _detachControllerSync();
+    FeedVideoDiskPrefetcher.instance.setPlayingUrl(null);
     if (mounted) setState(() {});
-    if (detached != null) {
+    if (detached == null) return;
+    if (park) {
+      await _parkController(detached.$1, detached.$2);
+    } else {
       await _disposeController(detached.$1, detached.$2);
+    }
+    if (url.isNotEmpty && AppMediaCacheManager.canDiskCacheVideo(url)) {
+      FeedVideoDiskPrefetcher.instance.enqueueAfterWatch(url);
+    }
+  }
+
+  Future<void> _parkController(
+    VideoPlayerController controller,
+    VoidCallback listener,
+  ) async {
+    try {
+      controller.removeListener(listener);
+    } catch (_) {}
+    try {
+      if (controller.value.isInitialized) {
+        await controller.pause();
+        await controller.setVolume(0);
+      }
+    } catch (_) {}
+    final url = _resolvedUrl;
+    if (url.isNotEmpty) {
+      FeedVideoPrewarmer.instance.offer(url, controller);
+    } else {
+      try {
+        await controller.dispose();
+      } catch (_) {}
     }
   }
 
@@ -595,17 +797,21 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
         !_isControllerReady(controller)) {
       return;
     }
+    if (_shouldPlay) {
+      notifier.bindSeekHandler(this, _seekFeedTo);
+    }
     try {
       final value = controller.value;
       notifier.updateFromPlayback(
         position: value.position,
         duration: value.duration,
-        isPlaying: force ? false : value.isPlaying,
+        isPlaying: value.isPlaying && !_userPaused,
       );
     } catch (_) {}
   }
 
   void _resetFeedProgress() {
+    _progressNotifier?.unbindSeekHandler(this);
     _progressNotifier?.reset();
   }
 
@@ -636,15 +842,24 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (widget.respectFeedPlaybackGate) {
       FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
     }
     widget.controller?._detach(this);
+    _progressNotifier?.unbindSeekHandler(this);
     _initGeneration++;
     if (widget.isActive) _resetFeedProgress();
     final detached = _detachControllerSync();
     if (detached != null) {
-      unawaited(_disposeController(detached.$1, detached.$2));
+      FeedVideoDiskPrefetcher.instance.setPlayingUrl(null);
+      final url = _resolvedUrl;
+      unawaited(() async {
+        await _parkController(detached.$1, detached.$2);
+        if (url.isNotEmpty && AppMediaCacheManager.canDiskCacheVideo(url)) {
+          FeedVideoDiskPrefetcher.instance.enqueueAfterWatch(url);
+        }
+      }());
     }
     super.dispose();
   }
@@ -696,9 +911,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
+    // Keep the texture mounted while soft-paused so scroll-back does not
+    // flash a black/poster frame before play resumes.
     final canMountVideoPlayer =
-        widget.isActive &&
-        _shouldPlay &&
         controller != null &&
         identical(controller, _controller) &&
         _isControllerReady(controller) &&
@@ -708,14 +923,24 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     // Only a deliberate tap-to-pause shows the pause UI; transient not-playing
     // states (startup, prewarmed handover, buffering) must not flash it.
     final isPaused =
-        isReady && !isBuffering && _userPaused && !_readIsPlaying(controller);
+        widget.isActive &&
+        isReady &&
+        !isBuffering &&
+        _userPaused &&
+        !_readIsPlaying(controller);
 
     if (_errorMessage != null && !isReady) {
       return _buildError();
     }
 
     final showVideoLoading =
-        widget.isActive && _shouldPlay && (!canMountVideoPlayer || isBuffering);
+        widget.isActive &&
+        _shouldPlay &&
+        (!canMountVideoPlayer || isBuffering) &&
+        // Never flash loader on scroll-back / disk reopen / poster-ready opens.
+        !_openedFromCache &&
+        !_hasEverPlayed &&
+        !_hasPosterVisual;
 
     return GestureDetector(
       onTap: () => unawaited(_togglePlayback()),
@@ -822,7 +1047,10 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               TextButton(
-                onPressed: () => unawaited(_initController()),
+                onPressed: () {
+                  _codecRetryAttempted = false;
+                  unawaited(_initController());
+                },
                 child: const Text(
                   'Retry',
                   style: TextStyle(color: Colors.white),

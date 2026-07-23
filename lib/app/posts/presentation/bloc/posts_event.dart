@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
@@ -281,6 +282,8 @@ class HidePostFromFeedEvent extends PostsEvent {
 class FetchFeedRequestedEvent extends PostsEvent {
   final int page;
   final int limit;
+  /// Opaque cursor from the previous page (`meta.nextCursor`). Prefer over [page].
+  final String? cursor;
   final String? categoryId;
   final String? type;
   final String? hashtag;
@@ -300,10 +303,13 @@ class FetchFeedRequestedEvent extends PostsEvent {
   final double? latitude;
   final double? longitude;
   final double? radiusKm;
+  /// When set, forwards auction filters (e.g. exclude auctions from home feed).
+  final FeedAuctionQuery? auctionQuery;
 
   const FetchFeedRequestedEvent({
     this.page = 1,
     this.limit = 10,
+    this.cursor,
     this.categoryId,
     this.type,
     this.hashtag,
@@ -321,12 +327,14 @@ class FetchFeedRequestedEvent extends PostsEvent {
     this.latitude,
     this.longitude,
     this.radiusKm,
+    this.auctionQuery,
   });
 
   @override
   List<Object?> get props => [
     page,
     limit,
+    cursor,
     categoryId,
     type,
     hashtag,
@@ -344,6 +352,7 @@ class FetchFeedRequestedEvent extends PostsEvent {
     latitude,
     longitude,
     radiusKm,
+    auctionQuery,
   ];
 }
 

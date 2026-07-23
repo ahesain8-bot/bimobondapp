@@ -53,6 +53,7 @@ class AuctionsScreenState extends State<AuctionsScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
+  Timer? _expiryTicker;
   String _searchQuery = '';
   AuctionSearchFilters _filters = AuctionSearchFilters.empty;
   final List<CategoryEntity> _categories = [];
@@ -74,6 +75,10 @@ class AuctionsScreenState extends State<AuctionsScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchTextChanged);
+    _expiryTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !widget.isTabActive) return;
+      _onExpiryTick();
+    });
     if (widget.isTabActive) {
       _loadTabData();
     }
@@ -119,10 +124,64 @@ class AuctionsScreenState extends State<AuctionsScreen> {
 
   @override
   void dispose() {
+    _expiryTicker?.cancel();
     _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchTextChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Drop time-expired auctions from Active and refresh countdowns.
+  void _onExpiryTick() {
+    if (_postAuctionItems.isEmpty) return;
+
+    final now = DateTime.now().toUtc();
+    final stillActive = <AuctionItem>[];
+    final newlyEnded = <AuctionItem>[];
+    var changed = false;
+
+    for (final item in _postAuctionItems) {
+      if (item.isEndedNow) {
+        newlyEnded.add(
+          item.copyWith(isLive: false, isEnded: true, countdown: null),
+        );
+        changed = true;
+        continue;
+      }
+      final startedAt = item.startedAt?.toUtc();
+      final endedAt = item.endedAt?.toUtc();
+      final nextCountdown = startedAt != null && endedAt != null
+          ? formatAuctionCountdown(now, startedAt, endedAt)
+          : item.countdown;
+      if (nextCountdown != item.countdown) {
+        stillActive.add(item.copyWith(countdown: nextCountdown));
+        changed = true;
+      } else {
+        stillActive.add(item);
+      }
+    }
+
+    if (!changed) return;
+
+    setState(() {
+      _postAuctionItems
+        ..clear()
+        ..addAll(stillActive);
+
+      if (newlyEnded.isEmpty) return;
+      if (_searchQuery.isNotEmpty || _filters.hasActiveFilters) return;
+
+      // Prepend into ended preview (cap at limit), avoiding duplicates.
+      final existingIds = _endedPreviewItems.map((e) => e.id).toSet();
+      for (final item in newlyEnded.reversed) {
+        if (existingIds.contains(item.id)) continue;
+        _endedPreviewItems.insert(0, item);
+        existingIds.add(item.id);
+      }
+      while (_endedPreviewItems.length > _endedPreviewLimit) {
+        _endedPreviewItems.removeLast();
+      }
+    });
   }
 
   void _onSearchTextChanged() {
@@ -237,15 +296,15 @@ class AuctionsScreenState extends State<AuctionsScreen> {
         endedFilters.toFeedParams(page: page, limit: 30),
       );
       var shouldContinue = false;
-      result.fold((_) => hasMore = false, (items) {
-        for (final item in items) {
+      result.fold((_) => hasMore = false, (page) {
+        for (final item in page.items) {
           final post = item.post;
           if (!post.isAuctionable || post.auction == null) continue;
           if (!_isEndedPost(post)) continue;
           postsById[post.id] = post;
           if (postsById.length >= _endedPreviewLimit) break;
         }
-        shouldContinue = items.length >= 30;
+        shouldContinue = !page.hasReachedMax && page.items.length >= 30;
       });
       if (!shouldContinue || postsById.length >= _endedPreviewLimit) {
         hasMore = false;
@@ -304,6 +363,7 @@ class AuctionsScreenState extends State<AuctionsScreen> {
           final mapped = auctions
               .where((a) => !a.isEnded)
               .map((a) => AuctionItem.fromAuction(a))
+              .where((item) => !item.isEndedNow)
               .where((item) {
                 if (_filters.liveStatus == AuctionLiveStatusFilter.live) {
                   return item.isLive;
@@ -348,8 +408,8 @@ class AuctionsScreenState extends State<AuctionsScreen> {
           failureMessage = failure.message;
           hasMore = false;
         },
-        (items) {
-          for (final item in items) {
+        (page) {
+          for (final item in page.items) {
             final post = item.post;
             if (!post.isAuctionable || post.auction == null) continue;
             if (_isEndedPost(post)) continue;
@@ -357,7 +417,7 @@ class AuctionsScreenState extends State<AuctionsScreen> {
             if (!_filters.matchesClientLiveStatus(post)) continue;
             postsById[post.id] = post;
           }
-          shouldContinue = items.length >= 30;
+          shouldContinue = !page.hasReachedMax && page.items.length >= 30;
         },
       );
       if (!shouldContinue) {
@@ -424,7 +484,8 @@ class AuctionsScreenState extends State<AuctionsScreen> {
 
   bool _isEndedPost(PostEntity post) => AuctionSearchFilters.isPostEnded(post);
 
-  List<AuctionItem> get _activeAuctionItems => _postAuctionItems;
+  List<AuctionItem> get _activeAuctionItems =>
+      _postAuctionItems.where((item) => !item.isEndedNow).toList();
 
   List<Widget> _buildAuctionSections({
     required BuildContext context,
