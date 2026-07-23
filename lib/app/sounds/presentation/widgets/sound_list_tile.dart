@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.dart';
@@ -52,11 +55,13 @@ class SoundListTile extends StatefulWidget {
 
 class _SoundListTileState extends State<SoundListTile> {
   bool _isPlaying = false;
+  Timer? _playPoll;
 
   @override
   void initState() {
     super.initState();
     _syncPlayingState();
+    _updatePlayPolling();
   }
 
   @override
@@ -65,18 +70,40 @@ class _SoundListTileState extends State<SoundListTile> {
     if (oldWidget.sound.id != widget.sound.id ||
         oldWidget.isSelected != widget.isSelected) {
       _syncPlayingState();
+      _updatePlayPolling();
     }
+  }
+
+  @override
+  void dispose() {
+    _playPoll?.cancel();
+    super.dispose();
   }
 
   void _syncPlayingState() {
     _isPlaying = SoundAudioPreview.isPlaying(widget.sound.id);
   }
 
+  void _updatePlayPolling() {
+    _playPoll?.cancel();
+    _playPoll = null;
+    if (!widget.isSelected) return;
+    _playPoll = Timer.periodic(const Duration(milliseconds: 280), (_) {
+      if (!mounted) return;
+      final playing = SoundAudioPreview.isPlaying(widget.sound.id);
+      if (playing != _isPlaying) {
+        setState(() => _isPlaying = playing);
+      }
+    });
+  }
+
   Future<void> _togglePreview() async {
-    await SoundAudioPreview.toggle(
-      widget.sound.id,
-      widget.sound.resolvedAudioUrl,
-    );
+    final id = widget.sound.id;
+    final wasPlaying = SoundAudioPreview.isPlaying(id);
+    await SoundAudioPreview.stop();
+    if (!wasPlaying) {
+      await SoundAudioPreview.playAt(id, widget.sound.resolvedAudioUrl);
+    }
     if (!mounted) return;
     setState(_syncPlayingState);
   }
@@ -96,6 +123,7 @@ class _SoundListTileState extends State<SoundListTile> {
     final onSurface = scheme.onSurface;
     final sound = widget.sound;
     final selected = widget.isSelected;
+    final accent = SoundPickerTheme.accentOf(context);
     final posts = sound.postCount ?? sound.useCount;
     final cover = _coverUrl;
     final placeholderBg = scheme.surfaceContainerHighest;
@@ -103,6 +131,7 @@ class _SoundListTileState extends State<SoundListTile> {
       onSurface.withValues(alpha: 0.12),
       placeholderBg,
     );
+    final showBars = selected || _isPlaying;
 
     return Material(
       color: Colors.transparent,
@@ -118,43 +147,48 @@ class _SoundListTileState extends State<SoundListTile> {
               GestureDetector(
                 onTap: _togglePreview,
                 child: Container(
-                  width: 56,
-                  height: 56,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
+                    shape: BoxShape.circle,
                     border: Border.all(
-                      color: selected
-                          ? SoundPickerTheme.accentOf(context)
-                          : Colors.transparent,
+                      color: selected ? accent : Colors.transparent,
                       width: 2,
                     ),
-                    color: placeholderBg,
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (cover != null && cover.isNotEmpty)
-                        SafeNetworkImage(imageUrl: cover, fit: BoxFit.cover)
-                      else
-                        ColoredBox(
-                          color: silhouetteBg,
-                          child: Icon(
-                            LucideIcons.user,
-                            color: scheme.onSurface.withValues(alpha: 0.35),
-                            size: 28,
-                          ),
-                        ),
-                      if (_isPlaying)
-                        ColoredBox(
-                          color: onSurface.withValues(alpha: 0.35),
-                          child: Icon(
-                            LucideIcons.pause,
-                            color: scheme.surface,
-                            size: 22,
-                          ),
-                        ),
-                    ],
+                  child: ClipOval(
+                    child: ColoredBox(
+                      color: placeholderBg,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (cover != null && cover.isNotEmpty)
+                            SafeNetworkImage(
+                              imageUrl: cover,
+                              fit: BoxFit.cover,
+                              borderRadius: BorderRadius.circular(26),
+                            )
+                          else
+                            ColoredBox(
+                              color: silhouetteBg,
+                              child: Icon(
+                                LucideIcons.music2,
+                                color: scheme.onSurface.withValues(alpha: 0.35),
+                                size: 22,
+                              ),
+                            ),
+                          if (_isPlaying)
+                            ColoredBox(
+                              color: onSurface.withValues(alpha: 0.35),
+                              child: Icon(
+                                LucideIcons.pause,
+                                color: scheme.surface,
+                                size: 20,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -163,24 +197,35 @@ class _SoundListTileState extends State<SoundListTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      sound.name,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: selected
-                            ? SoundPickerTheme.accentOf(context)
-                            : onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.left,
+                    Row(
+                      children: [
+                        if (showBars) ...[
+                          _TikTokMusicBars(
+                            active: _isPlaying,
+                            color: accent,
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(
+                            sound.name,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: selected ? accent : onSurface,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
                       '${sound.author} · ${formatSoundUseCount(posts, l10n)} · ${formatSoundDuration(sound.duration)}',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 11.5,
                         color: onSurface.withValues(alpha: 0.45),
                       ),
                       maxLines: 1,
@@ -201,7 +246,7 @@ class _SoundListTileState extends State<SoundListTile> {
                   tooltip: l10n.soundTrimTooltip,
                   icon: Icon(
                     LucideIcons.scissors,
-                    size: 22,
+                    size: 20,
                     color: onSurface.withValues(alpha: 0.87),
                   ),
                 ),
@@ -210,9 +255,9 @@ class _SoundListTileState extends State<SoundListTile> {
                   tooltip: l10n.soundFavoriteTooltip,
                   icon: Icon(
                     widget.isFavorite ? Icons.bookmark : LucideIcons.bookmark,
-                    size: 22,
+                    size: 20,
                     color: widget.isFavorite
-                        ? SoundPickerTheme.accentOf(context)
+                        ? accent
                         : onSurface.withValues(alpha: 0.87),
                   ),
                 ),
@@ -220,6 +265,93 @@ class _SoundListTileState extends State<SoundListTile> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Small equalizer bars beside the title (TikTok-style).
+class _TikTokMusicBars extends StatefulWidget {
+  const _TikTokMusicBars({
+    required this.active,
+    required this.color,
+  });
+
+  final bool active;
+  final Color color;
+
+  @override
+  State<_TikTokMusicBars> createState() => _TikTokMusicBarsState();
+}
+
+class _TikTokMusicBarsState extends State<_TikTokMusicBars>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  static const _heights = <double>[0.45, 1.0, 0.65, 0.85];
+  static const _phases = <double>[0.0, 0.35, 0.7, 0.15];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 780),
+    );
+    if (widget.active) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _TikTokMusicBars oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!widget.active && _controller.isAnimating) {
+      _controller.stop();
+      _controller.value = 0.35;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 14,
+      height: 14,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(4, (i) {
+              final wave = widget.active
+                  ? (math.sin(
+                          (_controller.value * 2 * math.pi) +
+                              (_phases[i] * 2 * math.pi),
+                        ) +
+                        1) /
+                      2
+                  : 0.35;
+              final h = (4.0 + (_heights[i] * 10.0 * wave)).clamp(3.0, 14.0);
+              return Container(
+                width: 2,
+                height: h,
+                decoration: BoxDecoration(
+                  color: widget.color,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              );
+            }),
+          );
+        },
       ),
     );
   }

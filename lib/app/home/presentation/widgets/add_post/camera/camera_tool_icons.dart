@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_effect_asset_loader.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,43 @@ class CameraToolIcons {
       Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
     ],
   );
+
+  /// Soft drop-shadow for rail glyphs (Icon / SVG / custom paint).
+  static const iconShadows = <Shadow>[
+    Shadow(
+      color: Color(0x59000000),
+      blurRadius: 5,
+      offset: Offset(0, 1),
+    ),
+  ];
+
+  static Widget withSoftShadow(Widget child) {
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        IgnorePointer(
+          child: Transform.translate(
+            offset: const Offset(0, 1),
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 1.4, sigmaY: 1.4),
+              child: Opacity(
+                opacity: 0.45,
+                child: ColorFiltered(
+                  colorFilter: const ColorFilter.mode(
+                    Colors.black,
+                    BlendMode.srcIn,
+                  ),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
 
   static BoxDecoration circleDecoration({bool active = false}) {
     return BoxDecoration(
@@ -63,6 +101,75 @@ class CameraToolIcons {
       border: Border.all(
         color: Colors.white.withValues(alpha: 0.95),
         width: 1.5,
+      ),
+    );
+  }
+}
+
+/// Soft vertical fade behind an expanded side rail (TikTok-style).
+/// Diffused / rounded edges — no hard rectangular outline.
+class CameraRailExpandedBackdrop extends StatelessWidget {
+  const CameraRailExpandedBackdrop({
+    super.key,
+    required this.expanded,
+    required this.iconOnStartEdge,
+    this.width = 128,
+  });
+
+  final bool expanded;
+  final bool iconOnStartEdge;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final openRadius = const Radius.circular(36);
+    final borderRadius = BorderRadius.only(
+      topLeft: iconOnStartEdge ? Radius.zero : openRadius,
+      bottomLeft: iconOnStartEdge ? Radius.zero : openRadius,
+      topRight: iconOnStartEdge ? openRadius : Radius.zero,
+      bottomRight: iconOnStartEdge ? openRadius : Radius.zero,
+    );
+
+    return Positioned(
+      top: -28,
+      bottom: -24,
+      left: iconOnStartEdge ? -18 : null,
+      right: iconOnStartEdge ? null : -18,
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          opacity: expanded ? 1 : 0,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 340),
+            curve: Curves.easeOutCubic,
+            width: expanded ? width : 56,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 16, sigmaY: 14),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: borderRadius,
+                  gradient: LinearGradient(
+                    begin: iconOnStartEdge
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    end: iconOnStartEdge
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.52),
+                      Colors.black.withValues(alpha: 0.34),
+                      Colors.black.withValues(alpha: 0.14),
+                      Colors.black.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 0.28, 0.62, 1.0],
+                  ),
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -194,12 +301,14 @@ class CameraRailToolRow extends StatelessWidget {
           width: 48,
           height: 48,
           child: Center(
-            child: customIcon ??
-                Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 30,
-                ),
+            child: customIcon != null
+                ? CameraToolIcons.withSoftShadow(customIcon!)
+                : Icon(
+                    icon,
+                    color: Colors.white,
+                    size: 30,
+                    shadows: CameraToolIcons.iconShadows,
+                  ),
           ),
         ),
         if (badge != null)

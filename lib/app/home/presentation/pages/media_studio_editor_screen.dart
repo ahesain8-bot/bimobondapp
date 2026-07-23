@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filters_panel.dart';
@@ -16,6 +17,7 @@ import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flo
 import 'package:bimobondapp/app/home/presentation/utils/media_skin_smooth.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_baker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_font_styles.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_text_layout.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_app_loading.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_photo_editor_panel.dart';
@@ -130,8 +132,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   /// Set once the user confirms Discard so [PopScope] lets the route pop.
   bool _leaving = false;
 
-  /// Full-screen preview box size, used to map text overlays onto the export.
+  /// Preview box size used to scale text when baking export.
   Size _previewSize = Size.zero;
+
+  /// Pixel size of the current source media (image or video frame).
+  Size _mediaPixelSize = Size.zero;
+  String? _mediaPixelSizePath;
 
   MediaItemEditState get _currentState => _states[_currentIndex];
 
@@ -184,6 +190,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
     _currentIndex = widget.initialIndex.clamp(0, widget.items.length - 1);
     _applyStateToUi(_states[_currentIndex]);
+    unawaited(_resolveMediaPixelSize());
     // Warm fancy fonts in the background so Aa opens without a hitch.
     unawaited(MediaTextFontStyles.preload());
     if (_hasPreviewEdits) {
@@ -194,6 +201,35 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         if (mounted) unawaited(_syncStudioSoundPreview());
       });
     }
+  }
+
+  Future<void> _resolveMediaPixelSize() async {
+    final file = _currentState.sourceFile;
+    final path = file.path;
+    if (_mediaPixelSizePath == path && _mediaPixelSize != Size.zero) return;
+
+    Size size = Size.zero;
+    try {
+      if (_currentState.isVideo) {
+        size = await NativeVideoProcessor.videoResolution(file) ?? Size.zero;
+      } else {
+        final bytes = await file.readAsBytes();
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        size = Size(
+          frame.image.width.toDouble(),
+          frame.image.height.toDouble(),
+        );
+        frame.image.dispose();
+      }
+    } catch (_) {
+      size = Size.zero;
+    }
+    if (!mounted || _currentState.sourceFile.path != path) return;
+    setState(() {
+      _mediaPixelSizePath = path;
+      _mediaPixelSize = size;
+    });
   }
 
   /// Keeps the selected track audible under the studio preview (video or photo).
@@ -822,11 +858,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
     final bytes = await state.sourceFile.readAsBytes();
     if (!mounted) return;
-    // Decode into the image cache first so the crop screen paints the photo on
-    // frame 1 instead of flashing black while Crop parses the bytes.
     await precacheImage(MemoryImage(bytes), context);
     if (!mounted) return;
-    final cropped = await Navigator.of(context).push<Uint8List>(
+    final cropped = await Navigator.of(context).push<MediaCropResult>(
       PageRouteBuilder(
         opaque: true,
         transitionDuration: const Duration(milliseconds: 220),
@@ -841,14 +875,31 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     final file = File(
       '${dir.path}/crop_${DateTime.now().millisecondsSinceEpoch}.png',
     );
-    await file.writeAsBytes(cropped);
+    await file.writeAsBytes(cropped.bytes);
     if (!mounted) return;
+
+    final previous = _states[_currentIndex];
+    final remapped = MediaTextLayout.remapForCrop(
+      overlays: previous.textOverlays,
+      sourceSize: cropped.sourceSize == Size.zero
+          ? _mediaPixelSize
+          : cropped.sourceSize,
+      cropRect: cropped.cropRect,
+      centerOf: (o) => o.center,
+      copyWithCenter: (o, center) => o.copyWith(center: center),
+    );
+
     setState(() {
-      _states[_currentIndex] = _states[_currentIndex].copyWith(
+      _states[_currentIndex] = previous.copyWith(
         croppedFile: file,
-        effectSlug: _states[_currentIndex].effectSlug,
+        textOverlays: remapped,
+        effectSlug: previous.effectSlug,
       );
+      _mediaPixelSizePath = null;
+      _mediaPixelSize = Size.zero;
     });
+    unawaited(_resolveMediaPixelSize());
+    if (_hasPreviewEdits) _scheduleFacePreview();
   }
 
   Future<MediaTextOverlay?> _openTextEditor({MediaTextOverlay? initial}) async {
@@ -1145,15 +1196,22 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         ? authState.user.avatarUrl
         : null;
     final selectedColorId = _hasActiveColorFilter ? _arFilterId : 'none';
-    _previewSize = MediaQuery.of(context).size;
-    final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
-        ? _smoothPreviewFile!
-        : _currentState.sourceFile;
+    final screenSize = MediaQuery.of(context).size;
     final isPhoto = !currentItem.isVideo;
     final previewChrome = CameraRatioLetterbox.tikTokChromeHeights(
       context,
       photoMode: isPhoto,
     );
+    final previewBandHeight = (screenSize.height -
+            previewChrome.top -
+            previewChrome.bottom)
+        .clamp(1.0, screenSize.height);
+    _previewSize = isPhoto
+        ? Size(screenSize.width, previewBandHeight)
+        : screenSize;
+    final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
+        ? _smoothPreviewFile!
+        : _currentState.sourceFile;
     final controlsTop = CameraRatioLetterbox.controlsTopInset(context);
     final showBottomSheet = _showPhotoEditor || _showFilters;
     final sideRailBottom = showBottomSheet
@@ -1190,24 +1248,59 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            TikTokPhotoPreviewClip(
-              topHeight: previewChrome.top,
-              bottomHeight: previewChrome.bottom,
-              child: previewWidget,
-            ),
+            if (isPhoto)
+              Positioned(
+                top: previewChrome.top,
+                left: 0,
+                right: 0,
+                bottom: previewChrome.bottom,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(
+                    CameraRatioLetterbox.tikTokPreviewRadius,
+                  ),
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: previewWidget,
+                  ),
+                ),
+              )
+            else
+              TikTokPhotoPreviewClip(
+                topHeight: previewChrome.top,
+                bottomHeight: previewChrome.bottom,
+                child: previewWidget,
+              ),
             if (_currentState.textOverlays.isNotEmpty)
-              Positioned.fill(
-                child: TikTokPhotoPreviewClip(
-                  topHeight: previewChrome.top,
-                  bottomHeight: previewChrome.bottom,
+              if (isPhoto)
+                Positioned(
+                  top: previewChrome.top,
+                  left: 0,
+                  right: 0,
+                  bottom: previewChrome.bottom,
                   child: MediaTextOverlayLayer(
                     key: ValueKey('text-overlays-$_currentIndex'),
                     overlays: _currentState.textOverlays,
                     onChanged: _moveOverlay,
                     onEdit: _editText,
+                    mediaSize: _mediaPixelSize,
+                    fit: BoxFit.contain,
+                  ),
+                )
+              else
+                Positioned.fill(
+                  child: TikTokPhotoPreviewClip(
+                    topHeight: previewChrome.top,
+                    bottomHeight: previewChrome.bottom,
+                    child: MediaTextOverlayLayer(
+                      key: ValueKey('text-overlays-$_currentIndex'),
+                      overlays: _currentState.textOverlays,
+                      onChanged: _moveOverlay,
+                      onEdit: _editText,
+                      mediaSize: _mediaPixelSize,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
-              ),
             TikTokChromeBarsOverlay(
               topHeight: previewChrome.top,
               bottomHeight: previewChrome.bottom,
@@ -1231,7 +1324,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                     ),
                   ),
                   Positioned(
-                    top: controlsTop,
+                    top: controlsTop + 48.0,
                     bottom: sideRailBottom,
                     right: isRtl ? null : 0,
                     left: isRtl ? 0 : null,

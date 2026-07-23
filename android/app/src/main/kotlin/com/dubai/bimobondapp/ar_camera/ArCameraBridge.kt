@@ -631,8 +631,9 @@ object ArCameraBridge {
 
     fun onGlFramePresented() {
         if (!awaitFirstGlFrame) return
-        // Empty GL clears before CameraX OES surface is live — do not count them.
-        if (!oesSurfaceLive) return
+        // Color LUT / OES path: ignore empty GL clears until CameraX surface is live.
+        // Distortion (big eyes / lips / nose) uses CPU bitmaps into GL — no OES surface.
+        if (currentFilter.usesGpuPreview() && !oesSurfaceLive) return
 
         if (oesRevealFramesLeft > 0) {
             oesRevealFramesLeft--

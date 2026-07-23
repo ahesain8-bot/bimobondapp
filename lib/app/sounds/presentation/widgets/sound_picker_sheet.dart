@@ -24,17 +24,19 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
-enum _PickerShelf { group, hot, forYou, mine, favorites, recent }
+enum _PickerShelf { all, group, hot, forYou, mine, favorites, recent }
 
 class SoundPickerSheet extends StatefulWidget {
   const SoundPickerSheet({
     super.key,
     this.initialSelection,
     this.allowMuteOnTrim = false,
+    this.scrollController,
   });
 
   final SoundEntity? initialSelection;
   final bool allowMuteOnTrim;
+  final ScrollController? scrollController;
 
   static Future<SoundPickResult?> show(
     BuildContext context, {
@@ -46,20 +48,17 @@ class SoundPickerSheet extends StatefulWidget {
     await SoundAudioPreview.stop();
     if (!context.mounted) return null;
 
-    final picked = await GlassBottomSheet.open<SoundPickResult?>(
+    final picked = await GlassBottomSheet.showDraggable<SoundPickResult?>(
       context,
-      isScrollControlled: true,
-      builder: (ctx) => SoundPickerTheme(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-          child: GlassBottomSheetShell(
-            lightSurface: true,
-            expand: false,
-            child: SoundPickerSheet(
-              initialSelection: initialSelection,
-              allowMuteOnTrim: allowMuteOnTrim,
-            ),
-          ),
+      initialChildSize: 0.50,
+      minChildSize: 0.42,
+      maxChildSize: 0.75,
+      lightSurface: true,
+      builder: (ctx, scrollController) => SoundPickerTheme(
+        child: SoundPickerSheet(
+          initialSelection: initialSelection,
+          allowMuteOnTrim: allowMuteOnTrim,
+          scrollController: scrollController,
         ),
       ),
     );
@@ -140,6 +139,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
 
   List<SoundGroupEntity> _groups = [];
   List<_PickerShelf> _shelves = const [
+    _PickerShelf.all,
     _PickerShelf.hot,
     _PickerShelf.forYou,
     _PickerShelf.mine,
@@ -149,6 +149,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   List<String> _tabLabels = const [];
 
   final Map<String, List<SoundEntity>> _groupSounds = {};
+  List<SoundEntity> _all = [];
   List<SoundEntity> _hot = [];
   List<SoundEntity> _forYou = [];
   List<SoundEntity> _mine = [];
@@ -208,8 +209,8 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     List<SoundGroupEntity> groups = const [];
     groupsResult.fold((_) {}, (g) => groups = g);
 
-    final shelves = <_PickerShelf>[];
-    final labels = <String>[];
+    final shelves = <_PickerShelf>[_PickerShelf.all];
+    final labels = <String>[l10n.soundTabAll];
 
     if (groups.isNotEmpty) {
       _groups = groups;
@@ -234,9 +235,16 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
       l10n.soundTabRecent,
     ]);
 
+    // All is first and selected by default.
+    const initialIndex = 0;
+
     _tabController?.removeListener(_onTabChanged);
     _tabController?.dispose();
-    _tabController = TabController(length: shelves.length, vsync: this);
+    _tabController = TabController(
+      length: shelves.length,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
     _tabController!.addListener(_onTabChanged);
 
     if (!mounted) return;
@@ -252,19 +260,29 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
 
   _PickerShelf get _currentShelf {
     final i = _tabController?.index ?? 0;
-    if (i < 0 || i >= _shelves.length) return _PickerShelf.hot;
+    if (i < 0 || i >= _shelves.length) return _PickerShelf.all;
     return _shelves[i];
   }
 
   String? get _currentGroupId {
     if (_currentShelf != _PickerShelf.group) return null;
     final i = _tabController?.index ?? 0;
-    if (i < 0 || i >= _groups.length) return null;
-    return _groups[i].id;
+    var groupOrdinal = -1;
+    for (var t = 0; t <= i && t < _shelves.length; t++) {
+      if (_shelves[t] != _PickerShelf.group) continue;
+      groupOrdinal++;
+      if (t == i) {
+        if (groupOrdinal < 0 || groupOrdinal >= _groups.length) return null;
+        return _groups[groupOrdinal].id;
+      }
+    }
+    return null;
   }
 
   Future<void> _ensureCurrentShelfLoaded() async {
     switch (_currentShelf) {
+      case _PickerShelf.all:
+        if (_all.isEmpty || _showSearch) await _loadAll();
       case _PickerShelf.group:
         final id = _currentGroupId;
         if (id == null) return;
@@ -285,6 +303,8 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
 
   Future<void> _reloadSearchableShelf() async {
     switch (_currentShelf) {
+      case _PickerShelf.all:
+        await _loadAll();
       case _PickerShelf.group:
         final id = _currentGroupId;
         if (id != null) await _loadGroup(id);
@@ -294,12 +314,39 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
         await _loadMine();
       case _PickerShelf.hot:
         if (_showSearch && _searchController.text.trim().isNotEmpty) {
-          await _loadForYou();
+          await _loadAll();
         }
       case _PickerShelf.favorites:
       case _PickerShelf.recent:
         break;
     }
+  }
+
+  Future<void> _loadAll() async {
+    setState(() {
+      _loadingRemote = true;
+      _error = null;
+    });
+    final query = _searchController.text.trim();
+    final result = await sounds_di.sl<GetSoundsUseCase>()(
+      GetSoundsParams(
+        page: 1,
+        limit: 60,
+        search: query.isEmpty ? null : query,
+        sort: SoundSort.trending,
+      ),
+    );
+    if (!mounted) return;
+    result.fold(
+      (failure) => setState(() {
+        _loadingRemote = false;
+        _error = failure.message;
+      }),
+      (page) => setState(() {
+        _loadingRemote = false;
+        _all = page.sounds;
+      }),
+    );
   }
 
   Future<void> _loadHot() async {
@@ -478,7 +525,9 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
     }
 
     setState(() => _selected = sound);
-    unawaited(SoundAudioPreview.toggle(sound.id, sound.resolvedAudioUrl));
+    await SoundAudioPreview.stop();
+    if (!mounted) return;
+    await SoundAudioPreview.playAt(sound.id, sound.resolvedAudioUrl);
   }
 
   Future<void> _confirm(
@@ -531,6 +580,8 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
 
   List<SoundEntity> _currentList() {
     switch (_currentShelf) {
+      case _PickerShelf.all:
+        return _all;
       case _PickerShelf.group:
         final id = _currentGroupId;
         return id == null ? const [] : (_groupSounds[id] ?? const []);
@@ -553,6 +604,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
       case _PickerShelf.favorites:
       case _PickerShelf.recent:
         return _loadingLocal;
+      case _PickerShelf.all:
       case _PickerShelf.group:
       case _PickerShelf.hot:
       case _PickerShelf.forYou:
@@ -563,6 +615,8 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
 
   Future<void> _retryCurrent() async {
     switch (_currentShelf) {
+      case _PickerShelf.all:
+        await _loadAll();
       case _PickerShelf.group:
         final id = _currentGroupId;
         if (id != null) await _loadGroup(id);
@@ -586,6 +640,8 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   }
 
   int? get _searchTabIndex {
+    final all = _shelves.indexOf(_PickerShelf.all);
+    if (all >= 0) return all;
     final forYou = _shelves.indexOf(_PickerShelf.forYou);
     if (forYou >= 0) return forYou;
     final firstGroup = _shelves.indexOf(_PickerShelf.group);
@@ -597,7 +653,6 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.88;
     final canRemove = widget.initialSelection != null;
     final controller = _tabController;
 
@@ -605,13 +660,12 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
       textDirection: TextDirection.ltr,
       child: Material(
         color: scheme.surface,
-        child: SizedBox(
-          height: maxHeight,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (controller != null)
-                SoundPickerHeader(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (controller != null)
+              DraggableSheetDragRegion(
+                child: SoundPickerHeader(
                   tabController: controller,
                   tabLabels: _tabLabels,
                   showSearch: _showSearch,
@@ -634,45 +688,46 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
                     unawaited(_reloadSearchableShelf());
                   },
                 ),
-              if (canRemove)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                  child: OutlinedButton.icon(
-                    onPressed: () => unawaited(_clearSelection()),
-                    icon: Icon(
-                      Icons.music_off_rounded,
-                      size: 18,
-                      color: scheme.onSurface.withValues(alpha: 0.75),
+              ),
+            if (canRemove)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: OutlinedButton.icon(
+                  onPressed: () => unawaited(_clearSelection()),
+                  icon: Icon(
+                    Icons.music_off_rounded,
+                    size: 18,
+                    color: scheme.onSurface.withValues(alpha: 0.75),
+                  ),
+                  label: Text(l10n.soundClearSelection),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: scheme.onSurface,
+                    side: BorderSide(
+                      color: scheme.onSurface.withValues(alpha: 0.18),
                     ),
-                    label: Text(l10n.soundClearSelection),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: scheme.onSurface,
-                      side: BorderSide(
-                        color: scheme.onSurface.withValues(alpha: 0.18),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
-              Expanded(
-                child: SoundPickerList(
-                  loading: _currentLoading(),
-                  sounds: _currentList(),
-                  selectedId: _selected?.id,
-                  favoriteIds: _favoriteIds,
-                  error: _error,
-                  showError: _showRemoteError,
-                  onRetry: () => unawaited(_retryCurrent()),
-                  onSoundTap: (sound) => unawaited(_onSoundTap(sound)),
-                  onScissorsTap: (sound) => unawaited(_openTrim(sound)),
-                  onFavoriteTap: (sound) => unawaited(_toggleFavorite(sound)),
-                ),
               ),
-            ],
-          ),
+            Expanded(
+              child: SoundPickerList(
+                scrollController: widget.scrollController,
+                loading: _currentLoading(),
+                sounds: _currentList(),
+                selectedId: _selected?.id,
+                favoriteIds: _favoriteIds,
+                error: _error,
+                showError: _showRemoteError,
+                onRetry: () => unawaited(_retryCurrent()),
+                onSoundTap: (sound) => unawaited(_onSoundTap(sound)),
+                onScissorsTap: (sound) => unawaited(_openTrim(sound)),
+                onFavoriteTap: (sound) => unawaited(_toggleFavorite(sound)),
+              ),
+            ),
+          ],
         ),
       ),
     );

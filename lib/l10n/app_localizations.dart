@@ -6965,6 +6965,12 @@ abstract class AppLocalizations {
   /// **'Recent'**
   String get soundTabRecent;
 
+  /// No description provided for @soundTabAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get soundTabAll;
+
   /// No description provided for @soundPickerEmpty.
   ///
   /// In en, this message translates to:

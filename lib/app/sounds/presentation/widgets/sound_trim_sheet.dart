@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_file.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_trim_widgets.dart';
@@ -108,6 +109,7 @@ class _SoundTrimSheetState extends State<SoundTrimSheet> {
 
   Future<void> _prepare() async {
     try {
+      await SoundAudioPreview.stop();
       final audio = await SoundLocalFile.resolve(widget.sound.resolvedAudioUrl);
       Duration track = Duration(seconds: widget.sound.duration.clamp(0, 3600));
 
