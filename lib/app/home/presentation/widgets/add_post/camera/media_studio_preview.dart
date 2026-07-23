@@ -302,7 +302,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           final targetW = (constraints.maxWidth * dpr).round().clamp(1, maxDecodeEdge);
           return Image.file(
             widget.file,
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             width: double.infinity,
             height: double.infinity,
             gaplessPlayback: true,
@@ -337,7 +337,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
             mediaSize: _mediaSize == Size.zero
                 ? MediaQuery.sizeOf(context)
                 : _mediaSize,
-            previewFit: BoxFit.cover,
+            previewFit: BoxFit.contain,
           ),
         if (activeEffect != null && activeEffect.isScreenEffect)
           CameraScreenEffectsLayer(effect: activeEffect),

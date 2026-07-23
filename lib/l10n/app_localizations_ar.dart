@@ -3624,6 +3624,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get soundTabRecent => 'الأخيرة';
 
   @override
+  String get soundTabAll => 'الكل';
+
+  @override
   String get soundPickerEmpty => 'لا توجد أصوات';
 
   @override

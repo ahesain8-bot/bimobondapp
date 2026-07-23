@@ -238,7 +238,7 @@ class CameraStudioOverlay extends StatelessWidget {
           );
     final controlsTop =
         CameraRatioLetterbox.tikTokTopChromeHeight(topPadding) + 16.0;
-    final sideToolbarTop = controlsTop;
+    final sideToolbarTop = controlsTop + 48.0;
 
     return Stack(
       fit: StackFit.expand,
