@@ -106,8 +106,9 @@ class AuctionItem {
     final ownerHandle = auction.host.username?.trim();
     final hasOwnerHandle = ownerHandle != null && ownerHandle.isNotEmpty;
     final image = auction.itemImageUrl?.trim();
-    final targetCoins = auction.pricing?.estimatedBidderSpendCoins?.round() ??
-        auction.targetPriceCoins;
+    final targetCoins = auction.targetPriceCoins > 0
+        ? auction.targetPriceCoins
+        : (auction.pricing?.estimatedBidderSpendCoins?.round() ?? 0);
 
     return AuctionItem(
       id: auction.postId?.isNotEmpty == true ? auction.postId! : auction.id,
@@ -166,7 +167,9 @@ class AuctionItem {
       giftTotalCoins: auction.currentTotalCoins,
       giftCount: auction.giftCount,
       highestPriceCoins: auction.displayHighestPriceCoins,
-      targetPriceCoins: auction.displayBidderSpendCoins.round(),
+      targetPriceCoins: auction.targetPriceCoins > 0
+          ? auction.targetPriceCoins
+          : auction.displayBidderSpendCoins.round(),
       ownerUsername: hasOwnerHandle ? ownerHandle : null,
       ownerFullName: owner?.fullName?.trim().isNotEmpty == true
           ? owner!.fullName!.trim()

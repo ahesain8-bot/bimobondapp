@@ -492,6 +492,12 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
   void openPostSound(PostEntity post) {
     final sound = post.sound;
     if (sound == null || sound.id.isEmpty) return;
-    unawaited(openSoundDetail(context, soundId: sound.id));
+    unawaited(
+      openSoundDetail(
+        context,
+        soundId: sound.id,
+        preferredSegmentId: sound.segmentId,
+      ),
+    );
   }
 }

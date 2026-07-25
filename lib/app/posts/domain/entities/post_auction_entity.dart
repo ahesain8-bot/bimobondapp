@@ -55,9 +55,15 @@ class PostAuctionEntity extends Equatable {
   /// Shown in the "highest price" slot across feed, cards, and live view.
   int get displayHostEarningsCoins => displayHighestPriceCoins;
 
-  /// Shown in the "target price" slot (`pricing.estimatedBidderSpendCoins`).
-  double get displayBidderSpendCoins =>
-      pricing?.estimatedBidderSpendCoins ?? targetPriceCoins.toDouble();
+  /// Shown in the "target price" slot — always coin goal, never fiat.
+  double get displayBidderSpendCoins {
+    final estimated = pricing?.estimatedBidderSpendCoins;
+    if (estimated != null && estimated > 0) return estimated;
+    if (targetPriceCoins > 0) return targetPriceCoins.toDouble();
+    final rate = pricing?.coinsPerPriceUnit ?? 0;
+    if (rate > 0 && targetPrice > 0) return targetPrice * rate;
+    return 0;
+  }
 
   static double _readDouble(dynamic value) {
     if (value is num) return value.toDouble();
@@ -73,6 +79,9 @@ class PostAuctionEntity extends Equatable {
   factory PostAuctionEntity.fromJson(Map<String, dynamic> json) {
     final imageUrl = json['itemImageUrl'];
     final pricingRaw = json['pricing'];
+    final pricing = pricingRaw is Map
+        ? AuctionPricingEntity.fromJson(pricingRaw)
+        : null;
 
     final startingPrice = _readDouble(
       json['startingPrice'] ?? json['startingPriceUsd'],
@@ -80,20 +89,20 @@ class PostAuctionEntity extends Equatable {
     final targetPrice = _readDouble(
       json['targetPrice'] ?? json['targetPriceUsd'],
     );
-    final startingPriceCoins = _readInt(
-      json['startingPriceCoins'] ??
-          json['startingPriceUsd'] ??
-          startingPrice.round(),
+
+    // Never treat fiat/USD fields as coin amounts.
+    final startingPriceCoins = _resolveCoins(
+      explicit: json['startingPriceCoins'],
+      fiat: startingPrice,
+      coinsPerUnit: pricing?.coinsPerPriceUnit,
     );
-    final targetPriceCoins = _readInt(
-      json['targetPriceCoins'] ?? json['targetPriceUsd'] ?? targetPrice.round(),
+    final targetPriceCoins = _resolveCoins(
+      explicit: json['targetPriceCoins'],
+      fiat: targetPrice,
+      coinsPerUnit: pricing?.coinsPerPriceUnit,
+      fallbackCoins: pricing?.estimatedHostEarningsCoins,
     );
-    final currentTotalCoins = _readInt(
-      json['currentTotalCoins'] ??
-          json['currentTotalUsd'] ??
-          json['giftTotalUsd'] ??
-          json['totalGiftsUsd'],
-    );
+    final currentTotalCoins = _readInt(json['currentTotalCoins']);
 
     return PostAuctionEntity(
       id: (json['id'] ?? json['auctionId'])?.toString(),
@@ -116,9 +125,7 @@ class PostAuctionEntity extends Equatable {
                 : 0),
       ),
       status: json['status']?.toString(),
-      pricing: pricingRaw is Map
-          ? AuctionPricingEntity.fromJson(pricingRaw)
-          : null,
+      pricing: pricing,
       startedAt: json['startedAt'] != null
           ? DateTime.parse(json['startedAt'].toString())
           : DateTime.now(),
@@ -126,6 +133,21 @@ class PostAuctionEntity extends Equatable {
           ? DateTime.parse(json['endedAt'].toString())
           : DateTime.now(),
     );
+  }
+
+  /// Prefer explicit coin fields; convert fiat only via [coinsPerUnit].
+  static int _resolveCoins({
+    required dynamic explicit,
+    required double fiat,
+    int? coinsPerUnit,
+    int? fallbackCoins,
+  }) {
+    final fromField = _readInt(explicit);
+    if (fromField > 0) return fromField;
+    if (fallbackCoins != null && fallbackCoins > 0) return fallbackCoins;
+    final rate = coinsPerUnit ?? 0;
+    if (rate > 0 && fiat > 0) return (fiat * rate).round();
+    return 0;
   }
 
   PostAuctionEntity copyWith({

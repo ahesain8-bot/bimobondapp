@@ -9,6 +9,9 @@ class PostSoundEntity extends Equatable {
     this.duration,
     this.useCount,
     this.audioUrl,
+    this.segmentId,
+    this.startMs,
+    this.endMs,
   });
 
   final String id;
@@ -18,10 +21,26 @@ class PostSoundEntity extends Equatable {
   final int? useCount;
   final String? audioUrl;
 
+  /// Attached clip id (`post.soundSegment.id`) when known — Mode A reuse.
+  final String? segmentId;
+
+  /// Inclusive start of the attached clip on [audioUrl].
+  final int? startMs;
+
+  /// Exclusive end of the attached clip on [audioUrl].
+  final int? endMs;
+
   String? get resolvedAudioUrl {
     final url = audioUrl;
     if (url == null || url.isEmpty) return null;
     return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
+  /// True when playback should seek/loop within [startMs, endMs).
+  bool get hasSegmentWindow {
+    final start = startMs;
+    final end = endMs;
+    return start != null && end != null && end > start;
   }
 
   factory PostSoundEntity.fromJson(Map<String, dynamic> json) {
@@ -36,9 +55,26 @@ class PostSoundEntity extends Equatable {
           ? json['useCount'] as int
           : int.tryParse(json['useCount']?.toString() ?? ''),
       audioUrl: json['audioUrl']?.toString(),
+      segmentId: json['segmentId']?.toString() ?? json['soundSegmentId']?.toString(),
+      startMs: json['startMs'] is int
+          ? json['startMs'] as int
+          : int.tryParse(json['startMs']?.toString() ?? ''),
+      endMs: json['endMs'] is int
+          ? json['endMs'] as int
+          : int.tryParse(json['endMs']?.toString() ?? ''),
     );
   }
 
   @override
-  List<Object?> get props => [id, name, author, duration, useCount, audioUrl];
+  List<Object?> get props => [
+        id,
+        name,
+        author,
+        duration,
+        useCount,
+        audioUrl,
+        segmentId,
+        startMs,
+        endMs,
+      ];
 }

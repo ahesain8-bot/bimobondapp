@@ -1,11 +1,24 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// Full-screen cropper for a single image. Returns the cropped PNG bytes via
+class MediaCropResult {
+  const MediaCropResult({
+    required this.bytes,
+    required this.cropRect,
+    required this.sourceSize,
+  });
+
+  final Uint8List bytes;
+  final Rect cropRect;
+  final Size sourceSize;
+}
+
+/// Full-screen cropper for a single image. Returns [MediaCropResult] via
 /// [Navigator.pop], or null when cancelled.
 class MediaCropScreen extends StatefulWidget {
   const MediaCropScreen({super.key, required this.imageBytes});
@@ -20,6 +33,8 @@ class _MediaCropScreenState extends State<MediaCropScreen> {
   final _controller = CropController();
   bool _cropping = false;
   int _ratioIndex = 0;
+  Rect? _imageCropRect;
+  Size _sourceSize = Size.zero;
 
   static const _ratios = <_CropRatio>[
     _CropRatio('Free', null),
@@ -29,6 +44,26 @@ class _MediaCropScreenState extends State<MediaCropScreen> {
     _CropRatio('16:9', 16 / 9),
     _CropRatio('9:16', 9 / 16),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSourceSize();
+  }
+
+  Future<void> _loadSourceSize() async {
+    final codec = await ui.instantiateImageCodec(widget.imageBytes);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    if (!mounted) {
+      image.dispose();
+      return;
+    }
+    setState(() {
+      _sourceSize = Size(image.width.toDouble(), image.height.toDouble());
+    });
+    image.dispose();
+  }
 
   void _selectRatio(int index) {
     setState(() => _ratioIndex = index);
@@ -78,8 +113,6 @@ class _MediaCropScreenState extends State<MediaCropScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Show the photo immediately so there is no black flash while
-                  // the Crop widget decodes the same bytes on first frame.
                   Image.memory(
                     widget.imageBytes,
                     fit: BoxFit.contain,
@@ -95,10 +128,34 @@ class _MediaCropScreenState extends State<MediaCropScreen> {
                     cornerDotBuilder: (size, edgeAlignment) => const DotControl(
                       color: Colors.white,
                     ),
+                    onMoved: (_, imageRect) {
+                      _imageCropRect = imageRect;
+                    },
                     onCropped: (result) {
                       switch (result) {
                         case CropSuccess(:final croppedImage):
-                          Navigator.of(context).pop(croppedImage);
+                          final crop = _imageCropRect;
+                          final size = _sourceSize;
+                          if (crop == null ||
+                              size == Size.zero ||
+                              crop.width <= 0 ||
+                              crop.height <= 0) {
+                            Navigator.of(context).pop(
+                              MediaCropResult(
+                                bytes: croppedImage,
+                                cropRect: Offset.zero & size,
+                                sourceSize: size,
+                              ),
+                            );
+                          } else {
+                            Navigator.of(context).pop(
+                              MediaCropResult(
+                                bytes: croppedImage,
+                                cropRect: crop,
+                                sourceSize: size,
+                              ),
+                            );
+                          }
                         case CropFailure():
                           if (mounted) setState(() => _cropping = false);
                       }

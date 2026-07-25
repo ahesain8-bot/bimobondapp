@@ -19,6 +19,7 @@ Future<SoundEntity?> openSoundDetail(
   required String soundId,
   bool pickMode = false,
   SoundEntity? preview,
+  String? preferredSegmentId,
 }) async {
   if (soundId.isEmpty) return null;
 
@@ -35,6 +36,7 @@ Future<SoundEntity?> openSoundDetail(
           soundId: soundId,
           pickMode: pickMode,
           previewSound: preview,
+          preferredSegmentId: preferredSegmentId,
         ),
       ),
     );

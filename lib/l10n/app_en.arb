@@ -1616,6 +1616,7 @@
   "soundTabForYou": "For You",
   "soundTabFavorites": "Favorites",
   "soundTabRecent": "Recent",
+  "soundTabAll": "All",
   "soundPickerEmpty": "No sounds found",
   "soundPickFromFiles": "Pick from files",
   "soundTrimTooltip": "Trim",

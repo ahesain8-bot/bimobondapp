@@ -8,9 +8,8 @@ import 'package:path_provider/path_provider.dart';
 
 /// Bakes text stickers onto an image at full resolution.
 ///
-/// The overlays are positioned as fractions of the on-screen preview box, which
-/// shows the image with [BoxFit.cover]. We reproduce that exact mapping here so
-/// the baked result matches what the user placed on screen (WYSIWYG).
+/// Overlay centers are image-normalized. [previewSize] scales font size so
+/// baked text matches on-screen size.
 class MediaTextBaker {
   const MediaTextBaker._();
 
@@ -36,13 +35,10 @@ class MediaTextBaker {
       return input;
     }
 
-    // BoxFit.cover mapping: logical preview px per image px.
-    final displayScale = _maxOf(
+    final displayScale = _minOf(
       previewSize.width / imgW,
       previewSize.height / imgH,
     );
-    final dispLeft = (previewSize.width - imgW * displayScale) / 2;
-    final dispTop = (previewSize.height - imgH * displayScale) / 2;
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -54,8 +50,6 @@ class MediaTextBaker {
       previewSize: previewSize,
       imgW: imgW,
       imgH: imgH,
-      dispLeft: dispLeft,
-      dispTop: dispTop,
       displayScale: displayScale,
     );
 
@@ -74,11 +68,8 @@ class MediaTextBaker {
     return file;
   }
 
-  /// Renders the text overlays onto a TRANSPARENT canvas of [frameSize] (the
-  /// video's pixel resolution) using the same on-screen [previewSize] cover
-  /// mapping. The result is a full-frame PNG meant to be stretched over a video
-  /// (see [NativeVideoProcessor.renderVideoEdits]). Returns null if there is
-  /// nothing to draw.
+  /// Renders text overlays onto a transparent canvas of [frameSize].
+  /// Centers are image-normalized; [previewSize] scales font size.
   static Future<File?> bakeOverlayPng({
     required List<MediaTextOverlay> overlays,
     required Size previewSize,
@@ -99,8 +90,6 @@ class MediaTextBaker {
       previewSize.width / imgW,
       previewSize.height / imgH,
     );
-    final dispLeft = (previewSize.width - imgW * displayScale) / 2;
-    final dispTop = (previewSize.height - imgH * displayScale) / 2;
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -111,8 +100,6 @@ class MediaTextBaker {
       previewSize: previewSize,
       imgW: imgW,
       imgH: imgH,
-      dispLeft: dispLeft,
-      dispTop: dispTop,
       displayScale: displayScale,
     );
 
@@ -136,21 +123,14 @@ class MediaTextBaker {
     required Size previewSize,
     required double imgW,
     required double imgH,
-    required double dispLeft,
-    required double dispTop,
     required double displayScale,
   }) {
     for (final overlay in overlays) {
       final text = overlay.text.trim();
       if (text.isEmpty) continue;
 
-      // Preview-box point -> image pixel point.
-      final previewPoint = Offset(
-        overlay.center.dx * previewSize.width,
-        overlay.center.dy * previewSize.height,
-      );
-      final imgX = (previewPoint.dx - dispLeft) / displayScale;
-      final imgY = (previewPoint.dy - dispTop) / displayScale;
+      final imgX = overlay.center.dx * imgW;
+      final imgY = overlay.center.dy * imgH;
 
       final fontSize = overlay.fontSize / displayScale;
       final maxWidth = (previewSize.width * 0.9) / displayScale;
@@ -219,4 +199,6 @@ class MediaTextBaker {
   }
 
   static double _maxOf(double a, double b) => a > b ? a : b;
+
+  static double _minOf(double a, double b) => a < b ? a : b;
 }

@@ -1,71 +1,20 @@
 import 'dart:convert';
 
-// ---------------------------------------------------------------------------
-// COLOR FILTERS CATALOG — Backend API Contract + App Model
-// ---------------------------------------------------------------------------
+// =============================================================================
+// BEAUTY FILTERS CATALOG — Backend API Contract + App Model
+// =============================================================================
 //
-// Full spec: docs/backend-ar-camera-api.md
+// Filters are TikTok-style beauty presets. Dashboard sends numbers + thumbnail.
+// NO .cube, NO lutUrl, NO LUT PNG.
 //
-// ENDPOINT
-//   GET /camera-studio/color-filters
-//   Optional wrapper: { "data": { …catalog… } }
-//   Offline fallback in app: ar_color_filter_bundled_catalog.dart
+// ENDPOINT: GET /camera-studio/color-filters
+// Offline: ar_color_filter_bundled_catalog.dart
 //
-// WHAT THIS POWERS
-//   Filters panel in AR camera (Portrait, Life, Retro, Film tabs).
-//   Every filter is a 3D LUT applied on the GPU (PNG texture) — NOT colorMatrix.
+ // Required filter fields (flat):
+//   id, label, type ("beauty"), thumbnailUrl (or emoji offline),
+//   smooth, whiten, brighten, blush, lipTint, lipStrength, defaultIntensity
 //
-// ── BACKEND: HOW TO ADD / UPDATE A FILTER (dashboard) ─────────────────────
-//
-//   1. Pick category: portrait | life | retro | film  (or create a new one)
-//   2. Set unique `id` (snake_case) — do NOT rename after release (native maps by id)
-//   3. Set label, sortOrder, emoji, previewColorHex, thumbnailUrl (carousel icon)
-//   4. Upload a .cube file from Lightroom / Photoshop (designer source)
-//   5. Backend converts .cube → 512×512 PNG and stores on CDN
-//   6. Return lutUrl in JSON (required for online dynamic filters)
-//   7. Optional lutAsset = bundled filename for offline app builds
-//   8. Bump top-level `version` whenever the catalog changes
-//
-// ── DASHBOARD UPLOADS ───────────────────────────────────────────────────────
-//
-//   Designer uploads:  .cube file  (stored on server only — never sent to app)
-//   Backend produces: 512×512 PNG on CDN → lutUrl
-//   Optional:          thumbnail JPG/PNG → thumbnailUrl
-//   API JSON fields:   id, label, category, sortOrder, emoji, previewColorHex,
-//                      renderType: "lut", lutUrl, lutAsset
-//
-// ── .cube → PNG PIPELINE (backend job, not mobile) ────────────────────────
-//
-//   .cube upload → convert to 512×512 PNG (GPUImage layout: 8×8 tiles of 64×64)
-//   → upload PNG to CDN → set lutUrl in API response
-//   Dev conversion tool in repo:
-//     dart run tool/cube_to_lut_png.dart "input.cube" assets/luts/output.png
-//
-// ── EXAMPLE: dynamic Film filter (replaces static bundled list) ───────────
-//
-// {
-//   "id": "going_for_a_walk",
-//   "label": "Going for a Walk",
-//   "renderType": "lut",
-//   "sortOrder": 0,
-//   "emoji": "🚶",
-//   "previewColorHex": "#A8B89A",
-//   "thumbnailUrl": "https://cdn.example.com/thumbs/going_for_a_walk.jpg",
-//   "lutUrl": "https://cdn.example.com/luts/going_for_a_walk.png",
-//   "lutAsset": "going_for_a_walk.png"
-// }
-//
-// App behaviour:
-//   • Online: downloads/applies PNG from lutUrl
-//   • Offline / bundled: uses assets/luts/{lutAsset} if present
-//   • Film category filters are loaded from this API — not hardcoded in app
-//
-// ── LUT PNG RULES ─────────────────────────────────────────────────────────
-//
-//   Size:     512 × 512 px, 8-bit RGB PNG
-//   Layout:   GPUImage 64³ cube (must match tool/cube_to_lut_png.dart output)
-//   Filename: lowercase_snake_case.png
-//   Mobile app NEVER parses .cube at runtime.
+// =============================================================================
 
 class ArColorFilterCatalog {
   const ArColorFilterCatalog({
@@ -115,6 +64,15 @@ class ArColorFilterCatalog {
     }
     throw const FormatException('Invalid color filter catalog');
   }
+
+  ArColorFilterItemModel? findFilter(String id) {
+    for (final category in categories) {
+      for (final filter in category.filters) {
+        if (filter.id == id) return filter;
+      }
+    }
+    return null;
+  }
 }
 
 class ArColorFilterCategoryModel {
@@ -159,92 +117,179 @@ class ArColorFilterCategoryModel {
       };
 }
 
-/// All color filters use 3D LUT PNGs. [ArColorFilterRenderType.lut] only.
 enum ArColorFilterRenderType {
-  lut;
+  beauty;
 
   static ArColorFilterRenderType fromJson(dynamic raw) {
-    final s = raw?.toString().toLowerCase();
-    if (s == 'lut') return ArColorFilterRenderType.lut;
-    // Legacy API may omit renderType when lutUrl/lutAsset is present.
-    return ArColorFilterRenderType.lut;
+    return ArColorFilterRenderType.beauty;
   }
 
-  String toJson() => 'lut';
+  String toJson() => 'beauty';
+}
+
+class ArBeautyFilterParams {
+  const ArBeautyFilterParams({
+    required this.smooth,
+    required this.whiten,
+    required this.brighten,
+    required this.blush,
+    required this.lipTint,
+    required this.lipStrength,
+    this.brightness = 0,
+    this.contrast = 0,
+    this.saturation = 0,
+    this.warmth = 0,
+  });
+
+  final double smooth;
+  final double whiten;
+  final double brighten;
+  final double blush;
+  final String lipTint;
+  final double lipStrength;
+
+  /// Color grade (-1..1, 0 = neutral) — same engine as the Face retouch
+  /// sliders (ArCameraBridge.setRetouchAdjustments), already proven stable.
+  /// Lets a filter be a pure color look (e.g. "Fade") with no beauty effect.
+  final double brightness;
+  final double contrast;
+  final double saturation;
+  final double warmth;
+
+  bool get hasColorGrade =>
+      brightness != 0 || contrast != 0 || saturation != 0 || warmth != 0;
+
+  static const ArBeautyFilterParams defaults = ArBeautyFilterParams(
+    smooth: 0.55,
+    whiten: 0.55,
+    brighten: 0.40,
+    blush: 0.20,
+    lipTint: '#E8527A',
+    lipStrength: 0.40,
+  );
+
+  factory ArBeautyFilterParams.fromJson(Map<String, dynamic> json) {
+    return ArBeautyFilterParams(
+      smooth: _readDouble01(json['smooth'], fallback: defaults.smooth),
+      whiten: _readDouble01(json['whiten'], fallback: defaults.whiten),
+      brighten: _readDouble01(json['brighten'], fallback: defaults.brighten),
+      blush: _readDouble01(json['blush'], fallback: defaults.blush),
+      lipTint: _readLipTint(json['lipTint']),
+      lipStrength:
+          _readDouble01(json['lipStrength'], fallback: defaults.lipStrength),
+      brightness: _readDoubleSigned(json['brightness'], fallback: 0),
+      contrast: _readDoubleSigned(json['contrast'], fallback: 0),
+      saturation: _readDoubleSigned(json['saturation'], fallback: 0),
+      warmth: _readDoubleSigned(json['warmth'], fallback: 0),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'smooth': smooth,
+        'whiten': whiten,
+        'brighten': brighten,
+        'blush': blush,
+        'lipTint': lipTint,
+        'lipStrength': lipStrength,
+        'brightness': brightness,
+        'contrast': contrast,
+        'saturation': saturation,
+        'warmth': warmth,
+      };
 }
 
 class ArColorFilterItemModel {
   const ArColorFilterItemModel({
     required this.id,
     required this.label,
-    this.renderType = ArColorFilterRenderType.lut,
-    this.lutUrl,
-    this.lutAsset,
+    this.type = ArColorFilterRenderType.beauty,
     this.thumbnailUrl,
     this.emoji,
     this.previewColorHex,
+    this.defaultIntensity = 0.7,
+    this.params,
     this.sortOrder = 0,
   });
 
   final String id;
   final String label;
-
-  /// Always [ArColorFilterRenderType.lut] for color filters.
-  final ArColorFilterRenderType renderType;
-
-  /// HTTPS URL to 512×512 LUT PNG on CDN. Required for server-driven filters.
-  final String? lutUrl;
-
-  /// Bundled filename under assets/luts/ for offline fallback, e.g. warm.png
-  final String? lutAsset;
-
-  /// Small image for filter carousel (optional — emoji used if missing).
+  final ArColorFilterRenderType type;
   final String? thumbnailUrl;
-
   final String? emoji;
   final String? previewColorHex;
+  final double defaultIntensity;
+  final ArBeautyFilterParams? params;
   final int sortOrder;
 
+  bool get isBeauty => true;
+
+  ArColorFilterRenderType get renderType => type;
+
   factory ArColorFilterItemModel.fromJson(Map<String, dynamic> json) {
-    final lutUrl = json['lutUrl']?.toString();
-    final lutAsset = json['lutAsset']?.toString();
+    final paramsRaw = json['params'];
+    final source = paramsRaw is Map
+        ? Map<String, dynamic>.from(paramsRaw)
+        : json;
+
     return ArColorFilterItemModel(
       id: json['id']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
-      renderType: json.containsKey('renderType')
-          ? ArColorFilterRenderType.fromJson(json['renderType'])
-          : (lutUrl != null || lutAsset != null)
-              ? ArColorFilterRenderType.lut
-              : ArColorFilterRenderType.lut,
-      lutUrl: lutUrl,
-      lutAsset: lutAsset,
+      type: ArColorFilterRenderType.beauty,
       thumbnailUrl: json['thumbnailUrl']?.toString(),
       emoji: json['emoji']?.toString(),
       previewColorHex: json['previewColorHex']?.toString(),
+      defaultIntensity:
+          _readDouble01(json['defaultIntensity'], fallback: 0.7),
+      params: ArBeautyFilterParams.fromJson(source),
       sortOrder: _readInt(json['sortOrder']),
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'label': label,
-        'renderType': renderType.toJson(),
-        if (lutUrl != null) 'lutUrl': lutUrl,
-        if (lutAsset != null) 'lutAsset': lutAsset,
-        if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
-        if (emoji != null) 'emoji': emoji,
-        if (previewColorHex != null) 'previewColorHex': previewColorHex,
-        'sortOrder': sortOrder,
-      };
+  Map<String, dynamic> toJson() {
+    final p = params ?? ArBeautyFilterParams.defaults;
+    return {
+      'id': id,
+      'label': label,
+      'type': 'beauty',
+      if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+      if (emoji != null) 'emoji': emoji,
+      if (previewColorHex != null) 'previewColorHex': previewColorHex,
+      'smooth': p.smooth,
+      'whiten': p.whiten,
+      'brighten': p.brighten,
+      'blush': p.blush,
+      'lipTint': p.lipTint,
+      'lipStrength': p.lipStrength,
+      'defaultIntensity': defaultIntensity,
+      if (sortOrder != 0) 'sortOrder': sortOrder,
+    };
+  }
 
-  /// Server filter is valid when at least one LUT source is provided.
-  bool get hasValidLut =>
-      (lutUrl != null && lutUrl!.isNotEmpty) ||
-      (lutAsset != null && lutAsset!.isNotEmpty);
+  bool get hasValidBeauty =>
+      id.trim().isNotEmpty &&
+      label.trim().isNotEmpty &&
+      ((thumbnailUrl ?? '').trim().isNotEmpty ||
+          (emoji ?? '').trim().isNotEmpty);
+}
 
-  /// Bundled asset path used by native Kotlin when lutUrl is unavailable.
-  String? get bundledLutPath =>
-      lutAsset != null && lutAsset!.isNotEmpty ? 'assets/luts/$lutAsset' : null;
+extension ArColorFilterCatalogBeautySanitize on ArColorFilterCatalog {
+  ArColorFilterCatalog withValidBeautyOnly() {
+    return ArColorFilterCatalog(
+      version: version,
+      categories: [
+        for (final category in categories)
+          ArColorFilterCategoryModel(
+            id: category.id,
+            label: category.label,
+            sortOrder: category.sortOrder,
+            filters: [
+              for (final filter in category.filters)
+                if (filter.hasValidBeauty) filter,
+            ],
+          ),
+      ],
+    );
+  }
 }
 
 int _readInt(dynamic value) {
@@ -252,4 +297,43 @@ int _readInt(dynamic value) {
   if (value is num) return value.round();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// Like [_readDouble01] but allows negative values (-1..1) — for color-grade
+/// fields (brightness/contrast/saturation/warmth) where 0 is neutral and both
+/// directions are meaningful, unlike the 0..1-only beauty strength fields.
+double _readDoubleSigned(dynamic value, {required double fallback}) {
+  double parsed;
+  if (value is num) {
+    parsed = value.toDouble();
+  } else if (value is String) {
+    parsed = double.tryParse(value) ?? fallback;
+  } else {
+    return fallback;
+  }
+  if (parsed < -1) return -1;
+  if (parsed > 1) return 1;
+  return parsed;
+}
+
+double _readDouble01(dynamic value, {required double fallback}) {
+  double parsed;
+  if (value is num) {
+    parsed = value.toDouble();
+  } else if (value is String) {
+    parsed = double.tryParse(value) ?? fallback;
+  } else {
+    return fallback;
+  }
+  if (parsed < 0) return 0;
+  if (parsed > 1) return 1;
+  return parsed;
+}
+
+String _readLipTint(dynamic value) {
+  final raw = value?.toString().trim() ?? '';
+  if (raw.isEmpty) return ArBeautyFilterParams.defaults.lipTint;
+  final hex = raw.startsWith('#') ? raw : '#$raw';
+  if (hex.length == 7) return hex.toUpperCase();
+  return ArBeautyFilterParams.defaults.lipTint;
 }

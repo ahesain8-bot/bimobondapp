@@ -31,25 +31,30 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
         ? json['data'] as Map<String, dynamic>
         : json;
 
+    final pricing = data['pricing'] is Map
+        ? AuctionPricingEntity.fromJson(data['pricing'])
+        : null;
+
     final targetPrice = _readDouble(
       data['targetPrice'] ?? data['targetPriceUsd'],
-    );
-    final targetPriceCoins = _readInt(
-      data['targetPriceCoins'] ?? data['targetPriceUsd'] ?? targetPrice.round(),
     );
     final startingPrice = _readDouble(
       data['startingPrice'] ?? data['startingPriceUsd'],
     );
-    final startingPriceCoins = _readInt(
-      data['startingPriceCoins'] ??
-          data['startingPriceUsd'] ??
-          startingPrice.round(),
+
+    // Never treat fiat/USD fields as coin amounts.
+    final targetPriceCoins = _resolveCoins(
+      explicit: data['targetPriceCoins'],
+      fiat: targetPrice,
+      coinsPerUnit: pricing?.coinsPerPriceUnit,
+      fallbackCoins: pricing?.estimatedHostEarningsCoins,
     );
-    final currentTotalCoins = _readInt(
-      data['currentTotalCoins'] ??
-          data['currentTotalUsd'] ??
-          data['giftTotalUsd'],
+    final startingPriceCoins = _resolveCoins(
+      explicit: data['startingPriceCoins'],
+      fiat: startingPrice,
+      coinsPerUnit: pricing?.coinsPerPriceUnit,
     );
+    final currentTotalCoins = _readInt(data['currentTotalCoins']);
     final giftTransactions = _parseTransactions(data['giftTransactions']);
     final countRaw = data['_count'];
     final giftCount = countRaw is Map
@@ -70,9 +75,7 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
           ? _parseUser(Map<String, dynamic>.from(data['winner'] as Map))
           : null,
       giftTransactions: giftTransactions,
-      pricing: data['pricing'] is Map
-          ? AuctionPricingEntity.fromJson(data['pricing'])
-          : null,
+      pricing: pricing,
       postId: data['postId']?.toString(),
       liveId: data['liveId']?.toString(),
       itemImageUrl: data['itemImageUrl']?.toString(),
@@ -83,6 +86,20 @@ class AuctionDetailsModel extends AuctionDetailsEntity {
       endedAt: DateTime.tryParse(data['endedAt']?.toString() ?? ''),
       giftCount: giftCount,
     );
+  }
+
+  static int _resolveCoins({
+    required dynamic explicit,
+    required double fiat,
+    int? coinsPerUnit,
+    int? fallbackCoins,
+  }) {
+    final fromField = _readInt(explicit);
+    if (fromField > 0) return fromField;
+    if (fallbackCoins != null && fallbackCoins > 0) return fallbackCoins;
+    final rate = coinsPerUnit ?? 0;
+    if (rate > 0 && fiat > 0) return (fiat * rate).round();
+    return 0;
   }
 
   static double _readDouble(dynamic value) {

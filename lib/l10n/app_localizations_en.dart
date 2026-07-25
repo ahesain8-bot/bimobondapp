@@ -3624,6 +3624,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get soundTabRecent => 'Recent';
 
   @override
+  String get soundTabAll => 'All';
+
+  @override
   String get soundPickerEmpty => 'No sounds found';
 
   @override

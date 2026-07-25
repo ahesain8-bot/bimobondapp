@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
@@ -48,6 +49,7 @@ class AddPostCameraScreen extends StatefulWidget {
     super.key,
     this.isStory = false,
     this.initialSound,
+    this.initialSoundSegmentId,
     this.returnMediaOnDone = false,
     this.initialFilterName,
     this.initialFilterCategory,
@@ -55,6 +57,8 @@ class AddPostCameraScreen extends StatefulWidget {
 
   final bool isStory;
   final SoundEntity? initialSound;
+  /// Mode A clip id when reusing another post’s exact segment.
+  final String? initialSoundSegmentId;
   final bool returnMediaOnDone;
   final String? initialFilterName;
   final CameraFilterCategory? initialFilterCategory;
@@ -142,6 +146,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   SoundEntity? _selectedSound;
   Duration _soundStartOffset = Duration.zero;
   Duration _soundWindow = const Duration(seconds: 15);
+  bool _soundDidTrim = false;
+  String? _pickedSoundSegmentId;
   bool _muteOriginalAudio = false;
   File? _storyCapturedFile;
   String? _storyCapturedType;
@@ -151,7 +157,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _isFrontCamera = false;
   int _workspaceTabIndex = 0;
   int _arFilterIndex = 0;
-  String _arColorCategoryId = 'portrait';
+  String _arColorCategoryId = 'beauty';
   double _arFilterIntensity = 1.0;
   double _arSwipeDrag = 0;
   double _pinchBaseZoom = CameraStudioConstants.zoomSteps[1].value;
@@ -167,6 +173,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void initState() {
     super.initState();
     _selectedSound = widget.initialSound;
+    _pickedSoundSegmentId = widget.initialSoundSegmentId?.trim().isNotEmpty == true
+        ? widget.initialSoundSegmentId!.trim()
+        : null;
     if (widget.initialFilterName != null &&
         CameraFilterCatalog.isUsableFilterName(widget.initialFilterName)) {
       _selectedFilter = CameraFilterCatalog.filterByName(
@@ -189,7 +198,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.installPlatformCallbacks();
       ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
-      ArCameraBridge.setFilter(ArFilterCatalog.items[_arFilterIndex].id);
+      _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
     }
     unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
     unawaited(_loadCatalog());
@@ -220,6 +229,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void dispose() {
     _recordTimer?.cancel();
     _countdownTimer?.cancel();
+    _arFilterIntensityDebounce?.cancel();
     unawaited(SoundAudioPreview.stop());
     _clearLayoutCapture();
     if (_useNativeArFilters) {
@@ -281,6 +291,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         sound: result.sound ?? _selectedSound,
         soundOffset: result.soundOffset,
         soundWindow: result.soundWindow,
+        soundDidTrim: result.soundDidTrim || _soundDidTrim,
+        soundSegmentId: result.soundSegmentId ?? _pickedSoundSegmentId,
       ),
     );
   }
@@ -296,7 +308,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       final arId = ArFilterCatalog.items[_arFilterIndex].id;
       final category = ArFilterCatalog.isColorFilter(arId)
           ? _arColorCategoryId
-          : 'portrait';
+          : 'beauty';
       return MediaEditorSeed(
         arFilterId: arId,
         arColorCategoryId: category,
@@ -381,7 +393,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       if (_useNativeArFilters) {
         if (next) {
           _arFilterIndex = ArFilterCatalog.indexOfId('whitening');
-          _arColorCategoryId = 'portrait';
+          _arColorCategoryId = 'beauty';
         } else if (ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
           _arFilterIndex = 0;
         }
@@ -391,7 +403,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       final id = ArFilterCatalog.items[_arFilterIndex].id;
       final intensity =
           ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
-      ArCameraBridge.setFilter(id, intensity: intensity);
+      _applyArFilter(id, intensity: intensity);
     } else {
       unawaited(_applyBeauty(next));
     }
@@ -421,7 +433,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     });
     if (_useNativeArFilters) {
       ArCameraBridge.clearRetouchAdjustments();
-      ArCameraBridge.setFilter('none');
+      _applyArFilter('none');
     } else {
       unawaited(_applyBeauty(false));
     }
@@ -437,14 +449,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         }
       } else {
         _arFilterIndex = ArFilterCatalog.indexOfId(id);
-        _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        _arColorCategoryId = 'beauty';
         _photoEditorMagicOn = false;
       }
     });
     final applied = ArFilterCatalog.items[_arFilterIndex].id;
     final intensity =
         ArFilterCatalog.isColorFilter(applied) ? _arFilterIntensity : 1.0;
-    ArCameraBridge.setFilter(applied, intensity: intensity);
+    _applyArFilter(applied, intensity: intensity);
   }
 
   Future<void> _reapplySelectedFilter() async {
@@ -509,6 +521,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         'type': MediaGalleryImportFlow.resolvePostType(edited.files),
         'isStory': false,
         'initialSound': edited.sound ?? _selectedSound,
+        'initialSoundOffset': edited.soundOffset,
+        'initialSoundWindow': edited.soundWindow,
+        'initialSoundDidTrim': edited.soundDidTrim || _soundDidTrim,
+        'initialSoundSegmentId':
+            edited.soundSegmentId ?? _pickedSoundSegmentId,
         if (edited.filterName != null) 'filterName': edited.filterName,
         'filterCategory': edited.filterCategory.name,
         if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
@@ -538,6 +555,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           ? picked.window
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
+      _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
+      final seg = picked.soundSegmentId?.trim();
+      final defaultId = sound.defaultSegment?.id.trim();
+      _pickedSoundSegmentId =
+          (seg != null && seg.isNotEmpty && seg != defaultId) ? seg : null;
     });
     // Preview only inside the picker/trim sheets — stop once the user continues.
     await SoundAudioPreview.stop();
@@ -550,6 +572,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _soundStartOffset = Duration.zero;
       _soundWindow = const Duration(seconds: 15);
       _muteOriginalAudio = false;
+      _soundDidTrim = false;
+      _pickedSoundSegmentId = null;
     });
   }
 
@@ -1296,11 +1320,51 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         ? _arFilterIntensity
         : 1.0;
     if (clamped == _arFilterIndex) {
-      ArCameraBridge.setFilter(id, intensity: intensity);
+      _applyArFilter(id, intensity: intensity);
       return;
     }
     setState(() => _arFilterIndex = clamped);
+    _applyArFilter(id, intensity: intensity);
+  }
+
+  /// Single entry point for applying a filter id to the native camera —
+  /// forwards AR-effect ids (glasses, stickers, distortion) via setFilter as
+  /// before, and additionally pushes named beauty-preset params (Soft Glow,
+  /// Pure, Rosy, Clean, ...) when [id] is one of those, or clears them when
+  /// it isn't. Keeps every call site consistent instead of duplicating this.
+  void _applyArFilter(String id, {double intensity = 1.0}) {
+    // Identity change (switching filters) — setFilter re-triggers native
+    // render-mode logic, so only call it here, never on intensity-only
+    // updates (see _onArFilterIntensityChanged), or a slider drag ends up
+    // spamming it dozens of times a second.
     ArCameraBridge.setFilter(id, intensity: intensity);
+    _pushBeautyParams(ArFilterCatalog.colorFilterById(id)?.params, intensity);
+  }
+
+  void _pushBeautyParams(ArBeautyFilterParams? params, double intensity) {
+    if (params != null) {
+      ArCameraBridge.setBeautyFilter(
+        smooth: params.smooth,
+        whiten: params.whiten,
+        brighten: params.brighten,
+        blush: params.blush,
+        lipTint: params.lipTint,
+        lipStrength: params.lipStrength,
+        intensity: intensity,
+      );
+      // Color grade (Fade/Fade Warm/Fade Cool) — same engine as the Face
+      // retouch sliders. Always set explicitly (even when all-zero, e.g.
+      // "Normal") so a previously selected grade doesn't linger.
+      ArCameraBridge.setRetouchAdjustments(
+        brightness: params.brightness * intensity,
+        contrast: params.contrast * intensity,
+        saturation: params.saturation * intensity,
+        whiteBalance: params.warmth * intensity,
+      );
+    } else {
+      ArCameraBridge.clearBeautyFilter();
+      ArCameraBridge.clearRetouchAdjustments();
+    }
   }
 
   void _onArColorCategorySelected(String categoryId) {
@@ -1308,9 +1372,22 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     setState(() => _arColorCategoryId = categoryId);
   }
 
+  Timer? _arFilterIntensityDebounce;
+
   void _onArFilterIntensityChanged(double value) {
-    setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
-    ArCameraBridge.setFilterIntensity(_arFilterIntensity);
+    final clamped = value.clamp(0.0, 1.0);
+    // Slider fires on every pixel of drag movement — keep the visible thumb
+    // instant (setState below), but debounce the native push (was sending
+    // setFilter + setBeautyFilter + setRetouchAdjustments on every tick,
+    // which is what caused the freeze while dragging).
+    setState(() => _arFilterIntensity = clamped);
+    ArCameraBridge.setFilterIntensity(clamped);
+    final id = ArFilterCatalog.items[_arFilterIndex].id;
+    if (!ArFilterCatalog.isColorFilter(id)) return;
+    _arFilterIntensityDebounce?.cancel();
+    _arFilterIntensityDebounce = Timer(const Duration(milliseconds: 40), () {
+      _pushBeautyParams(ArFilterCatalog.colorFilterById(id)?.params, clamped);
+    });
   }
 
   void _onArPreviewSwipeEnd(DragEndDetails details) {
@@ -2065,6 +2142,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         file: _storyCapturedFile!,
         type: _storyCapturedType!,
         sound: _selectedSound,
+        soundOffset: _soundStartOffset,
+        soundWindow: _soundWindow,
+        soundDidTrim: _soundDidTrim,
+        soundSegmentId: _pickedSoundSegmentId,
         onRetake: _retakeStory,
       );
     }

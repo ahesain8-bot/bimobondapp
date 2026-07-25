@@ -1,7 +1,7 @@
 ﻿import 'dart:async';
-import 'dart:ui';
 
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
@@ -273,6 +273,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
       if (found != null && found!.isNotEmpty && mounted) {
         setState(() => _resolvedAuctionId = found);
+        // Rejoin with the real auction UUID once resolved.
+        unawaited(_ensureAuctionRoomsJoined());
       }
       completer.complete(found);
       return found;
@@ -428,6 +430,55 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (comment.parentId != null) return;
     if (_postComments.any((existing) => existing.id == comment.id)) return;
 
+    // Avoid duplicate gift bubbles when optimistic + socket + HTTP refetch
+    // arrive with different ids for the same send.
+    if (comment.isGift) {
+      final senderId = comment.user.id;
+      final giftName = comment.giftName?.trim().toLowerCase() ?? '';
+      final alreadyShown = _postComments.any((existing) {
+        if (!existing.isGift) return false;
+        if (senderId.isNotEmpty && existing.user.id != senderId) return false;
+        if (giftName.isNotEmpty) {
+          final existingName = existing.giftName?.trim().toLowerCase() ?? '';
+          if (existingName.isNotEmpty && existingName != giftName) return false;
+        }
+        final existingAt = DateTime.tryParse(existing.createdAt);
+        final incomingAt = DateTime.tryParse(comment.createdAt);
+        if (existingAt != null && incomingAt != null) {
+          return existingAt.difference(incomingAt).abs() <
+              const Duration(seconds: 8);
+        }
+        return existing.id.startsWith('local-gift-') ||
+            existing.id.startsWith('socket-gift-') ||
+            comment.id.startsWith('local-gift-') ||
+            comment.id.startsWith('socket-gift-');
+      });
+      if (alreadyShown) {
+        // Prefer the server comment over a temporary local/socket placeholder.
+        if (!comment.id.startsWith('local-gift-') &&
+            !comment.id.startsWith('socket-gift-')) {
+          setState(() {
+            _postComments.removeWhere(
+              (existing) =>
+                  existing.isGift &&
+                  (existing.id.startsWith('local-gift-') ||
+                      existing.id.startsWith('socket-gift-')) &&
+                  (senderId.isEmpty || existing.user.id == senderId) &&
+                  (giftName.isEmpty ||
+                      (existing.giftName?.trim().toLowerCase() ?? '') ==
+                          giftName),
+            );
+            final updated = sortCommentsOldest([..._postComments, comment]);
+            _postComments
+              ..clear()
+              ..addAll(updated);
+          });
+          _scrollChatToBottom();
+        }
+        return;
+      }
+    }
+
     setState(() {
       // Sort a copy first — clearing `_postComments` before sort wiped the
       // new comment (gifts looked fine because they refetch the list).
@@ -464,21 +515,60 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       shouldAnimateBid = true;
       _refreshAuctionComments();
       final gift = payload.lastGift!;
+      final giftName = gift['name']?.toString();
+      final thumb =
+          (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
+              ?.toString();
+      final animationUrl =
+          (gift['animationUrl'] ?? gift['animation_url'])?.toString();
+      final senderFullName =
+          (gift['senderFullName'] ??
+                  gift['senderName'] ??
+                  gift['fullName'] ??
+                  gift['nameSender'])
+              ?.toString();
+      final senderUsername =
+          (gift['senderUsername'] ?? gift['username'])?.toString();
+      final senderId =
+          (gift['senderId'] ?? gift['userId'])?.toString() ?? '';
+
+      // auctionUpdated gift variant may omit lastComment — still show in list.
+      if (payload.lastComment == null) {
+        final postId = widget.post?.id;
+        if (postId != null) {
+          final giftId =
+              (gift['giftId'] ?? gift['id'])?.toString() ?? 'unknown';
+          final now = DateTime.now().toUtc().toIso8601String();
+          _appendCommentIfNew(
+            CommentEntity(
+              id: 'socket-gift-$giftId-$senderId-$now',
+              content: giftName != null && giftName.isNotEmpty
+                  ? 'Sent $giftName'
+                  : '',
+              postId: postId,
+              user: UserEntity(
+                id: senderId,
+                username: senderUsername,
+                fullName: senderFullName,
+              ),
+              isGift: true,
+              giftName: giftName,
+              giftThumbnailUrl: thumb,
+              giftAnimationUrl: animationUrl,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        }
+      }
+
       _playGiftAnimation(
-        animationUrl: (gift['animationUrl'] ?? gift['animation_url'])
-            ?.toString(),
-        thumbnailUrl:
-            (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
-                ?.toString(),
-        giftName: gift['name']?.toString(),
+        animationUrl: animationUrl,
+        thumbnailUrl: thumb,
+        giftName: giftName,
         senderName: _displaySenderName(
-          fullName:
-              (gift['senderFullName'] ??
-                      gift['senderName'] ??
-                      gift['fullName'] ??
-                      gift['nameSender'])
-                  ?.toString(),
-          username: (gift['senderUsername'] ?? gift['username'])?.toString(),
+          fullName: senderFullName,
+          username: senderUsername,
         ),
       );
     }
@@ -773,9 +863,26 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (state is CommentsLoadSuccess) {
       setState(() {
         final existing = List<CommentEntity>.from(_postComments);
+        final merged = _mergeCommentsById(state.comments, existing);
+        // Drop temporary placeholders once the server list is available.
+        final cleaned = merged
+            .where(
+              (c) =>
+                  !(c.id.startsWith('local-gift-') ||
+                      c.id.startsWith('socket-gift-')) ||
+                  !state.comments.any(
+                    (remote) =>
+                        remote.isGift &&
+                        remote.user.id == c.user.id &&
+                        (c.giftName == null ||
+                            c.giftName!.isEmpty ||
+                            remote.giftName == c.giftName),
+                  ),
+            )
+            .toList();
         _postComments
           ..clear()
-          ..addAll(_mergeCommentsById(state.comments, existing));
+          ..addAll(cleaned);
       });
       _scrollChatToBottom();
     } else if (state is AddCommentSuccess) {
@@ -895,8 +1002,26 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       ),
     );
 
+    // Optimistic gift comment so the sender sees it immediately even if the
+    // socket/refetch is slightly delayed.
     final postId = widget.post?.id;
-    if (postId != null) {
+    if (postId != null && me != null) {
+      final now = DateTime.now().toUtc().toIso8601String();
+      _appendCommentIfNew(
+        CommentEntity(
+          id: 'local-gift-${gift.id}-$now',
+          content: 'Sent ${gift.name}',
+          postId: postId,
+          user: me,
+          isGift: true,
+          giftName: gift.name,
+          giftIcon: gift.icon,
+          giftThumbnailUrl: gift.displayImageUrl,
+          giftAnimationUrl: gift.animationUrl,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
       _commentsBloc?.add(
         FetchCommentsRequested(postId: postId, isRefresh: true, sort: 'oldest'),
       );
@@ -964,15 +1089,17 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         );
         return;
       }
+      // Ensure auction room uses the real UUID (not a post-id fallback).
+      unawaited(_ensureAuctionRoomsJoined());
     }
-    final isAuctionGift = auctionId != null && auctionId.isNotEmpty;
 
     LiveGiftSheet.show(
       context,
-      postId: isAuctionGift ? null : post?.id,
+      // Always pass postId so the API creates a gift comment on the post.
+      postId: post?.id,
       // Prefer nested user.id — feed sometimes omits top-level userId.
       receiverId: _hostUserId ?? post?.userId,
-      auctionId: isAuctionGift ? auctionId : null,
+      auctionId: auctionId,
       canSendToHost: _canSendGiftToHost,
       onGiftSent: _refreshAfterGift,
     );
@@ -1036,16 +1163,23 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   String? _auctionTargetPriceLabel(AppLocalizations l10n) {
     final auction = widget.post?.auction;
     if (auction == null) return null;
-    final spend = auction.displayBidderSpendCoins;
-    if (spend <= 0) return null;
+    final target = auction.targetPriceCoins > 0
+        ? auction.targetPriceCoins.toDouble()
+        : auction.displayBidderSpendCoins;
+    if (target <= 0) return null;
     return l10n.auctionTargetPrice(
-      formatAuctionPricingCoins(spend, Localizations.localeOf(context)),
+      formatAuctionPricingCoins(target, Localizations.localeOf(context)),
       l10n.coinsUnit,
     );
   }
 
-  int? get _auctionTargetPrice =>
-      widget.post?.auction?.displayBidderSpendCoins.round();
+  int? get _auctionTargetPrice {
+    final auction = widget.post?.auction;
+    if (auction == null) return null;
+    if (auction.targetPriceCoins > 0) return auction.targetPriceCoins;
+    final spend = auction.displayBidderSpendCoins.round();
+    return spend > 0 ? spend : null;
+  }
 
   bool get _isAuctionInPeriod {
     final auction = widget.post?.auction;

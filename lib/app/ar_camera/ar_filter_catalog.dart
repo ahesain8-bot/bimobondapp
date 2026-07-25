@@ -13,9 +13,7 @@ class ArFilterItem {
   final String id;
   final String label;
   final String emoji;
-
   final String? thumbnailUrl;
-
   final String? previewColorHex;
 
   bool get hasThumbnail => (thumbnailUrl ?? '').isNotEmpty;
@@ -54,16 +52,33 @@ class ArFilterCatalog {
     ArFilterItem(id: 'big_eyes', label: 'Big Eyes', emoji: '👀'),
     ArFilterItem(id: 'big_lips', label: 'Big Lips', emoji: '👄'),
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
+    ArFilterItem(id: 'confetti', label: 'Confetti', emoji: '🎉'),
+    ArFilterItem(id: 'keywords', label: 'Keywords', emoji: '🔤'),
+    ArFilterItem(id: 'matrix', label: 'Matrix', emoji: '🟩'),
+    ArFilterItem(id: 'space_rocket', label: 'Space Rocket', emoji: '🚀'),
   ];
 
+  /// Static beauty catalog (no LUTs).
   static ArColorFilterCatalog colorCatalog =
       ArColorFilterBundledCatalog.catalog;
 
   static void updateColorCatalog(ArColorFilterCatalog catalog) {
-    colorCatalog = catalog;
+    colorCatalog = catalog.withValidBeautyOnly();
     _colorItemsCache = null;
     _colorCategoriesCache = null;
   }
+
+  static void restoreBundledColorCatalog() {
+    colorCatalog = ArColorFilterBundledCatalog.catalog;
+    _colorItemsCache = null;
+    _colorCategoriesCache = null;
+  }
+
+  static ArColorFilterItemModel? colorFilterById(String id) =>
+      colorCatalog.findFilter(id);
+
+  static bool isBeautyColorFilter(String id) =>
+      colorFilterById(id)?.isBeauty ?? false;
 
   static List<ArFilterItem>? _colorItemsCache;
   static List<ArColorFilterCategory>? _colorCategoriesCache;
@@ -111,6 +126,7 @@ class ArFilterCatalog {
       colorItems.any((item) => item.id == id);
 
   static List<ArFilterItem> colorItemsForCategory(String categoryId) {
+    if (colorCategories.isEmpty) return const [];
     final category = colorCategories.firstWhere(
       (c) => c.id == categoryId,
       orElse: () => colorCategories.first,

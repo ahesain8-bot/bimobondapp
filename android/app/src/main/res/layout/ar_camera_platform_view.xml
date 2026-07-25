@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -19,5 +20,26 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent" />
+
+    <!--
+      Screen-overlay filter animation — pure decoration on top of the live
+      preview, shared by Confetti/Keywords/Matrix/Space Rocket (only one is
+      ever active at a time; ArCameraBridge.applyRenderMode swaps which
+      asset is loaded based on the selected filter). Transparent background
+      so the camera stays visible underneath; not clickable/focusable so it
+      never intercepts touches meant for camera controls below it. No static
+      lottie_fileName/autoPlay here — asset + playback are entirely driven
+      from Kotlin (ArCameraPlatformView.init, ArCameraBridge.applyRenderMode)
+      since which animation plays depends on the selected filter.
+    -->
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/confettiOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        app:lottie_loop="true" />
 
 </FrameLayout>

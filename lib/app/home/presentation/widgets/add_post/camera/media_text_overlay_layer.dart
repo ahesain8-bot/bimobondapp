@@ -1,24 +1,28 @@
 import 'package:bimobondapp/app/home/presentation/utils/media_text_font_styles.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_text_layout.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_overlay.dart';
 import 'package:flutter/material.dart';
 
 /// Renders draggable text stickers over the media preview.
 ///
-/// Drag positions are updated locally while the finger moves so the heavy
-/// editor preview underneath is NOT rebuilt every frame — only this layer
-/// repaints. The final position is committed to the parent on [onChanged]
-/// once when the drag ends.
+/// [MediaTextOverlay.center] is image-normalized (0..1 of media pixels). This
+/// layer maps that through [fit] so stickers stay locked to image content when
+/// the preview letterboxes, filters refresh, or the container size changes.
 class MediaTextOverlayLayer extends StatefulWidget {
   const MediaTextOverlayLayer({
     super.key,
     required this.overlays,
     required this.onChanged,
     required this.onEdit,
+    this.mediaSize = Size.zero,
+    this.fit = BoxFit.contain,
   });
 
   final List<MediaTextOverlay> overlays;
   final ValueChanged<MediaTextOverlay> onChanged;
   final ValueChanged<MediaTextOverlay> onEdit;
+  final Size mediaSize;
+  final BoxFit fit;
 
   @override
   State<MediaTextOverlayLayer> createState() => _MediaTextOverlayLayerState();
@@ -27,6 +31,9 @@ class MediaTextOverlayLayer extends StatefulWidget {
 class _MediaTextOverlayLayerState extends State<MediaTextOverlayLayer> {
   final Map<String, Offset> _centers = {};
   final Set<String> _dragging = {};
+
+  bool get _hasMediaSize =>
+      widget.mediaSize.width > 0 && widget.mediaSize.height > 0;
 
   @override
   void initState() {
@@ -53,6 +60,16 @@ class _MediaTextOverlayLayerState extends State<MediaTextOverlayLayer> {
   Offset _centerFor(MediaTextOverlay overlay) =>
       _centers[overlay.id] ?? overlay.center;
 
+  Offset _displayNorm(Offset imageNorm, Size container) {
+    if (!_hasMediaSize) return imageNorm;
+    return MediaTextLayout.toContainer(
+      imageNorm,
+      widget.mediaSize,
+      container,
+      widget.fit,
+    );
+  }
+
   void _onPanStart(MediaTextOverlay overlay) {
     _dragging.add(overlay.id);
     _centers[overlay.id] = overlay.center;
@@ -65,11 +82,21 @@ class _MediaTextOverlayLayerState extends State<MediaTextOverlayLayer> {
     double h,
   ) {
     if (w <= 0 || h <= 0) return;
-    final current = _centerFor(overlay);
-    _centers[overlay.id] = Offset(
-      (current.dx + details.delta.dx / w).clamp(0.0, 1.0),
-      (current.dy + details.delta.dy / h).clamp(0.0, 1.0),
+    final container = Size(w, h);
+    final currentImage = _centerFor(overlay);
+    final currentDisplay = _displayNorm(currentImage, container);
+    final nextDisplay = Offset(
+      (currentDisplay.dx + details.delta.dx / w).clamp(0.0, 1.0),
+      (currentDisplay.dy + details.delta.dy / h).clamp(0.0, 1.0),
     );
+    _centers[overlay.id] = _hasMediaSize
+        ? MediaTextLayout.toImage(
+            nextDisplay,
+            widget.mediaSize,
+            container,
+            widget.fit,
+          )
+        : nextDisplay;
     setState(() {});
   }
 
@@ -88,6 +115,7 @@ class _MediaTextOverlayLayerState extends State<MediaTextOverlayLayer> {
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
+        final container = Size(w, h);
         return Stack(
           clipBehavior: Clip.none,
           children: [
@@ -95,8 +123,8 @@ class _MediaTextOverlayLayerState extends State<MediaTextOverlayLayer> {
               Align(
                 key: ValueKey(overlay.id),
                 alignment: Alignment(
-                  (_centerFor(overlay).dx * 2) - 1,
-                  (_centerFor(overlay).dy * 2) - 1,
+                  (_displayNorm(_centerFor(overlay), container).dx * 2) - 1,
+                  (_displayNorm(_centerFor(overlay), container).dy * 2) - 1,
                 ),
                 child: RepaintBoundary(
                   child: GestureDetector(

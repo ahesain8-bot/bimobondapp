@@ -278,16 +278,19 @@ class PostsRepositoryImpl implements PostsRepository {
         if (playlistId != null && playlistId.isNotEmpty) 'playlistId': playlistId,
         if (soundSegmentId != null && soundSegmentId.isNotEmpty)
           'soundSegmentId': soundSegmentId,
+        // Mode B: soundId alone, or soundId + both startMs/endMs.
         if (soundId != null &&
             soundId.isNotEmpty &&
             (soundSegmentId == null || soundSegmentId.isEmpty))
           'soundId': soundId,
-        if (startMs != null &&
-            (soundSegmentId == null || soundSegmentId.isEmpty))
+        if (soundId != null &&
+            soundId.isNotEmpty &&
+            (soundSegmentId == null || soundSegmentId.isEmpty) &&
+            startMs != null &&
+            endMs != null) ...{
           'startMs': startMs,
-        if (endMs != null &&
-            (soundSegmentId == null || soundSegmentId.isEmpty))
           'endMs': endMs,
+        },
         if (newSound != null &&
             (soundSegmentId == null || soundSegmentId.isEmpty) &&
             (soundId == null || soundId.isEmpty))

@@ -155,6 +155,33 @@ class ArCameraBridge {
     _channel.invokeMethod<void>('clearRetouchAdjustments');
   }
 
+  /// Named beauty filter (Soft Glow, Pure, Rosy, Clean, ...) — TikTok-style
+  /// preset applied on top of the live camera baseline. All 0..1 except
+  /// [lipTint] (hex color) and [intensity] (overall preset strength, 0..1).
+  static void setBeautyFilter({
+    required double smooth,
+    required double whiten,
+    required double brighten,
+    required double blush,
+    required String lipTint,
+    required double lipStrength,
+    double intensity = 1.0,
+  }) {
+    _channel.invokeMethod<void>('setBeautyFilter', {
+      'smooth': smooth.clamp(0.0, 1.0),
+      'whiten': whiten.clamp(0.0, 1.0),
+      'brighten': brighten.clamp(0.0, 1.0),
+      'blush': blush.clamp(0.0, 1.0),
+      'lipTint': lipTint,
+      'lipStrength': lipStrength.clamp(0.0, 1.0),
+      'intensity': intensity.clamp(0.0, 1.0),
+    });
+  }
+
+  static void clearBeautyFilter() {
+    _channel.invokeMethod<void>('clearBeautyFilter');
+  }
+
   static Future<void> setZoom(double zoom) async {
     await _channel.invokeMethod<void>('setZoom', {
       'zoom': zoom.clamp(0.0, 1.0),
@@ -167,21 +194,6 @@ class ArCameraBridge {
           .invokeMethod<void>('playCountdownTick', {'isFinal': isFinal})
           .catchError((_) {}),
     );
-  }
-
-  static Future<String?> applyColorLut({
-    required String path,
-    required String filter,
-    double intensity = 1.0,
-    int? maxEdge,
-  }) async {
-    final out = await _channel.invokeMethod<String>('applyColorLut', {
-      'path': path,
-      'filter': filter,
-      'intensity': intensity.clamp(0.0, 1.0),
-      if (maxEdge != null) 'maxEdge': maxEdge,
-    });
-    return out;
   }
 
   static Future<String?> applyBeauty({

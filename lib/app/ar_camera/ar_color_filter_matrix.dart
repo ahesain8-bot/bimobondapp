@@ -22,7 +22,7 @@ class ArColorFilterMatrix {
   }
 
   static List<double>? matrixFor(String? filterId) {
-    // Color filters are LUT-only — GPU PNG path, no colorMatrix in catalog.
+    // Beauty presets use native LiveRetouch — no ColorMatrix preview.
     return null;
   }
 

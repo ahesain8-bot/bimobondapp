@@ -53,10 +53,6 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
     }
 
-    fun setLutIntensity(intensity: Float) {
-        renderer.lutIntensity = intensity
-    }
-
     fun setOnFramePresented(callback: (() -> Unit)?) {
         renderer.onFramePresented = callback
     }
@@ -76,12 +72,12 @@ class FaceWarpGlView @JvmOverloads constructor(
         }
     }
 
-    fun submitLut(bitmap: Bitmap?) {
+    /** Skin-confidence mask (ALPHA_8, 255=skin) from ArCameraController's landmark rasterizer. */
+    fun updateSkinMask(bitmap: Bitmap) {
         ensureGlInitialized()
         queueEvent {
-            renderer.setLut(bitmap)
+            renderer.updateSkinMask(bitmap)
         }
-        requestRender()
     }
 
     fun setRenderModeSafe(mode: Int) {

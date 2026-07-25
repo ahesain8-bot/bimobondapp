@@ -17,8 +17,10 @@ Both models include inline comments, JSON parsing, validation helpers, and **bun
 
 | API | UI location | What it controls |
 |---|---|---|
-| `GET /camera-studio/color-filters` | Filters panel (Portrait, Life, Retro, Film) | Color grades on live camera + photos |
+| `GET /camera-studio/color-filters` | Filters panel (Beauty) | Beauty presets (smooth/whiten/blush…) — **no LUT / no `.cube`** |
 | `GET /camera-studio/ar-effects` | Bottom carousel | Stickers + face warp (glasses, dog, big eyes…) |
+
+> **LUT removed (app):** static `assets/luts/`, PNG LUT bake, and `renderType: "lut"` are no longer used. Dashboard should send beauty params only — see `ar_color_filter_catalog_model.dart`. Sections below that mention LUT are historical reference only.
 
 Responses may be wrapped:
 

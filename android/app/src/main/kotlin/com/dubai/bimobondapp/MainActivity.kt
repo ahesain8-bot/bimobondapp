@@ -7,8 +7,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
-import com.dubai.bimobondapp.ar_camera.ArColorGradeBaker
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
+import com.dubai.bimobondapp.ar_camera.LiveBeautyState
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
@@ -93,38 +93,6 @@ class MainActivity : FlutterActivity() {
                             } catch (t: Throwable) {
                                 runOnUiThread {
                                     result.error("beauty_failed", t.message ?: "unknown", null)
-                                }
-                            }
-                        }
-                    }
-                    "applyColorLut" -> {
-                        val path = call.argument<String>("path")
-                        val filterId = call.argument<String>("filter") ?: "none"
-                        if (path.isNullOrBlank()) {
-                            result.error("invalid_args", "path required", null)
-                            return@setMethodCallHandler
-                        }
-                        val intensity =
-                            (call.argument<Any>("intensity") as? Number)?.toFloat() ?: 1f
-                        val maxEdge = when (val raw = call.argument<Any>("maxEdge")) {
-                            is Int -> raw
-                            is Long -> raw.toInt()
-                            is Double -> raw.toInt()
-                            else -> null
-                        }
-                        beautyExecutor.execute {
-                            try {
-                                val out = ArColorGradeBaker.applyToFile(
-                                    context = this@MainActivity.applicationContext,
-                                    inputPath = path,
-                                    filterId = filterId,
-                                    intensity = intensity,
-                                    maxEdge = maxEdge,
-                                )
-                                runOnUiThread { result.success(out) }
-                            } catch (t: Throwable) {
-                                runOnUiThread {
-                                    result.error("lut_failed", t.message ?: "unknown", null)
                                 }
                             }
                         }
@@ -314,6 +282,32 @@ class MainActivity : FlutterActivity() {
                     }
                     "clearRetouchAdjustments" -> {
                         LiveRetouchState.clear()
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
+                    "setBeautyFilter" -> {
+                        fun level(key: String): Float =
+                            when (val raw = call.argument<Any>(key)) {
+                                is Double -> raw.toFloat()
+                                is Int -> raw.toFloat()
+                                is Long -> raw.toFloat()
+                                is Float -> raw
+                                else -> 0f
+                            }.coerceIn(0f, 1f)
+                        LiveBeautyState.apply(
+                            smooth = level("smooth"),
+                            whiten = level("whiten"),
+                            brighten = level("brighten"),
+                            blush = level("blush"),
+                            lipTintHex = call.argument<String>("lipTint") ?: "#E8527A",
+                            lipStrength = level("lipStrength"),
+                            intensity = level("intensity"),
+                        )
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
+                    "clearBeautyFilter" -> {
+                        LiveBeautyState.clear()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }

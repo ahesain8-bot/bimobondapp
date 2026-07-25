@@ -48,6 +48,8 @@ class VideoPostMediaItem extends StatelessWidget {
             posterUrl: MediaUtils.resolveVideoPosterUrl(post),
             isActive: isActiveSlide,
             respectFeedPlaybackGate: respectFeedPlaybackGate,
+            // Library sound plays separately — keep the video track silent.
+            muteAudio: post.sound?.resolvedAudioUrl?.isNotEmpty ?? false,
             controller: videoController,
             onLongPress: onLongPress,
           )

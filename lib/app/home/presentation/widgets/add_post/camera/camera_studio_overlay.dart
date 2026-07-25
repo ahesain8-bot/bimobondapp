@@ -104,7 +104,7 @@ class CameraStudioOverlay extends StatelessWidget {
     this.useNativeArFilters = false,
     this.arFilterIndex = 0,
     this.onArFilterSelected,
-    this.arColorCategoryId = 'portrait',
+    this.arColorCategoryId = 'beauty',
     this.onArColorCategorySelected,
     this.arFilterIntensity = 1.0,
     this.onArFilterIntensityChanged,
@@ -238,7 +238,7 @@ class CameraStudioOverlay extends StatelessWidget {
           );
     final controlsTop =
         CameraRatioLetterbox.tikTokTopChromeHeight(topPadding) + 16.0;
-    final sideToolbarTop = controlsTop;
+    final sideToolbarTop = controlsTop + 48.0;
 
     return Stack(
       fit: StackFit.expand,

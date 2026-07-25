@@ -26,11 +26,15 @@ class SoundDetailScreen extends StatefulWidget {
     required this.soundId,
     this.pickMode = false,
     this.previewSound,
+    this.preferredSegmentId,
   });
 
   final String soundId;
   final bool pickMode;
   final SoundEntity? previewSound;
+
+  /// When opened from a post that already has a clip, reuse that segment (Mode A).
+  final String? preferredSegmentId;
 
   @override
   State<SoundDetailScreen> createState() => _SoundDetailScreenState();
@@ -129,8 +133,16 @@ class _SoundDetailScreenState extends State<SoundDetailScreen> {
       popSoundDetail(context, sound);
       return;
     }
+    final segmentId = widget.preferredSegmentId?.trim();
     popSoundDetail(context);
-    context.pushNamed('add_post_camera', extra: {'initialSound': sound});
+    context.pushNamed(
+      'add_post_camera',
+      extra: {
+        'initialSound': sound,
+        if (segmentId != null && segmentId.isNotEmpty)
+          'initialSoundSegmentId': segmentId,
+      },
+    );
   }
 
   void _addToStory(SoundEntity sound) {
@@ -138,10 +150,16 @@ class _SoundDetailScreenState extends State<SoundDetailScreen> {
       popSoundDetail(context, sound);
       return;
     }
+    final segmentId = widget.preferredSegmentId?.trim();
     popSoundDetail(context);
     context.pushNamed(
       'add_post_camera',
-      extra: {'initialSound': sound, 'isStory': true},
+      extra: {
+        'initialSound': sound,
+        'isStory': true,
+        if (segmentId != null && segmentId.isNotEmpty)
+          'initialSoundSegmentId': segmentId,
+      },
     );
   }
 

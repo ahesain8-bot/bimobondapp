@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_matrix.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filters_panel.dart';
@@ -10,12 +11,12 @@ import 'package:bimobondapp/app/home/presentation/pages/media_crop_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/video_segment_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/utils/camera_capture_utils.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
-import 'package:bimobondapp/app/home/presentation/utils/media_color_lut.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_skin_smooth.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_baker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_font_styles.dart';
+import 'package:bimobondapp/app/home/presentation/utils/media_text_layout.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_text_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_app_loading.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_photo_editor_panel.dart';
@@ -86,6 +87,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   /// Mute the video's own audio when mixing the selected music in.
   bool _muteOriginalAudio = false;
 
+  /// True when the user confirmed a trim range (Mode B2: soundId + ms).
+  bool _soundDidTrim = false;
+
+  /// Explicit clip id for Mode A (“use this sound”), when known.
+  String? _pickedSoundSegmentId;
+
   /// Bumped after sound picker/trim closes so [MediaStudioPreview] remounts a
   /// fresh ExoPlayer if Android left the previous one frozen.
   int _previewEpoch = 0;
@@ -94,7 +101,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   static const _photoMusicMaxSeconds = 15;
 
   String _arFilterId = 'none';
-  String _arColorCategoryId = 'portrait';
+  String _arColorCategoryId = 'beauty';
   double _arFilterIntensity = 1.0;
   bool _alreadyBaked = false;
   String _bakedFilterId = 'none';
@@ -130,8 +137,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   /// Set once the user confirms Discard so [PopScope] lets the route pop.
   bool _leaving = false;
 
-  /// Full-screen preview box size, used to map text overlays onto the export.
+  /// Preview box size used to scale text when baking export.
   Size _previewSize = Size.zero;
+
+  /// Pixel size of the current source media (image or video frame).
+  Size _mediaPixelSize = Size.zero;
+  String? _mediaPixelSizePath;
 
   MediaItemEditState get _currentState => _states[_currentIndex];
 
@@ -156,18 +167,11 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   bool get _hasActiveColorFilter => ArFilterCatalog.isColorFilter(_arFilterId);
 
-  /// True when a color grade needs to be applied in the editor because it isn't
-  /// already baked into the source pixels (gallery import, or the user changed
-  /// away from the baked id). We bake it natively via the PNG LUT — no matrix.
-  bool get _needsColorLutPreview {
-    if (!_hasActiveColorFilter) return false;
-    if (!_alreadyBaked) return true;
-    return _arFilterId != _bakedFilterId;
-  }
+  /// Color LUT bake removed — beauty presets are live-retouch only (no still bake).
+  bool get _needsColorFilterPreview => false;
 
-  /// Any photo edit that requires a native-baked preview file (tone/geometry
-  /// adjustments or a LUT color grade).
-  bool get _hasPreviewEdits => _hasFaceEdits || _needsColorLutPreview;
+  /// Any photo edit that requires a native-baked preview file (tone/geometry).
+  bool get _hasPreviewEdits => _hasFaceEdits || _needsColorFilterPreview;
 
   @override
   void initState() {
@@ -184,6 +188,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
     _currentIndex = widget.initialIndex.clamp(0, widget.items.length - 1);
     _applyStateToUi(_states[_currentIndex]);
+    unawaited(_resolveMediaPixelSize());
     // Warm fancy fonts in the background so Aa opens without a hitch.
     unawaited(MediaTextFontStyles.preload());
     if (_hasPreviewEdits) {
@@ -194,6 +199,35 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         if (mounted) unawaited(_syncStudioSoundPreview());
       });
     }
+  }
+
+  Future<void> _resolveMediaPixelSize() async {
+    final file = _currentState.sourceFile;
+    final path = file.path;
+    if (_mediaPixelSizePath == path && _mediaPixelSize != Size.zero) return;
+
+    Size size = Size.zero;
+    try {
+      if (_currentState.isVideo) {
+        size = await NativeVideoProcessor.videoResolution(file) ?? Size.zero;
+      } else {
+        final bytes = await file.readAsBytes();
+        final codec = await ui.instantiateImageCodec(bytes);
+        final frame = await codec.getNextFrame();
+        size = Size(
+          frame.image.width.toDouble(),
+          frame.image.height.toDouble(),
+        );
+        frame.image.dispose();
+      }
+    } catch (_) {
+      size = Size.zero;
+    }
+    if (!mounted || _currentState.sourceFile.path != path) return;
+    setState(() {
+      _mediaPixelSizePath = path;
+      _mediaPixelSize = size;
+    });
   }
 
   /// Keeps the selected track audible under the studio preview (video or photo).
@@ -359,19 +393,13 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return edited ?? file;
   }
 
-  /// Bakes the color grade onto a photo using the native PNG-LUT engine (the
-  /// same lookup the live camera uses). Full resolution — no [maxEdge].
+  /// LUT bake removed — return the input file unchanged.
   Future<File> _bakeColorFilterToFile(
     File input,
     String filterId,
     double intensity,
   ) async {
-    final out = await MediaColorLut.apply(
-      input: input,
-      filterId: filterId,
-      intensity: intensity,
-    );
-    return out ?? input;
+    return input;
   }
 
   Future<List<File>> _exportAll() async {
@@ -384,24 +412,27 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return results;
   }
 
-  /// Bakes the selected music track into every exported file so the uploaded
-  /// media actually contains the sound (TikTok-style). Videos get the track
-  /// muxed in; still photos are turned into a short music video.
+  /// Bakes the selected music track into exported **photos** only (turns them
+  /// into a short music video). Videos skip remux — library sounds attach via
+  /// `soundId` and are mixed at playback, which avoids a full re-encode.
   Future<void> _bakeMusicInto(List<File> results) async {
     final sound = _selectedSound;
     if (sound == null) return;
     final audioUrl = sound.resolvedAudioUrl;
     if (audioUrl.isEmpty) return;
 
+    final hasPhoto = results.asMap().entries.any((e) {
+      final i = e.key;
+      return i < _states.length && !_states[i].isVideo;
+    });
+    if (!hasPhoto) return;
+
     final audio = await SoundLocalFile.resolve(audioUrl);
     if (audio == null) return;
 
-    // Photo + music → 15s clip from the chosen start (TikTok-style).
+    // Use the chosen trim window (capped), not a forced 15s encode.
     final trackSeconds = sound.duration > 0 ? sound.duration : 0;
     var photoSeconds = _soundWindow.inSeconds.clamp(1, _photoMusicMaxSeconds);
-    if (photoSeconds < _photoMusicMaxSeconds) {
-      photoSeconds = _photoMusicMaxSeconds;
-    }
     if (trackSeconds > 0) {
       final remaining = trackSeconds - _soundStartOffset.inSeconds;
       if (remaining > 0 && remaining < photoSeconds) {
@@ -414,25 +445,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
     for (var i = 0; i < results.length; i++) {
       final isVideo = i < _states.length ? _states[i].isVideo : false;
+      if (isVideo) continue;
       final file = results[i];
       try {
-        final File? withMusic;
-        if (isVideo) {
-          withMusic = await NativeVideoProcessor.muxAudioIntoVideo(
-            file,
-            audio: audio,
-            startOffset: _soundStartOffset,
-            audioEnd: _soundStartOffset + _soundWindow,
-            keepOriginalAudio: !_muteOriginalAudio,
-          );
-        } else {
-          withMusic = await NativeVideoProcessor.renderImageWithMusic(
-            file,
-            audio: audio,
-            duration: photoDuration,
-            startOffset: _soundStartOffset,
-          );
-        }
+        final withMusic = await NativeVideoProcessor.renderImageWithMusic(
+          file,
+          audio: audio,
+          duration: photoDuration,
+          startOffset: _soundStartOffset,
+        );
         if (withMusic != null) results[i] = withMusic;
       } catch (e, st) {
         debugPrint('Music bake failed for ${file.path}: $e\n$st');
@@ -461,6 +482,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
             sound: _selectedSound,
             soundOffset: _soundStartOffset,
             soundWindow: _soundWindow,
+            soundDidTrim: _soundDidTrim,
+            soundSegmentId: _pickedSoundSegmentId,
           ),
         );
         return;
@@ -476,6 +499,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               sound: _selectedSound,
               soundOffset: _soundStartOffset,
               soundWindow: _soundWindow,
+              soundDidTrim: _soundDidTrim,
+              soundSegmentId: _pickedSoundSegmentId,
               onRetake: () => context.pop(),
             ),
           ),
@@ -493,6 +518,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           'initialSound': _selectedSound,
           'initialSoundOffset': _soundStartOffset,
           'initialSoundWindow': _soundWindow,
+          'initialSoundDidTrim': _soundDidTrim,
+          'initialSoundSegmentId': _pickedSoundSegmentId,
           'filterName': primaryFilterNameFromStates(_states),
           'filterCategory': primaryFilterCategoryFromStates(_states).name,
           'effectSlug': primaryEffectSlugFromStates(_states),
@@ -516,7 +543,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _magicOn = false;
       } else {
         _arFilterId = 'whitening';
-        _arColorCategoryId = 'portrait';
+        _arColorCategoryId = 'beauty';
         _magicOn = true;
         _showFilters = false;
       }
@@ -528,7 +555,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     // Magic = brighten/beauty grade only. Smooth = separate skin-clear pass.
     if (_magicOn) {
       _arFilterId = 'whitening';
-      _arColorCategoryId = 'portrait';
+      _arColorCategoryId = 'beauty';
       _arFilterIntensity = 0.8;
     } else if (_arFilterId == 'whitening') {
       _arFilterId = 'none';
@@ -639,25 +666,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
     }
 
-    if (_needsColorLutPreview) {
-      final graded = await MediaColorLut.apply(
-        input: working,
-        filterId: _arFilterId,
-        intensity: _arFilterIntensity,
-        maxEdge: 960,
-      );
-      if (gen != _smoothGen) {
-        _deleteTemp(graded, source);
-        if (produced) _deleteTemp(working, source);
-        return;
-      }
-      if (graded != null) {
-        if (produced) _deleteTemp(working, source);
-        working = graded;
-        produced = true;
-      }
-    }
-
     if (!mounted || gen != _smoothGen) {
       if (produced) _deleteTemp(working, source);
       return;
@@ -701,7 +709,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       if (ArFilterCatalog.isColorFilter(id)) {
         // Keep retouch sheet open when picking Film grades from Makeup.
         if (_showPhotoEditor) {
-          _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+          _arColorCategoryId = 'beauty';
         } else {
           _showPhotoEditor = false;
         }
@@ -724,7 +732,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       if (id == 'none') {
         // Keep category for Makeup UI; clear only the grade.
       } else {
-        _arColorCategoryId = kMediaPhotoEditorFilmCategoryId;
+        _arColorCategoryId = 'beauty';
         _magicOn = false;
       }
       _saveUiToCurrentState();
@@ -773,6 +781,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _soundStartOffset = Duration.zero;
         _soundWindow = const Duration(seconds: 15);
         _muteOriginalAudio = false;
+        _soundDidTrim = false;
+        _pickedSoundSegmentId = null;
         return;
       }
       final sound = picked.sound;
@@ -783,7 +793,19 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           ? picked.window
           : const Duration(seconds: 15);
       _muteOriginalAudio = picked.muteOriginal;
+      _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
+      final seg = picked.soundSegmentId?.trim();
+      final defaultId = sound.defaultSegment?.id.trim();
+      _pickedSoundSegmentId =
+          (seg != null && seg.isNotEmpty && seg != defaultId) ? seg : null;
     });
+
+    // Warm the track in disk cache (photo→music export / preview).
+    final selected = _selectedSound;
+    final prefetchUrl = selected?.resolvedAudioUrl;
+    if (prefetchUrl != null && prefetchUrl.isNotEmpty) {
+      unawaited(SoundLocalFile.resolve(prefetchUrl));
+    }
 
     // Start music bed after the remounted video has had a frame to init.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -798,6 +820,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       _soundStartOffset = Duration.zero;
       _soundWindow = const Duration(seconds: 15);
       _muteOriginalAudio = false;
+      _soundDidTrim = false;
+      _pickedSoundSegmentId = null;
     });
     unawaited(_syncStudioSoundPreview());
   }
@@ -822,11 +846,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
     final bytes = await state.sourceFile.readAsBytes();
     if (!mounted) return;
-    // Decode into the image cache first so the crop screen paints the photo on
-    // frame 1 instead of flashing black while Crop parses the bytes.
     await precacheImage(MemoryImage(bytes), context);
     if (!mounted) return;
-    final cropped = await Navigator.of(context).push<Uint8List>(
+    final cropped = await Navigator.of(context).push<MediaCropResult>(
       PageRouteBuilder(
         opaque: true,
         transitionDuration: const Duration(milliseconds: 220),
@@ -841,14 +863,31 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     final file = File(
       '${dir.path}/crop_${DateTime.now().millisecondsSinceEpoch}.png',
     );
-    await file.writeAsBytes(cropped);
+    await file.writeAsBytes(cropped.bytes);
     if (!mounted) return;
+
+    final previous = _states[_currentIndex];
+    final remapped = MediaTextLayout.remapForCrop(
+      overlays: previous.textOverlays,
+      sourceSize: cropped.sourceSize == Size.zero
+          ? _mediaPixelSize
+          : cropped.sourceSize,
+      cropRect: cropped.cropRect,
+      centerOf: (o) => o.center,
+      copyWithCenter: (o, center) => o.copyWith(center: center),
+    );
+
     setState(() {
-      _states[_currentIndex] = _states[_currentIndex].copyWith(
+      _states[_currentIndex] = previous.copyWith(
         croppedFile: file,
-        effectSlug: _states[_currentIndex].effectSlug,
+        textOverlays: remapped,
+        effectSlug: previous.effectSlug,
       );
+      _mediaPixelSizePath = null;
+      _mediaPixelSize = Size.zero;
     });
+    unawaited(_resolveMediaPixelSize());
+    if (_hasPreviewEdits) _scheduleFacePreview();
   }
 
   Future<MediaTextOverlay?> _openTextEditor({MediaTextOverlay? initial}) async {
@@ -866,7 +905,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       arFilterId: selectedColorId,
       arFilterIntensity: _arFilterIntensity,
       applyArColorPreview: _currentState.isVideo
-          ? _needsColorLutPreview
+          ? _needsColorFilterPreview
           : false,
       muted: _currentState.isVideo,
       trimSegments: _currentState.isVideo
@@ -1145,15 +1184,21 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         ? authState.user.avatarUrl
         : null;
     final selectedColorId = _hasActiveColorFilter ? _arFilterId : 'none';
-    _previewSize = MediaQuery.of(context).size;
+    final screenSize = MediaQuery.of(context).size;
+    final isPhoto = !currentItem.isVideo;
+    // Full screen, no reserved top/bottom chrome band — matches the live
+    // camera's own default (non-ratio-toggled) viewport exactly, so photo/
+    // video capture shows here the same as it did while shooting. Was
+    // previously reduced by a fixed "TikTok chrome" amount (a much bigger cut
+    // for photos than video, unrelated to what the live camera actually
+    // showed), which made photos look squeezed/"square" and videos look
+    // over-cropped/"zoomed" relative to the live view. Toolbar controls now
+    // float over the media instead of sitting in a reserved band.
+    const previewChrome = (top: 0.0, bottom: 0.0);
+    _previewSize = screenSize;
     final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
         ? _smoothPreviewFile!
         : _currentState.sourceFile;
-    final isPhoto = !currentItem.isVideo;
-    final previewChrome = CameraRatioLetterbox.tikTokChromeHeights(
-      context,
-      photoMode: isPhoto,
-    );
     final controlsTop = CameraRatioLetterbox.controlsTopInset(context);
     final showBottomSheet = _showPhotoEditor || _showFilters;
     final sideRailBottom = showBottomSheet
@@ -1170,7 +1215,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         arFilterIntensity: _arFilterIntensity,
         // Photos: the grade is baked into previewFile via the native LUT.
         // Videos: still previewed with the matrix path (matches export).
-        applyArColorPreview: currentItem.isVideo ? _needsColorLutPreview : false,
+        applyArColorPreview: currentItem.isVideo ? _needsColorFilterPreview : false,
         paused: _subEditorOpen,
         muted: _selectedSound != null && _muteOriginalAudio,
         trimSegments: currentItem.isVideo
@@ -1190,24 +1235,59 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            TikTokPhotoPreviewClip(
-              topHeight: previewChrome.top,
-              bottomHeight: previewChrome.bottom,
-              child: previewWidget,
-            ),
+            if (isPhoto)
+              Positioned(
+                top: previewChrome.top,
+                left: 0,
+                right: 0,
+                bottom: previewChrome.bottom,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(
+                    CameraRatioLetterbox.tikTokPreviewRadius,
+                  ),
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: previewWidget,
+                  ),
+                ),
+              )
+            else
+              TikTokPhotoPreviewClip(
+                topHeight: previewChrome.top,
+                bottomHeight: previewChrome.bottom,
+                child: previewWidget,
+              ),
             if (_currentState.textOverlays.isNotEmpty)
-              Positioned.fill(
-                child: TikTokPhotoPreviewClip(
-                  topHeight: previewChrome.top,
-                  bottomHeight: previewChrome.bottom,
+              if (isPhoto)
+                Positioned(
+                  top: previewChrome.top,
+                  left: 0,
+                  right: 0,
+                  bottom: previewChrome.bottom,
                   child: MediaTextOverlayLayer(
                     key: ValueKey('text-overlays-$_currentIndex'),
                     overlays: _currentState.textOverlays,
                     onChanged: _moveOverlay,
                     onEdit: _editText,
+                    mediaSize: _mediaPixelSize,
+                    fit: BoxFit.contain,
+                  ),
+                )
+              else
+                Positioned.fill(
+                  child: TikTokPhotoPreviewClip(
+                    topHeight: previewChrome.top,
+                    bottomHeight: previewChrome.bottom,
+                    child: MediaTextOverlayLayer(
+                      key: ValueKey('text-overlays-$_currentIndex'),
+                      overlays: _currentState.textOverlays,
+                      onChanged: _moveOverlay,
+                      onEdit: _editText,
+                      mediaSize: _mediaPixelSize,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
-              ),
             TikTokChromeBarsOverlay(
               topHeight: previewChrome.top,
               bottomHeight: previewChrome.bottom,
@@ -1231,7 +1311,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                     ),
                   ),
                   Positioned(
-                    top: controlsTop,
+                    top: controlsTop + 48.0,
                     bottom: sideRailBottom,
                     right: isRtl ? null : 0,
                     left: isRtl ? 0 : null,
@@ -1273,7 +1353,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                   _saveUiToCurrentState();
                                 });
                                 if (!_currentState.isVideo &&
-                                    _needsColorLutPreview) {
+                                    _needsColorFilterPreview) {
                                   _scheduleFacePreview();
                                 }
                               },
@@ -1315,7 +1395,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                             _saveUiToCurrentState();
                                           });
                                           if (!_currentState.isVideo &&
-                                              _needsColorLutPreview) {
+                                              _needsColorFilterPreview) {
                                             _scheduleFacePreview();
                                           }
                                         },

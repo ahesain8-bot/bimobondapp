@@ -267,6 +267,10 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          CameraRailExpandedBackdrop(
+            expanded: _expanded,
+            iconOnStartEdge: widget.iconOnStartEdge,
+          ),
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: align,
@@ -439,6 +443,7 @@ class CameraRailExpandButton extends StatelessWidget {
               LucideIcons.chevronDown,
               color: Colors.white,
               size: 24,
+              shadows: CameraToolIcons.iconShadows,
             ),
           ),
         ),

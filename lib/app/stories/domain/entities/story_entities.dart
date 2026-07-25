@@ -515,8 +515,13 @@ class CreateStoryInput extends Equatable {
         if (location != null) 'location': location!.toJson(),
         if (soundSegmentId != null) 'soundSegmentId': soundSegmentId,
         if (soundId != null && soundSegmentId == null) 'soundId': soundId,
-        if (startMs != null && soundSegmentId == null) 'startMs': startMs,
-        if (endMs != null && soundSegmentId == null) 'endMs': endMs,
+        if (soundId != null &&
+            soundSegmentId == null &&
+            startMs != null &&
+            endMs != null) ...{
+          'startMs': startMs,
+          'endMs': endMs,
+        },
         if (newSound != null && soundSegmentId == null && soundId == null)
           'newSound': newSound,
         if (media != null && media!.isNotEmpty)

@@ -18,7 +18,7 @@ class MediaItemEditState {
     this.beautyEnabled = false,
     this.filterCategory = CameraFilterCategory.trending,
     this.arFilterId = 'none',
-    this.arColorCategoryId = 'portrait',
+    this.arColorCategoryId = 'beauty',
     this.arFilterIntensity = 1.0,
     this.faceSaturation = 0,
     this.faceBrightness = 0,
@@ -162,7 +162,7 @@ class MediaItemEditState {
       beautyEnabled: seed.beautyEnabled || arId == 'whitening',
       filterCategory: seed.filterCategory,
       arFilterId: arId,
-      arColorCategoryId: seed.arColorCategoryId ?? 'portrait',
+      arColorCategoryId: seed.arColorCategoryId ?? 'beauty',
       arFilterIntensity: seed.arFilterIntensity,
       faceSaturation: seed.faceSaturation,
       faceBrightness: seed.faceBrightness,
@@ -231,6 +231,8 @@ class MediaStudioExportResult {
     this.sound,
     this.soundOffset = Duration.zero,
     this.soundWindow = const Duration(seconds: 15),
+    this.soundDidTrim = false,
+    this.soundSegmentId,
   });
 
   final List<File> files;
@@ -243,6 +245,8 @@ class MediaStudioExportResult {
   final SoundEntity? sound;
   final Duration soundOffset;
   final Duration soundWindow;
+  final bool soundDidTrim;
+  final String? soundSegmentId;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.

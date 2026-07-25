@@ -16,6 +16,8 @@ class CameraMediaPickResult {
     this.sound,
     this.soundOffset = Duration.zero,
     this.soundWindow = const Duration(seconds: 15),
+    this.soundDidTrim = false,
+    this.soundSegmentId,
   });
 
   final List<File> files;
@@ -24,6 +26,8 @@ class CameraMediaPickResult {
   final SoundEntity? sound;
   final Duration soundOffset;
   final Duration soundWindow;
+  final bool soundDidTrim;
+  final String? soundSegmentId;
 }
 
 /// Runs gallery items through the media studio editor, then opens add post.
@@ -98,6 +102,8 @@ class MediaGalleryImportFlow {
       'initialSound': edited.sound ?? initialSound,
       'initialSoundOffset': edited.soundOffset,
       'initialSoundWindow': edited.soundWindow,
+      'initialSoundDidTrim': edited.soundDidTrim,
+      'initialSoundSegmentId': edited.soundSegmentId,
       if (edited.filterName != null) 'filterName': edited.filterName,
       'filterCategory': edited.filterCategory.name,
       if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,

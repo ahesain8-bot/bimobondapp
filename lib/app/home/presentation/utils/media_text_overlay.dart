@@ -10,9 +10,9 @@ enum MediaTextLook {
 
 /// A single editable text sticker placed on a photo in the media studio editor.
 ///
-/// [center] is stored as a fraction (0..1) of the preview box so the overlay
-/// stays anchored to the same spot regardless of the device/preview size, and
-/// can be mapped back onto the full-resolution image when baking.
+/// [center] is stored as a fraction (0..1) of the **media image/video frame**
+/// so overlays stay locked to image content across letterboxing, filter
+/// previews, and container resizes — and map 1:1 when baking.
 class MediaTextOverlay {
   const MediaTextOverlay({
     required this.id,
@@ -34,7 +34,7 @@ class MediaTextOverlay {
   final String id;
   final String text;
 
-  /// Fractional center within the preview box (0..1, 0..1).
+  /// Fractional center within the media frame (0..1, 0..1).
   final Offset center;
 
   final Color color;

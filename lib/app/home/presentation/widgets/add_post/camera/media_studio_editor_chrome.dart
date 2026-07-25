@@ -202,76 +202,85 @@ class _MediaStudioSideRailState extends State<MediaStudioSideRail> {
         builder: (context, constraints) {
           return Directionality(
             textDirection: TextDirection.ltr,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: widget.iconOnStartEdge
-                  ? CrossAxisAlignment.start
-                  : CrossAxisAlignment.end,
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                for (var i = 0; i < pinned.length; i++)
-                  _buildToolRow(
-                    pinned[i],
-                    trimBottomSpacing: i == pinned.length - 1,
-                  ),
-                CameraSideRailSeparator(
+                CameraRailExpandedBackdrop(
+                  expanded: _expanded,
                   iconOnStartEdge: widget.iconOnStartEdge,
                 ),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: _maxScrollHeight(constraints),
-                  ),
-                  child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: widget.iconOnStartEdge
-                          ? CrossAxisAlignment.start
-                          : CrossAxisAlignment.end,
-                      children: [
-                        for (var i = 0; i < scrollable.length; i++)
-                          _buildToolRow(
-                            scrollable[i],
-                            trimBottomSpacing: i == scrollable.length - 1 &&
-                                _hasMore &&
-                                !_expanded,
-                          ),
-                        if (overflow.isNotEmpty)
-                          ClipRect(
-                            child: AnimatedAlign(
-                              duration: const Duration(milliseconds: 480),
-                              curve: Curves.easeInOutCubic,
-                              alignment: widget.iconOnStartEdge
-                                  ? Alignment.topLeft
-                                  : Alignment.topRight,
-                              heightFactor: _expanded ? 1.0 : 0.0,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: widget.iconOnStartEdge
-                                    ? CrossAxisAlignment.start
-                                    : CrossAxisAlignment.end,
-                                children: [
-                                  for (var i = 0; i < overflow.length; i++)
-                                    _buildToolRow(
-                                      overflow[i],
-                                      trimBottomSpacing:
-                                          i == overflow.length - 1 &&
-                                              _hasMore,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: widget.iconOnStartEdge
+                      ? CrossAxisAlignment.start
+                      : CrossAxisAlignment.end,
+                  children: [
+                    for (var i = 0; i < pinned.length; i++)
+                      _buildToolRow(
+                        pinned[i],
+                        trimBottomSpacing: i == pinned.length - 1,
+                      ),
+                    CameraSideRailSeparator(
+                      iconOnStartEdge: widget.iconOnStartEdge,
                     ),
-                  ),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: _maxScrollHeight(constraints),
+                      ),
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: widget.iconOnStartEdge
+                              ? CrossAxisAlignment.start
+                              : CrossAxisAlignment.end,
+                          children: [
+                            for (var i = 0; i < scrollable.length; i++)
+                              _buildToolRow(
+                                scrollable[i],
+                                trimBottomSpacing: i == scrollable.length - 1 &&
+                                    _hasMore &&
+                                    !_expanded,
+                              ),
+                            if (overflow.isNotEmpty)
+                              ClipRect(
+                                child: AnimatedAlign(
+                                  duration: const Duration(milliseconds: 480),
+                                  curve: Curves.easeInOutCubic,
+                                  alignment: widget.iconOnStartEdge
+                                      ? Alignment.topLeft
+                                      : Alignment.topRight,
+                                  heightFactor: _expanded ? 1.0 : 0.0,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: widget.iconOnStartEdge
+                                        ? CrossAxisAlignment.start
+                                        : CrossAxisAlignment.end,
+                                    children: [
+                                      for (var i = 0; i < overflow.length; i++)
+                                        _buildToolRow(
+                                          overflow[i],
+                                          trimBottomSpacing:
+                                              i == overflow.length - 1 &&
+                                                  _hasMore,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_hasMore)
+                      CameraRailExpandButton(
+                        expanded: _expanded,
+                        iconOnStartEdge: widget.iconOnStartEdge,
+                        onTap: () => setState(() => _expanded = !_expanded),
+                        compact: true,
+                      ),
+                  ],
                 ),
-                if (_hasMore)
-                  CameraRailExpandButton(
-                    expanded: _expanded,
-                    iconOnStartEdge: widget.iconOnStartEdge,
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    compact: true,
-                  ),
               ],
             ),
           );
@@ -328,6 +337,7 @@ class _MediaStudioSideRailState extends State<MediaStudioSideRail> {
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         height: 1,
+                        shadows: CameraToolIcons.iconShadows,
                       ),
                     ),
                   ),

@@ -27,18 +27,17 @@ class AuctionCard extends StatelessWidget {
   final VoidCallback onOpen;
   final bool showBidButton;
 
-  String _formatHighestPrice(AppLocalizations l10n, Locale locale) {
+  String _formatHighestPrice(Locale locale) {
     final highest = auction.highestPriceCoins > 0
         ? auction.highestPriceCoins
         : auction.giftTotalCoins;
-    final amount = formatAuctionPricingCoins(highest, locale);
-    return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
+    return formatAuctionPricingCoins(highest, locale);
   }
 
   String _formatTargetPrice(Locale locale) {
     final target = auction.targetPriceCoins > 0
         ? auction.targetPriceCoins
-        : (auction.post?.auction?.displayBidderSpendCoins.round() ?? 0);
+        : (auction.post?.auction?.targetPriceCoins ?? 0);
     return formatAuctionPricingCoins(target, locale);
   }
 
@@ -224,20 +223,16 @@ class AuctionCard extends StatelessWidget {
                                     variant: TextVariant.secondary,
                                   ),
                                   const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      const AppCoinIcon(size: 13),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatTargetPrice(locale),
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: theme.colorScheme.onSurface
-                                              .withValues(alpha: 0.85),
-                                        ),
-                                      ),
-                                    ],
+                                  AppCoinAmount(
+                                    iconSize: 13,
+                                    spacing: 4,
+                                    text: _formatTargetPrice(locale),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.85),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -264,7 +259,7 @@ class AuctionCard extends StatelessWidget {
                                       AppCoinAmount(
                                         iconSize: 13,
                                         spacing: 4,
-                                        text: _formatHighestPrice(l10n, locale),
+                                        text: _formatHighestPrice(locale),
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,

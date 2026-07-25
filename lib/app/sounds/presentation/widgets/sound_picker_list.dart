@@ -20,6 +20,7 @@ class SoundPickerList extends StatelessWidget {
     required this.onSoundTap,
     required this.onScissorsTap,
     required this.onFavoriteTap,
+    this.scrollController,
   });
 
   final bool loading;
@@ -32,6 +33,7 @@ class SoundPickerList extends StatelessWidget {
   final ValueChanged<SoundEntity> onSoundTap;
   final ValueChanged<SoundEntity> onScissorsTap;
   final ValueChanged<SoundEntity> onFavoriteTap;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -39,39 +41,68 @@ class SoundPickerList extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     if (loading) {
-      return const Center(child: CustomLoadingWidget(size: 40));
+      return ListView(
+        controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 180, child: Center(child: CustomLoadingWidget(size: 40))),
+        ],
+      );
     }
 
     if (showError && error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomText(
-                error!,
-                variant: TextVariant.secondary,
-                textAlign: TextAlign.center,
+      return ListView(
+        controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 220,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSizes.p24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CustomText(
+                      error!,
+                      variant: TextVariant.secondary,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: onRetry,
+                      child: Text(l10n.liveGiftRetry),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              TextButton(onPressed: onRetry, child: Text(l10n.liveGiftRetry)),
-            ],
+            ),
           ),
-        ),
+        ],
       );
     }
 
     if (sounds.isEmpty) {
-      return Center(
-        child: CustomText(
-          l10n.soundPickerEmpty,
-          variant: TextVariant.secondary,
-        ),
+      return ListView(
+        controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 180,
+            child: Center(
+              child: CustomText(
+                l10n.soundPickerEmpty,
+                variant: TextVariant.secondary,
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     return ListView.separated(
+      controller: scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: sounds.length,
       separatorBuilder: (_, index) => Divider(
         height: 1,

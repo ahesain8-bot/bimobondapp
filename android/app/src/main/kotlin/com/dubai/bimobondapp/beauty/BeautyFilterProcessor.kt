@@ -64,6 +64,45 @@ object BeautyFilterProcessor {
         }
     }
 
+    /**
+     * Edge-preserving smoothing (bilateral filter) for captured photos/video frames.
+     * Blurs flat, noisy regions (skin texture, sensor grain) while keeping hard edges
+     * (eyes, brows, hairline, jaw contour) sharp — unlike a plain blur, which would
+     * also soften those edges. strength 0..1, 0 = no-op (returns [bitmap] unchanged).
+     * Returns a new bitmap; caller owns recycling both [bitmap] and the result.
+     */
+    fun smoothSkin(bitmap: Bitmap, strength: Float = 0.35f): Bitmap {
+        val s = strength.coerceIn(0f, 1f)
+        if (s <= 0.01f) return bitmap
+        if (!ensureOpenCv()) return bitmap
+
+        val src = Mat()
+        val bgr = Mat()
+        val filtered = Mat()
+        return try {
+            Utils.bitmapToMat(bitmap, src)
+            Imgproc.cvtColor(src, bgr, Imgproc.COLOR_RGBA2BGR)
+
+            // d=5..9, sigma=25..70 across the strength range — modest defaults so
+            // "a little" smoothing doesn't wax skin into plastic.
+            val diameter = 5 + (s * 4f).roundToInt()
+            val sigma = 25.0 + s * 45.0
+            Imgproc.bilateralFilter(bgr, filtered, diameter, sigma, sigma)
+
+            Imgproc.cvtColor(filtered, src, Imgproc.COLOR_BGR2RGBA)
+            val out = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(src, out)
+            out
+        } catch (t: Throwable) {
+            Log.w(TAG, "smoothSkin failed", t)
+            bitmap
+        } finally {
+            src.release()
+            bgr.release()
+            filtered.release()
+        }
+    }
+
     /** All slider levels, -100..100 (0 = original). */
     data class Adjustments(
         val saturation: Int = 0,

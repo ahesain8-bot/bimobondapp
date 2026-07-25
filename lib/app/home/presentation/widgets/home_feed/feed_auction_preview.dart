@@ -293,10 +293,10 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context);
     final theme = Theme.of(context);
-    final bidderSpend = auction?.displayBidderSpendCoins;
-    final targetPriceLabel = bidderSpend != null && bidderSpend > 0
+    final targetCoins = auction?.targetPriceCoins ?? 0;
+    final targetPriceLabel = targetCoins > 0
         ? l10n.auctionTargetPrice(
-            formatAuctionPricingCoins(bidderSpend, locale),
+            formatAuctionPricingCoins(targetCoins, locale),
             l10n.coinsUnit,
           )
         : null;
@@ -311,7 +311,7 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
             bidAmountText: _formatHighestBid(l10n, locale),
             showGiftIcon: true,
             showCoinIcon: true,
-            targetPrice: bidderSpend?.round(),
+            targetPrice: targetCoins > 0 ? targetCoins : null,
             targetPriceLabel: targetPriceLabel,
             isFinished: isAuctionFinished,
             popAnimation: const AlwaysStoppedAnimation(1),

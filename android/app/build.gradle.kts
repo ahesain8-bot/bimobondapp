@@ -84,6 +84,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("com.google.guava:guava:33.3.1-android")
 
+    // Lottie — confetti overlay animation on the AR camera preview.
+    implementation("com.airbnb.android:lottie:6.6.2")
+
     // OpenCV Android SDK (Maven Central) — still-image beauty pipeline
     implementation("org.opencv:opencv:4.9.0")
 }
