@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_remote_loader.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
@@ -205,9 +206,13 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   Future<void> _loadCatalog() async {
-    await camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded(
-      forceRefresh: true,
-    );
+    await Future.wait([
+      camera_studio_di.sl<CameraStudioCatalogLoader>().ensureLoaded(
+        forceRefresh: true,
+      ),
+      if (_useNativeArFilters)
+        ArColorFilterRemoteLoader.ensureLoaded(forceRefresh: true),
+    ]);
     if (!mounted) return;
     final categories = CameraFilterCatalog.filterCategories;
     setState(() {
@@ -379,11 +384,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_useNativeArFilters) {
       _syncRetouchToNative();
     }
-    if (_ratioLetterboxed) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_syncNativePreviewLetterbox());
-      });
-    }
+    // Deliberately NOT re-syncing the native letterbox margins here — same
+    // reason as onFiltersToggle above: it's cosmetic-only (handled by the
+    // live preview's ClipPath) and re-applying it natively resizes the
+    // SurfaceView, causing a brief camera freeze on every open/close.
   }
 
   void _onPhotoEditorMagicToggled() {
@@ -2371,11 +2375,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               _showFilters = next;
               if (next) _showPhotoEditor = false;
             });
-            if (_ratioLetterboxed) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                unawaited(_syncNativePreviewLetterbox());
-              });
-            }
+            // Deliberately NOT re-syncing the native letterbox margins here.
+            // bottomHeight() shrinks by ~48px while this panel is open, but
+            // that's purely cosmetic — the live preview's ClipPath already
+            // reflects it (see _buildNativeArCameraBody). Re-applying it
+            // natively via ArCameraBridge.setPreviewLetterbox changes
+            // previewView/warpGlView's actual layout margins, which resizes
+            // the underlying SurfaceView — the exact thing this screen's own
+            // ArCameraPreview sizing comment warns blacks/freezes the camera
+            // out ("resizing SurfaceView blacks it out"). Was causing a
+            // brief camera freeze on every open AND close of this panel.
             if (next) {
               unawaited(ArCameraBridge.prepareShaderPipeline());
             }

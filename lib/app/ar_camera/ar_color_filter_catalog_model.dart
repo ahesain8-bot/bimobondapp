@@ -1,5 +1,11 @@
 import 'dart:convert';
 
+/// Used when a backend filter ships with neither `thumbnailUrl` nor `emoji`
+/// set — see [ArColorFilterItemModel.fromJson]. Without a fallback, such a
+/// filter fails [ArColorFilterItemModel.hasValidBeauty] and is silently
+/// dropped from the list entirely.
+const String _fallbackEmoji = '🎨';
+
 // =============================================================================
 // BEAUTY FILTERS CATALOG — Backend API Contract + App Model
 // =============================================================================
@@ -10,9 +16,13 @@ import 'dart:convert';
 // ENDPOINT: GET /camera-studio/color-filters
 // Offline: ar_color_filter_bundled_catalog.dart
 //
- // Required filter fields (flat):
-//   id, label, type ("beauty"), thumbnailUrl (or emoji offline),
-//   smooth, whiten, brighten, blush, lipTint, lipStrength, defaultIntensity
+// Real backend response shape (see ar_color_filter_backend_guide.dart /
+// the camera-studio API docs): filter values are nested one level under a
+// "filterSettings" object, as 0-100 integers (one-direction fields: 0=off,
+// 100=max; balanced fields brightness/contrast/saturation/warmth: 50=neutral,
+// 0/100=max in either direction). "filterSettings" is omitted entirely for a
+// no-effect filter (e.g. "Normal"). This file converts those 0-100 ints to
+// the 0..1 / -1..1 decimals the native shader pipeline expects.
 //
 // =============================================================================
 
@@ -168,19 +178,21 @@ class ArBeautyFilterParams {
     lipStrength: 0.40,
   );
 
+  /// Parses the backend's 0-100 `filterSettings` object into this class's
+  /// 0..1 / -1..1 decimals. [json] is the `filterSettings` map itself (NOT
+  /// the whole filter object) — see [ArColorFilterItemModel.fromJson].
   factory ArBeautyFilterParams.fromJson(Map<String, dynamic> json) {
     return ArBeautyFilterParams(
-      smooth: _readDouble01(json['smooth'], fallback: defaults.smooth),
-      whiten: _readDouble01(json['whiten'], fallback: defaults.whiten),
-      brighten: _readDouble01(json['brighten'], fallback: defaults.brighten),
-      blush: _readDouble01(json['blush'], fallback: defaults.blush),
+      smooth: _readUnipolar100(json['smooth'], fallbackPercent: 55),
+      whiten: _readUnipolar100(json['whiten'], fallbackPercent: 0),
+      brighten: _readUnipolar100(json['brighten'], fallbackPercent: 0),
+      blush: _readUnipolar100(json['blush'], fallbackPercent: 0),
       lipTint: _readLipTint(json['lipTint']),
-      lipStrength:
-          _readDouble01(json['lipStrength'], fallback: defaults.lipStrength),
-      brightness: _readDoubleSigned(json['brightness'], fallback: 0),
-      contrast: _readDoubleSigned(json['contrast'], fallback: 0),
-      saturation: _readDoubleSigned(json['saturation'], fallback: 0),
-      warmth: _readDoubleSigned(json['warmth'], fallback: 0),
+      lipStrength: _readUnipolar100(json['lipStrength'], fallbackPercent: 0),
+      brightness: _readBalanced100(json['brightness'], fallbackPercent: 50),
+      contrast: _readBalanced100(json['contrast'], fallbackPercent: 50),
+      saturation: _readBalanced100(json['saturation'], fallbackPercent: 50),
+      warmth: _readBalanced100(json['warmth'], fallbackPercent: 50),
     );
   }
 
@@ -226,21 +238,42 @@ class ArColorFilterItemModel {
   ArColorFilterRenderType get renderType => type;
 
   factory ArColorFilterItemModel.fromJson(Map<String, dynamic> json) {
-    final paramsRaw = json['params'];
-    final source = paramsRaw is Map
-        ? Map<String, dynamic>.from(paramsRaw)
-        : json;
+    // Real backend shape: values live under "filterSettings" (0-100 ints).
+    // "params" (flat, 0..1) is also accepted so bundled/offline JSON in the
+    // old shape (if any) keeps working. No filterSettings/params at all (the
+    // documented "Normal"/off filter case) means no beauty effect — leave
+    // params null rather than guessing at ArBeautyFilterParams.defaults,
+    // which would apply a strong look nobody authored.
+    final settingsRaw = json['filterSettings'] ?? json['params'];
+    final settings = settingsRaw is Map
+        ? Map<String, dynamic>.from(settingsRaw)
+        : null;
+
+    final thumbnailUrl = json['thumbnailUrl']?.toString();
+    final rawEmoji = json['emoji']?.toString();
+    final hasThumbnail = (thumbnailUrl ?? '').trim().isNotEmpty;
+    final hasEmoji = (rawEmoji ?? '').trim().isNotEmpty;
+    // The app (and the guide handed to the backend) requires at least one of
+    // thumbnailUrl/emoji, or hasValidBeauty silently drops the filter from
+    // the list entirely. Backend responses have shipped without either on
+    // real filters more than once — fall back to a generic emoji rather than
+    // losing the filter outright; a thumbnail, once added backend-side,
+    // still takes priority over this fallback.
+    final emoji = hasEmoji
+        ? rawEmoji
+        : (hasThumbnail ? null : _fallbackEmoji);
 
     return ArColorFilterItemModel(
       id: json['id']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
       type: ArColorFilterRenderType.beauty,
-      thumbnailUrl: json['thumbnailUrl']?.toString(),
-      emoji: json['emoji']?.toString(),
+      thumbnailUrl: thumbnailUrl,
+      emoji: emoji,
       previewColorHex: json['previewColorHex']?.toString(),
-      defaultIntensity:
-          _readDouble01(json['defaultIntensity'], fallback: 0.7),
-      params: ArBeautyFilterParams.fromJson(source),
+      defaultIntensity: settings != null
+          ? _readUnipolar100(settings['defaultIntensity'], fallbackPercent: 70)
+          : 0.7,
+      params: settings != null ? ArBeautyFilterParams.fromJson(settings) : null,
       sortOrder: _readInt(json['sortOrder']),
     );
   }
@@ -299,35 +332,28 @@ int _readInt(dynamic value) {
   return 0;
 }
 
-/// Like [_readDouble01] but allows negative values (-1..1) — for color-grade
-/// fields (brightness/contrast/saturation/warmth) where 0 is neutral and both
-/// directions are meaningful, unlike the 0..1-only beauty strength fields.
-double _readDoubleSigned(dynamic value, {required double fallback}) {
+double _readPercent(dynamic value, {required double fallbackPercent}) {
   double parsed;
   if (value is num) {
     parsed = value.toDouble();
   } else if (value is String) {
-    parsed = double.tryParse(value) ?? fallback;
+    parsed = double.tryParse(value) ?? fallbackPercent;
   } else {
-    return fallback;
+    return fallbackPercent;
   }
-  if (parsed < -1) return -1;
-  if (parsed > 1) return 1;
+  if (parsed < 0) return 0;
+  if (parsed > 100) return 100;
   return parsed;
 }
 
-double _readDouble01(dynamic value, {required double fallback}) {
-  double parsed;
-  if (value is num) {
-    parsed = value.toDouble();
-  } else if (value is String) {
-    parsed = double.tryParse(value) ?? fallback;
-  } else {
-    return fallback;
-  }
-  if (parsed < 0) return 0;
-  if (parsed > 1) return 1;
-  return parsed;
+/// One-direction backend field (0-100, 0=off/100=max) -> internal 0..1.
+double _readUnipolar100(dynamic value, {required double fallbackPercent}) {
+  return _readPercent(value, fallbackPercent: fallbackPercent) / 100.0;
+}
+
+/// Balanced backend field (0-100, 50=neutral) -> internal -1..1.
+double _readBalanced100(dynamic value, {required double fallbackPercent}) {
+  return (_readPercent(value, fallbackPercent: fallbackPercent) - 50) / 50.0;
 }
 
 String _readLipTint(dynamic value) {

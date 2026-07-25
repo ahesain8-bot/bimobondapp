@@ -12,8 +12,8 @@ enum class FilterType {
     LONG_NOSE,
     CONFETTI,
     KEYWORDS,
-    MATRIX,
-    SPACE_ROCKET;
+    SNOWFALL,
+    SNOW_OFF_WHITE;
 
     fun isDistortion(): Boolean =
         this == BIG_EYES || this == BIG_LIPS || this == LONG_NOSE
@@ -24,14 +24,14 @@ enum class FilterType {
 
     /** Full-screen Lottie-style overlay — not face-anchored, needs no face detection. */
     fun isScreenOverlay(): Boolean =
-        this == CONFETTI || this == KEYWORDS || this == MATRIX || this == SPACE_ROCKET
+        this == CONFETTI || this == KEYWORDS || this == SNOWFALL || this == SNOW_OFF_WHITE
 
     /** assets/ filename for this screen-overlay filter's Lottie animation, or null. */
     fun screenOverlayAsset(): String? = when (this) {
         CONFETTI -> "Confetti.json"
         KEYWORDS -> "Keywords.json"
-        MATRIX -> "Matrix.json"
-        SPACE_ROCKET -> "Space rocket.json"
+        SNOWFALL -> "snowfall.json"
+        SNOW_OFF_WHITE -> "Snow Off white.json"
         else -> null
     }
 
@@ -49,8 +49,8 @@ enum class FilterType {
             "long_nose" -> LONG_NOSE
             "confetti" -> CONFETTI
             "keywords" -> KEYWORDS
-            "matrix" -> MATRIX
-            "space_rocket" -> SPACE_ROCKET
+            "snowfall" -> SNOWFALL
+            "snow_off_white" -> SNOW_OFF_WHITE
             else -> NONE
         }
     }

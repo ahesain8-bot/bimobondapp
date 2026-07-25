@@ -645,7 +645,7 @@ object ArCameraBridge {
 
         val confetti = confettiOverlay
         if (useScreenOverlay) {
-            // Confetti/Keywords/Matrix/Space Rocket all share this one Lottie
+            // Confetti/Keywords/Snowfall/Snow White all share this one Lottie
             // view — only one screen-overlay filter is ever active at a time —
             // so swap its loaded asset whenever the selection actually changes.
             val asset = type.screenOverlayAsset()
