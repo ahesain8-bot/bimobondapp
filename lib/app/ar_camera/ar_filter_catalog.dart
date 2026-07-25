@@ -54,8 +54,8 @@ class ArFilterCatalog {
     ArFilterItem(id: 'long_nose', label: 'Nose', emoji: '👃'),
     ArFilterItem(id: 'confetti', label: 'Confetti', emoji: '🎉'),
     ArFilterItem(id: 'keywords', label: 'Keywords', emoji: '🔤'),
-    ArFilterItem(id: 'matrix', label: 'Matrix', emoji: '🟩'),
-    ArFilterItem(id: 'space_rocket', label: 'Space Rocket', emoji: '🚀'),
+    ArFilterItem(id: 'snowfall', label: 'Snowfall', emoji: '❄️'),
+    ArFilterItem(id: 'snow_off_white', label: 'Snow White', emoji: '🌨️'),
   ];
 
   /// Static beauty catalog (no LUTs).

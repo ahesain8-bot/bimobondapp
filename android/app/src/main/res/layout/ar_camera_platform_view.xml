@@ -23,14 +23,20 @@
 
     <!--
       Screen-overlay filter animation — pure decoration on top of the live
-      preview, shared by Confetti/Keywords/Matrix/Space Rocket (only one is
-      ever active at a time; ArCameraBridge.applyRenderMode swaps which
+      preview, shared by Confetti/Keywords/Snowfall/Snow White (only
+      one is ever active at a time; ArCameraBridge.applyRenderMode swaps which
       asset is loaded based on the selected filter). Transparent background
       so the camera stays visible underneath; not clickable/focusable so it
       never intercepts touches meant for camera controls below it. No static
       lottie_fileName/autoPlay here — asset + playback are entirely driven
       from Kotlin (ArCameraPlatformView.init, ArCameraBridge.applyRenderMode)
       since which animation plays depends on the selected filter.
+      scaleType="centerCrop": several of these compositions aren't the same
+      aspect ratio as the phone screen (e.g. Confetti/Matrix are square) — the
+      ImageView default (fitCenter) would shrink them to fit width, leaving
+      the animation as a centered box with empty space above/below instead of
+      covering the full screen top-to-bottom. centerCrop fills the view and
+      crops any overflow instead.
     -->
     <com.airbnb.lottie.LottieAnimationView
         android:id="@+id/confettiOverlay"
@@ -40,6 +46,7 @@
         android:clickable="false"
         android:focusable="false"
         android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
         app:lottie_loop="true" />
 
 </FrameLayout>

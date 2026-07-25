@@ -54,7 +54,9 @@ import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import com.airbnb.lottie.LottieAnimationView
+import com.airbnb.lottie.LottieComposition
+import com.airbnb.lottie.LottieDrawable
+import com.airbnb.lottie.RenderMode
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import java.io.File
 import java.io.FileOutputStream
@@ -141,7 +143,7 @@ object ArCameraController {
     private const val PHOTO_TARGET_HEIGHT = 2880
     private const val RECORD_FRAME_INTERVAL_MS = 33L
 
-    // Screen-overlay filters (Confetti/Keywords/Matrix/Space Rocket) capture via
+    // Screen-overlay filters (Confetti/Keywords/Snowfall/Snow White) capture via
     // PreviewView.getBitmap(), which does a full-view pixel readback — Android's
     // own docs warn against calling it every frame. Polling it at 30fps (same as
     // RECORD_FRAME_INTERVAL_MS) was the source of the heavy recording lag; this
@@ -171,7 +173,7 @@ object ArCameraController {
 
     /**
      * Dedicated background thread for [PixelCopy] callbacks used by the
-     * screen-overlay (Confetti/Keywords/Matrix/Space Rocket) recording capture
+     * screen-overlay (Confetti/Keywords/Snowfall/Snow White) recording capture
      * — see [requestConfettiFrame]. Keeps that readback fully off the main
      * thread without adding another concurrent camera stream (which was tried
      * and reverted — see project history — because it degraded overall camera
@@ -524,6 +526,8 @@ object ArCameraController {
         pixelCopyHandlerThread?.quitSafely()
         pixelCopyHandlerThread = null
         confettiPixelCopyBusy.set(false)
+        confettiHeadlessDrawable = null
+        confettiHeadlessComposition = null
         try {
             stickerCameraOverlay?.release()
         } catch (_: Exception) {
@@ -808,7 +812,7 @@ object ArCameraController {
 
     /**
      * Snapshots the screen-overlay Lottie view's currently-rendered frame
-     * (Confetti/Keywords/Matrix/Space Rocket) as a bitmap, so it can be
+     * (Confetti/Keywords/Snowfall/Snow White) as a bitmap, so it can be
      * composited into a saved photo/video frame. Must run on the main thread
      * (View drawing) — call this BEFORE handing off to a background executor,
      * never from inside one.
@@ -1419,26 +1423,37 @@ object ArCameraController {
             glSurfaceRecording = false
             val gl = ArCameraBridge.warpGlView
 
-            fun finishStop() {
+            // videoRecorder.stop() blocks its calling thread 150ms+ (drain
+            // sleep) plus muxing time — stopRecording() runs on the main
+            // thread (direct MethodChannel handler call), so doing this
+            // inline froze the UI on every stop. Moved to recordOfferExecutor;
+            // gl.clearEncoderSurface() is itself already safe to call off the
+            // main thread (GLSurfaceView.queueEvent), so the existing
+            // "stop the encoder before clearing its surface" ordering (avoids
+            // an extra black frame as the clip's last sample) still holds,
+            // just both steps now happen on the background thread instead.
+            fun finishStop(after: () -> Unit) {
                 try {
                     val file = videoRecorder.stop()
                     if (file != null && file.exists() && file.length() > 0L) {
                         lastStoppedPath = file.absolutePath
-                        onResult(file.absolutePath, null)
+                        mainHandler.post { onResult(file.absolutePath, null) }
                     } else {
-                        onResult(null, "empty_video")
+                        mainHandler.post { onResult(null, "empty_video") }
                     }
                 } catch (e: Exception) {
-                    onResult(null, e.message ?: "record_stop_failed")
+                    mainHandler.post { onResult(null, e.message ?: "record_stop_failed") }
+                } finally {
+                    after()
                 }
             }
-            if (gl != null) {
-                // Stop the encoder first; clearing the encoder surface afterward
-                // avoids encoding an extra black frame as the clip's last sample.
-                finishStop()
-                gl.clearEncoderSurface(null)
+            val executor = recordOfferExecutor
+            if (executor != null) {
+                executor.execute {
+                    finishStop { gl?.clearEncoderSurface(null) }
+                }
             } else {
-                finishStop()
+                finishStop { gl?.clearEncoderSurface(null) }
             }
             return
         }
@@ -1455,6 +1470,35 @@ object ArCameraController {
 
             if (!boundToOes) {
                 gl?.setOnFramePresented(null)
+            }
+
+            // videoRecorder.stop() blocks its calling thread for 150ms+ (a
+            // hardcoded drain sleep) plus however long muxing the audio/video
+            // takes — stopRecording() is invoked directly from the Flutter
+            // method channel handler (MainActivity), i.e. the MAIN thread, so
+            // doing this inline froze the UI on every stop ("lag after
+            // recording"). Run it on recordOfferExecutor (already used for
+            // this same recording's frame work, so it naturally serializes
+            // after any in-flight frame) and hop back to mainHandler only for
+            // the result callback, which ends in a MethodChannel.Result that
+            // must complete on the platform thread.
+            val executor = recordOfferExecutor
+            if (executor != null) {
+                executor.execute {
+                    val (path, error) = try {
+                        val file = videoRecorder.stop()
+                        if (file != null && file.exists() && file.length() > 0L) {
+                            lastStoppedPath = file.absolutePath
+                            file.absolutePath to null
+                        } else {
+                            null to "empty_video"
+                        }
+                    } catch (e: Exception) {
+                        null to (e.message ?: "record_stop_failed")
+                    }
+                    mainHandler.post { onResult(path, error) }
+                }
+                return
             }
 
             val file = videoRecorder.stop()
@@ -1715,12 +1759,17 @@ object ArCameraController {
         }
     }
 
+    /** Reused across recording composite ticks — see [composeConfettiOverlay].
+     *  Only ever touched from [recordOfferExecutor]'s single thread. */
+    private var confettiHeadlessDrawable: LottieDrawable? = null
+    private var confettiHeadlessComposition: LottieComposition? = null
+
     /**
      * Grabs a base frame for the confetti recording composite, preferring an
      * async [PixelCopy] straight off previewView's backing [SurfaceView] (runs
      * on [pixelCopyHandlerThread], never blocks the main thread) over the old
      * `PreviewView.getBitmap()` (a synchronous, main-thread-blocking GPU
-     * readback — confirmed the dominant cost behind the overlay+recording lag).
+     * readback — confirmed a dominant cost behind the overlay+recording lag).
      * Requesting directly at ~[RECORD_PROCESS_EDGE] also means the copy itself
      * moves fewer pixels, on top of not blocking anything.
      *
@@ -1733,6 +1782,12 @@ object ArCameraController {
      * Falls back to the old synchronous path if the SurfaceView isn't found
      * (e.g. PreviewView fell back to TextureView) or PixelCopy can't be
      * started, so this can only be as slow as before, never worse.
+     *
+     * Only main-thread work left per tick: this function itself (a few field
+     * reads + either issuing the async PixelCopy request or, in the fallback
+     * case, the synchronous previewView.bitmap() call) — the Lottie composite
+     * draw itself (see [finishConfettiFrame]) always runs on a background
+     * thread now, never the on-screen View.
      */
     private fun requestConfettiFrame() {
         if (!confettiPixelCopyBusy.compareAndSet(false, true)) {
@@ -1741,13 +1796,21 @@ object ArCameraController {
         }
         val previewView = ArCameraBridge.previewView
         val overlay = ArCameraBridge.confettiOverlay
-        if (previewView == null || overlay == null ||
+        val composition = overlay?.composition
+        if (previewView == null || overlay == null || composition == null ||
             overlay.visibility != View.VISIBLE || overlay.width <= 0 || overlay.height <= 0
         ) {
             confettiPixelCopyBusy.set(false)
             scheduleNextConfettiTick()
             return
         }
+        // Snapshot the on-screen view's current animation position now, on the
+        // main thread (cheap field reads) — the actual draw happens later, off
+        // this thread, via a headless LottieDrawable that never touches the
+        // View, so it can't race the main thread's own animator.
+        val progress = overlay.progress
+        val overlayWidth = overlay.width
+        val overlayHeight = overlay.height
 
         val handler = pixelCopyHandler
         val surfaceView = previewView.getChildAt(0) as? SurfaceView
@@ -1770,7 +1833,7 @@ object ArCameraController {
                         dest,
                         { result ->
                             if (result == PixelCopy.SUCCESS) {
-                                mainHandler.post { finishConfettiFrame(overlay, dest) }
+                                finishConfettiFrame(composition, progress, overlayWidth, overlayHeight, dest)
                             } else {
                                 dest.recycle()
                                 confettiPixelCopyBusy.set(false)
@@ -1797,25 +1860,65 @@ object ArCameraController {
             scheduleNextConfettiTick()
             return
         }
-        finishConfettiFrame(overlay, raw)
+        finishConfettiFrame(composition, progress, overlayWidth, overlayHeight, raw)
     }
 
-    /** Runs on the main thread — [LottieAnimationView.draw] requires it. */
-    private fun finishConfettiFrame(overlay: LottieAnimationView, base: Bitmap) {
-        val composed = composeConfettiOverlay(overlay, base)
-        composed?.let { offerRecordingFrameAsync(it, recycleSourceAlways = true) }
-        confettiPixelCopyBusy.set(false)
-        scheduleNextConfettiTick()
+    /**
+     * Dispatches the Lottie composite to [recordOfferExecutor] regardless of
+     * which path produced [base] (PixelCopy's own background callback, or the
+     * main-thread previewView.bitmap() fallback) — the per-layer Lottie
+     * rasterization (see [composeConfettiOverlay]) never touches the main
+     * thread this way.
+     */
+    private fun finishConfettiFrame(
+        composition: LottieComposition,
+        progress: Float,
+        overlayWidth: Int,
+        overlayHeight: Int,
+        base: Bitmap,
+    ) {
+        val executor = recordOfferExecutor
+        if (executor == null) {
+            confettiPixelCopyBusy.set(false)
+            scheduleNextConfettiTick()
+            if (!base.isRecycled) base.recycle()
+            return
+        }
+        executor.execute {
+            val composed = try {
+                composeConfettiOverlay(base, composition, progress, overlayWidth, overlayHeight)
+            } catch (_: Exception) {
+                base
+            }
+            composed?.let { offerRecordingFrameAsync(it, recycleSourceAlways = true) }
+            confettiPixelCopyBusy.set(false)
+            scheduleNextConfettiTick()
+        }
     }
 
-    private fun composeConfettiOverlay(overlay: LottieAnimationView, raw: Bitmap): Bitmap? {
+    /**
+     * Draws the Lottie animation onto [raw] using a headless [LottieDrawable]
+     * (SOFTWARE render mode, matching the software Bitmap [Canvas] it draws
+     * to) instead of the on-screen `confettiOverlay` View — a plain Drawable
+     * has no thread restriction, unlike a View, which is what lets the whole
+     * composite run on [recordOfferExecutor] instead of the main thread.
+     * Reuses one drawable instance across ticks (recreated only if the
+     * composition itself changes, e.g. a different overlay filter is picked).
+     */
+    private fun composeConfettiOverlay(
+        raw: Bitmap,
+        composition: LottieComposition,
+        progress: Float,
+        overlayWidth: Int,
+        overlayHeight: Int,
+    ): Bitmap? {
         return try {
-            // Shrink before the Lottie draw below, not after: overlay.draw(canvas)'s
-            // cost scales with the canvas pixel area, and frameForRecording() rescales
-            // this whole composite down to RECORD_PROCESS_EDGE anyway once it reaches
-            // the background executor. (The PixelCopy path above already requests
-            // roughly this size, so this is usually a no-op there — still matters
-            // for the synchronous previewView.bitmap() fallback.)
+            // Shrink before the Lottie draw below, not after: its cost scales
+            // with the canvas pixel area, and frameForRecording() rescales
+            // this whole composite down to RECORD_PROCESS_EDGE anyway once it
+            // reaches offerRecordingFrameAsync. (The PixelCopy path above
+            // already requests roughly this size, so this is usually a no-op
+            // there — still matters for the previewView.bitmap() fallback.)
             val base = try {
                 val shrunk = ImageProxyBitmapUtils.scaleToMaxDimension(raw, RECORD_PROCESS_EDGE, filter = true)
                 if (shrunk !== raw) raw.recycle()
@@ -1830,17 +1933,28 @@ object ArCameraController {
                 base.recycle()
                 copy
             }
+            val drawable = confettiHeadlessDrawable?.takeIf { confettiHeadlessComposition === composition }
+                ?: LottieDrawable().apply {
+                    setComposition(composition)
+                    setRenderMode(RenderMode.SOFTWARE)
+                }.also {
+                    confettiHeadlessDrawable = it
+                    confettiHeadlessComposition = composition
+                }
+            drawable.progress = progress
             val canvas = Canvas(target)
-            if (target.width != overlay.width || target.height != overlay.height) {
+            if (target.width != overlayWidth || target.height != overlayHeight) {
                 canvas.save()
                 canvas.scale(
-                    target.width.toFloat() / overlay.width,
-                    target.height.toFloat() / overlay.height,
+                    target.width.toFloat() / overlayWidth,
+                    target.height.toFloat() / overlayHeight,
                 )
-                overlay.draw(canvas)
+                drawable.setBounds(0, 0, overlayWidth, overlayHeight)
+                drawable.draw(canvas)
                 canvas.restore()
             } else {
-                overlay.draw(canvas)
+                drawable.setBounds(0, 0, target.width, target.height)
+                drawable.draw(canvas)
             }
             target
         } catch (_: Exception) {

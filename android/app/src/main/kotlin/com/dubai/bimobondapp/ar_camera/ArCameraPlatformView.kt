@@ -67,7 +67,7 @@ class ArCameraPlatformView(
 
         warpGlView.ensureGlInitialized()
 
-        // Screen-overlay filter animation (Confetti/Keywords/Matrix/Space Rocket)
+        // Screen-overlay filter animation (Confetti/Keywords/Snowfall/Snow White)
         // — decorative only, on top of the preview/beauty layers, never
         // intercepts touch. Hidden/stopped until one of those filters is
         // actually tapped in the picker — which asset loads and when it plays
