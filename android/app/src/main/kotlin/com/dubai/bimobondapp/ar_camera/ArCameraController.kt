@@ -1819,8 +1819,19 @@ object ArCameraController {
             val srcW = previewView.width.coerceAtLeast(1)
             val srcH = previewView.height.coerceAtLeast(1)
             val scale = kotlin.math.min(1f, RECORD_PROCESS_EDGE.toFloat() / kotlin.math.max(srcW, srcH))
-            val dstW = (srcW * scale).toInt().coerceAtLeast(1)
-            val dstH = (srcH * scale).toInt().coerceAtLeast(1)
+            // Must be even — this bitmap's dimensions become the FIRST frame
+            // ArFilteredVideoRecorder.offerFrame() sees, which locks in the
+            // MediaCodec encoder's width/height for the whole recording. Odd
+            // dimensions here (missing before) meant the encoder's actual
+            // negotiated buffer size could silently differ from what this
+            // bitmap (and therefore the draw-into-encoder-surface step) used,
+            // stretching the whole recording — exactly the vertical
+            // stretch/elongated-face bug reported for confetti/overlay
+            // recordings specifically (this is the only capture path that
+            // sizes its frame from previewView.width/height instead of the
+            // already-even-rounded camera-buffer path every other filter uses).
+            val dstW = ((srcW * scale).toInt() and 1.inv()).coerceAtLeast(2)
+            val dstH = ((srcH * scale).toInt() and 1.inv()).coerceAtLeast(2)
             val dest = try {
                 Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
             } catch (_: Exception) {
@@ -1997,7 +2008,18 @@ object ArCameraController {
         }
         scaled = applyCaptureSmoothing(scaled, keep = source)
 
-        if (!ArCameraBridge.isPreviewLetterboxed()) {
+        // Screen-overlay (confetti/snowfall/etc.) frames come from
+        // previewView.bitmap()/PixelCopy — a screenshot of the ALREADY
+        // letterbox-margined PreviewView (its own top/bottom margins are set
+        // by ArCameraBridge.applyPreviewLetterbox() whenever letterbox mode
+        // is on), so any letterboxing is already baked into `source`. Every
+        // other recording path captures from a raw, unmargined camera buffer
+        // and needs the compose below to letterbox it for the first time —
+        // applying it again here to an already-letterboxed screen-overlay
+        // frame would letterbox it twice, distorting the frame.
+        if (!ArCameraBridge.isPreviewLetterboxed() ||
+            ArCameraBridge.currentFilter.isScreenOverlay()
+        ) {
             return scaled
         }
 

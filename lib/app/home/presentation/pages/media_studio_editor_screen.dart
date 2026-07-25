@@ -167,8 +167,16 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   bool get _hasActiveColorFilter => ArFilterCatalog.isColorFilter(_arFilterId);
 
-  /// Color LUT bake removed — beauty presets are live-retouch only (no still bake).
-  bool get _needsColorFilterPreview => false;
+  /// Whether the selected filter has an actual color grade (brightness/
+  /// contrast/saturation/warmth) to preview — gates [MediaStudioPreview]'s
+  /// `applyArColorPreview` (see build()) so a picked filter's color grade
+  /// actually shows up live in the editor, and [ArColorFilterMatrix] bakes
+  /// it into the exported video. Beauty-only filters (no color grade fields
+  /// set) return false here — those fields aren't supported post-capture.
+  bool get _needsColorFilterPreview =>
+      _hasActiveColorFilter &&
+      (ArFilterCatalog.colorFilterById(_arFilterId)?.params?.hasColorGrade ??
+          false);
 
   /// Any photo edit that requires a native-baked preview file (tone/geometry).
   bool get _hasPreviewEdits => _hasFaceEdits || _needsColorFilterPreview;
@@ -265,6 +273,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   void _applyStateToUi(MediaItemEditState state) {
     _arFilterId = state.arFilterId;
     _arColorCategoryId = state.arColorCategoryId;
+    // Default id doesn't match a real dynamic category (e.g. no filter was
+    // ever picked for this item) — fall back to whichever category the
+    // catalog lists first, matching the backend's own category order.
+    final arCategories = ArFilterCatalog.colorCategories;
+    if (arCategories.isNotEmpty &&
+        !arCategories.any((c) => c.id == _arColorCategoryId)) {
+      _arColorCategoryId = arCategories.first.id;
+    }
     _arFilterIntensity = state.arFilterIntensity;
     _alreadyBaked = state.alreadyBaked;
     _bakedFilterId = state.bakedArFilterId;
@@ -393,13 +409,29 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return edited ?? file;
   }
 
-  /// LUT bake removed — return the input file unchanged.
+  /// Bakes a filter's color grade (brightness/contrast/saturation/warmth)
+  /// into a photo, at [intensity] (0..1). Beauty fields (smooth/whiten/
+  /// blush/lipTint) aren't supported here — those need face-landmark
+  /// detection, which this post-capture path doesn't run; only the color
+  /// grade, same fields [ArColorFilterMatrix] bakes into exported video,
+  /// applies. Reuses the same native OpenCV pass as the face retouch
+  /// sliders (MediaSkinSmooth.apply / ArCameraBridge.applyBeauty).
   Future<File> _bakeColorFilterToFile(
     File input,
     String filterId,
     double intensity,
   ) async {
-    return input;
+    final params = ArFilterCatalog.colorFilterById(filterId)?.params;
+    if (params == null || !params.hasColorGrade) return input;
+    final t = intensity.clamp(0.0, 1.0);
+    final adjusted = await MediaSkinSmooth.apply(
+      input: input,
+      saturation: params.saturation * t,
+      brightness: params.brightness * t,
+      contrast: params.contrast * t,
+      whiteBalance: params.warmth * t,
+    );
+    return adjusted ?? input;
   }
 
   Future<List<File>> _exportAll() async {
@@ -630,8 +662,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     } catch (_) {}
   }
 
-  /// Builds the live preview file natively: tone/geometry adjustments (OpenCV)
-  /// then the color grade (PNG LUT). Both run on Kotlin — no Flutter matrix.
+  /// Builds the live preview file natively: tone/geometry adjustments
+  /// (OpenCV), then the selected filter's color grade (also OpenCV — see
+  /// _bakeColorFilterToFile). Both run on Kotlin — no Flutter matrix (that
+  /// path is video-only, see MediaStudioPreview's applyArColorPreview).
   Future<void> _rebuildFacePreview() async {
     if (_currentState.isVideo || !_hasPreviewEdits) {
       _clearFacePreview();
@@ -670,6 +704,26 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       if (produced) _deleteTemp(working, source);
       return;
     }
+
+    if (_needsColorFilterPreview) {
+      final beforeGrade = working;
+      final graded = await _bakeColorFilterToFile(
+        beforeGrade,
+        _arFilterId,
+        _arFilterIntensity,
+      );
+      if (!mounted || gen != _smoothGen) {
+        if (produced) _deleteTemp(beforeGrade, source);
+        if (graded.path != beforeGrade.path) _deleteTemp(graded, source);
+        return;
+      }
+      if (graded.path != beforeGrade.path) {
+        if (produced) _deleteTemp(beforeGrade, source);
+        working = graded;
+        produced = true;
+      }
+    }
+
     if (!produced) {
       // Native step(s) failed — keep last good preview, don't blank the image.
       return;
