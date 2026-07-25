@@ -72,6 +72,14 @@ class FaceWarpGlView @JvmOverloads constructor(
         }
     }
 
+    /** Skin-confidence mask (ALPHA_8, 255=skin) from ArCameraController's landmark rasterizer. */
+    fun updateSkinMask(bitmap: Bitmap) {
+        ensureGlInitialized()
+        queueEvent {
+            renderer.updateSkinMask(bitmap)
+        }
+    }
+
     fun setRenderModeSafe(mode: Int) {
         if (glInitialized) {
             renderMode = mode

@@ -135,6 +135,10 @@ class ArBeautyFilterParams {
     required this.blush,
     required this.lipTint,
     required this.lipStrength,
+    this.brightness = 0,
+    this.contrast = 0,
+    this.saturation = 0,
+    this.warmth = 0,
   });
 
   final double smooth;
@@ -143,6 +147,17 @@ class ArBeautyFilterParams {
   final double blush;
   final String lipTint;
   final double lipStrength;
+
+  /// Color grade (-1..1, 0 = neutral) — same engine as the Face retouch
+  /// sliders (ArCameraBridge.setRetouchAdjustments), already proven stable.
+  /// Lets a filter be a pure color look (e.g. "Fade") with no beauty effect.
+  final double brightness;
+  final double contrast;
+  final double saturation;
+  final double warmth;
+
+  bool get hasColorGrade =>
+      brightness != 0 || contrast != 0 || saturation != 0 || warmth != 0;
 
   static const ArBeautyFilterParams defaults = ArBeautyFilterParams(
     smooth: 0.55,
@@ -162,6 +177,10 @@ class ArBeautyFilterParams {
       lipTint: _readLipTint(json['lipTint']),
       lipStrength:
           _readDouble01(json['lipStrength'], fallback: defaults.lipStrength),
+      brightness: _readDoubleSigned(json['brightness'], fallback: 0),
+      contrast: _readDoubleSigned(json['contrast'], fallback: 0),
+      saturation: _readDoubleSigned(json['saturation'], fallback: 0),
+      warmth: _readDoubleSigned(json['warmth'], fallback: 0),
     );
   }
 
@@ -172,6 +191,10 @@ class ArBeautyFilterParams {
         'blush': blush,
         'lipTint': lipTint,
         'lipStrength': lipStrength,
+        'brightness': brightness,
+        'contrast': contrast,
+        'saturation': saturation,
+        'warmth': warmth,
       };
 }
 
@@ -274,6 +297,23 @@ int _readInt(dynamic value) {
   if (value is num) return value.round();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// Like [_readDouble01] but allows negative values (-1..1) — for color-grade
+/// fields (brightness/contrast/saturation/warmth) where 0 is neutral and both
+/// directions are meaningful, unlike the 0..1-only beauty strength fields.
+double _readDoubleSigned(dynamic value, {required double fallback}) {
+  double parsed;
+  if (value is num) {
+    parsed = value.toDouble();
+  } else if (value is String) {
+    parsed = double.tryParse(value) ?? fallback;
+  } else {
+    return fallback;
+  }
+  if (parsed < -1) return -1;
+  if (parsed > 1) return 1;
+  return parsed;
 }
 
 double _readDouble01(dynamic value, {required double fallback}) {

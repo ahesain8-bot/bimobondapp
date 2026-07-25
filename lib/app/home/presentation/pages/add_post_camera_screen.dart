@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
+import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
@@ -197,7 +198,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.installPlatformCallbacks();
       ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
-      ArCameraBridge.setFilter(ArFilterCatalog.items[_arFilterIndex].id);
+      _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
     }
     unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
     unawaited(_loadCatalog());
@@ -228,6 +229,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void dispose() {
     _recordTimer?.cancel();
     _countdownTimer?.cancel();
+    _arFilterIntensityDebounce?.cancel();
     unawaited(SoundAudioPreview.stop());
     _clearLayoutCapture();
     if (_useNativeArFilters) {
@@ -401,7 +403,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       final id = ArFilterCatalog.items[_arFilterIndex].id;
       final intensity =
           ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
-      ArCameraBridge.setFilter(id, intensity: intensity);
+      _applyArFilter(id, intensity: intensity);
     } else {
       unawaited(_applyBeauty(next));
     }
@@ -431,7 +433,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     });
     if (_useNativeArFilters) {
       ArCameraBridge.clearRetouchAdjustments();
-      ArCameraBridge.setFilter('none');
+      _applyArFilter('none');
     } else {
       unawaited(_applyBeauty(false));
     }
@@ -454,7 +456,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final applied = ArFilterCatalog.items[_arFilterIndex].id;
     final intensity =
         ArFilterCatalog.isColorFilter(applied) ? _arFilterIntensity : 1.0;
-    ArCameraBridge.setFilter(applied, intensity: intensity);
+    _applyArFilter(applied, intensity: intensity);
   }
 
   Future<void> _reapplySelectedFilter() async {
@@ -1318,11 +1320,51 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         ? _arFilterIntensity
         : 1.0;
     if (clamped == _arFilterIndex) {
-      ArCameraBridge.setFilter(id, intensity: intensity);
+      _applyArFilter(id, intensity: intensity);
       return;
     }
     setState(() => _arFilterIndex = clamped);
+    _applyArFilter(id, intensity: intensity);
+  }
+
+  /// Single entry point for applying a filter id to the native camera —
+  /// forwards AR-effect ids (glasses, stickers, distortion) via setFilter as
+  /// before, and additionally pushes named beauty-preset params (Soft Glow,
+  /// Pure, Rosy, Clean, ...) when [id] is one of those, or clears them when
+  /// it isn't. Keeps every call site consistent instead of duplicating this.
+  void _applyArFilter(String id, {double intensity = 1.0}) {
+    // Identity change (switching filters) — setFilter re-triggers native
+    // render-mode logic, so only call it here, never on intensity-only
+    // updates (see _onArFilterIntensityChanged), or a slider drag ends up
+    // spamming it dozens of times a second.
     ArCameraBridge.setFilter(id, intensity: intensity);
+    _pushBeautyParams(ArFilterCatalog.colorFilterById(id)?.params, intensity);
+  }
+
+  void _pushBeautyParams(ArBeautyFilterParams? params, double intensity) {
+    if (params != null) {
+      ArCameraBridge.setBeautyFilter(
+        smooth: params.smooth,
+        whiten: params.whiten,
+        brighten: params.brighten,
+        blush: params.blush,
+        lipTint: params.lipTint,
+        lipStrength: params.lipStrength,
+        intensity: intensity,
+      );
+      // Color grade (Fade/Fade Warm/Fade Cool) — same engine as the Face
+      // retouch sliders. Always set explicitly (even when all-zero, e.g.
+      // "Normal") so a previously selected grade doesn't linger.
+      ArCameraBridge.setRetouchAdjustments(
+        brightness: params.brightness * intensity,
+        contrast: params.contrast * intensity,
+        saturation: params.saturation * intensity,
+        whiteBalance: params.warmth * intensity,
+      );
+    } else {
+      ArCameraBridge.clearBeautyFilter();
+      ArCameraBridge.clearRetouchAdjustments();
+    }
   }
 
   void _onArColorCategorySelected(String categoryId) {
@@ -1330,9 +1372,22 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     setState(() => _arColorCategoryId = categoryId);
   }
 
+  Timer? _arFilterIntensityDebounce;
+
   void _onArFilterIntensityChanged(double value) {
-    setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
-    ArCameraBridge.setFilterIntensity(_arFilterIntensity);
+    final clamped = value.clamp(0.0, 1.0);
+    // Slider fires on every pixel of drag movement — keep the visible thumb
+    // instant (setState below), but debounce the native push (was sending
+    // setFilter + setBeautyFilter + setRetouchAdjustments on every tick,
+    // which is what caused the freeze while dragging).
+    setState(() => _arFilterIntensity = clamped);
+    ArCameraBridge.setFilterIntensity(clamped);
+    final id = ArFilterCatalog.items[_arFilterIndex].id;
+    if (!ArFilterCatalog.isColorFilter(id)) return;
+    _arFilterIntensityDebounce?.cancel();
+    _arFilterIntensityDebounce = Timer(const Duration(milliseconds: 40), () {
+      _pushBeautyParams(ArFilterCatalog.colorFilterById(id)?.params, clamped);
+    });
   }
 
   void _onArPreviewSwipeEnd(DragEndDetails details) {

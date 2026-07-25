@@ -1186,17 +1186,16 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     final selectedColorId = _hasActiveColorFilter ? _arFilterId : 'none';
     final screenSize = MediaQuery.of(context).size;
     final isPhoto = !currentItem.isVideo;
-    final previewChrome = CameraRatioLetterbox.tikTokChromeHeights(
-      context,
-      photoMode: isPhoto,
-    );
-    final previewBandHeight = (screenSize.height -
-            previewChrome.top -
-            previewChrome.bottom)
-        .clamp(1.0, screenSize.height);
-    _previewSize = isPhoto
-        ? Size(screenSize.width, previewBandHeight)
-        : screenSize;
+    // Full screen, no reserved top/bottom chrome band — matches the live
+    // camera's own default (non-ratio-toggled) viewport exactly, so photo/
+    // video capture shows here the same as it did while shooting. Was
+    // previously reduced by a fixed "TikTok chrome" amount (a much bigger cut
+    // for photos than video, unrelated to what the live camera actually
+    // showed), which made photos look squeezed/"square" and videos look
+    // over-cropped/"zoomed" relative to the live view. Toolbar controls now
+    // float over the media instead of sitting in a reserved band.
+    const previewChrome = (top: 0.0, bottom: 0.0);
+    _previewSize = screenSize;
     final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
         ? _smoothPreviewFile!
         : _currentState.sourceFile;

@@ -276,12 +276,19 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
               if (poster != null)
                 Image.file(
                   poster,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain,
                   gaplessPlayback: true,
                   filterQuality: FilterQuality.low,
                 ),
+              // contain, not cover — cover crops to fill and any small
+              // mismatch between the recorded file's aspect ratio and this
+              // container's exact aspect ratio gets amplified into a visible
+              // crop/zoom (this is what made captured video look zoomed
+              // in vs. the live camera view, which never crops). contain
+              // guarantees the full, un-cropped frame always shows, matching
+              // how the photo preview already renders (BoxFit.contain below).
               FittedBox(
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 clipBehavior: Clip.hardEdge,
                 child: SizedBox(
                   width: controller.value.size.width,

@@ -19,11 +19,16 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
+import com.airbnb.lottie.LottieAnimationView
 
 object ArCameraBridge {
     var faceOverlay: FaceOverlayView? = null
     var previewView: PreviewView? = null
     var warpGlView: FaceWarpGlView? = null
+    var confettiOverlay: LottieAnimationView? = null
+
+    /** Filename currently loaded into [confettiOverlay] — see [applyRenderMode]. */
+    private var loadedScreenOverlayAsset: String? = null
     var platformRoot: View? = null
     var hostActivity: Activity? = null
     var lifecycleOwner: LifecycleOwner? = null
@@ -63,6 +68,15 @@ object ArCameraBridge {
 
     @Volatile
     private var awaitFirstGlFrame: Boolean = false
+
+    /**
+     * First-ever bind into OES this session skips the freeze/spinner transition
+     * ceremony entirely (see [beginOesDirectNoFreeze]) — there's nothing on screen
+     * yet to protect with a freeze frame, so that machinery only adds a visible
+     * "Applying filter..." overlay and extra reveal-frame delay to a cold app open.
+     */
+    @Volatile
+    private var coldStartBindDone: Boolean = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -199,6 +213,27 @@ object ArCameraBridge {
         }
     }
 
+    /**
+     * Cold-open fast path: bind straight into OES with no freeze frame, no
+     * "Applying filter..." spinner, and no multi-frame reveal delay — the camera
+     * shows the instant real frames start arriving. Safe only because there's
+     * nothing already on screen to protect against a visible rebind flash (unlike
+     * [beginOesTransitionWithFreeze], used for actual filter switches later).
+     */
+    private fun beginOesDirectNoFreeze() {
+        if (ArCameraController.isBoundToOes()) return
+        if (!ArCameraController.canRebindCamera()) return
+        val gl = warpGlView ?: return
+        awaitFirstGlFrame = false
+        oesTransitionPending = false
+        gl.ensureGlInitialized()
+        gl.setOesEnabled(true)
+        gl.visibility = View.VISIBLE
+        previewView?.visibility = View.INVISIBLE
+        ArCameraController.setPreferOesBinding(true)
+        ArCameraController.ensureOesPreviewBound()
+    }
+
     fun beginOesTransitionWithFreeze() {
         if (ArCameraController.isBoundToOes()) {
             android.util.Log.i("ArFilterTap", "beginOes: alreadyOnOes")
@@ -241,24 +276,22 @@ object ArCameraBridge {
             // Real countdown starts in onOesSurfaceProvided — ignore empty pre-bind frames.
             oesRevealFramesLeft = 8
 
-            if (!hasFreezeFrame) {
-                android.util.Log.w("ArFilterTap", "beginOes: NO freeze — bitmap fallback (no OES rebind)")
-                oesTransitionPending = false
-                oesDiagStartMs = 0L
-                oesSurfaceLive = false
-                clearApplyingOverlay()
-                ArCameraController.setPreferOesBinding(false)
-                gl.setOesEnabled(false)
-                gl.visibility = View.INVISIBLE
-                previewView?.visibility = View.VISIBLE
-                previewView?.bringToFront()
-                return@showFreezeFromPreview
+            if (hasFreezeFrame) {
+                // Freeze stays on top covering the rebind — never expose black GL/Preview.
+                freezeOverlay?.alpha = 1f
+                freezeOverlay?.bringToFront()
+                applyingOverlay?.bringToFront()
+            } else {
+                // No prior frame to protect behind a freeze — this is the common
+                // cold-start case (no camera frame has ever been shown yet), so
+                // there's nothing on screen to flicker. Bind OES directly; a brief
+                // black frame here is the same one-time cost any camera app pays
+                // before its first sensor frame arrives.
+                android.util.Log.i(
+                    "ArFilterTap",
+                    "beginOes: NO freeze — binding OES directly (nothing to protect)",
+                )
             }
-
-            // Freeze stays on top covering the rebind — never expose black GL/Preview.
-            freezeOverlay?.alpha = 1f
-            freezeOverlay?.bringToFront()
-            applyingOverlay?.bringToFront()
             gl.visibility = View.VISIBLE
             previewView?.visibility = View.INVISIBLE
             diagVis("beginOes.afterHidePreview")
@@ -599,6 +632,7 @@ object ArCameraBridge {
     private fun applyRenderMode(type: FilterType) {
         val useShader = type.useShader()
         val usePngUnderlay = type.isPngOverlay()
+        val useScreenOverlay = type.isScreenOverlay()
         val gl = warpGlView
         val preview = previewView
 
@@ -608,6 +642,35 @@ object ArCameraBridge {
             faceOverlay?.resetForNonPngFilter()
         }
         faceOverlay?.visibility = if (usePngUnderlay) View.VISIBLE else View.GONE
+
+        val confetti = confettiOverlay
+        if (useScreenOverlay) {
+            // Confetti/Keywords/Matrix/Space Rocket all share this one Lottie
+            // view — only one screen-overlay filter is ever active at a time —
+            // so swap its loaded asset whenever the selection actually changes.
+            val asset = type.screenOverlayAsset()
+            if (confetti != null && asset != null && asset != loadedScreenOverlayAsset) {
+                try {
+                    confetti.cancelAnimation()
+                    confetti.setAnimation(asset)
+                    loadedScreenOverlayAsset = asset
+                } catch (t: Throwable) {
+                    android.util.Log.e("ArCamera", "screen overlay asset load failed: $asset", t)
+                }
+            }
+            confetti?.visibility = View.VISIBLE
+            confetti?.bringToFront()
+            try {
+                if (confetti != null && !confetti.isAnimating) confetti.playAnimation()
+            } catch (_: Throwable) {
+            }
+        } else {
+            try {
+                confetti?.pauseAnimation()
+            } catch (_: Throwable) {
+            }
+            confetti?.visibility = View.GONE
+        }
 
         when {
             useShader -> {
@@ -651,20 +714,59 @@ object ArCameraBridge {
                 faceOverlay?.bringToFront()
             }
 
-            else -> {
-                // Original / no GPU filter: prefer PreviewView (OES color-grade path removed).
+            useScreenOverlay -> {
+                // Confetti etc. — plain PreviewView, same as PNG-overlay filters,
+                // never OES. This is deliberate: it makes Normal Mode video
+                // recording's !boundToOes gate (ArCameraController.startRecording)
+                // naturally fall through to the bitmap-frame-pump path, which is
+                // what lets the overlay actually get composited into the saved
+                // video frame-by-frame instead of only showing up live.
+                //
+                // Uses the exact same direct ensurePreviewViewBound() call as
+                // usePngUnderlay above (no freeze-cover wrapper) — a PixelCopy
+                // freeze-frame taken from warpGlView (GLSurfaceView,
+                // RENDERMODE_WHEN_DIRTY) was tried here and risks never firing
+                // its callback if no GL frame is pending right when requested,
+                // which would stall this whole transition indefinitely. Since
+                // PNG-overlay filters go through this identical rebind with no
+                // cover and are smooth, the rebind itself isn't what needs
+                // covering.
                 awaitFirstGlFrame = false
                 oesTransitionPending = false
-                gl?.submitWarpParams(FaceWarpParams.INACTIVE)
-                gl?.setCaptureEnabled(false)
-                ArCameraController.setPreferOesBinding(false)
                 gl?.setOesEnabled(false)
+                ArCameraController.setPreferOesBinding(false)
                 ArCameraController.ensurePreviewViewBound()
+                gl?.setCaptureEnabled(false)
                 gl?.visibility = View.GONE
+                gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 preview?.visibility = View.VISIBLE
-                preview?.bringToFront()
-                preview?.invalidate()
-                preview?.requestLayout()
+            }
+
+            else -> {
+                // Normal Mode: live preview runs through the full-res OES/GPU
+                // pipeline (same path used for photo/video capture) instead of a
+                // raw CameraX PreviewView pass-through.
+                gl?.submitWarpParams(FaceWarpParams.INACTIVE)
+                gl?.setCaptureEnabled(true)
+                if (!ArCameraController.isBoundToOes()) {
+                    // Flutter can call setFilter() before the native camera view
+                    // exists (initState fires before the PlatformView is created) —
+                    // only consume the cold-start fast path once gl/rebind are
+                    // actually ready, so that premature call doesn't "use up" the
+                    // fast path and leave the real init stuck with the slow one.
+                    val canBindNow = gl != null && ArCameraController.canRebindCamera()
+                    if (!coldStartBindDone && canBindNow) {
+                        // App just opened — nothing on screen yet, so skip the
+                        // freeze/spinner ceremony and bind directly (fast, no
+                        // "Applying filter..." overlay, no black-screen wait).
+                        coldStartBindDone = true
+                        beginOesDirectNoFreeze()
+                    } else if (coldStartBindDone) {
+                        // Real filter switch back to Normal Mode later in the
+                        // session — freeze-frame transition still applies here.
+                        beginOesTransitionWithFreeze()
+                    }
+                }
             }
         }
     }
@@ -726,9 +828,15 @@ object ArCameraBridge {
         warpGlView?.releaseGl()
         clearApplyingOverlay()
         clearFreezeOverlay()
+        try {
+            confettiOverlay?.cancelAnimation()
+        } catch (_: Throwable) {
+        }
         faceOverlay = null
         previewView = null
         warpGlView = null
+        confettiOverlay = null
+        loadedScreenOverlayAsset = null
         platformRoot = null
         hostActivity = null
         lifecycleOwner = null
@@ -738,6 +846,7 @@ object ArCameraBridge {
         oesTransitionPending = false
         oesSurfaceLive = false
         oesDiagStartMs = 0L
+        coldStartBindDone = false
         warpViewWidth = 0
         warpViewHeight = 0
         isFrontCamera = true

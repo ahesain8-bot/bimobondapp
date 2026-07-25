@@ -8,6 +8,7 @@ import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
+import com.dubai.bimobondapp.ar_camera.LiveBeautyState
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
@@ -281,6 +282,32 @@ class MainActivity : FlutterActivity() {
                     }
                     "clearRetouchAdjustments" -> {
                         LiveRetouchState.clear()
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
+                    "setBeautyFilter" -> {
+                        fun level(key: String): Float =
+                            when (val raw = call.argument<Any>(key)) {
+                                is Double -> raw.toFloat()
+                                is Int -> raw.toFloat()
+                                is Long -> raw.toFloat()
+                                is Float -> raw
+                                else -> 0f
+                            }.coerceIn(0f, 1f)
+                        LiveBeautyState.apply(
+                            smooth = level("smooth"),
+                            whiten = level("whiten"),
+                            brighten = level("brighten"),
+                            blush = level("blush"),
+                            lipTintHex = call.argument<String>("lipTint") ?: "#E8527A",
+                            lipStrength = level("lipStrength"),
+                            intensity = level("intensity"),
+                        )
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
+                    "clearBeautyFilter" -> {
+                        LiveBeautyState.clear()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }

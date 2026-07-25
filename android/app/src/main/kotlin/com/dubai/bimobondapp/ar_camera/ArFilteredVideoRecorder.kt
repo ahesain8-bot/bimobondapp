@@ -79,7 +79,12 @@ class ArFilteredVideoRecorder {
             surfaceSession = true
             val out = videoTempFile ?: return null
             return try {
-                startEncoder(out, width, height)
+                // width/height here are already scaled by the caller (ArCameraController)
+                // to match exactly what it configures the GL viewport/encoder target to —
+                // do NOT rescale again with this class's own MAX_EDGE, or the encoder's
+                // actual Surface buffer ends up a different size than what GL renders
+                // into, which crops/zooms the encoded output relative to the live view.
+                startEncoder(out, width, height, rescale = false)
                 inputSurface
             } catch (e: Exception) {
                 Log.e(TAG, "startSurfaceSession failed", e)
@@ -221,11 +226,16 @@ class ArFilteredVideoRecorder {
         mediaRecorder = null
     }
 
-    private fun startEncoder(output: File, srcW: Int, srcH: Int) {
-        val maxEdge = MAX_EDGE
-        val scale = min(1f, maxEdge.toFloat() / max(srcW, srcH))
-        width = ((srcW * scale).toInt() and 1.inv()).coerceAtLeast(2)
-        height = ((srcH * scale).toInt() and 1.inv()).coerceAtLeast(2)
+    private fun startEncoder(output: File, srcW: Int, srcH: Int, rescale: Boolean = true) {
+        if (rescale) {
+            val maxEdge = MAX_EDGE
+            val scale = min(1f, maxEdge.toFloat() / max(srcW, srcH))
+            width = ((srcW * scale).toInt() and 1.inv()).coerceAtLeast(2)
+            height = ((srcH * scale).toInt() and 1.inv()).coerceAtLeast(2)
+        } else {
+            width = (srcW and 1.inv()).coerceAtLeast(2)
+            height = (srcH and 1.inv()).coerceAtLeast(2)
+        }
         trackIndex = -1
         muxerStarted = false
 

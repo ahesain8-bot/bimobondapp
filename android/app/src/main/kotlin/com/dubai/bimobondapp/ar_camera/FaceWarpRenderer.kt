@@ -85,6 +85,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUNoseWingL = 0
     private var oesUNoseWingR = 0
     private var oesUNoseRadius = 0
+    private var oesUSmoothStrength = 0
+    private var oesUTexelStep = 0
+    private var oesUHistory = 0
+    private var oesUHistoryValid = 0
+    private var oesUTemporalStrength = 0
+    private var oesUWideZoom = 0
+    private var oesUSkinMask = 0
+    private var oesUSkinMaskValid = 0
+    private var oesUIsFrontCamera = 0
 
     private val texMatrixGl = FloatArray(9)
     private var texMatrixReady = false
@@ -194,6 +203,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         oesUNoseWingL = GLES20.glGetUniformLocation(oesProgram, "uNoseWingL")
         oesUNoseWingR = GLES20.glGetUniformLocation(oesProgram, "uNoseWingR")
         oesUNoseRadius = GLES20.glGetUniformLocation(oesProgram, "uNoseRadius")
+        oesUSmoothStrength = GLES20.glGetUniformLocation(oesProgram, "uSmoothStrength")
+        oesUTexelStep = GLES20.glGetUniformLocation(oesProgram, "uTexelStep")
+        oesUHistory = GLES20.glGetUniformLocation(oesProgram, "uHistory")
+        oesUHistoryValid = GLES20.glGetUniformLocation(oesProgram, "uHistoryValid")
+        oesUTemporalStrength = GLES20.glGetUniformLocation(oesProgram, "uTemporalStrength")
+        oesUWideZoom = GLES20.glGetUniformLocation(oesProgram, "uWideZoom")
+        oesUSkinMask = GLES20.glGetUniformLocation(oesProgram, "uSkinMask")
+        oesUSkinMaskValid = GLES20.glGetUniformLocation(oesProgram, "uSkinMaskValid")
+        oesUIsFrontCamera = GLES20.glGetUniformLocation(oesProgram, "uIsFrontCamera")
 
         val st = SurfaceTexture(oesTextureId)
         cameraSurfaceTexture = st
@@ -218,10 +236,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             } catch (_: Throwable) {
                 return
             }
+            uploadPendingSkinMask()
             drawOes()
 
             presentToEncoder { drawOes() }
             if (captureEnabled) captureFrontBuffer { drawOes() }
+            writeHistoryFrame()
             onFramePresented?.invoke()
             return
         }
@@ -318,6 +338,32 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             dw.toFloat().coerceAtLeast(1f),
             dh.toFloat().coerceAtLeast(1f),
         )
+        // Texel step in the OES buffer's own UV space (pre display-rotation-swap —
+        // st sampling happens in raw camera-buffer space via uStMatrix), used by
+        // the skin-smoothing ring taps in the shader.
+        GLES20.glUniform2f(
+            oesUTexelStep,
+            1f / cameraBufW.coerceAtLeast(1),
+            1f / cameraBufH.coerceAtLeast(1),
+        )
+        val beauty = LiveBeautyState.adjustments
+        GLES20.glUniform1f(oesUSmoothStrength, beauty.smooth)
+        GLES20.glUniform1f(
+            oesUWideZoom,
+            if (ArCameraBridge.isFrontCamera) FRONT_WIDE_ZOOM_OUT else 1f,
+        )
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, historyTexId[historyReadIndex])
+        GLES20.glUniform1i(oesUHistory, 1)
+        GLES20.glUniform1f(oesUHistoryValid, if (historyValid) 1f else 0f)
+        GLES20.glUniform1f(oesUTemporalStrength, TEMPORAL_STRENGTH)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE2)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, skinMaskTexId)
+        GLES20.glUniform1i(oesUSkinMask, 2)
+        GLES20.glUniform1f(oesUSkinMaskValid, if (skinMaskValid) 1f else 0f)
+        GLES20.glUniform1f(oesUIsFrontCamera, if (ArCameraBridge.isFrontCamera) 1f else 0f)
         bindRetouchUniforms(
             oesURetouchSaturation,
             oesURetouchBrightness,
@@ -548,6 +594,67 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var captureFboW = 0
     private var captureFboH = 0
 
+    // Stage 3 — temporal denoise: ping-pong history of the last blended frame,
+    // sampled + re-blended each frame in drawOes() (screen-space UV, since both
+    // slots are always sized to match the current viewport).
+    private val historyTexId = IntArray(2)
+    private val historyFboId = IntArray(2)
+    private var historyW = 0
+    private var historyH = 0
+    private var historyReadIndex = 0
+    private var historyValid = false
+    private val historyRestoreViewport = IntArray(4)
+
+    // Skin mask (landmark-rasterized, see ArCameraController.buildFaceSkinMaskBitmap)
+    // — ALPHA_8 bitmap, alpha=skin confidence directly, uploaded from a background
+    // analysis frame, sampled in the shader to gate skin-smoothing precisely
+    // instead of the color-tone guess. Uploaded occasionally (analysis is
+    // throttled), not every frame like the OES texture.
+    private var skinMaskTexId = 0
+    @Volatile
+    private var pendingSkinMaskBitmap: Bitmap? = null
+    private var skinMaskValid = false
+
+    fun updateSkinMask(bitmap: Bitmap) {
+        val old = pendingSkinMaskBitmap
+        pendingSkinMaskBitmap = bitmap
+        if (old != null && old !== bitmap && !old.isRecycled) old.recycle()
+    }
+
+    private fun uploadPendingSkinMask() {
+        val bmp = pendingSkinMaskBitmap ?: return
+        pendingSkinMaskBitmap = null
+        if (bmp.isRecycled) return
+        try {
+            if (skinMaskTexId == 0) {
+                val tex = IntArray(1)
+                GLES20.glGenTextures(1, tex, 0)
+                skinMaskTexId = tex[0]
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, skinMaskTexId)
+                GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR,
+                )
+                GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR,
+                )
+                GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE,
+                )
+                GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE,
+                )
+            } else {
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, skinMaskTexId)
+            }
+            GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0)
+            skinMaskValid = true
+        } catch (t: Throwable) {
+            android.util.Log.w(TAG, "skin mask upload failed", t)
+        } finally {
+            bmp.recycle()
+        }
+    }
+
     private fun ensureCaptureFbo(w: Int, h: Int) {
         if (captureFboId != 0 && captureFboW == w && captureFboH == h) return
         releaseCaptureFbo()
@@ -597,6 +704,98 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
         captureFboW = 0
         captureFboH = 0
+    }
+
+    private fun ensureHistoryBuffers(w: Int, h: Int) {
+        if (historyTexId[0] != 0 && historyW == w && historyH == h) return
+        releaseHistoryBuffers()
+        val tex = IntArray(2)
+        GLES20.glGenTextures(2, tex, 0)
+        val fbo = IntArray(2)
+        GLES20.glGenFramebuffers(2, fbo, 0)
+        for (i in 0..1) {
+            historyTexId[i] = tex[i]
+            historyFboId[i] = fbo[i]
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex[i])
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexImage2D(
+                GLES20.GL_TEXTURE_2D,
+                0,
+                GLES20.GL_RGBA,
+                w,
+                h,
+                0,
+                GLES20.GL_RGBA,
+                GLES20.GL_UNSIGNED_BYTE,
+                null,
+            )
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo[i])
+            GLES20.glFramebufferTexture2D(
+                GLES20.GL_FRAMEBUFFER,
+                GLES20.GL_COLOR_ATTACHMENT0,
+                GLES20.GL_TEXTURE_2D,
+                tex[i],
+                0,
+            )
+        }
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        historyW = w
+        historyH = h
+        historyReadIndex = 0
+        historyValid = false
+    }
+
+    private fun releaseHistoryBuffers() {
+        if (historyFboId[0] != 0 || historyFboId[1] != 0) {
+            GLES20.glDeleteFramebuffers(2, historyFboId, 0)
+            historyFboId[0] = 0
+            historyFboId[1] = 0
+        }
+        if (historyTexId[0] != 0 || historyTexId[1] != 0) {
+            GLES20.glDeleteTextures(2, historyTexId, 0)
+            historyTexId[0] = 0
+            historyTexId[1] = 0
+        }
+        historyW = 0
+        historyH = 0
+        historyValid = false
+    }
+
+    /**
+     * Re-renders the just-drawn frame (same shader pass, same history read slot)
+     * into the "write" history slot, then flips it to become next frame's "read"
+     * slot. This is a recursive/exponential blend by construction — each stored
+     * history frame already contains the accumulated result of prior frames, not
+     * just one raw frame, so a modest per-frame temporal strength still compounds
+     * into meaningful noise averaging over a few frames of a static scene.
+     */
+    private fun writeHistoryFrame() {
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, historyRestoreViewport, 0)
+        val w = historyRestoreViewport[2]
+        val h = historyRestoreViewport[3]
+        if (w <= 1 || h <= 1) return
+        ensureHistoryBuffers(w, h)
+        val writeIndex = 1 - historyReadIndex
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, historyFboId[writeIndex])
+        GLES20.glViewport(0, 0, historyW, historyH)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        try {
+            drawOes()
+        } finally {
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glViewport(
+                historyRestoreViewport[0],
+                historyRestoreViewport[1],
+                historyRestoreViewport[2],
+                historyRestoreViewport[3],
+            )
+        }
+        historyReadIndex = writeIndex
+        historyValid = true
     }
 
     private fun captureFrontBuffer(redraw: (() -> Unit)? = null) {
@@ -711,6 +910,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         captureRowBuf = null
         captureBufBytes = 0
         releaseCaptureFbo()
+        releaseHistoryBuffers()
+        pendingSkinMaskBitmap?.recycle()
+        pendingSkinMaskBitmap = null
+        skinMaskValid = false
+        if (skinMaskTexId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(skinMaskTexId), 0)
+            skinMaskTexId = 0
+        }
         try {
             cameraSurfaceTexture?.release()
         } catch (_: Throwable) {
@@ -814,6 +1021,32 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     companion object {
         private const val TAG = "FaceWarpRenderer"
+
+        // Skin-smooth strength and lip-tint color/strength are no longer fixed
+        // constants — they come from LiveBeautyState, driven by the named
+        // filter picker (Soft Glow, Pure, Rosy, Clean, ...) in Dart, defaulting
+        // to the same baseline these constants used to hardcode.
+
+        /**
+         * Live-preview temporal denoise ceiling (0..1), OES path only — Stage 3.
+         * Gated per-pixel in-shader by frame-to-frame color similarity (see
+         * [OES_FRAGMENT_SHADER]'s temporal blend in main()), so static areas (most
+         * of a static face) blend toward the accumulated history and average out
+         * grain, while motion keeps this near zero to avoid ghosting/trails.
+         */
+        private const val TEMPORAL_STRENGTH = 0.5f
+
+        /**
+         * Front camera only — widens the live-preview crop by sampling this much
+         * more of the buffer around center (>1.0 = zoom out). The prior fix
+         * (Camera2 zoomRatio below 1.0) was a no-op on devices whose front lens
+         * can't optically zoom under 1x — this is a software crop change instead:
+         * fillCenter() previously cropped the 4:3 buffer tightly to fill a much
+         * taller screen; sampling a wider window around center before that fill
+         * shows more of the sides without needing hardware support. Kept modest to
+         * avoid visible edge softness/distortion from the OES buffer's clamped edges.
+         */
+        private const val FRONT_WIDE_ZOOM_OUT = 1.15f
 
         private val QUAD_VERTICES = floatArrayOf(
             -1f, -1f, 0f, 1f,
@@ -921,6 +1154,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform mat3 uTexTransform;
             uniform vec2 uViewSize;
             uniform vec2 uTexSize;
+            uniform vec2 uTexelStep;
+            uniform float uSmoothStrength;
+            uniform sampler2D uHistory;
+            uniform float uHistoryValid;
+            uniform float uTemporalStrength;
+            uniform float uWideZoom;
+            uniform sampler2D uSkinMask;
+            uniform float uSkinMaskValid;
+            uniform float uIsFrontCamera;
             $RETOUCH_UNIFORMS
             $RETOUCH_FUNCTIONS
 
@@ -937,12 +1179,112 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 }
             }
 
+            // Soft skin-tone confidence (YCbCr band), no face landmarks needed —
+            // excludes near-black (hair/lashes/shadow) and desaturated/non-skin hues,
+            // so eyes/eyebrows/hairline naturally resist smoothing even without a
+            // face mask.
+            float skinConfidence(vec3 c) {
+                float y  = dot(c, vec3(0.299, 0.587, 0.114));
+                float cb = dot(c, vec3(-0.169, -0.331, 0.500)) + 0.5;
+                float cr = dot(c, vec3(0.500, -0.419, -0.081)) + 0.5;
+                float cbW = smoothstep(0.28, 0.36, cb) * (1.0 - smoothstep(0.46, 0.54, cb));
+                float crW = smoothstep(0.46, 0.54, cr) * (1.0 - smoothstep(0.66, 0.74, cr));
+                float yW  = smoothstep(0.05, 0.15, y);
+                return cbW * crW * yW;
+            }
+
+            // Landmark-rasterized skin mask (see ArCameraController.buildFaceSkinMaskBitmap)
+            // — replaces the color guess above when available. Mask was built from
+            // a non-mirrored oriented analysis frame and sampled here in st-space,
+            // so front camera needs the same x-flip already proven for the
+            // nose-warp landmarks (FaceCoordinateMapper.toWarpUv). Alpha channel
+            // already IS the skin confidence (0..1), no further processing needed.
+            float maskConfidence(vec2 st) {
+                vec2 maskUv = st;
+                if (uIsFrontCamera > 0.5) {
+                    maskUv.x = 1.0 - maskUv.x;
+                }
+                return texture2D(uSkinMask, maskUv).a;
+            }
+
+            // Edge-aware 8-tap ring blur (bilateral-style): neighbors are weighted by
+            // color similarity to the center pixel, so real edges (eyes, brows, lips,
+            // hairline) keep their weight near zero and stay sharp; only flat, noisy
+            // regions (skin, sensor grain) blend in.
+            vec3 surfaceBlur(vec2 uv, vec3 center) {
+                vec2 t = uTexelStep * 2.5;
+                vec3 sum = center;
+                float wSum = 1.0;
+
+                vec3 s0 = texture2D(uTexture, uv + vec2( t.x,  0.0)).rgb;
+                float w0 = exp(-distance(s0, center) * distance(s0, center) * 50.0);
+                sum += s0 * w0; wSum += w0;
+
+                vec3 s1 = texture2D(uTexture, uv + vec2(-t.x,  0.0)).rgb;
+                float w1 = exp(-distance(s1, center) * distance(s1, center) * 50.0);
+                sum += s1 * w1; wSum += w1;
+
+                vec3 s2 = texture2D(uTexture, uv + vec2( 0.0,  t.y)).rgb;
+                float w2 = exp(-distance(s2, center) * distance(s2, center) * 50.0);
+                sum += s2 * w2; wSum += w2;
+
+                vec3 s3 = texture2D(uTexture, uv + vec2( 0.0, -t.y)).rgb;
+                float w3 = exp(-distance(s3, center) * distance(s3, center) * 50.0);
+                sum += s3 * w3; wSum += w3;
+
+                vec3 s4 = texture2D(uTexture, uv + vec2( t.x,  t.y)).rgb;
+                float w4 = exp(-distance(s4, center) * distance(s4, center) * 50.0);
+                sum += s4 * w4; wSum += w4;
+
+                vec3 s5 = texture2D(uTexture, uv + vec2(-t.x,  t.y)).rgb;
+                float w5 = exp(-distance(s5, center) * distance(s5, center) * 50.0);
+                sum += s5 * w5; wSum += w5;
+
+                vec3 s6 = texture2D(uTexture, uv + vec2( t.x, -t.y)).rgb;
+                float w6 = exp(-distance(s6, center) * distance(s6, center) * 50.0);
+                sum += s6 * w6; wSum += w6;
+
+                vec3 s7 = texture2D(uTexture, uv + vec2(-t.x, -t.y)).rgb;
+                float w7 = exp(-distance(s7, center) * distance(s7, center) * 50.0);
+                sum += s7 * w7; wSum += w7;
+
+                return sum / wSum;
+            }
+
             void main() {
                 vec2 d = fillCenter(vTexCoord);
-                vec2 uv = (uTexTransform * vec3(d, 1.0)).xy;
+                // Front camera: sample a wider window around center (>1.0 = zoom
+                // out) before the texture-space transform, so selfie mode shows
+                // more of the sides instead of the tight fill-center crop.
+                vec2 dZoomed = (d - 0.5) / uWideZoom + 0.5;
+                vec2 uv = (uTexTransform * vec3(dZoomed, 1.0)).xy;
                 vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
                 st = applyRetouchNoseWarp(st);
                 vec3 col = texture2D(uTexture, st).rgb;
+
+                // Skin mask needs its own unzoomed mapping — the mask texture was
+                // built from raw (pre-wideZoom) landmark/analysis-frame geometry,
+                // so sampling it with the zoomed `st` above would misalign it.
+                vec2 uvLandmark = (uTexTransform * vec3(d, 1.0)).xy;
+                vec2 stLandmark = (uStMatrix * vec4(uvLandmark, 0.0, 1.0)).xy;
+                if (uSmoothStrength > 0.001) {
+                    float skinConf = uSkinMaskValid > 0.5 ? maskConfidence(stLandmark) : skinConfidence(col);
+                    if (skinConf > 0.001) {
+                        vec3 blurred = surfaceBlur(st, col);
+                        col = mix(col, blurred, uSmoothStrength * skinConf);
+                    }
+                }
+                // Temporal denoise: blend toward the accumulated history frame when
+                // this pixel hasn't moved/changed much since — averages out sensor
+                // grain over a few frames of a static scene. History is written in
+                // the same screen-space UV (vTexCoord) it's read with here, since
+                // both slots are always sized to the current viewport.
+                if (uHistoryValid > 0.5 && uTemporalStrength > 0.001) {
+                    vec3 hist = texture2D(uHistory, vTexCoord).rgb;
+                    float diff = distance(col, hist);
+                    float staticWeight = 1.0 - smoothstep(0.03, 0.12, diff);
+                    col = mix(col, hist, uTemporalStrength * staticWeight);
+                }
                 col = applyRetouchColor(col);
                 gl_FragColor = vec4(col, 1.0);
             }
