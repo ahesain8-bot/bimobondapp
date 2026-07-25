@@ -136,13 +136,8 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
       return;
     }
 
-    // Videos with an attached library sound: keep video muted and play this
-    // track. Image slides also use this path.
-    if (isSlideVideo(soundCurrentPage)) {
-      unawaited(
-        soundVideoControllers[soundCurrentPage]?.setMuted(true),
-      );
-    }
+    // Video slides use [CustomVideoPlayer.muteAudio] when a library sound is
+    // attached; this path plays the soundtrack only.
 
     final existing = _postSoundController;
     if (existing != null &&

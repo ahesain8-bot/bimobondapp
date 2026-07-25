@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-typedef FeedVideoSeekHandler =
-    Future<void> Function(Duration position, {required bool resumePlayback});
+typedef FeedVideoSeekHandler = Future<void> Function(Duration position);
 
 /// Tracks playback progress for the active feed video (0.0–1.0).
 class FeedVideoProgressNotifier extends ChangeNotifier {
@@ -25,7 +24,7 @@ class FeedVideoProgressNotifier extends ChangeNotifier {
   bool get scrubbing => _scrubbing;
   bool get canSeek => _seekHandler != null && _hasDuration;
 
-  /// Progress shown in the bar (follows finger while dragging).
+  /// Progress shown in the bar (follows finger while scrubbing).
   double get displayProgress {
     if (_scrubbing && _scrubProgress != null) {
       return _scrubProgress!.clamp(0.0, 1.0);
@@ -76,14 +75,15 @@ class FeedVideoProgressNotifier extends ChangeNotifier {
     _scrubbing = true;
     _scrubProgress = progress.clamp(0.0, 1.0);
     if (hasListeners) notifyListeners();
-    unawaited(seekToProgress(_scrubProgress!, resumePlayback: false));
+    unawaited(seekToProgress(_scrubProgress!));
   }
 
   void updateScrub(double progress) {
     if (!_scrubbing) return;
     _scrubProgress = progress.clamp(0.0, 1.0);
     if (hasListeners) notifyListeners();
-    unawaited(seekToProgress(_scrubProgress!, resumePlayback: false));
+    // Live preview while dragging.
+    unawaited(seekToProgress(_scrubProgress!));
   }
 
   Future<void> endScrub({required bool commit}) async {
@@ -95,21 +95,15 @@ class FeedVideoProgressNotifier extends ChangeNotifier {
     _scrubProgress = null;
     _progress = target;
     if (hasListeners) notifyListeners();
-    await seekToProgress(target, resumePlayback: true);
+    await seekToProgress(target);
   }
 
-  Future<void> seekToProgress(
-    double progress, {
-    required bool resumePlayback,
-  }) async {
+  Future<void> seekToProgress(double progress) async {
     final handler = _seekHandler;
     final totalMs = _duration.inMilliseconds;
     if (handler == null || totalMs <= 0) return;
     final ms = (progress.clamp(0.0, 1.0) * totalMs).round();
-    await handler(
-      Duration(milliseconds: ms),
-      resumePlayback: resumePlayback,
-    );
+    await handler(Duration(milliseconds: ms));
   }
 
   void reset() {
