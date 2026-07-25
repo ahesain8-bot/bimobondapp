@@ -227,6 +227,17 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             CameraFilterCatalog.categoryFromSlug(_filterCategorySlug) ??
             CameraFilterCategory.trending;
       }
+      if (_useNativeArFilters) {
+        final arCategories = ArFilterCatalog.colorCategories;
+        if (arCategories.isNotEmpty &&
+            !arCategories.any((c) => c.id == _arColorCategoryId)) {
+          // Default to whichever category the catalog lists first (matches
+          // the backend's own category order), not a hardcoded id — the old
+          // static catalog only ever had one category ('beauty'), which
+          // doesn't exist anymore now that categories are dynamic.
+          _arColorCategoryId = arCategories.first.id;
+        }
+      }
     });
   }
 
