@@ -139,12 +139,7 @@ class SoundDetailMetaSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SoundDetailCover(
-                coverUrl: sound.resolvedCoverUrl ??
-                    (sound.creator?.avatarUrl != null
-                        ? MediaUtils.resolveAbsoluteUrl(
-                            sound.creator!.avatarUrl!,
-                          )
-                        : null),
+                coverUrl: sound.resolvedCoverUrl,
                 isPlaying: isPlaying,
                 onTap: onTogglePreview,
               ),
@@ -267,11 +262,27 @@ class SoundDetailCover extends StatelessWidget {
         padding: const EdgeInsets.all(2),
         child: ClipOval(
           child: coverUrl != null && coverUrl!.isNotEmpty
-              ? SafeNetworkImage(
-                  imageUrl: coverUrl!,
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SafeNetworkImage(
+                      imageUrl: coverUrl!,
+                      width: size,
+                      height: size,
+                      fit: BoxFit.cover,
+                    ),
+                    Container(
+                      color: Colors.black38,
+                    ),
+                    Icon(
+                      isPlaying ? LucideIcons.pause : LucideIcons.music,
+                      color: Colors.white,
+                      size: size * 0.32,
+                      shadows: const [
+                        Shadow(color: Colors.black54, blurRadius: 4),
+                      ],
+                    ),
+                  ],
                 )
               : ColoredBox(
                   color: scheme.surfaceContainerHighest,

@@ -6,7 +6,8 @@ import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_sound_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_promotion_entity.dart';
-import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_catalog_store.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 
@@ -60,9 +61,21 @@ class PostModel extends PostEntity {
   }
 
   static PostSoundEntity? _soundFromId(dynamic raw) {
-    final id = raw?.toString();
+    final id = raw?.toString().trim();
     if (id == null || id.isEmpty) return null;
-    return PostSoundEntity(id: id, name: 'Original Sound');
+    final cached = SoundLocalCatalogStore.findCached(id);
+    if (cached != null) {
+      return PostSoundEntity(
+        id: cached.id,
+        name: cached.name,
+        author: cached.author,
+        coverUrl: cached.coverUrl,
+        duration: cached.duration,
+        useCount: cached.useCount,
+        audioUrl: cached.resolvedAudioUrl,
+      );
+    }
+    return PostSoundEntity(id: id, name: 'Sound');
   }
 
   /// API returns nested `soundSegment.sound` (feed/detail), not top-level `sound`.
@@ -93,6 +106,7 @@ class PostModel extends PostEntity {
         id: sound.id,
         name: sound.name,
         author: sound.author,
+        coverUrl: sound.coverUrl,
         duration: sound.duration,
         useCount: sound.useCount,
         audioUrl: sound.audioUrl,
@@ -123,7 +137,35 @@ class PostModel extends PostEntity {
       return fallback == null ? null : withSegment(fallback);
     }
 
-    final byId = _soundFromId(json['soundId'] ?? json['soundSegmentId']);
+    final topSoundName = json['soundName']?.toString().trim();
+    final isOriginalSound = json['isOriginalSound'] == true;
+    final soundId = (json['soundId'] ?? json['soundSegmentId'])?.toString().trim();
+    final soundAuthor = (json['soundAuthor'] ?? json['artistName'])?.toString().trim();
+    final audioUrl = (json['soundAudioUrl'] ?? json['soundUrl'] ?? json['audioUrl'])?.toString().trim();
+
+    if (topSoundName != null && topSoundName.isNotEmpty && !isOriginalSound) {
+      final id = (soundId != null && soundId.isNotEmpty) ? soundId : (segmentId ?? '');
+      final entity = PostSoundEntity(
+        id: id,
+        name: topSoundName,
+        author: soundAuthor,
+        audioUrl: audioUrl,
+      );
+      if (id.isNotEmpty) {
+        SoundLocalCatalogStore.cacheSound(
+          SoundEntity(
+            id: id,
+            name: topSoundName,
+            author: soundAuthor ?? '',
+            audioUrl: audioUrl ?? '',
+            duration: 0,
+          ),
+        );
+      }
+      return withSegment(entity);
+    }
+
+    final byId = _soundFromId(soundId);
     return byId == null ? null : withSegment(byId);
   }
 
@@ -257,6 +299,7 @@ class PostModel extends PostEntity {
     );
   }
 
+  @override
   PostModel copyWith({
     int? commentCount,
     int? likeCount,
@@ -268,6 +311,7 @@ class PostModel extends PostEntity {
     List<RepostUserEntity>? recentReposters,
     String? description,
     String? privacyStatus,
+    PostSoundEntity? sound,
   }) {
     return PostModel(
       id: id,
@@ -301,7 +345,7 @@ class PostModel extends PostEntity {
       isAd: isAd,
       promotion: promotion,
       location: location,
-      sound: sound,
+      sound: sound ?? this.sound,
       filterName: filterName,
     );
   }
@@ -342,6 +386,10 @@ class PostModel extends PostEntity {
           .toList(),
       'isAuctionable': isAuctionable,
       if (auction != null) 'auction': _auctionToJson(auction!),
+      if (sound != null) ...{
+        'soundName': sound!.name.isNotEmpty ? sound!.name : null,
+        'isOriginalSound': sound!.name.isEmpty || sound!.name == 'Original Sound',
+      },
     };
   }
 

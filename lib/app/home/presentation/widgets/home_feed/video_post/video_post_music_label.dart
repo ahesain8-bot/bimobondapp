@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_local_catalog_store.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,6 +8,7 @@ class VideoPostMusicLabel extends StatefulWidget {
   const VideoPostMusicLabel({
     required this.soundName,
     this.soundAuthor,
+    this.soundId,
     this.postUsername,
     this.onTap,
     super.key,
@@ -14,6 +16,7 @@ class VideoPostMusicLabel extends StatefulWidget {
 
   final String? soundName;
   final String? soundAuthor;
+  final String? soundId;
   final String? postUsername;
   final VoidCallback? onTap;
 
@@ -40,6 +43,7 @@ class _VideoPostMusicLabelState extends State<VideoPostMusicLabel>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.soundName != widget.soundName ||
         oldWidget.soundAuthor != widget.soundAuthor ||
+        oldWidget.soundId != widget.soundId ||
         oldWidget.postUsername != widget.postUsername) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndStart());
     }
@@ -52,15 +56,48 @@ class _VideoPostMusicLabelState extends State<VideoPostMusicLabel>
   }
 
   String _label(AppLocalizations l10n) {
-    final sound = widget.soundName?.trim();
-    final author = (widget.soundAuthor ?? widget.postUsername)?.trim();
-    final base = (sound != null && sound.isNotEmpty)
-        ? sound
-        : l10n.cameraOriginalSound;
-    if (author != null && author.isNotEmpty) {
-      return '$base - $author';
+    var sound = widget.soundName?.trim();
+    var author = widget.soundAuthor?.trim();
+    final user = widget.postUsername?.trim();
+    final soundId = widget.soundId?.trim();
+    final hasSoundId = soundId != null && soundId.isNotEmpty;
+
+    if (hasSoundId) {
+      final cached = SoundLocalCatalogStore.findCached(soundId);
+      if (cached != null) {
+        sound = cached.name.trim();
+        if (author == null || author.isEmpty) {
+          author = cached.author.trim();
+        }
+      }
     }
-    return base;
+
+    final isGeneric = sound == null ||
+        sound.isEmpty ||
+        sound.toLowerCase() == 'sound' ||
+        sound.toLowerCase() == 'original sound' ||
+        sound.toLowerCase() == l10n.soundLabel.toLowerCase() ||
+        sound.toLowerCase() == l10n.cameraOriginalSound.toLowerCase();
+
+    if (hasSoundId) {
+      final trackName = !isGeneric ? sound : l10n.soundLabel;
+      if (author != null && author.isNotEmpty && author != user) {
+        return '$trackName - $author';
+      }
+      return trackName;
+    }
+
+    if (isGeneric) {
+      if (user != null && user.isNotEmpty) {
+        return '$user · ${l10n.cameraOriginalSound}';
+      }
+      return l10n.cameraOriginalSound;
+    }
+
+    if (author != null && author.isNotEmpty && author != user) {
+      return '$sound - $author';
+    }
+    return sound;
   }
 
   void _measureAndStart() {

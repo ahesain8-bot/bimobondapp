@@ -17,9 +17,7 @@ void navigateAfterSignUp(
 }
 
 /// Post-auth routing (auth + user-interests docs):
-/// 1. New user with incomplete profile → edit profile
-/// 2. New user / `needsInterests` / forced signup → interests (min 3)
-/// 3. Otherwise → home
+/// After successful login, go directly to home tab.
 void navigateAfterAuth(
   BuildContext context, {
   UserEntity? user,
@@ -28,34 +26,17 @@ void navigateAfterAuth(
 }) {
   final email = pendingVerificationEmail?.trim();
 
-  final forceProfileSetup =
-      user?.isNewUser == true && user?.isProfileIncomplete == true;
-  if (forceProfileSetup) {
-    context.goNamed(
-      'personal_info',
-      queryParameters: {'onboarding': '1'},
-    );
-    return;
-  }
-
-  final needsInterests =
-      forceInterests ||
-      user?.needsInterests == true ||
-      user?.isNewUser == true;
-  if (needsInterests) {
-    context.goNamed(
-      'interest_selection',
-      queryParameters: {
-        if (email != null && email.isNotEmpty) 'email': email,
-      },
-    );
-    return;
-  }
-
   if (email != null && email.isNotEmpty) {
     context.goNamed(
       'email_verification',
       queryParameters: {'email': email},
+    );
+    return;
+  }
+
+  if (forceInterests) {
+    context.goNamed(
+      'interest_selection',
     );
     return;
   }

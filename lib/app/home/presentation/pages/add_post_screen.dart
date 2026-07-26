@@ -535,6 +535,7 @@ class _AddPostScreenState extends State<AddPostScreen>
         isAuctionable: widget.isStory ? false : _isAuction,
         auction: widget.isStory ? null : auction,
         files: _selectedFiles,
+        sound: sound,
         // Exactly one of soundSegmentId | soundId | newSound (see post-sounds.md).
         soundId: attach.soundId,
         soundSegmentId: attach.soundSegmentId,

@@ -185,6 +185,7 @@ class VideoPostBottomInfo extends StatelessWidget {
                   VideoPostMusicLabel(
                     soundName: post.sound?.name,
                     soundAuthor: post.sound?.author,
+                    soundId: post.sound?.id,
                     postUsername: displayName ?? username,
                     onTap: onMusicTap,
                   ),

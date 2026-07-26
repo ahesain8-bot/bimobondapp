@@ -5,16 +5,28 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Static disc (no rotation): avoids a permanent 60fps ticker per post.
 class VideoPostMusicDisc extends StatelessWidget {
-  const VideoPostMusicDisc({this.avatarUrl, this.onTap, super.key});
+  const VideoPostMusicDisc({
+    this.soundCoverUrl,
+    this.avatarUrl,
+    this.onTap,
+    this.showSoundIcon = false,
+    this.soundIconData = LucideIcons.music,
+    super.key,
+  });
 
+  final String? soundCoverUrl;
   final String? avatarUrl;
   final VoidCallback? onTap;
+  final bool showSoundIcon;
+  final IconData soundIconData;
 
   @override
   Widget build(BuildContext context) {
     final size = VideoPostLayoutConstants.musicDiscSize;
     final centerSize = size * 0.52;
-    final resolvedAvatar = avatarUrl?.trim();
+    final resolvedCover = (soundCoverUrl?.trim().isNotEmpty == true)
+        ? soundCoverUrl!.trim()
+        : (avatarUrl?.trim().isNotEmpty == true ? avatarUrl!.trim() : null);
 
     return GestureDetector(
       onTap: onTap,
@@ -53,14 +65,39 @@ class VideoPostMusicDisc extends StatelessWidget {
             border: Border.all(color: Colors.white24, width: 1),
           ),
           clipBehavior: Clip.antiAlias,
-          child: resolvedAvatar != null && resolvedAvatar.isNotEmpty
-              ? SafeNetworkImage(
-                  imageUrl: resolvedAvatar,
-                  width: centerSize,
-                  height: centerSize,
-                  fit: BoxFit.cover,
+          child: resolvedCover != null && resolvedCover.isNotEmpty
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SafeNetworkImage(
+                      imageUrl: resolvedCover,
+                      width: centerSize,
+                      height: centerSize,
+                      fit: BoxFit.cover,
+                    ),
+                    if (showSoundIcon) ...[
+                      Container(
+                        color: Colors.black38,
+                      ),
+                      Icon(
+                        soundIconData,
+                        color: Colors.white,
+                        size: centerSize * 0.55,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black54,
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 )
-              : const Icon(LucideIcons.music, color: Colors.white70, size: 12),
+              : Icon(
+                  soundIconData,
+                  color: Colors.white70,
+                  size: 16,
+                ),
         ),
       ),
     );

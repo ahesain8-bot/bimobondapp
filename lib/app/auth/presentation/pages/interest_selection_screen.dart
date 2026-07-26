@@ -116,14 +116,9 @@ class _InterestSelectionScreenState extends State<InterestSelectionScreen> {
 
   void _cycleCategory(String categoryId) {
     setState(() {
+      _notInterestedIds.remove(categoryId);
       if (_interestedIds.contains(categoryId)) {
         _interestedIds.remove(categoryId);
-        if (_notInterestedIds.length <
-            InterestSelectionView.maxNotInterestedCount) {
-          _notInterestedIds.add(categoryId);
-        }
-      } else if (_notInterestedIds.contains(categoryId)) {
-        _notInterestedIds.remove(categoryId);
       } else {
         if (_interestedIds.length < InterestSelectionView.maxInterestedCount) {
           _interestedIds.add(categoryId);

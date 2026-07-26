@@ -1,15 +1,22 @@
 import 'dart:io';
 
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 /// Full-bleed story media preview (TikTok-style cover fit).
 class StoryMediaPreview extends StatefulWidget {
-  const StoryMediaPreview({required this.file, required this.type, super.key});
+  const StoryMediaPreview({
+    required this.file,
+    required this.type,
+    this.sound,
+    super.key,
+  });
 
   final File file;
   final String type;
+  final SoundEntity? sound;
 
   @override
   State<StoryMediaPreview> createState() => _StoryMediaPreviewState();
@@ -27,6 +34,9 @@ class _StoryMediaPreviewState extends State<StoryMediaPreview> {
       _videoController = VideoPlayerController.file(widget.file)
         ..initialize().then((_) {
           if (!mounted) return;
+          if (widget.sound != null) {
+            _videoController!.setVolume(0.0);
+          }
           _videoController!
             ..setLooping(true)
             ..play();

@@ -467,6 +467,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         chromeFade: _chromeFade,
         onMusicTap: musicTap,
         sideActions: VideoPostSideActions(
+          soundCoverUrl: post.sound?.resolvedCoverUrl,
           avatarUrl: post.user?.avatarUrl,
           username: post.user?.username,
           fullName: post.user?.fullName,

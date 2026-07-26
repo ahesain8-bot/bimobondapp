@@ -854,7 +854,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       _soundWindow = picked.window > Duration.zero
           ? picked.window
           : const Duration(seconds: 15);
-      _muteOriginalAudio = picked.muteOriginal;
+      _muteOriginalAudio = true;
       _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
       final seg = picked.soundSegmentId?.trim();
       final defaultId = sound.defaultSegment?.id.trim();
