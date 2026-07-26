@@ -128,7 +128,7 @@ class CameraStudioOverlay extends StatelessWidget {
   final ValueChanged<MediaPhotoEditorTool>? onPhotoEditorToolSelected;
   final VoidCallback? onPhotoEditorMagicToggled;
   final void Function(MediaPhotoEditorTool tool, double value)?
-      onPhotoEditorAdjustmentChanged;
+  onPhotoEditorAdjustmentChanged;
   final VoidCallback? onPhotoEditorReset;
   final String photoEditorColorFilterId;
   final double photoEditorColorFilterIntensity;
@@ -214,6 +214,12 @@ class CameraStudioOverlay extends StatelessWidget {
     final selectedArFilterId = ArFilterCatalog
         .items[arFilterIndex.clamp(0, ArFilterCatalog.items.length - 1)]
         .id;
+    // Screen-overlay filters (Confetti/Snow/etc.) only bake into recorded
+    // video — there's no photo-capture path for them — so hide them from the
+    // carousel while in photo mode.
+    final effectCarouselItems = ArFilterCatalog.effectItemsFor(
+      photoMode: isPhotoMode,
+    );
     final hasActiveFilter = useNativeArFilters
         ? selectedArFilterId != 'none'
         : selectedFilter != AwesomeFilter.None;
@@ -294,99 +300,112 @@ class CameraStudioOverlay extends StatelessWidget {
                     showSound: !isRecording,
                   ),
                   const Spacer(),
-                if (!showLegacyFiltersPanel && !showRetouchPanel) ...[
-                  if (!isLiveMode &&
-                      !isRecording &&
-                      !isReviewingDraft &&
-                      selectedLayoutMode == CameraLayoutMode.off)
-                    CameraModeDurationBar(
-                      studioMode: studioMode,
-                      selectedDuration: selectedDuration,
-                      photoLabel: l10n.cameraModePhoto,
-                      textLabel: l10n.cameraModeText,
-                      liveLabel: l10n.cameraModeLive,
-                      duration10mLabel: l10n.cameraDuration10m,
-                      showLive: !isStoryMode,
-                      showText: !isStoryMode,
-                      onPhotoSelected: () =>
-                          onStudioModeSelected(CameraStudioMode.photo),
-                      onDurationSelected: (seconds) {
-                        onDurationSelected(seconds);
-                        onStudioModeSelected(CameraStudioMode.video);
-                      },
-                      onLiveSelected: () =>
-                          onStudioModeSelected(CameraStudioMode.live),
-                      onTextSelected: onTextModeTap,
-                    ),
-                  if (useNativeArFilters &&
-                      !isLiveMode &&
-                      onArFilterSelected != null &&
-                      !showArColorFiltersPanel &&
-                      !showRetouchPanel)
-                    _BottomInsetPanel(
-                      bottomInset: MediaQuery.paddingOf(context).bottom + 48,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isRecording)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: Text(
-                                _formatRecordClock(recordSeconds),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.6,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 6,
+                  if (!showLegacyFiltersPanel && !showRetouchPanel) ...[
+                    if (!isLiveMode &&
+                        !isRecording &&
+                        !isReviewingDraft &&
+                        selectedLayoutMode == CameraLayoutMode.off)
+                      CameraModeDurationBar(
+                        studioMode: studioMode,
+                        selectedDuration: selectedDuration,
+                        photoLabel: l10n.cameraModePhoto,
+                        textLabel: l10n.cameraModeText,
+                        liveLabel: l10n.cameraModeLive,
+                        duration10mLabel: l10n.cameraDuration10m,
+                        showLive: !isStoryMode,
+                        showText: !isStoryMode,
+                        onPhotoSelected: () =>
+                            onStudioModeSelected(CameraStudioMode.photo),
+                        onDurationSelected: (seconds) {
+                          onDurationSelected(seconds);
+                          onStudioModeSelected(CameraStudioMode.video);
+                        },
+                        onLiveSelected: () =>
+                            onStudioModeSelected(CameraStudioMode.live),
+                        onTextSelected: onTextModeTap,
+                      ),
+                    if (useNativeArFilters &&
+                        !isLiveMode &&
+                        onArFilterSelected != null)
+                      // Hidden rather than removed while a bottom sheet is open.
+                      // ArFilterCarousel below is stateful (ScrollController plus a
+                      // post-frame scroll re-anchor), so unmounting it meant every
+                      // sheet dismissal rebuilt that whole subtree from scratch in
+                      // the same frame the sheet was torn down. With the camera
+                      // AndroidView composited in the same tree, that long frame is
+                      // what read as the preview freezing for a moment on close.
+                      // Offstage keeps the element tree and scroll position alive
+                      // and still skips paint and hit-testing.
+                      Offstage(
+                        offstage: showArColorFiltersPanel || showRetouchPanel,
+                        child: _BottomInsetPanel(
+                          bottomInset:
+                              MediaQuery.paddingOf(context).bottom + 48,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isRecording)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 14),
+                                  child: Text(
+                                    _formatRecordClock(recordSeconds),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.6,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 6,
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
+                                ),
+                              const SizedBox(height: 4),
+                              Transform.translate(
+                                offset: const Offset(0, -14),
+                                child: ArFilterCarousel(
+                                  items: effectCarouselItems,
+                                  selectedIndex:
+                                      ArFilterCatalog.effectCarouselIndexFor(
+                                        selectedArFilterId,
+                                        photoMode: isPhotoMode,
+                                      ),
+                                  onSelected: (index) {
+                                    final id = effectCarouselItems[index].id;
+                                    onArFilterSelected!(
+                                      ArFilterCatalog.indexOfId(id),
+                                    );
+                                  },
+                                  isRecording: isRecording,
+                                  isBusy: isBusy,
+                                  recordProgress: selectedDuration == 0
+                                      ? 0
+                                      : recordSeconds / selectedDuration,
+                                  isPhotoMode: isPhotoMode,
+                                  onShutterTap: onRecordTap,
+                                  onHoldStart: onLongPressStart,
+                                  onHoldEnd: onLongPressEnd,
+                                  showSideActions:
+                                      isReviewingDraft ||
+                                      (isRecording && recordSeconds >= 1),
+                                  soloShutter:
+                                      isRecording ||
+                                      isReviewingDraft ||
+                                      selectedLayoutMode !=
+                                          CameraLayoutMode.off,
+                                  onCancel: onDiscardDraft,
+                                  onConfirm: onFinishRecording,
                                 ),
                               ),
-                            ),
-                          const SizedBox(height: 4),
-                          Transform.translate(
-                            offset: const Offset(0, -14),
-                            child: ArFilterCarousel(
-                              items: ArFilterCatalog.effectItems,
-                              selectedIndex:
-                                  ArFilterCatalog.effectCarouselIndex(
-                                selectedArFilterId,
-                              ),
-                              onSelected: (index) {
-                                final id =
-                                    ArFilterCatalog.effectItems[index].id;
-                                onArFilterSelected!(
-                                  ArFilterCatalog.indexOfId(id),
-                                );
-                              },
-                              isRecording: isRecording,
-                              isBusy: isBusy,
-                              recordProgress: selectedDuration == 0
-                                  ? 0
-                                  : recordSeconds / selectedDuration,
-                              isPhotoMode: isPhotoMode,
-                              onShutterTap: onRecordTap,
-                              onHoldStart: onLongPressStart,
-                              onHoldEnd: onLongPressEnd,
-                              showSideActions: isReviewingDraft ||
-                                  (isRecording && recordSeconds >= 1),
-                              soloShutter: isRecording ||
-                                  isReviewingDraft ||
-                                  selectedLayoutMode != CameraLayoutMode.off,
-                              onCancel: onDiscardDraft,
-                              onConfirm: onFinishRecording,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 44,
-                            child: (isRecording || isReviewingDraft)
-                                ? null
-                                : selectedLayoutMode == CameraLayoutMode.off
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                height: 44,
+                                child: (isRecording || isReviewingDraft)
+                                    ? null
+                                    : selectedLayoutMode == CameraLayoutMode.off
                                     ? _BottomWorkspaceRow(
                                         showGallery: showGalleryUpload,
                                         onUploadTap: onUploadTap,
@@ -400,101 +419,103 @@ class CameraStudioOverlay extends StatelessWidget {
                                             onWorkspaceTabSelected,
                                       )
                                     : showGalleryUpload
-                                        ? Align(
-                                            alignment:
-                                                AlignmentDirectional.centerStart,
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsetsDirectional
-                                                      .only(start: 16),
-                                              child: GestureDetector(
-                                                onTap: onUploadTap,
-                                                child: Icon(
-                                                  Icons
-                                                      .photo_library_outlined,
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.9),
-                                                  size: 28,
-                                                ),
+                                    ? Align(
+                                        alignment:
+                                            AlignmentDirectional.centerStart,
+                                        child: Padding(
+                                          padding:
+                                              const EdgeInsetsDirectional.only(
+                                                start: 16,
                                               ),
+                                          child: GestureDetector(
+                                            onTap: onUploadTap,
+                                            child: Icon(
+                                              Icons.photo_library_outlined,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.9,
+                                              ),
+                                              size: 28,
                                             ),
-                                          )
-                                        : null,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(height: 4),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                        ],
-                      ),
-                    )
-                  else if (!useNativeArFilters || isLiveMode) ...[
-                    if (!isLiveMode) ...[
-                      const SizedBox(height: 10),
-                      CameraCaptureControls(
-                        isLiveMode: isLiveMode,
-                        isPhotoMode: isPhotoMode,
-                        isRecording: isRecording,
-                        isBusy: isBusy,
-                        recordProgress: selectedDuration == 0
-                            ? 0
-                            : recordSeconds / selectedDuration,
-                        effectsLabel: l10n.cameraEffects,
-                        uploadLabel: isStoryMode
-                            ? l10n.importFromLibrary
-                            : l10n.uploadFromLibrary,
-                        goLiveLabel: l10n.cameraGoLive,
-                        selectedEffect: activeEffect,
-                        onEffectsTap: onEffectsTap,
-                        onUploadTap: onUploadTap,
-                        onGoLiveTap: onGoLiveTap,
-                        onRecordTap: onRecordTap,
-                        showUpload: showGalleryUpload,
-                        showEffectsTool: true,
-                        onLongPressStart: onLongPressStart,
-                        onLongPressEnd: onLongPressEnd,
-                      ),
-                      if (isReviewingDraft)
-                        _ReviewActionsRow(
-                          cancelLabel: l10n.cancel,
-                          nextLabel: l10n.nextAction,
-                          onCancel: onDiscardDraft,
-                          onNext: onFinishRecording!,
                         ),
+                      )
+                    else if (!useNativeArFilters || isLiveMode) ...[
+                      if (!isLiveMode) ...[
+                        const SizedBox(height: 10),
+                        CameraCaptureControls(
+                          isLiveMode: isLiveMode,
+                          isPhotoMode: isPhotoMode,
+                          isRecording: isRecording,
+                          isBusy: isBusy,
+                          recordProgress: selectedDuration == 0
+                              ? 0
+                              : recordSeconds / selectedDuration,
+                          effectsLabel: l10n.cameraEffects,
+                          uploadLabel: isStoryMode
+                              ? l10n.importFromLibrary
+                              : l10n.uploadFromLibrary,
+                          goLiveLabel: l10n.cameraGoLive,
+                          selectedEffect: activeEffect,
+                          onEffectsTap: onEffectsTap,
+                          onUploadTap: onUploadTap,
+                          onGoLiveTap: onGoLiveTap,
+                          onRecordTap: onRecordTap,
+                          showUpload: showGalleryUpload,
+                          showEffectsTool: true,
+                          onLongPressStart: onLongPressStart,
+                          onLongPressEnd: onLongPressEnd,
+                        ),
+                        if (isReviewingDraft)
+                          _ReviewActionsRow(
+                            cancelLabel: l10n.cancel,
+                            nextLabel: l10n.nextAction,
+                            onCancel: onDiscardDraft,
+                            onNext: onFinishRecording!,
+                          ),
+                      ],
+                      if (isLiveMode) ...[
+                        const SizedBox(height: 10),
+                        CameraCaptureControls(
+                          isLiveMode: true,
+                          isPhotoMode: false,
+                          isRecording: false,
+                          isBusy: isBusy,
+                          recordProgress: 0,
+                          effectsLabel: l10n.cameraEffects,
+                          uploadLabel: l10n.uploadFromLibrary,
+                          goLiveLabel: l10n.cameraGoLive,
+                          onEffectsTap: onEffectsTap,
+                          onUploadTap: onUploadTap,
+                          onGoLiveTap: onGoLiveTap,
+                          onRecordTap: onRecordTap,
+                          showUpload: false,
+                          showEffectsTool: false,
+                        ),
+                      ],
+                      if (!isReviewingDraft) ...[
+                        const SizedBox(height: 10),
+                        CameraWorkspaceTabs(
+                          postLabel: l10n.cameraTabPost,
+                          creativeLabel: l10n.cameraTabCreative,
+                          selectedIndex: workspaceTabIndex,
+                          onSelected: onWorkspaceTabSelected,
+                        ),
+                        SizedBox(
+                          height: 10 + MediaQuery.paddingOf(context).bottom,
+                        ),
+                      ],
                     ],
-                    if (isLiveMode) ...[
-                      const SizedBox(height: 10),
-                      CameraCaptureControls(
-                        isLiveMode: true,
-                        isPhotoMode: false,
-                        isRecording: false,
-                        isBusy: isBusy,
-                        recordProgress: 0,
-                        effectsLabel: l10n.cameraEffects,
-                        uploadLabel: l10n.uploadFromLibrary,
-                        goLiveLabel: l10n.cameraGoLive,
-                        onEffectsTap: onEffectsTap,
-                        onUploadTap: onUploadTap,
-                        onGoLiveTap: onGoLiveTap,
-                        onRecordTap: onRecordTap,
-                        showUpload: false,
-                        showEffectsTool: false,
-                      ),
-                    ],
-                    if (!isReviewingDraft) ...[
-                      const SizedBox(height: 10),
-                      CameraWorkspaceTabs(
-                        postLabel: l10n.cameraTabPost,
-                        creativeLabel: l10n.cameraTabCreative,
-                        selectedIndex: workspaceTabIndex,
-                        onSelected: onWorkspaceTabSelected,
-                      ),
-                      SizedBox(
-                        height: 10 + MediaQuery.paddingOf(context).bottom,
-                      ),
-                    ],
-                  ],
-                ] else
-                  const SizedBox(height: 180),
-              ],
-            ),
+                  ] else
+                    const SizedBox(height: 180),
+                ],
+              ),
             ),
           ),
         if (showControls &&

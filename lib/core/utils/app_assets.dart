@@ -31,6 +31,10 @@ class AppAssets {
   static const String shareArrowIcon = '$iconsPath/share-arrow-svgrepo-com.svg';
   static const String cameraLayoutIcon = '$iconsPath/layout-1-svgrepo-com.svg';
   static const String cameraFiltersIcon = '$iconsPath/filters-svgrepo-com.svg';
+  static const String cameraFlashIcon = '$iconsPath/flash-fill.svg';
+  static const String cameraFlashOffIcon = '$iconsPath/flash-off.svg';
+  static const String cameraShutterIcon = '$iconsPath/video-camera-solid.svg';
+  static const String cameraSwitchIcon = '$iconsPath/refresh.svg';
   static const String cameraShareIcon = '$iconsPath/share-svgrepo-com.svg';
   static const String cameraStickerIcon =
       '$iconsPath/sticker-smile-square-svgrepo-com.svg';

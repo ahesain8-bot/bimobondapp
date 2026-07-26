@@ -19,7 +19,9 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import com.airbnb.lottie.LottieAnimationView
+import com.airbnb.lottie.LottieDrawable
 
 object ArCameraBridge {
     var faceOverlay: FaceOverlayView? = null
@@ -27,8 +29,17 @@ object ArCameraBridge {
     var warpGlView: FaceWarpGlView? = null
     var confettiOverlay: LottieAnimationView? = null
 
-    /** Filename currently loaded into [confettiOverlay] — see [applyRenderMode]. */
-    private var loadedScreenOverlayAsset: String? = null
+    /** Source currently loaded into [confettiOverlay] — see [applyRenderMode]. */
+    private var loadedOverlayKey: String? = null
+
+    /**
+     * Animation the selected screen overlay should play, handed over by Dart
+     * with the filter id. Null whenever the active filter isn't a screen
+     * overlay.
+     */
+    @Volatile
+    var currentOverlaySource: ScreenOverlaySource? = null
+        private set
     var platformRoot: View? = null
     var hostActivity: Activity? = null
     var lifecycleOwner: LifecycleOwner? = null
@@ -172,11 +183,24 @@ object ArCameraBridge {
         view.requestLayout()
     }
 
-    fun setFilter(name: String, intensity: Float? = null) {
+    fun setFilter(
+        name: String,
+        intensity: Float? = null,
+        overlay: ScreenOverlaySource? = null,
+    ) {
         if (intensity != null) {
             filterIntensity = intensity.coerceIn(0f, 1f)
         }
-        val type = FilterType.fromId(name)
+        // A screen overlay is identified by Dart sending an animation source
+        // alongside the id, not by the id itself — overlay ids are defined by
+        // the backend and mean nothing to [FilterType.fromId].
+        val type = if (overlay != null && overlay.isValid) {
+            FilterType.SCREEN_OVERLAY
+        } else {
+            FilterType.fromId(name)
+        }
+        val previousOverlayKey = currentOverlaySource?.cacheKey
+        currentOverlaySource = if (type.isScreenOverlay()) overlay else null
         val previous = currentFilter
         currentFilter = type
 
@@ -192,7 +216,13 @@ object ArCameraBridge {
                 "letterbox=${letterboxTopPx}/${letterboxBottomPx}",
         )
 
-        if (previous != type) {
+        // Switching between two screen overlays keeps the same FilterType now
+        // that they share one value, so the type comparison alone would miss it
+        // — compare the animation too, or picking Snowfall after Confetti would
+        // skip the reset onFilterChanged does.
+        val overlaySwapped = type.isScreenOverlay() &&
+            currentOverlaySource?.cacheKey != previousOverlayKey
+        if (previous != type || overlaySwapped) {
             ArCameraController.onFilterChanged()
         }
         applyCurrentFilter()
@@ -261,8 +291,12 @@ object ArCameraBridge {
         )
         diagVis("beginOes.START")
         oesTransitionPending = true
-        // Spinner immediately so tap feels responsive while we capture the still.
-        (platformRoot as? ViewGroup)?.let { showApplyingOverlay(it) }
+        // No "Applying filter..." spinner here (or in finishAttach below). The
+        // freeze frame already covers this transition with the last live frame,
+        // so the camera reads as still running; layering a spinner and label on
+        // top only made an otherwise invisible rebind look like a wait. The
+        // showApplyingOverlay/clearApplyingOverlay machinery is left in place in
+        // case a genuinely slow path needs it later.
         gl.ensureGlInitialized()
         gl.setOesEnabled(true)
 
@@ -280,7 +314,6 @@ object ArCameraBridge {
                 // Freeze stays on top covering the rebind — never expose black GL/Preview.
                 freezeOverlay?.alpha = 1f
                 freezeOverlay?.bringToFront()
-                applyingOverlay?.bringToFront()
             } else {
                 // No prior frame to protect behind a freeze — this is the common
                 // cold-start case (no camera frame has ever been shown yet), so
@@ -387,7 +420,6 @@ object ArCameraBridge {
             root.addView(iv)
             iv.bringToFront()
             freezeOverlay = iv
-            showApplyingOverlay(root)
             android.util.Log.i(
                 "ArFilterTap",
                 "freeze: overlayAttached path=$path ${frame.width}x${frame.height} " +
@@ -524,6 +556,123 @@ object ArCameraBridge {
         }
     }
 
+    // ------------------------------------------------------ rebind cover
+    //
+    // Any camera rebind goes through `cameraProvider.unbindAll()`, which releases
+    // the Preview surface and leaves the PreviewView showing black until the new
+    // stream delivers its first frame — visible as a blink when the filter
+    // category changes. Normal Mode's OES switch already had its own freeze-frame
+    // for this; these two functions are the equivalent for every other rebind, and
+    // are driven from the single funnel in ArCameraController.requestPreviewRebind.
+
+    private var rebindCover: ImageView? = null
+    private var rebindCoverObserver: Observer<PreviewView.StreamState>? = null
+
+    /**
+     * The stream state is already STREAMING when the cover goes up, so a bare
+     * "wait for STREAMING" would fire immediately. Wait for it to drop to IDLE
+     * (the unbind) first, and treat the following STREAMING as the real signal.
+     */
+    private var rebindCoverSawIdle = false
+
+    private val clearRebindCoverRunnable = Runnable { clearRebindCover() }
+
+    /** Freezes the last visible camera frame over the preview until it streams again. */
+    fun coverPreviewForRebind() {
+        if (freezeOverlay != null || rebindCover != null) return
+        val root = platformRoot as? ViewGroup ?: return
+        val preview = previewView ?: return
+        val bmp = lastVisibleFrameBitmap() ?: return
+
+        val iv = ImageView(root.context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setImageBitmap(bmp)
+            // Under the freeze overlay's 10_000f so an OES transition still wins.
+            elevation = 9_000f
+        }
+        applyVerticalMargins(iv, letterboxTopPx, letterboxBottomPx)
+        root.addView(iv)
+        iv.bringToFront()
+        // The screen-overlay animation sits on top of the preview and keeps
+        // running through the rebind, so it must stay above the cover.
+        if (currentFilter.isScreenOverlay()) confettiOverlay?.bringToFront()
+        if (currentFilter.isPngOverlay()) faceOverlay?.bringToFront()
+        rebindCover = iv
+        rebindCoverSawIdle = false
+
+        val owner = lifecycleOwner
+        if (owner != null) {
+            val observer = Observer<PreviewView.StreamState> { state ->
+                if (state == PreviewView.StreamState.IDLE) {
+                    rebindCoverSawIdle = true
+                } else if (state == PreviewView.StreamState.STREAMING && rebindCoverSawIdle) {
+                    clearRebindCover()
+                }
+            }
+            rebindCoverObserver = observer
+            try {
+                preview.previewStreamState.observe(owner, observer)
+            } catch (_: Throwable) {
+                rebindCoverObserver = null
+            }
+        }
+        // Safety net: never leave a stale still on screen if the stream state
+        // never reports back (bind failure, device quirk).
+        mainHandler.removeCallbacks(clearRebindCoverRunnable)
+        mainHandler.postDelayed(clearRebindCoverRunnable, REBIND_COVER_TIMEOUT_MS)
+    }
+
+    private fun clearRebindCover() {
+        mainHandler.removeCallbacks(clearRebindCoverRunnable)
+        rebindCoverObserver?.let { obs ->
+            rebindCoverObserver = null
+            try {
+                previewView?.previewStreamState?.removeObserver(obs)
+            } catch (_: Throwable) {
+            }
+        }
+        val iv = rebindCover ?: return
+        rebindCover = null
+        rebindCoverSawIdle = false
+        try {
+            val bmp = (iv.drawable as? BitmapDrawable)?.bitmap
+            (iv.parent as? ViewGroup)?.removeView(iv)
+            iv.setImageDrawable(null)
+            if (bmp != null && !bmp.isRecycled) bmp.recycle()
+        } catch (_: Throwable) {
+        }
+    }
+
+    private const val REBIND_COVER_TIMEOUT_MS = 1500L
+
+    /**
+     * Whichever surface the user is actually looking at right now.
+     *
+     * The GL branch matters for the most common blink of all: leaving Normal Mode
+     * for an overlay filter. There the GL view is what's on screen and the
+     * PreviewView is still unbound, so reading the PreviewView would hand back a
+     * black frame — which is exactly what the cover exists to avoid showing.
+     */
+    private fun lastVisibleFrameBitmap(): Bitmap? {
+        val preview = previewView
+        if (preview != null && preview.visibility == View.VISIBLE) {
+            capturePreviewBitmap(preview)?.let { return it }
+        }
+        val gl = warpGlView
+        if (gl != null && gl.visibility == View.VISIBLE) {
+            return try {
+                gl.copyLastFilteredFrame()
+            } catch (_: Throwable) {
+                null
+            }
+        }
+        return null
+    }
+
     private fun capturePreviewBitmap(preview: PreviewView?): Bitmap? {
         if (preview == null || preview.width <= 0 || preview.height <= 0) return null
         try {
@@ -645,17 +794,37 @@ object ArCameraBridge {
 
         val confetti = confettiOverlay
         if (useScreenOverlay) {
-            // Confetti/Keywords/Snowfall/Snow White all share this one Lottie
-            // view — only one screen-overlay filter is ever active at a time —
-            // so swap its loaded asset whenever the selection actually changes.
-            val asset = type.screenOverlayAsset()
-            if (confetti != null && asset != null && asset != loadedScreenOverlayAsset) {
+            // Every overlay shares this one Lottie view — only one is ever
+            // active at a time — so swap its animation whenever the selection
+            // actually changes.
+            val source = currentOverlaySource
+            if (confetti != null && source != null && source.isValid &&
+                source.cacheKey != loadedOverlayKey
+            ) {
                 try {
                     confetti.cancelAnimation()
-                    confetti.setAnimation(asset)
-                    loadedScreenOverlayAsset = asset
+                    confetti.repeatCount =
+                        if (source.loop) LottieDrawable.INFINITE else 0
+                    val url = source.url
+                    if (!url.isNullOrBlank()) {
+                        // Lottie caches downloaded compositions on disk itself,
+                        // keyed by URL, so this is a network call only the first
+                        // time a given overlay is ever used on the device — and
+                        // usually not even then, because prefetchOverlays() has
+                        // already warmed it. Async: onCompositionLoaded fires
+                        // when it's ready.
+                        confetti.setAnimationFromUrl(url)
+                    } else {
+                        confetti.setAnimation(source.assetName)
+                    }
+                    loadedOverlayKey = source.cacheKey
                 } catch (t: Throwable) {
-                    android.util.Log.e("ArCamera", "screen overlay asset load failed: $asset", t)
+                    android.util.Log.e(
+                        "ArCamera",
+                        "screen overlay load failed: ${source.cacheKey}",
+                        t,
+                    )
+                    loadedOverlayKey = null
                 }
             }
             confetti?.visibility = View.VISIBLE
@@ -782,6 +951,8 @@ object ArCameraBridge {
         }
         clearApplyingOverlay()
         clearFreezeOverlay()
+        // GL is now the visible surface; any PreviewView cover would only linger.
+        clearRebindCover()
     }
 
     /** Swap to live GL under the freeze, then fade the still out (no hard blink). */
@@ -795,6 +966,7 @@ object ArCameraBridge {
         )
         diagVis("reveal.start")
         clearApplyingOverlay()
+        clearRebindCover()
         gl?.visibility = View.VISIBLE
         preview?.visibility = View.INVISIBLE
         if (freeze == null) {
@@ -828,6 +1000,7 @@ object ArCameraBridge {
         warpGlView?.releaseGl()
         clearApplyingOverlay()
         clearFreezeOverlay()
+        clearRebindCover()
         try {
             confettiOverlay?.cancelAnimation()
         } catch (_: Throwable) {
@@ -836,7 +1009,8 @@ object ArCameraBridge {
         previewView = null
         warpGlView = null
         confettiOverlay = null
-        loadedScreenOverlayAsset = null
+        loadedOverlayKey = null
+        currentOverlaySource = null
         platformRoot = null
         hostActivity = null
         lifecycleOwner = null

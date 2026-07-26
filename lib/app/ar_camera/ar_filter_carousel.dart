@@ -1,6 +1,8 @@
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ArFilterCarousel extends StatefulWidget {
@@ -45,6 +47,11 @@ class ArFilterCarousel extends StatefulWidget {
   static const _loopCopies = 200;
   static double get visibleSpan => 4 * itemStride + inactiveSize;
 
+  /// Roughly five slots are visible at once ([visibleSpan] / [itemStride]), so
+  /// a list needs at least one more than that before wrapping can happen
+  /// off-screen. See `_ArFilterCarouselState._looping`.
+  static const _minLoopItems = 6;
+
   @override
   State<ArFilterCarousel> createState() => _ArFilterCarouselState();
 }
@@ -57,8 +64,16 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
 
   List<ArFilterItem> get _filters => widget.items;
   int get _n => _filters.length;
-  int get _midBase => (ArFilterCarousel._loopCopies ~/ 2) * _n;
-  int get _itemCount => _n * ArFilterCarousel._loopCopies;
+
+  /// The carousel is an infinite loop, which only reads as a loop when there
+  /// are more items than fit on screen. With a short list the repeats land
+  /// inside the visible window and you see the same entries — including the
+  /// centred shutter — twice over (shutter, overlay, shutter, overlay...).
+  /// Below the threshold the list is rendered once, unlooped.
+  bool get _looping => _n >= ArFilterCarousel._minLoopItems;
+
+  int get _midBase => _looping ? (ArFilterCarousel._loopCopies ~/ 2) * _n : 0;
+  int get _itemCount => _looping ? _n * ArFilterCarousel._loopCopies : _n;
 
   double get _effectiveScrollOffset =>
       _controller.hasClients ? _controller.offset : _scrollOffset;
@@ -66,7 +81,8 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   @override
   void initState() {
     super.initState();
-    _controller = ScrollController()..addListener(_syncScrollOffsetFromController);
+    _controller = ScrollController()
+      ..addListener(_syncScrollOffsetFromController);
     _lastHapticReal = widget.selectedIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToReal(widget.selectedIndex, animated: false);
@@ -93,7 +109,8 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
     }
 
     // Solo shutter replaces the list — re-anchor when coming back to carousel.
-    final resyncCarousel = (oldWidget.isRecording && !widget.isRecording) ||
+    final resyncCarousel =
+        (oldWidget.isRecording && !widget.isRecording) ||
         (oldWidget.soloShutter && !widget.soloShutter);
     if (resyncCarousel) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -110,8 +127,8 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
       });
       return;
     }
-    final target = _nearestLoopIndex(widget.selectedIndex) *
-        ArFilterCarousel.itemStride;
+    final target =
+        _nearestLoopIndex(widget.selectedIndex) * ArFilterCarousel.itemStride;
     if ((_controller.offset - target).abs() > 2) {
       _scrollToReal(widget.selectedIndex, animated: true);
     }
@@ -126,11 +143,14 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
 
   int _realFromLoop(int loopIndex) {
     if (_n == 0) return 0;
+    if (!_looping) return loopIndex.clamp(0, _n - 1);
     return ((loopIndex % _n) + _n) % _n;
   }
 
   int _nearestLoopIndex(int realIndex) {
     final real = realIndex.clamp(0, _n - 1);
+    // Unlooped: loop index IS the real index, and there is no shorter way round.
+    if (!_looping) return real;
     if (!_controller.hasClients || _n == 0) {
       return _midBase + real;
     }
@@ -172,6 +192,8 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
   }
 
   void _recenterIfNearEdge() {
+    // Nothing to recenter without the loop — the list has real ends.
+    if (!_looping) return;
     if (!_controller.hasClients || _n == 0) return;
     final loop = (_controller.offset / ArFilterCarousel.itemStride).round();
     final margin = _n * 20;
@@ -252,8 +274,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
             Center(
               child: GestureDetector(
                 onTap: _onActiveTap,
-                onLongPressStart:
-                    widget.isBusy ? null : widget.onHoldStart,
+                onLongPressStart: widget.isBusy ? null : widget.onHoldStart,
                 onLongPressEnd: widget.onHoldEnd,
                 child: _ShutterCircle(
                   size: ArFilterCarousel.activeSize,
@@ -326,8 +347,7 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                                   parent: AlwaysScrollableScrollPhysics(),
                                 ),
                               ),
-                        padding:
-                            EdgeInsets.symmetric(horizontal: sidePadding),
+                        padding: EdgeInsets.symmetric(horizontal: sidePadding),
                         itemCount: _itemCount,
                         itemBuilder: (context, loopIndex) {
                           final real = _realFromLoop(loopIndex);
@@ -335,9 +355,9 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                           final size = _sizeForLoop(loopIndex);
                           final opacity = _opacityForLoop(loopIndex);
                           final center =
-                              _effectiveScrollOffset / ArFilterCarousel.itemStride;
-                          final isCentered =
-                              (loopIndex - center).abs() < 0.35;
+                              _effectiveScrollOffset /
+                              ArFilterCarousel.itemStride;
+                          final isCentered = (loopIndex - center).abs() < 0.35;
 
                           if (widget.soloShutter && !isCentered) {
                             return const SizedBox(
@@ -361,16 +381,16 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                                     if (isCentered) {
                                       _onActiveTap();
                                     } else {
-                                      _scrollToReal(real, animated: true)
-                                          .then((_) {
+                                      _scrollToReal(real, animated: true).then((
+                                        _,
+                                      ) {
                                         if (mounted) _emit(real);
                                       });
                                     }
                                   },
-                                  onLongPressStart:
-                                      isCentered && !widget.isBusy
-                                          ? widget.onHoldStart
-                                          : null,
+                                  onLongPressStart: isCentered && !widget.isBusy
+                                      ? widget.onHoldStart
+                                      : null,
                                   onLongPressEnd: isCentered
                                       ? widget.onHoldEnd
                                       : null,
@@ -378,17 +398,17 @@ class _ArFilterCarouselState extends State<ArFilterCarousel> {
                                       ? _ShutterCircle(
                                           size: size,
                                           isActive: true,
-                                          isRecording: widget.isRecording &&
-                                              isCentered,
+                                          isRecording:
+                                              widget.isRecording && isCentered,
                                           isPhotoMode: widget.isPhotoMode,
                                           progress: widget.recordProgress,
                                         )
                                       : _FilterCircle(
-                                          emoji: item.emoji,
+                                          item: item,
                                           size: size,
                                           isActive: isCentered,
-                                          isRecording: widget.isRecording &&
-                                              isCentered,
+                                          isRecording:
+                                              widget.isRecording && isCentered,
                                         ),
                                 ),
                               ),
@@ -474,10 +494,7 @@ class _SideAction extends StatelessWidget {
         width: size,
         height: size,
         child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: background,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: background, shape: BoxShape.circle),
           child: Center(
             child: Icon(icon, color: Colors.white, size: iconSize),
           ),
@@ -488,10 +505,7 @@ class _SideAction extends StatelessWidget {
 }
 
 class _FilterSnapPhysics extends ScrollPhysics {
-  const _FilterSnapPhysics({
-    required this.itemExtent,
-    super.parent,
-  });
+  const _FilterSnapPhysics({required this.itemExtent, super.parent});
 
   final double itemExtent;
 
@@ -519,8 +533,10 @@ class _FilterSnapPhysics extends ScrollPhysics {
     double velocity,
   ) {
     final tolerance = toleranceFor(position);
-    final target = _targetPixels(position, velocity)
-        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    final target = _targetPixels(
+      position,
+      velocity,
+    ).clamp(position.minScrollExtent, position.maxScrollExtent);
 
     if ((target - position.pixels).abs() < tolerance.distance) {
       return null;
@@ -536,11 +552,8 @@ class _FilterSnapPhysics extends ScrollPhysics {
   }
 
   @override
-  SpringDescription get spring => const SpringDescription(
-        mass: 0.9,
-        stiffness: 140,
-        damping: 18,
-      );
+  SpringDescription get spring =>
+      const SpringDescription(mass: 0.9, stiffness: 140, damping: 18);
 }
 
 class _ShutterCircle extends StatelessWidget {
@@ -560,8 +573,9 @@ class _ShutterCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final innerColor =
-        isPhotoMode && !isRecording ? Colors.white : const Color(0xFFFE2C55);
+    final innerColor = isPhotoMode && !isRecording
+        ? Colors.white
+        : const Color(0xFFFE2C55);
     final ring = size;
     final outer = size * 0.90;
     final inner = isRecording ? size * 0.36 : size * 0.68;
@@ -603,9 +617,7 @@ class _ShutterCircle extends StatelessWidget {
             height: inner,
             decoration: BoxDecoration(
               color: innerColor,
-              borderRadius: BorderRadius.circular(
-                isRecording ? 6 : inner / 2,
-              ),
+              borderRadius: BorderRadius.circular(isRecording ? 6 : inner / 2),
             ),
           ),
         ],
@@ -616,68 +628,112 @@ class _ShutterCircle extends StatelessWidget {
 
 class _FilterCircle extends StatelessWidget {
   const _FilterCircle({
-    required this.emoji,
+    required this.item,
     required this.size,
     required this.isActive,
     required this.isRecording,
   });
 
-  final String emoji;
+  final ArFilterItem item;
   final double size;
   final bool isActive;
   final bool isRecording;
 
+  Color? get _previewColor {
+    final hex = item.previewColorHex;
+    if (hex == null) return null;
+    var value = hex.replaceFirst('#', '').trim();
+    if (value.length == 6) value = 'FF$value';
+    if (value.length != 8) return null;
+    final parsed = int.tryParse(value, radix: 16);
+    return parsed == null ? null : Color(parsed);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final emojiSize = 20 +
+    final emojiSize =
+        20 +
         (size - ArFilterCarousel.inactiveSize) /
             (ArFilterCarousel.activeSize - ArFilterCarousel.inactiveSize) *
             10;
 
+    final showThumbnail = item.hasThumbnail && !item.isOriginal;
+
+    // The thumbnail rides on the BoxDecoration instead of being a child widget.
+    // With shape: BoxShape.circle the decoration clips its own image to the
+    // circle, and BoxFit.cover crops any aspect ratio to fill it — so a tall or
+    // wide thumbnail can never spill past the ring or stretch the row, which a
+    // ClipOval'd child Image was still managing to do.
+    final thumbnail = showThumbnail
+        ? DecorationImage(
+            image: NetworkImage(item.thumbnailUrl!),
+            fit: BoxFit.cover,
+          )
+        : null;
+
+    // Behind the image: the catalog's swatch while it downloads, otherwise the
+    // usual translucent fill.
+    final fillColor = showThumbnail
+        ? (_previewColor ?? Colors.white.withValues(alpha: 0.08))
+        : Colors.white.withValues(alpha: isActive ? 0.16 : 0.08);
+
+    Widget? child;
+    if (isRecording) {
+      child = Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFE2C55),
+          borderRadius: BorderRadius.circular(5),
+        ),
+      );
+    } else if (item.isOriginal) {
+      // "Original" is the shutter slot. Off centre it becomes a plain carousel
+      // item, where a muted camera glyph reads as "no effect" better than the
+      // sparkle emoji did.
+      child = Opacity(
+        opacity: 0.5,
+        child: SvgPicture.asset(
+          AppAssets.cameraShutterIcon,
+          width: size * 0.42,
+          height: size * 0.42,
+          fit: BoxFit.contain,
+          colorFilter: const ColorFilter.mode(
+            Color(0xFFBDBDBD),
+            BlendMode.srcIn,
+          ),
+        ),
+      );
+    } else if (!showThumbnail) {
+      child = Text(item.emoji, style: TextStyle(fontSize: emojiSize));
+    }
+
     return SizedBox(
       width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: isActive ? 0.16 : 0.08),
-              border: Border.all(
-                color: isActive
-                    ? const Color(0xFFFE2C55)
-                    : Colors.white.withValues(alpha: 0.35),
-                width: isActive ? 3 : 1.5,
-              ),
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFFFE2C55).withValues(alpha: 0.35),
-                        blurRadius: 12,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Center(
-              child: isRecording
-                  ? Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFE2C55),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                    )
-                  : Text(
-                      emoji,
-                      style: TextStyle(fontSize: emojiSize),
-                    ),
-            ),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: fillColor,
+          image: thumbnail,
+          border: Border.all(
+            color: isActive
+                ? const Color(0xFFFE2C55)
+                : Colors.white.withValues(alpha: 0.35),
+            width: isActive ? 3 : 1.5,
           ),
-        ],
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFFE2C55).withValues(alpha: 0.35),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
+        ),
+        child: child == null ? null : Center(child: child),
       ),
     );
   }

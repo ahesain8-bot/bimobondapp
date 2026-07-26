@@ -152,7 +152,7 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
             label: widget.labels.switchCamera,
             onTap: widget.onFlip,
             iconOnly: true,
-            customIcon: TikTokSideIcons.flip(),
+            customIcon: _railSvg(AppAssets.cameraSwitchIcon),
           ),
         _SideToolItem(
           icon: widget.flashEnabled ? LucideIcons.zap : LucideIcons.zapOff,
@@ -161,6 +161,12 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           active: widget.flashEnabled,
           showActiveBadge: false,
           iconOnly: true,
+          // Dedicated asset per state, both rendered white at the same size.
+          customIcon: _railSvg(
+            widget.flashEnabled
+                ? AppAssets.cameraFlashIcon
+                : AppAssets.cameraFlashOffIcon,
+          ),
         ),
         const _SideToolItem(
           icon: Icons.remove,

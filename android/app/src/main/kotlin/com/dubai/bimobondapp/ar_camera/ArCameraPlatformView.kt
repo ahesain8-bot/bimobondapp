@@ -8,7 +8,6 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.airbnb.lottie.AsyncUpdates
 import com.airbnb.lottie.LottieAnimationView
-import com.airbnb.lottie.LottieCompositionFactory
 import com.airbnb.lottie.LottieDrawable
 import com.airbnb.lottie.RenderMode
 import com.dubai.bimobondapp.R
@@ -98,22 +97,13 @@ class ArCameraPlatformView(
             android.util.Log.e("ArCamera", "screen overlay setup failed", t)
         }
 
-        // Pre-parse all screen-overlay compositions in the background right
-        // now, while the user is still looking at Normal Mode — Lottie caches
-        // the parsed LottieComposition in memory (LottieCompositionFactory),
-        // so whichever one gets tapped first no longer pays the JSON-parse +
-        // composition-build cost inline on the tap that switches to it. That
-        // one-time build cost (large layer counts, see FilterType) is what
-        // showed up as a hitch the first time a given overlay filter was used.
-        try {
-            FilterType.entries.forEach { type ->
-                type.screenOverlayAsset()?.let { asset ->
-                    LottieCompositionFactory.fromAsset(context, asset)
-                }
-            }
-        } catch (t: Throwable) {
-            android.util.Log.e("ArCamera", "screen overlay pre-warm failed", t)
-        }
+        // Overlay compositions are no longer pre-parsed here. They used to be a
+        // fixed list of bundled assets; now they come from the backend, so the
+        // app doesn't know what to warm until the catalog has loaded. Dart
+        // drives it instead once /camera-studio/ar-overlays responds — see
+        // ArCameraBridge.prefetchOverlays / ArCameraOverlayPrefetcher — which
+        // keeps the same benefit (no JSON-parse hitch on the first tap) without
+        // parsing animations that may not even be published anymore.
 
         ArCameraBridge.syncPreviewNaturalOrientation()
         ArCameraController.start(activity, activity, previewView, faceOverlay)

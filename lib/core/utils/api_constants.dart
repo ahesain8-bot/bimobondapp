@@ -118,6 +118,7 @@ class ApiConstants {
   static const String cameraStudioCatalog = '/camera-studio/catalog';
   static const String cameraStudioColorFilters =
       '/camera-studio/color-filters';
+  static const String cameraStudioArOverlays = '/camera-studio/ar-overlays';
   static const String cameraStudioEffectPlacementSchema =
       '/camera-studio/effect-placement/schema';
 

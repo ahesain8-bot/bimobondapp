@@ -241,15 +241,17 @@ class ArFilteredVideoRecorder {
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(
-                MediaFormat.KEY_BIT_RATE,
-                (width * height * 4).coerceIn(4_000_000, 12_000_000),
-            )
+            setInteger(MediaFormat.KEY_BIT_RATE, bitRateFor(width, height))
             setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
 
         val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        // High profile buys noticeably cleaner output at the same bitrate than the
+        // baseline profile some encoders default to. Applied after the format is
+        // built and guarded, because a codec that doesn't advertise it will reject
+        // configure() outright and we'd rather record at baseline than not at all.
+        applyHighProfileIfSupported(encoder, format)
         encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         inputSurface = encoder.createInputSurface()
         encoder.start()
@@ -465,6 +467,31 @@ class ArFilteredVideoRecorder {
             info.flags = extractor.sampleFlags
             muxer.writeSampleData(trackIndex, buffer, info)
             if (!extractor.advance()) break
+        }
+    }
+
+    /**
+     * Target H.264 bitrate. The old formula (`w * h * 4`, clamped to 4–12 Mbps)
+     * left 1080p30 at roughly half what a stock camera app writes, which shows up
+     * as blocking and smeared detail in motion — read as "grainy". ~0.2 bits per
+     * pixel per frame is the usual rule of thumb for clean H.264 at this size.
+     */
+    private fun bitRateFor(width: Int, height: Int): Int {
+        val target = width.toLong() * height.toLong() * FRAME_RATE * 2 / 10
+        return target.coerceIn(6_000_000L, 24_000_000L).toInt()
+    }
+
+    private fun applyHighProfileIfSupported(encoder: MediaCodec, format: MediaFormat) {
+        try {
+            val caps = encoder.codecInfo
+                .getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            val high = caps.profileLevels.firstOrNull {
+                it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileHigh
+            } ?: return
+            format.setInteger(MediaFormat.KEY_PROFILE, high.profile)
+            format.setInteger(MediaFormat.KEY_LEVEL, high.level)
+        } catch (t: Throwable) {
+            Log.w(TAG, "high profile not applied", t)
         }
     }
 

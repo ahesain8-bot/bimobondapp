@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_constants.dart';
+import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 
 class ArCameraBridge {
   ArCameraBridge._();
@@ -35,11 +36,48 @@ class ArCameraBridge {
     await _channel.invokeMethod<void>('prepareShaderPipeline');
   }
 
+  /// Selects an effect on the native camera.
+  ///
+  /// Screen overlays are looked up here rather than at the call site so the
+  /// animation source always travels with the id: native no longer keeps its
+  /// own hardcoded overlay list, so an id alone means nothing to it — it needs
+  /// either the remote `lottieUrl` or a bundled asset name to play.
   static void setFilter(String filter, {double intensity = 1.0}) {
+    final overlay = ArFilterCatalog.overlayById(filter);
     _channel.invokeMethod<void>('setFilter', {
       'filter': filter,
       'intensity': intensity,
+      'overlayUrl': overlay?.lottieUrl,
+      'overlayAsset': overlay?.bundledAsset,
+      'overlayLoop': overlay?.loop ?? true,
     });
+  }
+
+  /// Warms Lottie's on-disk cache for every published overlay so the first tap
+  /// on one doesn't pay a download. Safe to call repeatedly; native skips any
+  /// composition already cached.
+  static Future<void> prefetchOverlays() async {
+    final overlays = ArFilterCatalog.overlayCatalog.overlays;
+    final urls = [
+      for (final overlay in overlays)
+        if ((overlay.lottieUrl ?? '').isNotEmpty) overlay.lottieUrl!,
+    ];
+    // Bundled entries too: when the endpoint is unreachable the catalog is the
+    // offline fallback, and those animations still benefit from being parsed
+    // ahead of the first tap.
+    final assets = [
+      for (final overlay in overlays)
+        if ((overlay.bundledAsset ?? '').isNotEmpty) overlay.bundledAsset!,
+    ];
+    if (urls.isEmpty && assets.isEmpty) return;
+    try {
+      await _channel.invokeMethod<void>('prefetchOverlays', {
+        'urls': urls,
+        'assets': assets,
+      });
+    } catch (_) {
+      // Prefetch is an optimisation — a failure just means a slower first tap.
+    }
   }
 
   static void setFilterIntensity(double intensity) {
@@ -115,6 +153,30 @@ class ArCameraBridge {
   static Future<bool> toggleTorch() async {
     final enabled = await _channel.invokeMethod<bool>('toggleTorch');
     return enabled ?? false;
+  }
+
+  /// Stops the native camera pipeline (camera stream, GL view and any
+  /// screen-overlay Lottie animation) while the camera screen is still mounted
+  /// but hidden behind another route.
+  ///
+  /// A Flutter route push does not pause the host Activity, so the native side
+  /// otherwise keeps rendering at full cost behind the editor and competes with
+  /// video playback there. Pair every call with [resumePreview].
+  static Future<void> suspendPreview() async {
+    try {
+      await _channel.invokeMethod<void>('suspendPreview');
+    } catch (_) {
+      // Camera view may already be disposed — nothing to suspend.
+    }
+  }
+
+  /// Restarts what [suspendPreview] stopped.
+  static Future<void> resumePreview() async {
+    try {
+      await _channel.invokeMethod<void>('resumePreview');
+    } catch (_) {
+      // Camera view may already be disposed — nothing to resume.
+    }
   }
 
   static Future<void> setPreviewLetterbox({
