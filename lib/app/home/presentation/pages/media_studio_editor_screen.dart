@@ -173,10 +173,18 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   /// actually shows up live in the editor, and [ArColorFilterMatrix] bakes
   /// it into the exported video. Beauty-only filters (no color grade fields
   /// set) return false here — those fields aren't supported post-capture.
+  /// Also skips the preview overlay when the capture already baked this same
+  /// filter into the source pixels natively (`_alreadyBaked`) — otherwise the
+  /// editor would layer the color grade on top of an already-graded image,
+  /// doubling the effect (e.g. warmth looking much stronger than what was
+  /// selected live). `_exportCurrentWithColorIfNeeded`/
+  /// `_exportVideoWithEditsIfNeeded` already guard the same way for the
+  /// exported file — this brings the live preview in line with them.
   bool get _needsColorFilterPreview =>
       _hasActiveColorFilter &&
       (ArFilterCatalog.colorFilterById(_arFilterId)?.params?.hasColorGrade ??
-          false);
+          false) &&
+      (!_alreadyBaked || _arFilterId != _bakedFilterId);
 
   /// Any photo edit that requires a native-baked preview file (tone/geometry).
   bool get _hasPreviewEdits => _hasFaceEdits || _needsColorFilterPreview;

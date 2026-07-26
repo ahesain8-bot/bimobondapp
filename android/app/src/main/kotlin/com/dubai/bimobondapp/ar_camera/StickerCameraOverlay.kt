@@ -94,9 +94,14 @@ class StickerCameraOverlay(private val appContext: Context) {
                 destH = size.height,
                 imgW = imgW,
                 imgH = imgH,
-                // VideoCapture MIRROR_MODE_ON_FRONT_ONLY mirrors the buffer after
-                // overlay blend — draw in analysis space without an extra X flip.
-                mirrorX = false,
+                // Confirmed on-device: the sticker ends up moving opposite to the
+                // face in the saved recording — i.e. VideoCapture's
+                // MIRROR_MODE_ON_FRONT_ONLY mirrors the buffer BEFORE this overlay
+                // is composited (not after, as originally assumed), so drawing in
+                // raw analysis space here left the sticker unmirrored relative to
+                // the already-mirrored base frame. Mirroring it here too aligns
+                // both.
+                mirrorX = true,
             )
             true
         }

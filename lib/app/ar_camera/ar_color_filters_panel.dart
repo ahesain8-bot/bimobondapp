@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_l10n.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -41,58 +39,58 @@ class ArColorFiltersPanel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_showIntensity) ...[
-          _IntensitySlider(
-            value: intensity,
-            onChanged: onIntensityChanged,
-          ),
+          _IntensitySlider(value: intensity, onChanged: onIntensityChanged),
           const SizedBox(height: 10),
         ],
+        // No BackdropFilter here on purpose. This panel sits directly over the
+        // native camera AndroidView, and a backdrop blur above a platform view
+        // forces Flutter into an extra overlay/readback layer on Android — which
+        // gets built and torn down every time the panel opens or closes, and
+        // showed up as the camera briefly freezing on dismiss. The background is
+        // near-opaque anyway, so the blur was doing almost nothing visually.
         ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A).withValues(alpha: 0.92),
-                border: Border(
-                  top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A).withValues(alpha: 0.97),
+              border: Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
               ),
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 10),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _CategoryRow(
-                        selectedCategoryId: selectedCategoryId,
-                        selectedFilterId: selectedFilterId,
-                        onCategorySelected: onCategorySelected,
-                        onClear: onClear,
-                        onApply: onApply,
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _CategoryRow(
+                      selectedCategoryId: selectedCategoryId,
+                      selectedFilterId: selectedFilterId,
+                      onCategorySelected: onCategorySelected,
+                      onClear: onClear,
+                      onApply: onApply,
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 92,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: filters.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 14),
+                        itemBuilder: (context, index) {
+                          final item = filters[index];
+                          final selected = item.id == selectedFilterId;
+                          return _FilterThumb(
+                            item: item,
+                            selected: selected,
+                            onTap: () => onFilterSelected(item.id),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        height: 92,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: filters.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 14),
-                          itemBuilder: (context, index) {
-                            final item = filters[index];
-                            final selected = item.id == selectedFilterId;
-                            return _FilterThumb(
-                              item: item,
-                              selected: selected,
-                              onTap: () => onFilterSelected(item.id),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -104,10 +102,7 @@ class ArColorFiltersPanel extends StatelessWidget {
 }
 
 class _IntensitySlider extends StatelessWidget {
-  const _IntensitySlider({
-    required this.value,
-    required this.onChanged,
-  });
+  const _IntensitySlider({required this.value, required this.onChanged});
 
   final double value;
   final ValueChanged<double> onChanged;
@@ -126,10 +121,7 @@ class _IntensitySlider extends StatelessWidget {
           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
           overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
         ),
-        child: Slider(
-          value: value.clamp(0.0, 1.0),
-          onChanged: onChanged,
-        ),
+        child: Slider(value: value.clamp(0.0, 1.0), onChanged: onChanged),
       ),
     );
   }
@@ -152,7 +144,8 @@ class _CategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final noneSelected = selectedFilterId == 'none' ||
+    final noneSelected =
+        selectedFilterId == 'none' ||
         !ArFilterCatalog.isColorFilter(selectedFilterId);
     final l10n = AppLocalizations.of(context)!;
 
@@ -202,8 +195,9 @@ class _CategoryRow extends StatelessWidget {
                           color: selected
                               ? Colors.white
                               : Colors.white.withValues(alpha: 0.45),
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           fontSize: 14,
                         ),
                       ),
@@ -236,24 +230,12 @@ class _CategoryRow extends StatelessWidget {
               padding: const EdgeInsets.only(right: 14),
               child: SizedBox(
                 height: 36,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      LucideIcons.check,
-                      size: 20,
-                      color: Colors.white.withValues(alpha: 0.95),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      l10n.mediaEditorDone,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                child: Center(
+                  child: Icon(
+                    LucideIcons.check,
+                    size: 22,
+                    color: Colors.white.withValues(alpha: 0.95),
+                  ),
                 ),
               ),
             ),

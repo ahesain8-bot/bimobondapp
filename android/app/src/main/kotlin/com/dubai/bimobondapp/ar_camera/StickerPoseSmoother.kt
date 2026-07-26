@@ -15,6 +15,19 @@ object StickerPoseSmoother {
     private const val MAX_PREDICT_FRAC = 0.55f
     private const val VEL_EMA = 0.55f
 
+    /**
+     * A single noisy/mis-detected landmark sample (common on a fast head turn
+     * or motion blur) can otherwise produce an implausibly large one-frame
+     * velocity spike, which VEL_EMA's 55% weight blends straight into the
+     * extrapolated velocity — visibly throwing the sticker the wrong way for
+     * the ~100ms+ prediction window until the next good sample corrects it.
+     * Caps how much position a single sample is allowed to move the velocity
+     * estimate by, relative to face size — same outlier-guard idea as
+     * [MAX_PREDICT_FRAC] already applies to the output, just applied to the
+     * input here.
+     */
+    private const val MAX_SAMPLE_VEL_FRAC = 0.35f
+
     private data class State(
         var measured: StickerPose,
         var measuredAtMs: Long,
@@ -45,8 +58,16 @@ object StickerPoseSmoother {
         if (state.sampleGen != sampleGen) {
             val dt = (now - state.measuredAtMs).toFloat().coerceAtLeast(8f)
             if (dt < 160f) {
-                val nvx = (current.centerX - state.measured.centerX) / dt
-                val nvy = (current.centerY - state.measured.centerY) / dt
+                var nvx = (current.centerX - state.measured.centerX) / dt
+                var nvy = (current.centerY - state.measured.centerY) / dt
+                val maxSampleVel =
+                    (state.measured.width * MAX_SAMPLE_VEL_FRAC / dt).coerceAtLeast(0.01f)
+                val sampleMag = hypot(nvx.toDouble(), nvy.toDouble()).toFloat()
+                if (sampleMag > maxSampleVel && sampleMag > 0.001f) {
+                    val s = maxSampleVel / sampleMag
+                    nvx *= s
+                    nvy *= s
+                }
                 state.vx = state.vx * (1f - VEL_EMA) + nvx * VEL_EMA
                 state.vy = state.vy * (1f - VEL_EMA) + nvy * VEL_EMA
 

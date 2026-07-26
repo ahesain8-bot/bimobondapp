@@ -17,13 +17,12 @@ import android.hardware.camera2.CaptureRequest
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.os.Handler
-import android.os.HandlerThread
 import android.os.Looper
 import android.util.Range
 import android.util.Size
-import android.view.PixelCopy
+import android.os.HandlerThread
 import android.view.Surface
-import android.view.SurfaceView
+import android.view.TextureView
 import android.view.View
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraControl
@@ -110,8 +109,14 @@ object ArCameraController {
      * [buildLivePreview]), so it only needs to nudge things further, not do the
      * heavy lifting itself. Live viewfinder preview is untouched; this only bakes
      * into saved media.
+     *
+     * Lowered from 0.18 once [buildImageCapture] switched to
+     * CAPTURE_MODE_MAXIMIZE_QUALITY: the HAL's own still pipeline now does real
+     * multi-frame denoising, so this pass was mostly costing fine detail rather
+     * than removing noise — part of the "photos look dull" complaint. Raise it
+     * again if skin reads as too noisy.
      */
-    private const val CAPTURE_SMOOTH_STRENGTH = 0.18f
+    private const val CAPTURE_SMOOTH_STRENGTH = 0.10f
 
     private const val PREVIEW_QUALITY_TAG = "ArPreviewQuality"
     private const val DETECT_MAX_DIMENSION = 384
@@ -127,9 +132,28 @@ object ArCameraController {
     private const val PNG_RECORD_INTERVAL_MS = 66L
     private const val GL_MAX_EDGE = 1280
     private const val CAPTURE_MAX_EDGE = 1920
-    /** Fast preview JPEG for instant Flutter navigation (hi-res upgrades in background). */
+    /**
+     * Warm-buffer edge for the OES photo path. This is only the size the GL view
+     * keeps a capture ready at between shutter taps — the shutter itself asks for
+     * a fresh [CAPTURE_MAX_EDGE] frame (see [takePhotoFromGl]). Keeping the warm
+     * copy small matters because [warmOesPhotoCaptureIfNeeded] re-reads it every
+     * 250ms while Normal Mode is live.
+     */
     private const val INSTANT_CAPTURE_EDGE = 1080
-    private const val INSTANT_JPEG_QUALITY = 85
+
+    /**
+     * JPEG quality for saved photos. Was 85 on the OES path, which is visibly
+     * lossy on skin gradients — the exact "dull/blotchy" look this pipeline is
+     * meant to avoid. Photos are written once to a cache file and handed
+     * straight to the editor, so the extra bytes cost nothing that matters.
+     */
+    private const val PHOTO_JPEG_QUALITY = 96
+
+    /** Fallback quality for the emergency/degraded save paths. */
+    private const val INSTANT_JPEG_QUALITY = 90
+
+    /** How long the shutter waits for a fresh full-resolution GL frame. */
+    private const val FULL_RES_GL_WAIT_MS = 220L
     private const val INSTANT_GL_POLL_MS = 96L
     private const val INSTANT_GL_COLD_POLL_MS = 400L
     private const val OES_PHOTO_WARM_INTERVAL_MS = 80L
@@ -139,22 +163,29 @@ object ArCameraController {
     // full-res OES pipeline the live preview and photos use (Stage 1), so it no
     // longer needs a lower cap than those.
     private const val RECORD_GL_EDGE = CAPTURE_MAX_EDGE
-    private const val PHOTO_TARGET_WIDTH = 2160
-    private const val PHOTO_TARGET_HEIGHT = 2880
     private const val RECORD_FRAME_INTERVAL_MS = 33L
 
-    // Screen-overlay filters (Confetti/Keywords/Snowfall/Snow White) capture via
-    // PreviewView.getBitmap(), which does a full-view pixel readback — Android's
-    // own docs warn against calling it every frame. Polling it at 30fps (same as
-    // RECORD_FRAME_INTERVAL_MS) was the source of the heavy recording lag; this
-    // slower interval (~10fps content updates) cuts that readback cost by ~3x.
-    // The encoder itself still writes at full frame rate — pumpRecordFrame keeps
-    // re-submitting the last captured composite between updates — so the saved
-    // video doesn't drop frames, only how often the overlay content refreshes,
-    // which is imperceptible for a decorative animation like this.
-    private const val CONFETTI_RECORD_INTERVAL_MS = 100L
+    // Screen-overlay filters (Confetti/Keywords/Snowfall/Snow White) capture their
+    // base recording frame via a Window-level PixelCopy (see
+    // requestConfettiFrame's doc) — off the main thread. Still throttled to
+    // ~5fps content updates (vs. RECORD_FRAME_INTERVAL_MS's 30fps) to keep the
+    // per-tick cost low. The encoder itself still writes at full frame rate —
+    // pumpRecordFrame keeps re-submitting the last captured composite between
+    // updates — so the saved video doesn't drop frames, only how often the
+    // overlay content refreshes, which is imperceptible for a decorative
+    // animation like this.
+    private const val CONFETTI_RECORD_INTERVAL_MS = 200L
 
     private const val NO_FACE_CLEAR_THRESHOLD = 2
+
+    /**
+     * How long to wait after a hardware recording finalizes before rebinding the
+     * camera back to its idle (no VideoCapture) configuration — see the call site
+     * in [stopRecording]. Long enough for the Flutter navigation to the editor to
+     * finish, short enough that a user who stays on the camera screen doesn't
+     * notice the preview running on the recording bind.
+     */
+    private const val POST_RECORD_REBIND_DELAY_MS = 700L
 
     private var faceLandmarker: FaceLandmarkerHelper? = null
     private var started = false
@@ -171,17 +202,11 @@ object ArCameraController {
     private val skinMaskBusy = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    /**
-     * Dedicated background thread for [PixelCopy] callbacks used by the
-     * screen-overlay (Confetti/Keywords/Snowfall/Snow White) recording capture
-     * — see [requestConfettiFrame]. Keeps that readback fully off the main
-     * thread without adding another concurrent camera stream (which was tried
-     * and reverted — see project history — because it degraded overall camera
-     * quality). Started in [start], torn down in [stop].
-     */
-    private var pixelCopyHandlerThread: HandlerThread? = null
-    private var pixelCopyHandler: Handler? = null
+    /** Guards against overlapping [requestConfettiFrame] ticks. */
     private val confettiPixelCopyBusy = AtomicBoolean(false)
+
+    private var pixelCopyThread: HandlerThread? = null
+    private var pixelCopyHandler: Handler? = null
 
     private val videoRecorder = ArFilteredVideoRecorder()
     private val simpleHardwareRecorder = ArSimpleHardwareRecorder()
@@ -256,6 +281,9 @@ object ArCameraController {
     /** Hardware VideoCapture sticker bake (PNG only) — same lag profile as normal record. */
     private var stickerCameraOverlay: StickerCameraOverlay? = null
 
+    /** Hardware VideoCapture Lottie bake (screen-overlay filters) — see [ScreenOverlayCameraEffect]. */
+    private var screenOverlayCameraEffect: ScreenOverlayCameraEffect? = null
+
     @Volatile
     private var camera: Camera? = null
 
@@ -309,9 +337,8 @@ object ArCameraController {
         recordOfferExecutor = Executors.newSingleThreadExecutor { r ->
             Thread(r, "ar-video-offer").apply { priority = Thread.NORM_PRIORITY }
         }
-        pixelCopyHandlerThread = HandlerThread("ar-confetti-pixelcopy").apply { start() }
-        pixelCopyHandler = pixelCopyHandlerThread?.looper?.let { Handler(it) }
         stickerCameraOverlay = StickerCameraOverlay(activity.applicationContext)
+        screenOverlayCameraEffect = ScreenOverlayCameraEffect()
 
         warmVideoEncoder()
 
@@ -381,6 +408,11 @@ object ArCameraController {
         faceOverlay.resetForNonPngFilter()
 
         activity.runOnUiThread {
+            // Flip goes straight to bindCamera rather than through
+            // requestPreviewRebind, so it needs its own cover over the unbind.
+            if (!preferOesBinding) {
+                ArCameraBridge.coverPreviewForRebind()
+            }
             bindCamera(lifecycleOwner, previewView, faceOverlay)
             ArCameraBridge.applyCurrentFilter()
             onResult?.invoke(true)
@@ -479,14 +511,21 @@ object ArCameraController {
         } else {
             stickerCameraOverlay?.clear()
         }
-        // Rebind when Analysis need changes (NONE = no Analysis → sharper Preview stream).
+        if (!filter.isScreenOverlay()) {
+            screenOverlayCameraEffect?.clear()
+        }
+        // Rebind when the required use-case set changes (NONE = no Analysis →
+        // sharper Preview stream; overlay filters keep VideoCapture bound so the
+        // shutter doesn't have to rebind — see [needsVideoUseCase]).
         val wantAnalysis = needsAnalysisUseCase(filter)
         val wantPngFast = filter.isPngOverlay()
+        val wantVideo = needsVideoUseCase(filter)
         if (started &&
             !isRecordingActive() &&
             !boundToOes &&
             canRebindCamera() &&
             (wantAnalysis != analysisUseCaseBound ||
+                wantVideo != videoUseCaseBound ||
                 (wantAnalysis && wantPngFast != pngFastAnalysisBound))
         ) {
             requestPreviewRebind()
@@ -496,9 +535,27 @@ object ArCameraController {
     private fun needsAnalysisUseCase(filter: FilterType): Boolean =
         filter.isDistortion() || filter.isPngOverlay()
 
+    /**
+     * Filters whose recording runs through the hardware [VideoCapture] pipeline
+     * keep it bound the whole time they're selected, not just while recording.
+     *
+     * Binding it lazily on the shutter meant every record start paid a full
+     * `unbindAll()` + rebind, which blanks the preview surface for the best part
+     * of a second — the black screen users saw right after tapping record. The
+     * other two categories don't need this: Normal Mode and the distortion
+     * filters record by attaching an encoder surface to the already-running GL
+     * view, so they never rebind to start.
+     *
+     * Side benefit: what's on screen while composing is now produced by the exact
+     * same binding that records, so framing can't shift when recording starts.
+     */
+    private fun needsVideoUseCase(filter: FilterType): Boolean =
+        filter.isPngOverlay() || filter.isScreenOverlay()
+
     fun stop() {
         abortCapture()
         started = false
+        previewSuspended = false
         boundToOes = false
         preferOesBinding = false
         preferVideoBinding = false
@@ -522,10 +579,7 @@ object ArCameraController {
         analysisExecutor = null
         recordOfferExecutor?.shutdownNow()
         recordOfferExecutor = null
-        pixelCopyHandler = null
-        pixelCopyHandlerThread?.quitSafely()
-        pixelCopyHandlerThread = null
-        confettiPixelCopyBusy.set(false)
+        stopConfettiFramePump()
         confettiHeadlessDrawable = null
         confettiHeadlessComposition = null
         try {
@@ -533,6 +587,11 @@ object ArCameraController {
         } catch (_: Exception) {
         }
         stickerCameraOverlay = null
+        try {
+            screenOverlayCameraEffect?.release()
+        } catch (_: Exception) {
+        }
+        screenOverlayCameraEffect = null
         imageCapture = null
         videoCapture = null
         simpleHardwareRecorder.attach(null)
@@ -777,7 +836,7 @@ object ArCameraController {
 
     private fun takePhotoWithImageCaptureToFile(
         file: File,
-        jpegQuality: Int = 95,
+        jpegQuality: Int = PHOTO_JPEG_QUALITY,
         onComplete: (Boolean) -> Unit,
     ) {
         val activity = ArCameraBridge.hostActivity
@@ -1011,40 +1070,6 @@ object ArCameraController {
 
         val filter = ArCameraBridge.currentFilter
 
-        // First-open / no-filter: use retained analysis frame so editor isn't black.
-        // Never use this path for active filters (must bake live GL / ImageCapture).
-        if (filter == FilterType.NONE && !boundToOes) {
-            val frame = bakePreviewFrame()
-            if (frame != null && !isMostlyEmpty(frame)) {
-                enqueueSaveBaked(frame) {
-                    if (!delivered.get()) takePhotoWithImageCapture(::deliver)
-                }
-                return
-            }
-            if (frame != null && frame !== lastCaptureBitmap) {
-                try {
-                    frame.recycle()
-                } catch (_: Exception) {
-                }
-            }
-        }
-
-        // OES preview path: grab a fresh GL frame when still bound to OES — already
-        // has skin-smoothing + temporal denoise baked in, so skip the CPU pass.
-        if (boundToOes) {
-            takePhotoFromGl(::deliver) { bmp -> saveBaked(bmp, alreadySmoothed = true) }
-            return
-        }
-
-        // Stickers: always use hardware ImageCapture (hi-res) then bake overlay —
-        // analysis frames are intentionally small for tracking and look soft if used.
-        if (filter.isPngOverlay() ||
-            (filter == FilterType.NONE && !ArCameraBridge.isPreviewLetterboxed())
-        ) {
-            takePhotoWithImageCapture(::deliver)
-            return
-        }
-
         fun tryBaked(remaining: Int) {
             snapshotVisibleFrame(preferImmediate = true) { bitmap ->
                 if (bitmap != null && !isMostlyEmpty(bitmap)) {
@@ -1077,8 +1102,75 @@ object ArCameraController {
             }
         }
 
-        val retries = if (filter.isDistortion()) 2 else 1
-        tryBaked(retries)
+        // Dispatch by filter CATEGORY first (Normal Mode / distortion / PNG-overlay /
+        // screen-overlay), not by the shared boundToOes flag — boundToOes is only
+        // ever true for Normal Mode today, but checking it before the category is
+        // known meant any future change that lets another category use OES-adjacent
+        // state could silently steer that category's photo down Normal Mode's path
+        // (skipping e.g. screen-overlay's confetti compositing). Each branch below
+        // reproduces the exact same behavior the old flat checks produced for that
+        // category — this only changes the order checks happen in, not what they do.
+        when {
+            filter == FilterType.NONE -> {
+                // First-open / no-filter: use retained analysis frame so editor isn't
+                // black. Never use this path once OES is bound (must bake live GL).
+                if (!boundToOes) {
+                    val frame = bakePreviewFrame()
+                    if (frame != null && !isMostlyEmpty(frame)) {
+                        enqueueSaveBaked(frame) {
+                            if (!delivered.get()) takePhotoWithImageCapture(::deliver)
+                        }
+                        return
+                    }
+                    if (frame != null && frame !== lastCaptureBitmap) {
+                        try {
+                            frame.recycle()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+                // OES preview path: grab a fresh GL frame when still bound to OES —
+                // already has skin-smoothing + temporal denoise baked in.
+                if (boundToOes) {
+                    takePhotoFromGl(::deliver) { bmp ->
+                        // maxEdge 0 = save the GL frame at its own resolution.
+                        // Downscaling it to INSTANT_CAPTURE_EDGE here was throwing
+                        // away most of the pixels the shutter just waited for.
+                        saveBaked(
+                            bmp,
+                            quality = PHOTO_JPEG_QUALITY,
+                            maxEdge = 0,
+                            alreadySmoothed = true,
+                        )
+                    }
+                    return
+                }
+                if (!ArCameraBridge.isPreviewLetterboxed()) {
+                    takePhotoWithImageCapture(::deliver)
+                    return
+                }
+                tryBaked(1)
+            }
+
+            filter.isPngOverlay() -> {
+                // Stickers: always use hardware ImageCapture (hi-res) then bake
+                // overlay — analysis frames are intentionally small for tracking
+                // and look soft if used.
+                takePhotoWithImageCapture(::deliver)
+            }
+
+            filter.isDistortion() -> {
+                tryBaked(2)
+            }
+
+            filter.isScreenOverlay() -> {
+                tryBaked(1)
+            }
+
+            else -> {
+                takePhotoWithImageCapture(::deliver)
+            }
+        }
     }
 
     private fun takePhotoFromGl(
@@ -1092,7 +1184,9 @@ object ArCameraController {
         }
 
         fun finishGlKeepWarm() {
-            // Leave capture enabled while OES preview is live so the next tap is instant.
+            // Back down to the small warm buffer so the idle re-reads in
+            // [warmOesPhotoCaptureIfNeeded] stay cheap; the next shutter raises it
+            // again for its own capture.
             gl.setCaptureMaxEdge(INSTANT_CAPTURE_EDGE)
             if (boundToOes && !recording) {
                 gl.setCaptureEnabled(true)
@@ -1101,7 +1195,7 @@ object ArCameraController {
             }
         }
 
-        fun saveOnExecutor(gpu: Bitmap, remaining: Int, onMiss: () -> Unit) {
+        fun saveOnExecutor(gpu: Bitmap) {
             val exec = analysisExecutor
                 ?: ArCameraBridge.hostActivity?.let {
                     ContextCompat.getMainExecutor(it)
@@ -1109,13 +1203,10 @@ object ArCameraController {
             val work = Runnable {
                 val ok = saveBaked(gpu)
                 mainHandler.post {
+                    finishGlKeepWarm()
                     if (ok) {
-                        finishGlKeepWarm()
                         gl.requestCaptureNow()
-                    } else if (remaining > 0) {
-                        onMiss()
                     } else {
-                        finishGlKeepWarm()
                         takePhotoWithImageCapture(onResult)
                     }
                 }
@@ -1123,49 +1214,44 @@ object ArCameraController {
             if (exec != null) exec.execute(work) else work.run()
         }
 
-        // Instant path: save the already-warm live preview frame.
-        val immediate = try {
-            gl.copyLastFilteredFrame()
-        } catch (_: Exception) {
-            null
-        }
-        if (immediate != null && !isMostlyEmpty(immediate)) {
-            saveOnExecutor(immediate, 0) {
-                takePhotoWithImageCapture(onResult)
-            }
-            return
-        }
-        immediate?.recycle()
-
-        // Cold path: force one new frame, then save (short poll).
-        gl.setCaptureMaxEdge(INSTANT_CAPTURE_EDGE)
+        // Ask for a fresh full-resolution frame instead of saving the warm buffer
+        // straight out. That buffer is only [INSTANT_CAPTURE_EDGE] on its long edge
+        // — under a megapixel — which is the main reason Normal Mode photos looked
+        // soft and noisy next to the stock camera app. Waiting a couple of frames
+        // for the real one is worth it, and once the deadline passes we take
+        // whatever is available rather than failing.
+        gl.setCaptureMaxEdge(CAPTURE_MAX_EDGE)
         gl.setCaptureEnabled(true)
         gl.requestCaptureNow()
 
-        fun tryRead(remaining: Int) {
+        val deadline = android.os.SystemClock.elapsedRealtime() + FULL_RES_GL_WAIT_MS
+
+        fun awaitFrame() {
             val gpu = try {
                 gl.copyLastFilteredFrame()
             } catch (_: Exception) {
                 null
             }
-            if (gpu != null && !isMostlyEmpty(gpu)) {
-                saveOnExecutor(gpu, remaining) {
-                    gl.requestCaptureNow()
-                    mainHandler.postDelayed({ tryRead(remaining - 1) }, 16)
-                }
+            val expired = android.os.SystemClock.elapsedRealtime() >= deadline
+            val usable = gpu != null && !isMostlyEmpty(gpu)
+            // The capture is the fresh full-resolution one once it outgrows the
+            // warm buffer; before the deadline, keep waiting for exactly that.
+            val fullRes = usable && maxOf(gpu!!.width, gpu.height) > INSTANT_CAPTURE_EDGE
+            if (usable && (fullRes || expired)) {
+                saveOnExecutor(gpu!!)
                 return
             }
             gpu?.recycle()
-            if (remaining > 0) {
-                gl.requestCaptureNow()
-                mainHandler.postDelayed({ tryRead(remaining - 1) }, 16)
-            } else {
+            if (expired) {
                 finishGlKeepWarm()
                 takePhotoWithImageCapture(onResult)
+                return
             }
+            gl.requestCaptureNow()
+            mainHandler.postDelayed({ awaitFrame() }, 16)
         }
 
-        mainHandler.postDelayed({ tryRead(4) }, 24)
+        mainHandler.post { awaitFrame() }
     }
 
     private fun takePhotoWithImageCapture(onResult: (String?, String?) -> Unit) {
@@ -1203,6 +1289,41 @@ object ArCameraController {
         maxRecordDurationMs = maxDurationMs.coerceAtLeast(0L)
 
         val file = File(activity.cacheDir, "ar_video_${System.currentTimeMillis()}.mp4")
+
+        // Tries the fast hardware Recorder first (works when preview isn't
+        // GPU-bound); if unavailable, rebinds with VideoCapture then starts.
+        // Shared by Normal Mode (cold-start, before OES binds) and
+        // PNG-overlay — the two categories that can use the plain hardware
+        // recorder instead of GPU-surface encoding.
+        fun startHardwareOrRebind() {
+            if (simpleHardwareRecorder.isAvailable()) {
+                simpleHardwareRecorder.start(activity, file) { ok, _ ->
+                    if (ok) {
+                        recording = true
+                        hardwareRecording = true
+                        glSurfaceRecording = false
+                        scheduleMaxDurationStop()
+                        onResult(true, null)
+                    } else {
+                        startBitmapRecording(file, onResult)
+                    }
+                }
+                return
+            }
+            // VideoCapture not bound in idle preview — rebind with video, then start.
+            preferVideoBinding = true
+            pendingHardwareRecordFile = file
+            pendingHardwareRecordCb = onResult
+            if (canRebindCamera()) {
+                requestPreviewRebind()
+            } else {
+                pendingHardwareRecordFile = null
+                pendingHardwareRecordCb = null
+                preferVideoBinding = false
+                startBitmapRecording(file, onResult)
+            }
+        }
+
         try {
             if (!hasMicPermission(activity)) {
                 ActivityCompat.requestPermissions(
@@ -1212,52 +1333,61 @@ object ArCameraController {
                 )
             }
 
-            if ((ArCameraBridge.currentFilter == FilterType.NONE ||
-                    ArCameraBridge.currentFilter.isPngOverlay()) &&
-                !ArCameraBridge.isPreviewLetterboxed() &&
-                !boundToOes
-            ) {
-                if (simpleHardwareRecorder.isAvailable()) {
-                    simpleHardwareRecorder.start(activity, file) { ok, err ->
-                        if (ok) {
-                            recording = true
-                            hardwareRecording = true
-                            glSurfaceRecording = false
-                            scheduleMaxDurationStop()
-                            onResult(true, null)
+            // Dispatch by filter CATEGORY, not by the shared boundToOes flag —
+            // same reasoning as takePhoto()'s category-first dispatch: keeps
+            // each category's recording path from being silently steered by
+            // another category's OES/GL state.
+            when (val filter = ArCameraBridge.currentFilter) {
+                FilterType.NONE -> {
+                    // Cold-start (before OES binds) can use the plain hardware
+                    // recorder; the common case (already OES-bound) must go
+                    // through the GL surface encoder so the live beauty/
+                    // color-filter effect actually gets baked into the video —
+                    // a GPU-shader effect can only be captured by rendering
+                    // it, not by a plain hardware Recorder.
+                    if (!ArCameraBridge.isPreviewLetterboxed() && !boundToOes) {
+                        startHardwareOrRebind()
+                    } else {
+                        startGlSurfaceRecording(file, onResult)
+                    }
+                }
+
+                else -> when {
+                    filter.isPngOverlay() -> {
+                        if (!ArCameraBridge.isPreviewLetterboxed()) {
+                            startHardwareOrRebind()
                         } else {
                             startBitmapRecording(file, onResult)
                         }
                     }
-                    return
-                }
-                // VideoCapture not bound in idle preview — rebind with video, then
-                // start. Only reached when NOT on the OES beauty preview (see the
-                // !boundToOes guard above) — e.g. a PNG-overlay filter. Normal Mode
-                // (boundToOes) always falls through to startGlSurfaceRecording below
-                // so the live beauty/color-filter effect actually gets baked into
-                // the recorded video — a GPU-shader effect can only be captured by
-                // rendering it, not by a plain hardware Recorder.
-                preferVideoBinding = true
-                pendingHardwareRecordFile = file
-                pendingHardwareRecordCb = onResult
-                if (canRebindCamera()) {
-                    requestPreviewRebind()
-                } else {
-                    pendingHardwareRecordFile = null
-                    pendingHardwareRecordCb = null
-                    preferVideoBinding = false
-                    startBitmapRecording(file, onResult)
-                }
-                return
-            }
 
-            if (ArCameraBridge.currentFilter.useShader() || boundToOes) {
-                startGlSurfaceRecording(file, onResult)
-                return
-            }
+                    filter.isDistortion() -> startGlSurfaceRecording(file, onResult)
 
-            startBitmapRecording(file, onResult)
+                    filter.isScreenOverlay() -> {
+                        // Same hardware VideoCapture + OverlayEffect path stickers
+                        // use: CameraX bakes the Lottie into the encoder buffer on
+                        // the effect's own thread (see [ScreenOverlayCameraEffect]),
+                        // so nothing is screenshotted off the main thread and the
+                        // recorded frame inherits Preview's ViewPort — this is what
+                        // fixes the previous "either it lags or the video comes out
+                        // stretched" trade-off of the CPU frame pump.
+                        //
+                        // Letterbox mode still falls back to the pump: hardware
+                        // recording writes the raw camera buffer with no way to bake
+                        // in the top/bottom bars, exactly as PNG-overlay does above.
+                        if (!ArCameraBridge.isPreviewLetterboxed()) {
+                            prepareScreenOverlaySource()
+                            startHardwareOrRebind()
+                        } else {
+                            startBitmapRecording(file, onResult)
+                        }
+                    }
+
+                    // Any other/unknown category: no GL/OES stream feeds these —
+                    // handled entirely by startBitmapRecording.
+                    else -> startBitmapRecording(file, onResult)
+                }
+            }
         } catch (e: Exception) {
             recording = false
             hardwareRecording = false
@@ -1265,6 +1395,22 @@ object ArCameraController {
             cancelMaxDurationStop()
             onResult(false, e.message ?: "record_start_failed")
         }
+    }
+
+    /**
+     * Hands the currently-loaded Lottie composition to [ScreenOverlayCameraEffect]
+     * so its raster thread can bake it into the video buffer. The effect advances
+     * the animation on its own clock rather than following the on-screen view —
+     * see ScreenOverlayCameraEffect.animationProgress for why.
+     */
+    private fun prepareScreenOverlaySource() {
+        val effect = screenOverlayCameraEffect ?: return
+        val composition = ArCameraBridge.confettiOverlay?.composition
+        if (composition == null) {
+            effect.clear()
+            return
+        }
+        effect.setSource(composition)
     }
 
     @Volatile
@@ -1355,18 +1501,24 @@ object ArCameraController {
             lastRecordCopyMs = 0L
             startRecordFramePump()
 
-            val gl = ArCameraBridge.warpGlView
-            if (boundToOes || ArCameraBridge.currentFilter.useShader()) {
-                gl?.setCaptureEnabled(true)
-                gl?.setCaptureMaxEdge(RECORD_GL_EDGE)
-
-                gl?.setOnFramePresented { onOesFramePresented() }
-            } else if (ArCameraBridge.currentFilter.isScreenOverlay()) {
+            // Category-first: screen-overlay is checked unconditionally, on its
+            // own, rather than as an "else" alongside the OES/shader check —
+            // so its confetti pump can never be silently skipped by another
+            // category's OES state (boundToOes is only ever true for Normal
+            // Mode today, but this keeps that true structurally, not by
+            // coincidence).
+            val filter = ArCameraBridge.currentFilter
+            if (filter.isScreenOverlay()) {
                 // No GL/analysis stream feeds these filters — pull frames
                 // ourselves (preview + overlay composited) so the animation
                 // actually bakes into the saved video instead of only showing
                 // up live.
                 startConfettiFramePump()
+            } else if (boundToOes || filter.useShader()) {
+                val gl = ArCameraBridge.warpGlView
+                gl?.setCaptureEnabled(true)
+                gl?.setCaptureMaxEdge(RECORD_GL_EDGE)
+                gl?.setOnFramePresented { onOesFramePresented() }
             }
             scheduleMaxDurationStop()
             onResult(true, null)
@@ -1407,13 +1559,31 @@ object ArCameraController {
                     onResult(null, err ?: "empty_video")
                 }
                 // Drop VideoCapture so idle preview stream quality returns.
-                if (started &&
-                    !boundToOes &&
-                    canRebindCamera() &&
-                    !needsAnalysisUseCase(ArCameraBridge.currentFilter)
-                ) {
-                    requestPreviewRebind()
-                }
+                //
+                // Deliberately deferred: this is a full camera unbind/rebind (and
+                // with a screen-overlay filter it also tears down the effect's GL
+                // node), and firing it the instant recording finalizes puts it on
+                // the main thread at exactly the moment Flutter is animating over
+                // to the editor screen — which is what the post-record hitch was.
+                // Nothing needs the idle-quality preview stream during that
+                // transition, so let the navigation settle first. The guards are
+                // re-checked on the delayed run, so a filter switch or a new
+                // recording started in the meantime cancels it naturally.
+                mainHandler.postDelayed({
+                    val current = ArCameraBridge.currentFilter
+                    if (started &&
+                        !boundToOes &&
+                        canRebindCamera() &&
+                        !preferVideoBinding &&
+                        // Overlay filters want VideoCapture bound at idle too, so
+                        // there is nothing to drop — rebinding would only blank
+                        // the preview for no gain.
+                        !needsVideoUseCase(current) &&
+                        !needsAnalysisUseCase(current)
+                    ) {
+                        requestPreviewRebind()
+                    }
+                }, POST_RECORD_REBIND_DELAY_MS)
             }
             return
         }
@@ -1744,6 +1914,12 @@ object ArCameraController {
     private fun startConfettiFramePump() {
         if (confettiFramePumpActive) return
         confettiFramePumpActive = true
+        if (pixelCopyThread == null) {
+            val thread = HandlerThread("ar-pixel-copy")
+            thread.start()
+            pixelCopyThread = thread
+            pixelCopyHandler = Handler(thread.looper)
+        }
         mainHandler.post(confettiFrameRunnable)
     }
 
@@ -1751,6 +1927,9 @@ object ArCameraController {
         confettiFramePumpActive = false
         mainHandler.removeCallbacks(confettiFrameRunnable)
         confettiPixelCopyBusy.set(false)
+        pixelCopyThread?.quitSafely()
+        pixelCopyThread = null
+        pixelCopyHandler = null
     }
 
     private fun scheduleNextConfettiTick() {
@@ -1765,29 +1944,30 @@ object ArCameraController {
     private var confettiHeadlessComposition: LottieComposition? = null
 
     /**
-     * Grabs a base frame for the confetti recording composite, preferring an
-     * async [PixelCopy] straight off previewView's backing [SurfaceView] (runs
-     * on [pixelCopyHandlerThread], never blocks the main thread) over the old
-     * `PreviewView.getBitmap()` (a synchronous, main-thread-blocking GPU
-     * readback — confirmed a dominant cost behind the overlay+recording lag).
-     * Requesting directly at ~[RECORD_PROCESS_EDGE] also means the copy itself
-     * moves fewer pixels, on top of not blocking anything.
-     *
-     * Deliberately does NOT add another concurrent camera stream (that was
-     * tried and reverted — it forced the whole camera session into a lower
-     * guaranteed-quality stream combination). This only changes *how* the
-     * already-existing PreviewView's pixels are read, so camera quality is
-     * unaffected either way.
-     *
-     * Falls back to the old synchronous path if the SurfaceView isn't found
-     * (e.g. PreviewView fell back to TextureView) or PixelCopy can't be
-     * started, so this can only be as slow as before, never worse.
-     *
-     * Only main-thread work left per tick: this function itself (a few field
-     * reads + either issuing the async PixelCopy request or, in the fallback
-     * case, the synchronous previewView.bitmap() call) — the Lottie composite
-     * draw itself (see [finishConfettiFrame]) always runs on a background
-     * thread now, never the on-screen View.
+     * Grabs a base frame for the confetti recording composite via
+     * `previewView.bitmap()` — synchronous and main-thread-blocking (a real
+     * cost; see [CONFETTI_RECORD_INTERVAL_MS]'s throttling), but a direct
+     * screenshot of exactly what's on screen with no separate width/height
+     * calculation of our own to get wrong.
+     * History — every async alternative tried here has failed for a
+     * different, fundamental reason: `PixelCopy` on the raw `SurfaceView`
+     * copies pre-transform pixels (confirmed stretch bug); a `Window`-level
+     * `PixelCopy` captures a black rect where the camera preview is (raw
+     * camera SurfaceViews are often composited via a hardware overlay that
+     * bypasses the window's normal buffer — a real Android platform
+     * limitation, not fixable in app code); switching `previewView` to
+     * `TextureView` (`ImplementationMode.COMPATIBLE`) so `getBitmap()` works
+     * correctly avoids both of those, but makes the *continuous* live camera
+     * rendering itself measurably more expensive every frame (a known,
+     * documented SurfaceView-vs-TextureView cost — see the comment on
+     * `implementationMode = PERFORMANCE` in `start()`), which compounds with
+     * video encoding's own load during recording and produced *more* lag
+     * than the synchronous baseline, not less. There is no capture mechanism
+     * available here that is simultaneously async, correctly transformed,
+     * and free of added continuous rendering cost — getting further would
+     * need real on-device profiling, not more static-code attempts. The
+     * Lottie composite draw itself still runs off the main thread (see
+     * [finishConfettiFrame]/[composeConfettiOverlay]), just not this capture.
      */
     private fun requestConfettiFrame() {
         if (!confettiPixelCopyBusy.compareAndSet(false, true)) {
@@ -1805,61 +1985,10 @@ object ArCameraController {
             return
         }
         // Snapshot the on-screen view's current animation position now, on the
-        // main thread (cheap field reads) — the actual draw happens later, off
+        // main thread (cheap field read) — the actual draw happens later, off
         // this thread, via a headless LottieDrawable that never touches the
         // View, so it can't race the main thread's own animator.
         val progress = overlay.progress
-        val overlayWidth = overlay.width
-        val overlayHeight = overlay.height
-
-        val handler = pixelCopyHandler
-        val surfaceView = previewView.getChildAt(0) as? SurfaceView
-        val surface = surfaceView?.holder?.surface
-        if (handler != null && surface != null && surface.isValid) {
-            val srcW = previewView.width.coerceAtLeast(1)
-            val srcH = previewView.height.coerceAtLeast(1)
-            val scale = kotlin.math.min(1f, RECORD_PROCESS_EDGE.toFloat() / kotlin.math.max(srcW, srcH))
-            // Must be even — this bitmap's dimensions become the FIRST frame
-            // ArFilteredVideoRecorder.offerFrame() sees, which locks in the
-            // MediaCodec encoder's width/height for the whole recording. Odd
-            // dimensions here (missing before) meant the encoder's actual
-            // negotiated buffer size could silently differ from what this
-            // bitmap (and therefore the draw-into-encoder-surface step) used,
-            // stretching the whole recording — exactly the vertical
-            // stretch/elongated-face bug reported for confetti/overlay
-            // recordings specifically (this is the only capture path that
-            // sizes its frame from previewView.width/height instead of the
-            // already-even-rounded camera-buffer path every other filter uses).
-            val dstW = ((srcW * scale).toInt() and 1.inv()).coerceAtLeast(2)
-            val dstH = ((srcH * scale).toInt() and 1.inv()).coerceAtLeast(2)
-            val dest = try {
-                Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
-            } catch (_: Exception) {
-                null
-            }
-            if (dest != null) {
-                try {
-                    PixelCopy.request(
-                        surfaceView,
-                        dest,
-                        { result ->
-                            if (result == PixelCopy.SUCCESS) {
-                                finishConfettiFrame(composition, progress, overlayWidth, overlayHeight, dest)
-                            } else {
-                                dest.recycle()
-                                confettiPixelCopyBusy.set(false)
-                                scheduleNextConfettiTick()
-                            }
-                        },
-                        handler,
-                    )
-                    return
-                } catch (_: Exception) {
-                    dest.recycle()
-                    // Falls through to the synchronous fallback below.
-                }
-            }
-        }
 
         val raw = try {
             previewView.bitmap
@@ -1871,22 +2000,20 @@ object ArCameraController {
             scheduleNextConfettiTick()
             return
         }
-        finishConfettiFrame(composition, progress, overlayWidth, overlayHeight, raw)
+        finishConfettiFrame(composition, progress, raw, previewView.width, previewView.height)
     }
 
     /**
-     * Dispatches the Lottie composite to [recordOfferExecutor] regardless of
-     * which path produced [base] (PixelCopy's own background callback, or the
-     * main-thread previewView.bitmap() fallback) — the per-layer Lottie
-     * rasterization (see [composeConfettiOverlay]) never touches the main
-     * thread this way.
+     * Dispatches the Lottie composite to [recordOfferExecutor] so the
+     * per-layer Lottie rasterization (see [composeConfettiOverlay]) never
+     * touches the main thread.
      */
     private fun finishConfettiFrame(
         composition: LottieComposition,
         progress: Float,
-        overlayWidth: Int,
-        overlayHeight: Int,
         base: Bitmap,
+        viewW: Int,
+        viewH: Int,
     ) {
         val executor = recordOfferExecutor
         if (executor == null) {
@@ -1897,7 +2024,7 @@ object ArCameraController {
         }
         executor.execute {
             val composed = try {
-                composeConfettiOverlay(base, composition, progress, overlayWidth, overlayHeight)
+                composeConfettiOverlay(base, composition, progress, viewW, viewH)
             } catch (_: Exception) {
                 base
             }
@@ -1910,33 +2037,41 @@ object ArCameraController {
     /**
      * Draws the Lottie animation onto [raw] using a headless [LottieDrawable]
      * (SOFTWARE render mode, matching the software Bitmap [Canvas] it draws
-     * to) instead of the on-screen `confettiOverlay` View — a plain Drawable
-     * has no thread restriction, unlike a View, which is what lets the whole
-     * composite run on [recordOfferExecutor] instead of the main thread.
-     * Reuses one drawable instance across ticks (recreated only if the
-     * composition itself changes, e.g. a different overlay filter is picked).
+     * to) instead of the on-screen `confettiOverlay` View.
      */
     private fun composeConfettiOverlay(
         raw: Bitmap,
         composition: LottieComposition,
         progress: Float,
-        overlayWidth: Int,
-        overlayHeight: Int,
+        viewW: Int,
+        viewH: Int,
     ): Bitmap? {
+        var current: Bitmap = raw
         return try {
-            // Shrink before the Lottie draw below, not after: its cost scales
-            // with the canvas pixel area, and frameForRecording() rescales
-            // this whole composite down to RECORD_PROCESS_EDGE anyway once it
-            // reaches offerRecordingFrameAsync. (The PixelCopy path above
-            // already requests roughly this size, so this is usually a no-op
-            // there — still matters for the previewView.bitmap() fallback.)
+            // Crop raw to the aspect ratio of the viewport to prevent stretching!
+            val cropped = try {
+                val c = ImageProxyBitmapUtils.cropFillCenterToViewport(current, viewW, viewH)
+                if (c !== current) {
+                    current.recycle()
+                    current = c
+                }
+                c
+            } catch (_: Exception) {
+                current
+            }
+
+            // Shrink before the Lottie draw below, not after
             val base = try {
-                val shrunk = ImageProxyBitmapUtils.scaleToMaxDimension(raw, RECORD_PROCESS_EDGE, filter = true)
-                if (shrunk !== raw) raw.recycle()
+                val shrunk = ImageProxyBitmapUtils.scaleToMaxDimension(current, RECORD_PROCESS_EDGE, filter = true)
+                if (shrunk !== current) {
+                    current.recycle()
+                    current = shrunk
+                }
                 shrunk
             } catch (_: Exception) {
-                raw
+                current
             }
+
             val target = if (base.isMutable && base.config == Bitmap.Config.ARGB_8888) {
                 base
             } else {
@@ -1953,23 +2088,23 @@ object ArCameraController {
                     confettiHeadlessComposition = composition
                 }
             drawable.progress = progress
+
+            val srcW = composition.bounds.width().toFloat().coerceAtLeast(1f)
+            val srcH = composition.bounds.height().toFloat().coerceAtLeast(1f)
+            val dstW = target.width.toFloat()
+            val dstH = target.height.toFloat()
+            val cropScale = kotlin.math.max(dstW / srcW, dstH / srcH)
+            val scaledW = (srcW * cropScale)
+            val scaledH = (srcH * cropScale)
+            val left = ((dstW - scaledW) / 2f).toInt()
+            val top = ((dstH - scaledH) / 2f).toInt()
+
             val canvas = Canvas(target)
-            if (target.width != overlayWidth || target.height != overlayHeight) {
-                canvas.save()
-                canvas.scale(
-                    target.width.toFloat() / overlayWidth,
-                    target.height.toFloat() / overlayHeight,
-                )
-                drawable.setBounds(0, 0, overlayWidth, overlayHeight)
-                drawable.draw(canvas)
-                canvas.restore()
-            } else {
-                drawable.setBounds(0, 0, target.width, target.height)
-                drawable.draw(canvas)
-            }
+            drawable.setBounds(left, top, left + scaledW.toInt(), top + scaledH.toInt())
+            drawable.draw(canvas)
             target
         } catch (_: Exception) {
-            raw
+            current
         }
     }
 
@@ -2183,10 +2318,37 @@ object ArCameraController {
         }
     }
 
+    /**
+     * Still capture, configured for quality rather than shutter speed.
+     *
+     * Two changes from the original here, both aimed at the "photos look dull and
+     * noisy next to the stock camera app" gap:
+     *
+     * - CAPTURE_MODE_MAXIMIZE_QUALITY lets the HAL run its full still pipeline
+     *   (multi-frame noise reduction, stronger tone mapping on most vendors)
+     *   instead of the fast path MINIMIZE_LATENCY asks for. It also raises
+     *   CameraX's own intermediate JPEG quality to 100, so decoding and
+     *   re-encoding the frame to composite overlays no longer stacks two lossy
+     *   passes. Costs a few hundred ms of shutter latency.
+     * - HIGHEST_AVAILABLE_STRATEGY instead of the old fixed 2160x2880 target,
+     *   which was pinning captures near 6MP on sensors that can do far more.
+     *   4:3 is requested because that is the sensor's native aspect on virtually
+     *   every phone — anything else is a crop of it.
+     */
     private fun buildImageCapture(displayRotation: Int): ImageCapture {
+        val resolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(
+                AspectRatioStrategy(
+                    AspectRatio.RATIO_4_3,
+                    AspectRatioStrategy.FALLBACK_RULE_AUTO,
+                ),
+            )
+            .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+            .build()
+
         return ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-            .setTargetResolution(Size(PHOTO_TARGET_WIDTH, PHOTO_TARGET_HEIGHT))
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setResolutionSelector(resolutionSelector)
             .setTargetRotation(displayRotation)
             .build()
             .also { it.flashMode = ImageCapture.FLASH_MODE_OFF }
@@ -2520,7 +2682,65 @@ object ArCameraController {
         preferOesBinding = prefer
     }
 
-    fun canRebindCamera(): Boolean = started && !isRecordingActive()
+    fun canRebindCamera(): Boolean = started && !isRecordingActive() && !previewSuspended
+
+    /**
+     * True while the camera screen is covered by another Flutter route (e.g. the
+     * media studio editor) — see [suspendPreview].
+     */
+    @Volatile
+    private var previewSuspended = false
+
+    /**
+     * Fully stops the camera pipeline while the camera screen is still mounted
+     * but no longer visible.
+     *
+     * Pushing the editor route does NOT pause the host Activity, so without this
+     * everything kept running behind it: the camera stream, the GL view, and — for
+     * screen-overlay filters — a full-screen 60fps Lottie animation. That load
+     * doesn't disappear just because Flutter stopped painting the route, and it
+     * was competing with video playback on the editor screen. It also let the
+     * deferred post-record rebind (see [stopRecording]) fire right as the editor
+     * was opening; [canRebindCamera] now reports false here, so that rebind and
+     * any other queued one drop out on their own.
+     *
+     * Deliberately does NOT unbind the camera. That was tried and it is exactly
+     * the wrong thing to do on this path: `unbindAll()` is main-thread-only and
+     * tears down the capture session, which showed up as a visible freeze on the
+     * tap that opens the editor. What actually costs continuous work behind the
+     * editor is the animation and the GL renderer, and both stop cheaply.
+     *
+     * No-op mid-recording — that path owns the camera.
+     */
+    fun suspendPreview() {
+        if (!started || previewSuspended) return
+        if (isRecordingActive()) return
+        previewSuspended = true
+        val activity = ArCameraBridge.hostActivity
+        val work = Runnable {
+            try {
+                ArCameraBridge.confettiOverlay?.pauseAnimation()
+            } catch (_: Throwable) {
+            }
+            try {
+                ArCameraBridge.warpGlView?.onPause()
+            } catch (_: Throwable) {
+            }
+            applyScreenFlash(false)
+        }
+        if (activity != null) activity.runOnUiThread(work) else work.run()
+    }
+
+    /**
+     * Undoes [suspendPreview]. Reuses the app-foreground path, which already
+     * re-initializes GL, reapplies the current filter (restarting the overlay
+     * animation) and rebinds the camera.
+     */
+    fun resumePreview() {
+        if (!started || !previewSuspended) return
+        previewSuspended = false
+        onHostResume()
+    }
 
     fun onHostPause() {
         if (!started) return
@@ -2533,6 +2753,9 @@ object ArCameraController {
     fun onHostResume() {
         if (!started) return
         if (isRecordingActive()) return
+        // App foregrounded while the editor is on top — leave the camera stopped;
+        // [resumePreview] clears the flag before delegating here.
+        if (previewSuspended) return
         val activity = ArCameraBridge.hostActivity ?: return
         val gl = ArCameraBridge.warpGlView
         try {
@@ -2620,6 +2843,8 @@ object ArCameraController {
         val previewView = ArCameraBridge.previewView ?: return
         val faceOverlay = ArCameraBridge.faceOverlay ?: return
 
+        if (previewSuspended) return
+
         if (rebindPosted) {
             android.util.Log.i(
                 "ArCameraOES",
@@ -2638,6 +2863,12 @@ object ArCameraController {
         )
         activity.runOnUiThread {
             rebindPosted = false
+            // Freeze the last preview frame over the unbind so the surface going
+            // black isn't visible. Skipped for the OES path, which runs its own
+            // freeze-frame transition (ArCameraBridge.beginOesTransitionWithFreeze).
+            if (!preferOesBinding) {
+                ArCameraBridge.coverPreviewForRebind()
+            }
             bindCamera(lifecycleOwner, previewView, faceOverlay)
         }
     }
@@ -2835,7 +3066,7 @@ object ArCameraController {
 
             val filter = ArCameraBridge.currentFilter
             val needAnalysis = needsAnalysisUseCase(filter)
-            val needVideo = preferVideoBinding
+            val needVideo = preferVideoBinding || needsVideoUseCase(filter)
             // Normal idle: Preview ONLY. Capture binds on shutter; Analysis on effects; Video on record.
             val needCapture = preferCaptureBinding || needAnalysis || needVideo
             val capture = if (needCapture) {
@@ -2865,11 +3096,16 @@ object ArCameraController {
             imageAnalysis = analysis
 
             val hwVideo = if (needVideo) {
+                // FHD first: the previous HD-then-SD list capped every hardware
+                // recording at 720p, which is well under what the stock camera app
+                // writes and reads as soft/noisy on a 1080p+ screen. 4K is left out
+                // deliberately — it would have to go through the same GL effect node
+                // as the overlay filters.
                 val recorder = Recorder.Builder()
                     .setQualitySelector(
                         QualitySelector.fromOrderedList(
-                            listOf(Quality.HD, Quality.SD, Quality.LOWEST),
-                            FallbackStrategy.lowerQualityOrHigherThan(Quality.SD),
+                            listOf(Quality.FHD, Quality.HD, Quality.SD),
+                            FallbackStrategy.lowerQualityOrHigherThan(Quality.HD),
                         ),
                     )
                     .build()
@@ -2886,6 +3122,7 @@ object ArCameraController {
                 withVideo: Boolean,
                 withCapture: Boolean,
                 withPngEffect: Boolean,
+                withScreenEffect: Boolean = false,
             ): Boolean {
                 return try {
                     val useAnalysis = withAnalysis && analysis != null
@@ -2939,8 +3176,23 @@ object ArCameraController {
                         } else {
                             null
                         }
-                        val bound = if (viewPort != null) {
-                            val groupBuilder = UseCaseGroup.Builder().setViewPort(viewPort)
+                        // Bakes the full-screen Lottie into the recorded stream
+                        // (VIDEO_CAPTURE target only, so Preview/ImageCapture are
+                        // untouched). Needs a UseCaseGroup, so when there's no
+                        // ViewPort to build one around we still make one here.
+                        val screenEffect = if (withScreenEffect && useVideo) {
+                            val overlay = screenOverlayCameraEffect
+                                ?: ScreenOverlayCameraEffect().also {
+                                    screenOverlayCameraEffect = it
+                                }
+                            overlay.ensureEffect()
+                        } else {
+                            null
+                        }
+                        val bound = if (viewPort != null || screenEffect != null) {
+                            val groupBuilder = UseCaseGroup.Builder()
+                            if (viewPort != null) groupBuilder.setViewPort(viewPort)
+                            if (screenEffect != null) groupBuilder.addEffect(screenEffect)
                             cases.forEach { groupBuilder.addUseCase(it) }
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
@@ -2985,6 +3237,12 @@ object ArCameraController {
                         bindCombo(true, true, true, withPngEffect = false)
                     needAnalysis ->
                         bindCombo(true, false, true, withPngEffect = false)
+                    needVideo && filter.isScreenOverlay() ->
+                        // Fall back to a plain video bind if the device can't take
+                        // the effect — recording still works, the overlay just
+                        // isn't baked in, same shape as the PNG-effect fallback.
+                        bindCombo(false, true, true, withPngEffect = false, withScreenEffect = true) ||
+                            bindCombo(false, true, true, withPngEffect = false)
                     needVideo ->
                         bindCombo(false, true, true, withPngEffect = false)
                     needCapture ->
@@ -3057,7 +3315,7 @@ object ArCameraController {
             cb(false)
             return
         }
-        takePictureWithBoundCapture(capture, file, 95) { ok ->
+        takePictureWithBoundCapture(capture, file, PHOTO_JPEG_QUALITY) { ok ->
             cb(ok)
             preferCaptureBinding = false
             if (ArCameraBridge.currentFilter == FilterType.NONE &&

@@ -80,6 +80,22 @@ data class StickerAnchorConfig(
 
 object StickerCatalog {
 
+    // ---------------------------------------------------------------------
+    // PNG sticker configs — commented out, not deleted.
+    //
+    // The carousel now carries only backend-driven overlays, so these five
+    // effects were pulled from ArFilterCatalog.nativeEffectItems. Their
+    // drawables (glasses_round, glasses_aviator, filter_moustache,
+    // filter_skull_mask, filter_ears, filter_nose, filter_tongue) were
+    // deleted with them, which is why these blocks have to be commented
+    // rather than left in place — they reference R.drawable ids that no
+    // longer exist and would break the build.
+    //
+    // To restore an effect: put its PNG back in res/drawable, uncomment its
+    // config here and its branch in configsFor(), and uncomment the matching
+    // ArFilterItem in ArFilterCatalog.
+    // ---------------------------------------------------------------------
+/*
     val glasses = StickerAnchorConfig(
         id = "glasses",
         drawableRes = R.drawable.glasses_round,
@@ -196,12 +212,18 @@ object StickerCatalog {
         yawSqueeze = 0.12f,
     )
 
+*/
+    /**
+     * Always empty while the sticker configs above are commented out. The PNG
+     * overlay rendering path (StickerCameraOverlay, FaceOverlayView) is
+     * untouched and simply has nothing to draw, so nothing needed unwiring.
+     */
     fun configsFor(filter: FilterType): List<StickerAnchorConfig> = when (filter) {
-        FilterType.SUNGLASSES -> listOf(glasses)
-        FilterType.SHADES -> listOf(shades)
-        FilterType.MOUSTACHE -> listOf(moustache)
-        FilterType.MASK -> listOf(mask)
-        FilterType.EMOJI -> listOf(dogEars, dogNose, dogTongue)
+        // FilterType.SUNGLASSES -> listOf(glasses)
+        // FilterType.SHADES -> listOf(shades)
+        // FilterType.MOUSTACHE -> listOf(moustache)
+        // FilterType.MASK -> listOf(mask)
+        // FilterType.EMOJI -> listOf(dogEars, dogNose, dogTongue)
         else -> emptyList()
     }
 }

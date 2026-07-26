@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 import 'package:bimobondapp/app/ar_camera/ar_color_filter_remote_loader.dart';
+import 'package:bimobondapp/app/ar_camera/ar_overlay_remote_loader.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
@@ -212,7 +213,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ),
       if (_useNativeArFilters)
         ArColorFilterRemoteLoader.ensureLoaded(forceRefresh: true),
+      if (_useNativeArFilters)
+        ArOverlayRemoteLoader.ensureLoaded(forceRefresh: true),
     ]);
+    if (_useNativeArFilters) {
+      // Downloads every published overlay animation into Lottie's disk cache
+      // now, while the user is still looking at Normal Mode, so the first tap
+      // on one plays immediately instead of waiting on the network.
+      unawaited(ArCameraBridge.prefetchOverlays());
+    }
     if (!mounted) return;
     final categories = CameraFilterCatalog.filterCategories;
     setState(() {
@@ -269,6 +278,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (items.isEmpty || !mounted) return;
     unawaited(SoundAudioPreview.stop());
     setState(() => _isBusy = true);
+    // Same reason as _openCapturedMediaEditor: the editor route is pushed over a
+    // still-running native camera view.
+    unawaited(ArCameraBridge.suspendPreview());
     try {
       if (widget.returnMediaOnDone) {
         final edited = await MediaGalleryImportFlow.openBatchEditor(
@@ -293,6 +305,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         initialMuteOriginal: _muteOriginalAudio,
       );
     } finally {
+      unawaited(ArCameraBridge.resumePreview());
       if (mounted) setState(() => _isBusy = false);
     }
   }
@@ -513,15 +526,29 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }) async {
     // Leave camera → editor: never carry a catalog preview into the next step.
     unawaited(SoundAudioPreview.stop());
-    final edited = await MediaGalleryImportFlow.openBatchEditor(
-      context,
-      items: [GalleryMediaItem(file: file, type: type)],
-      isStory: widget.isStory,
-      initialSound: _selectedSound,
-      initialSoundOffset: _soundStartOffset,
-      initialMuteOriginal: _muteOriginalAudio,
-      initialEdit: _captureEditSeed,
-    );
+    // The editor is pushed on top of this screen, which leaves the native camera
+    // view mounted and running (a route push doesn't pause the Activity). Stop it
+    // for the duration so the editor's video playback isn't competing with a live
+    // camera stream plus, for screen-overlay filters, a full-screen Lottie loop.
+    // Fire-and-forget on purpose: awaiting a channel round-trip here would delay
+    // the push itself, and the native side's work is already non-blocking.
+    unawaited(ArCameraBridge.suspendPreview());
+    final MediaStudioExportResult? edited;
+    try {
+      edited = await MediaGalleryImportFlow.openBatchEditor(
+        context,
+        items: [GalleryMediaItem(file: file, type: type)],
+        isStory: widget.isStory,
+        initialSound: _selectedSound,
+        initialSoundOffset: _soundStartOffset,
+        initialMuteOriginal: _muteOriginalAudio,
+        initialEdit: _captureEditSeed,
+      );
+    } finally {
+      // Back on the camera (or about to leave it entirely) — either way the
+      // native side must not be left suspended.
+      unawaited(ArCameraBridge.resumePreview());
+    }
     if (!mounted || edited == null || edited.files.isEmpty) return;
 
     if (widget.returnMediaOnDone) {

@@ -147,9 +147,29 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
     }
   }
 
+  /// How long to wait for the platform player to come up before treating the
+  /// attempt as failed. `initialize()` does not always reject on an unplayable
+  /// file — on a freshly muxed clip it can simply never complete, which is what
+  /// left the preview on a permanent spinner in release builds (release runs
+  /// fast enough to open the file before the muxer has finished flushing it;
+  /// debug was slow enough to hide the race).
+  static const _initTimeout = Duration(seconds: 8);
+
+  /// One retry is enough: by the time it runs, a file that was still being
+  /// written has been closed.
+  static const _initRetryDelay = Duration(milliseconds: 300);
+
   Future<void> _initVideo() async {
+    // Every exit path from here MUST clear _isVideoLoading. build() checks it
+    // before _videoFailed, so a stranded `true` hides even the fallback
+    // thumbnail and shows nothing but a spinner forever.
     if (!await widget.file.exists()) {
-      if (mounted) setState(() => _videoFailed = true);
+      if (mounted) {
+        setState(() {
+          _videoFailed = true;
+          _isVideoLoading = false;
+        });
+      }
       return;
     }
 
@@ -158,6 +178,24 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       _videoFailed = false;
     });
 
+    if (await _attemptInitVideo()) return;
+    if (!mounted) return;
+
+    await Future<void>.delayed(_initRetryDelay);
+    if (!mounted) return;
+    if (await _attemptInitVideo()) return;
+    if (!mounted) return;
+
+    setState(() {
+      _videoFailed = true;
+      _isVideoLoading = false;
+    });
+  }
+
+  /// Returns true when the player is up and playing. On failure it leaves
+  /// [_isVideoLoading] alone so the caller can retry without flashing the
+  /// fallback thumbnail in between.
+  Future<bool> _attemptInitVideo() async {
     // mixWithOthers so studio soundtrack (SoundAudioPreview) can play under
     // the looping video without ExoPlayer stealing focus / freezing frames.
     final controller = VideoPlayerController.file(
@@ -185,10 +223,10 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
     controller.addListener(_enforceTrim);
 
     try {
-      await controller.initialize();
+      await controller.initialize().timeout(_initTimeout);
       if (!mounted) {
         await controller.dispose();
-        return;
+        return true;
       }
       await controller.setLooping(true);
       await controller.setVolume(widget.muted ? 0 : 1);
@@ -204,13 +242,17 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       // Poster sits behind the player so ExoPlayer's loop seek (or a 1-frame
       // black tail) doesn't flash the black ColoredBox behind the texture.
       unawaited(_loadLoopPoster());
+      return true;
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _videoFailed = true;
-          _isVideoLoading = false;
-        });
-      }
+      // Drop the dead controller so the retry (and dispose()) don't touch a
+      // half-initialised player.
+      controller.removeListener(onUpdate);
+      controller.removeListener(_enforceTrim);
+      try {
+        await controller.dispose();
+      } catch (_) {}
+      if (_videoController == controller) _videoController = null;
+      return false;
     }
   }
 

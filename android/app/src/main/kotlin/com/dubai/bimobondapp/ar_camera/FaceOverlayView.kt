@@ -193,17 +193,23 @@ class FaceOverlayView @JvmOverloads constructor(
             bitmapFor(config.drawableRes)
         }
 
-        for (config in listOf(
-            StickerCatalog.glasses,
-            StickerCatalog.shades,
-            StickerCatalog.moustache,
-            StickerCatalog.mask,
-            StickerCatalog.dogEars,
-            StickerCatalog.dogNose,
-            StickerCatalog.dogTongue,
-        )) {
-            bitmapFor(config.drawableRes)
-        }
+        // The eager pre-warm of every sticker bitmap that used to live here is
+        // commented out along with StickerCatalog's configs — the PNG drawables
+        // it decoded were deleted when the sticker effects were pulled from the
+        // carousel. Restore it together with those configs if the effects come
+        // back; the loop above already covers whatever is currently active.
+        //
+        // for (config in listOf(
+        //     StickerCatalog.glasses,
+        //     StickerCatalog.shades,
+        //     StickerCatalog.moustache,
+        //     StickerCatalog.mask,
+        //     StickerCatalog.dogEars,
+        //     StickerCatalog.dogNose,
+        //     StickerCatalog.dogTongue,
+        // )) {
+        //     bitmapFor(config.drawableRes)
+        // }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

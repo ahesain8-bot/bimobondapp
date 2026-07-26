@@ -6,7 +6,9 @@ import android.media.ToneGenerator
 import androidx.camera.lifecycle.ProcessCameraProvider
 import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
+import com.dubai.bimobondapp.ar_camera.ArCameraOverlayPrefetcher
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
+import com.dubai.bimobondapp.ar_camera.ScreenOverlaySource
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
 import com.dubai.bimobondapp.ar_camera.LiveBeautyState
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
@@ -100,7 +102,30 @@ class MainActivity : FlutterActivity() {
                     "setFilter" -> {
                         val filter = call.argument<String>("filter") ?: "none"
                         val intensity = call.argument<Double>("intensity")?.toFloat()
-                        ArCameraBridge.setFilter(filter, intensity)
+                        // Present only for screen overlays — Dart looks the
+                        // animation up in its (backend-driven) catalog and sends
+                        // it along, since native has no overlay list of its own.
+                        val overlayUrl = call.argument<String>("overlayUrl")
+                        val overlayAsset = call.argument<String>("overlayAsset")
+                        val overlay = if (!overlayUrl.isNullOrBlank() ||
+                            !overlayAsset.isNullOrBlank()
+                        ) {
+                            ScreenOverlaySource(
+                                id = filter,
+                                url = overlayUrl,
+                                assetName = overlayAsset,
+                                loop = call.argument<Boolean>("overlayLoop") ?: true,
+                            )
+                        } else {
+                            null
+                        }
+                        ArCameraBridge.setFilter(filter, intensity, overlay)
+                        result.success(null)
+                    }
+                    "prefetchOverlays" -> {
+                        val urls = call.argument<List<String>>("urls").orEmpty()
+                        val assets = call.argument<List<String>>("assets").orEmpty()
+                        ArCameraOverlayPrefetcher.prefetch(this, urls, assets)
                         result.success(null)
                     }
                     "setFilterIntensity" -> {
@@ -251,6 +276,18 @@ class MainActivity : FlutterActivity() {
                                 result.error("torch_failed", error, null)
                             }
                         }
+                    }
+                    // Called when the camera screen is covered by another route
+                    // (media studio editor) and when it comes back — the host
+                    // Activity isn't paused by a Flutter push, so the native
+                    // camera has to be told explicitly.
+                    "suspendPreview" -> {
+                        ArCameraController.suspendPreview()
+                        result.success(null)
+                    }
+                    "resumePreview" -> {
+                        ArCameraController.resumePreview()
+                        result.success(null)
                     }
                     "setPreviewLetterbox" -> {
                         val top = call.argument<Int>("topPx") ?: 0

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:bimobondapp/app/camera_studio/domain/entities/camera_studio_catalog_entity.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_preset.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_strip.dart';
@@ -23,7 +21,8 @@ class CameraFiltersPanel extends StatelessWidget {
 
   final List<CameraFilterCategoryEntity> categories;
   final String selectedCategorySlug;
-  final String Function(CameraFilterCategoryEntity category) categoryLabelBuilder;
+  final String Function(CameraFilterCategoryEntity category)
+  categoryLabelBuilder;
   final ValueChanged<String> onCategorySelected;
   final List<CameraFilterPreset> presets;
   final AwesomeFilter selectedFilter;
@@ -33,57 +32,59 @@ class CameraFiltersPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // No BackdropFilter here on purpose — same reason as ArColorFiltersPanel:
+    // a backdrop blur above the camera's native AndroidView costs Flutter an
+    // extra overlay/readback layer that is created and destroyed on every open
+    // and close, which reads as the camera freezing for a moment. The
+    // background is near-opaque, so the blur was barely visible anyway.
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF121212).withValues(alpha: 0.96),
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
-                blurRadius: 24,
-                offset: const Offset(0, -6),
-              ),
-            ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF121212).withValues(alpha: 0.96),
+          border: Border(
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 10, 0, 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.28),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 24,
+              offset: const Offset(0, -6),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 10, 0, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.28),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  CameraFilterCategoryTabs(
-                    categories: categories,
-                    selectedSlug: selectedCategorySlug,
-                    labelBuilder: categoryLabelBuilder,
-                    onSelected: onCategorySelected,
-                    onClear: onClearFilter,
-                    style: CameraFilterTabStyle.underline,
-                  ),
-                  const SizedBox(height: 16),
-                  CameraFilterStrip(
-                    presets: presets,
-                    selected: selectedFilter,
-                    labelBuilder: filterLabelBuilder,
-                    onSelected: onFilterSelected,
-                  ),
-                ],
-              ),
+                ),
+                CameraFilterCategoryTabs(
+                  categories: categories,
+                  selectedSlug: selectedCategorySlug,
+                  labelBuilder: categoryLabelBuilder,
+                  onSelected: onCategorySelected,
+                  onClear: onClearFilter,
+                  style: CameraFilterTabStyle.underline,
+                ),
+                const SizedBox(height: 16),
+                CameraFilterStrip(
+                  presets: presets,
+                  selected: selectedFilter,
+                  labelBuilder: filterLabelBuilder,
+                  onSelected: onFilterSelected,
+                ),
+              ],
             ),
           ),
         ),
@@ -94,10 +95,7 @@ class CameraFiltersPanel extends StatelessWidget {
 
 /// Dimmed scrim behind the filter sheet so labels stay readable on camera preview.
 class CameraFiltersScrim extends StatelessWidget {
-  const CameraFiltersScrim({
-    super.key,
-    required this.onDismiss,
-  });
+  const CameraFiltersScrim({super.key, required this.onDismiss});
 
   final VoidCallback onDismiss;
 
@@ -106,9 +104,7 @@ class CameraFiltersScrim extends StatelessWidget {
     return GestureDetector(
       onTap: onDismiss,
       behavior: HitTestBehavior.opaque,
-      child: ColoredBox(
-        color: Colors.black.withValues(alpha: 0.52),
-      ),
+      child: ColoredBox(color: Colors.black.withValues(alpha: 0.52)),
     );
   }
 }
