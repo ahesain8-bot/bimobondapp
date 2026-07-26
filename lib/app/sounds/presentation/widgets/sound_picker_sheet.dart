@@ -164,6 +164,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   bool _showSearch = false;
 
   SoundEntity? _selected;
+  String? _previewStartedSoundId;
   String? _error;
 
   @override
@@ -516,10 +517,25 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
   }
 
   Future<void> _onSoundTap(SoundEntity sound) async {
-    // Selecting a track applies it and returns to camera/editor.
-    // Trim stays optional via the scissors action.
-    setState(() => _selected = sound);
-    await _confirm(sound);
+    final isSameSelected = _selected?.id == sound.id;
+    final hasStartedPreview = _previewStartedSoundId == sound.id;
+
+    if (isSameSelected && hasStartedPreview) {
+      // Second click on the selected sound: apply and close dialog.
+      await _confirm(sound);
+      return;
+    }
+
+    // First click on this sound: select track, start audio preview, keep dialog open.
+    setState(() {
+      _selected = sound;
+      _previewStartedSoundId = sound.id;
+    });
+    await SoundAudioPreview.stop();
+    await SoundAudioPreview.playAt(sound.id, sound.resolvedAudioUrl);
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _confirm(
@@ -714,6 +730,7 @@ class _SoundPickerSheetState extends State<SoundPickerSheet>
                 showError: _showRemoteError,
                 onRetry: () => unawaited(_retryCurrent()),
                 onSoundTap: (sound) => unawaited(_onSoundTap(sound)),
+                onUseTap: (sound) => unawaited(_confirm(sound)),
                 onScissorsTap: (sound) => unawaited(_openTrim(sound)),
                 onFavoriteTap: (sound) => unawaited(_toggleFavorite(sound)),
               ),

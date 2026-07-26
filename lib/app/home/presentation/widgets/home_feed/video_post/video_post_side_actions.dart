@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class VideoPostSideActions extends StatelessWidget {
   const VideoPostSideActions({
+    this.soundCoverUrl,
     required this.avatarUrl,
     required this.username,
     required this.fullName,
@@ -40,6 +41,7 @@ class VideoPostSideActions extends StatelessWidget {
     super.key,
   });
 
+  final String? soundCoverUrl;
   final String? avatarUrl;
   final String? username;
   final String? fullName;
@@ -159,6 +161,7 @@ class VideoPostSideActions extends StatelessWidget {
         ),
         const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
         VideoPostMusicDisc(
+          soundCoverUrl: soundCoverUrl,
           avatarUrl: avatarUrl,
           onTap: onMusicTap,
         ),

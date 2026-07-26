@@ -72,6 +72,7 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
         status: 'PUBLISHED',
         isStory: true,
         files: [widget.file],
+        sound: widget.sound,
         // Exactly one of soundSegmentId | soundId | newSound (see post-sounds.md).
         soundId: attach.soundId,
         soundSegmentId: attach.soundSegmentId,
@@ -103,7 +104,11 @@ class _StoryCameraEditorState extends State<StoryCameraEditor> {
             body: Stack(
               fit: StackFit.expand,
               children: [
-                StoryMediaPreview(file: widget.file, type: widget.type),
+                StoryMediaPreview(
+                  file: widget.file,
+                  type: widget.type,
+                  sound: widget.sound,
+                ),
                 const Positioned.fill(
                   child: IgnorePointer(
                     child: DecoratedBox(

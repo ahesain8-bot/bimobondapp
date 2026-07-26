@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_sound_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/create_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/entities/toggle_like_params.dart';
@@ -18,7 +19,6 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
-import 'package:bimobondapp/app/sounds/presentation/utils/sound_duration_probe.dart';
 import 'package:bimobondapp/app/stories/domain/entities/story_entities.dart';
 import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
@@ -317,53 +317,40 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         ),
       );
 
-      result.fold(
-        (failure) => emit(PostsFailure(failure.message)),
-        (post) => emit(CreatePostSuccess(post)),
-      );
+      result.fold((failure) => emit(PostsFailure(failure.message)), (post) {
+        final chosen = event.sound;
+        PostEntity finalPost = post;
+        if (chosen != null) {
+          final enrichedSound = PostSoundEntity(
+            id: chosen.id,
+            name: chosen.name,
+            author: chosen.author,
+            duration: chosen.duration,
+            useCount: chosen.useCount,
+            audioUrl: chosen.resolvedAudioUrl,
+            segmentId: event.soundSegmentId ?? post.sound?.segmentId,
+            startMs: event.startMs ?? post.sound?.startMs,
+            endMs: event.endMs ?? post.sound?.endMs,
+          );
+          finalPost = post.copyWith(sound: enrichedSound);
+        }
+        emit(CreatePostSuccess(finalPost));
+      });
     } catch (e) {
       emit(PostsFailure(ErrorMessageResolver.resolve(e)));
     }
   }
 
   /// Builds inline `newSound` for original recorded video audio when the
-  /// client did not attach a library `soundId` / segment / explicit newSound.
+  /// Mode C: Return explicit [newSound] if provided; otherwise null so original-audio
+  /// videos omit all sound fields as per mobile-api spec.
   Future<Map<String, dynamic>?> _resolveNewSound({
     required CreatePostWithMediaRequestedEvent event,
     required String? videoUrl,
     required String? thumbnailUrl,
     required File? primaryVideoFile,
   }) async {
-    final existing = event.newSound;
-    if (existing != null) return existing;
-
-    final hasLibrarySound =
-        (event.soundId != null && event.soundId!.trim().isNotEmpty) ||
-        (event.soundSegmentId != null &&
-            event.soundSegmentId!.trim().isNotEmpty);
-    if (hasLibrarySound) return null;
-
-    final url = videoUrl?.trim();
-    final file = primaryVideoFile;
-    if (url == null || url.isEmpty || file == null) return null;
-
-    try {
-      final duration = await SoundDurationProbe.probeSeconds(file);
-      return {
-        'audioUrl': url,
-        'duration': duration < 1 ? 1 : duration,
-        if (thumbnailUrl != null && thumbnailUrl.trim().isNotEmpty)
-          'coverUrl': thumbnailUrl.trim(),
-      };
-    } catch (_) {
-      // Still attempt create with a safe minimum duration.
-      return {
-        'audioUrl': url,
-        'duration': 1,
-        if (thumbnailUrl != null && thumbnailUrl.trim().isNotEmpty)
-          'coverUrl': thumbnailUrl.trim(),
-      };
-    }
+    return event.newSound;
   }
 
   Future<void> _onFetchFeedRequested(

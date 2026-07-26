@@ -5,7 +5,6 @@ import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -111,9 +110,7 @@ class _SoundListTileState extends State<SoundListTile> {
   String? get _coverUrl {
     final cover = widget.sound.resolvedCoverUrl;
     if (cover != null && cover.isNotEmpty) return cover;
-    final avatar = widget.sound.creator?.avatarUrl?.trim();
-    if (avatar == null || avatar.isEmpty) return null;
-    return MediaUtils.resolveAbsoluteUrl(avatar);
+    return null;
   }
 
   @override
@@ -241,6 +238,23 @@ class _SoundListTileState extends State<SoundListTile> {
                   child: Text(l10n.soundUseThis),
                 )
               else if (selected) ...[
+                IconButton(
+                  onPressed: widget.onUseTap ?? widget.onTap,
+                  tooltip: l10n.soundUseThis,
+                  icon: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: scheme.surface,
+                    ),
+                  ),
+                ),
                 IconButton(
                   onPressed: widget.onScissorsTap,
                   tooltip: l10n.soundTrimTooltip,

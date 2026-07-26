@@ -6,7 +6,7 @@ class SoundPickResult {
     required SoundEntity this.sound,
     this.offset = Duration.zero,
     this.window = const Duration(seconds: 15),
-    this.muteOriginal = false,
+    this.muteOriginal = true,
     this.didTrim = false,
     this.needsTrim = false,
     this.soundSegmentId,

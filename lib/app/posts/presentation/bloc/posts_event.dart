@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_input.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:equatable/equatable.dart';
 
 abstract class PostsEvent extends Equatable {
@@ -132,6 +133,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final bool isStory;
   final PostAuctionInput? auction;
   final List<File> files;
+  final SoundEntity? sound;
   final String? soundId;
   final String? soundSegmentId;
   final int? startMs;
@@ -156,6 +158,7 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     this.isStory = false,
     this.auction,
     required this.files,
+    this.sound,
     this.soundId,
     this.soundSegmentId,
     this.startMs,

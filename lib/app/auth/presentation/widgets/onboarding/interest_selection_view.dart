@@ -73,16 +73,12 @@ class InterestSelectionView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textDirection = isArabic ? TextDirection.rtl : TextDirection.ltr;
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
-    final primary = Theme.of(context).colorScheme.primary;
-    final error = Theme.of(context).colorScheme.error;
-
     return Directionality(
       textDirection: textDirection,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         child: Scaffold(
-          backgroundColor: scaffoldColor,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -149,31 +145,12 @@ class InterestSelectionView extends StatelessWidget {
                           fontSize: 14,
                           textAlign: TextAlign.start,
                         ),
-                        const SizedBox(height: AppSizes.p4),
-                        CustomText(
-                          l10n.interestSelectionNotInterestedHint,
-                          variant: TextVariant.secondary,
-                          fontSize: 13,
-                          textAlign: TextAlign.start,
-                        ),
-                        const SizedBox(height: AppSizes.p16),
-                        Wrap(
-                          spacing: AppSizes.p16,
-                          runSpacing: AppSizes.p8,
-                          children: [
-                            _LegendItem(
-                              color: primary,
-                              label: l10n.interestSelectionInterestedLegend,
-                            ),
-                            _LegendItem(
-                              color: error,
-                              label: l10n.interestSelectionNotInterestedLegend,
-                            ),
-                          ],
-                        ),
                         const SizedBox(height: AppSizes.p24),
                         if (isLoadingCategories)
-                          const Center(child: CustomLoadingWidget())
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(child: CustomLoadingWidget(size: 48)),
+                          )
                         else if (errorMessage != null)
                           _ErrorState(
                             message: errorMessage!,
@@ -240,36 +217,6 @@ class InterestSelectionView extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _LegendItem extends StatelessWidget {
-  const _LegendItem({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: AppSizes.p6),
-        CustomText(
-          label,
-          fontSize: 13,
-          variant: TextVariant.secondary,
-        ),
-      ],
     );
   }
 }

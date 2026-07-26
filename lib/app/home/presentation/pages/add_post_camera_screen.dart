@@ -596,7 +596,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _soundWindow = picked.window > Duration.zero
           ? picked.window
           : const Duration(seconds: 15);
-      _muteOriginalAudio = picked.muteOriginal;
+      _muteOriginalAudio = true;
       _soundDidTrim = picked.didTrim || picked.offset > Duration.zero;
       final seg = picked.soundSegmentId?.trim();
       final defaultId = sound.defaultSegment?.id.trim();
@@ -1932,8 +1932,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
     final kept = <String>[
       for (var i = 0; i < _layoutCellPhotos.length; i++)
-        if (i != index)
-          if (_layoutCellPhotos[i] case final p?) p,
+        if (i != index && _layoutCellPhotos[i] != null)
+          _layoutCellPhotos[i]!,
     ];
     final next = List<String?>.filled(_layoutMode.cellCount, null);
     for (var i = 0; i < kept.length; i++) {

@@ -88,6 +88,7 @@ class PostEntity extends Equatable {
     List<RepostUserEntity>? recentReposters,
     String? description,
     String? privacyStatus,
+    PostSoundEntity? sound,
   }) {
     return PostEntity(
       id: id,
@@ -121,7 +122,7 @@ class PostEntity extends Equatable {
       isAd: isAd,
       promotion: promotion,
       location: location,
-      sound: sound,
+      sound: sound ?? this.sound,
       filterName: filterName,
     );
   }

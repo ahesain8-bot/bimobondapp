@@ -18,8 +18,8 @@ class PostSoundAttach {
 
   /// Mode B — library / trending track.
   ///
-  /// Full track → `soundId` only.
-  /// User trimmed → `soundId` + `startMs`/`endMs` (never with soundSegmentId).
+  /// Always includes [startMs] and [endMs]: defaults to 0..15000ms (or track length)
+  /// when not trimmed, or custom range when trimmed.
   static PostSoundAttachParams fromLibrary(
     SoundEntity sound, {
     Duration offset = Duration.zero,
@@ -29,24 +29,16 @@ class PostSoundAttach {
     final id = sound.id.trim();
     if (id.isEmpty) return const PostSoundAttachParams();
 
-    // Mode B2 only when the user explicitly trimmed (or restored a non-zero
-    // offset). A default 15s picker window must not become startMs/endMs.
-    final customClip = didTrim || offset > Duration.zero;
-
-    if (customClip) {
-      final clip = SoundEntity.clipRangeMs(
-        durationSeconds: sound.duration,
-        offset: offset,
-        window: window,
-      );
-      return PostSoundAttachParams(
-        soundId: id,
-        startMs: clip.startMs,
-        endMs: clip.endMs,
-      );
-    }
-
-    return PostSoundAttachParams(soundId: id);
+    final clip = SoundEntity.clipRangeMs(
+      durationSeconds: sound.duration,
+      offset: offset,
+      window: window,
+    );
+    return PostSoundAttachParams(
+      soundId: id,
+      startMs: clip.startMs,
+      endMs: clip.endMs,
+    );
   }
 
   /// Prefer Mode A when [soundSegmentId] is set and there is no custom trim;

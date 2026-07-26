@@ -6,6 +6,7 @@ class PostSoundEntity extends Equatable {
     required this.id,
     required this.name,
     this.author,
+    this.coverUrl,
     this.duration,
     this.useCount,
     this.audioUrl,
@@ -17,6 +18,7 @@ class PostSoundEntity extends Equatable {
   final String id;
   final String name;
   final String? author;
+  final String? coverUrl;
   final int? duration;
   final int? useCount;
   final String? audioUrl;
@@ -36,6 +38,12 @@ class PostSoundEntity extends Equatable {
     return MediaUtils.resolveAbsoluteUrl(url);
   }
 
+  String? get resolvedCoverUrl {
+    final url = coverUrl;
+    if (url == null || url.isEmpty) return null;
+    return MediaUtils.resolveAbsoluteUrl(url);
+  }
+
   /// True when playback should seek/loop within [startMs, endMs).
   bool get hasSegmentWindow {
     final start = startMs;
@@ -44,10 +52,19 @@ class PostSoundEntity extends Equatable {
   }
 
   factory PostSoundEntity.fromJson(Map<String, dynamic> json) {
+    String? author = json['author']?.toString();
+    if (author == null || author.isEmpty) {
+      final creator = json['creator'];
+      if (creator is Map) {
+        author = (creator['fullName'] ?? creator['username'])?.toString();
+      }
+    }
+
     return PostSoundEntity(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      author: json['author']?.toString(),
+      author: author,
+      coverUrl: json['coverUrl']?.toString() ?? json['iconUrl']?.toString(),
       duration: json['duration'] is int
           ? json['duration'] as int
           : int.tryParse(json['duration']?.toString() ?? ''),
@@ -70,6 +87,7 @@ class PostSoundEntity extends Equatable {
         id,
         name,
         author,
+        coverUrl,
         duration,
         useCount,
         audioUrl,

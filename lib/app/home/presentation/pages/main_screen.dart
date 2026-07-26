@@ -134,16 +134,11 @@ class _MainScreenState extends State<MainScreen> {
             BlocListener<AuthBloc, AuthState>(
               listenWhen: (previous, current) {
                 if (current is AuthInitial) return true;
-                // Fresh login only — ignore profile refresh and
-                // AuthLoading → AuthSuccess from update-profile.
-                return current is AuthSuccess &&
-                    (previous is AuthInitial || previous is AuthFailure);
+                return current is AuthSuccess && previous is! AuthSuccess;
               },
               listener: (context, authState) {
-                if (authState is AuthSuccess) {
-                  setState(() => _currentIndex = 0);
-                } else if (authState is AuthInitial) {
-                  setState(() => _currentIndex = 0);
+                setState(() => _currentIndex = 0);
+                if (authState is AuthInitial) {
                   context.go('/');
                 }
               },

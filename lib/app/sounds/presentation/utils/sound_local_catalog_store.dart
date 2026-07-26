@@ -11,6 +11,26 @@ class SoundLocalCatalogStore {
   static const _recentKey = 'sound_picker_recent_v1';
   static const _maxRecent = 40;
 
+  static final Map<String, SoundEntity> _memoryCache = {};
+
+  static void cacheSound(SoundEntity sound) {
+    if (sound.id.trim().isNotEmpty) {
+      _memoryCache[sound.id.trim()] = sound;
+    }
+  }
+
+  static void cacheAll(Iterable<SoundEntity> sounds) {
+    for (final s in sounds) {
+      cacheSound(s);
+    }
+  }
+
+  static SoundEntity? findCached(String soundId) {
+    final id = soundId.trim();
+    if (id.isEmpty) return null;
+    return _memoryCache[id];
+  }
+
   static Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   static Future<List<SoundEntity>> listFavorites() async {
@@ -68,7 +88,9 @@ class SoundLocalCatalogStore {
       try {
         final map = jsonDecode(item);
         if (map is Map) {
-          out.add(SoundEntity.fromJson(Map<String, dynamic>.from(map)));
+          final sound = SoundEntity.fromJson(Map<String, dynamic>.from(map));
+          cacheSound(sound);
+          out.add(sound);
         }
       } catch (_) {
         // Skip corrupt entries.

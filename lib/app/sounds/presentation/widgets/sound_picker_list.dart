@@ -18,6 +18,7 @@ class SoundPickerList extends StatelessWidget {
     required this.showError,
     required this.onRetry,
     required this.onSoundTap,
+    this.onUseTap,
     required this.onScissorsTap,
     required this.onFavoriteTap,
     this.scrollController,
@@ -31,6 +32,7 @@ class SoundPickerList extends StatelessWidget {
   final bool showError;
   final VoidCallback onRetry;
   final ValueChanged<SoundEntity> onSoundTap;
+  final ValueChanged<SoundEntity>? onUseTap;
   final ValueChanged<SoundEntity> onScissorsTap;
   final ValueChanged<SoundEntity> onFavoriteTap;
   final ScrollController? scrollController;
@@ -116,6 +118,7 @@ class SoundPickerList extends StatelessWidget {
           isSelected: selectedId == sound.id,
           isFavorite: favoriteIds.contains(sound.id),
           onTap: () => onSoundTap(sound),
+          onUseTap: onUseTap != null ? () => onUseTap!(sound) : null,
           onScissorsTap: () => onScissorsTap(sound),
           onFavoriteTap: () => onFavoriteTap(sound),
         );
