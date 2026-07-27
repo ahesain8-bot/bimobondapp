@@ -128,7 +128,7 @@ class _ChatGiftSheetBodyState extends State<_ChatGiftSheetBody> {
                   children: [
                     Icon(
                       LucideIcons.gift,
-                      size: 40,
+                      size: 52,
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: AppSizes.p12),
@@ -191,6 +191,7 @@ class _ChatGiftSheetBodyState extends State<_ChatGiftSheetBody> {
                                     )
                                   : Icon(
                                       LucideIcons.gift,
+                                      size: 36,
                                       color: theme.colorScheme.primary,
                                     ),
                             ),

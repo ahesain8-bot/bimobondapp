@@ -95,7 +95,7 @@ class _AuctionGiftsSheetBodyState extends State<_AuctionGiftsSheetBody> {
                   const Icon(
                     LucideIcons.gift,
                     color: LiveDetailsLayoutConstants.giftCommentGold,
-                    size: 22,
+                    size: 26,
                   ),
                   const SizedBox(width: AppSizes.p8),
                   Expanded(
@@ -399,11 +399,11 @@ class _GiftThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 40,
-      height: 40,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: LiveDetailsLayoutConstants.giftCommentGold.withValues(
             alpha: 0.4,
@@ -422,7 +422,7 @@ class _GiftThumbnail extends StatelessWidget {
           : const Icon(
               LucideIcons.gift,
               color: LiveDetailsLayoutConstants.giftCommentGold,
-              size: 20,
+              size: 28,
             ),
     );
   }

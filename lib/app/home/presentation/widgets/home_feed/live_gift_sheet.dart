@@ -317,6 +317,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
         setState(() => _busy = false);
         final onSent = widget.onGiftSent;
         Navigator.of(context).pop();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
         onSent?.call(gift);
       },
     );
@@ -459,7 +460,8 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final ordered = _orderedCatalog;
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      clipBehavior: Clip.none,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: LiveDetailsLayoutConstants.giftGridCrossCount,
         mainAxisSpacing: 8,
@@ -637,27 +639,39 @@ class _GiftTile extends StatelessWidget {
     return GestureDetector(
       onTap: onSelect,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
+        clipBehavior: Clip.none,
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFFE2C55).withValues(alpha: 0.22)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          color: isSelected ? const Color(0xFF26262A) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 6, 4, 5),
               child: Column(
                 children: [
-                  // Same icon slot for selected + unselected → stable cell size.
                   Expanded(
                     child: Center(
-                      child: _GiftIcon(
-                        gift: gift,
-                        isSelected: isSelected,
-                        size: 36,
+                      child: Transform.translate(
+                        offset: isSelected ? const Offset(0, -6) : Offset.zero,
+                        child: AnimatedRotation(
+                          turns: isSelected ? (-15 / 360) : 0,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutBack,
+                          child: AnimatedScale(
+                            scale: isSelected ? 1.18 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutBack,
+                            child: _GiftIcon(
+                              gift: gift,
+                              isSelected: isSelected,
+                              size: 70,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -957,7 +971,7 @@ class _GiftIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconSize = size ?? (isSelected ? 32.0 : 28.0);
+    final iconSize = size ?? (isSelected ? 52.0 : 46.0);
     final icon = gift.icon.trim();
     final imageUrl = gift.displayImageUrl ?? icon;
     if (gift.hasNetworkIcon ||
@@ -979,8 +993,11 @@ class _GiftIcon extends StatelessWidget {
         width: iconSize,
         height: iconSize,
         fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            Icon(LucideIcons.gift, size: iconSize * 0.7, color: Colors.white70),
+        errorBuilder: (context, error, stackTrace) => Icon(
+          LucideIcons.gift,
+          size: iconSize * 0.85,
+          color: Colors.white70,
+        ),
       );
     }
     return Text(icon, style: TextStyle(fontSize: iconSize));

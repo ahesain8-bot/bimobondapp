@@ -240,8 +240,8 @@ class _CommentRowState extends State<CommentRow> {
                           const SizedBox(width: 8),
                           SafeNetworkImage(
                             imageUrl: giftImage,
-                            width: 32,
-                            height: 32,
+                            width: 44,
+                            height: 44,
                             fit: BoxFit.contain,
                           ),
                         ],

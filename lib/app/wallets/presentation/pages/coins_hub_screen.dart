@@ -1303,11 +1303,11 @@ class _CoinsInventoryTabState extends State<CoinsInventoryTab> {
             ),
             tileColor: Theme.of(context).cardColor,
             leading: SizedBox(
-              width: 48,
-              height: AppSizes.buttonHeightSm,
+              width: 56,
+              height: 56,
               child: gift != null
                   ? _GiftVisual(gift: gift)
-                  : const Icon(LucideIcons.gift),
+                  : const Icon(LucideIcons.gift, size: 32),
             ),
             title: Text(gift?.name ?? item.giftId),
             subtitle: Text(l10n.coinsVaultOwned),
@@ -1346,6 +1346,6 @@ class _GiftVisual extends StatelessWidget {
       );
     }
 
-    return Center(child: Text(gift.icon, style: const TextStyle(fontSize: 32)));
+    return Center(child: Text(gift.icon, style: const TextStyle(fontSize: 48)));
   }
 }

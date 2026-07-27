@@ -84,7 +84,7 @@ class LiveCommentBubble extends StatelessWidget {
                     ),
                     child: Icon(
                       LucideIcons.gift,
-                      size: 12,
+                      size: 16,
                       color: _giftNameColor,
                     ),
                   ),
@@ -122,8 +122,8 @@ class LiveCommentBubble extends StatelessWidget {
                     ),
                     child: SafeNetworkImage(
                       imageUrl: giftImage,
-                      width: 18,
-                      height: 18,
+                      width: 26,
+                      height: 26,
                       fit: BoxFit.contain,
                     ),
                   ),

@@ -1,11 +1,7 @@
 import 'dart:ui';
 
-import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
-import 'package:bimobondapp/core/utils/locale_format_utils.dart';
-import 'package:bimobondapp/core/utils/media_utils.dart';
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/quick_bid_chip.dart';
@@ -81,7 +77,7 @@ class LiveBiddingInput extends StatelessWidget {
                     child: const Icon(
                       LucideIcons.gift,
                       color: Colors.white,
-                      size: 22,
+                      size: 26,
                     ),
                   ),
                 ),

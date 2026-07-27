@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
@@ -374,9 +374,15 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     String? thumbnailUrl,
     String? senderName,
     String? giftName,
-  }) {
+  }) async {
     final url = animationUrl?.trim();
     if (url == null || url.isEmpty || !mounted) return;
+
+    // Wait until any open bottom sheet or dialog has completely closed.
+    while (mounted && ModalRoute.of(context)?.isCurrent != true) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted) return;
 
     final dedupeKey = '${giftName ?? ''}|${senderName ?? ''}';
     final now = DateTime.now();
@@ -983,8 +989,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   }
 
   Future<void> _refreshAfterGift(GiftEntity gift) async {
-    // Let the gift sheet finish closing before inserting the overlay.
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    // Let the gift sheet finish completely closing before inserting overlay or comment.
+    while (mounted && ModalRoute.of(context)?.isCurrent != true) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
 
     final animationUrl = gift.animationUrl?.trim().isNotEmpty == true

@@ -324,8 +324,8 @@ class ChatGiftMessageWidget extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 88,
-            height: 88,
+            width: 112,
+            height: 112,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isWebp ? Colors.black : null,
@@ -344,14 +344,14 @@ class ChatGiftMessageWidget extends StatelessWidget {
                     color: isWebp ? Colors.black : Colors.transparent,
                     child: SafeNetworkImage(
                       imageUrl: imageUrl,
-                      width: 88,
-                      height: 88,
+                      width: 112,
+                      height: 112,
                       fit: BoxFit.contain,
                     ),
                   )
                 : Icon(
                     LucideIcons.gift,
-                    size: 40,
+                    size: 56,
                     color: isMe ? color : theme.colorScheme.primary,
                   ),
           ),
