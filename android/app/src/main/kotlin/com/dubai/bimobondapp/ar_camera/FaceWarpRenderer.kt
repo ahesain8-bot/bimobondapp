@@ -6,6 +6,7 @@ import android.opengl.EGL14
 import android.opengl.EGLExt
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.util.Log
 import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.os.SystemClock
@@ -138,6 +139,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         program = buildProgram(VERTEX_SHADER, FRAGMENT_SHADER)
+        if (program == 0) reportGlUnusable("bitmap program")
         aPosition = GLES20.glGetAttribLocation(program, "aPosition")
         aTexCoord = GLES20.glGetAttribLocation(program, "aTexCoord")
         uTexture = GLES20.glGetUniformLocation(program, "uTexture")
@@ -185,6 +187,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         )
 
         oesProgram = buildProgram(VERTEX_SHADER, OES_FRAGMENT_SHADER)
+        if (oesProgram == 0) reportGlUnusable("OES program")
         oesAPosition = GLES20.glGetAttribLocation(oesProgram, "aPosition")
         oesATexCoord = GLES20.glGetAttribLocation(oesProgram, "aTexCoord")
         oesUTexture = GLES20.glGetUniformLocation(oesProgram, "uTexture")
@@ -233,9 +236,20 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             try {
                 st.updateTexImage()
                 st.getTransformMatrix(stMatrix)
-            } catch (_: Throwable) {
+            } catch (t: Throwable) {
+                // Silently returning here meant a camera texture the driver
+                // refuses to update looked exactly like "nothing to draw" — a
+                // black preview with no trace anywhere. Count the failures: one
+                // is a transient hiccup, a run of them means this device can't
+                // drive the OES path at all.
+                oesUpdateFailures++
+                Log.e(TAG, "SurfaceTexture.updateTexImage failed (#$oesUpdateFailures)", t)
+                if (oesUpdateFailures >= MAX_OES_UPDATE_FAILURES) {
+                    reportGlUnusable("camera texture updates keep failing")
+                }
                 return
             }
+            oesUpdateFailures = 0
             uploadPendingSkinMask()
             drawOes()
 
@@ -389,6 +403,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         GLES20.glDisableVertexAttribArray(oesAPosition)
         GLES20.glDisableVertexAttribArray(oesATexCoord)
+        probeGlError("OES draw")
     }
 
     @Volatile
@@ -427,6 +442,71 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 } catch (_: Throwable) {
                 }
             }
+        }
+    }
+
+    /**
+     * Tells the rest of the camera that GL cannot render on this device, so it
+     * switches to the plain preview pipeline instead of showing a black screen.
+     * Routed through the watchdog so there is a single place that decides to
+     * degrade, and a single place it can be observed from.
+     */
+    /** Consecutive [android.graphics.SurfaceTexture.updateTexImage] failures. */
+    private var oesUpdateFailures = 0
+
+    private var glErrorProbeCounter = 0
+
+    /**
+     * Periodic GL error check. GL fails silently by design — an invalid draw
+     * leaves an error flag and produces nothing, which is indistinguishable from
+     * a black frame unless someone asks. Probing occasionally (not every frame,
+     * glGetError forces a pipeline sync) means a broken draw shows up in logcat
+     * instead of only as a black screen on a device we don't have.
+     */
+    private fun probeGlError(where: String) {
+        glErrorProbeCounter++
+        if (glErrorProbeCounter % GL_ERROR_PROBE_EVERY != 0) return
+        val error = GLES20.glGetError()
+        if (error != GLES20.GL_NO_ERROR) {
+            Log.e(TAG, "GL error 0x${Integer.toHexString(error)} after $where")
+        }
+    }
+
+    private fun reportGlUnusable(what: String) {
+        Log.e(TAG, "GL unusable on this device ($what) — requesting simple mode")
+        ArCameraWatchdog.reportGlFailure()
+    }
+
+    /**
+     * The EGLConfig the given context was created with, found by matching
+     * EGL_CONFIG_ID against the display's configs.
+     */
+    private fun contextConfig(
+        display: android.opengl.EGLDisplay,
+        context: android.opengl.EGLContext,
+    ): AndroidEglConfig? {
+        return try {
+            val id = IntArray(1)
+            if (!EGL14.eglQueryContext(display, context, EGL14.EGL_CONFIG_ID, id, 0)) {
+                return null
+            }
+            val total = IntArray(1)
+            if (!EGL14.eglGetConfigs(display, null, 0, 0, total, 0) || total[0] <= 0) {
+                return null
+            }
+            val configs = arrayOfNulls<AndroidEglConfig>(total[0])
+            if (!EGL14.eglGetConfigs(display, configs, 0, total[0], total, 0)) {
+                return null
+            }
+            val value = IntArray(1)
+            configs.firstOrNull { cfg ->
+                cfg != null &&
+                    EGL14.eglGetConfigAttrib(display, cfg, EGL14.EGL_CONFIG_ID, value, 0) &&
+                    value[0] == id[0]
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "context config lookup failed", t)
+            null
         }
     }
 
@@ -486,20 +566,45 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         var eglSurf = encoderEglSurface
         if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) {
-            val config = chooseRecordableConfig(eglDisplay) ?: return
+            // Use the CONTEXT'S OWN config, not a freshly chosen one. Choosing
+            // independently produced a config that differed from the one the
+            // GLSurfaceView built its context with, and eglMakeCurrent below then
+            // failed with EGL_BAD_MATCH on every frame on stricter GPUs — the GL
+            // thread stalled and the camera froze / went black. Reusing the
+            // context's config makes a match structural rather than a coincidence.
+            val config = contextConfig(eglDisplay, eglContext)
+                ?: chooseRecordableConfig(eglDisplay)
+                ?: return
             val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
-            eglSurf = EGL14.eglCreateWindowSurface(
-                eglDisplay,
-                config,
-                androidSurface,
-                surfaceAttribs,
-                0,
-            )
+            eglSurf = try {
+                EGL14.eglCreateWindowSurface(
+                    eglDisplay,
+                    config,
+                    androidSurface,
+                    surfaceAttribs,
+                    0,
+                )
+            } catch (t: Throwable) {
+                Log.w(TAG, "encoder EGL surface creation failed", t)
+                null
+            }
             if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) return
             encoderEglSurface = eglSurf
         }
 
-        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurf, eglSurf, eglContext)) return
+        if (!EGL14.eglMakeCurrent(eglDisplay, eglSurf, eglSurf, eglContext)) {
+            // Don't retry a surface the driver refuses — a per-frame failure loop
+            // is what made this so expensive. Drop it and give up on encoding via
+            // GL; the caller's non-GL paths still work.
+            Log.e(
+                TAG,
+                "eglMakeCurrent failed (0x${Integer.toHexString(EGL14.eglGetError())}) " +
+                    "— disabling GL encoder surface",
+            )
+            destroyEncoderEglSurface()
+            encoderAndroidSurface = null
+            return
+        }
         try {
             GLES20.glViewport(0, 0, encW, encH)
             GLES20.glClearColor(0f, 0f, 0f, 1f)
@@ -512,7 +617,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             )
             EGL14.eglSwapBuffers(eglDisplay, eglSurf)
             lastEncoderSwapMs = now
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
+            Log.e(TAG, "encoder frame present failed", t)
         } finally {
             EGL14.eglMakeCurrent(eglDisplay, backupDraw, backupRead, eglContext)
             GLES20.glViewport(
@@ -655,9 +761,29 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
     }
 
-    private fun ensureCaptureFbo(w: Int, h: Int) {
-        if (captureFboId != 0 && captureFboW == w && captureFboH == h) return
+    /**
+     * Builds the offscreen framebuffer used to read captured frames back.
+     * Returns false when the driver won't give us a usable one.
+     *
+     * That check is the point. This used to bind whatever came out of
+     * glGenFramebuffers and draw into it regardless, so an incomplete FBO
+     * produced a stream of GL_INVALID_FRAMEBUFFER_OPERATION and captured
+     * nothing — no photo, no recorded frame, and no error the app could act on.
+     */
+    private fun ensureCaptureFbo(w: Int, h: Int): Boolean {
+        if (captureFboId != 0 && captureFboW == w && captureFboH == h) return true
         releaseCaptureFbo()
+
+        // A texture larger than the driver allows is one way to end up with an
+        // incomplete framebuffer, and the limit varies widely between GPUs.
+        val maxTex = IntArray(1)
+        GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTex, 0)
+        val limit = maxTex[0].takeIf { it > 0 } ?: 2048
+        if (w > limit || h > limit) {
+            Log.e(TAG, "capture size ${w}x$h exceeds GL_MAX_TEXTURE_SIZE ($limit)")
+            return false
+        }
+
         val tex = IntArray(1)
         GLES20.glGenTextures(1, tex, 0)
         captureFboTexId = tex[0]
@@ -688,9 +814,21 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             captureFboTexId,
             0,
         )
+        val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+            Log.e(
+                TAG,
+                "capture framebuffer incomplete (0x${Integer.toHexString(status)}) " +
+                    "at ${w}x$h",
+            )
+            releaseCaptureFbo()
+            return false
+        }
+
         captureFboW = w
         captureFboH = h
+        return true
     }
 
     private fun releaseCaptureFbo() {
@@ -821,14 +959,20 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             val s = maxEdge.toFloat() / largest
             readW = ((screenW * s).toInt() and 1.inv()).coerceAtLeast(2)
             readH = ((screenH * s).toInt() and 1.inv()).coerceAtLeast(2)
-            ensureCaptureFbo(readW, readH)
+            if (!ensureCaptureFbo(readW, readH)) {
+                // No usable framebuffer here — skip the readback rather than draw
+                // into an incomplete one and "capture" nothing. Callers already
+                // fall back (photos go to hardware ImageCapture).
+                return
+            }
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, captureFboId)
             GLES20.glViewport(0, 0, readW, readH)
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             try {
                 redraw!!()
-            } catch (_: Throwable) {
+            } catch (t: Throwable) {
+                Log.e(TAG, "capture redraw failed", t)
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
                 GLES20.glViewport(screenX, screenY, screenW, screenH)
                 return
@@ -956,34 +1100,70 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         bitmap.recycle()
     }
 
+    /**
+     * Returns 0 when the program could not be built.
+     *
+     * This used to log the failure and hand back the broken program id anyway.
+     * That is a quiet way to produce a black screen on exactly the devices we
+     * can't test: GLSL compilers differ per GPU vendor, and a shader this size
+     * (the OES one carries the skin mask, surface blur, temporal denoise and the
+     * whole retouch block) is a realistic candidate for compiling on one vendor
+     * and failing on another. With a broken id the renderer carried on drawing
+     * nothing, with no error anywhere but logcat. Now the caller can see it and
+     * fall back.
+     */
     private fun buildProgram(vertexSource: String, fragmentSource: String): Int {
         val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, vertexSource)
         val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource)
+        if (vertexShader == 0 || fragmentShader == 0) {
+            if (vertexShader != 0) GLES20.glDeleteShader(vertexShader)
+            if (fragmentShader != 0) GLES20.glDeleteShader(fragmentShader)
+            return 0
+        }
+
         val program = GLES20.glCreateProgram()
+        if (program == 0) {
+            Log.e(TAG, "glCreateProgram failed")
+            GLES20.glDeleteShader(vertexShader)
+            GLES20.glDeleteShader(fragmentShader)
+            return 0
+        }
         GLES20.glAttachShader(program, vertexShader)
         GLES20.glAttachShader(program, fragmentShader)
         GLES20.glLinkProgram(program)
 
         val linkStatus = IntArray(1)
         GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
-        if (linkStatus[0] != GLES20.GL_TRUE) {
-            android.util.Log.e(TAG, "Program link failed: ${GLES20.glGetProgramInfoLog(program)}")
-        }
-
         GLES20.glDeleteShader(vertexShader)
         GLES20.glDeleteShader(fragmentShader)
+
+        if (linkStatus[0] != GLES20.GL_TRUE) {
+            Log.e(TAG, "program link failed: ${GLES20.glGetProgramInfoLog(program)}")
+            GLES20.glDeleteProgram(program)
+            return 0
+        }
         return program
     }
 
+    /** Returns 0 when the shader could not be compiled — see [buildProgram]. */
     private fun compileShader(type: Int, source: String): Int {
         val shader = GLES20.glCreateShader(type)
+        if (shader == 0) {
+            Log.e(TAG, "glCreateShader failed for type $type")
+            return 0
+        }
         GLES20.glShaderSource(shader, source)
         GLES20.glCompileShader(shader)
 
         val status = IntArray(1)
         GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0)
         if (status[0] != GLES20.GL_TRUE) {
-            android.util.Log.e(TAG, "Shader compile failed: ${GLES20.glGetShaderInfoLog(shader)}")
+            Log.e(
+                TAG,
+                "shader compile failed (type=$type): ${GLES20.glGetShaderInfoLog(shader)}",
+            )
+            GLES20.glDeleteShader(shader)
+            return 0
         }
         return shader
     }
@@ -1021,6 +1201,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     companion object {
         private const val TAG = "FaceWarpRenderer"
+
+        /** Consecutive camera-texture update failures before giving up on GL. */
+        private const val MAX_OES_UPDATE_FAILURES = 30
+
+        /** glGetError forces a sync, so only probe every Nth frame. */
+        private const val GL_ERROR_PROBE_EVERY = 60
 
         // Skin-smooth strength and lip-tint color/strength are no longer fixed
         // constants — they come from LiveBeautyState, driven by the named

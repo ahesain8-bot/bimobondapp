@@ -778,7 +778,40 @@ object ArCameraBridge {
         preview.scaleX = 1f
     }
 
+    /**
+     * Forces the UI into the plainest possible state: GL view gone, overlays
+     * hidden, PreviewView showing. Called when [ArCameraWatchdog] gives up on
+     * the full pipeline — see ArCameraController.enterSimpleMode.
+     */
+    fun forceSimplePreview() {
+        clearApplyingOverlay()
+        clearFreezeOverlay()
+        clearRebindCover()
+        awaitFirstGlFrame = false
+        oesTransitionPending = false
+        oesSurfaceLive = false
+        try {
+            confettiOverlay?.cancelAnimation()
+        } catch (_: Throwable) {
+        }
+        confettiOverlay?.visibility = View.GONE
+        faceOverlay?.resetForNonPngFilter()
+        faceOverlay?.visibility = View.GONE
+        warpGlView?.setOesEnabled(false)
+        warpGlView?.setCaptureEnabled(false)
+        warpGlView?.visibility = View.GONE
+        previewView?.visibility = View.VISIBLE
+        previewView?.bringToFront()
+    }
+
     private fun applyRenderMode(type: FilterType) {
+        // Once the watchdog has degraded the pipeline, every filter renders as
+        // plain preview — re-enabling GL or overlays here would walk straight
+        // back into whatever stalled the camera in the first place.
+        if (ArCameraWatchdog.degraded) {
+            forceSimplePreview()
+            return
+        }
         val useShader = type.useShader()
         val usePngUnderlay = type.isPngOverlay()
         val useScreenOverlay = type.isScreenOverlay()

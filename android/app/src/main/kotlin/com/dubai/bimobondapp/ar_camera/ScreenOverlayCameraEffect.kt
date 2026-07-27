@@ -11,6 +11,7 @@ import android.graphics.RectF
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
+import android.util.Log
 import androidx.camera.core.CameraEffect
 import androidx.camera.effects.OverlayEffect
 import com.airbnb.lottie.LottieComposition
@@ -89,6 +90,34 @@ class ScreenOverlayCameraEffect {
         const val FRAME_DELTA_SMOOTHING = 0.15f
 
         /**
+         * Frame interval above which the device is considered to be struggling.
+         * The recorder targets 30fps (33ms); past this the pipeline is clearly
+         * not keeping up.
+         */
+        const val SLOW_FRAME_THRESHOLD_MS = 45f
+
+        /** Interval below which it is comfortably keeping up again. */
+        const val FAST_FRAME_THRESHOLD_MS = 36f
+
+        /**
+         * How many encoded frames to skip between overlay updates, per level.
+         * 0 = update every frame (best looking), 2 = every third frame.
+         *
+         * Updating the overlay means handing CameraX a fresh canvas, and CameraX
+         * blocks its video GL thread until that canvas round-trips (up to 30ms).
+         * On a capable phone that is affordable every frame; on a slower one the
+         * same cost stalls camera frame delivery outright, which is what showed
+         * up as the preview freezing during overlay recording. Backing off trades
+         * a little overlay smoothness for a pipeline that keeps moving.
+         */
+        val SKIP_LEVELS = intArrayOf(0, 1, 2)
+
+        /** Consecutive slow/fast frames before changing level — avoids flapping. */
+        const val LEVEL_CHANGE_STREAK = 12
+
+        const val TAG = "ArScreenOverlay"
+
+        /**
          * Long-edge cap for the offscreen Lottie raster.
          *
          * Was briefly raised to 1080 to match FHD recording, but rasterizing
@@ -149,6 +178,14 @@ class ScreenOverlayCameraEffect {
 
     /** Timestamp of the previous encoded frame, for measuring the interval. */
     private var lastFrameTimestampNs = 0L
+
+    /** Index into [SKIP_LEVELS]; raised when the device can't keep up. */
+    private var skipLevel = 0
+    private var slowStreak = 0
+    private var fastStreak = 0
+
+    /** Frames seen since the last overlay update, for the current skip level. */
+    private var framesSinceUpdate = 0
 
     /** Rastered frames the encoder has actually blitted. */
     private val consumedSeq = AtomicLong(0)
@@ -219,6 +256,17 @@ class ScreenOverlayCameraEffect {
                 bitmap = readyBitmap
                 seq = readySeq
             }
+            // Skip level: leave the canvas alone on skipped frames so CameraX
+            // reuses the last overlay texture and does no blocking post at all.
+            val skip = SKIP_LEVELS[skipLevel]
+            if (skip > 0) {
+                if (framesSinceUpdate < skip) {
+                    framesSinceUpdate++
+                    return@setOnDrawListener true
+                }
+                framesSinceUpdate = 0
+            }
+
             val ready = bitmap
             if (ready == null || ready.isRecycled || seq == blittedSeq) {
                 // Nothing new to show. Deliberately does NOT touch
@@ -268,6 +316,35 @@ class ScreenOverlayCameraEffect {
         if (deltaMs < MIN_FRAME_DELTA_MS || deltaMs > MAX_FRAME_DELTA_MS) return
         measuredFrameDeltaMs +=
             (deltaMs - measuredFrameDeltaMs) * FRAME_DELTA_SMOOTHING
+        adaptSkipLevel(measuredFrameDeltaMs)
+    }
+
+    /**
+     * Raises or lowers how often the overlay is refreshed based on how fast
+     * frames are actually arriving. Both directions need a streak so a couple of
+     * slow frames don't visibly change the overlay's pace.
+     */
+    private fun adaptSkipLevel(avgDeltaMs: Float) {
+        if (avgDeltaMs > SLOW_FRAME_THRESHOLD_MS) {
+            fastStreak = 0
+            slowStreak++
+            if (slowStreak >= LEVEL_CHANGE_STREAK && skipLevel < SKIP_LEVELS.lastIndex) {
+                skipLevel++
+                slowStreak = 0
+                Log.i(TAG, "overlay backing off: skip=${SKIP_LEVELS[skipLevel]} avg=${avgDeltaMs}ms")
+            }
+        } else if (avgDeltaMs < FAST_FRAME_THRESHOLD_MS) {
+            slowStreak = 0
+            fastStreak++
+            if (fastStreak >= LEVEL_CHANGE_STREAK && skipLevel > 0) {
+                skipLevel--
+                fastStreak = 0
+                Log.i(TAG, "overlay recovering: skip=${SKIP_LEVELS[skipLevel]} avg=${avgDeltaMs}ms")
+            }
+        } else {
+            slowStreak = 0
+            fastStreak = 0
+        }
     }
 
     // ---------------------------------------------------------------- raster
@@ -407,6 +484,10 @@ class ScreenOverlayCameraEffect {
         animationTimeMs = 0f
         measuredFrameDeltaMs = NOMINAL_FRAME_DELTA_MS
         lastFrameTimestampNs = 0L
+        skipLevel = 0
+        slowStreak = 0
+        fastStreak = 0
+        framesSinceUpdate = 0
         // Dropped rather than recycled: quitSafely() is asynchronous and the GL
         // thread may still hold a blit against one of these. GC is the safe owner.
         drawable = null

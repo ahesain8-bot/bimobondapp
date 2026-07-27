@@ -149,6 +149,14 @@ object ArCameraController {
      */
     private const val PHOTO_JPEG_QUALITY = 96
 
+    /**
+     * Still-capture target used when several streams are already bound — see
+     * [buildImageCapture]'s allowFullSensor. Roughly 6MP: comfortably supported
+     * everywhere, and these captures get an overlay composited onto them anyway.
+     */
+    private const val PHOTO_FALLBACK_WIDTH = 2160
+    private const val PHOTO_FALLBACK_HEIGHT = 2880
+
     /** Fallback quality for the emergency/degraded save paths. */
     private const val INSTANT_JPEG_QUALITY = 90
 
@@ -339,6 +347,10 @@ object ArCameraController {
         }
         stickerCameraOverlay = StickerCameraOverlay(activity.applicationContext)
         screenOverlayCameraEffect = ScreenOverlayCameraEffect()
+
+        ArCameraWatchdog.reset()
+        ArCameraWatchdog.onDegrade = { enterSimpleMode() }
+        ArCameraWatchdog.isPaused = { isRecordingActive() || previewSuspended }
 
         warmVideoEncoder()
 
@@ -532,8 +544,15 @@ object ArCameraController {
         }
     }
 
+    /**
+     * True when the watchdog has given up on the full pipeline for this session
+     * — see [ArCameraWatchdog]. Everything that adds a stream, a GL surface or an
+     * effect checks this and stays out.
+     */
+    private fun inSimpleMode(): Boolean = ArCameraWatchdog.degraded
+
     private fun needsAnalysisUseCase(filter: FilterType): Boolean =
-        filter.isDistortion() || filter.isPngOverlay()
+        !inSimpleMode() && (filter.isDistortion() || filter.isPngOverlay())
 
     /**
      * Filters whose recording runs through the hardware [VideoCapture] pipeline
@@ -550,10 +569,48 @@ object ArCameraController {
      * same binding that records, so framing can't shift when recording starts.
      */
     private fun needsVideoUseCase(filter: FilterType): Boolean =
-        filter.isPngOverlay() || filter.isScreenOverlay()
+        !inSimpleMode() && (filter.isPngOverlay() || filter.isScreenOverlay())
+
+    /**
+     * Cached answer to "can this device comfortably run the demanding camera
+     * configuration?" Resolved once per session from the camera's own reported
+     * hardware level, so nothing here is guessed per device model.
+     *
+     * Everything the AR camera does at full strength — a full-sensor still
+     * alongside a 1080p video stream and a GL effect node — needs a camera that
+     * supports several concurrent streams. LEGACY and LIMITED devices do not, and
+     * CameraX's bind fails and falls back to preview-only; the user sees that as
+     * the camera freezing or going black. Asking for less on those devices means
+     * they get a working camera at lower quality instead.
+     */
+    @Volatile
+    private var deviceIsHighCapability: Boolean? = null
+
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun isHighCapabilityDevice(info: CameraInfo): Boolean {
+        deviceIsHighCapability?.let { return it }
+        val level = try {
+            Camera2CameraInfo.from(info).getCameraCharacteristic(
+                CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL,
+            )
+        } catch (t: Throwable) {
+            null
+        }
+        // FULL / LEVEL_3 guarantee the multi-stream combinations we rely on.
+        // Anything else (or an unknown level) is treated as constrained — the
+        // safe assumption, since the cost of being wrong is a broken camera.
+        val high = level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL ||
+            level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3
+        deviceIsHighCapability = high
+        Log.i(PREVIEW_QUALITY_TAG, "camera hardware level=$level highCapability=$high")
+        return high
+    }
 
     fun stop() {
         abortCapture()
+        ArCameraWatchdog.onDegrade = null
+        ArCameraWatchdog.isPaused = null
+        ArCameraWatchdog.reset()
         started = false
         previewSuspended = false
         boundToOes = false
@@ -2330,12 +2387,32 @@ object ArCameraController {
      *   CameraX's own intermediate JPEG quality to 100, so decoding and
      *   re-encoding the frame to composite overlays no longer stacks two lossy
      *   passes. Costs a few hundred ms of shutter latency.
-     * - HIGHEST_AVAILABLE_STRATEGY instead of the old fixed 2160x2880 target,
-     *   which was pinning captures near 6MP on sensors that can do far more.
-     *   4:3 is requested because that is the sensor's native aspect on virtually
-     *   every phone — anything else is a crop of it.
+     * - A high resolution target instead of the old fixed 2160x2880, which was
+     *   pinning captures near 6MP on sensors that can do far more. 4:3 is
+     *   requested because that is the sensor's native aspect on virtually every
+     *   phone — anything else is a crop of it.
+     *
+     * [allowFullSensor] exists because those two settings are not free. A
+     * full-sensor still plus MAXIMIZE_QUALITY is a large surface and a demanding
+     * stream combination; on capable phones it binds fine, on weaker ones the
+     * whole bind fails and the fallback chain drops to preview-only, which the
+     * user sees as the camera freezing or going black. So it is only requested
+     * where few streams are in play. When several are (stickers and overlays bind
+     * Preview + Analysis + Capture + Video + an effect), this asks for a bounded
+     * target and lets CameraX pick something the device can actually service.
      */
-    private fun buildImageCapture(displayRotation: Int): ImageCapture {
+    private fun buildImageCapture(
+        displayRotation: Int,
+        allowFullSensor: Boolean,
+    ): ImageCapture {
+        val resolutionStrategy = if (allowFullSensor) {
+            ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY
+        } else {
+            ResolutionStrategy(
+                Size(PHOTO_FALLBACK_WIDTH, PHOTO_FALLBACK_HEIGHT),
+                ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
+            )
+        }
         val resolutionSelector = ResolutionSelector.Builder()
             .setAspectRatioStrategy(
                 AspectRatioStrategy(
@@ -2343,11 +2420,17 @@ object ArCameraController {
                     AspectRatioStrategy.FALLBACK_RULE_AUTO,
                 ),
             )
-            .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+            .setResolutionStrategy(resolutionStrategy)
             .build()
 
         return ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setCaptureMode(
+                if (allowFullSensor) {
+                    ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
+                } else {
+                    ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
+                },
+            )
             .setResolutionSelector(resolutionSelector)
             .setTargetRotation(displayRotation)
             .build()
@@ -2668,6 +2751,7 @@ object ArCameraController {
     }
 
     private fun onOesFramePresented() {
+        ArCameraWatchdog.onFrame()
         ArCameraBridge.onGlFramePresented()
         warmOesPhotoCaptureIfNeeded()
 
@@ -2680,6 +2764,35 @@ object ArCameraController {
 
     fun setPreferOesBinding(prefer: Boolean) {
         preferOesBinding = prefer
+    }
+
+    /**
+     * Tears the fancy pipeline down and rebinds the camera as plainly as
+     * possible: no OES/GL preview, no effects, no extra streams — just CameraX
+     * driving the PreviewView, which is the one configuration every Android
+     * device supports.
+     *
+     * Invoked by [ArCameraWatchdog] when frames stop arriving. Filters stop
+     * working from here on, and that is the intended trade: a plain but live
+     * camera beats a frozen one with features.
+     */
+    private fun enterSimpleMode() {
+        if (!started) return
+        Log.w(PREVIEW_QUALITY_TAG, "entering simple mode — rebinding plain preview")
+        val activity = ArCameraBridge.hostActivity ?: return
+        activity.runOnUiThread {
+            try {
+                ArCameraBridge.forceSimplePreview()
+            } catch (t: Throwable) {
+                Log.e(PREVIEW_QUALITY_TAG, "simple-mode UI switch failed", t)
+            }
+            preferOesBinding = false
+            preferVideoBinding = false
+            preferCaptureBinding = false
+            boundToOes = false
+            rebindPosted = false
+            forcePreviewViewRebind()
+        }
     }
 
     fun canRebindCamera(): Boolean = started && !isRecordingActive() && !previewSuspended
@@ -2901,7 +3014,12 @@ object ArCameraController {
             val preview = buildLivePreview(displayRotation, cameraProvider)
 
             val glView = ArCameraBridge.warpGlView
-            val useOes = preferOesBinding &&
+            // Simple mode never binds the camera into the GL/OES pipeline — that
+            // is the path with the most moving parts (a second EGL surface, an
+            // encoder surface, shaders) and therefore the most ways for an
+            // unfamiliar driver to stall it.
+            val useOes = !inSimpleMode() &&
+                preferOesBinding &&
                 glView != null &&
                 glView.cameraSurfaceTexture() != null
 
@@ -2935,6 +3053,10 @@ object ArCameraController {
             fun applyTorchAfterBind(bound: Camera?) {
                 camera = bound
                 if (bound == null) return
+                // Restarts the stall timer. Only the OES/GL path reports frames
+                // individually, so only that path can be watched for stalls —
+                // see ArCameraWatchdog.onCameraBound.
+                ArCameraWatchdog.onCameraBound(hasPerFrameSignal = useOes)
                 applyPreviewLook(bound)
                 applyFrontZoomOut(bound)
                 if (ArCameraBridge.isFrontCamera) {
@@ -2960,7 +3082,18 @@ object ArCameraController {
                 glView.setOesEnabled(true)
                 glView.setOnFramePresented { onOesFramePresented() }
                 bindPreviewToOes(preview, glView, activity)
-                val capture = buildImageCapture(displayRotation)
+                // OES path: Preview + Capture (+ a small skin-mask analysis).
+                // Few enough streams to ask for the sensor's best — where the
+                // device can service it.
+                val oesCameraInfo = try {
+                    selector.filter(cameraProvider.availableCameraInfos).firstOrNull()
+                } catch (_: Throwable) {
+                    null
+                }
+                val capture = buildImageCapture(
+                    displayRotation,
+                    allowFullSensor = oesCameraInfo?.let { isHighCapabilityDevice(it) } ?: false,
+                )
                 imageCapture = capture
 
                 // Normal Mode only — small background analysis stream feeding the
@@ -2968,7 +3101,9 @@ object ArCameraController {
                 // buildFaceSkinMaskBitmap). Attempted first; if this 3rd concurrent
                 // stream isn't supported on a given device, the catch block below
                 // falls back to the proven 2-stream (Preview + ImageCapture) bind.
-                val wantSkinMask = ArCameraBridge.currentFilter == FilterType.NONE
+                // Third concurrent stream — only where the camera guarantees it.
+                val wantSkinMask = ArCameraBridge.currentFilter == FilterType.NONE &&
+                    (oesCameraInfo?.let { isHighCapabilityDevice(it) } ?: false)
                 val skinMaskAnalysis = if (wantSkinMask) {
                     ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -3069,8 +3204,22 @@ object ArCameraController {
             val needVideo = preferVideoBinding || needsVideoUseCase(filter)
             // Normal idle: Preview ONLY. Capture binds on shutter; Analysis on effects; Video on record.
             val needCapture = preferCaptureBinding || needAnalysis || needVideo
+            val boundCameraInfo = try {
+                selector.filter(cameraProvider.availableCameraInfos).firstOrNull()
+            } catch (_: Throwable) {
+                null
+            }
+            val highCapability = boundCameraInfo?.let { isHighCapabilityDevice(it) } ?: false
+
             val capture = if (needCapture) {
-                buildImageCapture(displayRotation).also { imageCapture = it }
+                // Full sensor only when nothing else is competing for the camera
+                // AND the device can take it; sticker/overlay binds add Analysis
+                // + Video + an effect on top.
+                val heavyBind = needAnalysis || needVideo
+                buildImageCapture(
+                    displayRotation,
+                    allowFullSensor = !heavyBind && highCapability,
+                ).also { imageCapture = it }
             } else {
                 imageCapture = null
                 null
@@ -3101,11 +3250,19 @@ object ArCameraController {
                 // writes and reads as soft/noisy on a 1080p+ screen. 4K is left out
                 // deliberately — it would have to go through the same GL effect node
                 // as the overlay filters.
+                // FHD only where the device can service it alongside everything
+                // else; constrained devices start at HD so the bind succeeds
+                // rather than failing into preview-only.
+                val preferred = if (highCapability) {
+                    listOf(Quality.FHD, Quality.HD, Quality.SD)
+                } else {
+                    listOf(Quality.HD, Quality.SD)
+                }
                 val recorder = Recorder.Builder()
                     .setQualitySelector(
                         QualitySelector.fromOrderedList(
-                            listOf(Quality.FHD, Quality.HD, Quality.SD),
-                            FallbackStrategy.lowerQualityOrHigherThan(Quality.HD),
+                            preferred,
+                            FallbackStrategy.lowerQualityOrHigherThan(Quality.SD),
                         ),
                     )
                     .build()
@@ -3128,7 +3285,9 @@ object ArCameraController {
                     val useAnalysis = withAnalysis && analysis != null
                     val useVideo = withVideo && hwVideo != null
                     val useCapture = withCapture && capture != null
-                    if (withPngEffect && useAnalysis && useVideo && useCapture && pngFast) {
+                    if (withPngEffect && useAnalysis && useVideo && useCapture && pngFast &&
+                        !inSimpleMode()
+                    ) {
                         val overlay = stickerCameraOverlay ?: StickerCameraOverlay(
                             activity.applicationContext,
                         ).also { stickerCameraOverlay = it }
@@ -3180,7 +3339,7 @@ object ArCameraController {
                         // (VIDEO_CAPTURE target only, so Preview/ImageCapture are
                         // untouched). Needs a UseCaseGroup, so when there's no
                         // ViewPort to build one around we still make one here.
-                        val screenEffect = if (withScreenEffect && useVideo) {
+                        val screenEffect = if (withScreenEffect && useVideo && !inSimpleMode()) {
                             val overlay = screenOverlayCameraEffect
                                 ?: ScreenOverlayCameraEffect().also {
                                     screenOverlayCameraEffect = it

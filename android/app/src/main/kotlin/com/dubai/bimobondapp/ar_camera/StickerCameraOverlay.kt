@@ -5,12 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.RectF
 import android.os.Handler
 import android.os.HandlerThread
-import android.util.Size
 import android.util.SparseArray
 import androidx.camera.core.CameraEffect
 import androidx.camera.effects.OverlayEffect
@@ -81,17 +81,45 @@ class StickerCameraOverlay(private val appContext: Context) {
             val imgW = imageWidth
             val imgH = imageHeight
             if (!filter.isPngOverlay() || snap == null || imgW <= 0 || imgH <= 0) {
-                return@setOnDrawListener false
+                // TRUE, not false. The return value tells CameraX whether to keep
+                // the VIDEO FRAME — returning false here dropped a frame from the
+                // recording every time a face wasn't detected, so any moment the
+                // subject looked away came out stuttering. Nothing needs to be
+                // drawn; leaving the canvas untouched makes CameraX reuse the last
+                // overlay texture, which is what "no update" should mean.
+                return@setOnDrawListener true
             }
             val canvas = frame.overlayCanvas
             canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-            val size: Size = frame.size
+
+            // The overlay canvas is the raw camera buffer: crop, rotation and
+            // mirroring are applied downstream to the composite, so stickers have
+            // to be drawn pre-transformed or they come out rotated relative to the
+            // footage. Same reasoning (and the same geometry) as
+            // ScreenOverlayCameraEffect.applyOutputToBufferTransform.
+            val cropRect = frame.cropRect
+            val rotation = ((frame.rotationDegrees % 360) + 360) % 360
+            val quarterTurn = rotation == 90 || rotation == 270
+            val outW = if (quarterTurn) cropRect.height() else cropRect.width()
+            val outH = if (quarterTurn) cropRect.width() else cropRect.height()
+            if (outW <= 0 || outH <= 0) return@setOnDrawListener true
+
+            canvas.save()
+            canvas.translate(cropRect.left.toFloat(), cropRect.top.toFloat())
+            if (rotation != 0) {
+                val m = Matrix()
+                m.postRotate(-rotation.toFloat())
+                val bounds = RectF(0f, 0f, outW.toFloat(), outH.toFloat())
+                m.mapRect(bounds)
+                m.postTranslate(-bounds.left, -bounds.top)
+                canvas.concat(m)
+            }
             drawStickers(
                 canvas = canvas,
                 snapshot = snap,
                 filter = filter,
-                destW = size.width,
-                destH = size.height,
+                destW = outW,
+                destH = outH,
                 imgW = imgW,
                 imgH = imgH,
                 // Confirmed on-device: the sticker ends up moving opposite to the
@@ -101,8 +129,11 @@ class StickerCameraOverlay(private val appContext: Context) {
                 // raw analysis space here left the sticker unmirrored relative to
                 // the already-mirrored base frame. Mirroring it here too aligns
                 // both.
-                mirrorX = true,
+                // Mirroring is applied downstream too, so pre-mirror here to
+                // cancel it — confirmed on-device when this effect was written.
+                mirrorX = frame.isMirroring,
             )
+            canvas.restore()
             true
         }
         overlayEffect = effect
