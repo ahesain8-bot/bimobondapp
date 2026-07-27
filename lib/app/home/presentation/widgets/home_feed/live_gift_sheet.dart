@@ -24,7 +24,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 typedef OnGiftSentCallback = void Function(GiftEntity gift);
 
-enum _GiftSheetTab { gifts, songs, interactive }
+enum _GiftSheetTab { gifts }
 
 String shortGiftName(String name) {
   const maxLen = LiveDetailsLayoutConstants.giftNameMaxLength;
@@ -397,22 +397,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   }
 
   Widget _buildTabBody(AppLocalizations l10n) {
-    switch (_tab) {
-      case _GiftSheetTab.gifts:
-        return _buildGrid(l10n);
-      case _GiftSheetTab.songs:
-      case _GiftSheetTab.interactive:
-        return Center(
-          child: Text(
-            l10n.liveGiftTabComingSoon,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        );
-    }
+    return _buildGrid(l10n);
   }
 
   Widget _buildGrid(AppLocalizations l10n) {
@@ -825,18 +810,8 @@ class _BottomBar extends StatelessWidget {
               children: [
                 _TabChip(
                   label: l10n.liveGiftTabGifts,
-                  selected: tab == _GiftSheetTab.gifts,
-                  onTap: () => onTabChanged(_GiftSheetTab.gifts),
-                ),
-                _TabChip(
-                  label: l10n.liveGiftTabSongs,
-                  selected: tab == _GiftSheetTab.songs,
-                  onTap: () => onTabChanged(_GiftSheetTab.songs),
-                ),
-                _TabChip(
-                  label: l10n.liveGiftTabInteractive,
-                  selected: tab == _GiftSheetTab.interactive,
-                  onTap: () => onTabChanged(_GiftSheetTab.interactive),
+                  selected: true,
+                  onTap: () {},
                 ),
               ],
             ),
