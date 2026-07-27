@@ -625,15 +625,15 @@ class _GiftTile extends StatelessWidget {
   final VoidCallback? onSend;
 
   static const double _footerSlotHeight = 24;
-  static const double _metaSlotHeight = 16;
+  static const double _metaSlotHeight = 18;
 
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
     final priceStyle = TextStyle(
-      color: Colors.white.withValues(alpha: isSelected ? 0.9 : 0.55),
-      fontSize: 10,
-      fontWeight: FontWeight.w600,
+      color: Colors.white.withValues(alpha: isSelected ? 0.95 : 0.75),
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
     );
 
     return GestureDetector(
@@ -680,8 +680,8 @@ class _GiftTile extends StatelessWidget {
                     child: Center(
                       child: isSelected
                           ? AppCoinAmount(
-                              iconSize: 10,
-                              spacing: 2,
+                              iconSize: 13,
+                              spacing: 3,
                               text: gift.priceCoinsLabel(locale),
                               style: priceStyle,
                             )
@@ -738,8 +738,8 @@ class _GiftTile extends StatelessWidget {
                           )
                         : Center(
                             child: AppCoinAmount(
-                              iconSize: 10,
-                              spacing: 2,
+                              iconSize: 13,
+                              spacing: 3,
                               text: gift.priceCoinsLabel(locale),
                               style: priceStyle,
                             ),
