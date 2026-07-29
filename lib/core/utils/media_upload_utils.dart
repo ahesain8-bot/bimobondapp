@@ -1,16 +1,18 @@
 import 'dart:io';
 
 import 'package:bimobondapp/core/utils/image_compress_utils.dart';
-import 'package:bimobondapp/core/utils/video_compress_utils.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 
 class MediaUploadUtils {
   MediaUploadUtils._();
 
-  /// Compresses images and videos before upload when possible.
+  /// Images are compressed for upload. Videos are already encoded by the
+  /// camera/editor pipeline at their final resolution and bitrate, so upload
+  /// the exact file. Recompressing here used the compressor's default 720p
+  /// preset and visibly reduced post quality.
   static Future<File> prepareForUpload(File file) async {
     if (VideoThumbnailUtils.isVideoFile(file)) {
-      return VideoCompressUtils.compressIfNeeded(file);
+      return file;
     }
     if (ImageCompressUtils.isImageFile(file)) {
       return ImageCompressUtils.compressIfNeeded(file);

@@ -554,19 +554,20 @@ class ArFilteredVideoRecorder {
             FRAME_RATE
         }.coerceAtLeast(1)
 
-        // ~0.2 bits per pixel per frame is the usual rule of thumb for clean
-        // H.264, then clamped into the encoder's own supported bitrate range —
+        // ~0.3 bits per pixel per frame keeps gradients, skin texture and
+        // high-frequency beauty output clean through a later social upload.
+        // Clamp into the encoder's own supported bitrate range —
         // asking for more than it advertises is what corrupted the output.
-        val desired = width.toLong() * height.toLong() * frameRate * 2 / 10
+        val desired = width.toLong() * height.toLong() * frameRate * 3 / 10
         val bitRate = try {
             val range = video?.bitrateRange
             if (range != null) {
                 desired.coerceIn(range.lower.toLong(), range.upper.toLong())
             } else {
-                desired.coerceIn(2_000_000L, 12_000_000L)
+                desired.coerceIn(4_000_000L, 20_000_000L)
             }
         } catch (_: Throwable) {
-            desired.coerceIn(2_000_000L, 12_000_000L)
+            desired.coerceIn(4_000_000L, 20_000_000L)
         }.toInt()
 
         val format = MediaFormat.createVideoFormat(
@@ -620,7 +621,7 @@ class ArFilteredVideoRecorder {
                 MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface,
             )
-            setInteger(MediaFormat.KEY_BIT_RATE, 6_000_000)
+            setInteger(MediaFormat.KEY_BIT_RATE, 10_000_000)
             setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }

@@ -111,16 +111,37 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
   bool _magicOn = false;
 
+  static const Map<MediaPhotoEditorTool, double> _magicBeautyDefaults = {
+    MediaPhotoEditorTool.smooth: 0.50,
+    MediaPhotoEditorTool.contrast: 0.04,
+    MediaPhotoEditorTool.shape: 0.0,
+    MediaPhotoEditorTool.nose: 0.0,
+    MediaPhotoEditorTool.eyes: 0.0,
+    MediaPhotoEditorTool.tooth: 0.0,
+    MediaPhotoEditorTool.mouth: 0.0,
+    MediaPhotoEditorTool.saturation: 0.05,
+    MediaPhotoEditorTool.brightness: 0.18,
+    MediaPhotoEditorTool.exposure: 0.06,
+    MediaPhotoEditorTool.whiteBalance: 0.02,
+    MediaPhotoEditorTool.highlights: -0.05,
+    MediaPhotoEditorTool.shadows: 0.10,
+  };
+
   /// Bipolar tone/color adjustments (-1…1) keyed by tool.
   final Map<MediaPhotoEditorTool, double> _adjustments = {
+    MediaPhotoEditorTool.smooth: 0.0,
+    MediaPhotoEditorTool.contrast: 0.0,
+    MediaPhotoEditorTool.shape: 0.0,
+    MediaPhotoEditorTool.nose: 0.0,
+    MediaPhotoEditorTool.eyes: 0.0,
+    MediaPhotoEditorTool.tooth: 0.0,
+    MediaPhotoEditorTool.mouth: 0.0,
     MediaPhotoEditorTool.saturation: 0.0,
     MediaPhotoEditorTool.brightness: 0.0,
-    MediaPhotoEditorTool.contrast: 0.0,
     MediaPhotoEditorTool.exposure: 0.0,
     MediaPhotoEditorTool.whiteBalance: 0.0,
     MediaPhotoEditorTool.highlights: 0.0,
     MediaPhotoEditorTool.shadows: 0.0,
-    MediaPhotoEditorTool.nose: 0.0,
   };
   File? _smoothPreviewFile;
   Timer? _smoothDebounce;
@@ -146,9 +167,11 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   MediaItemEditState get _currentState => _states[_currentIndex];
 
-  double _adj(MediaPhotoEditorTool tool) => _adjustments[tool] ?? 0.0;
+  double _adj(MediaPhotoEditorTool tool) =>
+      _magicOn ? (_adjustments[tool] ?? 0.0) : 0.0;
 
-  bool get _hasFaceEdits => _adjustments.values.any((v) => v.abs() > 0.02);
+  bool get _hasFaceEdits =>
+      _magicOn && _adjustments.values.any((v) => v.abs() > 0.02);
 
   static bool _stateHasFaceEdits(MediaItemEditState s) =>
       s.faceSaturation.abs() > 0.02 ||
@@ -585,6 +608,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _arFilterId = 'whitening';
         _arColorCategoryId = 'beauty';
         _magicOn = true;
+        _adjustments.addAll(_magicBeautyDefaults);
         _showFilters = false;
       }
       _saveUiToCurrentState();
@@ -625,8 +649,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   void _onMagicToggled() {
     setState(() {
       _magicOn = !_magicOn;
+      if (_magicOn) {
+        _adjustments.addAll(_magicBeautyDefaults);
+        _photoEditorTool = MediaPhotoEditorTool.smooth;
+      } else {
+        _photoEditorTool = MediaPhotoEditorTool.magic;
+      }
       _applyPhotoBeautyLook();
     });
+    _scheduleFacePreview();
   }
 
   void _onPhotoEditorToolSelected(MediaPhotoEditorTool tool) {
@@ -795,6 +826,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         // Keep category for Makeup UI; clear only the grade.
       } else {
         _arColorCategoryId = 'beauty';
+        _arFilterIntensity = 0.50;
         _magicOn = false;
       }
       _saveUiToCurrentState();
@@ -1277,7 +1309,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         arFilterIntensity: _arFilterIntensity,
         // Photos: the grade is baked into previewFile via the native LUT.
         // Videos: still previewed with the matrix path (matches export).
-        applyArColorPreview: currentItem.isVideo ? _needsColorFilterPreview : false,
+        applyArColorPreview: currentItem.isVideo
+            ? _needsColorFilterPreview
+            : false,
         paused: _subEditorOpen,
         muted: _selectedSound != null && _muteOriginalAudio,
         trimSegments: currentItem.isVideo
@@ -1307,10 +1341,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                   borderRadius: BorderRadius.circular(
                     CameraRatioLetterbox.tikTokPreviewRadius,
                   ),
-                  child: ColoredBox(
-                    color: Colors.black,
-                    child: previewWidget,
-                  ),
+                  child: ColoredBox(color: Colors.black, child: previewWidget),
                 ),
               )
             else
@@ -1447,9 +1478,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                         intensity: _arFilterIntensity,
                                         onCategorySelected: (id) =>
                                             setState(() {
-                                          _arColorCategoryId = id;
-                                          _saveUiToCurrentState();
-                                        }),
+                                              _arColorCategoryId = id;
+                                              _saveUiToCurrentState();
+                                            }),
                                         onFilterSelected: _selectArFilter,
                                         onIntensityChanged: (value) {
                                           setState(() {
@@ -1461,8 +1492,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                             _scheduleFacePreview();
                                           }
                                         },
-                                        onClear: () =>
-                                            _selectArFilter('none'),
+                                        onClear: () => _selectArFilter('none'),
                                         onApply: () => setState(
                                           () => _showFilters = false,
                                         ),
@@ -1479,13 +1509,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                               duration: const Duration(milliseconds: 280),
                               curve: Curves.easeInOutCubic,
                               alignment: Alignment.topCenter,
-                              heightFactor:
-                                  (_showFilters || _showPhotoEditor) ? 0 : 1,
+                              heightFactor: (_showFilters || _showPhotoEditor)
+                                  ? 0
+                                  : 1,
                               child: AnimatedOpacity(
                                 duration: const Duration(milliseconds: 220),
                                 curve: Curves.easeOut,
-                                opacity:
-                                    (_showFilters || _showPhotoEditor) ? 0 : 1,
+                                opacity: (_showFilters || _showPhotoEditor)
+                                    ? 0
+                                    : 1,
                                 child: MediaStudioBottomActions(
                                   yourStoryLabel: l10n.messagesYourStory,
                                   nextLabel: l10n.nextAction,

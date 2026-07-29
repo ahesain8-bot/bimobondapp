@@ -2,37 +2,47 @@ import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_l10n.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Which Face tool is selected in the TikTok-style photo editor panel.
 enum MediaPhotoEditorTool {
   magic,
+  smooth,
+  contrast,
+  shape,
+  nose,
+  eyes,
+  tooth,
+  mouth,
   saturation,
   brightness,
-  contrast,
   exposure,
   whiteBalance,
   highlights,
   shadows,
-  nose,
 }
 
 /// Bipolar adjustment tools (slider -1…1, 0 = original).
 const Set<MediaPhotoEditorTool> _bipolarTools = {
+  MediaPhotoEditorTool.contrast,
+  MediaPhotoEditorTool.shape,
+  MediaPhotoEditorTool.nose,
+  MediaPhotoEditorTool.eyes,
+  MediaPhotoEditorTool.tooth,
+  MediaPhotoEditorTool.mouth,
   MediaPhotoEditorTool.saturation,
   MediaPhotoEditorTool.brightness,
-  MediaPhotoEditorTool.contrast,
   MediaPhotoEditorTool.exposure,
   MediaPhotoEditorTool.whiteBalance,
   MediaPhotoEditorTool.highlights,
   MediaPhotoEditorTool.shadows,
-  MediaPhotoEditorTool.nose,
 };
 
-enum MediaPhotoEditorTab {
-  face,
-  makeup,
-}
+/// One-way 0…1 tools (Smooth).
+const Set<MediaPhotoEditorTool> _intensityTools = {MediaPhotoEditorTool.smooth};
+
+enum MediaPhotoEditorTab { face, makeup }
 
 /// Film color-grade category shown under Makeup.
 const String kMediaPhotoEditorFilmCategoryId = 'beauty';
@@ -68,7 +78,8 @@ class MediaPhotoEditorPanel extends StatefulWidget {
   final ValueChanged<MediaPhotoEditorTab> onTabChanged;
   final ValueChanged<MediaPhotoEditorTool> onToolSelected;
   final VoidCallback onMagicToggled;
-  final void Function(MediaPhotoEditorTool tool, double value) onAdjustmentChanged;
+  final void Function(MediaPhotoEditorTool tool, double value)
+  onAdjustmentChanged;
   final VoidCallback onReset;
 
   /// Selected AR color filter id (`none` or a film-catalog id).
@@ -105,19 +116,29 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
     if (_bipolarTools.contains(tool)) {
       return (widget.adjustmentValues[tool] ?? 0).clamp(-1.0, 1.0);
     }
+    if (_intensityTools.contains(tool)) {
+      return (widget.adjustmentValues[tool] ?? 0).clamp(0.0, 1.0);
+    }
     return 0;
   }
 
   bool get _isFilmFilterSelected {
     final id = widget.selectedColorFilterId;
     if (id == 'none' || !ArFilterCatalog.isColorFilter(id)) return false;
-    return ArFilterCatalog.colorItemsForCategory(kMediaPhotoEditorFilmCategoryId)
-        .any((f) => f.id == id);
+    return ArFilterCatalog.colorItemsForCategory(
+      kMediaPhotoEditorFilmCategoryId,
+    ).any((f) => f.id == id);
   }
 
   bool get _showFaceSlider =>
       widget.tab == MediaPhotoEditorTab.face &&
+      widget.magicOn &&
       _bipolarTools.contains(widget.selectedTool);
+
+  bool get _showSmoothSlider =>
+      widget.tab == MediaPhotoEditorTab.face &&
+      widget.magicOn &&
+      widget.selectedTool == MediaPhotoEditorTool.smooth;
 
   bool get _showMakeupIntensity =>
       widget.tab == MediaPhotoEditorTab.makeup &&
@@ -151,7 +172,13 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_showFaceSlider)
+        if (_showSmoothSlider)
+          _FloatingIntensitySlider(
+            value: _localValue,
+            onChanged: _onSliderDrag,
+            onChangeEnd: _onSliderDragEnd,
+          )
+        else if (_showFaceSlider)
           _FloatingBipolarSlider(
             value: _localValue,
             onChanged: _onSliderDrag,
@@ -268,10 +295,12 @@ class _FloatingIntensitySlider extends StatelessWidget {
   const _FloatingIntensitySlider({
     required this.value,
     required this.onChanged,
+    this.onChangeEnd,
   });
 
   final double value;
   final ValueChanged<double> onChanged;
+  final ValueChanged<double>? onChangeEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -313,6 +342,7 @@ class _FloatingIntensitySlider extends StatelessWidget {
             child: Slider(
               value: clamped,
               onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
             ),
           ),
         ],
@@ -356,7 +386,11 @@ class _Header extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(LucideIcons.rotateCcw, color: Colors.white70, size: 16),
+              const Icon(
+                LucideIcons.rotateCcw,
+                color: Colors.white70,
+                size: 16,
+              ),
               const SizedBox(width: 6),
               Text(
                 l10n.mediaEditorReset,
@@ -433,12 +467,47 @@ class _FaceToolsRow extends StatelessWidget {
   final ValueChanged<MediaPhotoEditorTool> onToolSelected;
   final VoidCallback onMagicToggled;
 
-  bool _active(MediaPhotoEditorTool tool) =>
-      (adjustmentValues[tool] ?? 0).abs() > 0.02;
+  bool _active(MediaPhotoEditorTool tool) {
+    if (!magicOn) return false;
+    if (tool == MediaPhotoEditorTool.smooth) {
+      return (adjustmentValues[tool] ?? 0) > 0.02;
+    }
+    return (adjustmentValues[tool] ?? 0).abs() > 0.02;
+  }
 
   @override
   Widget build(BuildContext context) {
     final adjustTools = <_AdjustToolSpec>[
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.contrast,
+        LucideIcons.contrast,
+        l10n.mediaPhotoEditorContrast,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.shape,
+        LucideIcons.scanFace,
+        l10n.mediaPhotoEditorShape,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.nose,
+        LucideIcons.smile,
+        l10n.mediaPhotoEditorNose,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.eyes,
+        LucideIcons.eye,
+        l10n.mediaPhotoEditorEyes,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.tooth,
+        LucideIcons.sparkle,
+        l10n.mediaPhotoEditorTooth,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.mouth,
+        LucideIcons.laugh,
+        l10n.mediaPhotoEditorMouth,
+      ),
       _AdjustToolSpec(
         MediaPhotoEditorTool.saturation,
         LucideIcons.palette,
@@ -448,11 +517,6 @@ class _FaceToolsRow extends StatelessWidget {
         MediaPhotoEditorTool.brightness,
         LucideIcons.sun,
         l10n.mediaPhotoEditorBrightness,
-      ),
-      _AdjustToolSpec(
-        MediaPhotoEditorTool.contrast,
-        LucideIcons.contrast,
-        l10n.mediaPhotoEditorContrast,
       ),
       _AdjustToolSpec(
         MediaPhotoEditorTool.exposure,
@@ -474,11 +538,6 @@ class _FaceToolsRow extends StatelessWidget {
         LucideIcons.moon,
         l10n.mediaPhotoEditorShadows,
       ),
-      _AdjustToolSpec(
-        MediaPhotoEditorTool.nose,
-        LucideIcons.scanFace,
-        l10n.mediaPhotoEditorNose,
-      ),
     ];
 
     return SizedBox(
@@ -489,15 +548,28 @@ class _FaceToolsRow extends StatelessWidget {
         children: [
           _ToolChip(
             icon: LucideIcons.wandSparkles,
-            label: magicOn ? l10n.mediaPhotoEditorOn : l10n.mediaPhotoEditorMagic,
+            label: magicOn ? l10n.mediaPhotoEditorOn : l10n.mediaPhotoEditorOff,
             selected: selectedTool == MediaPhotoEditorTool.magic,
             activeBadge: magicOn,
             showDot: false,
             accentSelected: false,
+            enabled: true,
             onTap: () {
+              HapticFeedback.selectionClick();
               onToolSelected(MediaPhotoEditorTool.magic);
               onMagicToggled();
             },
+          ),
+          const SizedBox(width: 14),
+          _ToolChip(
+            icon: LucideIcons.sparkles,
+            label: l10n.mediaPhotoEditorSmooth,
+            selected: selectedTool == MediaPhotoEditorTool.smooth,
+            activeBadge: false,
+            showDot: _active(MediaPhotoEditorTool.smooth),
+            accentSelected: true,
+            enabled: magicOn,
+            onTap: () => onToolSelected(MediaPhotoEditorTool.smooth),
           ),
           for (final spec in adjustTools) ...[
             const SizedBox(width: 14),
@@ -508,6 +580,7 @@ class _FaceToolsRow extends StatelessWidget {
               activeBadge: false,
               showDot: _active(spec.tool),
               accentSelected: true,
+              enabled: magicOn,
               onTap: () => onToolSelected(spec.tool),
             ),
           ],
@@ -530,9 +603,11 @@ class _FilmFiltersRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filters =
-        ArFilterCatalog.colorItemsForCategory(kMediaPhotoEditorFilmCategoryId);
-    final noneSelected = selectedFilterId == 'none' ||
+    final filters = ArFilterCatalog.colorItemsForCategory(
+      kMediaPhotoEditorFilmCategoryId,
+    );
+    final noneSelected =
+        selectedFilterId == 'none' ||
         !filters.any((f) => f.id == selectedFilterId);
 
     return SizedBox(
@@ -730,6 +805,7 @@ class _ToolChip extends StatelessWidget {
     required this.activeBadge,
     required this.showDot,
     required this.accentSelected,
+    required this.enabled,
     required this.onTap,
   });
 
@@ -739,83 +815,89 @@ class _ToolChip extends StatelessWidget {
   final bool activeBadge;
   final bool showDot;
   final bool accentSelected;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     const accent = Color(0xFFE11D48);
-    final ringColor = selected
+    final ringColor = selected && enabled
         ? (accentSelected ? accent : Colors.white)
         : null;
-    final labelColor = selected && accentSelected ? accent : Colors.white;
+    final labelColor = selected && accentSelected && enabled
+        ? accent
+        : Colors.white;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF2A2A2A),
-                    border: ringColor != null
-                        ? Border.all(color: ringColor, width: 2)
-                        : null,
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.35,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 64,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF2A2A2A),
+                      border: ringColor != null
+                          ? Border.all(color: ringColor, width: 2)
+                          : null,
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 22),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 22),
-                ),
-                if (activeBadge)
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: const BoxDecoration(
-                        color: accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        size: 12,
-                        color: Colors.white,
+                  if (activeBadge)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: const BoxDecoration(
+                          color: accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: labelColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+                ],
               ),
-            ),
-            const SizedBox(height: 3),
-            if (showDot)
-              Container(
-                width: 4,
-                height: 4,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+              const SizedBox(height: 8),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: labelColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
-              )
-            else
-              const SizedBox(height: 4),
-          ],
+              ),
+              const SizedBox(height: 3),
+              if (showDot)
+                Container(
+                  width: 4,
+                  height: 4,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              else
+                const SizedBox(height: 4),
+            ],
+          ),
         ),
       ),
     );

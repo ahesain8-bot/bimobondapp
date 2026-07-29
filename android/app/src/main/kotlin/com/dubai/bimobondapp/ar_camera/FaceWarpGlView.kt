@@ -101,8 +101,46 @@ class FaceWarpGlView @JvmOverloads constructor(
         }
         setEGLContextClientVersion(2)
         setEGLConfigChooser(RecordableConfigChooser())
+        // The editor is a Flutter route over this still-mounted platform view.
+        // suspendPreview() pauses this GLSurfaceView without pausing the Activity;
+        // preserving EGL keeps the camera SurfaceTexture and shader resources
+        // intact, avoiding corrupted/striped frames while a new context starts.
+        preserveEGLContextOnPause = true
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
+    }
+
+    /**
+     * Runs [src] through the still beauty shader and returns the result, or null
+     * if GL is unavailable or too slow to answer.
+     *
+     * Blocks the caller until the GL thread has rendered it, so this must be
+     * called off the main thread. Used by the photo path, which already runs on a
+     * background executor.
+     */
+    fun renderStillBlocking(src: android.graphics.Bitmap, timeoutMs: Long = 6_000L): Bitmap? {
+        if (!glInitialized) return null
+        val latch = java.util.concurrent.CountDownLatch(1)
+        val holder = arrayOfNulls<Bitmap>(1)
+        queueEvent {
+            try {
+                holder[0] = renderer.renderStill(src)
+            } catch (_: Throwable) {
+                holder[0] = null
+            } finally {
+                latch.countDown()
+            }
+        }
+        requestRender()
+        return try {
+            if (latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                holder[0]
+            } else {
+                null
+            }
+        } catch (_: InterruptedException) {
+            null
+        }
     }
 
     fun cameraSurfaceTexture(): SurfaceTexture? = cameraSurfaceTexture
@@ -136,6 +174,17 @@ class FaceWarpGlView @JvmOverloads constructor(
         queueEvent {
             renderer.setWarpParams(params)
         }
+    }
+
+    /** Average frame brightness, so the beauty pass can follow the light. */
+    fun updateSceneLuma(luma: Float) {
+        if (!glInitialized) return
+        renderer.updateSceneLuma(luma)
+    }
+
+    fun updateSkinTone(luma: Float) {
+        if (!glInitialized) return
+        renderer.updateSkinTone(luma)
     }
 
     /** Skin-confidence mask (ALPHA_8, 255=skin) from ArCameraController's landmark rasterizer. */
@@ -215,6 +264,15 @@ class FaceWarpGlView @JvmOverloads constructor(
     fun clearLastCapturedFrame() {
         if (!glInitialized) return
         renderer.clearLastCapturedFrame()
+    }
+
+    /** Drops only frame-to-frame caches; beauty values and GL resources stay intact. */
+    fun resetAfterRouteResume() {
+        if (!glInitialized) return
+        queueEvent {
+            renderer.resetTransientFrameState()
+        }
+        requestRender()
     }
 
     fun releaseGl() {

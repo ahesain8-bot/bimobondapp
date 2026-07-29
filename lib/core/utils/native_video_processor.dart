@@ -12,6 +12,12 @@ class NativeVideoProcessor {
   NativeVideoProcessor._();
 
   static const _maxVideoFilterSeconds = 60;
+  static const _highQualityVideoBitrate = 20 * 1000 * 1000;
+
+  /// Preserve the input pixel dimensions while giving 1080p camera footage
+  /// enough bitrate to survive an editor render without visible degradation.
+  static VideoQualityConfig get _sourceResolutionHighQuality =>
+      VideoQualityConfig.custom(bitrate: _highQualityVideoBitrate);
 
   /// Mixes an external [audio] file into [input] (the selected music track).
   ///
@@ -37,6 +43,9 @@ class NativeVideoProcessor {
       final resultPath = await ProVideoEditor.instance.renderVideoToFile(
         outPath,
         VideoRenderData(
+          qualityConfig: _sourceResolutionHighQuality,
+          bitrate: _highQualityVideoBitrate,
+          shouldOptimizeForNetworkUse: true,
           videoSegments: [
             VideoSegment(
               video: EditorVideo.file(input),
@@ -53,8 +62,7 @@ class NativeVideoProcessor {
             VideoAudioTrack(
               path: audio.path,
               volume: musicVolume,
-              audioStartTime:
-                  startOffset <= Duration.zero ? null : startOffset,
+              audioStartTime: startOffset <= Duration.zero ? null : startOffset,
               audioEndTime: audioEnd != null && audioEnd > startOffset
                   ? audioEnd
                   : null,
@@ -257,10 +265,14 @@ class NativeVideoProcessor {
       final resultPath = await ProVideoEditor.instance.renderVideoToFile(
         outPath,
         VideoRenderData(
+          qualityConfig: _sourceResolutionHighQuality,
+          bitrate: _highQualityVideoBitrate,
+          shouldOptimizeForNetworkUse: true,
           videoSegments: [
             VideoSegment(
               video: EditorVideo.file(input),
-              endTime: maxDuration ??
+              endTime:
+                  maxDuration ??
                   const Duration(seconds: _maxVideoFilterSeconds),
             ),
           ],
@@ -329,14 +341,14 @@ class NativeVideoProcessor {
 
       final videoSegments = hasTrim
           ? segments
-              .map(
-                (r) => VideoSegment(
-                  video: EditorVideo.file(input),
-                  startTime: r.start,
-                  endTime: r.end,
-                ),
-              )
-              .toList()
+                .map(
+                  (r) => VideoSegment(
+                    video: EditorVideo.file(input),
+                    startTime: r.start,
+                    endTime: r.end,
+                  ),
+                )
+                .toList()
           : [
               VideoSegment(
                 video: EditorVideo.file(input),
@@ -347,11 +359,15 @@ class NativeVideoProcessor {
       final resultPath = await ProVideoEditor.instance.renderVideoToFile(
         outPath,
         VideoRenderData(
+          qualityConfig: _sourceResolutionHighQuality,
+          bitrate: _highQualityVideoBitrate,
+          shouldOptimizeForNetworkUse: true,
           videoSegments: videoSegments,
           outputFormat: VideoOutputFormat.mp4,
           enableAudio: true,
-          colorFilters:
-              colorMatrix != null ? [ColorFilter(matrix: colorMatrix)] : const [],
+          colorFilters: colorMatrix != null
+              ? [ColorFilter(matrix: colorMatrix)]
+              : const [],
           imageLayers: imageLayers,
         ),
       );
@@ -380,11 +396,12 @@ class NativeVideoProcessor {
       final resultPath = await ProVideoEditor.instance.renderVideoToFile(
         outPath,
         VideoRenderData(
+          qualityConfig: _sourceResolutionHighQuality,
+          bitrate: _highQualityVideoBitrate,
+          shouldOptimizeForNetworkUse: true,
           videoSegments: [VideoSegment(video: EditorVideo.file(input))],
           imageLayers: [
-            ImageLayer(
-              image: EditorLayerImage.memory(overlayBytes),
-            ),
+            ImageLayer(image: EditorLayerImage.memory(overlayBytes)),
           ],
           outputFormat: VideoOutputFormat.mp4,
           enableAudio: true,

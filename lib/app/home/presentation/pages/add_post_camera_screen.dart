@@ -59,6 +59,7 @@ class AddPostCameraScreen extends StatefulWidget {
 
   final bool isStory;
   final SoundEntity? initialSound;
+
   /// Mode A clip id when reusing another post’s exact segment.
   final String? initialSoundSegmentId;
   final bool returnMediaOnDone;
@@ -82,15 +83,38 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
   MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
   bool _photoEditorMagicOn = false;
+
+  /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
+  static const double _kMagicAutoSmooth = 0.50;
+  static const Map<MediaPhotoEditorTool, double> _kMagicBeautyDefaults = {
+    MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
+    MediaPhotoEditorTool.contrast: 0.10,
+    MediaPhotoEditorTool.shape: 0.08,
+    MediaPhotoEditorTool.nose: 0.05,
+    MediaPhotoEditorTool.eyes: 0.05,
+    MediaPhotoEditorTool.tooth: 0.12,
+    MediaPhotoEditorTool.mouth: 0.05,
+    MediaPhotoEditorTool.saturation: 0.10,
+    MediaPhotoEditorTool.brightness: 0.20,
+    MediaPhotoEditorTool.exposure: 0.06,
+    MediaPhotoEditorTool.whiteBalance: 0.06,
+    MediaPhotoEditorTool.highlights: 0.08,
+    MediaPhotoEditorTool.shadows: 0.10,
+  };
   final Map<MediaPhotoEditorTool, double> _photoAdjustments = {
+    MediaPhotoEditorTool.smooth: 0.0,
+    MediaPhotoEditorTool.contrast: 0.0,
+    MediaPhotoEditorTool.shape: 0.0,
+    MediaPhotoEditorTool.nose: 0.0,
+    MediaPhotoEditorTool.eyes: 0.0,
+    MediaPhotoEditorTool.tooth: 0.0,
+    MediaPhotoEditorTool.mouth: 0.0,
     MediaPhotoEditorTool.saturation: 0.0,
     MediaPhotoEditorTool.brightness: 0.0,
-    MediaPhotoEditorTool.contrast: 0.0,
     MediaPhotoEditorTool.exposure: 0.0,
     MediaPhotoEditorTool.whiteBalance: 0.0,
     MediaPhotoEditorTool.highlights: 0.0,
     MediaPhotoEditorTool.shadows: 0.0,
-    MediaPhotoEditorTool.nose: 0.0,
   };
   bool _catalogLoading = true;
   bool _filtersReady = false;
@@ -104,6 +128,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   CameraLayoutMode _layoutMode = CameraLayoutMode.off;
   List<String?> _layoutCellPhotos = const [];
   int _layoutActiveCell = 0;
+
   /// TikTok layout: max seconds for the next cell = min of prior cell lengths.
   int? _layoutCellCapSeconds;
   bool _isRecording = false;
@@ -140,7 +165,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   String _filterCategorySlug = 'trending';
   AwesomeFilter _selectedFilter = AwesomeFilter.None;
   bool _initialFilterApplied = false;
-  double _selectedZoom = CameraStudioConstants.zoomSteps[1].value;
+  double _selectedZoom = CameraStudioConstants.zoomSteps.first.value;
   int _selectedDuration = CameraStudioConstants.durationOptions.first;
   double _selectedSpeed = 1.0;
   String? _selectedEffectSlug;
@@ -162,7 +187,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   String _arColorCategoryId = 'beauty';
   double _arFilterIntensity = 1.0;
   double _arSwipeDrag = 0;
-  double _pinchBaseZoom = CameraStudioConstants.zoomSteps[1].value;
+  double _pinchBaseZoom = CameraStudioConstants.zoomSteps.first.value;
   bool _isPinchingZoom = false;
   static const double _pinchZoomSensitivity = 0.9;
 
@@ -175,7 +200,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void initState() {
     super.initState();
     _selectedSound = widget.initialSound;
-    _pickedSoundSegmentId = widget.initialSoundSegmentId?.trim().isNotEmpty == true
+    _pickedSoundSegmentId =
+        widget.initialSoundSegmentId?.trim().isNotEmpty == true
         ? widget.initialSoundSegmentId!.trim()
         : null;
     if (widget.initialFilterName != null &&
@@ -342,7 +368,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         arFilterId: arId,
         arColorCategoryId: category,
         arFilterIntensity: _arFilterIntensity,
-        beautyEnabled: arId == 'whitening' || _photoEditorMagicOn,
+        beautyEnabled: _photoEditorMagicOn,
         alreadyBaked: true,
         effectSlug: ArFilterCatalog.isColorFilter(arId) || arId == 'none'
             ? null
@@ -374,7 +400,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   double _photoAdj(MediaPhotoEditorTool tool) =>
-      _photoAdjustments[tool] ?? 0.0;
+      _photoEditorMagicOn ? (_photoAdjustments[tool] ?? 0.0) : 0.0;
 
   void _syncRetouchToNative() {
     if (!_useNativeArFilters) return;
@@ -387,6 +413,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       highlights: _photoAdj(MediaPhotoEditorTool.highlights),
       shadows: _photoAdj(MediaPhotoEditorTool.shadows),
       nose: _photoAdj(MediaPhotoEditorTool.nose),
+      shape: _photoAdj(MediaPhotoEditorTool.shape),
+      eyes: _photoAdj(MediaPhotoEditorTool.eyes),
+      tooth: _photoAdj(MediaPhotoEditorTool.tooth),
+      mouth: _photoAdj(MediaPhotoEditorTool.mouth),
     );
   }
 
@@ -400,10 +430,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _showFilters = false;
       _layoutPickerOpen = false;
       _speedPickerOpen = false;
-      if (_useNativeArFilters &&
-          ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
-        _photoEditorMagicOn = true;
-      }
+      // Magic stays Off until the user taps it (TikTok behavior).
     });
     if (_useNativeArFilters) {
       _syncRetouchToNative();
@@ -416,24 +443,48 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   void _onPhotoEditorMagicToggled() {
     final next = !_photoEditorMagicOn;
-    setState(() {
-      _photoEditorMagicOn = next;
-      if (_useNativeArFilters) {
-        if (next) {
-          _arFilterIndex = ArFilterCatalog.indexOfId('whitening');
-          _arColorCategoryId = 'beauty';
-        } else if (ArFilterCatalog.items[_arFilterIndex].id == 'whitening') {
-          _arFilterIndex = 0;
-        }
-      }
-    });
+    _photoEditorMagicOn = next;
+    if (next) {
+      _photoAdjustments.addAll(_kMagicBeautyDefaults);
+      _photoEditorTool = MediaPhotoEditorTool.smooth;
+    } else {
+      _photoEditorTool = MediaPhotoEditorTool.magic;
+    }
+    setState(() {});
     if (_useNativeArFilters) {
-      final id = ArFilterCatalog.items[_arFilterIndex].id;
-      final intensity =
-          ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0;
-      _applyArFilter(id, intensity: intensity);
+      if (next) {
+        ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+        _syncRetouchToNative();
+      } else {
+        ArCameraBridge.setMagicEnabled(false);
+        _syncRetouchToNative();
+      }
     } else {
       unawaited(_applyBeauty(next));
+    }
+  }
+
+  /// Kept for filter / reset paths that still need to re-sync beauty params
+  /// while preserving Magic On smooth.
+  void _applyMagicSmoothOnly() {
+    if (_photoEditorMagicOn) {
+      final strength =
+          (_photoAdjustments[MediaPhotoEditorTool.smooth] ?? _kMagicAutoSmooth)
+              .clamp(0.0, 1.0);
+      ArCameraBridge.setMagicEnabled(true, strength: strength);
+      return;
+    }
+    ArCameraBridge.setMagicEnabled(false);
+    final id = ArFilterCatalog.items[_arFilterIndex].id;
+    final params = ArFilterCatalog.colorFilterById(id)?.params;
+    if (params != null) {
+      final intensity = ArFilterCatalog.isColorFilter(id)
+          ? _arFilterIntensity
+          : 1.0;
+      _pushBeautyParams(params, intensity);
+    } else {
+      ArCameraBridge.clearBeautyFilter();
+      _syncRetouchToNative();
     }
   }
 
@@ -441,6 +492,24 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     MediaPhotoEditorTool tool,
     double value,
   ) {
+    if (tool == MediaPhotoEditorTool.smooth) {
+      final strength = value.clamp(0.0, 1.0);
+      setState(() {
+        _photoAdjustments[tool] = strength;
+        // Dragging Smooth turns Retouch On if it was Off.
+        if (!_photoEditorMagicOn && strength > 0.01) {
+          _photoEditorMagicOn = true;
+        }
+      });
+      if (_useNativeArFilters) {
+        if (_photoEditorMagicOn) {
+          ArCameraBridge.setMagicEnabled(true, strength: strength);
+        } else {
+          ArCameraBridge.setMagicEnabled(false);
+        }
+      }
+      return;
+    }
     setState(() => _photoAdjustments[tool] = value);
     _syncRetouchToNative();
   }
@@ -454,12 +523,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _photoEditorMagicOn = false;
       if (_useNativeArFilters) {
         final currentId = ArFilterCatalog.items[_arFilterIndex].id;
-        if (currentId == 'whitening' || ArFilterCatalog.isColorFilter(currentId)) {
+        if (currentId == 'whitening' ||
+            ArFilterCatalog.isColorFilter(currentId)) {
           _arFilterIndex = 0;
         }
       }
     });
     if (_useNativeArFilters) {
+      ArCameraBridge.setMagicEnabled(false);
       ArCameraBridge.clearRetouchAdjustments();
       _applyArFilter('none');
     } else {
@@ -478,12 +549,18 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       } else {
         _arFilterIndex = ArFilterCatalog.indexOfId(id);
         _arColorCategoryId = 'beauty';
+        _arFilterIntensity = 0.50;
         _photoEditorMagicOn = false;
+        _photoAdjustments[MediaPhotoEditorTool.smooth] = 0.0;
       }
     });
+    if (!_photoEditorMagicOn) {
+      ArCameraBridge.setMagicEnabled(false);
+    }
     final applied = ArFilterCatalog.items[_arFilterIndex].id;
-    final intensity =
-        ArFilterCatalog.isColorFilter(applied) ? _arFilterIntensity : 1.0;
+    final intensity = ArFilterCatalog.isColorFilter(applied)
+        ? _arFilterIntensity
+        : 1.0;
     _applyArFilter(applied, intensity: intensity);
   }
 
@@ -566,8 +643,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         'initialSoundOffset': edited.soundOffset,
         'initialSoundWindow': edited.soundWindow,
         'initialSoundDidTrim': edited.soundDidTrim || _soundDidTrim,
-        'initialSoundSegmentId':
-            edited.soundSegmentId ?? _pickedSoundSegmentId,
+        'initialSoundSegmentId': edited.soundSegmentId ?? _pickedSoundSegmentId,
         if (edited.filterName != null) 'filterName': edited.filterName,
         'filterCategory': edited.filterCategory.name,
         if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
@@ -863,10 +939,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           setState(() => _isBusy = false);
           return;
         }
-        await _completeRecordingSegment(
-          path ?? '',
-          autoFinish: autoFinish,
-        );
+        await _completeRecordingSegment(path ?? '', autoFinish: autoFinish);
       } catch (_) {
         if (mounted) {
           setState(() => _isBusy = false);
@@ -1384,9 +1457,13 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _pushBeautyParams(ArBeautyFilterParams? params, double intensity) {
+    final magicSmooth =
+        (_photoAdjustments[MediaPhotoEditorTool.smooth] ?? _kMagicAutoSmooth)
+            .clamp(0.0, 1.0);
     if (params != null) {
       ArCameraBridge.setBeautyFilter(
-        smooth: params.smooth,
+        // Magic only boosts smooth — never whiten/brighten.
+        smooth: _photoEditorMagicOn ? magicSmooth : params.smooth,
         whiten: params.whiten,
         brighten: params.brighten,
         blush: params.blush,
@@ -1403,6 +1480,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         saturation: params.saturation * intensity,
         whiteBalance: params.warmth * intensity,
       );
+      if (_photoEditorMagicOn) {
+        ArCameraBridge.setMagicEnabled(true, strength: magicSmooth);
+      }
+    } else if (_photoEditorMagicOn) {
+      ArCameraBridge.setMagicEnabled(true, strength: magicSmooth);
+      _syncRetouchToNative();
     } else {
       ArCameraBridge.clearBeautyFilter();
       ArCameraBridge.clearRetouchAdjustments();
@@ -1433,7 +1516,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _onArPreviewSwipeEnd(DragEndDetails details) {
-    if (!_useNativeArFilters || _isRecording || _showFilters || _showPhotoEditor) {
+    if (!_useNativeArFilters ||
+        _isRecording ||
+        _showFilters ||
+        _showPhotoEditor) {
       return;
     }
     final currentId = ArFilterCatalog.items[_arFilterIndex].id;
@@ -1669,7 +1755,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         if (!mounted) return;
         setState(() {
           _isFrontCamera = isFront;
-          _selectedZoom = CameraStudioConstants.zoomSteps[1].value;
+          _selectedZoom = CameraStudioConstants.zoomSteps.first.value;
         });
         _faceDetectorService.isFrontCamera = isFront;
         unawaited(_applyZoom(_selectedZoom, force: true));
@@ -1680,7 +1766,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (mounted) {
       setState(() {
         _isFrontCamera = !_isFrontCamera;
-        _selectedZoom = CameraStudioConstants.zoomSteps[1].value;
+        _selectedZoom = CameraStudioConstants.zoomSteps.first.value;
       });
       _faceDetectorService.isFrontCamera = _isFrontCamera;
       unawaited(_applyZoom(_selectedZoom, force: true));
@@ -1846,8 +1932,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     // Cap later cells to the shortest take so far (TikTok layout rule).
     final recordedSecs = _recordSeconds.clamp(1, 600);
     final prevCap = _layoutCellCapSeconds;
-    _layoutCellCapSeconds =
-        prevCap == null ? recordedSecs : (recordedSecs < prevCap ? recordedSecs : prevCap);
+    _layoutCellCapSeconds = prevCap == null
+        ? recordedSecs
+        : (recordedSecs < prevCap ? recordedSecs : prevCap);
 
     final next = List<String?>.from(_layoutCellPhotos);
     if (next.length != mode.cellCount) {
@@ -1932,8 +2019,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
     final kept = <String>[
       for (var i = 0; i < _layoutCellPhotos.length; i++)
-        if (i != index && _layoutCellPhotos[i] != null)
-          _layoutCellPhotos[i]!,
+        if (i != index && _layoutCellPhotos[i] != null) _layoutCellPhotos[i]!,
     ];
     final next = List<String?>.filled(_layoutMode.cellCount, null);
     for (var i = 0; i < kept.length; i++) {
@@ -2023,6 +2109,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void _onStudioModeSelected(CameraStudioMode mode) {
     if (_isRecording) return;
     if (widget.isStory && mode == CameraStudioMode.live) return;
+    if (mode == _studioMode) {
+      if (_showPhotoEditor || _showFilters) {
+        setState(() {
+          _showPhotoEditor = false;
+          _showFilters = false;
+        });
+      }
+      return;
+    }
 
     _cancelCountdown();
     // Live cannot use grid cells — clear layout. Photo↔video keeps layout
@@ -2043,7 +2138,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _discardVideoDraft();
     }
 
-    setState(() => _studioMode = mode);
+    setState(() {
+      _studioMode = mode;
+      // A mode choice must remain usable while a bottom editor is open.
+      // Dismiss the editor after selection so its panel cannot cover the
+      // capture controls for the newly selected mode.
+      _showPhotoEditor = false;
+      _showFilters = false;
+    });
 
     _cameraState?.when(
       onPhotoMode: (state) {
@@ -2251,7 +2353,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               cell: cell,
             );
             layoutShift =
-                layoutFrame.center - Offset(screen.width / 2, screen.height / 2);
+                layoutFrame.center -
+                Offset(screen.width / 2, screen.height / 2);
           }
 
           final isPhoto = _studioMode == CameraStudioMode.photo;
@@ -2269,7 +2372,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             media.padding.bottom,
             photoMode: true,
           );
-          final letterboxTop = CameraRatioLetterbox.topHeight(media.padding.top);
+          final letterboxTop = CameraRatioLetterbox.topHeight(
+            media.padding.top,
+          );
           final letterboxBottom = CameraRatioLetterbox.bottomHeight(
             useNativeAr: true,
             filtersPanelOpen: _showFilters || _showPhotoEditor,
@@ -2287,10 +2392,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
               if (layoutFrame != null) {
                 return ClipPath(
                   clipper: RectPreviewClipper(layoutFrame),
-                  child: Transform.translate(
-                    offset: layoutShift,
-                    child: child,
-                  ),
+                  child: Transform.translate(offset: layoutShift, child: child),
                 );
               }
               final top = _ratioLetterboxed
@@ -2349,8 +2451,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           beautyEnabled:
               _beautyEnabled ||
               _photoEditorMagicOn ||
-              _photoAdjustments.values.any((v) => v.abs() > 0.02) ||
-              ArFilterCatalog.items[_arFilterIndex].id == 'whitening',
+              _photoAdjustments.values.any((v) => v.abs() > 0.02),
           photoEditorTab: _photoEditorTab,
           photoEditorTool: _photoEditorTool,
           photoEditorMagicOn: _photoEditorMagicOn,
@@ -2368,10 +2469,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           }(),
           photoEditorColorFilterIntensity: _arFilterIntensity,
           onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
-          onPhotoEditorColorFilterIntensityChanged: (value) {
-            setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
-            ArCameraBridge.setFilterIntensity(_arFilterIntensity);
-          },
+          onPhotoEditorColorFilterIntensityChanged: _onArFilterIntensityChanged,
           timerEnabled: _timerEnabled,
           flashEnabled: _flashEnabled,
           isRecording: _isRecording,
@@ -2522,7 +2620,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 studioMode: _studioMode,
                 showFilters: _showFilters && _filtersReady,
                 showPhotoEditor: _showPhotoEditor,
-                beautyEnabled: _beautyEnabled ||
+                beautyEnabled:
+                    _beautyEnabled ||
                     _photoEditorMagicOn ||
                     _photoAdjustments.values.any((v) => v.abs() > 0.02),
                 photoEditorTab: _photoEditorTab,
@@ -2542,10 +2641,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 }(),
                 photoEditorColorFilterIntensity: _arFilterIntensity,
                 onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
-                onPhotoEditorColorFilterIntensityChanged: (value) {
-                  setState(() => _arFilterIntensity = value.clamp(0.0, 1.0));
-                  ArCameraBridge.setFilterIntensity(_arFilterIntensity);
-                },
+                onPhotoEditorColorFilterIntensityChanged:
+                    _onArFilterIntensityChanged,
                 timerEnabled: _timerEnabled,
                 flashEnabled: _flashEnabled,
                 isRecording: _isRecording,

@@ -9,6 +9,10 @@ object MediaPipeLandmarkIndices {
     const val MOUTH_RIGHT = 291
     const val MOUTH_BOTTOM = 17
     const val MOUTH_TOP = 0
+    const val MOUTH_INNER_TOP = 13
+    const val MOUTH_INNER_BOTTOM = 14
+    const val MOUTH_INNER_LEFT = 78
+    const val MOUTH_INNER_RIGHT = 308
 
     val TOP_HEAD = intArrayOf(
         10, 109, 67, 103, 54, 21, 162, 127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148,
@@ -16,6 +20,13 @@ object MediaPipeLandmarkIndices {
 
     const val LEFT_CHEEK = 234
     const val RIGHT_CHEEK = 454
+
+    /**
+     * Cheeks → lower jaw (Shape slim/expand). Includes cheek apples down to
+     * the mandible so the whole side of the face narrows/widens together.
+     */
+    val LEFT_JAW_ZONE = intArrayOf(234, 93, 132, 58, 172, 136, 150)
+    val RIGHT_JAW_ZONE = intArrayOf(454, 323, 361, 288, 397, 365, 379)
 
     val LEFT_EYE = intArrayOf(
         33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246,

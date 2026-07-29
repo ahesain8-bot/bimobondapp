@@ -199,6 +199,10 @@ class ArCameraBridge {
     double highlights = 0,
     double shadows = 0,
     double nose = 0,
+    double shape = 0,
+    double eyes = 0,
+    double tooth = 0,
+    double mouth = 0,
   }) {
     int level(double v) => (v * 100).round().clamp(-100, 100);
     _channel.invokeMethod<void>('setRetouchAdjustments', {
@@ -210,6 +214,10 @@ class ArCameraBridge {
       'highlightsLevel': level(highlights),
       'shadowsLevel': level(shadows),
       'noseLevel': level(nose),
+      'shapeLevel': level(shape),
+      'eyesLevel': level(eyes),
+      'toothLevel': level(tooth),
+      'mouthLevel': level(mouth),
     });
   }
 
@@ -242,6 +250,22 @@ class ArCameraBridge {
 
   static void clearBeautyFilter() {
     _channel.invokeMethod<void>('clearBeautyFilter');
+  }
+
+  /// Retouch panel Off/On — light face smooth / scar cleanup only.
+  /// [strength] is the Smooth slider 0..1 (defaults to auto when null / On).
+  static void setMagicEnabled(bool enabled, {double? strength}) {
+    _channel.invokeMethod<void>('setMagicEnabled', {
+      'enabled': enabled,
+      if (strength != null) 'strength': strength.clamp(0.0, 1.0),
+    });
+  }
+
+  /// Retouch Smooth slider while Magic is On (0..1).
+  static void setMagicStrength(double strength) {
+    _channel.invokeMethod<void>('setMagicStrength', {
+      'strength': strength.clamp(0.0, 1.0),
+    });
   }
 
   static Future<void> setZoom(double zoom) async {

@@ -11,6 +11,7 @@ import android.graphics.PorterDuff
 import android.graphics.RectF
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.util.SparseArray
 import androidx.camera.core.CameraEffect
 import androidx.camera.effects.OverlayEffect
@@ -68,8 +69,12 @@ class StickerCameraOverlay(private val appContext: Context) {
 
     fun ensureEffect(): OverlayEffect {
         closeEffectOnly()
-        val thread = HandlerThread("ar-sticker-overlay").also { it.start() }
-        handlerThread = thread
+        // Long-lived thread, not recreated per effect — CameraX posts to this
+        // executor while tearing an effect down, and a dead Looper there throws
+        // RejectedExecutionException on the main thread. Same fix as
+        // ScreenOverlayCameraEffect.
+        val thread = handlerThread ?: HandlerThread("ar-sticker-overlay")
+            .also { it.start(); handlerThread = it }
         val effect = OverlayEffect(
             CameraEffect.VIDEO_CAPTURE,
             /* queueDepth */ 1,
@@ -150,16 +155,21 @@ class StickerCameraOverlay(private val appContext: Context) {
         } catch (_: Exception) {
         }
         overlayEffect = null
-        try {
-            handlerThread?.quitSafely()
-        } catch (_: Exception) {
-        }
-        handlerThread = null
+        // Thread intentionally left running — torn down in release().
     }
 
     fun release() {
         closeEffectOnly()
         clear()
+        val thread = handlerThread
+        handlerThread = null
+        if (thread != null) {
+            // Delayed so already-queued CameraX callbacks land on a live Looper.
+            Handler(Looper.getMainLooper()).postDelayed(
+                { runCatching { thread.quitSafely() } },
+                THREAD_QUIT_DELAY_MS,
+            )
+        }
         for (i in 0 until stickerBitmaps.size()) {
             stickerBitmaps.valueAt(i)?.takeIf { !it.isRecycled }?.recycle()
         }
@@ -210,6 +220,11 @@ class StickerCameraOverlay(private val appContext: Context) {
         canvas.translate(-targetWidth * pose.pivotU, -targetHeight * pose.pivotV)
         canvas.drawBitmap(bitmap, null, dest, bitmapPaint)
         canvas.restore()
+    }
+
+    private companion object {
+        /** Grace period before quitting the effect thread — see [release]. */
+        const val THREAD_QUIT_DELAY_MS = 3_000L
     }
 
     private fun bitmapFor(resId: Int): Bitmap? {

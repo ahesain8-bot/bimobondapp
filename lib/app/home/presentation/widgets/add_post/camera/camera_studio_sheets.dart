@@ -33,7 +33,9 @@ class CameraStudioSheets {
             children: CameraStudioConstants.durationOptions.map((seconds) {
               return ListTile(
                 title: Text(
-                  '$seconds ${l10n.cameraSeconds}',
+                  seconds == 600
+                      ? l10n.cameraDuration10m
+                      : '$seconds ${l10n.cameraSeconds}',
                   style: const TextStyle(color: Colors.white),
                 ),
                 trailing: selectedDuration == seconds
@@ -387,11 +389,7 @@ class _CountdownSegment extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          _seg(0, offLabel),
-          _seg(3, '3s'),
-          _seg(10, '10s'),
-        ],
+        children: [_seg(0, offLabel), _seg(3, '3s'), _seg(10, '10s')],
       ),
     );
   }

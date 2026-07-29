@@ -10,6 +10,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.Process
 import android.util.Log
 import androidx.camera.core.CameraEffect
@@ -136,6 +137,9 @@ class ScreenOverlayCameraEffect {
          * few cycles after it is handed over. Three gives ~100ms of slack.
          */
         const val BUFFER_COUNT = 3
+
+        /** Grace period before quitting the effect thread — see [release]. */
+        const val THREAD_QUIT_DELAY_MS = 3_000L
     }
 
     private val blitPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -222,8 +226,13 @@ class ScreenOverlayCameraEffect {
 
     fun ensureEffect(): OverlayEffect {
         closeEffectOnly()
-        val thread = HandlerThread("ar-screen-overlay").also { it.start() }
-        handlerThread = thread
+        // One long-lived thread for the whole object, deliberately NOT recreated
+        // per effect. CameraX keeps posting to this executor while it tears an
+        // effect down — quitting the thread alongside close() meant a late
+        // onOutputSurface callback hit a dead Looper and threw
+        // RejectedExecutionException on the main thread, killing the app.
+        val thread = handlerThread ?: HandlerThread("ar-screen-overlay")
+            .also { it.start(); handlerThread = it }
         val effect = OverlayEffect(
             CameraEffect.VIDEO_CAPTURE,
             // queueDepth 2, not 1: with no slack in the queue, the time this
@@ -564,11 +573,8 @@ class ScreenOverlayCameraEffect {
         } catch (_: Exception) {
         }
         overlayEffect = null
-        try {
-            handlerThread?.quitSafely()
-        } catch (_: Exception) {
-        }
-        handlerThread = null
+        // Thread intentionally left running — see ensureEffect. It is torn down
+        // in release(), and even then only after a delay.
         stopRaster()
         blittedSeq = -1L
     }
@@ -576,5 +582,15 @@ class ScreenOverlayCameraEffect {
     fun release() {
         closeEffectOnly()
         clear()
+        // Delayed so callbacks CameraX has already queued still land on a live
+        // Looper. Quitting immediately is what crashed the app.
+        val thread = handlerThread
+        handlerThread = null
+        if (thread != null) {
+            Handler(Looper.getMainLooper()).postDelayed(
+                { runCatching { thread.quitSafely() } },
+                THREAD_QUIT_DELAY_MS,
+            )
+        }
     }
 }

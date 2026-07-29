@@ -2,9 +2,10 @@ import 'package:bimobondapp/app/ar_camera/ar_color_filter_catalog_model.dart';
 
 /// Offline filter seed (no LUT PNGs) — Instagram-style color grades, built on
 /// the same color-grade engine as the Face retouch sliders
-/// (ArCameraBridge.setRetouchAdjustments), already proven stable, plus the
-/// baseline skin-smooth beauty effect on top. Values deliberately stronger
-/// than a subtle grade so each filter reads as a clearly different look.
+/// (ArCameraBridge.setRetouchAdjustments), already proven stable, plus a light
+/// natural skin-smooth (0.18) so Normal Mode stays close to real skin rather
+/// than plastic. Color grades still differ clearly via brightness/contrast/
+/// saturation/warmth.
 ///
 /// Grouped into categories matching the backend's `colorFilterCategories`
 /// shape (same category ids as GET /camera-studio/color-filters), so the
@@ -17,7 +18,7 @@ class ArColorFilterBundledCatalog {
   ArColorFilterBundledCatalog._();
 
   static const ArColorFilterCatalog catalog = ArColorFilterCatalog(
-    version: 'bundled-17',
+    version: 'bundled-24',
     categories: [
       ArColorFilterCategoryModel(
         id: 'portrait',
@@ -31,12 +32,16 @@ class ArColorFilterBundledCatalog {
             sortOrder: 0,
             previewColorHex: '#FFFFFF',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.16,
+              whiten: 0.03,
+              brighten: 0.10,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
+              brightness: 0.05,
+              contrast: 0.03,
+              saturation: 0.02,
+              warmth: 0,
             ),
           ),
           ArColorFilterItemModel(
@@ -46,9 +51,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 1,
             previewColorHex: '#FFF4D6',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.16,
+              whiten: 0.04,
+              brighten: 0.12,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -64,9 +69,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 2,
             previewColorHex: '#F7E0EC',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -90,9 +95,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 0,
             previewColorHex: '#FF6B9D',
             params: ArBeautyFilterParams(
-              smooth: 2,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -108,9 +113,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 1,
             previewColorHex: '#1A1A1A',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -125,16 +130,16 @@ class ArColorFilterBundledCatalog {
             sortOrder: 2,
             previewColorHex: '#FFB570',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
               brightness: 0.15,
               contrast: 0.05,
               saturation: 0.15,
-              warmth: 0.35,
+              warmth: 0.22,
             ),
           ),
         ],
@@ -151,9 +156,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 0,
             previewColorHex: '#E8DFD6',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -169,9 +174,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 1,
             previewColorHex: '#F0DCC4',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -188,9 +193,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 2,
             previewColorHex: '#DCE6EC',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -214,9 +219,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 0,
             previewColorHex: '#C9A876',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -233,9 +238,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 1,
             previewColorHex: '#2B2B2B',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -251,9 +256,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 2,
             previewColorHex: '#808080',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -275,9 +280,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 0,
             previewColorHex: '#3A3A42',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
@@ -294,16 +299,16 @@ class ArColorFilterBundledCatalog {
             sortOrder: 1,
             previewColorHex: '#F5A623',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,
               brightness: 0.20,
               contrast: 0.10,
               saturation: 0.20,
-              warmth: 0.45,
+              warmth: 0.28,
             ),
           ),
           ArColorFilterItemModel(
@@ -313,9 +318,9 @@ class ArColorFilterBundledCatalog {
             sortOrder: 2,
             previewColorHex: '#A8C8E8',
             params: ArBeautyFilterParams(
-              smooth: 0.55,
-              whiten: 0,
-              brighten: 0,
+              smooth: 0.18,
+              whiten: 0.06,
+              brighten: 0.16,
               blush: 0,
               lipTint: '#E8527A',
               lipStrength: 0,

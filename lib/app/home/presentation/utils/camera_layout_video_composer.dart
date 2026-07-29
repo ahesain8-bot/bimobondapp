@@ -16,8 +16,8 @@ class CameraLayoutVideoComposer {
     required CameraLayoutMode mode,
     required List<String> cellPaths,
   }) async {
-    const outW = 720.0;
-    const outH = 1280.0;
+    const outW = 1080.0;
+    const outH = 1920.0;
     final fracs = mode.cellFractions;
     if (cellPaths.isEmpty || fracs.isEmpty) {
       throw StateError('layout_video_compose_empty');
@@ -77,6 +77,9 @@ class CameraLayoutVideoComposer {
       final resultPath = await ProVideoEditor.instance.renderVideoToFile(
         outPath,
         VideoRenderData(
+          qualityConfig: VideoQualityConfig.custom(bitrate: 16 * 1000 * 1000),
+          bitrate: 16 * 1000 * 1000,
+          shouldOptimizeForNetworkUse: true,
           composition: VideoComposition(
             canvasSize: const Size(outW, outH),
             backgroundColor: const Color(0xFF000000),
