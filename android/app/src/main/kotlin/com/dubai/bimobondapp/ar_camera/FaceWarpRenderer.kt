@@ -2485,6 +2485,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 // so sampling it with the zoomed `st` above would misalign it.
                 vec2 uvLandmark = (uTexTransform * vec3(dLandmark, 1.0)).xy;
                 vec2 stLandmark = (uStMatrix * vec4(uvLandmark, 0.0, 1.0)).xy;
+                // Brightness must follow the exact camera pixel currently on
+                // screen. Sampling its mask through fillCenter (stLandmark)
+                // leaves the mask behind when the preview is zoomed out, making
+                // the face-shaped lift slide onto a shoulder as the user moves.
+                vec2 uvBrightnessMask =
+                    (uTexTransform * vec3(d, 1.0)).xy;
+                vec2 stBrightnessMask =
+                    (uStMatrix * vec4(uvBrightnessMask, 0.0, 1.0)).xy;
                 // Two different gates on purpose.
                 //
                 // Smoothing needs the landmark mask: it must avoid eyes, brows and
@@ -2515,7 +2523,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 // Never use the colour-only fallback here because it can select
                 // skin-coloured walls or shoulders outside the detected face.
                 float retouchBrightnessConf =
-                    maskConf * skinConfidence(col);
+                    (uSkinMaskValid > 0.5
+                        ? maskConfidence(stBrightnessMask)
+                        : 0.0) * skinConfidence(col);
 
                 if (smoothConf > 0.001) {
                     // Frequency separation.
