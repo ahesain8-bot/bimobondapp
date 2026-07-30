@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Shared layout tokens for [VideoPostWidget] chrome.
 abstract final class VideoPostLayoutConstants {
-  static const double actionIconSize = 35;
-  static const double actionLabelSize = 12;
-  static const double actionSpacing = 20;
+  static const double actionIconSize = 32;
+  static const double actionLabelSize = 10;
+  static const double actionSpacing = 14;
   static const double actionHitWidth = 48;
   static const double actionColumnInset = 8;
   static const double contentActionGap = 12;

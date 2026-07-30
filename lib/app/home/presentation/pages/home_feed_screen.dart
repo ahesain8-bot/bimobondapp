@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_top_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_posts_viewer_layout.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_tab.dart';
-import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
+    as auth_di;
 import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
     as notifications_di;
 import 'package:bimobondapp/app/notifications/presentation/services/notification_coordinator.dart';
@@ -16,6 +19,7 @@ import 'package:bimobondapp/core/services/app_location_service.dart';
 import 'package:bimobondapp/core/services/feed_video_disk_prefetcher.dart';
 import 'package:bimobondapp/core/services/feed_video_prewarmer.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
@@ -38,6 +42,7 @@ class HomeFeedScreen extends StatefulWidget {
 
 class HomeFeedScreenState extends State<HomeFeedScreen> {
   final PageController _pageController = PageController();
+  final ValueNotifier<int> _bottomChromeRevision = ValueNotifier(0);
   final List<FeedItemEntity> _feedItems = [];
   String? _nextCursor;
   bool _hasReachedMax = false;
@@ -53,6 +58,36 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       FeedVideoProgressNotifier();
   final FeedMediaPreloader _mediaPreloader = FeedMediaPreloader();
   bool _didRunPostFeedBootstrap = false;
+
+  FeedVideoProgressNotifier get feedVideoProgress => _feedVideoProgress;
+
+  Listenable get bottomChromeListenable => _bottomChromeRevision;
+
+  double feedMediaBottomInset(BuildContext context, PostEntity post) {
+    if (post.isAuctionable) {
+      return FeedVideoPostsViewerLayout.homeFeedBottomNavReservedHeight(
+        context,
+      );
+    }
+    return FeedVideoPostsViewerLayout.homeFeedBottomNavReservedHeight(context);
+  }
+
+  void _notifyBottomChromeLayout() => _bottomChromeRevision.value++;
+
+  void patchFeedPost(
+    String postId,
+    PostEntity Function(PostEntity post) patch,
+  ) {
+    final index = _feedItems.indexWhere((item) => item.post.id == postId);
+    if (index == -1) return;
+    setState(() {
+      _feedItems[index] = _feedItems[index].copyWith(
+        post: patch(_feedItems[index].post),
+      );
+    });
+  }
+
+  Widget? buildBottomSearchProgressColumn() => null;
 
   /// Called when the user re-taps the Home tab while already on it.
   void refreshFromTab() {
@@ -94,6 +129,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       _feedItems.clear();
     });
     _feedVideoProgress.reset();
+    _notifyBottomChromeLayout();
     if (_pageController.hasClients) {
       _pageController.jumpToPage(0);
     }
@@ -110,14 +146,13 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
     if (_didRunPostFeedBootstrap) return;
     _didRunPostFeedBootstrap = true;
 
-    notifications_di
-        .sl<NotificationCoordinator>()
-        .allowLoginSideEffects();
+    notifications_di.sl<NotificationCoordinator>().allowLoginSideEffects();
     unawaited(auth_di.sl<AppLocationService>().ensureViewerLocation());
   }
 
   @override
   void dispose() {
+    _bottomChromeRevision.dispose();
     _feedVideoProgress.dispose();
     _pageController.dispose();
     FeedVideoPrewarmer.instance.clear();
@@ -219,8 +254,13 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   void _onFeedPageChanged(int index) {
     if (_feedItems.isEmpty) return;
 
-    setState(() => _currentPostIndex = index);
     _feedVideoProgress.reset();
+    setState(() => _currentPostIndex = index);
+    _notifyBottomChromeLayout();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _feedVideoProgress.notifyListeners();
+    });
     _mediaPreloader.preloadAround(context, _feedItems, index);
 
     final threshold =
@@ -261,6 +301,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
         }
         _isLoadingMore = false;
       });
+      _notifyBottomChromeLayout();
       if (isFirstPage) {
         _completePullRefreshIfPending();
         _mediaPreloader.reset();
@@ -292,6 +333,18 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
           }
         }
       });
+    } else if (state is LikePostSuccess) {
+      patchFeedPost(
+        state.postId,
+        (post) => patchFeedPostLike(post, liked: state.liked),
+      );
+    } else if (state is SavePostSuccess) {
+      patchFeedPost(state.postId, patchFeedPostSaveToggle);
+    } else if (state is RepostPostSuccess) {
+      patchFeedPost(
+        state.postId,
+        (post) => patchFeedPostRepost(post, isReposted: state.isReposted),
+      );
     } else if (state is PostHiddenFromFeedState) {
       setState(() {
         final index = _feedItems.indexWhere(
@@ -434,6 +487,9 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
                     currentPostIndex: _currentPostIndex,
                     isTabActive: widget.isTabActive,
                     onPageChanged: _onFeedPageChanged,
+                    bottomChromeListenable: bottomChromeListenable,
+                    mediaBottomInsetFor: feedMediaBottomInset,
+                    onFeedPostPatch: patchFeedPost,
                   ),
                 ),
               ),

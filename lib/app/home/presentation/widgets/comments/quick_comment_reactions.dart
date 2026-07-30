@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:flutter/material.dart';
 
 class QuickCommentReactions extends StatelessWidget {
@@ -5,21 +6,20 @@ class QuickCommentReactions extends StatelessWidget {
 
   final ValueChanged<String> onReactionSelected;
 
+  /// Classic TikTok quick-reaction strip (7 emojis).
   static const List<String> emojis = [
-    '😄',
-    '❤️',
-    '🙌',
-    '🔥',
-    '👏',
-    '😢',
-    '😍',
-    '😮',
+    '😁',
+    '🥰',
+    '😂',
+    '😳',
+    '😜',
+    '😅',
+    '🥺',
   ];
-
-  static const double emojiSize = 26;
 
   @override
   Widget build(BuildContext context) {
+    final size = CommentLayout.composerEmojiSize;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: emojis.map((emoji) {
@@ -27,10 +27,10 @@ class QuickCommentReactions extends StatelessWidget {
           onTap: () => onReactionSelected(emoji),
           behavior: HitTestBehavior.opaque,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 1),
             child: Text(
               emoji,
-              style: const TextStyle(fontSize: emojiSize, height: 1.1),
+              style: TextStyle(fontSize: size, height: 1),
             ),
           ),
         );

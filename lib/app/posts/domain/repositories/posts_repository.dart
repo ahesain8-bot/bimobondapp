@@ -108,6 +108,10 @@ abstract class PostsRepository {
   });
   Future<Either<Failure, bool>> toggleSave(String postId);
   Future<Either<Failure, bool>> toggleRepost(String postId, {String? quote});
+  Future<Either<Failure, void>> updateRepostQuote(
+    String postId, {
+    required String quote,
+  });
   Future<Either<Failure, RepostsPageEntity>> getPostReposts(
     String postId, {
     int page = 1,

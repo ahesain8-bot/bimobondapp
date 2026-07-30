@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_picker.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_input_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_skeleton.dart';
@@ -22,6 +23,7 @@ import 'package:bimobondapp/core/utils/comment_sort.dart';
 import 'package:bimobondapp/core/utils/tag_text_editing.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +61,10 @@ class CommentSheetWidget extends StatefulWidget {
   static const int likesTabIndex = 1;
   static const int ownerViewsTabIndex = 2;
 
+  static const double sheetInitialFraction = 0.55;
+  static const double sheetMinFraction = 0.38;
+  static const double sheetMaxFraction = 0.75;
+
   /// Engagement sheet: Comments / Likes (+ Views for owner).
   /// Returns the latest comment count when the sheet closes.
   static Future<int?> show(
@@ -75,9 +81,9 @@ class CommentSheetWidget extends StatefulWidget {
     var latestCount = commentCount;
     await GlassBottomSheet.showDraggable<void>(
       context,
-      initialChildSize: 0.72,
-      minChildSize: 0.45,
-      maxChildSize: 0.95,
+      initialChildSize: CommentSheetWidget.sheetInitialFraction,
+      minChildSize: CommentSheetWidget.sheetMinFraction,
+      maxChildSize: CommentSheetWidget.sheetMaxFraction,
       lightSurface: true,
       builder: (context, scrollController) => CommentSheetWidget(
         postId: postId,
@@ -172,7 +178,14 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   bool get _showCommentSort =>
       _tabController.index == CommentSheetWidget.commentsTabIndex;
 
+  /// Only the visible tab may use the sheet [ScrollController].
+  ScrollController? _sheetScrollForTab(int tabIndex) {
+    if (_tabController.index != tabIndex) return null;
+    return _sheetScrollController;
+  }
+
   void _onCommentsScroll() {
+    if (_tabController.index != CommentSheetWidget.commentsTabIndex) return;
     if (!_sheetScrollController.hasClients) return;
     final loaded = _lastLoadedState;
     if (loaded == null || loaded.hasReachedMax || _isLoadingMoreComments) {
@@ -302,9 +315,9 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
     result.fold(
       (failure) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(failure.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message)));
       },
       (url) {
         final encoded = CommentMedia.encodeImage(url);
@@ -361,6 +374,20 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
       onConfirm: () => context.pushNamed('login'),
     );
     return false;
+  }
+
+  Widget? _buildCommentInputAvatar() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthSuccess) return null;
+    final user = authState.user;
+    final label = user.username?.trim().isNotEmpty == true
+        ? user.username
+        : user.fullName;
+    return SafeNetworkAvatar(
+      imageUrl: user.avatarUrl,
+      radius: CommentLayout.composerAvatarRadius,
+      fallbackText: label,
+    );
   }
 
   @override
@@ -437,17 +464,22 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
                             if (displayState is CommentsLoading) {
                               return ListView.builder(
-                                controller: _sheetScrollController,
+                                controller: _sheetScrollForTab(
+                                  CommentSheetWidget.commentsTabIndex,
+                                ),
+                                physics: const AlwaysScrollableScrollPhysics(),
                                 itemCount: 15,
                                 padding: const EdgeInsets.fromLTRB(
-                                  AppSizes.p16,
-                                  AppSizes.p16,
-                                  AppSizes.p16,
                                   AppSizes.p12,
+                                  AppSizes.p6,
+                                  AppSizes.p12,
+                                  AppSizes.p4,
                                 ),
                                 itemBuilder: (context, index) {
                                   return const Padding(
-                                    padding: EdgeInsets.only(bottom: 20),
+                                    padding: EdgeInsets.only(
+                                      bottom: CommentLayout.itemBottomSpacing,
+                                    ),
                                     child: CommentSkeletonRow(),
                                   );
                                 },
@@ -456,13 +488,16 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                             if (displayState is CommentsLoadSuccess) {
                               if (displayState.comments.isEmpty) {
                                 return ListView(
-                                  controller: _sheetScrollController,
-                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  controller: _sheetScrollForTab(
+                                    CommentSheetWidget.commentsTabIndex,
+                                  ),
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   children: [
                                     SizedBox(
                                       height:
                                           MediaQuery.sizeOf(context).height *
-                                          0.35,
+                                          0.22,
                                       child: Center(
                                         child: CustomText(l10n.noCommentsYet),
                                       ),
@@ -479,22 +514,26 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                                   !displayState.hasReachedMax;
 
                               return ListView.builder(
-                                controller: _sheetScrollController,
+                                controller: _sheetScrollForTab(
+                                  CommentSheetWidget.commentsTabIndex,
+                                ),
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 itemCount:
                                     sortedComments.length +
                                     (showLoadMoreFooter ? 1 : 0),
                                 padding: const EdgeInsets.fromLTRB(
-                                  AppSizes.p16,
-                                  AppSizes.p16,
-                                  AppSizes.p16,
                                   AppSizes.p12,
+                                  AppSizes.p6,
+                                  AppSizes.p12,
+                                  AppSizes.p4,
                                 ),
                                 itemBuilder: (context, index) {
                                   if (showLoadMoreFooter &&
                                       index == sortedComments.length) {
                                     return const Padding(
-                                      padding: EdgeInsets.only(bottom: 20),
+                                      padding: EdgeInsets.only(
+                                        bottom: CommentLayout.itemBottomSpacing,
+                                      ),
                                       child: CommentSkeletonRow(),
                                     );
                                   }
@@ -573,17 +612,24 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
                         commentFocusNode: _commentFocusNode,
                         onSendComment: _onSendComment,
                         showPostButton: _showPostButton,
+                        inputAvatar: _buildCommentInputAvatar(),
                       ),
                     ],
                   ),
                   PostEngagementUsersTab(
                     postId: widget.postId,
                     kind: PostEngagementUserListKind.likes,
+                    scrollController: _sheetScrollForTab(
+                      CommentSheetWidget.likesTabIndex,
+                    ),
                   ),
                   if (widget.isPostOwner)
                     PostEngagementUsersTab(
                       postId: widget.postId,
                       kind: PostEngagementUserListKind.views,
+                      scrollController: _sheetScrollForTab(
+                        CommentSheetWidget.ownerViewsTabIndex,
+                      ),
                     ),
                 ],
               ),

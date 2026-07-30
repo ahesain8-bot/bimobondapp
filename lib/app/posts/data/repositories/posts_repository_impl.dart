@@ -526,6 +526,19 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
+  Future<Either<Failure, void>> updateRepostQuote(
+    String postId, {
+    required String quote,
+  }) async {
+    try {
+      await remoteDataSource.updateRepostQuote(postId, quote: quote);
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, RepostsPageEntity>> getPostReposts(
     String postId, {
     int page = 1,

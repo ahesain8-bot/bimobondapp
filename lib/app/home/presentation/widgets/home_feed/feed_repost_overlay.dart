@@ -7,31 +7,46 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_reposte
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-const _repostAccent = Color(0xFF2ECC71);
 const _avatarRadius = 9.0;
-const _quoteAvatarRadius = 12.0;
+const _quoteAvatarRadius = 9.0;
 const _avatarDiameter = _avatarRadius * 2;
 const _avatarOverlap = 8.0;
 const _cardRadius = 7.0;
-const _quoteBoxRadius = 18.0;
+const _quoteBoxRadius = 10.0;
 const _quoteRotateInterval = Duration(seconds: 3);
 const _quoteSlideDuration = Duration(milliseconds: 680);
 const _quoteSlideCurve = Cubic(0.22, 1, 0.36, 1);
-const _quoteFontSize = 13.0;
-const _quoteBubbleHeight = AppSizes.p6 * 2 + _quoteFontSize * 1.2;
+const _quoteFontSize = 11.0;
+const _quoteBubbleHeight = 4.0 * 2 + _quoteFontSize * 1.2;
 const _quoteRowHeight =
     (_quoteAvatarRadius * 2 > _quoteBubbleHeight
         ? _quoteAvatarRadius * 2
         : _quoteBubbleHeight) +
-    14;
+    8;
 const _glassBlurSigma = 22.0;
+
+/// Themed colors for repost quote chips (light / dark [ColorScheme]).
+class _RepostQuoteColors {
+  _RepostQuoteColors(ColorScheme cs) : _cs = cs;
+
+  final ColorScheme _cs;
+
+  factory _RepostQuoteColors.of(BuildContext context) =>
+      _RepostQuoteColors(Theme.of(context).colorScheme);
+
+  Color get bubbleFill => _cs.surfaceContainerHigh;
+  Color get bubbleBorder => _cs.outline.withValues(alpha: 0.22);
+  Color get text => _cs.onSurface;
+  Color get icon => _cs.primary;
+  Color get avatarBorder => _cs.outline.withValues(alpha: 0.35);
+  Color get avatarFill => _cs.surfaceContainerHighest;
+}
 
 /// TikTok-style repost row shown above the post author username.
 class FeedRepostBanner extends StatelessWidget {
@@ -213,9 +228,9 @@ class FeedRepostBanner extends StatelessWidget {
     final quotedReposters = _repostersWithQuotes(context, reposters);
 
     if (feedItem?.isRepost == true) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: AppSizes.p4),
-        child: _RepostActivityHeader(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: _RepostActivityHeader(
           repostedBy: reposters.isNotEmpty
               ? reposters.first
               : feedItem!.repostedBy,
@@ -232,7 +247,7 @@ class FeedRepostBanner extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.p4),
+      padding: const EdgeInsets.only(bottom: 2),
       child: _RecentRepostersRow(
         reposters: reposters,
         quotedReposters: quotedReposters,
@@ -419,12 +434,13 @@ class _RepostQuoteReplyCard extends StatelessWidget {
     final quote = user.quote?.trim() ?? '';
     if (quote.isEmpty) return const SizedBox.shrink();
 
+    final colors = _RepostQuoteColors.of(context);
     final avatarSize = _quoteAvatarRadius * 2;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxBubbleWidth = constraints.maxWidth.isFinite
-            ? (constraints.maxWidth - avatarSize - AppSizes.p8).clamp(
+            ? (constraints.maxWidth - avatarSize - 6).clamp(
                 0.0,
                 double.infinity,
               )
@@ -434,68 +450,57 @@ class _RepostQuoteReplyCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: avatarSize,
-              height: avatarSize,
-              child: ClipOval(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.45),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: SafeNetworkAvatar(
-                      imageUrl: user.avatarUrl,
-                      radius: _quoteAvatarRadius,
-                      fallbackText: user.username,
-                      backgroundColor: Colors.white.withValues(alpha: 0.15),
-                    ),
-                  ),
-                ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: colors.avatarBorder, width: 1),
+              ),
+              child: SafeNetworkAvatar(
+                imageUrl: user.avatarUrl,
+                radius: _quoteAvatarRadius,
+                fallbackText: user.username,
+                backgroundColor: colors.avatarFill,
               ),
             ),
-            const SizedBox(width: AppSizes.p8),
+            const SizedBox(width: 6),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-              child: _ModernGlassSurface(
-                radius: _quoteBoxRadius,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.p8,
-                  vertical: AppSizes.p6,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.bubbleFill,
+                  borderRadius: BorderRadius.circular(_quoteBoxRadius),
+                  border: Border.all(color: colors.bubbleBorder),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      LucideIcons.repeat2,
-                      size: 13,
-                      color: _repostAccent,
-                      shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        quote,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: _quoteFontSize,
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
-                          letterSpacing: 0.1,
-                          shadows: [
-                            Shadow(color: Colors.black45, blurRadius: 6),
-                          ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.repeat2,
+                        size: 11,
+                        color: colors.icon,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          quote,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.text,
+                            fontSize: _quoteFontSize,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -607,7 +612,7 @@ class _RepostWhiteCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(_cardRadius + 6),
-        splashColor: _repostAccent.withValues(alpha: 0.12),
+        splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
         highlightColor: Colors.black.withValues(alpha: 0.04),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -749,7 +754,7 @@ class _RepostActivityHeader extends StatelessWidget {
         children: [
           if (quotedReposters.isNotEmpty) ...[
             _AnimatedRepostQuotesCarousel(reposters: quotedReposters),
-            const SizedBox(height: AppSizes.p8),
+            const SizedBox(height: 4),
           ],
           Align(
             alignment: AlignmentDirectional.centerStart,
@@ -794,7 +799,7 @@ class _RecentRepostersRow extends StatelessWidget {
         children: [
           if (quotedReposters.isNotEmpty) ...[
             _AnimatedRepostQuotesCarousel(reposters: quotedReposters),
-            const SizedBox(height: AppSizes.p8),
+            const SizedBox(height: 4),
           ],
           Align(
             alignment: AlignmentDirectional.centerStart,

@@ -31,8 +31,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
     repostQuote = initialRepostQuote();
-    isFollowing = widget.post.user?.isFollowing ?? false;
-    followStatusResolved = widget.post.user?.isFollowing != null;
+    _syncFollowStateFromPost();
   }
 
   void syncEngagementFromPost() {
@@ -45,9 +44,34 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
     repostQuote = initialRepostQuote();
-    isFollowing = widget.post.user?.isFollowing ?? false;
-    followStatusResolved = widget.post.user?.isFollowing != null;
+    _syncFollowStateFromPost();
     isFollowLoading = false;
+  }
+
+  void _syncFollowStateFromPost() {
+    final authorId = postAuthorUserId();
+    final fromPost = widget.post.user?.isFollowing;
+
+    if (fromPost != null) {
+      isFollowing = fromPost;
+      followStatusResolved = true;
+      if (authorId != null && authorId.isNotEmpty) {
+        FeedAuthorFollowCache.instance.put(authorId, fromPost);
+      }
+      return;
+    }
+
+    if (authorId != null && authorId.isNotEmpty) {
+      final cached = FeedAuthorFollowCache.instance.lookup(authorId);
+      if (cached != null) {
+        isFollowing = cached;
+        followStatusResolved = true;
+        return;
+      }
+    }
+
+    isFollowing = false;
+    followStatusResolved = false;
   }
 
   void recordViewIfNeeded() {
@@ -73,20 +97,52 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     final authorId = postAuthorUserId();
     if (authorId == null || authorId.isEmpty) return;
 
-    final result = await social_di.sl<CheckIsFollowingUseCase>()(
-      CheckIsFollowingParams(
-        currentUserId: authState.user.id,
-        targetUserId: authorId,
-      ),
-    );
-    if (!mounted) return;
+    final cached = FeedAuthorFollowCache.instance.lookup(authorId);
+    if (cached != null) {
+      setState(() {
+        isFollowing = cached;
+        followStatusResolved = true;
+      });
+      return;
+    }
 
-    result.fold((_) {}, (following) {
+    final pending = FeedAuthorFollowCache.instance.inFlightFor(authorId);
+    if (pending != null) {
+      final following = await pending;
+      if (!mounted || followStatusResolved) return;
       setState(() {
         isFollowing = following;
         followStatusResolved = true;
       });
+      return;
+    }
+
+    final request = _fetchFollowStatus(
+      currentUserId: authState.user.id,
+      targetUserId: authorId,
+    );
+    FeedAuthorFollowCache.instance.trackInFlight(authorId, request);
+    final following = await request;
+    if (!mounted || followStatusResolved) return;
+
+    FeedAuthorFollowCache.instance.put(authorId, following);
+    setState(() {
+      isFollowing = following;
+      followStatusResolved = true;
     });
+  }
+
+  Future<bool> _fetchFollowStatus({
+    required String currentUserId,
+    required String targetUserId,
+  }) async {
+    final result = await social_di.sl<CheckIsFollowingUseCase>()(
+      CheckIsFollowingParams(
+        currentUserId: currentUserId,
+        targetUserId: targetUserId,
+      ),
+    );
+    return result.fold((_) => false, (following) => following);
   }
 
   Future<void> handleFollow() async {
@@ -112,6 +168,10 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
           isFollowing = false;
           isFollowLoading = false;
         });
+        final authorId = postAuthorUserId();
+        if (authorId != null && authorId.isNotEmpty) {
+          FeedAuthorFollowCache.instance.put(authorId, false);
+        }
         PopupDialogs.showErrorDialog(context, failure.message);
       },
       (_) {
@@ -120,28 +180,44 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
           isFollowLoading = false;
           followStatusResolved = true;
         });
+        final authorId = postAuthorUserId();
+        if (authorId != null && authorId.isNotEmpty) {
+          FeedAuthorFollowCache.instance.put(authorId, true);
+        }
       },
     );
   }
 
   void handleLike() {
     if (!checkAuth()) return;
+    final nextLiked = !isLiked;
+    final nextCount = nextLiked ? likeCount + 1 : likeCount - 1;
     setState(() {
-      isLiked = !isLiked;
-      isLiked ? likeCount++ : likeCount--;
+      isLiked = nextLiked;
+      likeCount = nextCount;
     });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(isLiked: nextLiked, likeCount: nextCount),
+    );
     likeAnimController.forward(from: 0);
     context.read<PostsBloc>().add(
-      ToggleLikePostRequestedEvent(widget.post.id, liked: isLiked),
+      ToggleLikePostRequestedEvent(widget.post.id, liked: nextLiked),
     );
   }
 
   void handleSave() {
     if (!checkAuth()) return;
+    final nextSaved = !isSaved;
+    final nextCount = nextSaved ? saveCount + 1 : saveCount - 1;
     setState(() {
-      isSaved = !isSaved;
-      isSaved ? saveCount++ : saveCount--;
+      isSaved = nextSaved;
+      saveCount = nextCount;
     });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(isSaved: nextSaved, saveCount: nextCount),
+    );
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
   }
 
@@ -167,15 +243,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
       return;
     }
 
-    if (isReposted) {
-      toggleRepost();
-      return;
-    }
-
-    RepostSheet.show(
-      context: context,
-      onRepost: (quote) => toggleRepost(quote: quote),
-    );
+    toggleRepost();
   }
 
   String? initialRepostQuote() {
@@ -241,6 +309,15 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
       }
       syncRecentRepostersWithState();
     });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(
+        isReposted: !wasReposted,
+        repostCount: !wasReposted
+            ? post.repostCount + 1
+            : (post.repostCount > 0 ? post.repostCount - 1 : 0),
+      ),
+    );
     context.read<PostsBloc>().add(
       ToggleRepostPostRequestedEvent(widget.post.id, quote: quote),
     );
@@ -284,6 +361,10 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     );
     if (!mounted || latestCount == null) return;
     setState(() => commentCount = latestCount);
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(commentCount: latestCount),
+    );
   }
 
   Future<void> showQuickCommentReactions() async {
@@ -391,6 +472,10 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
       ),
     );
     setState(() => commentCount++);
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(commentCount: post.commentCount + 1),
+    );
     HapticFeedback.lightImpact();
   }
 
@@ -434,6 +519,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
       isFollowing = following;
       followStatusResolved = true;
     });
+    FeedAuthorFollowCache.instance.put(userId, following);
   }
 
   void showMoreOptions() {

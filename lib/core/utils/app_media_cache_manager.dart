@@ -66,6 +66,12 @@ class AppMediaCacheManager {
     } catch (_) {}
   }
 
+  /// Progressive media (video/audio) — same disk pool as feed video cache.
+  static Future<File?> getCachedSoundFile(String url) =>
+      getCachedVideoFile(url);
+
+  static Future<File?> downloadSoundFile(String url) => downloadVideoFile(url);
+
   static Future<File?> downloadVideoFile(String url) async {
     if (!canDiskCacheVideo(url)) return null;
     final resolved = MediaUtils.resolveAbsoluteUrl(url.trim());

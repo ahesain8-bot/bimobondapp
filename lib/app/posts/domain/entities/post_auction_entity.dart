@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/auctions/domain/entities/auction_pricing_entity.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/auction_last_gift_parser.dart';
 import 'package:equatable/equatable.dart';
 
 class PostAuctionEntity extends Equatable {
@@ -17,6 +18,7 @@ class PostAuctionEntity extends Equatable {
     this.pricing,
     required this.startedAt,
     required this.endedAt,
+    this.lastGift,
   });
 
   final String? id;
@@ -33,6 +35,7 @@ class PostAuctionEntity extends Equatable {
   final AuctionPricingEntity? pricing;
   final DateTime startedAt;
   final DateTime endedAt;
+  final PostAuctionLastGiftEntity? lastGift;
 
   double get progressPercent {
     if (pricing != null && pricing!.progressPercent > 0) {
@@ -132,6 +135,7 @@ class PostAuctionEntity extends Equatable {
       endedAt: json['endedAt'] != null
           ? DateTime.parse(json['endedAt'].toString())
           : DateTime.now(),
+      lastGift: PostAuctionLastGiftEntity.fromJson(json['lastGift']),
     );
   }
 
@@ -165,6 +169,7 @@ class PostAuctionEntity extends Equatable {
     AuctionPricingEntity? pricing,
     DateTime? startedAt,
     DateTime? endedAt,
+    PostAuctionLastGiftEntity? lastGift,
   }) {
     return PostAuctionEntity(
       id: id ?? this.id,
@@ -181,6 +186,7 @@ class PostAuctionEntity extends Equatable {
       pricing: pricing ?? this.pricing,
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
+      lastGift: lastGift ?? this.lastGift,
     );
   }
 
@@ -200,5 +206,6 @@ class PostAuctionEntity extends Equatable {
     pricing,
     startedAt,
     endedAt,
+    lastGift,
   ];
 }

@@ -30,17 +30,6 @@ class VideoPostBottomInfo extends StatelessWidget {
   final int mediaCount;
   final VoidCallback? onMusicTap;
 
-  String _relativeTime(AppLocalizations l10n) {
-    final local = post.createdAt.toLocal();
-    final diff = DateTime.now().difference(local);
-    if (diff.inMinutes < 1) return l10n.justNow;
-    if (diff.inMinutes < 60) return l10n.storyTimeMinutesAgo(diff.inMinutes);
-    if (diff.inHours < 24) return l10n.storyTimeHoursAgo(diff.inHours);
-    if (diff.inDays < 7) return l10n.storyTimeDaysAgo(diff.inDays);
-    if (diff.inDays < 30) return l10n.storyTimeDaysAgo(diff.inDays);
-    return l10n.storyTimeDaysAgo(diff.inDays);
-  }
-
   Future<void> _openAuthor(BuildContext context) async {
     final user = post.user;
     final id = user?.id.trim() ?? '';
@@ -88,7 +77,7 @@ class VideoPostBottomInfo extends StatelessWidget {
               padding: const EdgeInsets.only(
                 left: VideoPostLayoutConstants.contentEdgeInset,
                 right: VideoPostLayoutConstants.contentActionSidePadding,
-                bottom: 8,
+                bottom: 0,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,38 +127,17 @@ class VideoPostBottomInfo extends StatelessWidget {
                     GestureDetector(
                       onTap: () => _openAuthor(context),
                       behavior: HitTestBehavior.opaque,
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: displayName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 6,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' · ${_relativeTime(l10n)}',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.72),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                shadows: const [
-                                  Shadow(
-                                    color: Colors.black45,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ],
-                              ),
+                      child: Text(
+                        displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black54,
+                              blurRadius: 6,
+                              offset: Offset(0, 1),
                             ),
                           ],
                         ),
@@ -181,7 +149,7 @@ class VideoPostBottomInfo extends StatelessWidget {
                     PostCaptionTags(post: post)
                   else if (post.hashtags.isNotEmpty)
                     PostHashtagChips(tags: post.hashtags),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   VideoPostMusicLabel(
                     soundName: post.sound?.name,
                     soundAuthor: post.sound?.author,

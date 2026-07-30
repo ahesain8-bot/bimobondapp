@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/gifts/data/models/gift_group_model.dart';
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
@@ -7,7 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 abstract class GiftsRemoteDataSource {
-  Future<List<GiftModel>> getGifts();
+  Future<List<GiftGroupModel>> getGiftGroups();
+  Future<List<GiftModel>> getGifts({String? groupId, String? groupSlug});
   Future<GiftInventoryModel> getInventory();
   Future<GiftInventoryModel> purchaseGift({
     required String giftId,
@@ -49,7 +51,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
         }
         return [data];
       }
-      for (final key in ['items', 'gifts']) {
+      for (final key in ['groups', 'items', 'gifts']) {
         final nested = body[key];
         if (nested is List) return nested;
       }
@@ -64,22 +66,60 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     return null;
   }
 
+  List<GiftModel> _mapGiftList(List<dynamic> list) {
+    return list
+        .whereType<Map>()
+        .map((json) => Map<String, dynamic>.from(json))
+        .where((json) {
+          final isActive = json['isActive'];
+          return isActive == null || isActive == true;
+        })
+        .map(GiftModel.fromJson)
+        .where((gift) => gift.id.isNotEmpty)
+        .toList();
+  }
+
   @override
-  Future<List<GiftModel>> getGifts() async {
+  Future<List<GiftGroupModel>> getGiftGroups() async {
     try {
-      final response = await apiClient.dio.get(ApiConstants.gifts);
+      final response = await apiClient.dio.get(ApiConstants.giftsGroups);
       if (response.statusCode == 200) {
         return _extractList(response.data)
             .whereType<Map>()
-            .where((json) {
-              final isActive = json['isActive'];
-              return isActive == null || isActive == true;
-            })
-            .map(
-              (json) => GiftModel.fromJson(Map<String, dynamic>.from(json)),
-            )
-            .where((gift) => gift.id.isNotEmpty)
-            .toList();
+            .map((json) => GiftGroupModel.fromJson(Map<String, dynamic>.from(json)))
+            .where((group) => group.id.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to load gift groups',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<List<GiftModel>> getGifts({String? groupId, String? groupSlug}) async {
+    try {
+      final query = <String, dynamic>{};
+      if (groupId != null && groupId.isNotEmpty) {
+        query['groupId'] = groupId;
+      } else if (groupSlug != null && groupSlug.isNotEmpty) {
+        query['groupSlug'] = groupSlug;
+      }
+
+      final response = await apiClient.dio.get(
+        ApiConstants.gifts,
+        queryParameters: query.isEmpty ? null : query,
+      );
+      if (response.statusCode == 200) {
+        final body = response.data;
+        if (body is Map && body['data'] is List) {
+          return _mapGiftList(body['data'] as List);
+        }
+        return _mapGiftList(_extractList(body));
       }
       throw ServerException(
         message: _extractErrorMessage(response.data) ?? 'Failed to load gifts',
@@ -170,8 +210,6 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     String? message,
   }) async {
     try {
-      // Docs: send consumes exactly 1 inventory unit. Body requires giftId +
-      // receiverId; auction/live may override receiver server-side.
       final data = <String, dynamic>{
         'giftId': giftId,
         'receiverId': receiverId,

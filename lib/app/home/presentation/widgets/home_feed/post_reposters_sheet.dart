@@ -9,8 +9,6 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-const _repostAccent = Color(0xFF2ECC71);
-
 class PostRepostersSheet {
   PostRepostersSheet._();
 
@@ -20,31 +18,74 @@ class PostRepostersSheet {
     int repostCount = 0,
   }) {
     final l10n = AppLocalizations.of(context)!;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.78;
+    final sheetTheme = Theme.of(context);
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
 
     return GlassBottomSheet.showContent<void>(
       context,
       isScrollControlled: true,
-      adaptTheme: true,
-      title: l10n.postRepostersTitle(repostCount),
-      child: SizedBox(
-        height: maxHeight * 0.72,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSizes.p20),
-              child: Text(
-                l10n.repostSubtitle,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 13,
+      showHandle: true,
+      lightSurface: true,
+      child: Theme(
+        data: sheetTheme,
+        child: SizedBox(
+          height: maxHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSizes.p8,
+                  0,
+                  AppSizes.p8,
+                  AppSizes.p4,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Text(
+                      l10n.postRepostersHeader,
+                      textAlign: TextAlign.center,
+                      style: sheetTheme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: sheetTheme.colorScheme.onSurface,
+                      ),
+                    ),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          LucideIcons.x,
+                          size: 22,
+                          color: sheetTheme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: AppSizes.p8),
-            Expanded(child: _PostRepostersList(postId: postId)),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSizes.p16,
+                  0,
+                  AppSizes.p16,
+                  AppSizes.p8,
+                ),
+                child: Text(
+                  l10n.postRepostersTitle(repostCount),
+                  textAlign: TextAlign.center,
+                  style: sheetTheme.textTheme.bodySmall?.copyWith(
+                    color: sheetTheme.colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              Expanded(child: _PostRepostersList(postId: postId)),
+            ],
+          ),
         ),
       ),
     );
@@ -163,14 +204,14 @@ class _PostRepostersListState extends State<_PostRepostersList> {
     if (_isLoading && _reposts.isEmpty) {
       return ListView.builder(
         padding: const EdgeInsets.fromLTRB(
-          AppSizes.p16,
+          AppSizes.p12,
+          AppSizes.p4,
           AppSizes.p12,
           AppSizes.p16,
-          AppSizes.p24,
         ),
         itemCount: 5,
-        itemBuilder: (_, __) => const Padding(
-          padding: EdgeInsets.only(bottom: AppSizes.p10),
+        itemBuilder: (_, _) => const Padding(
+          padding: EdgeInsets.only(bottom: AppSizes.p8),
           child: _ReposterCardSkeleton(),
         ),
       );
@@ -192,27 +233,29 @@ class _PostRepostersListState extends State<_PostRepostersList> {
       );
     }
 
+    final cs = Theme.of(context).colorScheme;
+
     return ListView.separated(
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(
-        AppSizes.p16,
+        AppSizes.p12,
+        AppSizes.p4,
         AppSizes.p12,
         AppSizes.p16,
-        AppSizes.p24,
       ),
       itemCount: _reposts.length + (_isLoadingMore ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: AppSizes.p8),
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         if (index >= _reposts.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSizes.p12),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
             child: Center(
               child: SizedBox(
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: _repostAccent,
+                  color: cs.primary,
                 ),
               ),
             ),
@@ -230,32 +273,49 @@ class _ReposterCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlassSurface(
-      borderRadius: BorderRadius.circular(14),
+    final cs = Theme.of(context).colorScheme;
+    final skeletonTone = Theme.of(context).brightness == Brightness.dark
+        ? LiquidGlassSkeletonTone.standard
+        : LiquidGlassSkeletonTone.light;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p12,
-          vertical: AppSizes.p10,
+          horizontal: AppSizes.p10,
+          vertical: AppSizes.p8,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const LiquidGlassSkeletonBox.circular(size: 44),
-            const SizedBox(width: AppSizes.p12),
+            LiquidGlassSkeletonBox.circular(
+              size: 36,
+              tone: skeletonTone,
+            ),
+            const SizedBox(width: AppSizes.p10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const LiquidGlassSkeletonBox(height: 14, width: 120),
+                  LiquidGlassSkeletonBox(
+                    height: 12,
+                    width: 120,
+                    tone: skeletonTone,
+                  ),
                   const SizedBox(height: 6),
                   LiquidGlassSkeletonBox(
-                    height: 12,
+                    height: 10,
                     width: MediaQuery.sizeOf(context).width * 0.28,
+                    tone: skeletonTone,
                   ),
-                  const SizedBox(height: AppSizes.p8),
+                  const SizedBox(height: AppSizes.p6),
                   LiquidGlassSkeletonBox(
-                    height: 12,
+                    height: 10,
                     width: MediaQuery.sizeOf(context).width * 0.45,
+                    tone: skeletonTone,
                   ),
                 ],
               ),
@@ -277,104 +337,81 @@ class _ReposterCard extends StatelessWidget {
     final user = repost.user;
     if (user == null) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final displayName = user.fullName?.trim().isNotEmpty == true
         ? user.fullName!
         : user.username;
     final quote = repost.quote?.trim();
 
-    return LiquidGlassSurface(
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p12,
-          vertical: AppSizes.p10,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SafeNetworkAvatar(
-              imageUrl: user.avatarUrl,
-              radius: 22,
-              fallbackText: user.username,
-              backgroundColor: Colors.white.withValues(alpha: 0.12),
-            ),
-            const SizedBox(width: AppSizes.p12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.p4,
+        vertical: AppSizes.p6,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SafeNetworkAvatar(
+            imageUrl: user.avatarUrl,
+            radius: 22,
+            fallbackText: user.username,
+            backgroundColor: cs.surfaceContainerHighest,
+          ),
+          const SizedBox(width: AppSizes.p10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
                       ),
-                      if (user.isVerified) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.verified,
-                          size: 15,
-                          color: Colors.blue.shade300,
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (user.username.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      '@${user.username}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 13,
-                      ),
                     ),
-                  ],
-                  if (quote != null && quote.isNotEmpty) ...[
-                    const SizedBox(height: AppSizes.p6),
-                    Text(
-                      quote,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.88),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        LucideIcons.repeat2,
-                        size: 12,
-                        color: _repostAccent,
-                      ),
+                    if (user.isVerified) ...[
                       const SizedBox(width: 4),
-                      Text(
-                        _formatRepostedAt(repost.createdAt),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
+                      Icon(
+                        Icons.verified,
+                        size: 14,
+                        color: cs.primary,
                       ),
                     ],
+                  ],
+                ),
+                if (quote != null && quote.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    quote,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurface,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
                   ),
                 ],
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatRepostedAt(repost.createdAt),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -395,40 +432,44 @@ class _SheetMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSizes.p32),
+        padding: const EdgeInsets.all(AppSizes.p24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LiquidGlassSurface(
-              borderRadius: BorderRadius.circular(28),
-              padding: const EdgeInsets.all(AppSizes.p16),
-              child: Icon(
-                icon,
-                size: 24,
-                color: Colors.white.withValues(alpha: 0.75),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHigh,
+                shape: BoxShape.circle,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSizes.p12),
+                child: Icon(icon, size: 22, color: cs.onSurfaceVariant),
               ),
             ),
-            const SizedBox(height: AppSizes.p16),
+            const SizedBox(height: AppSizes.p12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontSize: 14,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontSize: 13,
                 height: 1.4,
               ),
             ),
             if (showRetry && onRetry != null) ...[
-              const SizedBox(height: AppSizes.p16),
+              const SizedBox(height: AppSizes.p12),
               IconButton.filled(
                 onPressed: onRetry,
                 style: IconButton.styleFrom(
-                  backgroundColor: _repostAccent.withValues(alpha: 0.12),
-                  foregroundColor: _repostAccent,
+                  backgroundColor: cs.primary.withValues(alpha: 0.12),
+                  foregroundColor: cs.primary,
                 ),
-                icon: const Icon(LucideIcons.refreshCw, size: 20),
+                icon: const Icon(LucideIcons.refreshCw, size: 18),
               ),
             ],
           ],

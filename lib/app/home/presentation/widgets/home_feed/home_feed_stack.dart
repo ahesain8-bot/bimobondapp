@@ -1,9 +1,13 @@
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_posts_viewer_layout.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_scrub_time_overlay.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_search_progress_column.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_page_view.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:flutter/material.dart';
 
+/// Home feed stack: full-bleed media + search/progress docked on the post bottom.
 class HomeFeedStack extends StatelessWidget {
   const HomeFeedStack({
     required this.pageController,
@@ -11,6 +15,9 @@ class HomeFeedStack extends StatelessWidget {
     required this.currentPostIndex,
     required this.isTabActive,
     required this.onPageChanged,
+    required this.bottomChromeListenable,
+    required this.mediaBottomInsetFor,
+    this.onFeedPostPatch,
     super.key,
   });
 
@@ -19,33 +26,54 @@ class HomeFeedStack extends StatelessWidget {
   final int currentPostIndex;
   final bool isTabActive;
   final ValueChanged<int> onPageChanged;
+  final Listenable bottomChromeListenable;
+  final double Function(BuildContext context, PostEntity post)
+  mediaBottomInsetFor;
+  final FeedPostPatch? onFeedPostPatch;
 
   @override
   Widget build(BuildContext context) {
-    final currentItem = feedItems[currentPostIndex.clamp(0, feedItems.length - 1)];
-    final currentPost = currentItem.post;
-    final showVideoProgress =
-        !currentPost.isAuctionable && feedPostHasVideo(currentPost);
+    final chromeBottom =
+        FeedVideoPostsViewerLayout.homeFeedPostStackChromeBottom(context);
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        HomeFeedPageView(
-          controller: pageController,
-          feedItems: feedItems,
-          currentPostIndex: currentPostIndex,
-          isTabActive: isTabActive,
-          onPageChanged: onPageChanged,
-        ),
-        if (showVideoProgress)
-          Positioned(
-            key: ValueKey(feedItems[currentPostIndex].id),
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.paddingOf(context).bottom,
-            child: const FeedVideoProgressBar(),
-          ),
-      ],
+    return ListenableBuilder(
+      listenable: bottomChromeListenable,
+      builder: (context, _) {
+        final current =
+            feedItems[currentPostIndex.clamp(0, feedItems.length - 1)];
+        final showPostStackChrome = isTabActive && !current.post.isAuctionable;
+
+        final currentHasVideo = feedPostHasVideo(current.post);
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            HomeFeedPageView(
+              controller: pageController,
+              feedItems: feedItems,
+              currentPostIndex: currentPostIndex,
+              isTabActive: isTabActive,
+              onPageChanged: onPageChanged,
+              bottomChromeListenable: bottomChromeListenable,
+              mediaBottomInsetFor: mediaBottomInsetFor,
+              onFeedPostPatch: onFeedPostPatch,
+            ),
+            const Positioned.fill(child: FeedVideoScrubTimeOverlay()),
+            if (showPostStackChrome)
+              Positioned(
+                key: ValueKey('feed_stack_chrome_${current.post.id}'),
+                left: 0,
+                right: 0,
+                bottom: chromeBottom,
+                child: FeedVideoSearchProgressColumn(
+                  post: current.post,
+                  transparentBackground: true,
+                  showProgressBar: currentHasVideo,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

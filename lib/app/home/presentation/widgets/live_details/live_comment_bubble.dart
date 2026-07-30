@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_accent_color.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -15,6 +16,8 @@ class LiveCommentBubble extends StatelessWidget {
     this.userId,
     required this.body,
     required this.isGift,
+    this.isAudioGift = false,
+    this.audioGiftColorHex,
     this.giftImageUrl,
     this.onProfileTap,
   });
@@ -25,6 +28,8 @@ class LiveCommentBubble extends StatelessWidget {
   final String? userId;
   final String body;
   final bool isGift;
+  final bool isAudioGift;
+  final String? audioGiftColorHex;
   final String? giftImageUrl;
   final VoidCallback? onProfileTap;
 
@@ -34,12 +39,27 @@ class LiveCommentBubble extends StatelessWidget {
   Color get _giftBodyColor => LiveDetailsLayoutConstants.giftCommentGoldText
       .withValues(alpha: LiveDetailsLayoutConstants.giftCommentContentOpacity);
 
+  static const Color _audioGiftAccentFallback = Color(0xFF3D2E6B);
+
+  Color get _audioAccent => giftAccentColor(
+        audioGiftColorHex,
+        fallback: _audioGiftAccentFallback,
+      );
+
+  Color get _audioCapsuleFill => _audioAccent.withValues(alpha: 0.24);
+
+  Color get _audioNameColor =>
+      Colors.white.withValues(alpha: 0.78);
+
+  Color get _audioBodyColor =>
+      Colors.white.withValues(alpha: 0.72);
+
   @override
   Widget build(BuildContext context) {
     final nameRecognizer = onProfileTap != null
         ? (TapGestureRecognizer()..onTap = onProfileTap)
         : null;
-    final giftImage = giftImageUrl?.trim();
+    final giftImage = isAudioGift ? null : giftImageUrl?.trim();
     final hasGiftImage = giftImage != null && giftImage.isNotEmpty;
     final maxWidth = MediaQuery.sizeOf(context).width * 0.72;
 
@@ -48,12 +68,20 @@ class LiveCommentBubble extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(4, 3, 8, 3),
         decoration: BoxDecoration(
-          color: isGift
-              ? LiveDetailsLayoutConstants.giftCommentGoldDeep.withValues(
-                  alpha: 0.28,
-                )
-              : Colors.black.withValues(alpha: 0.28),
+          color: isAudioGift
+              ? _audioCapsuleFill
+              : isGift
+                  ? LiveDetailsLayoutConstants.giftCommentGoldDeep.withValues(
+                      alpha: 0.28,
+                    )
+                  : Colors.black.withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(14),
+          border: isAudioGift
+              ? Border.all(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  width: 0.5,
+                )
+              : null,
         ),
         child: RichText(
           text: TextSpan(
@@ -83,9 +111,9 @@ class LiveCommentBubble extends StatelessWidget {
                       start: isRtl ? 4 : 0,
                     ),
                     child: Icon(
-                      LucideIcons.gift,
+                      isAudioGift ? LucideIcons.music2 : LucideIcons.gift,
                       size: 16,
-                      color: _giftNameColor,
+                      color: isAudioGift ? _audioNameColor : _giftNameColor,
                     ),
                   ),
                 ),
@@ -93,9 +121,11 @@ class LiveCommentBubble extends StatelessWidget {
                 text: '$displayName ',
                 recognizer: nameRecognizer,
                 style: TextStyle(
-                  color: isGift
-                      ? _giftNameColor
-                      : Colors.white.withValues(alpha: 0.92),
+                  color: isAudioGift
+                      ? _audioNameColor
+                      : isGift
+                          ? _giftNameColor
+                          : Colors.white.withValues(alpha: 0.92),
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                   height: 1.25,
@@ -104,9 +134,11 @@ class LiveCommentBubble extends StatelessWidget {
               TextSpan(
                 text: body,
                 style: TextStyle(
-                  color: isGift
-                      ? _giftBodyColor
-                      : Colors.white.withValues(alpha: 0.88),
+                  color: isAudioGift
+                      ? _audioBodyColor
+                      : isGift
+                          ? _giftBodyColor
+                          : Colors.white.withValues(alpha: 0.88),
                   fontSize: 12,
                   height: 1.25,
                   fontWeight: FontWeight.w500,

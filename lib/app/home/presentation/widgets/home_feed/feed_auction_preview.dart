@@ -281,11 +281,12 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
   final bool isAuctionFinished;
 
   String _formatHighestBid(AppLocalizations l10n, Locale locale) {
-    final amount = formatAuctionPricingCoins(
-      auction?.displayHighestPriceCoins ?? 0,
-      locale,
-    );
-    return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
+    final coins = auction?.displayHighestPriceCoins ?? 0;
+    return formatAuctionLiveCoinsLabel(l10n, locale, coins);
+  }
+
+  int? _resolveAuctionTargetCoins(PostAuctionEntity? auction) {
+    return resolveAuctionTargetPriceCoins(auction);
   }
 
   @override
@@ -293,13 +294,12 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final locale = Localizations.localeOf(context);
     final theme = Theme.of(context);
-    final targetCoins = auction?.targetPriceCoins ?? 0;
-    final targetPriceLabel = targetCoins > 0
-        ? l10n.auctionTargetPrice(
-            formatAuctionPricingCoins(targetCoins, locale),
-            l10n.coinsUnit,
-          )
-        : null;
+    final targetCoins = _resolveAuctionTargetCoins(auction);
+    final targetPriceLabel = formatAuctionTargetPriceLabel(
+      auction: auction,
+      l10n: l10n,
+      locale: locale,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,10 +309,12 @@ class _FeedAuctionInfoOverlay extends StatelessWidget {
           CompactHighestBid(
             topBidLabel: l10n.liveTopBid,
             bidAmountText: _formatHighestBid(l10n, locale),
+            bidAmountCoins: auction?.displayHighestPriceCoins ?? 0,
             showGiftIcon: true,
             showCoinIcon: true,
-            targetPrice: targetCoins > 0 ? targetCoins : null,
+            targetPrice: targetCoins,
             targetPriceLabel: targetPriceLabel,
+            targetPriceHeader: l10n.liveTargetPrice,
             isFinished: isAuctionFinished,
             popAnimation: const AlwaysStoppedAnimation(1),
             theme: theme,

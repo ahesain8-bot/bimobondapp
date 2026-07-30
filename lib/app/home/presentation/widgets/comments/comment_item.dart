@@ -6,7 +6,6 @@ import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_event.dart';
 import 'package:bimobondapp/app/posts/presentation/utils/comment_thread_utils.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -93,7 +92,7 @@ class _CommentItemState extends State<CommentItem> {
     final hasReplies = comment.replyCount > 0;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.p20),
+      padding: const EdgeInsets.only(bottom: CommentLayout.itemBottomSpacing),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -108,8 +107,8 @@ class _CommentItemState extends State<CommentItem> {
           if (hasReplies && !widget.isExpanded)
             Padding(
               padding: const EdgeInsetsDirectional.only(
-                start: CommentLayout.avatarSize + 10,
-                top: AppSizes.p4,
+                start: CommentLayout.avatarSize + CommentLayout.avatarTextGap,
+                top: 2,
               ),
               child: GestureDetector(
                 onTap: _toggleReplies,
@@ -117,7 +116,7 @@ class _CommentItemState extends State<CommentItem> {
                 child: Text(
                   l10n.viewReplies(comment.replyCount),
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: CommentLayout.threadActionFontSize,
                     fontWeight: FontWeight.w600,
                     color: replyToggleColor,
                   ),
@@ -137,7 +136,9 @@ class _CommentItemState extends State<CommentItem> {
                   isLast: isLast,
                   lineColor: theme.dividerColor.withValues(alpha: 0.45),
                   child: Padding(
-                    padding: const EdgeInsets.only(top: AppSizes.p12),
+                    padding: const EdgeInsets.only(
+                      top: CommentLayout.replyTopSpacing,
+                    ),
                     child: CommentRow(
                       comment: reply,
                       onLike: widget.onLike,
@@ -157,15 +158,15 @@ class _CommentItemState extends State<CommentItem> {
             if (widget.isExpanded && hasReplies)
               Padding(
                 padding: EdgeInsetsDirectional.only(
-                  start: CommentLayout.avatarSize + 10,
-                  top: AppSizes.p4,
+                  start: CommentLayout.avatarSize + CommentLayout.avatarTextGap,
+                  top: 2,
                 ),
                 child: GestureDetector(
                   onTap: _toggleReplies,
                   child: Text(
                     l10n.hideReplies,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: CommentLayout.threadActionFontSize,
                       fontWeight: FontWeight.w600,
                       color: replyToggleColor,
                     ),
@@ -181,14 +182,14 @@ class _CommentItemState extends State<CommentItem> {
               Padding(
                 padding: EdgeInsetsDirectional.only(
                   start: CommentLayout.threadIndent + 24,
-                  top: AppSizes.p4,
+                  top: 2,
                 ),
                 child: GestureDetector(
                   onTap: _handleLoadMoreReplies,
                   child: Text(
                     l10n.loadMoreReplies,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: CommentLayout.threadActionFontSize,
                       fontWeight: FontWeight.w600,
                       color: replyToggleColor,
                     ),

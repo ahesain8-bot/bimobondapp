@@ -26,6 +26,7 @@ import 'package:bimobondapp/app/social/domain/usecases/toggle_follow_usecase.dar
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import 'package:bimobondapp/app/auctions/domain/entities/auction_details_entity.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/cancel_auction_usecase.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_active_auctions_usecase.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_usecase.dart';
@@ -38,7 +39,9 @@ import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_searc
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_parts.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/live_details/compact_highest_bid.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/auction_audio_gift_chip_session.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/auction_last_gift_parser.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_price_with_audio_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/gift_animation_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_bidding_input.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_chat_message.dart';
@@ -88,6 +91,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   int _highestBid = LiveDetailsLayoutConstants.initialHighestBid;
   int? _giftContributionOverride;
   int? _startingPriceOverride;
+  int? _targetPriceCoinsOverride;
   bool _isAuctionFinished = false;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
@@ -104,6 +108,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   /// Resolved auction UUID when `post.auction.id` is missing from feed payload.
   String? _resolvedAuctionId;
   Completer<String?>? _auctionIdResolveCompleter;
+  final _audioGiftChipSession = AuctionAudioGiftChipSession();
+  String? _ephemeralAudioGiftLabel;
+  String? _ephemeralAudioGiftColor;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -138,9 +145,17 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     return widget.post?.auction?.giftContributionCoins ?? 0;
   }
 
-  int get _highestBidCoins => _startingPriceCoins + _giftContributionCoins;
+  int get _highestBidCoins {
+    if (_startingPriceOverride != null || _giftContributionOverride != null) {
+      return _startingPriceCoins + _giftContributionCoins;
+    }
+    return widget.post?.auction?.displayHighestPriceCoins ?? 0;
+  }
 
   bool get _usesGiftTotal => widget.post?.auction != null;
+
+  bool get _showAuctionCoinPricing =>
+      _isAuctionPost || widget.post?.auction != null;
 
   @override
   void initState() {
@@ -186,7 +201,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       );
     }
 
-    if (widget.post?.auction != null) {
+    if (_isAuctionPost || widget.post?.auction != null) {
       _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
         _syncAuctionFinishedState();
@@ -199,7 +214,44 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     unawaited(_startAuctionRealtime());
     if (_isAuctionPost) {
       unawaited(_ensureGiftAuctionId());
+      unawaited(_prefetchAuctionDetails());
     }
+  }
+
+  void _applyAuctionDetailsFromApi(
+    AuctionDetailsEntity details, {
+    bool animateBid = false,
+  }) {
+    setState(() {
+      _startingPriceOverride = details.startingPriceCoins;
+      _giftContributionOverride = details.currentTotalCoins;
+      if (details.targetPriceCoins > 0) {
+        _targetPriceCoinsOverride = details.targetPriceCoins;
+      }
+      final highest = details.displayHighestPriceCoins;
+      if (details.targetPriceCoins > 0 && highest >= details.targetPriceCoins) {
+        if (!_isAuctionFinished) {
+          _completeAuction();
+        }
+      } else if (animateBid) {
+        _bidPopController.forward(from: 0);
+      }
+      _syncAuctionFinishedState();
+    });
+  }
+
+  Future<void> _prefetchAuctionDetails() async {
+    final auctionId = await _ensureGiftAuctionId();
+    if (!mounted || auctionId == null || auctionId.isEmpty) return;
+
+    final result = await auctions_di.sl<GetAuctionDetailsUseCase>()(
+      GetAuctionDetailsParams(auctionId: auctionId),
+    );
+    if (!mounted) return;
+
+    result.fold((_) {}, (details) {
+      _applyAuctionDetailsFromApi(details);
+    });
   }
 
   String? get _auctionId => _auctionRoomId;
@@ -357,16 +409,35 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     if (comment.isGift) {
       _bidPopController.forward(from: 0);
-      _playGiftAnimation(
-        animationUrl: comment.giftAnimationUrl,
-        thumbnailUrl: comment.giftThumbnailUrl ?? comment.giftIcon,
-        senderName: _displaySenderName(
-          fullName: comment.user.fullName,
-          username: comment.user.username,
-        ),
-        giftName: comment.giftName,
-      );
+      if (comment.isAudioGiftComment) {
+        unawaited(
+          _audioGiftChipSession.play(
+            onUpdate: _onEphemeralAudioGiftChipUpdate,
+            label: comment.giftName ?? 'Gift',
+            colorHex: comment.giftColor,
+            audioUrl: comment.giftAudioUrl,
+          ),
+        );
+      } else {
+        _playGiftAnimation(
+          animationUrl: comment.giftAnimationUrl,
+          thumbnailUrl: comment.giftThumbnailUrl ?? comment.giftIcon,
+          senderName: _displaySenderName(
+            fullName: comment.user.fullName,
+            username: comment.user.username,
+          ),
+          giftName: comment.giftName,
+        );
+      }
     }
+  }
+
+  void _onEphemeralAudioGiftChipUpdate(String? label, String? colorHex) {
+    if (!mounted) return;
+    setState(() {
+      _ephemeralAudioGiftLabel = label;
+      _ephemeralAudioGiftColor = colorHex;
+    });
   }
 
   void _playGiftAnimation({
@@ -511,6 +582,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         _giftContributionOverride = payload.currentTotalCoins;
         shouldAnimateBid = true;
       }
+      if (payload.targetPriceCoins != null && payload.targetPriceCoins! > 0) {
+        _targetPriceCoinsOverride = payload.targetPriceCoins;
+      }
       if (_isFinishedStatus(payload.status)) {
         _isAuctionFinished = true;
         _pulseController.stop();
@@ -521,12 +595,43 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       shouldAnimateBid = true;
       _refreshAuctionComments();
       final gift = payload.lastGift!;
+      final parsedLastGift = PostAuctionLastGiftEntity.fromMap(
+        Map<String, dynamic>.from(gift),
+      );
       final giftName = gift['name']?.toString();
       final thumb =
           (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
               ?.toString();
       final animationUrl =
           (gift['animationUrl'] ?? gift['animation_url'])?.toString();
+      final audioUrl =
+          (gift['audioUrl'] ?? gift['audio_url'])?.toString();
+
+      if (parsedLastGift?.isAudioGift == true) {
+        unawaited(
+          _audioGiftChipSession.play(
+            onUpdate: _onEphemeralAudioGiftChipUpdate,
+            label: parsedLastGift!.name,
+            colorHex: parsedLastGift.color,
+            audioUrl: audioUrl,
+          ),
+        );
+      } else {
+        _playGiftAnimation(
+          animationUrl: animationUrl,
+          thumbnailUrl: thumb,
+          giftName: giftName,
+          senderName: _displaySenderName(
+            fullName: (gift['senderFullName'] ??
+                    gift['senderName'] ??
+                    gift['fullName'] ??
+                    gift['nameSender'])
+                ?.toString(),
+            username: (gift['senderUsername'] ?? gift['username'])?.toString(),
+          ),
+        );
+      }
+
       final senderFullName =
           (gift['senderFullName'] ??
                   gift['senderName'] ??
@@ -559,24 +664,21 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
               ),
               isGift: true,
               giftName: giftName,
-              giftThumbnailUrl: thumb,
-              giftAnimationUrl: animationUrl,
+              giftThumbnailUrl:
+                  parsedLastGift?.isAudioGift == true ? null : thumb,
+              giftAnimationUrl:
+                  parsedLastGift?.isAudioGift == true ? null : animationUrl,
+              giftCatalogType: parsedLastGift?.isAudioGift == true
+                  ? GiftCatalogType.audio
+                  : GiftCatalogType.image,
+              giftColor: parsedLastGift?.color,
+              giftAudioUrl: audioUrl,
               createdAt: now,
               updatedAt: now,
             ),
           );
         }
       }
-
-      _playGiftAnimation(
-        animationUrl: animationUrl,
-        thumbnailUrl: thumb,
-        giftName: giftName,
-        senderName: _displaySenderName(
-          fullName: senderFullName,
-          username: senderUsername,
-        ),
-      );
     }
 
     final target =
@@ -663,6 +765,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (prevTotal != nextTotal) {
       _giftContributionOverride = null;
       _startingPriceOverride = null;
+      _targetPriceCoinsOverride = null;
       if (nextTotal != null && nextTotal != prevTotal) {
         _bidPopController.forward(from: 0);
       }
@@ -680,7 +783,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (auction == null || _isAuctionFinished) return;
 
     final endedByStatusOrDate = AuctionSearchFilters.isPostEnded(post!);
-    final targetCoins = auction.targetPriceCoins;
+    final targetCoins = resolveAuctionTargetPriceCoins(
+      auction,
+      overrideCoins: _targetPriceCoinsOverride,
+    ) ?? 0;
     final targetReached = targetCoins > 0 && _highestBidCoins >= targetCoins;
 
     if (endedByStatusOrDate || targetReached) {
@@ -694,6 +800,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   @override
   void dispose() {
     _stopAuctionRealtime();
+    _audioGiftChipSession.dispose();
     _chatController.dispose();
     _chatScrollController.dispose();
     _mediaPageController.dispose();
@@ -996,20 +1103,31 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     await Future<void>.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
 
-    final animationUrl = gift.animationUrl?.trim().isNotEmpty == true
-        ? gift.animationUrl
-        : gift.displayImageUrl;
     final authState = context.read<AuthBloc>().state;
     final me = authState is AuthSuccess ? authState.user : null;
-    _playGiftAnimation(
-      animationUrl: animationUrl,
-      thumbnailUrl: gift.displayImageUrl,
-      giftName: gift.name,
-      senderName: _displaySenderName(
-        fullName: me?.fullName,
-        username: me?.username,
-      ),
-    );
+    if (gift.isAudioGift) {
+      unawaited(
+        _audioGiftChipSession.play(
+          onUpdate: _onEphemeralAudioGiftChipUpdate,
+          label: gift.name,
+          colorHex: gift.color,
+          audioUrl: gift.audioUrl,
+        ),
+      );
+    } else {
+      final animationUrl = gift.animationUrl?.trim().isNotEmpty == true
+          ? gift.animationUrl
+          : gift.displayImageUrl;
+      _playGiftAnimation(
+        animationUrl: animationUrl,
+        thumbnailUrl: gift.displayImageUrl,
+        giftName: gift.name,
+        senderName: _displaySenderName(
+          fullName: me?.fullName,
+          username: me?.username,
+        ),
+      );
+    }
 
     // Optimistic gift comment so the sender sees it immediately even if the
     // socket/refetch is slightly delayed.
@@ -1024,9 +1142,14 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
           user: me,
           isGift: true,
           giftName: gift.name,
-          giftIcon: gift.icon,
-          giftThumbnailUrl: gift.displayImageUrl,
-          giftAnimationUrl: gift.animationUrl,
+          giftIcon: gift.isAudioGift ? null : gift.icon,
+          giftThumbnailUrl:
+              gift.isAudioGift ? null : gift.displayImageUrl,
+          giftAnimationUrl: gift.isAudioGift ? null : gift.animationUrl,
+          giftCatalogType:
+              gift.isAudioGift ? GiftCatalogType.audio : GiftCatalogType.image,
+          giftColor: gift.color,
+          giftAudioUrl: gift.audioUrl,
           createdAt: now,
           updatedAt: now,
         ),
@@ -1059,19 +1182,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (!mounted) return;
 
     result.fold((_) {}, (details) {
-      setState(() {
-        _giftContributionOverride = details.currentTotalCoins;
-        _startingPriceOverride = details.startingPriceCoins;
-        final highest = details.displayHighestPriceCoins;
-        if (details.targetPriceCoins > 0 &&
-            highest >= details.targetPriceCoins) {
-          if (!_isAuctionFinished) {
-            _completeAuction();
-          }
-        } else {
-          _bidPopController.forward(from: 0);
-        }
-      });
+      _applyAuctionDetailsFromApi(details, animateBid: true);
     });
   }
 
@@ -1160,34 +1271,27 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
   String _formatHighestBid(AppLocalizations l10n) {
     final locale = Localizations.localeOf(context);
-    final auction = widget.post?.auction;
-    if (auction != null) {
-      final amount = formatAuctionPricingCoins(_highestBidCoins, locale);
-      return l10n.liveHighestBidAmount(amount, l10n.coinsUnit);
+    if (_showAuctionCoinPricing) {
+      return formatAuctionLiveCoinsLabel(l10n, locale, _highestBidCoins);
     }
     final amount = LocaleFormatUtils.localizeDigits('$_highestBid', locale);
     return l10n.liveHighestBidAmount(amount, _bidCurrencyLabel(l10n));
   }
 
   String? _auctionTargetPriceLabel(AppLocalizations l10n) {
-    final auction = widget.post?.auction;
-    if (auction == null) return null;
-    final target = auction.targetPriceCoins > 0
-        ? auction.targetPriceCoins.toDouble()
-        : auction.displayBidderSpendCoins;
-    if (target <= 0) return null;
-    return l10n.auctionTargetPrice(
-      formatAuctionPricingCoins(target, Localizations.localeOf(context)),
-      l10n.coinsUnit,
+    return formatAuctionTargetPriceLabel(
+      auction: widget.post?.auction,
+      l10n: l10n,
+      locale: Localizations.localeOf(context),
+      overrideCoins: _targetPriceCoinsOverride,
     );
   }
 
   int? get _auctionTargetPrice {
-    final auction = widget.post?.auction;
-    if (auction == null) return null;
-    if (auction.targetPriceCoins > 0) return auction.targetPriceCoins;
-    final spend = auction.displayBidderSpendCoins.round();
-    return spend > 0 ? spend : null;
+    return resolveAuctionTargetPriceCoins(
+      widget.post?.auction,
+      overrideCoins: _targetPriceCoinsOverride,
+    );
   }
 
   bool get _isAuctionInPeriod {
@@ -1380,13 +1484,19 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                             alignment: _isRtl
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
-                            child: CompactHighestBid(
+                            child: AuctionPriceWithAudioBadge(
+                              audioGiftLabel: _ephemeralAudioGiftLabel,
+                              audioGiftColor: _ephemeralAudioGiftColor,
                               topBidLabel: l10n.liveTopBid,
                               bidAmountText: _formatHighestBid(l10n),
+                              bidAmountCoins: _showAuctionCoinPricing
+                                  ? _highestBidCoins
+                                  : null,
                               showGiftIcon: _usesGiftTotal,
-                              showCoinIcon: widget.post?.auction != null,
+                              showCoinIcon: _showAuctionCoinPricing,
                               targetPrice: targetPrice,
                               targetPriceLabel: _auctionTargetPriceLabel(l10n),
+                              targetPriceHeader: l10n.liveTargetPrice,
                               isFinished: _isAuctionFinished,
                               popAnimation: _bidPopAnimation,
                               theme: theme,

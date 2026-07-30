@@ -1,9 +1,25 @@
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_group_entity.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
+import 'package:equatable/equatable.dart';
+
+class GetGiftsParams extends Equatable {
+  const GetGiftsParams({this.groupId, this.groupSlug});
+
+  final String? groupId;
+  final String? groupSlug;
+
+  @override
+  List<Object?> get props => [groupId, groupSlug];
+}
 
 abstract class GiftsRepository {
-  Future<Either<Failure, List<GiftEntity>>> getGifts();
+  Future<Either<Failure, List<GiftGroupEntity>>> getGiftGroups();
+  Future<Either<Failure, List<GiftEntity>>> getGifts({
+    String? groupId,
+    String? groupSlug,
+  });
   Future<Either<Failure, GiftInventoryEntity>> getInventory();
   Future<Either<Failure, GiftInventoryEntity>> purchaseGift({
     required String giftId,

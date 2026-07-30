@@ -15,6 +15,19 @@ class FeedPlaybackGate extends ChangeNotifier {
 
   bool get allowed => !_blocked;
 
+  /// True while a modal overlay (e.g. search) sits above the home feed.
+  bool get modalOverlayActive => _modalOverlayCount > 0;
+
+  /// Whether this post page may play video/sound.
+  ///
+  /// Dedicated viewers ([respectFeedPlaybackGate] false) own playback and are
+  /// not blocked by modal overlays (e.g. opening post detail from search).
+  bool playbackAllowed({required bool respectFeedPlaybackGate}) {
+    if (!respectFeedPlaybackGate) return true;
+    if (modalOverlayActive) return false;
+    return allowed;
+  }
+
   void setBlocked(bool blocked) {
     if (_blocked == blocked) return;
     _blocked = blocked;
@@ -32,6 +45,8 @@ class FeedPlaybackGate extends ChangeNotifier {
   /// Call when a modal overlay (e.g. bottom sheet) opens above the feed.
   void pushModalOverlay() {
     _modalOverlayCount++;
+    unawaited(SoundAudioPreview.stop());
+    notifyListeners();
     syncFromRouter();
   }
 
@@ -40,6 +55,7 @@ class FeedPlaybackGate extends ChangeNotifier {
     if (_modalOverlayCount > 0) {
       _modalOverlayCount--;
     }
+    notifyListeners();
     syncFromRouter();
   }
 

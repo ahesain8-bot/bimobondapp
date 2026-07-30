@@ -10,6 +10,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase.dart';
+import 'package:bimobondapp/app/gifts/domain/repositories/gifts_repository.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gifts_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/purchase_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
@@ -1040,7 +1041,7 @@ class _CoinsMarketTabState extends State<CoinsMarketTab> {
       _error = null;
     });
 
-    final giftsResult = await _getGifts(NoParams());
+    final giftsResult = await _getGifts(const GetGiftsParams());
     final inventoryResult = await _getInventory(NoParams());
 
     if (!mounted) return;

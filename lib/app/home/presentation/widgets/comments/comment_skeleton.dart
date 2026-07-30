@@ -1,5 +1,4 @@
 import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -60,31 +59,31 @@ class CommentSkeletonRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _CommentSkeletonBox.circular(size: avatarSize),
-        const SizedBox(width: 10),
+        const SizedBox(width: CommentLayout.avatarTextGap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _CommentSkeletonBox(
-                height: 13,
+                height: CommentLayout.usernameFontSize,
                 width: isReply ? 90 : 110,
                 borderRadius: 4,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: CommentLayout.gapAfterUsername),
               const _CommentSkeletonBox(
-                height: 14,
+                height: CommentLayout.bodyFontSize,
                 width: double.infinity,
                 borderRadius: 4,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               _CommentSkeletonBox(
-                height: 14,
+                height: CommentLayout.bodyFontSize,
                 width: isReply ? 140 : 200,
                 borderRadius: 4,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: CommentLayout.gapBeforeMeta),
               _CommentSkeletonBox(
-                height: 12,
+                height: CommentLayout.metaFontSize,
                 width: isReply ? 64 : 88,
                 borderRadius: 4,
               ),
@@ -112,7 +111,9 @@ class CommentRepliesSkeleton extends StatelessWidget {
           itemCount,
           (index) => Padding(
             padding: EdgeInsets.only(
-              top: index == 0 ? AppSizes.p12 : AppSizes.p16,
+              top: index == 0
+                  ? CommentLayout.replyTopSpacing
+                  : CommentLayout.itemBottomSpacing,
             ),
             child: const CommentSkeletonRow(isReply: true),
           ),

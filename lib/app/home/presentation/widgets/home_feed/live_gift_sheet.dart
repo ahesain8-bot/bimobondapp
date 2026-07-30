@@ -1,12 +1,20 @@
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_group_entity.dart';
+import 'package:bimobondapp/app/gifts/domain/repositories/gifts_repository.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_groups_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gifts_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/purchase_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/domain/usecases/send_gift_usecase.dart';
 import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
     as gifts_di;
+import 'dart:async';
+
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_accent_color.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_catalog_audio_preview.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
+import 'package:bimobondapp/app/gifts/presentation/widgets/gift_vinyl_record_icon.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/first_recharge_offer_sheet.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
@@ -24,7 +32,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 typedef OnGiftSentCallback = void Function(GiftEntity gift);
 
-enum _GiftSheetTab { gifts }
+String giftGroupTabLabel(GiftGroupEntity group, AppLocalizations l10n) {
+  final fromBackend = group.tabLabel;
+  if (fromBackend.isNotEmpty) return fromBackend;
+  return l10n.liveGiftTabGifts;
+}
 
 String shortGiftName(String name) {
   const maxLen = LiveDetailsLayoutConstants.giftNameMaxLength;
@@ -41,6 +53,7 @@ class LiveGiftSheet {
     String? postId,
     String? receiverId,
     String? auctionId,
+    String? liveId,
     bool canSendToHost = true,
     OnGiftSentCallback? onGiftSent,
   }) {
@@ -51,6 +64,7 @@ class LiveGiftSheet {
         postId: postId,
         receiverId: receiverId,
         auctionId: auctionId,
+        liveId: liveId,
         canSendToHost: canSendToHost,
         onGiftSent: onGiftSent,
       ),
@@ -63,6 +77,7 @@ class _LiveGiftSheetBody extends StatefulWidget {
     this.postId,
     this.receiverId,
     this.auctionId,
+    this.liveId,
     this.canSendToHost = true,
     this.onGiftSent,
   });
@@ -70,6 +85,7 @@ class _LiveGiftSheetBody extends StatefulWidget {
   final String? postId;
   final String? receiverId;
   final String? auctionId;
+  final String? liveId;
   final bool canSendToHost;
   final OnGiftSentCallback? onGiftSent;
 
@@ -82,19 +98,22 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   static const _footerBg = Color(0xFF121214);
   static const _accent = LiveDetailsLayoutConstants.liveBadgeColor;
 
+  final _getGiftGroups = gifts_di.sl<GetGiftGroupsUseCase>();
   final _getGifts = gifts_di.sl<GetGiftsUseCase>();
   final _getInventory = gifts_di.sl<GetGiftInventoryUseCase>();
   final _purchaseGift = gifts_di.sl<PurchaseGiftUseCase>();
   final _sendGift = gifts_di.sl<SendGiftUseCase>();
 
+  List<GiftGroupEntity> _groups = [];
   List<GiftEntity> _catalog = [];
   final Set<String> _pinnedIds = {};
   GiftInventoryEntity? _inventory;
   int? _selectedIndex;
-  _GiftSheetTab _tab = _GiftSheetTab.gifts;
+  int _selectedGroupIndex = 0;
   bool _loading = true;
   bool _busy = false;
   String? _loadError;
+  late final GiftCatalogAudioPreview _giftAudioPreview;
 
   bool get _isLoggedIn => FirebaseAuth.instance.currentUser != null;
 
@@ -103,10 +122,33 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final receiverId = widget.receiverId?.trim() ?? '';
     final hasAuction = widget.auctionId?.trim().isNotEmpty == true;
     final hasPost = widget.postId?.trim().isNotEmpty == true;
-    // Auction/live: server overrides receiver, but body still needs a value.
-    if (hasAuction) return receiverId.isNotEmpty;
+    final hasLive = widget.liveId?.trim().isNotEmpty == true;
+    if (hasAuction) return receiverId.isNotEmpty || hasLive;
+    if (hasLive) return receiverId.isNotEmpty;
     if (receiverId.isEmpty) return false;
     return hasPost || receiverId.isNotEmpty;
+  }
+
+  GiftGroupEntity? get _activeGroup {
+    if (_groups.isEmpty) return null;
+    final index = _selectedGroupIndex.clamp(0, _groups.length - 1);
+    return _groups[index];
+  }
+
+  bool get _showSongRecommendationBanner {
+    final group = _activeGroup;
+    if (group == null || !group.isSongsShelf) return false;
+    return _selectedGift != null;
+  }
+
+  void _applyGroupCatalog(int index) {
+    if (_groups.isEmpty) return;
+    final safeIndex = index.clamp(0, _groups.length - 1);
+    _selectedGroupIndex = safeIndex;
+    _catalog = List<GiftEntity>.from(_groups[safeIndex].gifts);
+    if (_selectedIndex != null && _selectedIndex! >= _catalog.length) {
+      _selectedIndex = null;
+    }
   }
 
   ColorScheme get _scheme => Theme.of(context).colorScheme;
@@ -128,7 +170,18 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   @override
   void initState() {
     super.initState();
+    _giftAudioPreview = GiftCatalogAudioPreview(
+      onStateChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
     _load();
+  }
+
+  @override
+  void dispose() {
+    _giftAudioPreview.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -137,7 +190,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       _loadError = null;
     });
 
-    final giftsResult = await _getGifts(NoParams());
+    final groupsResult = await _getGiftGroups(NoParams());
     GiftInventoryEntity? inventory;
 
     if (_isLoggedIn) {
@@ -147,26 +200,82 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
     if (!mounted) return;
 
+    await groupsResult.fold(
+      (failure) async {
+        await _loadFlatCatalog(failure.message, inventory);
+      },
+      (groups) async {
+        if (groups.isEmpty) {
+          await _loadFlatCatalog(null, inventory);
+          return;
+        }
+        setState(() {
+          _groups = groups;
+          _applyGroupCatalog(0);
+          _inventory = inventory;
+          _loading = false;
+          _loadError = null;
+        });
+        GiftLottieCache.instance.prefetch(
+          _catalog.map((gift) => gift.animationUrl),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadFlatCatalog(
+    String? groupsError,
+    GiftInventoryEntity? inventory,
+  ) async {
+    final giftsResult = await _getGifts(const GetGiftsParams());
+    if (!mounted) return;
+
     giftsResult.fold(
       (failure) {
         setState(() {
           _loading = false;
-          _loadError = failure.message;
+          _loadError = groupsError ?? failure.message;
+          _groups = [];
+          _catalog = [];
         });
       },
       (gifts) {
+        final fallbackGroup = GiftGroupEntity(
+          id: 'catalog',
+          name: 'Gifts',
+          slug: 'gifts',
+          sortOrder: 0,
+          gifts: gifts,
+        );
         setState(() {
-          _catalog = gifts;
+          _groups = gifts.isEmpty ? [] : [fallbackGroup];
+          if (_groups.isNotEmpty) {
+            _applyGroupCatalog(0);
+          } else {
+            _catalog = [];
+          }
           _inventory = inventory;
           _loading = false;
-          if (_selectedIndex != null && _selectedIndex! >= _catalog.length) {
-            _selectedIndex = null;
-          }
+          _loadError = gifts.isEmpty ? groupsError : null;
         });
         GiftLottieCache.instance.prefetch(
           gifts.map((gift) => gift.animationUrl),
         );
       },
+    );
+  }
+
+  void _selectGroup(int index) {
+    if (index == _selectedGroupIndex || index < 0 || index >= _groups.length) {
+      return;
+    }
+    unawaited(_giftAudioPreview.stop());
+    setState(() {
+      _applyGroupCatalog(index);
+      _selectedIndex = null;
+    });
+    GiftLottieCache.instance.prefetch(
+      _catalog.map((gift) => gift.animationUrl),
     );
   }
 
@@ -285,15 +394,16 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final hasAuction = auctionId != null && auctionId.isNotEmpty;
     final postId = widget.postId?.trim();
     final hasPost = postId != null && postId.isNotEmpty;
+    final liveId = widget.liveId?.trim();
+    final hasLive = liveId != null && liveId.isNotEmpty;
 
     final result = await _sendGift(
       SendGiftParams(
         giftId: gift.id,
         receiverId: receiverId,
-        // postId creates the gift comment (newComment). auctionId drives
-        // auction progress (auctionUpdated). Send both on auction posts.
         postId: hasPost ? postId : null,
         auctionId: hasAuction ? auctionId : null,
+        liveId: hasLive ? liveId : null,
       ),
     );
     if (!mounted) return;
@@ -373,7 +483,13 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
               ),
             ),
             const SizedBox(height: 10),
-            _LevelBanner(onTap: _openRecharge),
+            if (_showSongRecommendationBanner)
+              _SongRecommendationBanner(
+                gift: _selectedGift!,
+                isSpinning: _giftAudioPreview.isActiveGift(_selectedGift!.id),
+              )
+            else
+              _LevelBanner(onTap: _openRecharge),
             _PinRow(
               selected: _selectedGift != null,
               isPinned:
@@ -383,8 +499,9 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
             ),
             Expanded(child: _buildTabBody(l10n)),
             _BottomBar(
-              tab: _tab,
-              onTabChanged: (tab) => setState(() => _tab = tab),
+              groups: _groups,
+              selectedGroupIndex: _selectedGroupIndex,
+              onGroupSelected: _selectGroup,
               onRecharge: _openRecharge,
               balanceCoins: _inventory?.balanceCoins ?? 0,
               loadingBalance: _loading && _isLoggedIn,
@@ -456,9 +573,17 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       itemCount: ordered.length,
       itemBuilder: (context, index) {
         final gift = ordered[index];
+        final audioPlaying = gift.isAudioGift &&
+            _selectedIndex == index &&
+            _giftAudioPreview.isPlayingGift(gift.id);
+        final audioPaused = gift.isAudioGift &&
+            _selectedIndex == index &&
+            _giftAudioPreview.isPausedGift(gift.id);
         return _GiftTile(
           gift: gift,
           isSelected: _selectedIndex == index,
+          isAudioSpinning: audioPlaying,
+          isAudioPaused: audioPaused,
           isPinned: _pinnedIds.contains(gift.id),
           owned: _ownedQuantity(gift.id),
           busy: _busy && _selectedIndex == index,
@@ -469,6 +594,15 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
               : () {
                   setState(() => _selectedIndex = index);
                   GiftLottieCache.instance.prefetch([gift.animationUrl]);
+                  if (gift.isAudioGift) {
+                    if (_giftAudioPreview.isActiveGift(gift.id)) {
+                      unawaited(_giftAudioPreview.toggleGift(gift));
+                    } else {
+                      unawaited(_giftAudioPreview.playGift(gift));
+                    }
+                  } else {
+                    unawaited(_giftAudioPreview.stop());
+                  }
                 },
           onSend: _busy || !_canSend ? null : () => _send(gift),
         );
@@ -535,6 +669,82 @@ class _LevelBanner extends StatelessWidget {
   }
 }
 
+class _SongRecommendationBanner extends StatelessWidget {
+  const _SongRecommendationBanner({
+    required this.gift,
+    this.isSpinning = false,
+  });
+
+  final GiftEntity gift;
+  final bool isSpinning;
+
+  @override
+  Widget build(BuildContext context) {
+    final ring = giftAccentColor(gift.color);
+    final subtitleStyle = TextStyle(
+      color: Colors.white.withValues(alpha: 0.55),
+      fontSize: 11,
+      fontWeight: FontWeight.w500,
+      height: 1.15,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: Material(
+        color: ring.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              isSpinning
+                  ? SpinningGiftVinylRecordIcon(
+                      gift: gift,
+                      spinning: true,
+                      size: 44,
+                      isSelected: true,
+                      showPauseIcon: true,
+                    )
+                  : GiftVinylRecordIcon(
+                      gift: gift,
+                      size: 40,
+                      isSelected: true,
+                    ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      gift.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      AppLocalizations.of(context)!.soundFindRelatedHint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: subtitleStyle,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PinRow extends StatelessWidget {
   const _PinRow({
     required this.selected,
@@ -590,6 +800,8 @@ class _GiftTile extends StatelessWidget {
   const _GiftTile({
     required this.gift,
     required this.isSelected,
+    required this.isAudioSpinning,
+    required this.isAudioPaused,
     required this.isPinned,
     required this.owned,
     required this.busy,
@@ -601,6 +813,8 @@ class _GiftTile extends StatelessWidget {
 
   final GiftEntity gift;
   final bool isSelected;
+  final bool isAudioSpinning;
+  final bool isAudioPaused;
   final bool isPinned;
   final int owned;
   final bool busy;
@@ -620,6 +834,8 @@ class _GiftTile extends StatelessWidget {
       fontSize: 16,
       fontWeight: FontWeight.w700,
     );
+
+    final isAudio = gift.isAudioGift;
 
     return GestureDetector(
       onTap: onSelect,
@@ -641,22 +857,42 @@ class _GiftTile extends StatelessWidget {
                   Expanded(
                     child: Center(
                       child: Transform.translate(
-                        offset: isSelected ? const Offset(0, -6) : Offset.zero,
-                        child: AnimatedRotation(
-                          turns: isSelected ? (-15 / 360) : 0,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutBack,
-                          child: AnimatedScale(
-                            scale: isSelected ? 1.18 : 1.0,
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOutBack,
-                            child: _GiftIcon(
-                              gift: gift,
-                              isSelected: isSelected,
-                              size: 70,
-                            ),
-                          ),
-                        ),
+                        offset: isSelected && !isAudio
+                            ? const Offset(0, -6)
+                            : Offset.zero,
+                        child: isAudio
+                            ? AnimatedScale(
+                                scale: !isSelected
+                                    ? 1.0
+                                    : isAudioSpinning
+                                        ? 1.22
+                                        : 1.08,
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutBack,
+                                child: _GiftIcon(
+                                  gift: gift,
+                                  isSelected: isSelected,
+                                  isAudioSpinning: isAudioSpinning,
+                                  isAudioPaused: isAudioPaused,
+                                  size: isSelected && isAudioSpinning ? 68 : 62,
+                                ),
+                              )
+                            : AnimatedRotation(
+                                turns: isSelected ? (-15 / 360) : 0,
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeOutBack,
+                                child: AnimatedScale(
+                                  scale: isSelected ? 1.18 : 1.0,
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOutBack,
+                                  child: _GiftIcon(
+                                    gift: gift,
+                                    isSelected: isSelected,
+                                    isAudioSpinning: false,
+                                    size: 70,
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -765,6 +1001,12 @@ class _GiftTile extends StatelessWidget {
                   size: 11,
                   color: accent.withValues(alpha: 0.95),
                 ),
+              )
+            else if (gift.tag != null)
+              Positioned(
+                top: 4,
+                left: 4,
+                child: _GiftTagBadge(tag: gift.tag!),
               ),
           ],
         ),
@@ -773,18 +1015,50 @@ class _GiftTile extends StatelessWidget {
   }
 }
 
+class _GiftTagBadge extends StatelessWidget {
+  const _GiftTagBadge({required this.tag});
+
+  final GiftCatalogTag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (tag) {
+      GiftCatalogTag.newBadge => 'NEW',
+      GiftCatalogTag.recent => 'RECENT',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFE2C55),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
-    required this.tab,
-    required this.onTabChanged,
+    required this.groups,
+    required this.selectedGroupIndex,
+    required this.onGroupSelected,
     required this.onRecharge,
     required this.balanceCoins,
     required this.loadingBalance,
     required this.bottomInset,
   });
 
-  final _GiftSheetTab tab;
-  final ValueChanged<_GiftSheetTab> onTabChanged;
+  final List<GiftGroupEntity> groups;
+  final int selectedGroupIndex;
+  final ValueChanged<int> onGroupSelected;
   final VoidCallback onRecharge;
   final int balanceCoins;
   final bool loadingBalance;
@@ -806,14 +1080,26 @@ class _BottomBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Row(
-              children: [
-                _TabChip(
-                  label: l10n.liveGiftTabGifts,
-                  selected: true,
-                  onTap: () {},
-                ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  if (groups.isEmpty)
+                    _TabChip(
+                      label: l10n.liveGiftTabGifts,
+                      selected: true,
+                      onTap: () {},
+                    )
+                  else
+                    for (var i = 0; i < groups.length; i++)
+                      _TabChip(
+                        label: giftGroupTabLabel(groups[i], l10n),
+                        selected: i == selectedGroupIndex,
+                        onTap: () => onGroupSelected(i),
+                      ),
+                ],
+              ),
             ),
           ),
           if (loadingBalance)
@@ -938,15 +1224,40 @@ class _RechargeButton extends StatelessWidget {
 }
 
 class _GiftIcon extends StatelessWidget {
-  const _GiftIcon({required this.gift, required this.isSelected, this.size});
+  const _GiftIcon({
+    required this.gift,
+    required this.isSelected,
+    this.isAudioSpinning = false,
+    this.isAudioPaused = false,
+    this.size,
+  });
 
   final GiftEntity gift;
   final bool isSelected;
+  final bool isAudioSpinning;
+  final bool isAudioPaused;
   final double? size;
 
   @override
   Widget build(BuildContext context) {
     final iconSize = size ?? (isSelected ? 52.0 : 46.0);
+    if (gift.isAudioGift) {
+      if (isAudioSpinning) {
+        return SpinningGiftVinylRecordIcon(
+          gift: gift,
+          spinning: true,
+          size: iconSize,
+          isSelected: isSelected,
+          showPauseIcon: isSelected,
+        );
+      }
+      return GiftVinylRecordIcon(
+        gift: gift,
+        size: iconSize,
+        isSelected: isSelected,
+        showPlayIcon: isSelected && isAudioPaused,
+      );
+    }
     final icon = gift.icon.trim();
     final imageUrl = gift.displayImageUrl ?? icon;
     if (gift.hasNetworkIcon ||

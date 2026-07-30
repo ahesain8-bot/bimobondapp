@@ -287,24 +287,8 @@ class SocialRepositoryImpl implements SocialRepository {
     required String targetUserId,
   }) async {
     try {
-      var page = 1;
-      const limit = 50;
-
-      while (true) {
-        final result = await remoteDataSource.getFollowing(
-          SocialListQuery(userId: currentUserId, page: page, limit: limit),
-        );
-
-        if (result.users.any((user) => user.id == targetUserId)) {
-          return const Right(true);
-        }
-
-        if (result.hasReachedMax) {
-          return const Right(false);
-        }
-
-        page++;
-      }
+      final following = await remoteDataSource.getFollowStatus(targetUserId);
+      return Right(following);
     } catch (e) {
       return Left(_mapException(e));
     }

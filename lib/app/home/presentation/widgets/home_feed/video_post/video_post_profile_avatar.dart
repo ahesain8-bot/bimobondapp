@@ -45,32 +45,26 @@ class VideoPostProfileAvatar extends StatelessWidget {
           isFollowing: isFollowing,
           onTap: onTap,
         ),
-        if (showFollowBadge)
+        if (showFollowBadge && !isFollowing)
           Positioned(
             bottom: -8,
             child: GestureDetector(
-              onTap: isFollowing ? null : onFollow,
+              onTap: onFollow,
               behavior: HitTestBehavior.opaque,
               child: Container(
                 width: 18,
                 height: 18,
                 decoration: BoxDecoration(
-                  gradient: isFollowing
-                      ? null
-                      : LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.secondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                  color: isFollowing ? Colors.white : null,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isFollowing ? Colors.white : Colors.black,
-                    width: 1.5,
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.secondary,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black, width: 1.5),
                   boxShadow: [
                     BoxShadow(
                       color: theme.colorScheme.primary.withValues(alpha: 0.5),
@@ -86,11 +80,9 @@ class VideoPostProfileAvatar extends StatelessWidget {
                           color: theme.colorScheme.primary,
                         ),
                       )
-                    : Icon(
-                        isFollowing ? Icons.check : Icons.add,
-                        color: isFollowing
-                            ? theme.colorScheme.primary
-                            : Colors.white,
+                    : const Icon(
+                        Icons.add,
+                        color: Colors.white,
                         size: 12,
                       ),
               ),

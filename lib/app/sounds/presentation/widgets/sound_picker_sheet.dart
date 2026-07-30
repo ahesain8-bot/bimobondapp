@@ -54,12 +54,11 @@ class SoundPickerSheet extends StatefulWidget {
       minChildSize: 0.42,
       maxChildSize: 0.75,
       lightSurface: true,
-      builder: (ctx, scrollController) => SoundPickerTheme(
-        child: SoundPickerSheet(
-          initialSelection: initialSelection,
-          allowMuteOnTrim: allowMuteOnTrim,
-          scrollController: scrollController,
-        ),
+      wrapSheet: (context, sheet) => SoundPickerTheme(child: sheet),
+      builder: (ctx, scrollController) => SoundPickerSheet(
+        initialSelection: initialSelection,
+        allowMuteOnTrim: allowMuteOnTrim,
+        scrollController: scrollController,
       ),
     );
 

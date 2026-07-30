@@ -49,6 +49,7 @@ abstract class PostsRemoteDataSource {
   });
   Future<bool> toggleSave(String postId);
   Future<bool> toggleRepost(String postId, {String? quote});
+  Future<void> updateRepostQuote(String postId, {required String quote});
   Future<RepostsPageModel> getPostReposts(
     String postId, {
     int page = 1,
@@ -784,6 +785,42 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
 
       throw ServerException(
         message: _extractErrorMessage(response.data) ?? 'Failed to toggle repost',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> updateRepostQuote(
+    String postId, {
+    required String quote,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw ServerException(message: 'User not authenticated');
+      }
+
+      final idToken = await user.getIdToken();
+      final trimmedQuote = quote.trim();
+      if (trimmedQuote.isEmpty) {
+        throw ServerException(message: 'Quote cannot be empty');
+      }
+
+      final response = await apiClient.dio.patch(
+        ApiConstants.toggleRepost(postId),
+        data: {'quote': trimmedQuote},
+        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return;
+      }
+
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to update repost',
       );
     } catch (e) {
       throw DioHandler.handle(e);

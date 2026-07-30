@@ -442,6 +442,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get repostQuoteHint => 'أضف تعليقاً (اختياري)';
 
   @override
+  String get repostComposeTitle => 'أضف إلى إعادة النشر';
+
+  @override
+  String get repostComposeHint => 'قل شيئاً...';
+
+  @override
+  String get repostComposeAdd => 'إضافة';
+
+  @override
+  String get postRepostersHeader => 'إعادات النشر';
+
+  @override
   String get repostSuccess => 'تمت إعادة النشر';
 
   @override
@@ -1607,6 +1619,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get postShareSendToTitle => 'إرسال إلى';
+
+  @override
+  String get postShareSearchHint => 'بحث';
+
+  @override
+  String get postShareRecentChats => 'المحادثات الأخيرة';
 
   @override
   String get postShareSearchUsers => 'ابحث عن الأصدقاء والمستخدمين';

@@ -15,6 +15,7 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_bottom_nav_bar.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_bottom_nav.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -185,14 +186,17 @@ class _MainScreenState extends State<MainScreen> {
                       Theme.of(context).brightness,
                     ),
               child: Scaffold(
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                backgroundColor: isHome
+                    ? Colors.black
+                    : Theme.of(context).scaffoldBackgroundColor,
                 extendBody: isHome,
                 body: IndexedStack(
                   key: ValueKey(isLoggedIn),
                   index: _currentIndex,
                   children: pages,
                 ),
-                bottomNavigationBar: LiquidGlassBottomNav(
+                bottomNavigationBar: HomeFeedBottomNavBar(
+                  feedKey: _homeFeedKey,
                   currentIndex: _currentIndex,
                   glassStyle: isHome,
                   onItemTap: (index) =>

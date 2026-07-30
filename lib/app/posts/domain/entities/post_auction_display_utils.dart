@@ -1,14 +1,64 @@
 import 'dart:ui';
 
+import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 
 String formatAuctionPricingCoins(num value, Locale locale) {
   final text = value == value.roundToDouble()
       ? value.round().toString()
       : value.toStringAsFixed(1);
   return LocaleFormatUtils.localizeDigits(text, locale);
+}
+
+/// Coin goal for the target segment on auction price cards.
+///
+/// Uses the same coin basis as [PostAuctionEntity.displayHighestPriceCoins]
+/// (host earnings / gift total goal), not bidder spend estimates.
+int? resolveAuctionTargetPriceCoins(
+  PostAuctionEntity? auction, {
+  int? overrideCoins,
+}) {
+  if (overrideCoins != null && overrideCoins > 0) return overrideCoins;
+  if (auction == null) return null;
+  if (auction.targetPriceCoins > 0) return auction.targetPriceCoins;
+
+  final hostGoal = auction.pricing?.estimatedHostEarningsCoins;
+  if (hostGoal != null && hostGoal > 0) return hostGoal;
+
+  final rate = auction.pricing?.coinsPerPriceUnit ?? 0;
+  if (rate > 0 && auction.targetPrice > 0) {
+    return (auction.targetPrice * rate).round();
+  }
+  return null;
+}
+
+/// Same `{amount} {currency}` pattern as the highest-price row on the card.
+String formatAuctionLiveCoinsLabel(
+  AppLocalizations l10n,
+  Locale locale,
+  int coins,
+) {
+  return l10n.liveHighestBidAmount(
+    formatAuctionPricingCoins(coins, locale),
+    l10n.coinsUnit,
+  );
+}
+
+String? formatAuctionTargetPriceLabel({
+  required PostAuctionEntity? auction,
+  required AppLocalizations l10n,
+  required Locale locale,
+  int? overrideCoins,
+}) {
+  final coins = resolveAuctionTargetPriceCoins(
+    auction,
+    overrideCoins: overrideCoins,
+  );
+  if (coins == null || coins <= 0) return null;
+  return formatAuctionLiveCoinsLabel(l10n, locale, coins);
 }
 
 /// Ordered media items for auction detail screens (images and videos).

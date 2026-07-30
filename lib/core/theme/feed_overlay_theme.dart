@@ -1,4 +1,3 @@
-import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 /// Immersive feed overlay colors (home video feed + bottom nav on home).
@@ -41,7 +40,7 @@ class FeedOverlayTheme extends ThemeExtension<FeedOverlayTheme> {
       tabPillBorder: Colors.white.withValues(alpha: 0.2),
       tabDivider: Colors.white.withValues(alpha: 0.3),
       progressTrack: Colors.white.withValues(alpha: 0.1),
-      progressFill: AppTheme.primaryColor,
+      progressFill: Colors.white,
       shadow: Colors.black.withValues(alpha: 0.45),
     );
   }

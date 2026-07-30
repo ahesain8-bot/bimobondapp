@@ -100,13 +100,32 @@ class PostModel extends PostEntity {
     }
     segmentId ??= json['soundSegmentId']?.toString();
 
+    int? parseMs(dynamic raw) {
+      if (raw is int) return raw;
+      return int.tryParse(raw?.toString() ?? '');
+    }
+
+    startMs ??= parseMs(json['soundStartMs']);
+    endMs ??= parseMs(json['soundEndMs']);
+
+    final soundThumbOverride =
+        json['soundThumbUrl']?.toString() ?? json['soundImageUrl']?.toString();
+
     PostSoundEntity? withSegment(PostSoundEntity sound) {
-      if (segmentId == null && startMs == null && endMs == null) return sound;
+      final mergedCover = (sound.coverUrl != null && sound.coverUrl!.isNotEmpty)
+          ? sound.coverUrl
+          : soundThumbOverride;
+      if (segmentId == null &&
+          startMs == null &&
+          endMs == null &&
+          mergedCover == sound.coverUrl) {
+        return sound;
+      }
       return PostSoundEntity(
         id: sound.id,
         name: sound.name,
         author: sound.author,
-        coverUrl: sound.coverUrl,
+        coverUrl: mergedCover,
         duration: sound.duration,
         useCount: sound.useCount,
         audioUrl: sound.audioUrl,
@@ -139,12 +158,21 @@ class PostModel extends PostEntity {
 
     final topSoundName = json['soundName']?.toString().trim();
     final isOriginalSound = json['isOriginalSound'] == true;
-    final soundId = (json['soundId'] ?? json['soundSegmentId'])?.toString().trim();
-    final soundAuthor = (json['soundAuthor'] ?? json['artistName'])?.toString().trim();
-    final audioUrl = (json['soundAudioUrl'] ?? json['soundUrl'] ?? json['audioUrl'])?.toString().trim();
+    final soundId = (json['soundId'] ?? json['soundSegmentId'])
+        ?.toString()
+        .trim();
+    final soundAuthor = (json['soundAuthor'] ?? json['artistName'])
+        ?.toString()
+        .trim();
+    final audioUrl =
+        (json['soundAudioUrl'] ?? json['soundUrl'] ?? json['audioUrl'])
+            ?.toString()
+            .trim();
 
     if (topSoundName != null && topSoundName.isNotEmpty && !isOriginalSound) {
-      final id = (soundId != null && soundId.isNotEmpty) ? soundId : (segmentId ?? '');
+      final id = (soundId != null && soundId.isNotEmpty)
+          ? soundId
+          : (segmentId ?? '');
       final entity = PostSoundEntity(
         id: id,
         name: topSoundName,
@@ -236,7 +264,8 @@ class PostModel extends PostEntity {
   }
 
   static String? _parseFilterName(Map<String, dynamic> json) {
-    final raw = json['filterName'] ?? json['filter_name'] ?? json['cameraFilter'];
+    final raw =
+        json['filterName'] ?? json['filter_name'] ?? json['cameraFilter'];
     final name = raw?.toString().trim();
     if (name == null || name.isEmpty) return null;
     if (name == 'None' || name == 'Original') return null;
@@ -287,7 +316,9 @@ class PostModel extends PostEntity {
       isPromoted: PostModel._parseBoolField(json['isPromoted']),
       isAd: PostModel._parseBoolField(json['isAd']),
       promotion: json['promotion'] is Map<String, dynamic>
-          ? PostPromotionEntity.fromJson(json['promotion'] as Map<String, dynamic>)
+          ? PostPromotionEntity.fromJson(
+              json['promotion'] as Map<String, dynamic>,
+            )
           : null,
       location: json['location'] is Map
           ? PostLocationEntity.fromJson(
@@ -388,7 +419,8 @@ class PostModel extends PostEntity {
       if (auction != null) 'auction': _auctionToJson(auction!),
       if (sound != null) ...{
         'soundName': sound!.name.isNotEmpty ? sound!.name : null,
-        'isOriginalSound': sound!.name.isEmpty || sound!.name == 'Original Sound',
+        'isOriginalSound':
+            sound!.name.isEmpty || sound!.name == 'Original Sound',
       },
     };
   }
@@ -436,7 +468,10 @@ class PostUserModel extends PostUserEntity {
     return PostUserModel(
       id: json['id'] ?? '',
       username: json['username'] ?? '',
-      fullName: json['fullName']?.toString() ?? json['name']?.toString() ?? json['displayName']?.toString(),
+      fullName:
+          json['fullName']?.toString() ??
+          json['name']?.toString() ??
+          json['displayName']?.toString(),
       avatarUrl: PostModel._normalizeUrl(json['avatarUrl']),
       isFollowing:
           _parseOptionalBool(json['isFollowing']) ??

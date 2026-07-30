@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/utils/feed_author_follow_cache.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/quick_comment_reactions.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_options_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_quick_share_bar.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/repost_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_content.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_media_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_side_actions.dart';
@@ -29,17 +31,19 @@ import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_video_player.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:video_player/video_player.dart';
+import 'package:just_audio/just_audio.dart';
 
 part 'video_post/video_post_engagement_mixin.dart';
 part 'video_post/video_post_sound_mixin.dart';
@@ -48,6 +52,8 @@ class VideoPostWidget extends StatefulWidget {
   final PostEntity post;
   final FeedItemEntity? feedItem;
   final double? bottomPadding;
+  final double? mediaBottomInset;
+  final BoxFit feedMediaFit;
   final bool isActive;
 
   /// When false, playback ignores [FeedPlaybackGate] (e.g. profile posts viewer).
@@ -67,11 +73,16 @@ class VideoPostWidget extends StatefulWidget {
   /// Index of this post in [pageController] (required when [pageController] is set).
   final int? pageIndex;
 
+  /// Keeps the parent feed list in sync when like/comment/save changes locally.
+  final FeedPostPatch? onFeedPostPatch;
+
   const VideoPostWidget({
     super.key,
     required this.post,
     this.feedItem,
     this.bottomPadding,
+    this.mediaBottomInset,
+    this.feedMediaFit = BoxFit.contain,
     this.isActive = true,
     this.respectFeedPlaybackGate = true,
     this.openCommentsOnLoad = false,
@@ -80,6 +91,7 @@ class VideoPostWidget extends StatefulWidget {
     this.animateChromeEntrance = false,
     this.pageController,
     this.pageIndex,
+    this.onFeedPostPatch,
   });
 
   @override
@@ -137,7 +149,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   bool get _playbackActive =>
       widget.isActive &&
-      (!widget.respectFeedPlaybackGate || FeedPlaybackGate.instance.allowed);
+      FeedPlaybackGate.instance.playbackAllowed(
+        respectFeedPlaybackGate: widget.respectFeedPlaybackGate,
+      );
 
   List<PostMediaEntity> get _displayMedia {
     if (widget.post.media.isNotEmpty) return widget.post.media;
@@ -152,9 +166,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.respectFeedPlaybackGate) {
-      FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
-    }
+    FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
     initEngagementState();
 
     _likeAnimController = AnimationController(
@@ -217,6 +229,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   void didUpdateWidget(VideoPostWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.post.id != oldWidget.post.id ||
+        feedPostEngagementChanged(widget.post, oldWidget.post) ||
         widget.post != oldWidget.post ||
         widget.feedItem != oldWidget.feedItem) {
       syncEngagementFromPost();
@@ -230,14 +243,12 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       unawaited(syncPostSoundPlayback());
     } else if (!widget.isActive && oldWidget.isActive) {
       unawaited(stopPostSound());
-    } else if (widget.respectFeedPlaybackGate &&
-        !FeedPlaybackGate.instance.allowed &&
-        oldWidget.isActive &&
-        widget.isActive) {
+    } else if (!_playbackActive && oldWidget.isActive && widget.isActive) {
       unawaited(pausePostSound());
     } else if (_playbackActive &&
         (widget.post.id != oldWidget.post.id ||
             widget.post.sound != oldWidget.post.sound)) {
+      resetPostSoundMuteState();
       unawaited(syncPostSoundPlayback());
     }
   }
@@ -262,9 +273,31 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       respectFeedPlaybackGate: widget.respectFeedPlaybackGate,
       videoController: videoController,
       isImagePlaybackActive: isPostPlaybackActive(),
+      isImageMuted: isPostSoundUserMuted,
       onLongPress: showMoreOptions,
       onImageTap: isActiveSlide && hasImageSound
           ? () => unawaited(togglePostPlayback())
+          : null,
+      onImageMuteTap: isActiveSlide && hasImageSound
+          ? togglePostSoundMute
+          : null,
+      onPlaybackChanged: hasImageSound
+          ? onVideoPlaybackChangedFromPlayer
+          : null,
+      onSeekSync: hasImageSound ? onVideoSeekSync : null,
+      onUserMuteChanged: hasImageSound ? onVideoUserMuteChanged : null,
+      onSegmentEnd: hasImageSound && widget.post.sound!.hasSegmentWindow
+          ? () => unawaited(onPostSoundSegmentLoop())
+          : null,
+      onVideoDurationReady:
+          hasImageSound && isActiveSlide && isSlideVideo(index)
+          ? onVideoDurationReady
+          : null,
+      segmentPlaybackMax: hasImageSound ? segmentPlaybackMaxForPost() : null,
+      mediaFit: widget.feedMediaFit,
+      mediaHeight:
+          widget.mediaBottomInset != null && widget.mediaBottomInset! > 0
+          ? MediaQuery.sizeOf(context).height - widget.mediaBottomInset!
           : null,
     );
   }
@@ -445,6 +478,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       child: VideoPostContent(
         size: size,
         bottom: bottom,
+        mediaBottomInset: widget.mediaBottomInset ?? 0,
         post: post,
         displayMedia: _displayMedia,
         currentPage: _currentPage,
@@ -453,6 +487,9 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
             _buildMediaItem(_displayMedia[index], index),
         onPageChanged: (index) {
           setState(() => _currentPage = index);
+          if (widget.isActive) {
+            FeedVideoProgressScope.maybeOf(context)?.reset();
+          }
           unawaited(syncPostSoundPlayback());
         },
         feedItem: widget.feedItem,
@@ -474,7 +511,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           userId: postAuthorUserId(),
           isFollowing: isFollowing,
           isFollowLoading: isFollowLoading,
-          showFollowBadge: !isPostOwner(),
+          showFollowBadge: !isPostOwner() && followStatusResolved && !isFollowing,
           isLiked: isLiked,
           likeLabel: formatCompactCount(likeCount),
           likeScaleAnimation: _likeScaleAnim,

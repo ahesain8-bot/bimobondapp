@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/activity_feed_list_row.dart';
@@ -18,6 +19,9 @@ class SocialUserListTile extends StatelessWidget {
     this.onProfileFollowStateChanged,
     this.subtitleOverride,
     this.hideFollowButton = false,
+    this.showUsernameSubtitle = true,
+    this.compact = false,
+    this.avatarRadius = 24,
     this.useActivityCard = false,
     this.showDivider = true,
     this.trailingOverride,
@@ -32,6 +36,9 @@ class SocialUserListTile extends StatelessWidget {
   final VoidCallback? onTap;
   final ValueChanged<bool>? onProfileFollowStateChanged;
   final String? subtitleOverride;
+  final bool showUsernameSubtitle;
+  final bool compact;
+  final double avatarRadius;
   final bool useActivityCard;
   final bool showDivider;
   final Widget? trailingOverride;
@@ -123,22 +130,29 @@ class SocialUserListTile extends StatelessWidget {
 
     return ListTile(
       onTap: openProfile,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      visualDensity: compact ? VisualDensity.compact : null,
+      minVerticalPadding: compact ? 0 : 4,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: compact ? 2 : 4,
+      ),
       leading: StoryProfileAvatar(
         userId: user.id,
         imageUrl: user.avatarUrl,
         fallbackText: user.displayName,
-        radius: 24,
+        radius: avatarRadius,
         username: user.username,
         fullName: user.fullName,
         isFollowing: user.isFollowing,
       ),
       title: Text(
-        user.fullName ?? user.username ?? user.displayName,
+        _titleText(showUsernameSubtitle),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
+          fontSize: compact ? CommentLayout.likesNameFontSize : null,
+          height: compact ? 1.15 : null,
         ),
       ),
       subtitle: _buildSubtitle(handle, subtitleOverride),
@@ -154,9 +168,24 @@ class SocialUserListTile extends StatelessWidget {
     );
   }
 
+  String _titleText(bool includeUsernameFallback) {
+    final full = user.fullName?.trim();
+    if (full != null && full.isNotEmpty) return full;
+    if (includeUsernameFallback) {
+      return user.username ?? user.displayName;
+    }
+    return user.displayName;
+  }
+
   Widget? _buildSubtitle(String? handle, String? extra) {
-    final hasHandle = handle != null && handle.isNotEmpty;
     final hasExtra = extra != null && extra.isNotEmpty;
+    if (!showUsernameSubtitle) {
+      return hasExtra
+          ? CustomText(extra, fontSize: 12, variant: TextVariant.secondary)
+          : null;
+    }
+
+    final hasHandle = handle != null && handle.isNotEmpty;
     if (!hasHandle && !hasExtra) return null;
 
     if (hasHandle && hasExtra) {

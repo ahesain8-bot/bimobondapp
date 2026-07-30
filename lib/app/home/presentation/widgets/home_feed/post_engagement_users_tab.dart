@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/create_or_get_chat_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
     as chats_di;
+import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_l10n_format.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_view_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_likes_usecase.dart';
@@ -31,6 +32,7 @@ class PostEngagementUsersTab extends StatefulWidget {
     super.key,
     required this.postId,
     required this.kind,
+    this.scrollController,
     this.hideFollowForViewers = false,
     this.hideFollowButton = false,
     this.showMessageButton = false,
@@ -40,6 +42,9 @@ class PostEngagementUsersTab extends StatefulWidget {
 
   final String postId;
   final PostEngagementUserListKind kind;
+
+  /// When set (e.g. engagement sheet), drives [DraggableScrollableSheet] resize.
+  final ScrollController? scrollController;
 
   /// Story viewers sheet: list viewers only, no follow actions.
   final bool hideFollowForViewers;
@@ -65,6 +70,12 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
   static const int _likedIdsPageSize = 100;
 
   final ScrollController _scrollController = ScrollController();
+
+  ScrollController get _listController =>
+      widget.scrollController ?? _scrollController;
+
+  bool get _ownsListController => widget.scrollController == null;
+
   final List<SocialUserEntity> _likedUsers = [];
   final List<PostViewEntity> _views = [];
   final Set<String> _likedViewerIds = {};
@@ -79,20 +90,36 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
 
   bool get _isViews => widget.kind == PostEngagementUserListKind.views;
 
+  bool get _isLikes => widget.kind == PostEngagementUserListKind.likes;
+
+  bool get _compactLikesList => _isLikes && !widget.isStory;
+
   int get _itemCount => _isViews ? _views.length : _likedUsers.length;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
+    _listController.addListener(_onScroll);
     _load(refresh: true);
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _listController.removeListener(_onScroll);
+    if (_ownsListController) {
+      _scrollController.dispose();
+    }
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(PostEngagementUsersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController != widget.scrollController) {
+      (oldWidget.scrollController ?? _scrollController)
+          .removeListener(_onScroll);
+      _listController.addListener(_onScroll);
+    }
   }
 
   String? get _currentUserId {
@@ -114,10 +141,10 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
   }
 
   void _onScroll() {
-    if (!_scrollController.hasClients || _hasReachedMax || _isLoadingMore) {
+    if (!_listController.hasClients || _hasReachedMax || _isLoadingMore) {
       return;
     }
-    final position = _scrollController.position;
+    final position = _listController.position;
     if (position.pixels >= position.maxScrollExtent - 120) {
       _load(loadMore: true);
     }
@@ -366,12 +393,6 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
     return formatTimeAgo(at, l10n);
   }
 
-  String? _likeTimeSubtitle(SocialUserEntity user, AppLocalizations l10n) {
-    final at = user.likedAt;
-    if (at == null) return null;
-    return formatTimeAgo(at, l10n);
-  }
-
   Widget _buildUserTile({
     required SocialUserEntity user,
     required int index,
@@ -413,6 +434,11 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
       isFollowLoading: _followLoadingIds.contains(user.id),
       onTap: disableProfileTap ? () {} : null,
       onFollowTap: hideFollow ? null : () => _toggleFollowForUser(index, user),
+      showUsernameSubtitle: !_compactLikesList,
+      compact: _compactLikesList,
+      avatarRadius: _compactLikesList
+          ? CommentLayout.likesAvatarRadius
+          : 24,
       onProfileFollowStateChanged: (isFollowing) {
         setState(() {
           final updated = user.copyWith(isFollowing: isFollowing);
@@ -431,7 +457,7 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
           }
         });
       },
-      subtitleOverride: subtitle,
+      subtitleOverride: _compactLikesList ? null : subtitle,
       trailingOverride: trailing,
     );
   }
@@ -479,43 +505,60 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
 
     if (_isLoading) {
       return ListView.builder(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.p16,
-          vertical: AppSizes.p12,
+        controller: _listController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(
+          horizontal: _compactLikesList
+              ? CommentLayout.likesListHorizontalPadding
+              : AppSizes.p16,
+          vertical: _compactLikesList ? AppSizes.p4 : AppSizes.p12,
         ),
         itemCount: 15,
         itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.only(bottom: AppSizes.p16),
+          padding: EdgeInsets.only(
+            bottom: _compactLikesList ? CommentLayout.likesRowSpacing : AppSizes.p16,
+          ),
           child: Row(
             children: [
               LiquidGlassSkeletonBox.circular(
-                size: 44,
+                size: _compactLikesList
+                    ? CommentLayout.likesAvatarRadius * 2
+                    : 44,
                 tone: skeletonTone,
               ),
-              const SizedBox(width: AppSizes.p12),
+              SizedBox(
+                width: _compactLikesList ? AppSizes.p8 : AppSizes.p12,
+              ),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LiquidGlassSkeletonBox(
-                      height: 14,
-                      width: 120,
-                      tone: skeletonTone,
-                    ),
-                    const SizedBox(height: 6),
-                    LiquidGlassSkeletonBox(
-                      height: 12,
-                      width: 80,
-                      tone: skeletonTone,
-                    ),
-                  ],
+                child: _compactLikesList
+                    ? LiquidGlassSkeletonBox(
+                        height: CommentLayout.likesNameFontSize,
+                        width: 120,
+                        tone: skeletonTone,
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LiquidGlassSkeletonBox(
+                            height: 14,
+                            width: 120,
+                            tone: skeletonTone,
+                          ),
+                          const SizedBox(height: 6),
+                          LiquidGlassSkeletonBox(
+                            height: 12,
+                            width: 80,
+                            tone: skeletonTone,
+                          ),
+                        ],
+                      ),
+              ),
+              if (!_compactLikesList)
+                LiquidGlassSkeletonBox(
+                  height: 32,
+                  width: 72,
+                  tone: skeletonTone,
                 ),
-              ),
-              LiquidGlassSkeletonBox(
-                height: 32,
-                width: 72,
-                tone: skeletonTone,
-              ),
             ],
           ),
         ),
@@ -523,36 +566,63 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
     }
 
     if (_errorMessage != null && _itemCount == 0) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.p24),
-          child: CustomText(
-            _errorMessage!,
-            color: theme.colorScheme.error,
-            textAlign: TextAlign.center,
+      return ListView(
+        controller: _listController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.22,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSizes.p24),
+                child: CustomText(
+                  _errorMessage!,
+                  color: theme.colorScheme.error,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       );
     }
 
     if (_itemCount == 0) {
-      return Center(
-        child: CustomText(
-          _emptyMessage,
-          variant: TextVariant.secondary,
-          textAlign: TextAlign.center,
-        ),
+      return ListView(
+        controller: _listController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.22,
+            child: Center(
+              child: CustomText(
+                _emptyMessage,
+                variant: TextVariant.secondary,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
       );
     }
 
     final showFooter = _isLoadingMore && !_hasReachedMax;
 
     return ListView.separated(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
+      controller: _listController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(
+        horizontal: _compactLikesList
+            ? CommentLayout.likesListHorizontalPadding
+            : 0,
+        vertical: _compactLikesList ? AppSizes.p4 : AppSizes.p8,
+      ),
       itemCount: _itemCount + (showFooter ? 1 : 0),
       separatorBuilder: (context, index) {
         if (index >= _itemCount - 1) return const SizedBox.shrink();
+        if (_compactLikesList) {
+          return const SizedBox(height: CommentLayout.likesRowSpacing);
+        }
         return Divider(
           height: 1,
           indent: 72,
@@ -615,7 +685,6 @@ class _PostEngagementUsersTabState extends State<PostEngagementUsersTab> {
         return _buildUserTile(
           user: _likedUsers[index],
           index: index,
-          subtitle: _likeTimeSubtitle(_likedUsers[index], l10n),
         );
       },
     );

@@ -9,7 +9,7 @@ class EngagementTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tab(
-      height: 40,
+      height: 34,
       child: Align(
         alignment: AlignmentDirectional.centerStart,
         child: Text(

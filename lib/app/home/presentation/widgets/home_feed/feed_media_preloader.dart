@@ -96,13 +96,7 @@ class FeedMediaPreloader {
         continue;
       }
 
-      unawaited(
-        _preloadPost(
-          context,
-          post,
-          warmDecoder: shouldWarmDecoder,
-        ),
-      );
+      unawaited(_preloadPost(context, post, warmDecoder: shouldWarmDecoder));
     }
 
     _preloadedIds.removeWhere((id) => !windowIds.contains(id));
@@ -129,6 +123,13 @@ class FeedMediaPreloader {
       if (url != null) unawaited(FeedVideoPrewarmer.instance.prewarm(url));
     }
 
+    final soundUrl = post.sound?.resolvedAudioUrl;
+    if (soundUrl != null &&
+        soundUrl.isNotEmpty &&
+        AppMediaCacheManager.canDiskCacheVideo(soundUrl)) {
+      unawaited(AppMediaCacheManager.downloadSoundFile(soundUrl));
+    }
+
     final firstSlide = _firstSlideImageUrl(post);
     if (firstSlide != null && context.mounted) {
       try {
@@ -150,7 +151,8 @@ class FeedMediaPreloader {
   }
 
   String? _firstSlideVideoUrl(PostEntity post) {
-    return MediaUtils.resolveCacheableFeedVideoUrl(post);
+    return MediaUtils.resolveFeedProgressiveVideoUrl(post) ??
+        MediaUtils.resolveCacheableFeedVideoUrl(post);
   }
 
   String? _firstSlideImageUrl(PostEntity post) {

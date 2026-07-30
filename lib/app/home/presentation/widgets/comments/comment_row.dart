@@ -198,7 +198,7 @@ class _CommentRowState extends State<CommentRow> {
           fullName: comment.user.fullName,
           onTap: openProfile,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: CommentLayout.avatarTextGap),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,14 +211,14 @@ class _CommentRowState extends State<CommentRow> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: CommentLayout.usernameFontSize,
                     fontWeight: FontWeight.w700,
                     color: onSurface,
-                    height: 1.2,
+                    height: 1.15,
                   ),
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: CommentLayout.gapAfterUsername),
               if (comment.isGift) ...[
                 Builder(
                   builder: (context) {
@@ -230,8 +230,8 @@ class _CommentRowState extends State<CommentRow> {
                           child: Text(
                             localizedGiftCommentText(l10n, comment),
                             style: TextStyle(
-                              fontSize: 15,
-                              height: 1.35,
+                              fontSize: CommentLayout.bodyFontSize,
+                              height: CommentLayout.bodyLineHeight,
                               color: onSurface,
                             ),
                           ),
@@ -263,8 +263,8 @@ class _CommentRowState extends State<CommentRow> {
                 TaggedText(
                   text: bodyText,
                   style: TextStyle(
-                    fontSize: 15,
-                    height: 1.35,
+                    fontSize: CommentLayout.bodyFontSize,
+                    height: CommentLayout.bodyLineHeight,
                     color: onSurface,
                   ),
                   mentionUserIds: MentionRefUtils.usernameToUserIdMap(
@@ -273,7 +273,7 @@ class _CommentRowState extends State<CommentRow> {
                   ),
                 ),
               if (_canTranslate) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: CommentLayout.gapBeforeTranslate),
                 GestureDetector(
                   onTap: _isTranslating ? null : _toggleTranslation,
                   behavior: HitTestBehavior.opaque,
@@ -291,7 +291,7 @@ class _CommentRowState extends State<CommentRow> {
                               ? l10n.seeOriginal
                               : (_translationError ?? l10n.seeTranslation),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: CommentLayout.metaFontSize,
                             fontWeight: FontWeight.w600,
                             color: _translationError != null
                                 ? theme.colorScheme.error
@@ -300,19 +300,19 @@ class _CommentRowState extends State<CommentRow> {
                         ),
                 ),
               ],
-              const SizedBox(height: 8),
+              const SizedBox(height: CommentLayout.gapBeforeMeta),
               Row(
                 children: [
                   if (timeLabel.isNotEmpty) ...[
                     Text(
                       timeLabel,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: CommentLayout.metaFontSize,
                         fontWeight: FontWeight.w400,
                         color: muted,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: CommentLayout.metaActionGap),
                   ],
                   GestureDetector(
                     onTap: widget.onReply != null ? handleReply : null,
@@ -320,14 +320,14 @@ class _CommentRowState extends State<CommentRow> {
                     child: Text(
                       l10n.replyAction,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: CommentLayout.metaFontSize,
                         fontWeight: FontWeight.w600,
                         color: actionColor,
                       ),
                     ),
                   ),
                   if (widget.canDelete && widget.onDelete != null) ...[
-                    const SizedBox(width: 12),
+                    const SizedBox(width: CommentLayout.metaActionGap),
                     GestureDetector(
                       onTap: widget.onDelete,
                       behavior: HitTestBehavior.opaque,
@@ -369,7 +369,7 @@ class _CommentRowState extends State<CommentRow> {
                         child: Text(
                           formatCompactCount(comment.likeCount),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: CommentLayout.metaFontSize,
                             fontWeight: FontWeight.w500,
                             color: comment.isLiked ? _likedRed : muted,
                           ),

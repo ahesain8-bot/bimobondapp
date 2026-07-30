@@ -1,9 +1,6 @@
-import 'dart:ui';
-
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
 import 'package:bimobondapp/core/utils/app_assets.dart';
-import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -162,9 +159,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
 
     Widget navBar = Container(
       decoration: BoxDecoration(
-        color: glassStyle
-            ? feedOverlay.navBarScrim
-            : theme.scaffoldBackgroundColor,
+        color: glassStyle ? Colors.black : theme.scaffoldBackgroundColor,
         border: glassStyle
             ? null
             : Border(
@@ -175,7 +170,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
       ),
       padding: EdgeInsets.only(
         bottom:
-            MediaQuery.paddingOf(context).bottom +
+            MediaQuery.viewPaddingOf(context).bottom +
             HomeLayoutConstants.bottomNavSafeExtra,
         top: HomeLayoutConstants.bottomNavTopPadding,
       ),
@@ -189,18 +184,6 @@ class LiquidGlassBottomNav extends StatelessWidget {
         ),
       ),
     );
-
-    if (glassStyle) {
-      navBar = ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: HomeLayoutConstants.navBlurSigma,
-            sigmaY: HomeLayoutConstants.navBlurSigma,
-          ),
-          child: navBar,
-        ),
-      );
-    }
 
     return navBar;
   }
@@ -304,7 +287,7 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           iconWidget,
-          const SizedBox(height: AppSizes.p4),
+          const SizedBox(height: HomeLayoutConstants.navIconLabelGap),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(

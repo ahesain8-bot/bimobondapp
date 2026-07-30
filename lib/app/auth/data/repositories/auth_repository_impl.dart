@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bimobondapp/app/home/presentation/utils/feed_author_follow_cache.dart';
 import 'package:bimobondapp/app/auth/data/models/user_model.dart';
 import 'package:dartz/dartz.dart';
 import 'package:bimobondapp/core/error/failure_mapper.dart';
@@ -322,6 +323,12 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
+    try {
+      await remoteDataSource.logout();
+    } catch (_) {
+      // Best-effort: still sign out locally if the server call fails.
+    }
+    FeedAuthorFollowCache.instance.clear();
     if (userId != null) {
       await likesLocalDataSource.clearForUser(userId);
     }

@@ -3,6 +3,12 @@ import 'dart:ui';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:equatable/equatable.dart';
 
+enum GiftCatalogType { image, audio }
+
+enum GiftCatalogTag { newBadge, recent }
+
+enum GiftCatalogSize { small, medium, large }
+
 class GiftEntity extends Equatable {
   const GiftEntity({
     required this.id,
@@ -12,6 +18,12 @@ class GiftEntity extends Equatable {
     this.imageUrl,
     this.thumbnailUrl,
     this.animationUrl,
+    this.audioUrl,
+    this.color,
+    this.type = GiftCatalogType.image,
+    this.tag,
+    this.size = GiftCatalogSize.small,
+    this.sortOrder = 0,
   });
 
   final String id;
@@ -21,6 +33,14 @@ class GiftEntity extends Equatable {
   final String? imageUrl;
   final String? thumbnailUrl;
   final String? animationUrl;
+  final String? audioUrl;
+  final String? color;
+  final GiftCatalogType type;
+  final GiftCatalogTag? tag;
+  final GiftCatalogSize size;
+  final int sortOrder;
+
+  bool get isAudioGift => type == GiftCatalogType.audio;
 
   String? get displayImageUrl =>
       thumbnailUrl ?? imageUrl ?? (hasNetworkIcon ? icon : null);
@@ -42,8 +62,21 @@ class GiftEntity extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, name, icon, priceCoins, imageUrl, thumbnailUrl, animationUrl];
+  List<Object?> get props => [
+        id,
+        name,
+        icon,
+        priceCoins,
+        imageUrl,
+        thumbnailUrl,
+        animationUrl,
+        audioUrl,
+        color,
+        type,
+        tag,
+        size,
+        sortOrder,
+      ];
 }
 
 class GiftInventoryItemEntity extends Equatable {

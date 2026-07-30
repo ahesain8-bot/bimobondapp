@@ -43,10 +43,10 @@ class EngagementSheetHeader extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsetsDirectional.only(
-              start: AppSizes.p16,
-              end: AppSizes.p8,
-              top: 2,
-              bottom: 2,
+              start: AppSizes.p12,
+              end: AppSizes.p4,
+              top: 0,
+              bottom: 0,
             ),
             child: Row(
               children: [
@@ -59,16 +59,16 @@ class EngagementSheetHeader extends StatelessWidget {
                     indicatorWeight: 2,
                     indicatorColor: onSurface,
                     dividerHeight: 0,
-                    labelPadding: const EdgeInsetsDirectional.only(end: 18),
+                    labelPadding: const EdgeInsetsDirectional.only(end: 14),
                     labelColor: onSurface,
                     unselectedLabelColor: muted,
                     labelStyle: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                      fontSize: 13,
                     ),
                     unselectedLabelStyle: const TextStyle(
                       fontWeight: FontWeight.w500,
-                      fontSize: 15,
+                      fontSize: 13,
                     ),
                     tabs: [
                       EngagementTab(
@@ -97,10 +97,10 @@ class EngagementSheetHeader extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                    minWidth: 32,
+                    minHeight: 32,
                   ),
-                  icon: Icon(LucideIcons.x, size: 22, color: onSurface),
+                  icon: Icon(LucideIcons.x, size: 20, color: onSurface),
                 ),
               ],
             ),

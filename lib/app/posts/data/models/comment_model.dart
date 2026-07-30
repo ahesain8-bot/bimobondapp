@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/auth/data/models/user_model.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/posts/data/models/mention_ref_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/comment_entity.dart';
 
@@ -17,6 +18,9 @@ class CommentModel extends CommentEntity {
     super.giftIcon,
     super.giftThumbnailUrl,
     super.giftAnimationUrl,
+    super.giftCatalogType,
+    super.giftColor,
+    super.giftAudioUrl,
     required super.createdAt,
     required super.updatedAt,
     super.mentions = const [],
@@ -37,6 +41,58 @@ class CommentModel extends CommentEntity {
     };
     final direct = json[directKey]?.toString().trim();
     if (direct != null && direct.isNotEmpty) return direct;
+    return null;
+  }
+
+  static GiftCatalogType? _giftCatalogType(Map<String, dynamic> json) {
+    final gift = json['gift'];
+    final candidates = <dynamic>[
+      if (gift is Map) gift['type'],
+      if (gift is Map) gift['catalogType'],
+      if (gift is Map) gift['tag'],
+      json['giftType'],
+      json['giftCatalogType'],
+    ];
+    for (final raw in candidates) {
+      final value = raw?.toString().trim().toUpperCase();
+      if (value == null || value.isEmpty) continue;
+      if (value == 'AUDIO' ||
+          value == 'SONG' ||
+          value == 'SONGS' ||
+          value == 'SOUND' ||
+          value == 'MUSIC') {
+        return GiftCatalogType.audio;
+      }
+      if (value == 'IMAGE') return GiftCatalogType.image;
+    }
+    final audioUrl = _giftAudioUrl(json);
+    if (audioUrl != null && audioUrl.isNotEmpty) {
+      return GiftCatalogType.audio;
+    }
+    return null;
+  }
+
+  static String? _giftColor(Map<String, dynamic> json) {
+    final gift = json['gift'];
+    if (gift is Map) {
+      final value = gift['color']?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static String? _giftAudioUrl(Map<String, dynamic> json) {
+    final gift = json['gift'];
+    if (gift is Map) {
+      for (final key in ['audioUrl', 'audio_url']) {
+        final value = gift[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+    }
+    for (final key in ['giftAudioUrl', 'audioUrl', 'audio_url']) {
+      final value = json[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
     return null;
   }
 
@@ -64,6 +120,9 @@ class CommentModel extends CommentEntity {
             iconRaw.startsWith('/') ||
             iconRaw.contains('uploads/'));
 
+    final catalogType = _giftCatalogType(json);
+    final isAudio = catalogType == GiftCatalogType.audio;
+
     return CommentModel(
       id: json['id']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
@@ -83,9 +142,14 @@ class CommentModel extends CommentEntity {
           ? json['isGift']
           : json['isGift']?.toString().toLowerCase() == 'true',
       giftName: _giftField(json, 'name'),
-      giftIcon: iconIsUrl ? null : iconRaw,
-      giftThumbnailUrl: thumbnail ?? (iconIsUrl ? iconRaw : null),
-      giftAnimationUrl: _giftField(json, 'animationUrl'),
+      giftIcon: isAudio ? null : (iconIsUrl ? null : iconRaw),
+      giftThumbnailUrl: isAudio
+          ? null
+          : (thumbnail ?? (iconIsUrl ? iconRaw : null)),
+      giftAnimationUrl: isAudio ? null : _giftField(json, 'animationUrl'),
+      giftCatalogType: catalogType,
+      giftColor: _giftColor(json),
+      giftAudioUrl: _giftAudioUrl(json),
       createdAt: json['createdAt']?.toString() ?? now,
       updatedAt: json['updatedAt']?.toString() ?? now,
       mentions: MentionRefModel.listFromJson(json['mentions']),

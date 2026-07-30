@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/gifts/data/datasources/gifts_remote_data_source.dart';
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_group_entity.dart';
 import 'package:bimobondapp/app/gifts/domain/repositories/gifts_repository.dart';
 import 'package:bimobondapp/app/wallets/domain/repositories/wallets_repository.dart';
 import 'package:bimobondapp/core/error/failure_mapper.dart';
@@ -19,9 +20,25 @@ class GiftsRepositoryImpl implements GiftsRepository {
   Failure _mapException(Object e) => FailureMapper.from(e);
 
   @override
-  Future<Either<Failure, List<GiftEntity>>> getGifts() async {
+  Future<Either<Failure, List<GiftGroupEntity>>> getGiftGroups() async {
     try {
-      final gifts = await remoteDataSource.getGifts();
+      final groups = await remoteDataSource.getGiftGroups();
+      return Right(groups);
+    } catch (e) {
+      return Left(_mapException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<GiftEntity>>> getGifts({
+    String? groupId,
+    String? groupSlug,
+  }) async {
+    try {
+      final gifts = await remoteDataSource.getGifts(
+        groupId: groupId,
+        groupSlug: groupSlug,
+      );
       return Right(gifts);
     } catch (e) {
       return Left(_mapException(e));

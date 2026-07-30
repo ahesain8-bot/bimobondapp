@@ -29,6 +29,7 @@ class FeedNavigationHelper {
     Map<String, dynamic> queryParameters = const {},
     Object? extra,
   }) async {
+    FeedPlaybackGate.instance.pushModalOverlay();
     FeedPlaybackGate.instance.setBlocked(true);
     try {
       return await context.pushNamed<T>(
@@ -38,6 +39,7 @@ class FeedNavigationHelper {
         extra: extra,
       );
     } finally {
+      FeedPlaybackGate.instance.popModalOverlay();
       FeedPlaybackGate.instance.syncFromRouter();
     }
   }
@@ -47,10 +49,12 @@ class FeedNavigationHelper {
     String location, {
     Object? extra,
   }) async {
+    FeedPlaybackGate.instance.pushModalOverlay();
     FeedPlaybackGate.instance.setBlocked(true);
     try {
       return await context.push<T>(location, extra: extra);
     } finally {
+      FeedPlaybackGate.instance.popModalOverlay();
       FeedPlaybackGate.instance.syncFromRouter();
     }
   }

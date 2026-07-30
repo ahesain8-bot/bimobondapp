@@ -61,6 +61,8 @@ class LivePostCommentsArea extends StatelessWidget {
                   avatarUrl: comment.user.avatarUrl,
                   body: _commentBody(l10n, comment),
                   isGift: comment.isGift,
+                  isAudioGift: comment.isAudioGiftComment,
+                  audioGiftColorHex: comment.giftColor,
                   giftImageUrl: giftCommentImageUrl(comment),
                   onProfileTap: comment.user.id.isNotEmpty
                       ? () => openUserStoryOrProfile(

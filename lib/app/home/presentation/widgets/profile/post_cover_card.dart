@@ -56,6 +56,7 @@ class PostCoverCard extends StatelessWidget {
     final resolvedTheme = theme ?? Theme.of(context);
     final imageUrl = _resolveImageUrl();
     final isVideo = _isVideoPost();
+    final hasAttachedSound = _hasAttachedSound();
     final isAuction = _isAuctionPost;
     final videoUrl = _resolveVideoUrl();
     final placeholderColor = resolvedTheme.dividerColor.withValues(
@@ -97,9 +98,10 @@ class PostCoverCard extends StatelessWidget {
           else
             _placeholderIcon(resolvedTheme, isVideo, isAuction),
           if (showCenterPlayIcon &&
-              isVideo &&
+              (isVideo || hasAttachedSound) &&
               ((videoUrl != null && videoUrl.isNotEmpty) ||
-                  (posterUrl != null && posterUrl.isNotEmpty)))
+                  (posterUrl != null && posterUrl.isNotEmpty) ||
+                  (imageUrl != null && imageUrl.isNotEmpty)))
             const _ProfileVideoPlayIcon(),
         ],
       ),
@@ -165,6 +167,11 @@ class PostCoverCard extends StatelessWidget {
       );
     }
     return false;
+  }
+
+  bool _hasAttachedSound() {
+    final soundUrl = post?.sound?.resolvedAudioUrl;
+    return soundUrl != null && soundUrl.isNotEmpty;
   }
 
   bool get _isAuctionPost => post?.isAuctionable ?? false;

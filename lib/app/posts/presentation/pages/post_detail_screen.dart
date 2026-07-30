@@ -1,3 +1,8 @@
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_posts_viewer_layout.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_scrub_time_overlay.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_search_progress_column.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
@@ -25,6 +30,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   late PostEntity _post;
+  final FeedVideoProgressNotifier _videoProgress = FeedVideoProgressNotifier();
 
   @override
   void initState() {
@@ -33,7 +39,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   @override
+  void dispose() {
+    _videoProgress.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bottomChrome = MediaQuery.viewPaddingOf(context).bottom;
+    final showProgressBar = feedPostHasVideo(_post);
+    final showSearchRow = feedPostShowsProfileSearchChrome(_post);
+    final progressBottom =
+        FeedVideoPostsViewerLayout.progressColumnBottom(bottomChrome);
+
     return BlocListener<PostsBloc, PostsState>(
       listener: (context, state) {
         if (state is UpdatePostSuccess && state.post.id == _post.id) {
@@ -53,16 +71,47 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
-        body: VideoPostWidget(
-          key: ValueKey('${_post.id}_${_post.description}'),
-          post: _post,
-          isActive: true,
-          // Never the home feed — gate stays blocked under overlays like sound
-          // detail, which would leave this screen silent/frozen.
-          respectFeedPlaybackGate: false,
-          bottomPadding: MediaQuery.of(context).padding.bottom + 16,
-          openCommentsOnLoad: widget.openCommentsOnLoad,
-          highlightCommentId: widget.highlightCommentId,
+        body: FeedVideoProgressScope(
+          notifier: _videoProgress,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              VideoPostWidget(
+                key: ValueKey('${_post.id}_${_post.description}'),
+                post: _post,
+                isActive: true,
+                // Never the home feed — gate stays blocked under overlays like
+                // sound detail, which would leave this screen silent/frozen.
+                respectFeedPlaybackGate: false,
+                feedMediaFit: BoxFit.cover,
+                bottomPadding:
+                    FeedVideoPostsViewerLayout.videoContentBottomPadding(
+                      bottomChromeStackHeight: bottomChrome,
+                      post: _post,
+                      showProgressBar: showProgressBar,
+                      showSearchRow: showSearchRow,
+                    ),
+                openCommentsOnLoad: widget.openCommentsOnLoad,
+                highlightCommentId: widget.highlightCommentId,
+              ),
+              const Positioned.fill(child: FeedVideoScrubTimeOverlay()),
+              if (showProgressBar || showSearchRow)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: progressBottom,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: FeedVideoSearchProgressColumn(
+                      post: _post,
+                      transparentBackground: true,
+                      showProgressBar: showProgressBar,
+                      showSearchRow: showSearchRow,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

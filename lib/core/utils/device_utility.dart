@@ -60,4 +60,26 @@ class DeviceUtility {
       "appVersion": packageInfo?.version ?? '1.0.0',
     };
   }
+
+  /// Fields for `POST /auth/logout` (same stable [deviceId] as login).
+  static Future<Map<String, String>> getLogoutPayload() async {
+    final deviceInfo = DeviceInfoPlugin();
+    var deviceId = '';
+    var deviceName = '';
+
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfo.androidInfo;
+      deviceId = androidInfo.id;
+      deviceName = '${androidInfo.manufacturer} ${androidInfo.model}'.trim();
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      deviceId = iosInfo.identifierForVendor ?? '';
+      deviceName = iosInfo.name.trim();
+    }
+
+    final payload = <String, String>{};
+    if (deviceId.isNotEmpty) payload['deviceId'] = deviceId;
+    if (deviceName.isNotEmpty) payload['deviceName'] = deviceName;
+    return payload;
+  }
 }

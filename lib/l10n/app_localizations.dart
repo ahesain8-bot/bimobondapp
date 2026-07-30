@@ -953,6 +953,30 @@ abstract class AppLocalizations {
   /// **'Add a comment (optional)'**
   String get repostQuoteHint;
 
+  /// No description provided for @repostComposeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to your repost'**
+  String get repostComposeTitle;
+
+  /// No description provided for @repostComposeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Say something...'**
+  String get repostComposeHint;
+
+  /// No description provided for @repostComposeAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get repostComposeAdd;
+
+  /// No description provided for @postRepostersHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Reposts'**
+  String get postRepostersHeader;
+
   /// No description provided for @repostSuccess.
   ///
   /// In en, this message translates to:
@@ -2882,7 +2906,7 @@ abstract class AppLocalizations {
   /// No description provided for @addCommentHint.
   ///
   /// In en, this message translates to:
-  /// **'Add a comment...'**
+  /// **'Add comment...'**
   String get addCommentHint;
 
   /// No description provided for @justNow.
@@ -3142,6 +3166,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send to'**
   String get postShareSendToTitle;
+
+  /// No description provided for @postShareSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get postShareSearchHint;
+
+  /// No description provided for @postShareRecentChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent chats'**
+  String get postShareRecentChats;
 
   /// No description provided for @postShareSearchUsers.
   ///

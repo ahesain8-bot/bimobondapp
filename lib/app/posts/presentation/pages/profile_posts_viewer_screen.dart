@@ -1,12 +1,16 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/comment_sheet_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_bar.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_posts_viewer_layout.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_search_progress_column.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_scrub_time_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_widget.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_viewer_chrome.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
@@ -17,16 +21,11 @@ import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/core/utils/one_page_scroll_physics.dart';
-import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
-import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ProfilePostsViewerScreen extends StatefulWidget {
-  const ProfilePostsViewerScreen({
-    required this.args,
-    super.key,
-  });
+  const ProfilePostsViewerScreen({required this.args, super.key});
 
   final ProfilePostsOpenArgs args;
 
@@ -105,8 +104,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
     final loadKey = DateTime.now().microsecondsSinceEpoch;
     _pendingLoadKey = loadKey;
     final nextPage = _page;
-    final currentUserId =
-        authState is AuthSuccess ? authState.user.id : null;
+    final currentUserId = authState is AuthSuccess ? authState.user.id : null;
 
     switch (widget.args.source) {
       case ProfilePostsViewerSource.ownReposts:
@@ -241,10 +239,30 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
         ? post.likeCount + (post.isLiked ? 0 : 1)
         : (post.likeCount - (post.isLiked ? 1 : 0)).clamp(0, 1 << 30).toInt();
     setState(() {
-      _posts[index] = post.copyWith(
-        isLiked: state.liked,
-        likeCount: nextCount,
-      );
+      _posts[index] = post.copyWith(isLiked: state.liked, likeCount: nextCount);
+    });
+  }
+
+  Future<void> _openCommentsForCurrentPost() async {
+    if (_posts.isEmpty) return;
+    final post = _posts[_currentIndex.clamp(0, _posts.length - 1)];
+    final authState = context.read<AuthBloc>().state;
+    final isOwner =
+        authState is AuthSuccess && authState.user.id == post.userId;
+    final latestCount = await CommentSheetWidget.show(
+      context,
+      postId: post.id,
+      postOwnerId: post.userId,
+      likeCount: post.likeCount,
+      commentCount: post.commentCount,
+      viewCount: post.viewCount,
+      isPostOwner: isOwner,
+    );
+    if (latestCount == null || !mounted) return;
+    final index = _posts.indexWhere((p) => p.id == post.id);
+    if (index == -1) return;
+    setState(() {
+      _posts[index] = _posts[index].copyWith(commentCount: latestCount);
     });
   }
 
@@ -293,33 +311,30 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        extendBodyBehindAppBar: true,
-        // Let embedded auction screens receive keyboard insets themselves.
         resizeToAvoidBottomInset: false,
-        appBar: CustomAppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const DirectionalBackIcon(color: Colors.white, size: 20),
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ),
         body: FeedVideoProgressScope(
           notifier: _videoProgress,
           child: _posts.isEmpty
               ? const SizedBox.shrink()
               : Builder(
                   builder: (context) {
-                    final current = _posts[_currentIndex.clamp(
-                      0,
-                      _posts.length - 1,
-                    )];
-                    final showVideoProgress =
-                        !current.isAuctionable && feedPostHasVideo(current);
-                    final safeBottom = MediaQuery.paddingOf(context).bottom;
-                    final contentBottom =
-                        safeBottom +
-                        ProfileLayoutConstants.postsViewerBottomPadding;
+                    final current =
+                        _posts[_currentIndex.clamp(0, _posts.length - 1)];
+                    final currentHasVideo = feedPostHasVideo(current);
+                    final showTopSearch = feedPostShowsProfileSearchChrome(
+                      current,
+                    );
+                    final bottomChrome =
+                        FeedVideoPostsViewerLayout.profileCommentBarStackHeight(
+                          context,
+                        );
+                    final progressBottom =
+                        FeedVideoPostsViewerLayout.progressColumnBottom(
+                          bottomChrome,
+                        );
+                    final topClearance = ProfilePostsViewerTopBar.stackHeight(
+                      context,
+                    );
 
                     return Stack(
                       fit: StackFit.expand,
@@ -347,22 +362,70 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
                               post: post,
                               isActive: index == _currentIndex,
                               respectFeedPlaybackGate: false,
-                              // TikTok-style: likes/comments rise up when
-                              // opening from profile.
                               animateChromeEntrance: true,
-                              bottomPadding: contentBottom,
+                              bottomPadding:
+                                  FeedVideoPostsViewerLayout.videoContentBottomPadding(
+                                    bottomChromeStackHeight: bottomChrome,
+                                    post: post,
+                                    captionGap: HomeLayoutConstants
+                                        .feedCaptionGapBelowSearchChrome,
+                                    showProgressBar: feedPostHasVideo(post),
+                                    showSearchRow: true,
+                                  ),
+                              feedTopBarClearance: topClearance,
                               pageController: _pageController,
                               pageIndex: index,
+                              feedMediaFit: BoxFit.cover,
                             );
                           },
                         ),
-                        if (showVideoProgress)
+                        const Positioned.fill(
+                          child: FeedVideoScrubTimeOverlay(),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.55),
+                                  Colors.black.withValues(alpha: 0.0),
+                                ],
+                                stops: const [0.0, 1.0],
+                              ),
+                            ),
+                            child: ProfilePostsViewerTopBar(
+                              onBack: () => Navigator.of(context).maybePop(),
+                              post: current,
+                              showSearch: showTopSearch,
+                            ),
+                          ),
+                        ),
+                        if (showTopSearch)
                           Positioned(
-                            key: ValueKey(_posts[_currentIndex].id),
+                            key: ValueKey('chrome_${_posts[_currentIndex].id}'),
                             left: 0,
                             right: 0,
-                            bottom: safeBottom,
-                            child: const FeedVideoProgressBar(),
+                            bottom: progressBottom,
+                            child: FeedVideoSearchProgressColumn(
+                              post: current,
+                              transparentBackground: true,
+                              showProgressBar: currentHasVideo,
+                              showSearchRow: true,
+                            ),
+                          ),
+                        if (!current.isAuctionable)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: ProfilePostsViewerCommentBar(
+                              onTap: _openCommentsForCurrentPost,
+                            ),
                           ),
                       ],
                     );

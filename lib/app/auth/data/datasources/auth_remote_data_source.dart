@@ -38,6 +38,7 @@ abstract class AuthRemoteDataSource {
     int limit = 10,
   });
   Future<void> syncDeviceRegistration();
+  Future<void> logout();
   Future<void> forgotPassword({required String email});
   Future<void> sendOtp({
     required String type,
@@ -341,6 +342,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       data: deviceInfo,
       options: Options(headers: {'Authorization': 'Bearer $idToken'}),
     );
+  });
+
+  @override
+  Future<void> logout() => _execute(() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final idToken = await user.getIdToken();
+    if (idToken == null || idToken.isEmpty) return;
+
+    final payload = await DeviceUtility.getLogoutPayload();
+
+    final response = await apiClient.dio.post(
+      ApiConstants.authLogout,
+      data: payload,
+      options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) return;
+    throw ServerException(message: 'Logout failed');
   });
 
   @override

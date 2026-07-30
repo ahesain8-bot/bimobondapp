@@ -18,8 +18,9 @@ String localizedGiftCommentText(AppLocalizations l10n, CommentEntity comment) {
   return text.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
-/// Network thumbnail for gift comments (null when only an emoji icon exists).
+/// Network thumbnail for gift comments (never for [AUDIO] / song gifts).
 String? giftCommentImageUrl(CommentEntity comment) {
+  if (!comment.isGift || comment.isAudioGiftComment) return null;
   for (final candidate in [
     comment.giftThumbnailUrl,
     comment.giftIcon,

@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/comments/comment_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/comments/quick_comment_reactions.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/mention_composer_field.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -35,10 +36,6 @@ class CommentInputSection extends StatelessWidget {
   final bool showPostButton;
   final Widget? inputAvatar;
 
-  static const double _fieldMinHeight = 48;
-  static const double _fieldRadius = 24;
-  static const double _inputFontSize = 16;
-
   void _insertMentionTrigger() {
     final text = commentController.text;
     final selection = commentController.selection;
@@ -66,180 +63,204 @@ class CommentInputSection extends StatelessWidget {
     );
   }
 
+  Color _fieldFill(Brightness brightness, ColorScheme scheme) {
+    if (brightness == Brightness.light) {
+      return CommentLayout.composerFieldFillLight;
+    }
+    return scheme.surfaceContainerHighest;
+  }
+
+  Color _hintColor(Brightness brightness, ColorScheme scheme) {
+    if (brightness == Brightness.light) {
+      return CommentLayout.composerHintLight;
+    }
+    return scheme.onSurfaceVariant;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
-    final muted = onSurface.withValues(alpha: 0.42);
-    final fieldFill = theme.brightness == Brightness.dark
-        ? Colors.white.withValues(alpha: 0.08)
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.72);
-    final borderColor = onSurface.withValues(alpha: 0.12);
-    final barBorder = onSurface.withValues(alpha: 0.08);
+    final scheme = theme.colorScheme;
+    final brightness = theme.brightness;
+    final fieldFill = _fieldFill(brightness, scheme);
+    final hintColor = _hintColor(brightness, scheme);
+    final onSurface = scheme.onSurface;
+    final iconColor = brightness == Brightness.light
+        ? CommentLayout.composerHintLight
+        : scheme.onSurfaceVariant;
+    final footerDivider = brightness == Brightness.light
+        ? CommentLayout.composerFooterDividerLight
+        : onSurface.withValues(alpha: 0.08);
+
+    final textStyle = TextStyle(
+      fontSize: CommentLayout.composerFontSize,
+      height: 1.2,
+      color: onSurface,
+      fontWeight: FontWeight.w400,
+    );
 
     return Material(
-      color: theme.colorScheme.surface,
+      color: scheme.surface,
       elevation: 0,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-          AppSizes.p16,
-          AppSizes.p10,
-          AppSizes.p16,
-          bottomPadding + AppSizes.p12,
-        ),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(top: BorderSide(color: barBorder, width: 1)),
+          color: scheme.surface,
+          border: Border(top: BorderSide(color: footerDivider, width: 0.5)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (replyingToUsername != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSizes.p10),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.reply,
-                      size: 16,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: CustomText(
-                        l10n.replyingTo(replyingToUsername!),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.primary,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSizes.p16,
+            AppSizes.p8,
+            AppSizes.p16,
+            bottomPadding + AppSizes.p8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (replyingToUsername != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSizes.p8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        LucideIcons.reply,
+                        size: 16,
+                        color: scheme.primary,
                       ),
-                    ),
-                    GestureDetector(
-                      onTap: onClearReplyingTo,
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(LucideIcons.x, size: 18, color: muted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            QuickCommentReactions(onReactionSelected: onQuickReaction),
-            const SizedBox(height: AppSizes.p12),
-            MentionComposerField(
-              controller: commentController,
-              focusNode: commentFocusNode,
-              maxLines: 5,
-              minLines: 1,
-              style: TextStyle(
-                fontSize: _inputFontSize,
-                height: 1.35,
-                color: onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-              decoration: InputDecoration(
-                hintText: replyingToUsername != null
-                    ? l10n.replyingTo(replyingToUsername!)
-                    : l10n.addCommentHint,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                hintStyle: TextStyle(
-                  fontSize: _inputFontSize,
-                  height: 1.35,
-                  color: muted,
-                  fontWeight: FontWeight.w400,
-                ),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              layoutBuilder: (context, suggestions, textField) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (suggestions != null) ...[
-                      suggestions,
-                      const SizedBox(height: AppSizes.p8),
-                    ],
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (inputAvatar != null)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              end: 10,
-                              bottom: 4,
-                            ),
-                            child: inputAvatar,
-                          ),
-                        Expanded(
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            constraints: const BoxConstraints(
-                              minHeight: _fieldMinHeight,
-                            ),
-                            decoration: BoxDecoration(
-                              color: fieldFill,
-                              borderRadius: BorderRadius.circular(_fieldRadius),
-                              border: Border.all(color: borderColor),
-                            ),
-                            padding: const EdgeInsetsDirectional.only(
-                              start: 16,
-                              end: 4,
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      minHeight: _fieldMinHeight - 2,
-                                    ),
-                                    child: Align(
-                                      alignment: AlignmentDirectional.centerStart,
-                                      child: textField,
-                                    ),
-                                  ),
-                                ),
-                                if (!showPostButton)
-                                  _FieldIconButton(
-                                    icon: LucideIcons.atSign,
-                                    color: muted,
-                                    onTap: _insertMentionTrigger,
-                                  ),
-                                _FieldIconButton(
-                                  icon: LucideIcons.smile,
-                                  color: muted,
-                                  onTap: () => _openEmojiPicker(context),
-                                ),
-                                if (onPickImage != null)
-                                  _FieldIconButton(
-                                    icon: LucideIcons.image,
-                                    color: muted,
-                                    onTap: isSendingImage ? null : onPickImage,
-                                    isLoading: isSendingImage,
-                                  ),
-                              ],
-                            ),
-                          ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: CustomText(
+                          l10n.replyingTo(replyingToUsername!),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary,
                         ),
-                        if (showPostButton) ...[
-                          const SizedBox(width: 8),
-                          _PostActionButton(
-                            label: l10n.postButton,
-                            onTap: onSendComment,
-                          ),
-                        ],
+                      ),
+                      GestureDetector(
+                        onTap: onClearReplyingTo,
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(LucideIcons.x, size: 18, color: iconColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              QuickCommentReactions(onReactionSelected: onQuickReaction),
+              const SizedBox(height: AppSizes.p8),
+              MentionComposerField(
+                controller: commentController,
+                focusNode: commentFocusNode,
+                maxLines: 5,
+                minLines: 1,
+                style: textStyle,
+                decoration: InputDecoration(
+                  hintText: replyingToUsername != null
+                      ? l10n.replyingTo(replyingToUsername!)
+                      : l10n.addCommentHint,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  hintStyle: TextStyle(
+                    fontSize: CommentLayout.composerFontSize,
+                    height: 1.2,
+                    color: hintColor,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                layoutBuilder: (context, suggestions, textField) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (suggestions != null) ...[
+                        suggestions,
+                        const SizedBox(height: AppSizes.p8),
                       ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (inputAvatar != null)
+                            Padding(
+                              padding:
+                                  const EdgeInsetsDirectional.only(end: 10),
+                              child: inputAvatar,
+                            ),
+                          Expanded(
+                            child: Container(
+                              constraints: const BoxConstraints(
+                                minHeight: CommentLayout.composerFieldMinHeight,
+                              ),
+                              decoration: BoxDecoration(
+                                color: fieldFill,
+                                borderRadius: BorderRadius.circular(
+                                  CommentLayout.composerFieldRadius,
+                                ),
+                              ),
+                              padding: const EdgeInsetsDirectional.only(
+                                start: 14,
+                                end: 2,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minHeight:
+                                            CommentLayout.composerFieldMinHeight,
+                                      ),
+                                      child: Align(
+                                        alignment:
+                                            AlignmentDirectional.centerStart,
+                                        child: textField,
+                                      ),
+                                    ),
+                                  ),
+                                  if (!showPostButton) ...[
+                                    _FieldIconButton(
+                                      icon: LucideIcons.atSign,
+                                      color: iconColor,
+                                      onTap: _insertMentionTrigger,
+                                    ),
+                                    _FieldIconButton(
+                                      icon: LucideIcons.smile,
+                                      color: iconColor,
+                                      onTap: () => _openEmojiPicker(context),
+                                    ),
+                                    if (onPickImage != null)
+                                      _FieldIconButton(
+                                        icon: LucideIcons.image,
+                                        color: iconColor,
+                                        onTap:
+                                            isSendingImage ? null : onPickImage,
+                                        isLoading: isSendingImage,
+                                      ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (showPostButton) ...[
+                            const SizedBox(width: 8),
+                            _PostActionButton(
+                              label: l10n.postButton,
+                              onTap: onSendComment,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -265,15 +286,15 @@ class _FieldIconButton extends StatelessWidget {
       onPressed: onTap,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 42, minHeight: 46),
+      constraints: const BoxConstraints(
+        minWidth: 34,
+        minHeight: CommentLayout.composerFieldMinHeight,
+      ),
       icon: isLoading
           ? SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.8,
-                color: color,
-              ),
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 1.8, color: color),
             )
           : Icon(icon, size: 22, color: color),
       tooltip: null,
@@ -293,20 +314,23 @@ class _PostActionButton extends StatelessWidget {
 
     return Material(
       color: primary,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(CommentLayout.composerFieldRadius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(CommentLayout.composerFieldRadius),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48, minWidth: 72),
+          constraints: const BoxConstraints(
+            minHeight: CommentLayout.composerFieldMinHeight,
+            minWidth: 64,
+          ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Center(
               child: Text(
                 label,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   height: 1.1,
                 ),

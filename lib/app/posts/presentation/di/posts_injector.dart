@@ -21,6 +21,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/share_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_like_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_my_reposts_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_reposts_usecase.dart';
+import 'package:bimobondapp/app/posts/domain/usecases/update_repost_quote_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_repost_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/toggle_save_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
@@ -39,10 +40,8 @@ Future<void> initPosts() async {
 
   // Repository
   sl.registerLazySingleton<PostsRepository>(
-    () => PostsRepositoryImpl(
-      remoteDataSource: sl(),
-      likesLocalDataSource: sl(),
-    ),
+    () =>
+        PostsRepositoryImpl(remoteDataSource: sl(), likesLocalDataSource: sl()),
   );
 
   // Use cases
@@ -57,6 +56,7 @@ Future<void> initPosts() async {
   sl.registerLazySingleton(() => RecordPostViewUseCase(sl()));
   sl.registerLazySingleton(() => ToggleSavePostUsecase(sl()));
   sl.registerLazySingleton(() => ToggleRepostPostUsecase(sl()));
+  sl.registerLazySingleton(() => UpdateRepostQuoteUsecase(sl()));
   sl.registerLazySingleton(() => GetPostRepostsUseCase(sl()));
   sl.registerLazySingleton(() => GetMyRepostsUseCase(sl()));
   sl.registerLazySingleton(() => UpdatePostUsecase(sl()));

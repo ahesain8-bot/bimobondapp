@@ -114,11 +114,15 @@ class GlassBottomSheet {
           showHandle: showHandle,
           expand: expand,
           lightSurface: lightSurface,
-          child: padding == null ? child : Padding(padding: padding, child: child),
+          child: padding == null
+              ? child
+              : Padding(padding: padding, child: child),
         );
         if (isScrollControlled) {
           body = Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
             child: body,
           );
         }
@@ -141,6 +145,7 @@ class GlassBottomSheet {
     double maxChildSize = 0.95,
     bool adaptTheme = false,
     bool lightSurface = false,
+    Widget Function(BuildContext context, Widget sheet)? wrapSheet,
     String? title,
     bool showHandle = true,
   }) {
@@ -160,6 +165,7 @@ class GlassBottomSheet {
         snapSizes: snapSizes,
         adaptTheme: adaptTheme,
         lightSurface: lightSurface,
+        wrapSheet: wrapSheet,
         title: title,
         showHandle: showHandle,
         builder: builder,
@@ -271,6 +277,7 @@ class _DraggableSheetHost extends StatefulWidget {
     required this.snapSizes,
     required this.adaptTheme,
     required this.lightSurface,
+    this.wrapSheet,
     required this.showHandle,
     this.title,
   });
@@ -283,6 +290,7 @@ class _DraggableSheetHost extends StatefulWidget {
   final List<double> snapSizes;
   final bool adaptTheme;
   final bool lightSurface;
+  final Widget Function(BuildContext context, Widget sheet)? wrapSheet;
   final bool showHandle;
   final String? title;
 
@@ -335,8 +343,11 @@ class _DraggableSheetHostState extends State<_DraggableSheetHost> {
               lightSurface: widget.lightSurface,
               child: widget.builder(context, scrollController),
             );
-            if (widget.lightSurface) {
-              // Keep current app theme (white in light, dark surface in dark).
+            final wrap = widget.wrapSheet;
+            if (wrap != null) {
+              body = wrap(context, body);
+            } else if (widget.lightSurface) {
+              // Keep current app theme (themed surface in light and dark).
             } else if (widget.adaptTheme) {
               body = GlassBottomSheetTheme.wrap(context, body);
             }
@@ -460,9 +471,7 @@ class GlassBottomSheetFrame extends StatelessWidget {
       // Prefer [build] path which reads theme; this is a fallback.
       return const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0x14000000)),
-        ),
+        border: Border(top: BorderSide(color: Color(0x14000000))),
       );
     }
     return BoxDecoration(
@@ -484,11 +493,7 @@ class GlassBottomSheetFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
-    final bg = lightSurface
-        ? (theme.scaffoldBackgroundColor == Colors.transparent
-              ? surface
-              : theme.scaffoldBackgroundColor)
-        : null;
+    final bg = lightSurface ? surface : null;
 
     final shell = DecoratedBox(
       decoration: lightSurface
@@ -599,10 +604,7 @@ class GlassBottomSheetTheme {
   }
 
   static Widget wrap(BuildContext context, Widget child) {
-    return Theme(
-      data: adapt(Theme.of(context)),
-      child: child,
-    );
+    return Theme(data: adapt(Theme.of(context)), child: child);
   }
 
   /// Kept for callers that still force a light overlay; prefer app theme surface.
@@ -759,8 +761,7 @@ class GlassBottomSheetListTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (isSelected)
-                Icon(LucideIcons.check, color: color, size: 20),
+              if (isSelected) Icon(LucideIcons.check, color: color, size: 20),
             ],
           ),
         ),

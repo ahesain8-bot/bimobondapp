@@ -9,6 +9,12 @@ class GiftModel extends GiftEntity {
     super.imageUrl,
     super.thumbnailUrl,
     super.animationUrl,
+    super.audioUrl,
+    super.color,
+    super.type,
+    super.tag,
+    super.size,
+    super.sortOrder,
   });
 
   factory GiftModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +35,9 @@ class GiftModel extends GiftEntity {
         ?.toString()
         .trim();
 
+    final audioUrl = json['audioUrl']?.toString().trim();
+    final color = json['color']?.toString().trim();
+
     var icon = (json['icon'] ?? json['emoji'] ?? json['symbol'] ?? '')
         .toString();
     if (icon.isEmpty && thumbnailUrl != null) {
@@ -38,7 +47,7 @@ class GiftModel extends GiftEntity {
       icon = '🎁';
     }
 
-    final priceCoins = _readInt(
+    final priceCoins = readInt(
       json['priceCoins'] ??
           json['priceUsd'] ??
           json['price'] ??
@@ -56,10 +65,40 @@ class GiftModel extends GiftEntity {
       thumbnailUrl: thumbnailUrl,
       animationUrl:
           animationUrl != null && animationUrl.isNotEmpty ? animationUrl : null,
+      audioUrl: audioUrl != null && audioUrl.isNotEmpty ? audioUrl : null,
+      color: color != null && color.isNotEmpty ? color : null,
+      type: _parseType(json['type']),
+      tag: _parseTag(json['tag']),
+      size: _parseSize(json['size']),
+      sortOrder: readInt(json['sortOrder']),
     );
   }
 
-  static int _readInt(dynamic value) {
+  static GiftCatalogType _parseType(dynamic raw) {
+    final value = raw?.toString().toUpperCase();
+    if (value == 'AUDIO') return GiftCatalogType.audio;
+    return GiftCatalogType.image;
+  }
+
+  static GiftCatalogTag? _parseTag(dynamic raw) {
+    final value = raw?.toString().toUpperCase();
+    return switch (value) {
+      'NEW' => GiftCatalogTag.newBadge,
+      'RECENT' => GiftCatalogTag.recent,
+      _ => null,
+    };
+  }
+
+  static GiftCatalogSize _parseSize(dynamic raw) {
+    final value = raw?.toString().toUpperCase();
+    return switch (value) {
+      'MEDIUM' => GiftCatalogSize.medium,
+      'LARGE' => GiftCatalogSize.large,
+      _ => GiftCatalogSize.small,
+    };
+  }
+
+  static int readInt(dynamic value) {
     if (value is int) return value;
     if (value is double) return value.round();
     if (value is String) return int.tryParse(value) ?? 0;
@@ -89,7 +128,7 @@ class GiftInventoryItemModel extends GiftInventoryItemEntity {
 
     return GiftInventoryItemModel(
       giftId: giftId ?? '',
-      quantity: GiftModel._readInt(
+      quantity: GiftModel.readInt(
         json['quantity'] ?? json['count'] ?? json['qty'] ?? 0,
       ),
       gift: gift,

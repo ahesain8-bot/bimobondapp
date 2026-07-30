@@ -23,7 +23,8 @@ class AppAssets {
   static const String mobileIcon =
       '$iconsPath/mobile-phone-svgrepo-com (1).svg';
   static const String googleIcon = '$iconsPath/google-color-svgrepo-com.svg';
-  static const String chatNavIcon = '$iconsPath/message-pending-svgrepo-com.svg';
+  static const String chatNavIcon =
+      '$iconsPath/message-pending-svgrepo-com.svg';
   static const String chatNavIconFilled = '$iconsPath/chat_filled.svg';
   static const String feedSearchIcon = '$iconsPath/feed_search.svg';
   static const String feedLiveIcon = '$iconsPath/live-svgrepo-com.svg';

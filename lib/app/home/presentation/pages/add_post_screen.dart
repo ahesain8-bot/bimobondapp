@@ -126,8 +126,9 @@ class _AddPostScreenState extends State<AddPostScreen>
     _soundDidTrim =
         widget.initialSoundDidTrim || widget.initialSoundOffset > Duration.zero;
     final initialSeg = widget.initialSoundSegmentId?.trim();
-    _pickedSoundSegmentId =
-        (initialSeg != null && initialSeg.isNotEmpty) ? initialSeg : null;
+    _pickedSoundSegmentId = (initialSeg != null && initialSeg.isNotEmpty)
+        ? initialSeg
+        : null;
     _loadCategories();
     if (widget.isStory &&
         (widget.initialFiles == null || widget.initialFiles!.isEmpty)) {
@@ -222,8 +223,9 @@ class _AddPostScreenState extends State<AddPostScreen>
         _soundDidTrim =
             edited.soundDidTrim || edited.soundOffset > Duration.zero;
         final seg = edited.soundSegmentId?.trim();
-        _pickedSoundSegmentId =
-            (seg != null && seg.isNotEmpty) ? seg : _pickedSoundSegmentId;
+        _pickedSoundSegmentId = (seg != null && seg.isNotEmpty)
+            ? seg
+            : _pickedSoundSegmentId;
       }
       _updateType();
     });
@@ -280,8 +282,9 @@ class _AddPostScreenState extends State<AddPostScreen>
             _soundDidTrim =
                 edited.soundDidTrim || edited.soundOffset > Duration.zero;
             final seg = edited.soundSegmentId?.trim();
-            _pickedSoundSegmentId =
-                (seg != null && seg.isNotEmpty) ? seg : _pickedSoundSegmentId;
+            _pickedSoundSegmentId = (seg != null && seg.isNotEmpty)
+                ? seg
+                : _pickedSoundSegmentId;
           }
           _updateType();
         });
@@ -316,10 +319,10 @@ class _AddPostScreenState extends State<AddPostScreen>
         _soundWindow = result.soundWindow > Duration.zero
             ? result.soundWindow
             : const Duration(seconds: 15);
-        _soundDidTrim = result.soundDidTrim || result.soundOffset > Duration.zero;
+        _soundDidTrim =
+            result.soundDidTrim || result.soundOffset > Duration.zero;
         final seg = result.soundSegmentId?.trim();
-        _pickedSoundSegmentId =
-            (seg != null && seg.isNotEmpty) ? seg : null;
+        _pickedSoundSegmentId = (seg != null && seg.isNotEmpty) ? seg : null;
       }
       _updateType();
     });
@@ -428,11 +431,11 @@ class _AddPostScreenState extends State<AddPostScreen>
 
         final message = status == 'REJECTED'
             ? (eligibility.rejectionReason?.trim().isNotEmpty == true
-                ? eligibility.rejectionReason!
-                : l10n.auctionSellerRejectedMessage)
+                  ? eligibility.rejectionReason!
+                  : l10n.auctionSellerRejectedMessage)
             : (eligibility.message?.trim().isNotEmpty == true
-                ? eligibility.message!
-                : l10n.auctionSellerRequiredMessage);
+                  ? eligibility.message!
+                  : l10n.auctionSellerRequiredMessage);
 
         var openedForm = false;
         await PopupDialogs.showConfirmDialog(
@@ -456,9 +459,8 @@ class _AddPostScreenState extends State<AddPostScreen>
         }
 
         // Re-check after verification (usually PENDING until admin approves).
-        final recheck = await auctions_di.sl<GetAuctionSellerEligibilityUseCase>()(
-          NoParams(),
-        );
+        final recheck = await auctions_di
+            .sl<GetAuctionSellerEligibilityUseCase>()(NoParams());
         if (!mounted) return false;
         return recheck.fold(
           (failure) {

@@ -442,6 +442,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get repostQuoteHint => 'Add a comment (optional)';
 
   @override
+  String get repostComposeTitle => 'Add to your repost';
+
+  @override
+  String get repostComposeHint => 'Say something...';
+
+  @override
+  String get repostComposeAdd => 'Add';
+
+  @override
+  String get postRepostersHeader => 'Reposts';
+
+  @override
   String get repostSuccess => 'Reposted';
 
   @override
@@ -1467,7 +1479,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noCommentsYet => 'No comments yet. Be the first!';
 
   @override
-  String get addCommentHint => 'Add a comment...';
+  String get addCommentHint => 'Add comment...';
 
   @override
   String get justNow => 'Just now';
@@ -1607,6 +1619,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get postShareSendToTitle => 'Send to';
+
+  @override
+  String get postShareSearchHint => 'Search';
+
+  @override
+  String get postShareRecentChats => 'Recent chats';
 
   @override
   String get postShareSearchUsers => 'Search friends and users';

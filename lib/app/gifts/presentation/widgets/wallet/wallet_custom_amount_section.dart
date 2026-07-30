@@ -12,7 +12,6 @@ import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class WalletCustomAmountSection extends StatelessWidget {
   const WalletCustomAmountSection({

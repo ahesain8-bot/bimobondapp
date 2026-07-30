@@ -334,7 +334,16 @@ class AppRouter {
       GoRoute(
         path: '/posts-search',
         name: 'posts_search',
-        builder: (context, state) => const PostsSearchScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          String? initialQuery;
+          if (extra is Map) {
+            initialQuery = extra['initialQuery']?.toString();
+          } else if (extra is String) {
+            initialQuery = extra;
+          }
+          return PostsSearchScreen(initialQuery: initialQuery);
+        },
       ),
       GoRoute(
         path: '/hashtag',

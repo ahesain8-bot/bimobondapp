@@ -36,7 +36,10 @@ class ProfileLayoutConstants {
   static const int postsPageSize = 10;
 
   /// Extra gap above the home-indicator for profile fullscreen posts.
-  static const double postsViewerBottomPadding = 24;
+  static const double postsViewerBottomPadding = 12;
+
+  /// Space reserved for the TikTok-style comment bar (excludes safe area).
+  static const double postsViewerCommentBarHeight = 56;
 
   /// Feed API sort: newest posts first (`LATEST`).
   static const String postsSortNewestFirst = 'LATEST';

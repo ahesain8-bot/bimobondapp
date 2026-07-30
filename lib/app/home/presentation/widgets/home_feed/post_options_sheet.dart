@@ -30,12 +30,14 @@ class PostOptionsSheet {
     VoidCallback? onRepost,
     bool isReposted = false,
   }) {
-    return GlassBottomSheet.open<void>(
+    final sheetTheme = Theme.of(context);
+    return GlassBottomSheet.showContent<void>(
       context,
       isScrollControlled: true,
-      builder: (ctx) => GlassBottomSheetShell(
-        showHandle: true,
-        lightSurface: true,
+      showHandle: true,
+      lightSurface: true,
+      child: Theme(
+        data: sheetTheme,
         child: _PostOptionsSheetContent(
           post: post,
           isOwner: isOwner,
@@ -113,8 +115,12 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     });
   }
 
-  List<SocialUserEntity> get _visiblePeople {
-    return PostSharePeopleLoader.filter(_allPeople, _query, limit: 24);
+  List<SocialUserEntity> get _horizontalPeople {
+    return _allPeople.take(20).toList(growable: false);
+  }
+
+  List<SocialUserEntity> get _searchListPeople {
+    return PostSharePeopleLoader.filter(_allPeople, _query, limit: 60);
   }
 
   void _toggleUser(SocialUserEntity user) {
@@ -249,8 +255,9 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
 
   List<_CircleAction> _buildOptionActions(PostOptionsActions actions) {
     final l10n = AppLocalizations.of(context)!;
-    final mutedBg = Theme.of(context).colorScheme.surfaceContainerHighest;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final mutedBg = theme.colorScheme.surfaceContainerHighest;
+    final onSurface = theme.colorScheme.onSurface;
 
     return [
       if (!widget.isOwner)
@@ -345,7 +352,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.deletePost,
           background: mutedBg,
           icon: LucideIcons.trash2,
-          iconColor: const Color(0xFFEF4444),
+          iconColor: theme.colorScheme.error,
           onTap: () {
             Navigator.pop(context);
             widget.onDelete!();
@@ -354,28 +361,121 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     ];
   }
 
-  Widget _buildHeader(ThemeData theme, AppLocalizations l10n) {
+  Widget _titleBar({
+    required AppLocalizations l10n,
+    Widget? leading,
+    VoidCallback? onClose,
+  }) {
+    final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    if (_searchOpen) {
-      return SizedBox(
-        height: 44,
+    final titleStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      fontSize: 16,
+      color: onSurface,
+    );
+
+    return SizedBox(
+      height: 40,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            child: leading ?? const SizedBox.shrink(),
+          ),
+          Expanded(
+            child: Text(
+              l10n.postShareSendToTitle,
+              textAlign: TextAlign.center,
+              style: titleStyle,
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            onPressed: onClose ?? () => Navigator.pop(context),
+            icon: Icon(LucideIcons.x, size: 20, color: onSurface),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchTitleBar(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final titleStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      fontSize: 16,
+      color: onSurface,
+    );
+
+    return SizedBox(
+      height: 40,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Text(l10n.postShareSendToTitle, style: titleStyle),
+          PositionedDirectional(
+            end: 0,
+            top: 0,
+            bottom: 0,
+            child: IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(LucideIcons.x, size: 20, color: onSurface),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Elevated fill for the search pill (light gray / dark gray from [ColorScheme]).
+  Color _searchFieldFill(ColorScheme cs) {
+    return cs.brightness == Brightness.light
+        ? cs.surfaceContainerHighest
+        : cs.surfaceContainerHigh;
+  }
+
+  Widget _buildSearchField(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Material(
+      color: _searchFieldFill(cs),
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        height: 40,
         child: Row(
           children: [
+            const SizedBox(width: 12),
+            Icon(
+              LucideIcons.search,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocus,
                 autofocus: true,
-                style: TextStyle(
-                  color: onSurface,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
+                textInputAction: TextInputAction.search,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface,
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
                 ),
+                cursorColor: cs.primary,
                 decoration: InputDecoration(
-                  hintText: l10n.postShareSearchUsers,
-                  hintStyle: TextStyle(
-                    color: onSurface.withValues(alpha: 0.45),
-                    fontSize: 15,
+                  hintText: l10n.postShareSearchHint,
+                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
                   ),
                   border: InputBorder.none,
                   isDense: true,
@@ -383,68 +483,134 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
                 ),
               ),
             ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              onPressed: () {
-                _searchController.clear();
-                setState(() => _searchOpen = false);
-              },
-              icon: Icon(LucideIcons.x, size: 22, color: onSurface),
-            ),
+            const SizedBox(width: 10),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSendButton(AppLocalizations l10n, {bool compact = false}) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.only(top: compact ? 6 : AppSizes.p10),
+      child: SizedBox(
+        height: compact ? 42 : 48,
+        width: double.infinity,
+        child: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: cs.primary,
+            foregroundColor: cs.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          onPressed: _sending ? null : _sendSelected,
+          child: _sending
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.onPrimary,
+                  ),
+                )
+              : Text(
+                  l10n.postShareSendToCount(_selected.length),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: compact ? 14 : 16,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFriendSearchList(AppLocalizations l10n) {
+    final people = _searchListPeople;
+    final theme = Theme.of(context);
+    if (_loadingPeople) {
+      return const Center(child: CustomLoadingWidget(size: 40));
+    }
+    if (people.isEmpty) {
+      return Center(
+        child: Text(
+          l10n.postShareNoUsers,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
 
-    return SizedBox(
-      height: 44,
-      child: Row(
-        children: [
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            onPressed: () {
-              setState(() => _searchOpen = true);
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _searchFocus.requestFocus();
-              });
-            },
-            icon: Icon(LucideIcons.search, size: 22, color: onSurface),
-          ),
-          Expanded(
-            child: Text(
-              l10n.postShareSendToTitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: 17,
-                color: onSurface,
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      itemCount: people.length,
+      itemBuilder: (context, index) {
+        final user = people[index];
+        return _FriendSearchRow(
+          user: user,
+          friendsLabel: l10n.friendsLabel,
+          selected: _selected.contains(user.id),
+          sent: _sentTo.contains(user.id),
+          showFriendsRelation: _query.isEmpty,
+          onTap: () => _toggleUser(user),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchMode(AppLocalizations l10n) {
+    final screenH = MediaQuery.sizeOf(context).height;
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final theme = Theme.of(context);
+    final panelHeight = screenH * 0.88;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      height: panelHeight,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSizes.p16,
+          0,
+          AppSizes.p16,
+          6 + viewInsets.bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _searchTitleBar(l10n),
+            const SizedBox(height: 8),
+            _buildSearchField(l10n),
+            const SizedBox(height: 8),
+            Text(
+              l10n.postShareRecentChats,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
               ),
             ),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(LucideIcons.x, size: 22, color: onSurface),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Expanded(child: _buildFriendSearchList(l10n)),
+            if (_selected.isNotEmpty) _buildSendButton(l10n, compact: true),
+          ],
+        ),
       ),
     );
   }
 
   Widget _horizontalActions(List<_CircleAction> actions) {
     return SizedBox(
-      height: 102,
+      height: 88,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
+        padding: EdgeInsets.zero,
         itemCount: actions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final action = actions[index];
           return _CircleActionButton(action: action);
@@ -453,48 +619,68 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     );
   }
 
+  void _openSearchMode() {
+    setState(() => _searchOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocus.requestFocus();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
+    if (_searchOpen) {
+      return _buildSearchMode(l10n);
+    }
+
     final actions = PostOptionsActions(context, widget.post);
     final appActions = _buildAppActions(l10n);
     final optionActions = _buildOptionActions(actions);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSizes.p16,
-        0,
-        AppSizes.p16,
         AppSizes.p12,
+        0,
+        AppSizes.p12,
+        AppSizes.p8,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(theme, l10n),
-          const SizedBox(height: AppSizes.p10),
+          _titleBar(
+            l10n: l10n,
+            leading: IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              onPressed: _openSearchMode,
+              icon: Icon(LucideIcons.search, size: 20, color: onSurface),
+            ),
+          ),
+          const SizedBox(height: 6),
           SizedBox(
-            height: 100,
+            height: 88,
             child: _loadingPeople
-                ? const Center(child: CustomLoadingWidget(size: 40))
-                : _visiblePeople.isEmpty
+                ? const Center(child: CustomLoadingWidget(size: 36))
+                : _horizontalPeople.isEmpty
                 ? Center(
                     child: Text(
                       l10n.postShareNoUsers,
-                      style: TextStyle(
-                        color: onSurface.withValues(alpha: 0.5),
-                        fontSize: 13,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 12,
                       ),
                     ),
                   )
                 : ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _visiblePeople.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemCount: _horizontalPeople.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      final user = _visiblePeople[index];
+                      final user = _horizontalPeople[index];
                       return _FriendShareAvatar(
                         user: user,
                         selected: _selected.contains(user.id),
@@ -504,27 +690,189 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
                     },
                   ),
           ),
-          if (_selected.isNotEmpty) ...[
-            const SizedBox(height: AppSizes.p10),
-            SizedBox(
-              height: 44,
-              child: FilledButton(
-                onPressed: _sending ? null : _sendSelected,
-                child: _sending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.postShareSendToCount(_selected.length)),
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSizes.p12),
+          if (_selected.isNotEmpty) _buildSendButton(l10n, compact: true),
+          const SizedBox(height: 8),
           _horizontalActions(appActions),
-          const SizedBox(height: AppSizes.p8),
+          const SizedBox(height: 6),
           _horizontalActions(optionActions),
         ],
+      ),
+    );
+  }
+}
+
+class _FriendSearchRow extends StatelessWidget {
+  const _FriendSearchRow({
+    required this.user,
+    required this.friendsLabel,
+    required this.selected,
+    required this.sent,
+    required this.onTap,
+    this.showFriendsRelation = false,
+  });
+
+  final SocialUserEntity user;
+  final String friendsLabel;
+  final bool selected;
+  final bool sent;
+  final VoidCallback onTap;
+  final bool showFriendsRelation;
+
+  bool get _showFriendsBadge {
+    if (showFriendsRelation) {
+      return user.isFollowing || user.isFollowedBy;
+    }
+    return user.isFollowing && user.isFollowedBy;
+  }
+
+  static const _onlineGreen = Color(0xFF22C55E);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final username = user.username?.trim();
+    final handle = username != null && username.isNotEmpty
+        ? (username.startsWith('@') ? username : '@$username')
+        : null;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: sent ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SafeNetworkAvatar(
+                    imageUrl: user.avatarUrl,
+                    fallbackText: user.displayName,
+                    radius: 22,
+                  ),
+                  if (user.isActive == true)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _onlineGreen,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: cs.surface, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: cs.onSurface,
+                        ),
+                        children: [
+                          TextSpan(text: user.displayName),
+                          if (_showFriendsBadge)
+                            TextSpan(
+                              text: ' • $friendsLabel',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (handle != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        handle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SelectionRing(selected: selected, sent: sent, compact: true),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionRing extends StatelessWidget {
+  const _SelectionRing({
+    required this.selected,
+    required this.sent,
+    this.compact = false,
+  });
+
+  final bool selected;
+  final bool sent;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final sentColor = cs.tertiary;
+    final size = compact ? 22.0 : 26.0;
+    final iconSize = compact ? 14.0 : 16.0;
+
+    if (sent) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: sentColor,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Icon(Icons.check, size: iconSize, color: cs.onTertiary),
+      );
+    }
+    if (selected) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: cs.primary,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Icon(Icons.check, size: iconSize, color: cs.onPrimary),
+      );
+    }
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: cs.onSurfaceVariant.withValues(alpha: 0.55),
+          width: 1.5,
+        ),
       ),
     );
   }
@@ -555,18 +903,25 @@ class _CircleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final labelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: onSurface.withValues(alpha: 0.85),
+      fontWeight: FontWeight.w600,
+      height: 1.2,
+    );
+
     return SizedBox(
-      width: 68,
+      width: 60,
       child: InkWell(
         onTap: action.onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: action.background,
                 shape: BoxShape.circle,
@@ -575,30 +930,25 @@ class _CircleActionButton extends StatelessWidget {
               child: action.assetPath != null
                   ? SvgPicture.asset(
                       action.assetPath!,
-                      width: 26,
-                      height: 26,
+                      width: 22,
+                      height: 22,
                     )
                   : Icon(
                       action.icon,
-                      size: 22,
+                      size: 20,
                       color: action.iconColor ?? onSurface,
                     ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             SizedBox(
-              height: 28,
-              width: 68,
+              height: 26,
+              width: 60,
               child: Text(
                 action.label,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.85),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
+                style: labelStyle?.copyWith(fontSize: 10),
               ),
             ),
           ],
@@ -624,18 +974,20 @@ class _FriendShareAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
+    final cs = theme.colorScheme;
+    final sentColor = cs.tertiary;
     final ring = sent
-        ? const Color(0xFF22C55E)
+        ? sentColor
         : selected
-        ? theme.colorScheme.primary
+        ? cs.primary
         : Colors.transparent;
+    final badgeBorder = cs.surface;
 
     return SizedBox(
-      width: 64,
+      width: 56,
       child: InkWell(
         onTap: sent ? null : onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -651,7 +1003,7 @@ class _FriendShareAvatar extends StatelessWidget {
                   SafeNetworkAvatar(
                     imageUrl: user.avatarUrl,
                     fallbackText: user.displayName,
-                    radius: 24,
+                    radius: 21,
                   ),
                   if (selected || sent)
                     Positioned(
@@ -660,39 +1012,37 @@ class _FriendShareAvatar extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
-                          color: sent
-                              ? const Color(0xFF22C55E)
-                              : theme.colorScheme.primary,
+                          color: sent ? sentColor : cs.primary,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: theme.colorScheme.surface,
+                            color: badgeBorder,
                             width: 1.5,
                           ),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.check,
                           size: 11,
-                          color: Colors.white,
+                          color: sent ? cs.onTertiary : cs.onPrimary,
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             SizedBox(
-              height: 28,
-              width: 64,
+              height: 24,
+              width: 56,
               child: Text(
                 user.displayName,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.9),
-                  fontSize: 10,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurface,
                   fontWeight: FontWeight.w600,
-                  height: 1.2,
+                  fontSize: 10,
+                  height: 1.15,
                 ),
               ),
             ),

@@ -3,6 +3,7 @@ class ApiConstants {
   static const String apiKey =
       'YOUR_API_KEY'; // Replace with your ReqRes API Key
   static const String backendLogin = '/auth/login';
+  static const String authLogout = '/auth/logout';
   static const String authMe = '/auth/me';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
@@ -66,6 +67,7 @@ class ApiConstants {
   static String categoryById(String id) => '/categories/$id';
 
   static const String gifts = '/gifts';
+  static const String giftsGroups = '/gifts/groups';
   static const String giftsInventory = '/gifts/inventory';
   static const String giftsPurchase = '/gifts/purchase';
   static const String giftsSend = '/gifts/send';

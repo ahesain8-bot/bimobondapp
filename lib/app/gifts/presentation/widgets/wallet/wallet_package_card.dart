@@ -6,7 +6,6 @@ import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class WalletPackageCard extends StatelessWidget {
   const WalletPackageCard({

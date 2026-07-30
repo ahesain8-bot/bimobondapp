@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_scrub_chrome.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_bottom_info.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_chrome.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_gradient_overlay.dart';
@@ -15,6 +16,7 @@ class VideoPostContent extends StatelessWidget {
   const VideoPostContent({
     required this.size,
     required this.bottom,
+    this.mediaBottomInset = 0,
     required this.post,
     required this.displayMedia,
     required this.currentPage,
@@ -38,6 +40,7 @@ class VideoPostContent extends StatelessWidget {
 
   final Size size;
   final double bottom;
+  final double mediaBottomInset;
   final PostEntity post;
   final List<PostMediaEntity> displayMedia;
   final int currentPage;
@@ -59,6 +62,11 @@ class VideoPostContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaHeight = (size.height - mediaBottomInset).clamp(
+      0.0,
+      size.height,
+    );
+
     return Container(
       height: size.height,
       width: size.width,
@@ -66,22 +74,34 @@ class VideoPostContent extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          CarouselSlider.builder(
-            carouselController: carouselController,
-            itemCount: displayMedia.length,
-            options: CarouselOptions(
-              height: size.height,
-              viewportFraction: 1.0,
-              enableInfiniteScroll: false,
-              scrollDirection: Axis.horizontal,
-              scrollPhysics: displayMedia.length > 1
-                  ? const PageScrollPhysics()
-                  : const NeverScrollableScrollPhysics(),
-              onPageChanged: (index, reason) => onPageChanged(index),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: mediaHeight,
+            child: CarouselSlider.builder(
+              carouselController: carouselController,
+              itemCount: displayMedia.length,
+              options: CarouselOptions(
+                height: mediaHeight,
+                viewportFraction: 1.0,
+                enableInfiniteScroll: false,
+                scrollDirection: Axis.horizontal,
+                scrollPhysics: displayMedia.length > 1
+                    ? const PageScrollPhysics()
+                    : const NeverScrollableScrollPhysics(),
+                onPageChanged: (index, reason) => onPageChanged(index),
+              ),
+              itemBuilder: mediaItemBuilder,
             ),
-            itemBuilder: mediaItemBuilder,
           ),
-          const VideoPostGradientOverlay(),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: mediaHeight,
+            child: const VideoPostGradientOverlay(),
+          ),
           if (displayMedia.length > 1)
             Positioned(
               top:
@@ -115,17 +135,19 @@ class VideoPostContent extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: bottom,
-            child: VideoPostRiseFade(
-              controller: chromeEntranceController,
-              rise: chromeCaptionRise,
-              fade: chromeFade,
-              child: VideoPostBottomInfo(
-                post: postForBottomInfo,
-                feedItem: feedItem,
-                repostQuote: repostQuote,
-                currentPage: currentPage,
-                mediaCount: displayMedia.length,
-                onMusicTap: onMusicTap,
+            child: FeedVideoHideWhenScrubbing(
+              child: VideoPostRiseFade(
+                controller: chromeEntranceController,
+                rise: chromeCaptionRise,
+                fade: chromeFade,
+                child: VideoPostBottomInfo(
+                  post: postForBottomInfo,
+                  feedItem: feedItem,
+                  repostQuote: repostQuote,
+                  currentPage: currentPage,
+                  mediaCount: displayMedia.length,
+                  onMusicTap: onMusicTap,
+                ),
               ),
             ),
           ),

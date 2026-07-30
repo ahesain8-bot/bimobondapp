@@ -38,7 +38,9 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class PostsSearchScreen extends StatefulWidget {
-  const PostsSearchScreen({super.key});
+  const PostsSearchScreen({super.key, this.initialQuery});
+
+  final String? initialQuery;
 
   @override
   State<PostsSearchScreen> createState() => _PostsSearchScreenState();
@@ -116,9 +118,16 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    final seed = widget.initialQuery?.trim();
+    if (seed != null && seed.isNotEmpty) {
+      _searchController.text = seed;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadHistory());
       unawaited(_loadTrends());
+      if (seed != null && seed.isNotEmpty && mounted) {
+        unawaited(_submitSearch(saveHistory: false));
+      }
     });
   }
 

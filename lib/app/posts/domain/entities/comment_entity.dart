@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:equatable/equatable.dart';
 
@@ -16,6 +17,9 @@ class CommentEntity extends Equatable {
   final String? giftIcon;
   final String? giftThumbnailUrl;
   final String? giftAnimationUrl;
+  final GiftCatalogType? giftCatalogType;
+  final String? giftColor;
+  final String? giftAudioUrl;
   final String createdAt;
   final String updatedAt;
   final List<MentionRefEntity> mentions;
@@ -34,6 +38,9 @@ class CommentEntity extends Equatable {
     this.giftIcon,
     this.giftThumbnailUrl,
     this.giftAnimationUrl,
+    this.giftCatalogType,
+    this.giftColor,
+    this.giftAudioUrl,
     required this.createdAt,
     required this.updatedAt,
     this.mentions = const [],
@@ -48,6 +55,9 @@ class CommentEntity extends Equatable {
     String? giftIcon,
     String? giftThumbnailUrl,
     String? giftAnimationUrl,
+    GiftCatalogType? giftCatalogType,
+    String? giftColor,
+    String? giftAudioUrl,
   }) {
     return CommentEntity(
       id: id,
@@ -63,11 +73,18 @@ class CommentEntity extends Equatable {
       giftIcon: giftIcon ?? this.giftIcon,
       giftThumbnailUrl: giftThumbnailUrl ?? this.giftThumbnailUrl,
       giftAnimationUrl: giftAnimationUrl ?? this.giftAnimationUrl,
+      giftCatalogType: giftCatalogType ?? this.giftCatalogType,
+      giftColor: giftColor ?? this.giftColor,
+      giftAudioUrl: giftAudioUrl ?? this.giftAudioUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
       mentions: mentions,
     );
   }
+
+  bool get isAudioGiftComment =>
+      giftCatalogType == GiftCatalogType.audio ||
+      (giftAudioUrl != null && giftAudioUrl!.trim().isNotEmpty);
 
   @override
   List<Object?> get props => [
@@ -84,6 +101,9 @@ class CommentEntity extends Equatable {
         giftIcon,
         giftThumbnailUrl,
         giftAnimationUrl,
+        giftCatalogType,
+        giftColor,
+        giftAudioUrl,
         createdAt,
         updatedAt,
         mentions,

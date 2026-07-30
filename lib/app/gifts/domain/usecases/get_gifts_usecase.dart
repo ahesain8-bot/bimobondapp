@@ -4,13 +4,16 @@ import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:dartz/dartz.dart';
 
-class GetGiftsUseCase implements UseCase<List<GiftEntity>, NoParams> {
+class GetGiftsUseCase implements UseCase<List<GiftEntity>, GetGiftsParams> {
   GetGiftsUseCase(this.repository);
 
   final GiftsRepository repository;
 
   @override
-  Future<Either<Failure, List<GiftEntity>>> call(NoParams params) {
-    return repository.getGifts();
+  Future<Either<Failure, List<GiftEntity>>> call(GetGiftsParams params) {
+    return repository.getGifts(
+      groupId: params.groupId,
+      groupSlug: params.groupSlug,
+    );
   }
 }

@@ -1,12 +1,10 @@
 import 'package:bimobondapp/app/gifts/presentation/widgets/wallet/wallet_glass_style.dart';
-import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class WalletBalanceCard extends StatelessWidget {
   const WalletBalanceCard({

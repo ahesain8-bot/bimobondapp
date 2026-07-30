@@ -2,9 +2,18 @@ part of '../video_post_widget.dart';
 
 /// Post soundtrack playback for image slides and for videos that attach a
 /// library sound via `soundId` (video track is muted; this plays the track).
+///
+/// Uses [AudioPlayer] (not a second [VideoPlayerController]) so feed video +
+/// sound does not stall on Android ExoPlayer/surface contention.
 mixin VideoPostSoundMixin on State<VideoPostWidget> {
-  VideoPlayerController? _postSoundController;
-  VoidCallback? _postSoundListener;
+  AudioPlayer? _postSoundPlayer;
+  bool _postSoundUserMuted = false;
+  Future<void>? _soundPrepareFuture;
+  int _postSoundGeneration = 0;
+  static bool _postSoundSessionReady = false;
+  int? _knownVideoDurationMs;
+  String? _preparedClipSignature;
+  StreamSubscription<PlayerState>? _postSoundStateSub;
 
   int get soundCurrentPage;
   Map<int, CustomVideoPlayerController> get soundVideoControllers;
@@ -13,6 +22,13 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
 
   bool get _hasExternalSoundtrack =>
       widget.post.sound?.resolvedAudioUrl?.isNotEmpty ?? false;
+
+  bool get _syncSoundWithVideoSlide =>
+      _hasExternalSoundtrack && isSlideVideo(soundCurrentPage);
+
+  double get _postSoundVolume => _postSoundUserMuted ? 0 : 1;
+
+  bool get _hasSegmentWindow => widget.post.sound?.hasSegmentWindow ?? false;
 
   Duration? get _segmentStart {
     final ms = widget.post.sound?.startMs;
@@ -26,28 +42,170 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     return Duration(milliseconds: ms);
   }
 
+  /// Playback window on the video timeline (0 → this duration), capped by video
+  /// length when the sound segment is longer than the clip.
+  Duration? get _segmentPlaybackDuration {
+    if (!_hasSegmentWindow) return null;
+    final sound = widget.post.sound!;
+    final segmentLenMs = sound.endMs! - sound.startMs!;
+    if (segmentLenMs <= 0) return null;
+
+    if (_syncSoundWithVideoSlide) {
+      final videoMs = _resolvedVideoDurationMs();
+      if (videoMs != null && videoMs > 0 && videoMs < segmentLenMs) {
+        return Duration(milliseconds: videoMs);
+      }
+    }
+    return Duration(milliseconds: segmentLenMs);
+  }
+
+  /// For feed chrome: pass to [CustomVideoPlayer.segmentMaxPosition].
+  Duration? segmentPlaybackMaxForPost() => _segmentPlaybackDuration;
+
+  int? _resolvedVideoDurationMs() {
+    if (_knownVideoDurationMs != null && _knownVideoDurationMs! > 0) {
+      return _knownVideoDurationMs;
+    }
+    if (!_syncSoundWithVideoSlide) return null;
+    final ms =
+        soundVideoControllers[soundCurrentPage]?.playbackDuration.inMilliseconds ??
+        0;
+    return ms > 0 ? ms : null;
+  }
+
+  Duration? _effectiveClipEndOnSource() {
+    final start = _segmentStart ?? Duration.zero;
+    final end = _segmentEnd;
+    if (end == null || end <= start) return null;
+
+    final playWindow = _segmentPlaybackDuration;
+    if (playWindow == null) return end;
+    final cappedEnd = start + playWindow;
+    return cappedEnd > end ? end : cappedEnd;
+  }
+
+  String _clipSignature(String audioUrl) {
+    final start = widget.post.sound?.startMs ?? 0;
+    final endMs = _effectiveClipEndOnSource()?.inMilliseconds ?? 0;
+    return '$audioUrl|$start|$endMs';
+  }
+
+  void onVideoDurationReady(Duration duration) {
+    final ms = duration.inMilliseconds;
+    if (ms <= 0) return;
+    if (_knownVideoDurationMs == ms) return;
+    _knownVideoDurationMs = ms;
+    unawaited(_onVideoDurationChanged());
+  }
+
+  Future<void> _onVideoDurationChanged() async {
+    if (!mounted) return;
+    final sig = widget.post.sound?.resolvedAudioUrl;
+    if (sig == null || sig.isEmpty) return;
+    if (_preparedClipSignature != null &&
+        _preparedClipSignature != _clipSignature(sig)) {
+      await stopPostSound();
+    }
+    setState(() {});
+    unawaited(syncPostSoundPlayback());
+  }
+
   bool get canTogglePlayback =>
       isSlideVideo(soundCurrentPage) || _hasExternalSoundtrack;
+
+  bool get isPostSoundUserMuted => _postSoundUserMuted;
+
+  void togglePostSoundMute() {
+    onVideoUserMuteChanged(!_postSoundUserMuted);
+    if (mounted) setState(() {});
+  }
+
+  void _bindPostSoundStateListener(AudioPlayer player) {
+    _postSoundStateSub?.cancel();
+    _postSoundStateSub = player.playerStateStream.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void resetPostSoundMuteState() {
+    _postSoundUserMuted = false;
+    _knownVideoDurationMs = null;
+    _preparedClipSignature = null;
+  }
+
+  void onVideoPlaybackChangedFromPlayer() {
+    if (!_hasExternalSoundtrack || !isSlideVideo(soundCurrentPage)) return;
+
+    final playing =
+        soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
+    if (playing) {
+      unawaited(_tryStartSoundWithVideo());
+    } else {
+      unawaited(pausePostSound());
+    }
+  }
+
+  void onVideoUserMuteChanged(bool muted) {
+    _postSoundUserMuted = muted;
+    unawaited(_applyPostSoundVolume());
+  }
+
+  Future<void> onPostSoundSegmentLoop() async {
+    if (!_hasExternalSoundtrack) return;
+    if (_syncSoundWithVideoSlide && !_videoSlideSoundShouldPlay()) {
+      await pausePostSound();
+      return;
+    }
+    final player = _postSoundPlayer;
+    if (player == null) return;
+    try {
+      await player.seek(Duration.zero);
+      if (_postSoundVolume > 0 && !player.playing) {
+        await player.play();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> onVideoSeekSync(
+    Duration videoPosition, {
+    required bool resumePlayback,
+  }) async {
+    if (!_syncSoundWithVideoSlide) return;
+    final clamped = _clampVideoPosition(videoPosition);
+    await seekPostSoundToVideoPosition(clamped);
+    if (!resumePlayback) {
+      await pausePostSound();
+      return;
+    }
+    if (soundVideoControllers[soundCurrentPage]?.isPlaying ?? false) {
+      await _tryStartSoundWithVideo(skipAlign: true);
+    }
+  }
 
   bool isPostPlaybackActive() {
     if (isSlideVideo(soundCurrentPage)) {
       return soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
     }
-    return _postSoundController?.value.isPlaying ?? false;
+    return _postSoundPlayer?.playing ?? false;
   }
 
   bool isSlideVideo(int index) {
     final media = soundDisplayMedia;
     if (media.isEmpty) {
       final videoUrl = widget.post.videoUrl;
-      return widget.post.type == 'VIDEO' ||
+      return _postTypeIsVideo(widget.post.type) ||
           (videoUrl != null && MediaUtils.isVideo(videoUrl));
     }
     if (index < 0 || index >= media.length) return false;
     final item = media[index];
     final url = MediaUtils.resolveAbsoluteUrl(item.url);
     return MediaUtils.isVideo(url, mediaType: item.mediaType) ||
-        widget.post.type == 'VIDEO';
+        _postTypeIsVideo(widget.post.type);
+  }
+
+  bool _postTypeIsVideo(String? type) {
+    final normalized = type?.trim().toUpperCase();
+    return normalized == 'VIDEO' || normalized == 'REEL';
   }
 
   Future<void> togglePostPlayback() async {
@@ -59,19 +217,22 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
           soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
       if (_hasExternalSoundtrack) {
         if (playing) {
-          await _resumePostSound();
+          await _tryStartSoundWithVideo();
         } else {
           await pausePostSound();
         }
       }
     } else {
-      final controller = _postSoundController;
-      if (controller != null && controller.value.isInitialized) {
-        if (controller.value.isPlaying) {
-          await controller.pause();
+      final player = _postSoundPlayer;
+      if (player != null) {
+        if (player.playing) {
+          await player.pause();
         } else {
-          await controller.setVolume(1);
-          await controller.play();
+          if (_hasSegmentWindow) {
+            await player.seek(Duration.zero);
+          }
+          await player.setVolume(_postSoundVolume);
+          await player.play();
         }
       } else {
         await syncPostSoundPlayback();
@@ -82,49 +243,137 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
   }
 
   Future<void> pausePostSound() async {
-    final controller = _postSoundController;
-    if (controller == null) return;
+    final player = _postSoundPlayer;
+    if (player == null) return;
     try {
-      if (!controller.value.isInitialized) return;
-      await controller.pause();
+      if (player.playing) {
+        await player.pause();
+      }
     } catch (_) {}
   }
 
-  Future<void> _resumePostSound() async {
-    final controller = _postSoundController;
-    if (controller != null && controller.value.isInitialized) {
-      try {
-        await controller.setVolume(1);
-        if (!controller.value.isPlaying) await controller.play();
-        return;
-      } catch (_) {}
+  bool _videoSlideSoundShouldPlay() {
+    if (!_syncSoundWithVideoSlide || !soundPlaybackActive) return false;
+    return soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
+  }
+
+  Future<void> _tryStartSoundWithVideo({bool skipAlign = false}) async {
+    if (!_videoSlideSoundShouldPlay()) {
+      await pausePostSound();
+      return;
     }
-    await syncPostSoundPlayback();
+    await _restartSegmentIfAtEnd();
+    await ensurePostSoundPrepared();
+    if (!_videoSlideSoundShouldPlay()) {
+      await pausePostSound();
+      return;
+    }
+    final player = _postSoundPlayer;
+    if (player == null) return;
+    try {
+      if (!skipAlign) {
+        await _alignPostSoundToVideo(force: false);
+      }
+      if (!_videoSlideSoundShouldPlay()) {
+        await pausePostSound();
+        return;
+      }
+      await player.setVolume(_postSoundVolume);
+      if (!player.playing) {
+        await player.play();
+      }
+    } catch (_) {}
   }
 
   Future<void> stopPostSound() async {
-    final controller = _postSoundController;
-    final listener = _postSoundListener;
-    _postSoundController = null;
-    _postSoundListener = null;
-    if (controller == null) return;
-    if (listener != null) {
-      controller.removeListener(listener);
+    _postSoundGeneration++;
+    _soundPrepareFuture = null;
+    _preparedClipSignature = null;
+    await _postSoundStateSub?.cancel();
+    _postSoundStateSub = null;
+    final player = _postSoundPlayer;
+    _postSoundPlayer = null;
+    if (player == null) return;
+    try {
+      await player.stop();
+    } catch (_) {}
+    try {
+      await player.dispose();
+    } catch (_) {}
+  }
+
+  Future<void> _applyPostSoundVolume() async {
+    final player = _postSoundPlayer;
+    if (player == null) return;
+    try {
+      await player.setVolume(_postSoundVolume);
+    } catch (_) {}
+  }
+
+  Duration _clampVideoPosition(Duration videoPosition) {
+    final window = _segmentPlaybackDuration;
+    if (window == null) return videoPosition;
+    if (videoPosition > window) return window;
+    if (videoPosition.isNegative) return Duration.zero;
+    return videoPosition;
+  }
+
+  Duration _playerSeekPosition(Duration videoPosition) {
+    return _clampVideoPosition(videoPosition);
+  }
+
+  Future<void> seekPostSoundToVideoPosition(Duration videoPosition) async {
+    final player = _postSoundPlayer;
+    if (player == null) return;
+    try {
+      await player.seek(_playerSeekPosition(videoPosition));
+    } catch (_) {}
+  }
+
+  Future<void> _alignPostSoundToVideo({required bool force}) async {
+    if (!isSlideVideo(soundCurrentPage)) return;
+    final player = _postSoundPlayer;
+    if (player == null) return;
+    final videoPosition = _clampVideoPosition(
+      soundVideoControllers[soundCurrentPage]?.playbackPosition ??
+          Duration.zero,
+    );
+    final target = _playerSeekPosition(videoPosition);
+    if (!force) {
+      try {
+        final delta = (player.position - target).abs();
+        if (delta < const Duration(milliseconds: 280)) return;
+      } catch (_) {}
     }
-    try {
-      await controller.pause();
-      await controller.dispose();
-    } catch (_) {}
+    await seekPostSoundToVideoPosition(videoPosition);
   }
 
-  Future<void> _seekToSegmentStart(VideoPlayerController controller) async {
+  Future<AudioSource> _buildSoundAudioSource(String audioUrl) async {
+    final resolved = MediaUtils.resolveAbsoluteUrl(audioUrl);
+    final UriAudioSource child;
+    if (AppMediaCacheManager.canDiskCacheVideo(resolved)) {
+      var file = await AppMediaCacheManager.getCachedSoundFile(resolved);
+      file ??= await AppMediaCacheManager.downloadSoundFile(resolved);
+      child = file != null
+          ? AudioSource.uri(Uri.file(file.path))
+          : AudioSource.uri(Uri.parse(resolved));
+    } else {
+      child = AudioSource.uri(Uri.parse(resolved));
+    }
+
     final start = _segmentStart ?? Duration.zero;
-    try {
-      await controller.seekTo(start);
-    } catch (_) {}
+    final clipEnd = _effectiveClipEndOnSource();
+    if (clipEnd != null && clipEnd > start) {
+      return ClippingAudioSource(
+        child: child,
+        start: start,
+        end: clipEnd,
+      );
+    }
+    return child;
   }
 
-  Future<void> syncPostSoundPlayback() async {
+  Future<void> ensurePostSoundPrepared() async {
     if (!soundPlaybackActive) {
       await stopPostSound();
       return;
@@ -136,69 +385,159 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
       return;
     }
 
-    // Videos with an attached library sound: keep video muted and play this
-    // track. Image slides also use this path.
     if (isSlideVideo(soundCurrentPage)) {
       unawaited(
         soundVideoControllers[soundCurrentPage]?.setMuted(true),
       );
     }
 
-    final existing = _postSoundController;
-    if (existing != null &&
-        existing.dataSource == audioUrl &&
-        existing.value.isInitialized) {
-      if (!existing.value.isPlaying) {
-        await existing.setVolume(1);
-        await existing.play();
+    final signature = _clipSignature(audioUrl);
+    if (_postSoundPlayer != null) {
+      if (_preparedClipSignature == signature) return;
+      await stopPostSound();
+    }
+
+    final inFlight = _soundPrepareFuture;
+    if (inFlight != null) {
+      await inFlight;
+      if (_postSoundPlayer != null && _preparedClipSignature == signature) {
+        return;
       }
+    }
+
+    final prepare = _preparePostSoundPlayer(audioUrl, signature);
+    _soundPrepareFuture = prepare;
+    try {
+      await prepare;
+    } finally {
+      if (identical(_soundPrepareFuture, prepare)) {
+        _soundPrepareFuture = null;
+      }
+    }
+  }
+
+  Future<void> _ensurePostSoundSession() async {
+    if (_postSoundSessionReady) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(
+        const AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.mixWithOthers,
+          avAudioSessionMode: AVAudioSessionMode.defaultMode,
+          androidAudioAttributes: AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.music,
+            usage: AndroidAudioUsage.media,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
+          androidWillPauseWhenDucked: false,
+        ),
+      );
+      _postSoundSessionReady = true;
+    } catch (_) {}
+  }
+
+  Future<void> _preparePostSoundPlayer(
+    String audioUrl,
+    String signature,
+  ) async {
+    await stopPostSound();
+    await _ensurePostSoundSession();
+
+    final generation = ++_postSoundGeneration;
+    final player = AudioPlayer(
+      handleInterruptions: false,
+      androidApplyAudioAttributes: false,
+      handleAudioSessionActivation: false,
+    );
+    _postSoundPlayer = player;
+
+    try {
+      final source = await _buildSoundAudioSource(audioUrl);
+      if (generation != _postSoundGeneration || _postSoundPlayer != player) {
+        await player.dispose();
+        return;
+      }
+
+      await player.setAudioSource(source);
+      if (generation != _postSoundGeneration || _postSoundPlayer != player) {
+        await player.dispose();
+        return;
+      }
+
+      await player.setLoopMode(LoopMode.one);
+      await player.setVolume(_postSoundVolume);
+      _preparedClipSignature = signature;
+      _bindPostSoundStateListener(player);
+
+      if (_syncSoundWithVideoSlide) {
+        await seekPostSoundToVideoPosition(Duration.zero);
+      }
+
+      if (!mounted ||
+          !soundPlaybackActive ||
+          _postSoundPlayer != player ||
+          generation != _postSoundGeneration) {
+        await player.dispose();
+        return;
+      }
+
+      if (!_syncSoundWithVideoSlide) {
+        if (soundPlaybackActive) {
+          await player.play();
+        }
+      } else if (_videoSlideSoundShouldPlay()) {
+        await player.play();
+      } else {
+        await player.pause();
+      }
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (_postSoundPlayer == player) {
+        await stopPostSound();
+      } else {
+        try {
+          await player.dispose();
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<void> _restartSegmentIfAtEnd() async {
+    final window = _segmentPlaybackDuration;
+    if (window == null) return;
+    if (_syncSoundWithVideoSlide) {
+      final pos =
+          soundVideoControllers[soundCurrentPage]?.playbackPosition ??
+          Duration.zero;
+      if (pos >= window - const Duration(milliseconds: 80)) {
+        await soundVideoControllers[soundCurrentPage]?.restartFromBeginning();
+      }
+    }
+  }
+
+  Future<void> syncPostSoundPlayback() async {
+    if (!soundPlaybackActive) {
+      await stopPostSound();
       return;
     }
 
-    await stopPostSound();
-
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(audioUrl),
-      videoPlayerOptions: VideoPlayerOptions(
-        mixWithOthers: true,
-        allowBackgroundPlayback: false,
-      ),
-    );
-    _postSoundController = controller;
-    void onSoundPlaybackChanged() {
-      if (!mounted || _postSoundController != controller) return;
-      final end = _segmentEnd;
-      if (end != null &&
-          controller.value.isInitialized &&
-          controller.value.isPlaying &&
-          controller.value.position >= end) {
-        unawaited(_seekToSegmentStart(controller));
-      }
-      setState(() {});
+    if (!_hasExternalSoundtrack) {
+      await stopPostSound();
+      return;
     }
 
-    _postSoundListener = onSoundPlaybackChanged;
-    controller.addListener(onSoundPlaybackChanged);
+    final audioUrl = widget.post.sound!.resolvedAudioUrl!;
+    if (AppMediaCacheManager.canDiskCacheVideo(audioUrl)) {
+      unawaited(AppMediaCacheManager.downloadSoundFile(audioUrl));
+    }
 
-    try {
-      await controller.initialize();
-      // Loop the full file only when there is no segment window; otherwise
-      // we manually wrap at endMs → startMs (see listener above).
-      final hasWindow = widget.post.sound?.hasSegmentWindow ?? false;
-      await controller.setLooping(!hasWindow);
-      await controller.setVolume(1);
-      if (hasWindow) {
-        await _seekToSegmentStart(controller);
-      }
-      if (!mounted ||
-          !soundPlaybackActive ||
-          _postSoundController != controller) {
-        await controller.dispose();
-        return;
-      }
-      await controller.play();
-    } catch (_) {
-      await stopPostSound();
+    unawaited(ensurePostSoundPrepared());
+
+    if (_syncSoundWithVideoSlide && isPostPlaybackActive()) {
+      unawaited(_tryStartSoundWithVideo());
     }
   }
 }

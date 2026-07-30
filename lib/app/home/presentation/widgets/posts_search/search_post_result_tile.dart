@@ -62,7 +62,6 @@ class SearchPostResultTile extends StatelessWidget {
                   post: post,
                   tabIndex: 0,
                   theme: theme,
-                  showCenterPlayIcon: false,
                 ),
               ),
             ),

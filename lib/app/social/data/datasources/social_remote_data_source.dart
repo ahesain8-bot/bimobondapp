@@ -19,6 +19,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 abstract class SocialRemoteDataSource {
   Future<FollowStatus> toggleFollow(String userId);
 
+  Future<bool> getFollowStatus(String userId);
+
   Future<SocialUserPageModel> getFollowers(SocialListQuery query);
 
   Future<SocialUserPageModel> getFollowing(SocialListQuery query);
@@ -138,6 +140,27 @@ class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
       }
       throw ServerException(
         message: _extractErrorMessage(response.data) ?? 'Failed to follow user',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<bool> getFollowStatus(String userId) async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.userFollowStatus(userId),
+        options: Options(headers: await _authHeaders()),
+      );
+      if (response.statusCode == 200) {
+        final data = _extractObject(response.data);
+        return FollowStatus.fromResponse(data) == FollowStatus.followed;
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ??
+            'Failed to fetch follow status',
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);
