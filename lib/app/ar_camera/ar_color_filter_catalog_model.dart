@@ -170,12 +170,12 @@ class ArBeautyFilterParams {
       brightness != 0 || contrast != 0 || saturation != 0 || warmth != 0;
 
   static const ArBeautyFilterParams defaults = ArBeautyFilterParams(
-    smooth: 0.55,
-    whiten: 0.55,
-    brighten: 0.40,
-    blush: 0.20,
+    smooth: 0.16,
+    whiten: 0.03,
+    brighten: 0.10,
+    blush: 0,
     lipTint: '#E8527A',
-    lipStrength: 0.40,
+    lipStrength: 0,
   );
 
   /// Parses the backend's 0-100 `filterSettings` object into this class's
@@ -183,7 +183,7 @@ class ArBeautyFilterParams {
   /// the whole filter object) — see [ArColorFilterItemModel.fromJson].
   factory ArBeautyFilterParams.fromJson(Map<String, dynamic> json) {
     return ArBeautyFilterParams(
-      smooth: _readUnipolar100(json['smooth'], fallbackPercent: 55),
+      smooth: _readUnipolar100(json['smooth'], fallbackPercent: 18),
       whiten: _readUnipolar100(json['whiten'], fallbackPercent: 0),
       brighten: _readUnipolar100(json['brighten'], fallbackPercent: 0),
       blush: _readUnipolar100(json['blush'], fallbackPercent: 0),

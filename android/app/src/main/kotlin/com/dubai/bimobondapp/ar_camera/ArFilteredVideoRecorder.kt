@@ -149,7 +149,7 @@ class ArFilteredVideoRecorder {
                     "videoBytes=${video?.length() ?: 0} audioBytes=${audio?.length() ?: 0}",
             )
 
-            val result = when {
+            var result = when {
                 finalOut == null -> null
                 video != null && video.exists() && video.length() > 0L -> {
                     muxAv(video, audio, finalOut)
@@ -157,9 +157,52 @@ class ArFilteredVideoRecorder {
                 else -> null
             }
 
+            // A non-empty file is not the same as a playable one. On devices whose
+            // encoder quietly produced a stream it couldn't actually encode, the
+            // file exists with a sensible size but has no readable video track —
+            // and the editor then sits on a spinner forever waiting for a player
+            // that will never initialise. Better to report failure here, where the
+            // caller can show a real error.
+            if (result != null && !isPlayable(result)) {
+                Log.e(TAG, "recorded file has no readable video track — discarding")
+                try {
+                    result.delete()
+                } catch (_: Exception) {
+                }
+                result = null
+            }
+
             cleanupTemps()
             finalOutputFile = null
             return result
+        }
+    }
+
+    /**
+     * True when [file] has a video track a player can actually read. Cheap: opens
+     * the container and reads track metadata only, no decoding.
+     */
+    private fun isPlayable(file: File): Boolean {
+        val extractor = MediaExtractor()
+        return try {
+            extractor.setDataSource(file.absolutePath)
+            var hasVideo = false
+            for (i in 0 until extractor.trackCount) {
+                val mime = extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)
+                if (mime?.startsWith("video/") == true) {
+                    hasVideo = true
+                    break
+                }
+            }
+            hasVideo
+        } catch (t: Throwable) {
+            Log.w(TAG, "playability check failed for ${file.name}", t)
+            false
+        } finally {
+            try {
+                extractor.release()
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -239,20 +282,36 @@ class ArFilteredVideoRecorder {
         trackIndex = -1
         muxerStarted = false
 
-        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, bitRateFor(width, height))
-            setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-        }
-
         val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        // High profile buys noticeably cleaner output at the same bitrate than the
-        // baseline profile some encoders default to. Applied after the format is
-        // built and guarded, because a codec that doesn't advertise it will reject
-        // configure() outright and we'd rather record at baseline than not at all.
-        applyHighProfileIfSupported(encoder, format)
-        encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        // Ask the device's encoder what it can actually do instead of assuming.
+        // Hardcoded settings (High profile, up to 24Mbps) worked on capable
+        // phones and produced an unplayable file on weaker ones — which showed
+        // up much later as the editor sitting on a spinner forever.
+        val encoder1 = encoder
+        var configured = false
+        try {
+            encoder1.configure(
+                buildTunedFormat(encoder1, width, height),
+                null,
+                null,
+                MediaCodec.CONFIGURE_FLAG_ENCODE,
+            )
+            configured = true
+        } catch (t: Throwable) {
+            Log.w(TAG, "tuned encoder config rejected — falling back", t)
+        }
+        if (!configured) {
+            // Last resort: the plainest format that any AVC encoder must accept.
+            // No profile/level, conservative bitrate. Recording at lower quality
+            // beats not recording, and beats writing a file that won't play.
+            encoder1.reset()
+            encoder1.configure(
+                buildSafeFormat(width, height),
+                null,
+                null,
+                MediaCodec.CONFIGURE_FLAG_ENCODE,
+            )
+        }
         inputSurface = encoder.createInputSurface()
         encoder.start()
         codec = encoder
@@ -471,27 +530,100 @@ class ArFilteredVideoRecorder {
     }
 
     /**
-     * Target H.264 bitrate. The old formula (`w * h * 4`, clamped to 4–12 Mbps)
-     * left 1080p30 at roughly half what a stock camera app writes, which shows up
-     * as blocking and smeared detail in motion — read as "grainy". ~0.2 bits per
-     * pixel per frame is the usual rule of thumb for clean H.264 at this size.
+     * Encoder format tuned to what THIS device's encoder reports it can handle.
+     *
+     * Everything here used to be hardcoded, which is how a file that plays fine
+     * on one phone came out unplayable on another. Now every value is clamped to
+     * the codec's own advertised capabilities.
      */
-    private fun bitRateFor(width: Int, height: Int): Int {
-        val target = width.toLong() * height.toLong() * FRAME_RATE * 2 / 10
-        return target.coerceIn(6_000_000L, 24_000_000L).toInt()
+    private fun buildTunedFormat(encoder: MediaCodec, width: Int, height: Int): MediaFormat {
+        val caps = try {
+            encoder.codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        } catch (t: Throwable) {
+            Log.w(TAG, "codec capabilities unavailable", t)
+            return buildSafeFormat(width, height)
+        }
+        val video = caps.videoCapabilities
+
+        // Frame rate the encoder will actually sustain at this size.
+        val frameRate = try {
+            video?.getSupportedFrameRatesFor(width, height)
+                ?.let { FRAME_RATE.coerceAtMost(it.upper.toInt()) }
+                ?: FRAME_RATE
+        } catch (_: Throwable) {
+            FRAME_RATE
+        }.coerceAtLeast(1)
+
+        // ~0.3 bits per pixel per frame keeps gradients, skin texture and
+        // high-frequency beauty output clean through a later social upload.
+        // Clamp into the encoder's own supported bitrate range —
+        // asking for more than it advertises is what corrupted the output.
+        val desired = width.toLong() * height.toLong() * frameRate * 3 / 10
+        val bitRate = try {
+            val range = video?.bitrateRange
+            if (range != null) {
+                desired.coerceIn(range.lower.toLong(), range.upper.toLong())
+            } else {
+                desired.coerceIn(4_000_000L, 20_000_000L)
+            }
+        } catch (_: Throwable) {
+            desired.coerceIn(4_000_000L, 20_000_000L)
+        }.toInt()
+
+        val format = MediaFormat.createVideoFormat(
+            MediaFormat.MIMETYPE_VIDEO_AVC,
+            width,
+            height,
+        ).apply {
+            setInteger(
+                MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface,
+            )
+            setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
+            setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
+            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+        }
+
+        // Highest High-profile level the encoder lists, not the first one found.
+        // profileLevels has no defined order, so firstOrNull could pick a level
+        // far too low for the resolution/bitrate above — the encoder then either
+        // rejects the config or silently writes a broken stream.
+        try {
+            val highestLevel = caps.profileLevels
+                .filter { it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileHigh }
+                .maxOfOrNull { it.level }
+            if (highestLevel != null) {
+                format.setInteger(
+                    MediaFormat.KEY_PROFILE,
+                    MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
+                )
+                format.setInteger(MediaFormat.KEY_LEVEL, highestLevel)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "profile/level not applied", t)
+        }
+
+        Log.i(
+            TAG,
+            "encoder tuned ${width}x$height @${frameRate}fps ${bitRate / 1000}kbps",
+        )
+        return format
     }
 
-    private fun applyHighProfileIfSupported(encoder: MediaCodec, format: MediaFormat) {
-        try {
-            val caps = encoder.codecInfo
-                .getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
-            val high = caps.profileLevels.firstOrNull {
-                it.profile == MediaCodecInfo.CodecProfileLevel.AVCProfileHigh
-            } ?: return
-            format.setInteger(MediaFormat.KEY_PROFILE, high.profile)
-            format.setInteger(MediaFormat.KEY_LEVEL, high.level)
-        } catch (t: Throwable) {
-            Log.w(TAG, "high profile not applied", t)
+    /** Plainest format any AVC encoder must accept — the fallback path. */
+    private fun buildSafeFormat(width: Int, height: Int): MediaFormat {
+        return MediaFormat.createVideoFormat(
+            MediaFormat.MIMETYPE_VIDEO_AVC,
+            width,
+            height,
+        ).apply {
+            setInteger(
+                MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface,
+            )
+            setInteger(MediaFormat.KEY_BIT_RATE, 10_000_000)
+            setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE)
+            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
     }
 

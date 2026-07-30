@@ -3217,6 +3217,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mediaPhotoEditorMagic => 'Magic';
 
   @override
+  String get mediaPhotoEditorOff => 'Off';
+
+  @override
   String get mediaPhotoEditorSmooth => 'Smooth';
 
   @override
@@ -3227,6 +3230,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaPhotoEditorContrast => 'Contrast';
+
+  @override
+  String get mediaPhotoEditorShape => 'Shape';
+
+  @override
+  String get mediaPhotoEditorEyes => 'Eyes';
+
+  @override
+  String get mediaPhotoEditorTooth => 'Tooth';
+
+  @override
+  String get mediaPhotoEditorMouth => 'Mouth';
 
   @override
   String get mediaPhotoEditorExposure => 'Exposure';

@@ -58,8 +58,8 @@ class CameraModeDurationBar extends StatelessWidget {
       _ModeDurationItem(
         label: duration10mLabel,
         selected:
-            studioMode == CameraStudioMode.video && selectedDuration == 180,
-        onTap: () => onDurationSelected(180),
+            studioMode == CameraStudioMode.video && selectedDuration == 600,
+        onTap: () => onDurationSelected(600),
       ),
       _ModeDurationItem(
         label: '60s',
@@ -92,7 +92,6 @@ class CameraModeDurationBar extends StatelessWidget {
           onTap: onLiveSelected,
         ),
     ];
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       child: SizedBox(
@@ -130,12 +129,11 @@ class _ModeDurationItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: selected
-              ? Colors.white
-              : Colors.transparent,
+          color: selected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -243,7 +241,9 @@ class _WorkspaceTab extends StatelessWidget {
         child: Text(
           label.toUpperCase(),
           style: TextStyle(
-            color: selected ? Colors.white : Colors.white.withValues(alpha: 0.45),
+            color: selected
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.45),
             fontSize: 15,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
             letterSpacing: 0.6,
@@ -525,8 +525,7 @@ class CameraCaptureControls extends StatelessWidget {
       );
     }
 
-    final hasEffect =
-        selectedEffect != null && !selectedEffect!.isNone;
+    final hasEffect = selectedEffect != null && !selectedEffect!.isNone;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
@@ -558,10 +557,7 @@ class CameraCaptureControls extends StatelessWidget {
             ),
           ),
           if (showUpload)
-            CameraGalleryTool(
-              onTap: onUploadTap,
-              label: uploadLabel,
-            )
+            CameraGalleryTool(onTap: onUploadTap, label: uploadLabel)
           else
             const SizedBox(width: 72),
         ],

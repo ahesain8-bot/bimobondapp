@@ -10,6 +10,7 @@ import com.dubai.bimobondapp.ar_camera.ArCameraOverlayPrefetcher
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
 import com.dubai.bimobondapp.ar_camera.ScreenOverlaySource
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
+import com.dubai.bimobondapp.ar_camera.LiveBeautyAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveBeautyState
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
@@ -18,6 +19,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 class MainActivity : FlutterActivity() {
@@ -28,6 +30,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private var arCameraChannel: MethodChannel? = null
+    private val arPipelineWarmupStarted = AtomicBoolean(false)
 
     private val beautyExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "beauty-filter").apply { isDaemon = true }
@@ -313,6 +316,10 @@ class MainActivity : FlutterActivity() {
                             highlights = level("highlightsLevel"),
                             shadows = level("shadowsLevel"),
                             nose = level("noseLevel"),
+                            shape = level("shapeLevel"),
+                            eyes = level("eyesLevel"),
+                            tooth = level("toothLevel"),
+                            mouth = level("mouthLevel"),
                         )
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
@@ -348,6 +355,36 @@ class MainActivity : FlutterActivity() {
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }
+                    "setMagicEnabled" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        val strength = when (val raw = call.argument<Any>("strength")) {
+                            is Double -> raw.toFloat()
+                            is Int -> raw.toFloat()
+                            is Long -> raw.toFloat()
+                            is Float -> raw
+                            else -> null
+                        }
+                        LiveBeautyState.setMagic(enabled, strength)
+                        android.util.Log.i(
+                            "ArRetouchMagic",
+                            "setMagicEnabled=$enabled strength=${LiveBeautyState.magicStrength} " +
+                                "smooth=${LiveBeautyState.adjustments.smooth}",
+                        )
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
+                    "setMagicStrength" -> {
+                        val strength = when (val raw = call.argument<Any>("strength")) {
+                            is Double -> raw.toFloat()
+                            is Int -> raw.toFloat()
+                            is Long -> raw.toFloat()
+                            is Float -> raw
+                            else -> LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH
+                        }
+                        LiveBeautyState.applyMagicStrength(strength)
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
                     "setZoom" -> {
                         val zoom = (call.argument<Double>("zoom") ?: 0.0).toFloat()
                         ArCameraController.setLinearZoom(zoom) { ok, error ->
@@ -376,21 +413,25 @@ class MainActivity : FlutterActivity() {
 
     /** Prefetch CameraX provider + MediaPipe so + → camera isn't cold-starting. */
     private fun warmArCameraPipeline() {
+        if (!arPipelineWarmupStarted.compareAndSet(false, true)) return
         FaceLandmarkerHolder.warmup(this)
         try {
             ProcessCameraProvider.getInstance(this)
         } catch (_: Throwable) {
         }
         // Warm H.264 encoder so the first record tap isn't cold.
-        Executors.newSingleThreadExecutor { r ->
+        val executor = Executors.newSingleThreadExecutor { r ->
             Thread(r, "ar-encoder-warm").apply { isDaemon = true }
-        }.execute {
+        }
+        executor.execute {
             try {
                 val codec = android.media.MediaCodec.createEncoderByType(
                     android.media.MediaFormat.MIMETYPE_VIDEO_AVC,
                 )
                 codec.release()
             } catch (_: Throwable) {
+            } finally {
+                executor.shutdown()
             }
         }
     }

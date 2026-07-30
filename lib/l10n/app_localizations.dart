@@ -6191,6 +6191,12 @@ abstract class AppLocalizations {
   /// **'Magic'**
   String get mediaPhotoEditorMagic;
 
+  /// No description provided for @mediaPhotoEditorOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get mediaPhotoEditorOff;
+
   /// No description provided for @mediaPhotoEditorSmooth.
   ///
   /// In en, this message translates to:
@@ -6214,6 +6220,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Contrast'**
   String get mediaPhotoEditorContrast;
+
+  /// No description provided for @mediaPhotoEditorShape.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get mediaPhotoEditorShape;
+
+  /// No description provided for @mediaPhotoEditorEyes.
+  ///
+  /// In en, this message translates to:
+  /// **'Eyes'**
+  String get mediaPhotoEditorEyes;
+
+  /// No description provided for @mediaPhotoEditorTooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Tooth'**
+  String get mediaPhotoEditorTooth;
+
+  /// No description provided for @mediaPhotoEditorMouth.
+  ///
+  /// In en, this message translates to:
+  /// **'Mouth'**
+  String get mediaPhotoEditorMouth;
 
   /// No description provided for @mediaPhotoEditorExposure.
   ///

@@ -266,15 +266,37 @@ object ImageProxyBitmapUtils {
         val mid = cropFillCenterToViewport(source, outW, midH)
         val out = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(out)
+        // Solid black letterbox — draw bars AFTER the mid frame too so any
+        // bilinear filter bleed / edge smear from the camera content cannot
+        // leak into the bar regions (the streaky top/bottom bars users saw).
         canvas.drawColor(android.graphics.Color.BLACK)
         val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        val barPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.BLACK
+            style = android.graphics.Paint.Style.FILL
+        }
         val dst = android.graphics.Rect(0, top, outW, top + midH)
+        canvas.save()
+        canvas.clipRect(dst)
         canvas.drawBitmap(
             mid,
             android.graphics.Rect(0, 0, mid.width, mid.height),
             dst,
             paint,
         )
+        canvas.restore()
+        if (top > 0) {
+            canvas.drawRect(0f, 0f, outW.toFloat(), top.toFloat(), barPaint)
+        }
+        if (bottom > 0) {
+            canvas.drawRect(
+                0f,
+                (outH - bottom).toFloat(),
+                outW.toFloat(),
+                outH.toFloat(),
+                barPaint,
+            )
+        }
         if (mid !== source && !mid.isRecycled) {
             mid.recycle()
         }

@@ -17,7 +17,7 @@ class CameraStudioConstants {
     CameraZoomStep(label: '3x', value: 0.72),
   ];
 
-  static const durationOptions = [15, 60, 180];
+  static const durationOptions = [15, 60, 600];
   static const speedOptions = [0.3, 0.5, 1.0, 2.0, 3.0];
   static const studioModes = [
     CameraStudioMode.photo,

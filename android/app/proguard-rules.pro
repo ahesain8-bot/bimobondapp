@@ -65,3 +65,29 @@
 # OpenCV
 -keep class org.opencv.** { *; }
 -dontwarn org.opencv.**
+
+# AndroidX Media3 (ExoPlayer + Transformer)
+#
+# Used for video playback and, via pro_video_editor, for the export that runs
+# when a post is submitted. Media3 guards its newer-platform code with API level
+# checks; R8 was merging and inlining across those guards, which put an
+# API-31-only type (android.media.metrics.LogSessionId) on a path that executes
+# on older devices. On a Galaxy Note 9 (API 29) that crashed the app the moment
+# Post was tapped:
+#
+#   java.lang.NoClassDefFoundError:
+#       Failed resolution of: Landroid/media/metrics/LogSessionId;
+#     at androidx.media3.transformer.Transformer.start
+#     at ch.waio.pro_video_editor...RenderVideo
+#
+# Keeping these classes intact leaves the guards where the library put them.
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+
+# Platform classes that only exist on newer API levels and are referenced from
+# behind those guards.
+-dontwarn android.media.metrics.**
+
+# Video/media Flutter plugins that drive the above.
+-keep class ch.waio.pro_video_editor.** { *; }
+-dontwarn ch.waio.pro_video_editor.**

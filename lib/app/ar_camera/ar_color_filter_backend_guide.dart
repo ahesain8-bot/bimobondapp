@@ -114,7 +114,8 @@
 //                                                                   within their category
 //   defaultIntensity  int       0–100      70        intensity     see section 6 — the LIVE
 //                                                                   slider's starting position
-//   smooth            int       0–100      55        one-direction skin smoothing strength
+//   smooth            int       0–100      18        one-direction skin smoothing strength
+//                                                                   (18 ≈ natural; 50+ reads plastic)
 //   whiten            int       0–100      0         one-direction skin brightening/whitening
 //   brighten          int       0–100      0         one-direction overall face brightening
 //   blush             int       0–100      0         one-direction cheek blush strength
@@ -137,7 +138,7 @@
 // -----------------------------------------------------------------------------
 //
 //   One-direction fields:  internal = incoming / 100.0
-//     e.g. smooth = 55  ->  internal smooth = 0.55
+//     e.g. smooth = 18  ->  internal smooth = 0.18
 //
 //   Balanced fields:       internal = (incoming - 50) / 50.0
 //     e.g. saturation = 15   ->  internal saturation = (15-50)/50  = -0.70
@@ -170,7 +171,7 @@
 // -----------------------------------------------------------------------------
 //
 // The old hardcoded decimal version (for reference):
-//   smooth: 0.55, whiten: 0, brighten: 0, blush: 0, lipTint: '#E8527A',
+//   smooth: 0.18, whiten: 0, brighten: 0, blush: 0, lipTint: '#E8527A',
 //   lipStrength: 0, brightness: 0.10, contrast: 0.25, saturation: 0.40
 //
 // The SAME filter, as the backend should send it in the new 0–100 format:
@@ -183,7 +184,7 @@
 //   "previewColorHex": "#FF6B9D",
 //   "sortOrder": 8,
 //   "defaultIntensity": 70,
-//   "smooth": 55,
+//   "smooth": 18,
 //   "whiten": 0,
 //   "brighten": 0,
 //   "blush": 0,
@@ -273,7 +274,7 @@ class ArColorFilterBackendItem {
     this.previewColorHex,
     this.sortOrder = 0,
     this.defaultIntensity = 70,
-    this.smooth = 55,
+    this.smooth = 18,
     this.whiten = 0,
     this.brighten = 0,
     this.blush = 0,
@@ -354,7 +355,7 @@ const vividFilterExample = ArColorFilterBackendItem(
   previewColorHex: '#FF6B9D',
   sortOrder: 8,
   defaultIntensity: 70,
-  smooth: 55,
+  smooth: 18,
   brightness: 60,
   contrast: 63,
   saturation: 70,

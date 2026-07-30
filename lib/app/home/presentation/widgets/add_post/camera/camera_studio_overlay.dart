@@ -364,41 +364,37 @@ class CameraStudioOverlay extends StatelessWidget {
                                   ),
                                 ),
                               const SizedBox(height: 4),
-                              Transform.translate(
-                                offset: const Offset(0, -14),
-                                child: ArFilterCarousel(
-                                  items: effectCarouselItems,
-                                  selectedIndex:
-                                      ArFilterCatalog.effectCarouselIndexFor(
-                                        selectedArFilterId,
-                                        photoMode: isPhotoMode,
-                                      ),
-                                  onSelected: (index) {
-                                    final id = effectCarouselItems[index].id;
-                                    onArFilterSelected!(
-                                      ArFilterCatalog.indexOfId(id),
-                                    );
-                                  },
-                                  isRecording: isRecording,
-                                  isBusy: isBusy,
-                                  recordProgress: selectedDuration == 0
-                                      ? 0
-                                      : recordSeconds / selectedDuration,
-                                  isPhotoMode: isPhotoMode,
-                                  onShutterTap: onRecordTap,
-                                  onHoldStart: onLongPressStart,
-                                  onHoldEnd: onLongPressEnd,
-                                  showSideActions:
-                                      isReviewingDraft ||
-                                      (isRecording && recordSeconds >= 1),
-                                  soloShutter:
-                                      isRecording ||
-                                      isReviewingDraft ||
-                                      selectedLayoutMode !=
-                                          CameraLayoutMode.off,
-                                  onCancel: onDiscardDraft,
-                                  onConfirm: onFinishRecording,
-                                ),
+                              ArFilterCarousel(
+                                items: effectCarouselItems,
+                                selectedIndex:
+                                    ArFilterCatalog.effectCarouselIndexFor(
+                                      selectedArFilterId,
+                                      photoMode: isPhotoMode,
+                                    ),
+                                onSelected: (index) {
+                                  final id = effectCarouselItems[index].id;
+                                  onArFilterSelected!(
+                                    ArFilterCatalog.indexOfId(id),
+                                  );
+                                },
+                                isRecording: isRecording,
+                                isBusy: isBusy,
+                                recordProgress: selectedDuration == 0
+                                    ? 0
+                                    : recordSeconds / selectedDuration,
+                                isPhotoMode: isPhotoMode,
+                                onShutterTap: onRecordTap,
+                                onHoldStart: onLongPressStart,
+                                onHoldEnd: onLongPressEnd,
+                                showSideActions:
+                                    isReviewingDraft ||
+                                    (isRecording && recordSeconds >= 1),
+                                soloShutter:
+                                    isRecording ||
+                                    isReviewingDraft ||
+                                    selectedLayoutMode != CameraLayoutMode.off,
+                                onCancel: onDiscardDraft,
+                                onConfirm: onFinishRecording,
                               ),
                               const SizedBox(height: 10),
                               SizedBox(
