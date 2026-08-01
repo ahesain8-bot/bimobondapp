@@ -46,7 +46,8 @@ bool looksLikeGiftImageUrl(String value) {
       lower.contains('.jpg') ||
       lower.contains('.jpeg') ||
       lower.contains('.webp') ||
-      lower.contains('.gif');
+      lower.contains('.gif') ||
+      lower.contains('.svg');
 }
 
 String _resolveGiftName(CommentEntity comment) {

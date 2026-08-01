@@ -286,7 +286,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           : null,
       onSeekSync: hasImageSound ? onVideoSeekSync : null,
       onUserMuteChanged: hasImageSound ? onVideoUserMuteChanged : null,
-      onSegmentEnd: hasImageSound && widget.post.sound!.hasSegmentWindow
+      onSegmentEnd: hasImageSound
           ? () => unawaited(onPostSoundSegmentLoop())
           : null,
       onVideoDurationReady:

@@ -990,15 +990,28 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
 
   void _maybeLoopSegmentPlayback(VideoPlayerController controller) {
     final maxPos = widget.segmentMaxPosition;
-    if (maxPos == null) return;
 
-    if (controller.value.position <
-        maxPos - const Duration(milliseconds: 120)) {
-      _segmentEndHandled = false;
+    if (maxPos != null) {
+      if (controller.value.position <
+          maxPos - const Duration(milliseconds: 120)) {
+        _segmentEndHandled = false;
+        return;
+      }
+    } else if (widget.loopVideo && widget.muteAudio) {
+      // Native loop is enabled — only intervene if the platform did not loop.
+      final duration = controller.value.duration;
+      final nearNaturalEnd = duration.inMilliseconds > 0 &&
+          controller.value.position >=
+              duration - const Duration(milliseconds: 120);
+      if (!controller.value.isCompleted && !nearNaturalEnd) {
+        _segmentEndHandled = false;
+        return;
+      }
+    } else {
       return;
     }
 
-    if (!controller.value.isPlaying || _segmentEndHandled) return;
+    if (_segmentEndHandled) return;
     _segmentEndHandled = true;
     unawaited(_replaySegmentFromStart(controller));
   }
@@ -1006,13 +1019,18 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
   Future<void> _replaySegmentFromStart(VideoPlayerController controller) async {
     try {
       await controller.seekTo(Duration.zero);
-      if (_shouldPlay && !_userPaused && !controller.value.isPlaying) {
-        await controller.play();
+      if (_shouldPlay && !_userPaused) {
+        await _startPlayback(
+          controller,
+          _initGeneration,
+          muted: _playbackMuted,
+        );
       }
     } catch (_) {}
     widget.onSegmentEnd?.call();
     if (mounted) {
       _syncFeedProgress();
+      _notifyPlaybackChanged();
     }
   }
 

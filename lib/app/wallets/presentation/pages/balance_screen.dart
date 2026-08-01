@@ -1,13 +1,27 @@
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/gifts/presentation/widgets/wallet/wallet_custom_amount_section.dart';
+import 'package:bimobondapp/app/gifts/presentation/widgets/wallet/wallet_top_up_button.dart';
+import 'package:bimobondapp/app/wallets/domain/entities/wallet_entity.dart';
+import 'package:bimobondapp/app/wallets/domain/utils/wallet_coin_pricing.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase.dart';
+import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
+    as gifts_di;
+import 'package:bimobondapp/app/wallets/domain/usecases/wallet_usecases.dart';
+import 'package:bimobondapp/app/wallets/presentation/di/wallets_injector.dart'
+    as wallets_di;
 import 'package:bimobondapp/app/wallets/domain/entities/balance_entity.dart';
 import 'package:bimobondapp/app/wallets/presentation/data/balance_mock_data.dart';
 import 'package:bimobondapp/app/wallets/presentation/widgets/balance_setup_payments_sheet.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
+import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/money_format_utils.dart';
 import 'package:bimobondapp/core/widgets/app_coin_icon.dart';
+import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/directional_chevron_icon.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,6 +40,35 @@ class _BalanceScreenState extends State<BalanceScreen> {
     BalanceMockData.payoutSteps,
   );
   int _payoutCarouselIndex = 0;
+  int _balanceCoins = 0;
+  bool _loadingBalance = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshBalance();
+  }
+
+  Future<void> _refreshBalance() async {
+    setState(() => _loadingBalance = true);
+
+    final walletResult = await wallets_di.sl<GetMyWalletUseCase>()(NoParams());
+    var balance = 0;
+    walletResult.fold((_) {}, (wallet) => balance = wallet.balanceCoins);
+
+    if (balance == 0) {
+      final inventoryResult = await gifts_di.sl<GetGiftInventoryUseCase>()(
+        NoParams(),
+      );
+      inventoryResult.fold((_) {}, (inv) => balance = inv.balanceCoins);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _balanceCoins = balance;
+      _loadingBalance = false;
+    });
+  }
 
   String _displayName(AppLocalizations l10n) {
     final authState = context.read<AuthBloc>().state;
@@ -90,21 +133,16 @@ class _BalanceScreenState extends State<BalanceScreen> {
               ),
             ),
             _BalanceMainCard(
-              balanceLabel: l10n.balanceEstimatedBalance,
-              balanceAmount: MoneyFormatUtils.formatMoney(
-                BalanceMockData.estimatedBalanceUsd,
-                BalanceMockData.currencyCode,
-                locale: locale,
-              ),
-              coinsLabel: l10n.coinsUnit,
+              balanceLabel: l10n.coinsAvailableBalance,
               coinsAmount: LocaleFormatUtils.localizeDigits(
-                BalanceMockData.coinBalance.toString(),
+                _balanceCoins.toString(),
                 locale,
               ),
-              viewLabel: l10n.balanceView,
-              getLabel: l10n.balanceGet,
-              onGetCoins: () => context.pushNamed('wallet'),
+              coinsLabel: l10n.coinsUnit,
+              loading: _loadingBalance,
             ),
+            const SizedBox(height: 16),
+            _BalanceTopUpSection(onBalanceChanged: _refreshBalance),
             const SizedBox(height: 20),
             _SectionHeader(title: l10n.balanceScheduledPayouts),
             const SizedBox(height: 10),
@@ -236,102 +274,324 @@ class _BalanceScreenState extends State<BalanceScreen> {
 class _BalanceMainCard extends StatelessWidget {
   const _BalanceMainCard({
     required this.balanceLabel,
-    required this.balanceAmount,
-    required this.coinsLabel,
     required this.coinsAmount,
-    required this.viewLabel,
-    required this.getLabel,
-    required this.onGetCoins,
+    required this.coinsLabel,
+    required this.loading,
   });
 
   final String balanceLabel;
-  final String balanceAmount;
-  final String coinsLabel;
   final String coinsAmount;
-  final String viewLabel;
-  final String getLabel;
-  final VoidCallback onGetCoins;
+  final String coinsLabel;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
         color: const Color(0xFF161823),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        balanceLabel,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        balanceAmount,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '$viewLabel >',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          Text(
+            balanceLabel,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 13,
             ),
           ),
-          Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-            child: Row(
+          const SizedBox(height: 8),
+          if (loading)
+            const SizedBox(
+              height: 36,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: CustomLoadingWidget(size: 28),
+              ),
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                Expanded(
-                  child: AppCoinAmount(
-                    iconSize: 14,
-                    text: '$coinsAmount $coinsLabel',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: onGetCoins,
+                const AppCoinIcon(size: 28),
+                const SizedBox(width: 8),
+                Flexible(
                   child: Text(
-                    '$getLabel >',
+                    coinsAmount,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
                     ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  coinsLabel,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-          ),
         ],
       ),
+    );
+  }
+}
+
+class _BalanceTopUpSection extends StatefulWidget {
+  const _BalanceTopUpSection({required this.onBalanceChanged});
+
+  final VoidCallback onBalanceChanged;
+
+  @override
+  State<_BalanceTopUpSection> createState() => _BalanceTopUpSectionState();
+}
+
+class _BalanceTopUpSectionState extends State<_BalanceTopUpSection> {
+  final _getPackages = wallets_di.sl<GetCoinPackagesUseCase>();
+  final _purchaseCoins = wallets_di.sl<PurchaseCoinsUseCase>();
+  final _topUpWallet = wallets_di.sl<TopUpWalletUseCase>();
+  final _customCoinsController = TextEditingController();
+
+  List<CoinPackageEntity> _packages = [];
+  bool _loading = true;
+  bool _purchasing = false;
+  String? _error;
+  int _selectedIndex = 0;
+
+  WalletTopUpQuote get _activeQuote {
+    final customCoins = WalletCoinPricing.parseCoinsInput(
+      _customCoinsController.text,
+    );
+    if (customCoins > 0) {
+      return WalletCoinPricing.resolveQuote(customCoins, _packages);
+    }
+    if (_packages.isEmpty) {
+      return const WalletTopUpQuote(coins: 0, price: 0);
+    }
+    return WalletTopUpQuote.fromEntity(_packages[_selectedIndex]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _customCoinsController.addListener(() => setState(() {}));
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _customCoinsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final packagesResult = await _getPackages(NoParams());
+    if (!mounted) return;
+
+    packagesResult.fold(
+      (f) => setState(() {
+        _loading = false;
+        _error = f.message;
+      }),
+      (packages) => setState(() {
+        _packages = packages.where((p) => p.isActive).toList();
+        _loading = false;
+        if (_selectedIndex >= _packages.length) _selectedIndex = 0;
+      }),
+    );
+  }
+
+  Future<void> _purchaseCustom(WalletTopUpQuote quote) async {
+    final l10n = AppLocalizations.of(context)!;
+    final priceLabel = MoneyFormatUtils.formatMoney(
+      quote.price,
+      quote.currencyCode,
+      locale: Localizations.localeOf(context),
+    );
+
+    await PopupDialogs.showConfirmDialog(
+      context,
+      title: l10n.walletTopUpButton,
+      message: '${quote.coins} ${l10n.coinsUnit}\n$priceLabel',
+      confirmLabel: l10n.walletPayButton(priceLabel),
+      cancelLabel: l10n.cancel,
+      onConfirm: () async {
+        if (!mounted) return;
+        setState(() => _purchasing = true);
+        final txId = 'app-${DateTime.now().millisecondsSinceEpoch}';
+        final result = await _topUpWallet(
+          TopUpWalletParams(
+            paidPrice: quote.price,
+            provider: 'MOCK',
+            providerTxId: txId,
+            currencyCode: quote.currencyCode,
+          ),
+        );
+
+        if (!mounted) return;
+        setState(() => _purchasing = false);
+
+        result.fold((f) => PopupDialogs.showErrorDialog(context, f.message), (
+          _,
+        ) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.walletPurchaseSuccess(quote.coins)),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          widget.onBalanceChanged();
+          _customCoinsController.clear();
+        });
+      },
+    );
+  }
+
+  Future<void> _purchase(CoinPackageEntity pack) async {
+    final l10n = AppLocalizations.of(context)!;
+    final priceLabel = MoneyFormatUtils.formatMoney(
+      pack.price,
+      pack.currencyCode,
+      locale: Localizations.localeOf(context),
+    );
+
+    await PopupDialogs.showConfirmDialog(
+      context,
+      title: l10n.walletTopUpButton,
+      message: '${pack.coinAmount} ${l10n.coinsUnit}\n$priceLabel',
+      confirmLabel: l10n.walletPayButton(priceLabel),
+      cancelLabel: l10n.cancel,
+      onConfirm: () async {
+        if (!mounted) return;
+        setState(() => _purchasing = true);
+        final txId = 'app-${DateTime.now().millisecondsSinceEpoch}';
+        final result = await _purchaseCoins(
+          PurchaseCoinsParams(
+            packageId: pack.id,
+            provider: 'MOCK',
+            providerTxId: txId,
+          ),
+        );
+
+        if (!mounted) return;
+        setState(() => _purchasing = false);
+
+        result.fold((f) => PopupDialogs.showErrorDialog(context, f.message), (
+          _,
+        ) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.walletPurchaseSuccess(pack.coinAmount)),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          widget.onBalanceChanged();
+          _customCoinsController.clear();
+        });
+      },
+    );
+  }
+
+  Future<void> _onPayPressed() async {
+    final l10n = AppLocalizations.of(context)!;
+    final quote = _activeQuote;
+    if (!quote.isValid) {
+      PopupDialogs.showErrorDialog(context, l10n.walletCustomAmountInvalid);
+      return;
+    }
+
+    if (quote.isPackageQuote) {
+      CoinPackageEntity? pack;
+      for (final candidate in _packages) {
+        if (candidate.id == quote.packageId) {
+          pack = candidate;
+          break;
+        }
+      }
+      if (pack != null) {
+        await _purchase(pack);
+      }
+      return;
+    }
+
+    final customCoins = WalletCoinPricing.parseCoinsInput(
+      _customCoinsController.text,
+    );
+    if (customCoins > 0) {
+      await _purchaseCustom(quote);
+      return;
+    }
+
+    if (_packages.isNotEmpty) {
+      await _purchase(_packages[_selectedIndex]);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CustomLoadingWidget(size: 36)),
+      );
+    }
+
+    if (_error != null && _packages.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            TextButton(onPressed: _load, child: Text(l10n.liveGiftRetry)),
+          ],
+        ),
+      );
+    }
+
+    final quote = _activeQuote;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        WalletCustomAmountSection(
+          controller: _customCoinsController,
+          packages: _packages,
+          currencyCode: _packages.isNotEmpty
+              ? _packages.first.currencyCode
+              : BalanceMockData.currencyCode,
+          onPackageSelected: (pack) {
+            setState(() {
+              _selectedIndex = _packages.indexOf(pack);
+            });
+          },
+        ),
+        const SizedBox(height: AppSizes.p16),
+        _purchasing
+            ? const Center(child: CustomLoadingWidget(size: 36))
+            : WalletTopUpButton(
+                quote: quote,
+                enabled: quote.isValid,
+                onPressed: _onPayPressed,
+              ),
+      ],
     );
   }
 }

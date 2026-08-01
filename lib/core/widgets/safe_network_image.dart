@@ -2,6 +2,7 @@ import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// True when [url] is a non-empty http(s) URL that is not a video file.
 bool isValidNetworkImageUrl(String? url) {
@@ -267,6 +268,23 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final url = _resolvedUrl;
+
+    if (url != null && MediaUtils.isSvgUrl(url)) {
+      return _SafeNetworkSvgImage(
+        url: url,
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        borderRadius: widget.borderRadius,
+        errorIcon: widget.errorIcon,
+        blankOnError: widget.blankOnError,
+        showLoadingIndicator: widget.showLoadingIndicator,
+        loadingSize: widget.loadingSize,
+        onLoadFailed: widget.onLoadFailed,
+        onLoaded: widget.onLoaded,
+      );
+    }
 
     if (_failed) {
       return _placeholder(theme);
@@ -299,6 +317,130 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     }
 
     return image;
+  }
+}
+
+class _SafeNetworkSvgImage extends StatefulWidget {
+  const _SafeNetworkSvgImage({
+    required this.url,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+    this.borderRadius,
+    this.errorIcon = Icons.broken_image_outlined,
+    this.blankOnError = false,
+    this.showLoadingIndicator = true,
+    this.loadingSize,
+    this.onLoadFailed,
+    this.onLoaded,
+  });
+
+  final String url;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final BorderRadius? borderRadius;
+  final IconData errorIcon;
+  final bool blankOnError;
+  final bool showLoadingIndicator;
+  final double? loadingSize;
+  final VoidCallback? onLoadFailed;
+  final VoidCallback? onLoaded;
+
+  @override
+  State<_SafeNetworkSvgImage> createState() => _SafeNetworkSvgImageState();
+}
+
+class _SafeNetworkSvgImageState extends State<_SafeNetworkSvgImage> {
+  bool get _hasExplicitSize {
+    final width = widget.width;
+    final height = widget.height;
+    return width != null &&
+        height != null &&
+        width.isFinite &&
+        height.isFinite;
+  }
+
+  double get _effectiveLoadingSize {
+    if (widget.loadingSize != null) return widget.loadingSize!;
+    final w = widget.width;
+    final h = widget.height;
+    if (w != null && h != null && w.isFinite && h.isFinite) {
+      return ((w < h ? w : h) * 0.22).clamp(18.0, 28.0);
+    }
+    return 24;
+  }
+
+  Widget _wrapSized(Widget child) {
+    if (_hasExplicitSize) {
+      return SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: child,
+      );
+    }
+    return SizedBox.expand(child: child);
+  }
+
+  Widget _loadingPlaceholder(ThemeData theme) {
+    if (!widget.showLoadingIndicator && widget.blankOnError) {
+      return _wrapSized(const ColoredBox(color: Colors.black));
+    }
+
+    final background = widget.blankOnError
+        ? Colors.black
+        : theme.brightness == Brightness.light
+            ? const Color(0xFFF0F0F0)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35);
+    final spinnerSize = _effectiveLoadingSize;
+    final spinnerColor = theme.brightness == Brightness.light
+        ? const Color(0xFFB0B0B0)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.35);
+
+    return _wrapSized(
+      ColoredBox(
+        color: background,
+        child: Center(
+          child: SizedBox(
+            width: spinnerSize,
+            height: spinnerSize,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: spinnerColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget svg = SvgPicture.network(
+      widget.url,
+      width: _hasExplicitSize ? widget.width : null,
+      height: _hasExplicitSize ? widget.height : null,
+      fit: widget.fit,
+      placeholderBuilder: (_) => _loadingPlaceholder(theme),
+    );
+
+    if (!_hasExplicitSize) {
+      svg = SizedBox.expand(
+        child: FittedBox(
+          fit: widget.fit,
+          clipBehavior: Clip.hardEdge,
+          child: svg,
+        ),
+      );
+    }
+
+    if (widget.borderRadius != null) {
+      svg = ClipRRect(borderRadius: widget.borderRadius!, child: svg);
+    }
+
+    return svg;
   }
 }
 

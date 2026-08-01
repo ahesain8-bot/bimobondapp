@@ -1,9 +1,3 @@
-import 'dart:async';
-
-import 'package:bimobondapp/app/auctions/domain/entities/auction_pricing_preview_entity.dart';
-import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_pricing_preview_usecase.dart';
-import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
-    as auctions_di;
 import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase.dart';
 import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
     as gifts_di;
@@ -43,8 +37,6 @@ class _WalletScreenState extends State<WalletScreen>
   final PurchaseCoinsUseCase _purchaseCoins =
       wallets_di.sl<PurchaseCoinsUseCase>();
   final TopUpWalletUseCase _topUpWallet = wallets_di.sl<TopUpWalletUseCase>();
-  final GetAuctionPricingPreviewUseCase _getPricingPreview =
-      auctions_di.sl<GetAuctionPricingPreviewUseCase>();
   final SharedPreferences _prefs = gifts_di.sl<SharedPreferences>();
   final TextEditingController _customCoinsController = TextEditingController();
 
@@ -52,31 +44,14 @@ class _WalletScreenState extends State<WalletScreen>
   bool _loading = true;
   String? _errorMessage;
   List<CoinPackageEntity> _packages = [];
-  AuctionPricingPreviewEntity? _pricingPreview;
-  Timer? _previewDebounce;
-  bool _loadingPricingPreview = false;
   int _selectedPackageIndex = 0;
-  int? _previewForCoins;
   late AnimationController _pulseController;
 
   WalletTopUpQuote get _activeQuote {
     final customCoins =
         WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
     if (customCoins > 0) {
-      final packageMatch =
-          WalletCoinPricing.packageForCoins(customCoins, _packages);
-      if (packageMatch != null) {
-        return WalletTopUpQuote.fromEntity(packageMatch);
-      }
-      if (_pricingPreview != null &&
-          !_loadingPricingPreview &&
-          _previewForCoins == customCoins) {
-        return WalletTopUpQuote.fromPricingPreview(
-          _pricingPreview!,
-          requestedCoins: customCoins,
-        );
-      }
-      return const WalletTopUpQuote(coins: 0, price: 0);
+      return WalletCoinPricing.resolveQuote(customCoins, _packages);
     }
     if (_packages.isEmpty) {
       return const WalletTopUpQuote(coins: 0, price: 0);
@@ -91,77 +66,15 @@ class _WalletScreenState extends State<WalletScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
-    _customCoinsController.addListener(_onCustomCoinsChanged);
+    _customCoinsController.addListener(() => setState(() {}));
     _load();
   }
 
   @override
   void dispose() {
-    _previewDebounce?.cancel();
-    _customCoinsController.removeListener(_onCustomCoinsChanged);
     _pulseController.dispose();
     _customCoinsController.dispose();
     super.dispose();
-  }
-
-  void _onCustomCoinsChanged() {
-    final coins = WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
-    setState(() {});
-    _schedulePricingPreview(coins);
-  }
-
-  void _schedulePricingPreview(int coins) {
-    _previewDebounce?.cancel();
-    if (coins <= 0) {
-      setState(() {
-        _pricingPreview = null;
-        _previewForCoins = null;
-        _loadingPricingPreview = false;
-      });
-      return;
-    }
-
-    if (WalletCoinPricing.packageForCoins(coins, _packages) != null) {
-      setState(() {
-        _pricingPreview = null;
-        _previewForCoins = null;
-        _loadingPricingPreview = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _pricingPreview = null;
-      _previewForCoins = null;
-      _loadingPricingPreview = true;
-    });
-    _previewDebounce = Timer(const Duration(milliseconds: 400), () {
-      _fetchPricingPreview(coins);
-    });
-  }
-
-  Future<void> _fetchPricingPreview(int coins) async {
-    final result = await _getPricingPreview(
-      AuctionPricingPreviewParams(targetCoins: coins),
-    );
-    if (!mounted) return;
-
-    final currentCoins =
-        WalletCoinPricing.parseCoinsInput(_customCoinsController.text);
-    if (currentCoins != coins) return;
-
-    result.fold(
-      (_) => setState(() {
-        _loadingPricingPreview = false;
-        _pricingPreview = null;
-        _previewForCoins = null;
-      }),
-      (preview) => setState(() {
-        _loadingPricingPreview = false;
-        _pricingPreview = preview;
-        _previewForCoins = coins;
-      }),
-    );
   }
 
   Future<void> _load() async {
@@ -320,18 +233,12 @@ class _WalletScreenState extends State<WalletScreen>
                         WalletCustomAmountSection(
                           controller: _customCoinsController,
                           packages: _packages,
-                          pricingPreview: _pricingPreview,
-                          previewForCoins: _previewForCoins,
-                          loadingPricingPreview: _loadingPricingPreview,
                           currencyCode: _packages.isNotEmpty
                               ? _packages.first.currencyCode
                               : 'USD',
                           onPackageSelected: (pack) {
                             setState(() {
                               _selectedPackageIndex = _packages.indexOf(pack);
-                              _pricingPreview = null;
-                              _previewForCoins = null;
-                              _loadingPricingPreview = false;
                             });
                           },
                         ),
@@ -353,16 +260,13 @@ class _WalletScreenState extends State<WalletScreen>
                               _selectedPackageIndex = index;
                               _customCoinsController.text =
                                   '${_packages[index].coinAmount}';
-                              _pricingPreview = null;
-                              _previewForCoins = null;
-                              _loadingPricingPreview = false;
                             });
                           },
                         ),
                         const SizedBox(height: AppSizes.p20),
                         WalletTopUpButton(
                           quote: quote,
-                          enabled: quote.isValid && !_loadingPricingPreview,
+                          enabled: quote.isValid,
                           onPressed: () => _topUp(quote),
                         ),
                         const SizedBox(height: AppSizes.p24),

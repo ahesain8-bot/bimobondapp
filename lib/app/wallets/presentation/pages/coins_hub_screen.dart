@@ -1,9 +1,3 @@
-import 'dart:async';
-
-import 'package:bimobondapp/app/auctions/domain/entities/auction_pricing_preview_entity.dart';
-import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_pricing_preview_usecase.dart';
-import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
-    as auctions_di;
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
@@ -526,41 +520,21 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
   final _purchaseCoins = wallets_di.sl<PurchaseCoinsUseCase>();
   final _topUpWallet = wallets_di.sl<TopUpWalletUseCase>();
   final _getWallet = wallets_di.sl<GetMyWalletUseCase>();
-  final _getPricingPreview = auctions_di.sl<GetAuctionPricingPreviewUseCase>();
   final _customCoinsController = TextEditingController();
 
   List<CoinPackageEntity> _packages = [];
   WalletEntity? _wallet;
-  AuctionPricingPreviewEntity? _pricingPreview;
-  Timer? _previewDebounce;
   bool _loading = true;
   bool _purchasing = false;
-  bool _loadingPricingPreview = false;
   String? _error;
   int _selectedIndex = 0;
-  int? _previewForCoins;
 
   WalletTopUpQuote get _activeQuote {
     final customCoins = WalletCoinPricing.parseCoinsInput(
       _customCoinsController.text,
     );
     if (customCoins > 0) {
-      final packageMatch = WalletCoinPricing.packageForCoins(
-        customCoins,
-        _packages,
-      );
-      if (packageMatch != null) {
-        return WalletTopUpQuote.fromEntity(packageMatch);
-      }
-      if (_pricingPreview != null &&
-          !_loadingPricingPreview &&
-          _previewForCoins == customCoins) {
-        return WalletTopUpQuote.fromPricingPreview(
-          _pricingPreview!,
-          requestedCoins: customCoins,
-        );
-      }
-      return const WalletTopUpQuote(coins: 0, price: 0);
+      return WalletCoinPricing.resolveQuote(customCoins, _packages);
     }
     if (_packages.isEmpty) {
       return const WalletTopUpQuote(coins: 0, price: 0);
@@ -571,79 +545,14 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
   @override
   void initState() {
     super.initState();
-    _customCoinsController.addListener(_onCustomCoinsChanged);
+    _customCoinsController.addListener(() => setState(() {}));
     _load();
   }
 
   @override
   void dispose() {
-    _previewDebounce?.cancel();
-    _customCoinsController.removeListener(_onCustomCoinsChanged);
     _customCoinsController.dispose();
     super.dispose();
-  }
-
-  void _onCustomCoinsChanged() {
-    final coins = WalletCoinPricing.parseCoinsInput(
-      _customCoinsController.text,
-    );
-    setState(() {});
-    _schedulePricingPreview(coins);
-  }
-
-  Future<void> _fetchPricingPreview(int coins) async {
-    final result = await _getPricingPreview(
-      AuctionPricingPreviewParams(targetCoins: coins),
-    );
-    if (!mounted) return;
-
-    final currentCoins = WalletCoinPricing.parseCoinsInput(
-      _customCoinsController.text,
-    );
-    if (currentCoins != coins) return;
-
-    result.fold(
-      (_) => setState(() {
-        _loadingPricingPreview = false;
-        _pricingPreview = null;
-        _previewForCoins = null;
-      }),
-      (preview) => setState(() {
-        _loadingPricingPreview = false;
-        _pricingPreview = preview;
-        _previewForCoins = coins;
-      }),
-    );
-  }
-
-  void _schedulePricingPreview(int coins) {
-    _previewDebounce?.cancel();
-    if (coins <= 0) {
-      setState(() {
-        _pricingPreview = null;
-        _previewForCoins = null;
-        _loadingPricingPreview = false;
-      });
-      return;
-    }
-
-    if (WalletCoinPricing.packageForCoins(coins, _packages) != null) {
-      setState(() {
-        _pricingPreview = null;
-        _previewForCoins = null;
-        _loadingPricingPreview = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _pricingPreview = null;
-      _previewForCoins = null;
-      _loadingPricingPreview = true;
-    });
-    _previewDebounce = Timer(const Duration(milliseconds: 400), () {
-      _fetchPricingPreview(coins);
-    });
   }
 
   Future<void> _load() async {
@@ -842,18 +751,12 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
           WalletCustomAmountSection(
             controller: _customCoinsController,
             packages: _packages,
-            pricingPreview: _pricingPreview,
-            previewForCoins: _previewForCoins,
-            loadingPricingPreview: _loadingPricingPreview,
             currencyCode: _packages.isNotEmpty
                 ? _packages.first.currencyCode
                 : 'USD',
             onPackageSelected: (pack) {
               setState(() {
                 _selectedIndex = _packages.indexOf(pack);
-                _pricingPreview = null;
-                _previewForCoins = null;
-                _loadingPricingPreview = false;
               });
             },
           ),
@@ -871,9 +774,6 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
               setState(() {
                 _selectedIndex = index;
                 _customCoinsController.text = '${_packages[index].coinAmount}';
-                _pricingPreview = null;
-                _previewForCoins = null;
-                _loadingPricingPreview = false;
               });
             },
           ),
@@ -882,7 +782,7 @@ class _CoinsBuyTabState extends State<CoinsBuyTab> {
               ? const Center(child: CustomLoadingWidget(size: 36))
               : WalletTopUpButton(
                   quote: quote,
-                  enabled: quote.isValid && !_loadingPricingPreview,
+                  enabled: quote.isValid,
                   onPressed: _onTopUpPressed,
                 ),
           if (accountings.isNotEmpty) ...[

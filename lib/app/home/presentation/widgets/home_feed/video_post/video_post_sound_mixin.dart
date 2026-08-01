@@ -122,8 +122,14 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
 
   void _bindPostSoundStateListener(AudioPlayer player) {
     _postSoundStateSub?.cancel();
-    _postSoundStateSub = player.playerStateStream.listen((_) {
-      if (mounted) setState(() {});
+    _postSoundStateSub = player.playerStateStream.listen((state) {
+      if (!mounted) return;
+      if (state.processingState == ProcessingState.completed &&
+          soundPlaybackActive &&
+          _syncSoundWithVideoSlide) {
+        unawaited(onPostSoundSegmentLoop());
+      }
+      setState(() {});
     });
   }
 
@@ -136,13 +142,24 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
   void onVideoPlaybackChangedFromPlayer() {
     if (!_hasExternalSoundtrack || !isSlideVideo(soundCurrentPage)) return;
 
-    final playing =
-        soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
+    final controller = soundVideoControllers[soundCurrentPage];
+    final playing = controller?.isPlaying ?? false;
     if (playing) {
       unawaited(_tryStartSoundWithVideo());
-    } else {
-      unawaited(pausePostSound());
+      return;
     }
+
+    // Video briefly reports paused while seeking back for a segment loop.
+    if (_hasSegmentWindow) {
+      final pos = controller?.playbackPosition ?? Duration.zero;
+      final window = _segmentPlaybackDuration;
+      if (window != null &&
+          pos >= window - const Duration(milliseconds: 150)) {
+        return;
+      }
+    }
+
+    unawaited(pausePostSound());
   }
 
   void onVideoUserMuteChanged(bool muted) {
@@ -151,16 +168,13 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
   }
 
   Future<void> onPostSoundSegmentLoop() async {
-    if (!_hasExternalSoundtrack) return;
-    if (_syncSoundWithVideoSlide && !_videoSlideSoundShouldPlay()) {
-      await pausePostSound();
-      return;
-    }
+    if (!_hasExternalSoundtrack || !soundPlaybackActive) return;
     final player = _postSoundPlayer;
     if (player == null) return;
     try {
       await player.seek(Duration.zero);
       if (_postSoundVolume > 0 && !player.playing) {
+        await player.setVolume(_postSoundVolume);
         await player.play();
       }
     } catch (_) {}

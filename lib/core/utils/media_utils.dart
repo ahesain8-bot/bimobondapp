@@ -44,7 +44,14 @@ class MediaUtils {
     '.bmp',
     '.heic',
     '.heif',
+    '.svg',
   ];
+
+  static bool isSvgUrl(String url) {
+    if (url.isEmpty) return false;
+    final cleanUrl = url.toLowerCase().split('?').first.split('#').first;
+    return cleanUrl.endsWith('.svg');
+  }
 
   /// True only for URLs that look like real image files (not video / unknown).
   static bool isLikelyImageUrl(String url) {

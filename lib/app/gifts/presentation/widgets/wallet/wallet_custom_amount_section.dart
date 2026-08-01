@@ -76,7 +76,14 @@ class WalletCustomAmountSection extends StatelessWidget {
         locale: locale,
       );
     } else {
-      priceLabel = '—';
+      final quote = WalletCoinPricing.resolveQuote(coins, packages);
+      priceLabel = quote.isValid
+          ? MoneyFormatUtils.formatMoney(
+              quote.price,
+              quote.currencyCode,
+              locale: locale,
+            )
+          : '—';
     }
 
     final coinsLabel = receiveCoins > 0

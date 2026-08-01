@@ -15,7 +15,6 @@ import 'package:bimobondapp/app/gifts/presentation/utils/gift_accent_color.dart'
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_catalog_audio_preview.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
 import 'package:bimobondapp/app/gifts/presentation/widgets/gift_vinyl_record_icon.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/first_recharge_offer_sheet.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
@@ -28,6 +27,8 @@ import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 typedef OnGiftSentCallback = void Function(GiftEntity gift);
@@ -297,11 +298,9 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   }
 
   Future<void> _openRecharge() async {
-    final toppedUp = await FirstRechargeOfferSheet.show(context);
+    await context.push('/settings/wallet?tab=0');
     if (!mounted) return;
-    if (toppedUp == true) {
-      await _load();
-    }
+    await _load();
   }
 
   Future<bool> _offerTopUp() async {
@@ -1274,6 +1273,14 @@ class _GiftIcon extends StatelessWidget {
       );
     }
     if (icon.startsWith('assets/')) {
+      if (icon.toLowerCase().endsWith('.svg')) {
+        return SvgPicture.asset(
+          icon,
+          width: iconSize,
+          height: iconSize,
+          fit: BoxFit.contain,
+        );
+      }
       return Image.asset(
         icon,
         width: iconSize,
