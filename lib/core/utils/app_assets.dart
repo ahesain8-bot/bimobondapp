@@ -27,6 +27,7 @@ class AppAssets {
       '$iconsPath/message-pending-svgrepo-com.svg';
   static const String chatNavIconFilled = '$iconsPath/chat_filled.svg';
   static const String feedSearchIcon = '$iconsPath/feed_search.svg';
+  static const String locationPinIcon = '$svgsPath/location_pin_map.svg';
   static const String feedLiveIcon = '$iconsPath/live-svgrepo-com.svg';
   static const String commentIcon = '$iconsPath/comment-3-svgrepo-com.svg';
   static const String shareArrowIcon = '$iconsPath/share-arrow-svgrepo-com.svg';
@@ -49,5 +50,6 @@ class AppAssets {
   static const String shareSmsIcon = '$iconsPath/share_sms.svg';
   static const String shareCopyLinkIcon = '$iconsPath/share_copy_link.svg';
   static const String shareMoreIcon = '$iconsPath/share_more.svg';
+  static const String repostIcon = '$iconsPath/repost_retweet.svg';
   static const String coinsStackIcon = '$iconsPath/coins_stack.svg';
 }

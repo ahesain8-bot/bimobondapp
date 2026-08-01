@@ -468,6 +468,9 @@ class AppRouter {
             initialFilterName: extra?['initialFilterName'] as String?,
             initialFilterCategory: CameraFilterCategory.values
                 .asNameMap()[extra?['initialFilterCategory'] as String?],
+            initialArFilterId: extra?['initialArFilterId'] as String?,
+            initialArColorCategoryId:
+                extra?['initialArColorCategoryId'] as String?,
           );
         },
       ),

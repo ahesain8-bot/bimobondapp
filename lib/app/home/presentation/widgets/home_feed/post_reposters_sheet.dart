@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_reposts_usecase.dart';
-import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
+import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
+    as posts_di;
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/liquid_glass_surface.dart';
@@ -291,10 +292,7 @@ class _ReposterCardSkeleton extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            LiquidGlassSkeletonBox.circular(
-              size: 36,
-              tone: skeletonTone,
-            ),
+            LiquidGlassSkeletonBox.circular(size: 36, tone: skeletonTone),
             const SizedBox(width: AppSizes.p10),
             Expanded(
               child: Column(
@@ -379,11 +377,7 @@ class _ReposterCard extends StatelessWidget {
                     ),
                     if (user.isVerified) ...[
                       const SizedBox(width: 4),
-                      Icon(
-                        Icons.verified,
-                        size: 14,
-                        color: cs.primary,
-                      ),
+                      Icon(Icons.verified, size: 14, color: cs.primary),
                     ],
                   ],
                 ),

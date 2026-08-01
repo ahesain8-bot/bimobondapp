@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/posts/data/models/repost_model.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_filter_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_sound_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_promotion_entity.dart';
@@ -46,6 +47,8 @@ class PostModel extends PostEntity {
     super.location,
     super.sound,
     super.filterName,
+    super.filterCategory,
+    super.filter,
   });
 
   static List<String> _parseHashtagNames(dynamic raw) {
@@ -264,12 +267,63 @@ class PostModel extends PostEntity {
   }
 
   static String? _parseFilterName(Map<String, dynamic> json) {
-    final raw =
-        json['filterName'] ?? json['filter_name'] ?? json['cameraFilter'];
+    final raw = json['filterName'] ??
+        json['filter_name'] ??
+        json['cameraFilter'] ??
+        (json['filter'] is Map
+            ? (json['filter'] as Map)['id'] ?? (json['filter'] as Map)['name']
+            : null);
     final name = raw?.toString().trim();
     if (name == null || name.isEmpty) return null;
     if (name == 'None' || name == 'Original') return null;
     return name;
+  }
+
+  static String? _parseFilterCategory(Map<String, dynamic> json) {
+    final raw = json['filterCategory'] ?? json['filter_category'];
+    final value = raw?.toString().trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  static PostFilterEntity? _parseFilter(Map<String, dynamic> json) {
+    if (json['filter'] is! Map) return null;
+    final filter = PostFilterEntity.fromJson(
+      Map<String, dynamic>.from(json['filter'] as Map),
+    );
+    if (filter.id.isEmpty && filter.name.isEmpty) return null;
+    return filter;
+  }
+
+  static PostLocationEntity? _parseLocation(Map<String, dynamic> json) {
+    if (json['location'] is Map) {
+      return PostLocationEntity.fromJson(
+        Map<String, dynamic>.from(json['location'] as Map),
+      );
+    }
+
+    final name = (json['locationName'] ?? json['placeName'])?.toString().trim();
+    final city = json['locationCity']?.toString().trim();
+    if ((name == null || name.isEmpty) && (city == null || city.isEmpty)) {
+      return null;
+    }
+
+    return PostLocationEntity(
+      id: json['locationId']?.toString() ?? '',
+      name: (name != null && name.isNotEmpty) ? name : (city ?? ''),
+      latitude: _toDouble(json['locationLatitude'] ?? json['latitude']) ?? 0,
+      longitude: _toDouble(json['locationLongitude'] ?? json['longitude']) ?? 0,
+      city: city,
+      countryCode: json['locationCountryCode']?.toString(),
+      address: json['locationAddress']?.toString(),
+      placeId: json['placeId']?.toString(),
+    );
+  }
+
+  static double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -320,13 +374,11 @@ class PostModel extends PostEntity {
               json['promotion'] as Map<String, dynamic>,
             )
           : null,
-      location: json['location'] is Map
-          ? PostLocationEntity.fromJson(
-              Map<String, dynamic>.from(json['location'] as Map),
-            )
-          : null,
+      location: _parseLocation(json),
       sound: _parseSound(json),
       filterName: _parseFilterName(json),
+      filterCategory: _parseFilterCategory(json),
+      filter: _parseFilter(json),
     );
   }
 
@@ -378,6 +430,8 @@ class PostModel extends PostEntity {
       location: location,
       sound: sound ?? this.sound,
       filterName: filterName,
+      filterCategory: filterCategory,
+      filter: filter,
     );
   }
 

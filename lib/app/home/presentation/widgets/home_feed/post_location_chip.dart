@@ -1,19 +1,19 @@
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// TikTok-style location pill on the feed overlay.
+/// TikTok Local feed location pill: dark capsule + green pin (no badge).
 class PostLocationChip extends StatelessWidget {
-  const PostLocationChip({
-    required this.location,
-    super.key,
-  });
+  const PostLocationChip({required this.location, super.key});
 
   final PostLocationEntity location;
 
+  static const Color _pinColor = Color(0xFF25D366);
+
   Future<void> _openMaps() async {
-    final label = Uri.encodeComponent(location.displayLabel);
+    final label = Uri.encodeComponent(location.feedDisplayLabel);
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1'
       '&query=${location.latitude},${location.longitude}($label)',
@@ -31,45 +31,42 @@ class PostLocationChip extends StatelessWidget {
       onTap: _openMaps,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
-        child: Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.28),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  LucideIcons.mapPin,
-                  size: 12,
-                  color: Colors.white.withValues(alpha: 0.95),
+        padding: const EdgeInsets.only(bottom: 5),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 260),
+          padding: const EdgeInsets.fromLTRB(3, 4, 9, 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                AppAssets.locationPinIcon,
+                width: 14,
+                height: 14,
+                colorFilter: const ColorFilter.mode(
+                  _pinColor,
+                  BlendMode.srcIn,
                 ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    location.displayLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      height: 1.1,
-                      shadows: [
-                        Shadow(color: Colors.black54, blurRadius: 4),
-                      ],
-                    ),
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  location.feedDisplayLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    height: 1.2,
+                    letterSpacing: -0.1,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

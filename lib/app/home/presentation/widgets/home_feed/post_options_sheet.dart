@@ -160,10 +160,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
 
     if (!mounted) return;
     if (sentCount > 0) {
-      await PostShareTracker.trackAndResolveLink(
-        widget.post,
-        channel: 'CHAT',
-      );
+      await PostShareTracker.trackAndResolveLink(widget.post, channel: 'CHAT');
     }
     if (!mounted) return;
     setState(() => _sending = false);
@@ -175,10 +172,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
   }
 
   Future<String> _trackedLink(String channel) {
-    return PostShareTracker.trackAndResolveLink(
-      widget.post,
-      channel: channel,
-    );
+    return PostShareTracker.trackAndResolveLink(widget.post, channel: channel);
   }
 
   List<_CircleAction> _buildAppActions(AppLocalizations l10n) {
@@ -187,8 +181,8 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         _CircleAction(
           label: widget.isReposted ? l10n.repostUndo : l10n.repostAction,
           background: const Color(0xFFFACC15),
-          icon: LucideIcons.repeat2,
-          iconColor: Colors.black87,
+          assetPath: AppAssets.repostIcon,
+          iconColor: Colors.white,
           onTap: () {
             Navigator.pop(context);
             widget.onRepost!();
@@ -214,14 +208,14 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           if (!mounted) return;
           await PostShareDestinations.copyLink(link);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.postLinkCopied)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.postLinkCopied)));
         },
       ),
       _CircleAction(
         label: l10n.postShareTelegram,
-        background: const Color(0xFF2AABEE),
+        background: const Color.fromARGB(255, 70, 182, 238),
         assetPath: AppAssets.shareTelegramIcon,
         onTap: () async {
           final link = await _trackedLink('EXTERNAL');
@@ -231,7 +225,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
       ),
       _CircleAction(
         label: l10n.postShareMessenger,
-        background: const Color(0xFF0084FF),
+        background: const Color.fromARGB(255, 190, 209, 248),
         assetPath: AppAssets.shareMessengerIcon,
         onTap: () async {
           final link = await _trackedLink('EXTERNAL');
@@ -378,10 +372,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
       height: 40,
       child: Row(
         children: [
-          SizedBox(
-            width: 40,
-            child: leading ?? const SizedBox.shrink(),
-          ),
+          SizedBox(width: 40, child: leading ?? const SizedBox.shrink()),
           Expanded(
             child: Text(
               l10n.postShareSendToTitle,
@@ -452,11 +443,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         child: Row(
           children: [
             const SizedBox(width: 12),
-            Icon(
-              LucideIcons.search,
-              size: 18,
-              color: cs.onSurfaceVariant,
-            ),
+            Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -844,10 +831,7 @@ class _SelectionRing extends StatelessWidget {
       return Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          color: sentColor,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: sentColor, shape: BoxShape.circle),
         alignment: Alignment.center,
         child: Icon(Icons.check, size: iconSize, color: cs.onTertiary),
       );
@@ -856,10 +840,7 @@ class _SelectionRing extends StatelessWidget {
       return Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          color: cs.primary,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
         alignment: Alignment.center,
         child: Icon(Icons.check, size: iconSize, color: cs.onPrimary),
       );
@@ -932,6 +913,12 @@ class _CircleActionButton extends StatelessWidget {
                       action.assetPath!,
                       width: 22,
                       height: 22,
+                      colorFilter: action.iconColor != null
+                          ? ColorFilter.mode(
+                              action.iconColor!,
+                              BlendMode.srcIn,
+                            )
+                          : null,
                     )
                   : Icon(
                       action.icon,
@@ -1014,10 +1001,7 @@ class _FriendShareAvatar extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: sent ? sentColor : cs.primary,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: badgeBorder,
-                            width: 1.5,
-                          ),
+                          border: Border.all(color: badgeBorder, width: 1.5),
                         ),
                         child: Icon(
                           Icons.check,
