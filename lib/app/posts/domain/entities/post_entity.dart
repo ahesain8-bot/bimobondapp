@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/posts/domain/entities/mention_ref_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_filter_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_promotion_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_sound_entity.dart';
@@ -40,6 +41,8 @@ class PostEntity extends Equatable {
   final PostLocationEntity? location;
   final PostSoundEntity? sound;
   final String? filterName;
+  final String? filterCategory;
+  final PostFilterEntity? filter;
 
   const PostEntity({
     required this.id,
@@ -75,7 +78,32 @@ class PostEntity extends Equatable {
     this.location,
     this.sound,
     this.filterName,
+    this.filterCategory,
+    this.filter,
   });
+
+  /// Filter id from nested [filter] or legacy [filterName].
+  String? get effectiveFilterId {
+    final nested = filter?.id.trim();
+    if (nested != null && nested.isNotEmpty) return nested;
+    final legacy = filterName?.trim();
+    if (legacy != null && legacy.isNotEmpty) return legacy;
+    return null;
+  }
+
+  /// Human-readable filter label from API when available.
+  String? get effectiveFilterLabel {
+    final nested = filter?.name.trim();
+    if (nested != null && nested.isNotEmpty) return nested;
+    return null;
+  }
+
+  bool get hasDisplayableFilter {
+    final id = effectiveFilterId;
+    if (id == null || id.isEmpty) return false;
+    final lower = id.toLowerCase();
+    return lower != 'original' && lower != 'none';
+  }
 
   PostEntity copyWith({
     int? commentCount,
@@ -124,6 +152,8 @@ class PostEntity extends Equatable {
       location: location,
       sound: sound ?? this.sound,
       filterName: filterName,
+      filterCategory: filterCategory,
+      filter: filter,
     );
   }
 
@@ -165,6 +195,8 @@ class PostEntity extends Equatable {
     location,
     sound,
     filterName,
+    filterCategory,
+    filter,
   ];
 }
 

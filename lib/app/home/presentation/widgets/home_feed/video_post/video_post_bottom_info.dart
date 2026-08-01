@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_caption_tags.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_filter_chip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_hashtag_chips.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_location_chip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_layout_constants.dart';
@@ -88,8 +89,6 @@ class VideoPostBottomInfo extends StatelessWidget {
                     feedItem: feedItem,
                     repostQuote: repostQuote,
                   ),
-                  if (post.location != null && post.location!.hasDisplayLabel)
-                    PostLocationChip(location: post.location!),
                   if (post.isPromoted || post.isAd) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -123,6 +122,14 @@ class VideoPostBottomInfo extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                   ],
+                  if (post.location != null && post.location!.hasDisplayLabel)
+                    PostLocationChip(location: post.location!),
+                  if (post.hasDisplayableFilter)
+                    PostFilterChip(
+                      filterId: post.effectiveFilterId!,
+                      filterLabel: post.effectiveFilterLabel,
+                      filterCategory: post.filterCategory,
+                    ),
                   if (hasDisplayName) ...[
                     GestureDetector(
                       onTap: () => _openAuthor(context),

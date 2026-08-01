@@ -103,7 +103,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
         return SearchApiTab.users;
       case SearchResultsTab.sounds:
         return SearchApiTab.sounds;
-      case SearchResultsTab.places:
+      case SearchResultsTab.hashtags:
         return SearchApiTab.hashtags;
       case SearchResultsTab.live:
         return null;
@@ -520,7 +520,7 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
     if (_resultsTab == SearchResultsTab.sounds) {
       return _buildSoundList(l10n, theme);
     }
-    if (_resultsTab == SearchResultsTab.places) {
+    if (_resultsTab == SearchResultsTab.hashtags) {
       return _buildHashtagList(l10n, theme);
     }
     return _comingSoon(l10n, theme);

@@ -7,11 +7,12 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_reposte
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/repost_entity.dart';
+import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 const _avatarRadius = 9.0;
 const _quoteAvatarRadius = 9.0;
@@ -479,10 +480,14 @@ class _RepostQuoteReplyCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        LucideIcons.repeat2,
-                        size: 11,
-                        color: colors.icon,
+                      SvgPicture.asset(
+                        AppAssets.repostIcon,
+                        width: 11,
+                        height: 11,
+                        colorFilter: ColorFilter.mode(
+                          colors.icon,
+                          BlendMode.srcIn,
+                        ),
                       ),
                       const SizedBox(width: 4),
                       Flexible(
@@ -649,11 +654,14 @@ class _RepostWhiteCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(
-              LucideIcons.repeat2,
-              size: 20,
-              color: Colors.white,
-              shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+            SvgPicture.asset(
+              AppAssets.repostIcon,
+              width: 20,
+              height: 20,
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
             ),
           ],
         ),

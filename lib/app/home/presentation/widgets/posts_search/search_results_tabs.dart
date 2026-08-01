@@ -2,7 +2,7 @@ import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
-enum SearchResultsTab { top, users, videos, live, sounds, places }
+enum SearchResultsTab { top, users, videos, live, sounds, hashtags }
 
 /// TikTok-style result filter tabs under the search field.
 class SearchResultsTabs extends StatelessWidget {
@@ -28,7 +28,7 @@ class SearchResultsTabs extends StatelessWidget {
       (SearchResultsTab.videos, l10n.searchTabVideos),
       (SearchResultsTab.live, l10n.searchTabLive),
       (SearchResultsTab.sounds, l10n.searchTabSounds),
-      (SearchResultsTab.places, l10n.searchTabPlaces),
+      (SearchResultsTab.hashtags, l10n.hashtagsLabel),
     ];
 
     return SizedBox(

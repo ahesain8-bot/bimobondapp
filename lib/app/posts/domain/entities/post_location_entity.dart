@@ -21,7 +21,7 @@ class PostLocationEntity extends Equatable {
   final String? address;
   final String? placeId;
 
-  /// TikTok-style place label (city / name).
+  /// Short label for maps, chat, and composer chips.
   String get displayLabel {
     final cityName = city?.trim() ?? '';
     final placeName = name.trim();
@@ -36,7 +36,22 @@ class PostLocationEntity extends Equatable {
     return code;
   }
 
-  bool get hasDisplayLabel => displayLabel.isNotEmpty;
+  /// TikTok Local feed style: "Caffé · New York".
+  String get feedDisplayLabel {
+    final cityName = city?.trim() ?? '';
+    final placeName = name.trim();
+    if (placeName.isNotEmpty &&
+        cityName.isNotEmpty &&
+        placeName.toLowerCase() != cityName.toLowerCase()) {
+      return '$placeName · $cityName';
+    }
+    if (placeName.isNotEmpty) return placeName;
+    if (cityName.isNotEmpty) return cityName;
+    final code = countryCode?.trim() ?? '';
+    return code;
+  }
+
+  bool get hasDisplayLabel => feedDisplayLabel.isNotEmpty;
 
   factory PostLocationEntity.fromJson(Map<String, dynamic> json) {
     return PostLocationEntity(

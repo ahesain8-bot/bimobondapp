@@ -55,6 +55,8 @@ class AddPostCameraScreen extends StatefulWidget {
     this.returnMediaOnDone = false,
     this.initialFilterName,
     this.initialFilterCategory,
+    this.initialArFilterId,
+    this.initialArColorCategoryId,
   });
 
   final bool isStory;
@@ -65,6 +67,8 @@ class AddPostCameraScreen extends StatefulWidget {
   final bool returnMediaOnDone;
   final String? initialFilterName;
   final CameraFilterCategory? initialFilterCategory;
+  final String? initialArFilterId;
+  final String? initialArColorCategoryId;
 
   @override
   State<AddPostCameraScreen> createState() => _AddPostCameraScreenState();
@@ -273,7 +277,38 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           _arColorCategoryId = arCategories.first.id;
         }
       }
+      _applyInitialArFilterIfNeeded();
     });
+  }
+
+  void _applyInitialArFilterIfNeeded() {
+    final id = widget.initialArFilterId?.trim();
+    if (id == null || id.isEmpty || id == 'none') return;
+    if (!_useNativeArFilters) return;
+    if (!ArFilterCatalog.items.any((item) => item.id == id)) return;
+
+    setState(() {
+      _arFilterIndex = ArFilterCatalog.indexOfId(id);
+      final categoryId = widget.initialArColorCategoryId?.trim();
+      if (categoryId != null && categoryId.isNotEmpty) {
+        _arColorCategoryId = categoryId;
+      } else if (ArFilterCatalog.isColorFilter(id)) {
+        for (final category in ArFilterCatalog.colorCategories) {
+          if (category.filterIds.contains(id)) {
+            _arColorCategoryId = category.id;
+            break;
+          }
+        }
+      }
+      if (ArFilterCatalog.isColorFilter(id)) {
+        _arFilterIntensity = 0.50;
+      }
+      _showFilters = true;
+    });
+    _applyArFilter(
+      id,
+      intensity: ArFilterCatalog.isColorFilter(id) ? _arFilterIntensity : 1.0,
+    );
   }
 
   @override
