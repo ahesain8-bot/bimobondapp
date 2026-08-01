@@ -127,6 +127,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var smoothedSmooth = LiveBeautyState.adjustments.smooth
     private var smoothedWhiten = LiveBeautyState.adjustments.whiten
     private var smoothedBrighten = LiveBeautyState.adjustments.brighten
+    /** Heavily smoothed scene darkness — brightness must not pump on hand move. */
+    private var smoothedLowLight = 0.35f
+    /** Smoothed close-up for denoise only (not brightness). */
+    private var smoothedCloseUpBoost = 0f
+    /** One-shot log confirming live OES path is running grain clean. */
+    private var oesDenoiseLogged = false
 
     private var oesUSmoothStrength = 0
     private var oesUWhiten = 0
@@ -138,7 +144,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUTexelStep = 0
     private var oesUHistory = 0
     private var oesUHistoryValid = 0
+    private var oesUHistory2 = 0
+    private var oesUHistory2Valid = 0
     private var oesUTemporalStrength = 0
+    private var oesUSceneDenoise = 0
+    private var oesUCloseUpBoost = 0
     private var oesUWideZoom = 0
     private var oesUSkinMask = 0
     private var oesUSkinMaskValid = 0
@@ -187,6 +197,48 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     fun setWarpParams(params: FaceWarpParams) {
         warpParams = params
+    }
+
+    /**
+     * Replaces the camera OES producer after Android destroys/recreates the
+     * Activity surfaces while backgrounded. Reusing the old SurfaceTexture can
+     * bind successfully in CameraX but never deliver another GL frame.
+     * Must run on the GL thread.
+     */
+    fun recreateCameraSurfaceTexture() {
+        try {
+            cameraSurfaceTexture?.release()
+        } catch (_: Throwable) {
+        }
+        cameraSurfaceTexture = null
+        if (oesTextureId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(oesTextureId), 0)
+        }
+
+        val texture = IntArray(1)
+        GLES20.glGenTextures(1, texture, 0)
+        oesTextureId = texture[0]
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR,
+        )
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE,
+        )
+        GLES20.glTexParameteri(
+            GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE,
+        )
+
+        oesUpdateFailures = 0
+        texMatrixReady = false
+        historyValid = false
+        history2Valid = false
+        val st = SurfaceTexture(oesTextureId)
+        cameraSurfaceTexture = st
+        onCameraSurfaceReady?.invoke(st)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -294,7 +346,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         oesUTexelStep = GLES20.glGetUniformLocation(oesProgram, "uTexelStep")
         oesUHistory = GLES20.glGetUniformLocation(oesProgram, "uHistory")
         oesUHistoryValid = GLES20.glGetUniformLocation(oesProgram, "uHistoryValid")
+        oesUHistory2 = GLES20.glGetUniformLocation(oesProgram, "uHistory2")
+        oesUHistory2Valid = GLES20.glGetUniformLocation(oesProgram, "uHistory2Valid")
         oesUTemporalStrength = GLES20.glGetUniformLocation(oesProgram, "uTemporalStrength")
+        oesUSceneDenoise = GLES20.glGetUniformLocation(oesProgram, "uSceneDenoise")
+        oesUCloseUpBoost = GLES20.glGetUniformLocation(oesProgram, "uCloseUpBoost")
         oesUWideZoom = GLES20.glGetUniformLocation(oesProgram, "uWideZoom")
         oesUSkinMask = GLES20.glGetUniformLocation(oesProgram, "uSkinMask")
         oesUSkinMaskValid = GLES20.glGetUniformLocation(oesProgram, "uSkinMaskValid")
@@ -340,9 +396,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             oesUpdateFailures = 0
             uploadPendingSkinMask()
             drawOes()
-            // Copy the just-drawn screen into history — same pixels as a second
-            // drawOes() into an FBO, without re-running the heavy beauty shader.
-            writeHistoryFrame()
+            // Measure live noise from the frame that was just drawn.
+            sampleNoiseFloor()
+            // Temporal history disabled (face ghosts). Skip copy to save GPU.
 
             presentToEncoder { drawOes() }
             if (captureEnabled) captureFrontBuffer { drawOes() }
@@ -419,6 +475,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     private fun drawOes() {
         if (oesProgram == 0 || oesTextureId == 0) return
+        // Face size jumped (pull-back / lean-in) — drop temporal history so the
+        // previous face silhouette cannot ghost into the new framing.
+        if (pendingHistoryInvalidate) {
+            pendingHistoryInvalidate = false
+            historyValid = false
+            history2Valid = false
+        }
         GLES20.glUseProgram(oesProgram)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -469,42 +532,57 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // brightness is changing underneath it. See [sceneAdaptedTargets] and
         // [easeToward]. Large intentional jumps (e.g. Magic Off→On) snap so the
         // toggle is visible immediately instead of easing over many frames.
-        val lowLight = lowLightWeight()
+        val lowLightRaw = lowLightWeight()
+        // Brightness / beauty strength follow a slow scene average so waving the
+        // phone does not re-expose the face every frame.
+        smoothedLowLight =
+            smoothedLowLight + (lowLightRaw - smoothedLowLight) * SCENE_BRIGHTNESS_EASE
+        val lowLight = smoothedLowLight
         val magic = LiveBeautyState.magicOn
         val magicStrength = LiveBeautyState.magicStrength
+        // Far framing: face is small, so the same frame-fraction blur covers most
+        // of it and reads as weird soft/wax. Scale smooth with face size.
+        val distScale = faceDistanceScale()
         val targetSmooth = if (magic) {
-            LiveBeautyAdjustments.smoothFromStrength(magicStrength)
+            LiveBeautyAdjustments.smoothFromStrength(magicStrength) * distScale
         } else {
-            adaptedSmooth(beauty, lowLight)
+            adaptedSmooth(beauty, lowLight) * distScale
         }
-        if (kotlin.math.abs(targetSmooth - smoothedSmooth) > 0.08f) {
+        // Snap DOWN immediately when pulling away — easing left a soft trail.
+        if (targetSmooth < smoothedSmooth - 0.03f ||
+            kotlin.math.abs(targetSmooth - smoothedSmooth) > 0.08f
+        ) {
             smoothedSmooth = targetSmooth
         } else {
             smoothedSmooth = easeToward(smoothedSmooth, targetSmooth)
         }
         val targetWhiten = adaptedWhiten(LiveBeautyState.effectiveWhiten(), lowLight)
         smoothedWhiten = easeToward(smoothedWhiten, targetWhiten)
-        smoothedBrighten =
-            easeToward(smoothedBrighten, adaptedBrighten(beauty, lowLight))
+        // Brightness eases slower than smooth — kills the "hand move = new look".
+        smoothedBrighten = easeTowardSlow(
+            smoothedBrighten,
+            adaptedBrighten(beauty, lowLight),
+        )
         val targetSharpen = if (magic) {
             LiveBeautyAdjustments.MAGIC_DEFAULT_SHARPEN * (1f - lowLight * 0.65f)
         } else {
             adaptedSharpen(lowLight)
         }
         smoothedSharpen = easeToward(smoothedSharpen, targetSharpen)
-        smoothedAutoLift = easeToward(smoothedAutoLift, autoLiftTarget())
+        val autoLiftTarget = autoLiftTarget()
+        smoothedAutoLift = easeTowardSlow(smoothedAutoLift, autoLiftTarget)
+        logExposureDebug(autoLiftTarget, lowLight)
         GLES20.glUniform1f(oesUSmoothStrength, smoothedSmooth)
         GLES20.glUniform1f(oesUWhiten, smoothedWhiten)
         GLES20.glUniform1f(oesUSkinLuma, measuredSkinLuma)
         GLES20.glUniform1f(oesUSharpen, smoothedSharpen)
-        // Slightly higher noise floor under Magic so speckles count as grain
-        // (cut cleanly) instead of surviving as texture on plastic skin.
+        // Driven by live corner-patch measurement instead of a fixed constant.
         GLES20.glUniform1f(
             oesUNoiseFloor,
-            noiseFloorFor(lowLight) * if (magic) 1.80f else 1.25f,
+            measuredNoiseFloor * if (magic) 1.80f else 1.25f,
         )
-        GLES20.glUniform1f(oesUAutoLift, smoothedAutoLift)
-        GLES20.glUniform1f(oesUBrighten, smoothedBrighten)
+        GLES20.glUniform1f(oesUAutoLift, smoothedAutoLift * rearBrightnessScale())
+        GLES20.glUniform1f(oesUBrighten, smoothedBrighten * rearBrightnessScale())
         // Deliberately weaker than the smoothing it rides on: this pass flattens
         // toward a wide blur wherever it acts, so at parity it overwhelms the
         // band split that is doing the careful work. Magic On raises blemish so
@@ -519,19 +597,42 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         )
         GLES20.glUniform1f(
             oesUWideZoom,
-            if (ArCameraBridge.isFrontCamera) FRONT_WIDE_ZOOM_OUT else 1f,
+            if (ArCameraBridge.isFrontCamera) FRONT_WIDE_ZOOM_OUT else BACK_WIDE_ZOOM_OUT,
         )
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, historyTexId[historyReadIndex])
         GLES20.glUniform1i(oesUHistory, 1)
-        GLES20.glUniform1f(oesUHistoryValid, if (historyValid) 1f else 0f)
-        // Motion-gated temporal averaging removes grain in normal preview.
-        // Magic keeps it off because frame blending softens moving face detail.
-        GLES20.glUniform1f(
-            oesUTemporalStrength,
-            if (magic) MAGIC_TEMPORAL_STRENGTH else TEMPORAL_STRENGTH,
+        // Temporal frame-blend OFF — it left face/halo ghosts on pull-back and
+        // head move. Grain cleanup stays on spatial sceneGrainClean + close-up boost.
+        GLES20.glUniform1f(oesUHistoryValid, 0f)
+        val hist2Index = 1 - historyReadIndex
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE3)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, historyTexId[hist2Index])
+        GLES20.glUniform1i(oesUHistory2, 3)
+        GLES20.glUniform1f(oesUHistory2Valid, 0f)
+        GLES20.glUniform1f(oesUTemporalStrength, 0f)
+        smoothedCloseUpBoost = easeTowardSlow(
+            smoothedCloseUpBoost,
+            closeUpDenoiseBoost(),
         )
+        val closeUpBoost = smoothedCloseUpBoost
+        // Spatial grain clean: when far, dial down so cleanup does not read as
+        // face blur on a small head (same frame-fraction taps).
+        val denoiseDrive =
+            ((lowLight * 0.35f + closeUpBoost * 0.55f + 0.32f) * mix(0.35f, 1f, distScale))
+                .coerceIn(0f, 1f)
+        GLES20.glUniform1f(oesUSceneDenoise, denoiseDrive)
+        GLES20.glUniform1f(oesUCloseUpBoost, closeUpBoost)
+        if (!oesDenoiseLogged) {
+            oesDenoiseLogged = true
+            Log.i(
+                TAG,
+                "OES grain clean active oesEnabled=$oesEnabled " +
+                    "denoiseDrive=${"%.2f".format(denoiseDrive)} " +
+                    "noiseFloorBright=$NOISE_FLOOR_BRIGHT",
+            )
+        }
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE2)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, skinMaskTexId)
@@ -639,6 +740,22 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     /** Consecutive [android.graphics.SurfaceTexture.updateTexImage] failures. */
     private var oesUpdateFailures = 0
 
+    /**
+     * Live-measured noise floor, replacing the fixed NOISE_FLOOR_BRIGHT/DARK
+     * constants. Estimated from a background patch of the actual frame, so it
+     * adapts to whatever sensor/lighting this specific device+scene has,
+     * instead of assuming the same amplitude for every phone.
+     */
+    @Volatile
+    private var measuredNoiseFloor = NOISE_FLOOR_BRIGHT
+
+    private var noiseSampleCounter = 0
+    private var noiseReadBuf: ByteBuffer? = null
+
+    /** Sample roughly every N frames — no need to measure every frame. */
+    private val NOISE_SAMPLE_EVERY = 10
+    private val NOISE_PATCH = 24 // patch size in pixels (NOISE_PATCH x NOISE_PATCH)
+
     private var glErrorProbeCounter = 0
 
     /**
@@ -668,6 +785,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         (beauty.smooth * (1f + lowLight * 0.20f)).coerceIn(0f, 1f)
 
     /**
+     * How large the face is in frame (0 = far/tiny, 1 = close).
+     * Far must be ~0 so beauty smooth does not wax a small face.
+     */
+    private fun faceDistanceScale(): Float {
+        // Typical mid selfie ~0.20–0.35 fill; arm's length often ~0.10–0.18.
+        return smoothstep(0.18f, 0.40f, measuredFaceFill)
+    }
+
+    private fun mix(a: Float, b: Float, t: Float): Float = a + (b - a) * t.coerceIn(0f, 1f)
+
+    /**
      * Whitening an underexposed face lifts its noise along with it, so this eases
      * off in the dark rather than fighting the grain.
      */
@@ -675,7 +803,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         (amount * (1f - lowLight * 0.30f)).coerceIn(0f, 1f)
 
     private fun adaptedBrighten(beauty: LiveBeautyAdjustments, lowLight: Float): Float =
-        (beauty.brighten * (1f + lowLight * 0.25f)).coerceIn(0f, 1f)
+        (beauty.brighten * (1f + lowLight * 0.20f)).coerceIn(0f, 1f)
+
+    /**
+     * Back camera: don't add beauty brightness on top of the sensor — let the
+     * real room light (including warm/yellow) show through.
+     */
+    private fun rearBrightnessScale(): Float =
+        if (ArCameraBridge.isFrontCamera) 1f else 0.25f
 
     private fun adaptedSharpen(lowLight: Float): Float =
         (SHARPEN_STRENGTH * (1f - lowLight * 0.65f)).coerceAtLeast(0f)
@@ -727,8 +862,104 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         return deficit.coerceIn(0f, AUTO_LIFT_MAX)
     }
 
+    private var exposureDebugCounter = 0
+
+    /** Throttled log while moving the phone — filter logcat: FaceWarpExposure */
+    private fun logExposureDebug(autoLiftTarget: Float, lowLight: Float) {
+        exposureDebugCounter++
+        if (exposureDebugCounter % 12 != 0) return
+        val backlight = (measuredSceneLuma - measuredSkinLuma).coerceIn(-1f, 1f)
+        val applied = smoothedAutoLift * rearBrightnessScale()
+        Log.i(
+            "FaceWarpExposure",
+            "front=${ArCameraBridge.isFrontCamera} " +
+                "skin=${"%.3f".format(measuredSkinLuma)} " +
+                "scene=${"%.3f".format(measuredSceneLuma)} " +
+                "backlight=${"%.3f".format(backlight)} " +
+                "faceFill=${"%.3f".format(measuredFaceFill)} " +
+                "liftTarget=${"%.3f".format(autoLiftTarget)} " +
+                "liftSmooth=${"%.3f".format(smoothedAutoLift)} " +
+                "liftApplied=${"%.3f".format(applied)} " +
+                "brighten=${"%.3f".format(smoothedBrighten * rearBrightnessScale())} " +
+                "lowLight=${"%.3f".format(lowLight)}",
+        )
+    }
+
     private fun noiseFloorFor(lowLight: Float): Float =
         NOISE_FLOOR_BRIGHT + (NOISE_FLOOR_DARK - NOISE_FLOOR_BRIGHT) * lowLight
+
+    /**
+     * Reads a small patch from a screen corner (background, away from the
+     * face) every few frames and measures its pixel-to-pixel luma variance.
+     *
+     * In a flat background region, pixel-to-pixel jitter is almost entirely
+     * sensor grain rather than real detail, so this is a cheap, robust proxy
+     * for "how noisy is this camera/scene right now" — measured live instead
+     * of guessed as a fixed constant.
+     */
+    private fun sampleNoiseFloor() {
+        noiseSampleCounter++
+        if (noiseSampleCounter % NOISE_SAMPLE_EVERY != 0) return
+
+        val vp = oesViewport
+        val w = vp[2]
+        val h = vp[3]
+        if (w < NOISE_PATCH * 2 || h < NOISE_PATCH * 2) return
+
+        // Bottom-left corner — usually background, away from the face.
+        val x = vp[0] + 4
+        val y = vp[1] + h - NOISE_PATCH - 4
+
+        val bytes = NOISE_PATCH * NOISE_PATCH * 4
+        var buf = noiseReadBuf
+        if (buf == null || buf.capacity() < bytes) {
+            buf = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder())
+            noiseReadBuf = buf
+        }
+        buf!!.clear()
+        GLES20.glReadPixels(
+            x, y, NOISE_PATCH, NOISE_PATCH,
+            GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf,
+        )
+        buf.rewind()
+
+        // Convert each pixel to luma, then take the mean absolute difference
+        // between horizontal neighbours — a cheap, classic noise-sigma proxy
+        // (similar in spirit to MAD-based noise estimators).
+        val luma = FloatArray(NOISE_PATCH * NOISE_PATCH)
+        for (i in luma.indices) {
+            val base = i * 4
+            val r = (buf.get(base).toInt() and 0xFF)
+            val g = (buf.get(base + 1).toInt() and 0xFF)
+            val b = (buf.get(base + 2).toInt() and 0xFF)
+            luma[i] = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+        }
+
+        var diffSum = 0f
+        var count = 0
+        for (row in 0 until NOISE_PATCH) {
+            for (col in 0 until NOISE_PATCH - 1) {
+                val i = row * NOISE_PATCH + col
+                diffSum += kotlin.math.abs(luma[i] - luma[i + 1])
+                count++
+            }
+        }
+        if (count == 0) return
+
+        val meanDiff = diffSum / count
+        // Scale the raw mean-diff into a noise-floor-like amplitude and clamp
+        // it to a sane range, so a patch that happens to contain real detail
+        // (not flat background) can't blow this estimate out of proportion.
+        val estimate =
+            (meanDiff * 0.75f).coerceIn(NOISE_FLOOR_BRIGHT, NOISE_FLOOR_DARK * 1.5f)
+
+        // Heavily smoothed toward the new estimate — this value drives a
+        // shader uniform every frame, so it must not jump or the cleanup
+        // strength would visibly flicker.
+        measuredNoiseFloor =
+            measuredNoiseFloor + (estimate - measuredNoiseFloor) * 0.08f
+        Log.d(TAG, "measuredNoiseFloor=$measuredNoiseFloor")
+    }
 
     /** Same curve as GLSL smoothstep, for the strength maths above. */
     private fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
@@ -745,6 +976,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private fun easeToward(current: Float, target: Float): Float {
         val next = current + (target - current) * BEAUTY_EASE
         return if (kotlin.math.abs(target - next) < 0.002f) target else next
+    }
+
+    /** Open exposure fast; close slowly — avoids dark straight-on + pump. */
+    private fun easeTowardSlow(current: Float, target: Float): Float {
+        val rate = if (target > current) BRIGHTNESS_EASE_UP else BRIGHTNESS_EASE_DOWN
+        val next = current + (target - current) * rate
+        return if (kotlin.math.abs(target - next) < 0.0015f) target else next
     }
 
     private fun probeGlError(where: String) {
@@ -967,6 +1205,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
      */
     fun resetTransientFrameState() {
         historyValid = false
+        history2Valid = false
+        pendingHistoryInvalidate = false
+        prevFaceFillSample = -1f
+        oesDenoiseLogged = false
         oesUpdateFailures = 0
         texMatrixReady = false
         clearLastCapturedFrame()
@@ -1004,6 +1246,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var historyH = 0
     private var historyReadIndex = 0
     private var historyValid = false
+    /** True once two frames have been written — enables 2-frame temporal. */
+    private var history2Valid = false
     private val historyRestoreViewport = IntArray(4)
 
     // Skin mask (landmark-rasterized, see ArCameraController.buildFaceSkinMaskBitmap)
@@ -1038,6 +1282,24 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     private var measuredSceneLuma = 0.35f
 
+    /**
+     * Face oval area / frame area from MediaPipe. Rises when the user leans in;
+     * used to boost denoise so magnified sensor grain stays down (TikTok-like).
+     */
+    @Volatile
+    private var measuredFaceFill = 0f
+
+    /** Previous fill sample — pull-back detection for ghost-free temporal. */
+    @Volatile
+    private var prevFaceFillSample = -1f
+
+    /**
+     * Set from analysis thread when face size jumps (lean-in / pull-back).
+     * Consumed on the GL thread to drop history so temporal cannot trail.
+     */
+    @Volatile
+    private var pendingHistoryInvalidate = false
+
     fun updateSceneLuma(luma: Float) {
         if (luma.isNaN() || luma < 0f) return
         measuredSceneLuma = luma.coerceIn(0f, 1f)
@@ -1046,6 +1308,36 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     fun updateSkinTone(luma: Float) {
         if (luma.isNaN() || luma <= 0f) return
         measuredSkinLuma = luma.coerceIn(0.02f, 1f)
+    }
+
+    fun updateFaceFill(fill: Float) {
+        if (fill.isNaN() || fill < 0f) return
+        val f = fill.coerceIn(0f, 1f)
+        val prev = prevFaceFillSample
+        if (prev >= 0f) {
+            val shrink = prev - f
+            val jump = kotlin.math.abs(f - prev)
+            // Pull camera away (face shrinks) or sudden zoom jump → clear
+            // temporal history so the face/halo cannot ghost.
+            if (shrink > 0.018f || jump > 0.055f) {
+                pendingHistoryInvalidate = true
+            }
+        }
+        prevFaceFillSample = f
+        measuredFaceFill = f
+    }
+
+    /**
+     * Extra denoise when face is close and/or bright (lean-in / toward light).
+     * Close-up magnifies grain; bright-face AE often underexposes fabric → grain.
+     */
+    private fun closeUpDenoiseBoost(): Float {
+        val closeUp = smoothstep(0.10f, 0.32f, measuredFaceFill)
+        val brightFace = smoothstep(0.48f, 0.70f, measuredSkinLuma)
+        val skinVsScene =
+            (measuredSkinLuma - measuredSceneLuma).coerceIn(-0.2f, 0.55f)
+        val aeTrap = smoothstep(0.08f, 0.28f, skinVsScene)
+        return maxOf(closeUp, brightFace * 0.75f, aeTrap).coerceIn(0f, 1f)
     }
 
     fun updateSkinMask(bitmap: Bitmap) {
@@ -1448,6 +1740,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         historyH = h
         historyReadIndex = 0
         historyValid = false
+        history2Valid = false
     }
 
     private fun releaseHistoryBuffers() {
@@ -1464,6 +1757,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         historyW = 0
         historyH = 0
         historyValid = false
+        history2Valid = false
     }
 
     /**
@@ -1471,6 +1765,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
      * flips it to become next frame's "read" slot. Same exponential temporal
      * blend as re-drawing into an FBO (the screen buffer already IS that blend),
      * but without a second full beauty-shader pass every frame.
+     * After two writes the older slot is frame N-2 for dual-tap temporal.
      */
     private fun writeHistoryFrame() {
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, historyRestoreViewport, 0)
@@ -1483,6 +1778,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         val writeIndex = 1 - historyReadIndex
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, historyTexId[writeIndex])
         GLES20.glCopyTexSubImage2D(GLES20.GL_TEXTURE_2D, 0, 0, 0, x, y, w, h)
+        if (historyValid) history2Valid = true
         historyReadIndex = writeIndex
         historyValid = true
     }
@@ -1747,14 +2043,32 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         locToothRegion: Int,
     ) {
         val adj = LiveRetouchState.adjustments
-        if (locSaturation >= 0) GLES20.glUniform1f(locSaturation, adj.saturation)
-        if (locBrightness >= 0) GLES20.glUniform1f(locBrightness, adj.brightness)
-        if (locContrast >= 0) GLES20.glUniform1f(locContrast, adj.contrast)
-        if (locExposure >= 0) GLES20.glUniform1f(locExposure, adj.exposure)
-        if (locWhiteBalance >= 0) GLES20.glUniform1f(locWhiteBalance, adj.whiteBalance)
-        if (locHighlights >= 0) GLES20.glUniform1f(locHighlights, adj.highlights)
-        if (locShadows >= 0) GLES20.glUniform1f(locShadows, adj.shadows)
-        if (locNose >= 0) GLES20.glUniform1f(locNose, adj.nose)
+        // Live color baseline is back-camera only. On front with Magic Off,
+        // suppress that exact baseline so selfies stay natural; Magic On and
+        // non-baseline grades (filters / manual sliders) still apply.
+        val color = if (
+            ArCameraBridge.isFrontCamera &&
+            !LiveBeautyState.magicOn &&
+            adj.matchesLiveBaselineColors()
+        ) {
+            LiveRetouchAdjustments.neutral().copy(
+                nose = adj.nose,
+                shape = adj.shape,
+                eyes = adj.eyes,
+                tooth = adj.tooth,
+                mouth = adj.mouth,
+            )
+        } else {
+            adj
+        }
+        if (locSaturation >= 0) GLES20.glUniform1f(locSaturation, color.saturation)
+        if (locBrightness >= 0) GLES20.glUniform1f(locBrightness, color.brightness)
+        if (locContrast >= 0) GLES20.glUniform1f(locContrast, color.contrast)
+        if (locExposure >= 0) GLES20.glUniform1f(locExposure, color.exposure)
+        if (locWhiteBalance >= 0) GLES20.glUniform1f(locWhiteBalance, color.whiteBalance)
+        if (locHighlights >= 0) GLES20.glUniform1f(locHighlights, color.highlights)
+        if (locShadows >= 0) GLES20.glUniform1f(locShadows, color.shadows)
+        if (locNose >= 0) GLES20.glUniform1f(locNose, color.nose)
         if (locWingL >= 0) {
             GLES20.glUniform2fv(locWingL, 1, LiveRetouchState.noseWingL, 0)
         }
@@ -1812,10 +2126,16 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
          * preset should be dialling independently. If presets ever need their own
          * value it belongs in LiveBeautyAdjustments alongside the rest.
          */
-        private const val SHARPEN_STRENGTH = 0.20f
+        private const val SHARPEN_STRENGTH = 0.0f
 
         /** Per-frame easing fraction for beauty strengths — see [easeToward]. */
         private const val BEAUTY_EASE = 0.18f
+        /**
+         * Exposure ease: open fast for backlight, close slowly to avoid pump.
+         */
+        private const val BRIGHTNESS_EASE_UP = 0.20f
+        private const val BRIGHTNESS_EASE_DOWN = 0.04f
+        private const val SCENE_BRIGHTNESS_EASE = 0.035f
 
         /**
          * Frame luminance at or below which the scene counts as fully dark, and
@@ -1833,10 +2153,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         private const val SKIN_MASK_GRACE_MS = 2_500L
 
         /** Blemish strength as a fraction of the smoothing strength. */
-        /**
-         * Ceiling on the face-driven exposure lift. High enough to open a dim
-         * selfie toward TikTok brightness, capped so dark AE HALs do not blow out.
-         */
+        /** Ceiling on the face-driven exposure lift. */
         private const val AUTO_LIFT_MAX = 0.35f
 
         private const val BLEMISH_OF_SMOOTH = 0.28f
@@ -1844,10 +2161,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         private const val NOISE_FLOOR_BRIGHT = 0.008f
         private const val NOISE_FLOOR_DARK = 0.032f
 
-        /**
-         * Reference skin luminance for a light face auto-lift — not a forced
-         * "beauty bright" look.
-         */
+        /** Target skin luminance for auto-lift. */
         const val SKIN_LUMA_TARGET = 0.58f
 
         private const val TAG = "FaceWarpRenderer"
@@ -1865,17 +2179,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         /**
          * Live-preview temporal denoise ceiling (0..1), OES path only — Stage 3.
-         * Gated per-pixel in-shader by frame-to-frame color similarity (see
-         * [OES_FRAGMENT_SHADER]'s temporal blend in main()), so static areas (most
-         * of a static face) blend toward the accumulated history and average out
-         * grain, while motion keeps this near zero to avoid ghosting/trails.
-         * Kept light so denoise does not stack with skin smooth into a plastic look.
+         * Actual strength is scaled by scene brightness in drawOes(); the shader
+         * then motion-gates per pixel (static → clean grain, moving → keep sharp).
          */
-        private const val TEMPORAL_STRENGTH = 0.52f
-        // Magic smooth has its own spatial noise cleanup, so temporal blending is
-        // held well below the plain value — enough to keep grain off a still face
-        // without softening detail once it moves.
-        private const val MAGIC_TEMPORAL_STRENGTH = 0.20f
+        private const val TEMPORAL_STRENGTH = 0.48f
+        // Below plain temporal so Magic spatial cleanup + frames do not wax the face.
+        private const val MAGIC_TEMPORAL_STRENGTH = 0.22f
 
         /**
          * Front camera only — how far to ease from FILL_CENTER toward FIT_CENTER
@@ -1884,6 +2193,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
          * streak bars, no vertical stretch from single-axis crop hacks).
          */
         private const val FRONT_WIDE_ZOOM_OUT = 2.0f
+
+        /** Back camera — TikTok-like wide (near full FIT_CENTER). */
+        private const val BACK_WIDE_ZOOM_OUT = 2.0f
 
         private val QUAD_VERTICES = floatArrayOf(
             -1f, -1f, 0f, 1f,
@@ -1946,6 +2258,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return cbW * crW * yW;
             }
 
+            // Brightness is a skin tone curve, not a white RGB layer. Luminance
+            // changes preserve pores/shading; a tiny warm-chroma reduction makes
+            // positive brightness look fresh rather than yellow or washed out.
+            //
             // Brightness is a skin tone curve, not a white RGB layer. Luminance
             // changes preserve pores/shading; a tiny warm-chroma reduction makes
             // positive brightness look fresh rather than yellow or washed out.
@@ -2224,12 +2540,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // gamma, so it opens shadows and midtones far more than highlights.
             const float AUTO_LIFT_GAMMA = 0.55;
 
-            // Mild cool to cut indoor yellow/warm cast. Mostly on skin so walls
-            // stay natural; tiny global so the whole frame is not creamy.
+            // Front selfie polish.
             const float BASE_LIFT = 0.12;
             const float BASE_CONTRAST = 0.05;
-            const float BASE_COOL = 0.08;
-            const float SKIN_COOL = 0.14;
             // Sharpen radius as a fraction of frame height — see detailAt.
             const float SHARPEN_RADIUS_FRAC = 0.0012;
 
@@ -2277,7 +2590,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uBlemish;
             uniform sampler2D uHistory;
             uniform float uHistoryValid;
+            uniform sampler2D uHistory2;
+            uniform float uHistory2Valid;
             uniform float uTemporalStrength;
+            // 0 = bright scene, 1 = dark — scales spatial grain cleanup.
+            // Also raised on close-up / bright-face (see uCloseUpBoost).
+            uniform float uSceneDenoise;
+            uniform float uCloseUpBoost;
             uniform float uWideZoom;
             uniform sampler2D uSkinMask;
             uniform float uSkinMaskValid;
@@ -2360,6 +2679,79 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return uTexelStep * (frac / max(uTexelStep.y, 0.00001));
             }
 
+            // Scene grain clean: strength is driven mostly by LOCAL darkness
+            // (black shirt / hair / shadow), not only whole-room brightness.
+            // A lit face in a bright room still leaves dark fabric full of ISO
+            // grain — that case must clean hard even when uSceneDenoise is low.
+            vec3 sceneGrainClean(vec2 uv, vec3 center) {
+                float scene = clamp(uSceneDenoise, 0.0, 1.0);
+
+                vec2 t = radiusStep(FINE_RADIUS_FRAC * 1.0);
+                float cLum = dot(center, vec3(0.299, 0.587, 0.114));
+                vec3 cChroma = center - cLum;
+                vec3 chromaSum = cChroma;
+                float lumSum = cLum;
+                float wSum = 1.0;
+                float maxDl = 0.0;
+
+                vec2 offs[8];
+                offs[0] = vec2( t.x,  0.0);
+                offs[1] = vec2(-t.x,  0.0);
+                offs[2] = vec2( 0.0,  t.y);
+                offs[3] = vec2( 0.0, -t.y);
+                offs[4] = vec2( t.x,  t.y);
+                offs[5] = vec2(-t.x,  t.y);
+                offs[6] = vec2( t.x, -t.y);
+                offs[7] = vec2(-t.x, -t.y);
+                for (int i = 0; i < 8; i++) {
+                    vec3 s = texture2D(uTexture, uv + offs[i]).rgb;
+                    float sLum = dot(s, vec3(0.299, 0.587, 0.114));
+                    float dl = sLum - cLum;
+                    maxDl = max(maxDl, abs(dl));
+                    // Tight gate — hairline/edges must not average into dark rings.
+                    float w = exp(-dl * dl * 320.0);
+                    chromaSum += (s - sLum) * w;
+                    lumSum += sLum * w;
+                    wSum += w;
+                }
+                float invW = 1.0 / max(wSum, 0.001);
+                vec3 cleanChroma = chromaSum * invW;
+                float avgLum = lumSum * invW;
+
+                float localDark = 1.0 - smoothstep(0.05, 0.38, cLum);
+                float closeUp = clamp(uCloseUpBoost, 0.0, 1.0);
+                // Milder than before — aggressive denoise looked artificial.
+                float strength = mix(0.45, 0.82, scene);
+                strength = mix(strength, max(strength, 0.72), closeUp);
+                float amt = clamp(
+                    strength * mix(0.35, 1.0, localDark),
+                    0.0,
+                    1.0
+                );
+                // Hard edges (hair outline): skip cleanup entirely.
+                float edgeStop = 1.0 - smoothstep(0.035, 0.10, maxDl);
+                amt *= edgeStop;
+
+                float grain = cLum - avgLum;
+                float isGrain = 1.0 - smoothstep(
+                    uNoiseFloor * 0.35,
+                    uNoiseFloor * 3.8,
+                    abs(grain)
+                );
+                float flatPull = amt * localDark * 0.55 *
+                    (1.0 - smoothstep(0.015, 0.09, abs(grain)));
+                float cleanLum = mix(
+                    cLum,
+                    avgLum,
+                    max(isGrain * amt, flatPull)
+                );
+                return clamp(
+                    cleanLum + mix(cChroma, cleanChroma, amt * 0.85),
+                    0.0,
+                    1.0
+                );
+            }
+
             // Edge-aware 8-tap ring blur (bilateral-style): neighbors are weighted by
             // color similarity to the center pixel, so real edges (eyes, brows, lips,
             // hairline) keep their weight near zero and stay sharp; only flat, noisy
@@ -2370,35 +2762,35 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 float wSum = 1.0;
 
                 vec3 s0 = texture2D(uTexture, uv + vec2( t.x,  0.0)).rgb;
-                float w0 = exp(-distance(s0, center) * distance(s0, center) * 50.0);
+                float w0 = exp(-distance(s0, center) * distance(s0, center) * 85.0);
                 sum += s0 * w0; wSum += w0;
 
                 vec3 s1 = texture2D(uTexture, uv + vec2(-t.x,  0.0)).rgb;
-                float w1 = exp(-distance(s1, center) * distance(s1, center) * 50.0);
+                float w1 = exp(-distance(s1, center) * distance(s1, center) * 85.0);
                 sum += s1 * w1; wSum += w1;
 
                 vec3 s2 = texture2D(uTexture, uv + vec2( 0.0,  t.y)).rgb;
-                float w2 = exp(-distance(s2, center) * distance(s2, center) * 50.0);
+                float w2 = exp(-distance(s2, center) * distance(s2, center) * 85.0);
                 sum += s2 * w2; wSum += w2;
 
                 vec3 s3 = texture2D(uTexture, uv + vec2( 0.0, -t.y)).rgb;
-                float w3 = exp(-distance(s3, center) * distance(s3, center) * 50.0);
+                float w3 = exp(-distance(s3, center) * distance(s3, center) * 85.0);
                 sum += s3 * w3; wSum += w3;
 
                 vec3 s4 = texture2D(uTexture, uv + vec2( t.x,  t.y)).rgb;
-                float w4 = exp(-distance(s4, center) * distance(s4, center) * 50.0);
+                float w4 = exp(-distance(s4, center) * distance(s4, center) * 85.0);
                 sum += s4 * w4; wSum += w4;
 
                 vec3 s5 = texture2D(uTexture, uv + vec2(-t.x,  t.y)).rgb;
-                float w5 = exp(-distance(s5, center) * distance(s5, center) * 50.0);
+                float w5 = exp(-distance(s5, center) * distance(s5, center) * 85.0);
                 sum += s5 * w5; wSum += w5;
 
                 vec3 s6 = texture2D(uTexture, uv + vec2( t.x, -t.y)).rgb;
-                float w6 = exp(-distance(s6, center) * distance(s6, center) * 50.0);
+                float w6 = exp(-distance(s6, center) * distance(s6, center) * 85.0);
                 sum += s6 * w6; wSum += w6;
 
                 vec3 s7 = texture2D(uTexture, uv + vec2(-t.x, -t.y)).rgb;
-                float w7 = exp(-distance(s7, center) * distance(s7, center) * 50.0);
+                float w7 = exp(-distance(s7, center) * distance(s7, center) * 85.0);
                 sum += s7 * w7; wSum += w7;
 
                 return sum / wSum;
@@ -2479,6 +2871,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 vec2 uv = (uTexTransform * vec3(d, 1.0)).xy;
                 vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
                 vec3 col = texture2D(uTexture, st).rgb;
+                // Scene-aware grain clean before beauty lifts amplify speckles.
+                col = sceneGrainClean(st, col);
 
                 // Skin mask needs its own unzoomed mapping — the mask texture was
                 // built from raw (pre-wideZoom) landmark/analysis-frame geometry,
@@ -2518,40 +2912,33 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     uSkinFallback > 0.5 ? skinConfidence(col) : 0.0;
                 float smoothConf = max(maskConf, colourConf);
                 float toneConf = skinConfidence(col);
-                // Retouch Brightness is face-skin only: landmarks provide the
-                // face boundary and the colour gate rejects eyes/hair/background.
-                // Never use the colour-only fallback here because it can select
-                // skin-coloured walls or shoulders outside the detected face.
-                float retouchBrightnessConf =
-                    (uSkinMaskValid > 0.5
+                // Retouch brightness: prefer live skin colour so a lagged landmark
+                // mask cannot leave a bright ghost beside the face while moving.
+                float maskBright =
+                    uSkinMaskValid > 0.5
                         ? maskConfidence(stBrightnessMask)
-                        : 0.0) * skinConfidence(col);
+                        : 0.0;
+                float retouchBrightnessConf =
+                    toneConf * mix(0.40, 1.0, maskBright);
 
-                if (smoothConf > 0.001) {
+                if (smoothConf > 0.001 && uSmoothStrength > 0.04) {
                     // Frequency separation.
-                    //
-                    // Blending the pixel toward a blur — which is what this used
-                    // to do — cannot tell a blemish from a pore, so it removes
-                    // both and the face turns to wax. Splitting the skin by
-                    // feature SIZE can: two blurs at different radii cut it into
-                    // three bands, and each one gets treated on its own terms.
-                    //
-                    //   base : broad shading and tone. Untouched — this is the
-                    //          shape of the face, and softening it is what makes
-                    //          a face look flat and pasted-on.
-                    //   mid  : blotches, patchiness, spots. Cut hard. Removing
-                    //          this band is where smooth skin actually comes from.
-                    //   high : pores, fine lines, grain. Mostly kept, because
-                    //          this is the band the eye reads as real skin.
-                    vec3 fine = surfaceBlur(st, col, FINE_RADIUS_FRAC);
-                    vec3 base = baseBlur(st, col, BASE_RADIUS_FRAC);
+                    float radiusScale = mix(
+                        0.25,
+                        1.0,
+                        smoothstep(0.08, 0.55, uSmoothStrength)
+                    );
+                    vec3 fine = surfaceBlur(st, col, FINE_RADIUS_FRAC * radiusScale);
+                    vec3 base = baseBlur(st, col, BASE_RADIUS_FRAC * radiusScale);
                     vec3 midBand = fine - base;
                     vec3 highBand = col - fine;
 
                     float amount = uSmoothStrength * smoothConf;
+                    // Keep smooth in the face CORE only — hairline/mask edge is
+                    // where artificial dark outlines and wax seams appear.
+                    float faceCore = smoothstep(0.22, 0.70, smoothConf);
+                    amount *= faceCore;
                     // Magic: mid-band blotch cut for plastic/scar cleanup.
-                    // Above the default anchor, remove more uneven-tone band
-                    // without increasing the wide blur/blemish pass.
                     float highSlider = smoothstep(0.90, 1.0, uMagicStrength);
                     float midCut = MID_BAND_CUT;
                     if (uMagicOn > 0.5) {
@@ -2561,26 +2948,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                             0.91,
                             belowAnchor
                         );
-                        // Full slider cleans the blotch band hardest — this is
-                        // what "smooth" actually is. Sharpness is restored by
-                        // the high-band gain below rather than by keeping
-                        // blotches, so this can stay strong without blurring.
                         midCut = mix(midCut, 0.96, highSlider);
                         amount = min(amount, 0.99);
                     }
 
-                    // The high band is split again before it is weighted, because
-                    // grain and skin texture live in it together and a single
-                    // gain cannot keep one without the other.
-                    //
-                    // By colour: speckle in the colour channels is all noise, so
-                    // it goes almost entirely.
-                    //
-                    // By amplitude: grain is the smallest thing in the band, and
-                    // pores and fine lines sit above it. Cutting hard below the
-                    // noise floor and easing off above it removes the grain and
-                    // leaves the texture — the floor itself rises in dim light,
-                    // where the sensor is amplifying and the grain is stronger.
                     float highLuma = dot(highBand, vec3(0.299, 0.587, 0.114));
                     vec3 highChroma = highBand - highLuma;
                     float isTexture = smoothstep(
@@ -2591,9 +2962,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     float lumaCut = mix(HIGH_NOISE_CUT, HIGH_TEXTURE_CUT, isTexture);
                     float chromaCut = HIGH_CHROMA_CUT;
                     if (uMagicOn > 0.5) {
-                        // Above default preserve MORE real texture while the
-                        // mid/noise bands clean harder. This prevents the high
-                        // slider from becoming a patterned blur.
                         float noiseCut = mix(0.92, 1.0, uMagicStrength);
                         float textureCut = mix(
                             mix(0.08, 0.17, min(uMagicStrength / 0.90, 1.0)),
@@ -2607,10 +2975,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                             highSlider
                         );
                     }
-                    // Texture gain above the default anchor. The mid band is
-                    // cleaned hard there, which on its own reads as soft focus,
-                    // so the surviving pore/line detail is pushed back up to
-                    // keep the result crisp instead of blurred.
                     float textureGain = 1.0;
                     if (uMagicOn > 0.5) {
                         textureGain = mix(1.0, 1.30, highSlider);
@@ -2627,31 +2991,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                         1.0
                     );
 
-                    // Blemish / scar suppression, on top of the split. A spot is
-                    // a patch DARKER than the skin around it, so only pixels below
-                    // the local average get pulled toward the base. Targeting the
-                    // dark side alone removes marks the band cut left behind
-                    // without touching anything that isn't one.
-                    //
-                    // Measured against the wide base rather than the fine blur:
-                    // a scar is wider than the fine radius, so the fine blur
-                    // follows it down and barely registers a dip at all.
                     if (uBlemish > 0.001) {
                         float lumaCol = dot(col, vec3(0.299, 0.587, 0.114));
                         float lumaBase = dot(base, vec3(0.299, 0.587, 0.114));
                         float dip = max(0.0, lumaBase - lumaCol);
-                        // The threshold has to clear ordinary shading, not just
-                        // noise. This pass mixes toward a WIDE blur, so anything
-                        // it accepts gets genuinely flattened — set it too low
-                        // and every soft gradient on a face qualifies, which is
-                        // most of where the waxy look was coming from.
                         float spotLo = uMagicOn > 0.5 ? 0.032 : 0.045;
                         float spotHi = uMagicOn > 0.5 ? 0.13 : 0.16;
                         float spot = smoothstep(spotLo, spotHi, dip);
-                        // The wide-base blemish pull is spatial blur, so it is
-                        // eased back above the default anchor. It is kept at
-                        // half strength rather than dropped, because it is the
-                        // only pass that clears marks wider than the mid band.
                         float blemishClarity =
                             uMagicOn > 0.5 ? mix(1.0, 0.5, highSlider) : 1.0;
                         col = mix(
@@ -2731,7 +3077,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     float sharpenGate = 1.0 - clamp(smoothConf, 0.0, 1.0);
                     // Ease off in the darkest areas, where a high-pass mostly
                     // amplifies sensor noise rather than detail.
-                    float shadowGuard = smoothstep(0.04, 0.18, dot(col, vec3(0.299, 0.587, 0.114)));
+                    float shadowGuard = smoothstep(
+                        0.24,
+                        0.48,
+                        dot(col, vec3(0.299, 0.587, 0.114))
+                    );
                     vec3 detail = detailAt(st, col);
                     // Sharpen texture, never edges. The strongest high-pass values
                     // in the frame are not detail at all — they are the boundaries
@@ -2746,7 +3096,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                         1.0
                     );
                 }
-                // Exposure lift, on the WHOLE frame.
+                // Face-led exposure lift with shadow/background protection.
                 //
                 // This replaces face-region AE metering. Pointing the camera's
                 // metering at the face did expose it properly, but every time it
@@ -2755,11 +3105,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 // movement, and every time a face came back into frame. Doing the
                 // same job after the fact costs no convergence at all.
                 //
-                // Deliberately not restricted to skin. Brightening only the face
-                // leaves it sitting on an unchanged background and reads as a
-                // cut-out pasted on — the same mistake the tone block above is
-                // written to avoid. Raising exposure moves everything, so this
-                // does too.
+                // Most of the correction follows the detected face; a small
+                // ambient fraction remains globally so the face does not look
+                // cut out, without turning black fabric into lifted grey.
                 //
                 // Applied as a multiplicative gain on the original colour, which
                 // is what an exposure change actually is: channel ratios are
@@ -2768,49 +3116,132 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 // blow out while the face is being opened up.
                 if (uAutoLift > 0.001) {
                     float lumIn = max(dot(col, vec3(0.299, 0.587, 0.114)), 0.0001);
-                    float lifted = pow(lumIn, 1.0 - uAutoLift * AUTO_LIFT_GAMMA);
-                    float rolloff = 1.0 - smoothstep(0.65, 1.0, lumIn);
+                    float faceLiftGate = clamp(
+                        max(toneConf * 0.90, maskConf * 0.35),
+                        0.0,
+                        1.0
+                    );
+                    // Prefer face/skin; keep enough ambient so hair does not rim.
+                    float localLift =
+                        uAutoLift * mix(0.78, 1.0, faceLiftGate * 0.55);
+                    // Do not starve eye/cheek shadows — straight-on backlight
+                    // needs those opened, not protected into darkness.
+                    float shadowProtect = smoothstep(0.02, 0.16, lumIn);
+                    localLift *= mix(0.70, 1.0, shadowProtect);
+                    float lifted = pow(
+                        lumIn,
+                        1.0 - localLift * AUTO_LIFT_GAMMA
+                    );
+                    float rolloff = 1.0 - smoothstep(0.68, 1.0, lumIn);
                     col = clamp(col * (mix(lumIn, lifted, rolloff) / lumIn), 0.0, 1.0);
                 }
 
-                // Always-on preview polish (lift + contrast). Cool WB is applied
-                // LAST after temporal/retouch so history and warmth sliders cannot
-                // put the yellow cast back.
+                // Always-on preview polish (lift + contrast). Front only —
+                // rear keeps sensor exposure as-is.
                 {
                     float lumIn = max(dot(col, vec3(0.299, 0.587, 0.114)), 0.0001);
-                    float lifted = pow(lumIn, 1.0 - BASE_LIFT);
+                    float baseLift =
+                        BASE_LIFT * (uIsFrontCamera > 0.5 ? 1.0 : 0.0);
+                    float lifted = pow(lumIn, 1.0 - baseLift);
                     float rolloff = 1.0 - smoothstep(0.72, 1.0, lumIn);
                     col = clamp(col * (mix(lumIn, lifted, rolloff) / lumIn), 0.0, 1.0);
-                    col = clamp((col - 0.5) * (1.0 + BASE_CONTRAST) + 0.5, 0.0, 1.0);
+                    float contrast =
+                        BASE_CONTRAST * (uIsFrontCamera > 0.5 ? 1.0 : 0.0);
+                    col = clamp((col - 0.5) * (1.0 + contrast) + 0.5, 0.0, 1.0);
                 }
 
-                // Temporal denoise: blend toward the accumulated history frame when
-                // this pixel hasn't moved/changed much since — averages out sensor
-                // grain over a few frames of a static scene. History is written in
-                // the same screen-space UV (vTexCoord) it's read with here, since
-                // both slots are always sized to the current viewport.
+                // Motion-aware temporal denoise:
+                // Strong on static dark fabric; almost off on face + halo so
+                // pull-back / head move never leaves a ghost trail.
                 if (uHistoryValid > 0.5 && uTemporalStrength > 0.001) {
                     vec3 hist = texture2D(uHistory, vTexCoord).rgb;
                     float diff = distance(col, hist);
-                    float staticWeight = 1.0 - smoothstep(0.03, 0.12, diff);
-                    col = mix(col, hist, uTemporalStrength * staticWeight);
+                    float temporalLum =
+                        dot(col, vec3(0.299, 0.587, 0.114));
+                    float temporalDark =
+                        1.0 - smoothstep(0.08, 0.36, temporalLum);
+                    // Stricter motion gate: camera pull-back / pan kills blend
+                    // quickly so the face does not smear.
+                    float diffHigh = mix(0.09, 0.06, 1.0 - temporalDark);
+                    float staticWeight =
+                        1.0 - smoothstep(0.012, diffHigh, diff);
+                    float temporalAmount = min(
+                        0.55,
+                        uTemporalStrength * mix(1.10, 0.95, 1.0 - temporalDark)
+                    );
+                    float faceVicinity = 0.0;
+                    if (uSkinMaskValid > 0.5) {
+                        // Wide pad — ghost usually sits just outside the oval
+                        // (hair, jaw, ear). Far shots need an even larger pad.
+                        float padScale = mix(1.55, 1.0, clamp(uCloseUpBoost, 0.0, 1.0));
+                        vec2 maskPad = vec2(0.070, 0.090) * padScale;
+                        faceVicinity = max(
+                            maskConfidence(stBrightnessMask),
+                            max(
+                                max(
+                                    maskConfidence(stBrightnessMask + vec2(maskPad.x, 0.0)),
+                                    maskConfidence(stBrightnessMask - vec2(maskPad.x, 0.0))
+                                ),
+                                max(
+                                    maskConfidence(stBrightnessMask + vec2(0.0, maskPad.y)),
+                                    maskConfidence(stBrightnessMask - vec2(0.0, maskPad.y))
+                                )
+                            )
+                        );
+                        // Diagonal samples catch corner halo around the face.
+                        vec2 dPad = maskPad * 0.75;
+                        faceVicinity = max(
+                            faceVicinity,
+                            max(
+                                max(
+                                    maskConfidence(stBrightnessMask + vec2( dPad.x,  dPad.y)),
+                                    maskConfidence(stBrightnessMask + vec2(-dPad.x,  dPad.y))
+                                ),
+                                max(
+                                    maskConfidence(stBrightnessMask + vec2( dPad.x, -dPad.y)),
+                                    maskConfidence(stBrightnessMask + vec2(-dPad.x, -dPad.y))
+                                )
+                            )
+                        );
+                    }
+                    // Kill temporal early in the face halo (ghost cleanup).
+                    temporalAmount *=
+                        1.0 - smoothstep(0.008, 0.22, faceVicinity);
+                    float blend = temporalAmount * staticWeight;
+
+                    // Dual-tap only on close-up dark fabric — far/hist2 ghosts.
+                    vec3 histRef = hist;
+                    float away = 1.0 - faceVicinity;
+                    float closeUp = clamp(uCloseUpBoost, 0.0, 1.0);
+                    if (uHistory2Valid > 0.5 && away > 0.65 && closeUp > 0.35) {
+                        vec3 hist2 = texture2D(uHistory2, vTexCoord).rgb;
+                        float diff2 = distance(col, hist2);
+                        float static2 =
+                            1.0 - smoothstep(0.012, diffHigh, diff2);
+                        histRef = mix(hist, (hist + hist2) * 0.5, static2 * 0.40 * away * closeUp);
+                        blend = min(0.52, blend * mix(1.0, 1.04, static2 * away * closeUp));
+                    }
+
+                    float lumNow = temporalLum;
+                    float lumHist = dot(histRef, vec3(0.299, 0.587, 0.114));
+                    vec3 chromaNow = col - lumNow;
+                    vec3 chromaHist = histRef - lumHist;
+                    // Face/halo: chroma-only tiny blend; luma stays current frame.
+                    float lumaBlend =
+                        blend * mix(0.08, 0.80, temporalDark * away);
+                    float chromaBlend = blend * mix(0.15, 1.0, away);
+                    float outLum = mix(lumNow, lumHist, lumaBlend);
+                    col = clamp(
+                        outLum + mix(chromaNow, chromaHist, chromaBlend),
+                        0.0,
+                        1.0
+                    );
                 }
                 col = applyRetouchColor(col);
                 col = applyRetouchSkinBrightness(
                     col,
                     retouchBrightnessConf
                 );
-                // Cut yellow/warm: light global cool + extra on skin only.
-                {
-                    float skinW = skinConfidence(col);
-                    float coolK = (BASE_COOL + SKIN_COOL * skinW) * 0.35;
-                    if (coolK > 0.001) {
-                        col.r *= (1.0 - coolK);
-                        col.g *= (1.0 - coolK * 0.30);
-                        col.b *= (1.0 + coolK);
-                        col = clamp(col, 0.0, 1.0);
-                    }
-                }
                 // Last: the band split and the polish blocks above rebuild col
                 // from the original texture, which discarded an earlier tooth
                 // pass entirely.
@@ -2845,10 +3276,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uBrighten;
             // Same always-on polish as the live OES preview — keeps stills from
             // looking darker/duller than what the user just saw in the viewfinder.
-            const float BASE_LIFT = 0.12;
-            const float BASE_CONTRAST = 0.05;
-            const float BASE_COOL = 0.08;
-            const float SKIN_COOL = 0.14;
+            const float BASE_LIFT = 0.04;
+            const float BASE_CONTRAST = 0.01;
+            const float BASE_COOL = 0.0;
+            const float SKIN_COOL = 0.0;
             $RETOUCH_UNIFORMS
             $RETOUCH_FUNCTIONS
 
@@ -2902,8 +3333,55 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return sum / wSum;
             }
 
+            // Still has no temporal history — spatial grain clean only.
+            // Edge-aware chroma + micro-luma; stronger in shadows.
+            vec3 stillGrainClean(vec2 uv, vec3 center) {
+                const float NOISE_FLOOR = 0.022;
+                vec2 t = uTexelStep * 2.0;
+                float cLum = dot(center, vec3(0.299, 0.587, 0.114));
+                vec3 cChroma = center - cLum;
+                vec3 chromaSum = cChroma;
+                float lumSum = cLum;
+                float wSum = 1.0;
+                vec2 offs[8];
+                offs[0] = vec2( t.x,  0.0);
+                offs[1] = vec2(-t.x,  0.0);
+                offs[2] = vec2( 0.0,  t.y);
+                offs[3] = vec2( 0.0, -t.y);
+                offs[4] = vec2( t.x,  t.y);
+                offs[5] = vec2(-t.x,  t.y);
+                offs[6] = vec2( t.x, -t.y);
+                offs[7] = vec2(-t.x, -t.y);
+                for (int i = 0; i < 8; i++) {
+                    vec3 s = texture2D(uTexture, uv + offs[i]).rgb;
+                    float sLum = dot(s, vec3(0.299, 0.587, 0.114));
+                    float dl = sLum - cLum;
+                    float w = exp(-dl * dl * 200.0);
+                    chromaSum += (s - sLum) * w;
+                    lumSum += sLum * w;
+                    wSum += w;
+                }
+                float invW = 1.0 / max(wSum, 0.001);
+                float avgLum = lumSum * invW;
+                vec3 cleanChroma = chromaSum * invW;
+                float darkAmt = mix(0.90, 0.35, smoothstep(0.07, 0.55, cLum));
+                float grain = cLum - avgLum;
+                float isGrain = 1.0 - smoothstep(
+                    NOISE_FLOOR * 0.5,
+                    NOISE_FLOOR * 3.2,
+                    abs(grain)
+                );
+                float cleanLum = mix(cLum, avgLum, isGrain * darkAmt);
+                return clamp(
+                    cleanLum + mix(cChroma, cleanChroma, darkAmt),
+                    0.0,
+                    1.0
+                );
+            }
+
             void main() {
                 vec3 col = texture2D(uTexture, vTexCoord).rgb;
+                col = stillGrainClean(vTexCoord, col);
                 float toneConf = skinConfidence(col);
                 if (uSmoothStrength > 0.001) {
                     float skinConf = toneConf;

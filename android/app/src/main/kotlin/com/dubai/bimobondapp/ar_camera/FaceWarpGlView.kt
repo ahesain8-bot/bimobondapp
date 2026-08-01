@@ -145,6 +145,15 @@ class FaceWarpGlView @JvmOverloads constructor(
 
     fun cameraSurfaceTexture(): SurfaceTexture? = cameraSurfaceTexture
 
+    fun recreateCameraSurfaceTexture() {
+        if (!glInitialized) return
+        cameraSurfaceTexture = null
+        queueEvent {
+            renderer.recreateCameraSurfaceTexture()
+        }
+        requestRender()
+    }
+
     fun setOesEnabled(enabled: Boolean) {
         ensureGlInitialized()
         queueEvent { renderer.oesEnabled = enabled }
@@ -185,6 +194,15 @@ class FaceWarpGlView @JvmOverloads constructor(
     fun updateSkinTone(luma: Float) {
         if (!glInitialized) return
         renderer.updateSkinTone(luma)
+    }
+
+    /**
+     * Face area as a fraction of the analysis frame (0..1). Close selfies raise
+     * this and the renderer boosts grain cleanup so magnified noise stays down.
+     */
+    fun updateFaceFill(fill: Float) {
+        if (!glInitialized) return
+        renderer.updateFaceFill(fill)
     }
 
     /** Skin-confidence mask (ALPHA_8, 255=skin) from ArCameraController's landmark rasterizer. */

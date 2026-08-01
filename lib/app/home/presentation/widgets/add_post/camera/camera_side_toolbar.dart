@@ -69,6 +69,7 @@ class CameraSideToolbar extends StatefulWidget {
     required this.onSpeed,
     required this.flashEnabled,
     required this.beautyEnabled,
+    this.beautyActiveBadge = false,
     required this.filtersEnabled,
     required this.timerEnabled,
     required this.speedLabel,
@@ -100,6 +101,8 @@ class CameraSideToolbar extends StatefulWidget {
   final VoidCallback onSpeed;
   final bool flashEnabled;
   final bool beautyEnabled;
+  /// Small red check on Retouch when Magic/Retouch is On (panel may be closed).
+  final bool beautyActiveBadge;
   final bool filtersEnabled;
   final bool timerEnabled;
   final String speedLabel;
@@ -196,7 +199,7 @@ class _CameraSideToolbarState extends State<CameraSideToolbar> {
           label: widget.labels.beauty,
           onTap: widget.onBeauty,
           active: widget.beautyEnabled,
-          showActiveBadge: false,
+          showActiveBadge: widget.beautyActiveBadge,
           customIcon: TikTokSideIcons.retouch(),
         ),
         _SideToolItem(

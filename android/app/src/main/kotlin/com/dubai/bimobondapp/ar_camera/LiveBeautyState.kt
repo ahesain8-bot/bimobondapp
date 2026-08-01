@@ -25,7 +25,7 @@ data class LiveBeautyAdjustments(
 
         /**
          * Smooth response curve midpoint. The camera UI supplies its own
-         * default slider position (currently 30%); 50 remains the curve anchor.
+         * default slider position (currently 50%); 50 remains the curve anchor.
          */
         const val MAGIC_AUTO_STRENGTH = 0.50f
 
@@ -39,7 +39,7 @@ data class LiveBeautyAdjustments(
 
         /** Camera Magic-On defaults without dedicated Flutter sliders. */
         const val MAGIC_DEFAULT_WHITEN = 0.10f
-        const val MAGIC_DEFAULT_SHARPEN = 0.08f
+        const val MAGIC_DEFAULT_SHARPEN = 0.0f
 
         /** Wide blemish pull stops growing above default to avoid blurry patches. */
         const val MAGIC_BLEMISH_MIN = 0.48f
@@ -86,11 +86,15 @@ data class LiveBeautyAdjustments(
 
 object LiveBeautyState {
     @Volatile
-    var adjustments: LiveBeautyAdjustments = LiveBeautyAdjustments()
+    var adjustments: LiveBeautyAdjustments = LiveBeautyAdjustments(
+        smooth = LiveBeautyAdjustments.smoothFromStrength(
+            LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH,
+        ),
+    )
 
     /** Retouch panel Off/On — face smooth boost, independent of color filters. */
     @Volatile
-    var magicOn: Boolean = false
+    var magicOn: Boolean = true
 
     /** 0..1 Smooth slider while Magic is On. */
     @Volatile

@@ -84,15 +84,14 @@ object ArCameraController {
     private const val PNG_ANALYSIS_HEIGHT = 640
 
     /** Fallback raw EV index used only for the pre-bind builder (device step unknown yet). */
-    private const val PREVIEW_EXPOSURE_BIAS = 2
+    private const val PREVIEW_EXPOSURE_BIAS = 0
 
     /**
-     * Target EV bias for the live preview once the real device step size is known
-     * (applied in [applyPreviewLook]). +0.75 opens the selfie toward TikTok
-     * brightness at the sensor (natural), instead of stacking heavy shader lifts
-     * that read as an overlay. Index from each device's exposureCompensationStep.
+     * Front gets a mild positive EV so selfies open up toward TikTok brightness.
+     * Back stays slightly negative so the brighter rear sensor does not wash out.
      */
-    private const val PREVIEW_EXPOSURE_EV_STOPS = 0.80f
+    private const val PREVIEW_EXPOSURE_EV_STOPS = 0.55f
+    private const val PREVIEW_EXPOSURE_EV_STOPS_BACK = -0.35f
 
     /**
      * Front-camera zoom ratio applied on bind. Selfie lenses/HAL 1.0x defaults are
@@ -129,7 +128,7 @@ object ArCameraController {
 
     /** Run landmark detect + mask rasterize every Nth analysis frame — mask
      *  changes slowly, so a soft gating mask doesn't need every-frame updates. */
-    private const val SKIN_MASK_DETECT_EVERY = 6
+    private const val SKIN_MASK_DETECT_EVERY = 2
     /** Sticker video encode edge — keep modest so preview stays responsive while recording. */
     private const val PNG_RECORD_EDGE = 640
     private const val PNG_RECORD_INTERVAL_MS = 66L
@@ -2814,8 +2813,8 @@ object ArCameraController {
      * Strongest noise reduction the device advertises. HIGH_QUALITY gives the
      * cleanest result (fewer visible grain "dots") and is preferred even though
      * it's the mode documented as possibly reducing frame rate — noise was the
-     * user-visible complaint, not preview smoothness. Falls back to MINIMAL, then
-     * the always-guaranteed FAST if neither richer mode is supported.
+     * user-visible complaint, not preview smoothness. FAST is the next choice;
+     * MINIMAL deliberately performs less denoising and is only a last resort.
      */
     private fun bestNoiseReductionMode(info: CameraInfo): Int {
         val modes = try {
@@ -2828,6 +2827,8 @@ object ArCameraController {
         return when {
             modes?.contains(CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY) == true ->
                 CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
+            modes?.contains(CaptureRequest.NOISE_REDUCTION_MODE_FAST) == true ->
+                CaptureRequest.NOISE_REDUCTION_MODE_FAST
             modes?.contains(CaptureRequest.NOISE_REDUCTION_MODE_MINIMAL) == true ->
                 CaptureRequest.NOISE_REDUCTION_MODE_MINIMAL
             else -> CaptureRequest.NOISE_REDUCTION_MODE_FAST
@@ -2894,7 +2895,12 @@ object ArCameraController {
                 val step = exposure.exposureCompensationStep.toFloat().let {
                     if (it > 0f) it else 1f
                 }
-                val rawIndex = Math.round(PREVIEW_EXPOSURE_EV_STOPS / step)
+                val targetEv = if (ArCameraBridge.isFrontCamera) {
+                    PREVIEW_EXPOSURE_EV_STOPS
+                } else {
+                    PREVIEW_EXPOSURE_EV_STOPS_BACK
+                }
+                val rawIndex = Math.round(targetEv / step)
                 val index = rawIndex.coerceIn(range.lower, range.upper)
                 Log.i(
                     PREVIEW_QUALITY_TAG,
@@ -3083,6 +3089,12 @@ object ArCameraController {
     @Volatile
     private var previewSuspended = false
 
+    @Volatile
+    private var hostWasPaused = false
+
+    @Volatile
+    private var hostResumeGeneration = 0
+
     /**
      * Fully stops the camera pipeline while the camera screen is still mounted
      * but no longer visible.
@@ -3145,7 +3157,7 @@ object ArCameraController {
                     gl.requestRender()
                 } catch (t: Throwable) {
                     Log.w("ArCameraController", "fast preview resume failed; rebinding", t)
-                    onHostResume()
+                    onHostResume(force = true)
                 }
             }
             return
@@ -3153,44 +3165,178 @@ object ArCameraController {
 
         // PreviewView/simple-mode and any device that lost its GL surface still
         // use the full recovery path.
-        onHostResume()
+        onHostResume(force = true)
     }
 
     fun onHostPause() {
+        Log.i(
+            "ArCameraLifecycle",
+            "Controller.onHostPause started=$started recording=${isRecordingActive()} " +
+                "suspended=$previewSuspended boundOes=$boundToOes " +
+                "preferOes=$preferOesBinding filter=${ArCameraBridge.currentFilter} " +
+                "glSurface=${ArCameraBridge.warpGlView?.cameraSurfaceTexture() != null}",
+        )
         if (!started) return
+        hostWasPaused = true
+        hostResumeGeneration++
+        // Do not leave lifecycle-bound use cases around for CameraX to
+        // auto-reattach during onResume. That automatic attach was racing the
+        // explicit fresh-OES rebind below, so whichever session won determined
+        // whether the preview resumed or stayed black.
+        unbindCamera()
+        camera = null
+        boundToOes = false
+        rebindPosted = false
+        switchingCamera = false
+        ArCameraWatchdog.stop()
+        Log.i("ArCameraLifecycle", "Controller.onHostPause camera fully unbound")
         try {
             ArCameraBridge.warpGlView?.onPause()
         } catch (_: Throwable) {
         }
     }
 
-    fun onHostResume() {
-        if (!started) return
-        if (isRecordingActive()) return
+    fun onHostResume(force: Boolean = false) {
+        Log.i(
+            "ArCameraLifecycle",
+            "Controller.onHostResume ENTER force=$force started=$started " +
+                "recording=${isRecordingActive()} suspended=$previewSuspended " +
+                "hostWasPaused=$hostWasPaused generation=$hostResumeGeneration " +
+                "boundOes=$boundToOes preferOes=$preferOesBinding " +
+                "filter=${ArCameraBridge.currentFilter} " +
+                "glSurface=${ArCameraBridge.warpGlView?.cameraSurfaceTexture() != null}",
+        )
+        if (!started) {
+            Log.w("ArCameraLifecycle", "Controller.onHostResume SKIP notStarted")
+            return
+        }
+        if (isRecordingActive()) {
+            Log.w("ArCameraLifecycle", "Controller.onHostResume SKIP recording")
+            return
+        }
         // App foregrounded while the editor is on top — leave the camera stopped;
         // [resumePreview] clears the flag before delegating here.
-        if (previewSuspended) return
-        val activity = ArCameraBridge.hostActivity ?: return
+        if (previewSuspended) {
+            Log.w("ArCameraLifecycle", "Controller.onHostResume SKIP previewSuspended")
+            return
+        }
+        if (ArCameraBridge.hostActivity == null) {
+            Log.e("ArCameraLifecycle", "Controller.onHostResume SKIP activity=null")
+            return
+        }
         val gl = ArCameraBridge.warpGlView
+
+        // Adding the PlatformView observer while the Activity is already resumed
+        // also invokes this callback. Only rebuild after a real background pause.
+        if (!hostWasPaused && !force) {
+            Log.i("ArCameraLifecycle", "Controller.onHostResume SKIP noRealPause")
+            return
+        }
+        hostWasPaused = false
+        val resumeGeneration = ++hostResumeGeneration
+        Log.i(
+            "ArCameraLifecycle",
+            "Controller.onHostResume SCHEDULE generation=$resumeGeneration " +
+                "gl=${gl?.width}x${gl?.height} glVis=${gl?.visibility} " +
+                "previewVis=${ArCameraBridge.previewView?.visibility}",
+        )
+
         try {
             gl?.onResume()
         } catch (_: Throwable) {
         }
 
-        boundToOes = false
-        rebindPosted = false
-        switchingCamera = false
-        convertingFrame.set(false)
-        activity.runOnUiThread {
+        // CameraX closes the capture session while the Activity is stopped and
+        // SurfaceView may recreate its producer afterwards. Waiting briefly lets
+        // both lifecycle and GL surfaces become valid, then performs one explicit
+        // bind instead of relying on the stale pre-background session.
+        mainHandler.postDelayed({
+            if (!started ||
+                previewSuspended ||
+                isRecordingActive() ||
+                resumeGeneration != hostResumeGeneration
+            ) {
+                Log.w(
+                    "ArCameraLifecycle",
+                    "Controller.resumeRebind CANCEL generation=$resumeGeneration " +
+                        "currentGeneration=$hostResumeGeneration started=$started " +
+                        "suspended=$previewSuspended recording=${isRecordingActive()}",
+                )
+                return@postDelayed
+            }
+
+            Log.i(
+                "ArCameraLifecycle",
+                "Controller.resumeRebind START generation=$resumeGeneration " +
+                    "filter=${ArCameraBridge.currentFilter} " +
+                    "glSurface=${gl?.cameraSurfaceTexture() != null}",
+            )
             ArCameraBridge.syncPreviewNaturalOrientation()
             gl?.ensureGlInitialized()
-            preferOesBinding = false
-            boundToOes = false
-            ArCameraBridge.applyCurrentFilter()
+            gl?.resetAfterRouteResume()
+            ArCameraBridge.prepareForHostResume()
 
-            // Color-grade OES path removed; always rebind PreviewView after camera switch.
-            requestPreviewRebind()
-        }
+            val filter = ArCameraBridge.currentFilter
+            preferOesBinding = !filter.useShader() && !filter.isPngOverlay()
+            boundToOes = false
+            rebindPosted = false
+            switchingCamera = false
+            convertingFrame.set(false)
+
+            fun requestFreshBind() {
+                Log.i(
+                    "ArCameraLifecycle",
+                    "Controller.resumeRebind REQUEST preferOes=$preferOesBinding " +
+                        "glSurface=${gl?.cameraSurfaceTexture() != null}",
+                )
+                requestPreviewRebind()
+
+                // Restore the selected filter/UI after the new CameraX session
+                // has attached its surface.
+                mainHandler.postDelayed({
+                    if (started &&
+                        !previewSuspended &&
+                        resumeGeneration == hostResumeGeneration
+                    ) {
+                        Log.i(
+                            "ArCameraLifecycle",
+                            "Controller.resumeReveal APPLY boundOes=$boundToOes " +
+                                "preferOes=$preferOesBinding " +
+                                "glSurface=${gl?.cameraSurfaceTexture() != null}",
+                        )
+                        ArCameraBridge.applyCurrentFilter()
+                        gl?.requestRender()
+                    } else {
+                        Log.w(
+                            "ArCameraLifecycle",
+                            "Controller.resumeReveal CANCEL generation=$resumeGeneration " +
+                                "currentGeneration=$hostResumeGeneration",
+                        )
+                    }
+                }, 500L)
+            }
+
+            if (preferOesBinding && gl != null) {
+                // The logs show CameraX reopening successfully against the old
+                // OES SurfaceTexture but no GL frames arriving afterwards. The
+                // Activity's SurfaceViews were destroyed/recreated, so replace
+                // the OES producer too and only bind once the new one exists.
+                gl.onCameraSurfaceReady = {
+                    gl.onCameraSurfaceReady = null
+                    if (resumeGeneration == hostResumeGeneration) {
+                        Log.i(
+                            "ArCameraLifecycle",
+                            "Controller.resumeRebind NEW_OES_SURFACE ready",
+                        )
+                        requestFreshBind()
+                    }
+                }
+                gl.setOesEnabled(true)
+                gl.recreateCameraSurfaceTexture()
+            } else {
+                requestFreshBind()
+            }
+        }, 300L)
     }
 
     fun ensureOesPreviewBound() {
@@ -3908,6 +4054,9 @@ object ArCameraController {
                         oriented.width,
                         oriented.height,
                     )
+                } else {
+                    // No face — decay fill so smooth/bright stop; empty grade stays.
+                    decayFacePresence()
                 }
                 val maskBitmap = if (snapshot != null) {
                     try {
@@ -3997,6 +4146,28 @@ object ArCameraController {
     /** Smoothed skin luminance — see [measureSkinTone]. */
     private var skinLumaAverage = -1f
 
+    /** Smoothed face-box area / frame area — drives close-up denoise boost. */
+    private var faceFillAverage = -1f
+
+    /**
+     * When landmarks disappear, ease face fill toward 0 so GPU beauty
+     * (smooth / bright / auto-lift) turns off and empty-frame grade stays.
+     */
+    private fun decayFacePresence() {
+        if (faceFillAverage < 0f) {
+            ArCameraBridge.warpGlView?.updateFaceFill(0f)
+            return
+        }
+        faceFillAverage *= 0.62f
+        if (faceFillAverage < 0.015f) faceFillAverage = 0f
+        ArCameraBridge.warpGlView?.updateFaceFill(faceFillAverage)
+        if (skinLumaAverage > 0f) {
+            val target = FaceWarpRenderer.SKIN_LUMA_TARGET
+            skinLumaAverage += (target - skinLumaAverage) * 0.25f
+            ArCameraBridge.warpGlView?.updateSkinTone(skinLumaAverage)
+        }
+    }
+
     /**
      * Measures how bright this person's skin actually is, so the tone curve can
      * adapt to them instead of applying the same lift to everyone.
@@ -4027,6 +4198,18 @@ object ArCameraController {
             if (p.y > maxY) maxY = p.y
         }
         if (minX >= maxX || minY >= maxY) return
+
+        // Face fill of the landmark frame — larger when the user leans in.
+        val frameArea =
+            (snapshot.imageWidth * snapshot.imageHeight).toFloat().coerceAtLeast(1f)
+        val faceArea = (maxX - minX).coerceAtLeast(1f) * (maxY - minY).coerceAtLeast(1f)
+        val frameFill = (faceArea / frameArea).coerceIn(0f, 1f)
+        faceFillAverage = if (faceFillAverage < 0f) {
+            frameFill
+        } else {
+            faceFillAverage + (frameFill - faceFillAverage) * SKIN_TONE_EASE
+        }
+        ArCameraBridge.warpGlView?.updateFaceFill(faceFillAverage)
 
         val scaleX = oriented.width / snapshot.imageWidth.toFloat()
         val scaleY = oriented.height / snapshot.imageHeight.toFloat()
@@ -4075,12 +4258,16 @@ object ArCameraController {
         if (samples < SKIN_TONE_MIN_SAMPLES) return
 
         val frameLuma = total / samples
-        // Smoothed hard: skin tone is a property of the person, not the frame, so
-        // it should drift with the lighting rather than react to it.
+        // Detect underexposure quickly; ease up more gently when light improves.
+        val ease = if (skinLumaAverage >= 0f && frameLuma < skinLumaAverage) {
+            0.32f
+        } else {
+            SKIN_TONE_EASE
+        }
         skinLumaAverage = if (skinLumaAverage < 0f) {
             frameLuma
         } else {
-            skinLumaAverage + (frameLuma - skinLumaAverage) * SKIN_TONE_EASE
+            skinLumaAverage + (frameLuma - skinLumaAverage) * ease
         }
         ArCameraBridge.warpGlView?.updateSkinTone(skinLumaAverage)
     }
