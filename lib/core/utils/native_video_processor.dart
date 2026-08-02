@@ -12,7 +12,7 @@ class NativeVideoProcessor {
   NativeVideoProcessor._();
 
   static const _maxVideoFilterSeconds = 60;
-  static const _highQualityVideoBitrate = 20 * 1000 * 1000;
+  static const _highQualityVideoBitrate = 8 * 1000 * 1000;
 
   /// Preserve the input pixel dimensions while giving 1080p camera footage
   /// enough bitrate to survive an editor render without visible degradation.

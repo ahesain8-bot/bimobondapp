@@ -939,8 +939,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
       return;
     }
     try {
-      final effectivelyPlaying =
-          controller.value.isPlaying && !_userPaused;
+      final effectivelyPlaying = controller.value.isPlaying && !_userPaused;
       if (effectivelyPlaying) {
         _userPaused = true;
         if (widget.muteAudio) {
@@ -997,14 +996,17 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
         _segmentEndHandled = false;
         return;
       }
-    } else if (widget.loopVideo && widget.muteAudio) {
-      // Native loop is enabled — only intervene if the platform did not loop.
+    } else if (widget.loopVideo) {
+      // Native loop is enabled — only intervene if platform stalled at natural end.
       final duration = controller.value.duration;
-      final nearNaturalEnd = duration.inMilliseconds > 0 &&
+      final nearNaturalEnd =
+          duration.inMilliseconds > 0 &&
           controller.value.position >=
               duration - const Duration(milliseconds: 120);
       if (!controller.value.isCompleted && !nearNaturalEnd) {
-        _segmentEndHandled = false;
+        if (controller.value.position < const Duration(milliseconds: 300)) {
+          _segmentEndHandled = false;
+        }
         return;
       }
     } else {
@@ -1020,11 +1022,14 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
     try {
       await controller.seekTo(Duration.zero);
       if (_shouldPlay && !_userPaused) {
-        await _startPlayback(
+        final ok = await _startPlayback(
           controller,
           _initGeneration,
           muted: _playbackMuted,
         );
+        if (!ok && _isControllerReady(controller)) {
+          await controller.play();
+        }
       }
     } catch (_) {}
     widget.onSegmentEnd?.call();

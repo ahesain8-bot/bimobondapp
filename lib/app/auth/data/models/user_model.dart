@@ -1,5 +1,5 @@
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
-import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class UserModel extends UserEntity {
@@ -49,11 +49,8 @@ class UserModel extends UserEntity {
   });
 
   static String? _normalizeUrl(String? url) {
-    if (url == null || url.isEmpty) return url;
-    if (url.startsWith('/')) {
-      return url;
-    }
-    return url;
+    if (url == null || url.trim().isEmpty) return null;
+    return MediaUtils.resolveAbsoluteUrl(url.trim());
   }
 
   static int _parseInt(dynamic value, {int fallback = 0}) {
@@ -122,15 +119,33 @@ class UserModel extends UserEntity {
   }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final avatarRaw = json['avatarUrl'] ??
+        json['avatar'] ??
+        json['profilePicture'] ??
+        json['profileImage'] ??
+        json['photoURL'] ??
+        json['photoUrl'] ??
+        json['image'] ??
+        (json['user'] is Map
+            ? json['user']['avatarUrl'] ??
+                json['user']['avatar'] ??
+                json['user']['profilePicture']
+            : null);
+
+    final avatarStr = avatarRaw?.toString().trim();
+    final avatarUrl = (avatarStr != null && avatarStr.isNotEmpty)
+        ? _normalizeUrl(avatarStr)
+        : null;
+
     return UserModel(
-      id: json['id'] ?? '',
-      firebaseUid: json['firebaseUid'],
-      email: json['email'],
-      phoneNumber: json['phoneNumber'],
-      username: json['username'],
-      fullName: json['fullName'],
-      bio: json['bio'],
-      avatarUrl: _normalizeUrl(json['avatarUrl']),
+      id: json['id']?.toString() ?? '',
+      firebaseUid: json['firebaseUid']?.toString(),
+      email: json['email']?.toString(),
+      phoneNumber: json['phoneNumber']?.toString(),
+      username: json['username']?.toString(),
+      fullName: json['fullName']?.toString() ?? json['name']?.toString(),
+      bio: json['bio']?.toString(),
+      avatarUrl: avatarUrl,
       dateOfBirth: json['dateOfBirth'],
       isVerified: json['isVerified'] ?? false,
       roles: (json['roles'] as List<dynamic>?)

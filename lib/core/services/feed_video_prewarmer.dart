@@ -2,15 +2,25 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
+import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 
-/// Parks up to 2 ready controllers so scroll up/down can [take] instantly.
-class FeedVideoPrewarmer {
-  FeedVideoPrewarmer._();
+/// Parks up to 1 ready controller so scroll up/down can [take] instantly
+/// while preventing Android hardware decoder exhaustion during long scrolls.
+class FeedVideoPrewarmer with WidgetsBindingObserver {
+  FeedVideoPrewarmer._() {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   static final FeedVideoPrewarmer instance = FeedVideoPrewarmer._();
 
-  static const int _maxReady = 2;
+  static const int _maxReady = 1;
+
+  @override
+  void didHaveMemoryPressure() {
+    // OS is running low on memory/decoders — release all parked video controllers immediately.
+    clear();
+  }
 
   final LinkedHashMap<String, VideoPlayerController> _ready =
       LinkedHashMap<String, VideoPlayerController>();

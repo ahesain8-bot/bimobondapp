@@ -149,9 +149,13 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
       return;
     }
 
-    // Video briefly reports paused while seeking back for a segment loop.
+    // Video briefly reports paused while seeking back for a segment loop or starting at 0:00.
+    final pos = controller?.playbackPosition ?? Duration.zero;
+    if (pos <= const Duration(milliseconds: 350)) {
+      return;
+    }
+
     if (_hasSegmentWindow) {
-      final pos = controller?.playbackPosition ?? Duration.zero;
       final window = _segmentPlaybackDuration;
       if (window != null &&
           pos >= window - const Duration(milliseconds: 150)) {

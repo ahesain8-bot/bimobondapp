@@ -20,6 +20,7 @@ import 'package:bimobondapp/app/posts/domain/entities/user_repost_entity.dart';
 import 'package:bimobondapp/app/posts/data/models/post_view_model.dart';
 import 'package:bimobondapp/app/posts/data/models/post_views_page_model.dart';
 import 'package:bimobondapp/core/utils/comment_sort.dart';
+import 'package:bimobondapp/core/utils/media_upload_utils.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
 import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
@@ -76,11 +77,14 @@ class PostsRepositoryImpl implements PostsRepository {
 
   @override
   Future<Either<Failure, String>> uploadMedia(File file) async {
+    final prepared = await MediaUploadUtils.prepareForUpload(file);
     try {
-      final url = await remoteDataSource.uploadMedia(file);
+      final url = await remoteDataSource.uploadMedia(prepared);
       return Right(url);
     } catch (e) {
       return Left(FailureMapper.from(e));
+    } finally {
+      await MediaUploadUtils.deleteIfTemp(file, prepared);
     }
   }
 

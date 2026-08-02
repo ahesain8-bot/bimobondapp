@@ -45,7 +45,16 @@ class FeedItemModel extends FeedItemEntity {
     final quote = _parseQuote(json);
 
     if (feedTypeRaw == 'REPOST') {
-      final repostedByJson = json['repostedBy'];
+      final repostedByJson = json['repostedBy'] ??
+          json['repostUser'] ??
+          json['reposter'] ??
+          json['user'] ??
+          (json['repost'] is Map
+              ? json['repost']['repostedBy'] ??
+                  json['repost']['repostUser'] ??
+                  json['repost']['user']
+              : null);
+
       return FeedItemModel(
         id: json['repostId']?.toString() ??
             '${postWithReposters.id}_${repostedByJson is Map ? repostedByJson['id'] : 'repost'}',

@@ -519,14 +519,33 @@ class PostUserModel extends PostUserEntity {
   }
 
   factory PostUserModel.fromJson(Map<String, dynamic> json) {
+    final avatarRaw = json['avatarUrl'] ??
+        json['avatar'] ??
+        json['profilePicture'] ??
+        json['profileImage'] ??
+        json['photoURL'] ??
+        json['photoUrl'] ??
+        json['image'] ??
+        (json['user'] is Map
+            ? json['user']['avatarUrl'] ??
+                json['user']['avatar'] ??
+                json['user']['profilePicture'] ??
+                json['user']['photoUrl']
+            : null);
+
+    final avatarStr = avatarRaw?.toString().trim();
+    final avatarUrl = (avatarStr != null && avatarStr.isNotEmpty)
+        ? PostModel._normalizeUrl(avatarStr)
+        : null;
+
     return PostUserModel(
-      id: json['id'] ?? '',
-      username: json['username'] ?? '',
+      id: json['id']?.toString() ?? '',
+      username: json['username']?.toString() ?? '',
       fullName:
           json['fullName']?.toString() ??
           json['name']?.toString() ??
           json['displayName']?.toString(),
-      avatarUrl: PostModel._normalizeUrl(json['avatarUrl']),
+      avatarUrl: avatarUrl,
       isFollowing:
           _parseOptionalBool(json['isFollowing']) ??
           _parseOptionalBool(json['isFollowed']),
