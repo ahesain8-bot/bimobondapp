@@ -28,8 +28,13 @@ class ArCameraPlatformView(
 
     private val lifecycleObserver = object : DefaultLifecycleObserver {
         override fun onPause(owner: LifecycleOwner) {
+            android.util.Log.i(
+                "ArCameraLifecycle",
+                "PlatformView.onPause state=${owner.lifecycle.currentState} " +
+                    "rootAttached=${root.isAttachedToWindow} " +
+                    "glSurface=${warpGlView.cameraSurfaceTexture() != null}",
+            )
             ArCameraController.onHostPause()
-            // Stop burning GPU/CPU on the confetti loop while the screen isn't visible.
             try {
                 confettiOverlay.pauseAnimation()
             } catch (_: Throwable) {
@@ -37,6 +42,12 @@ class ArCameraPlatformView(
         }
 
         override fun onResume(owner: LifecycleOwner) {
+            android.util.Log.i(
+                "ArCameraLifecycle",
+                "PlatformView.onResume state=${owner.lifecycle.currentState} " +
+                    "rootAttached=${root.isAttachedToWindow} " +
+                    "glSurface=${warpGlView.cameraSurfaceTexture() != null}",
+            )
             ArCameraController.onHostResume()
             try {
                 if (confettiOverlay.visibility == View.VISIBLE) confettiOverlay.resumeAnimation()
@@ -58,7 +69,6 @@ class ArCameraPlatformView(
             ArCameraBridge.updateWarpViewSize(right - left, bottom - top)
         }
 
-        // SurfaceView path — sharper live preview than TextureView (COMPATIBLE).
         previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
         previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
         previewView.visibility = View.VISIBLE
@@ -66,28 +76,10 @@ class ArCameraPlatformView(
 
         warpGlView.ensureGlInitialized()
 
-        // Screen-overlay filter animation (Confetti/Keywords/Snowfall/Snow White)
-        // — decorative only, on top of the preview/beauty layers, never
-        // intercepts touch. Hidden/stopped until one of those filters is
-        // actually tapped in the picker — which asset loads and when it plays
-        // is entirely driven from ArCameraBridge.applyRenderMode from then on.
-        // NOT autoplayed/loaded on camera open. Wrapped so a bad/missing asset
-        // or a Lottie failure can never take the camera down with it; a
-        // failure listener is required too, since Lottie's async composition
-        // loader rethrows parse errors on the main thread if nothing consumes
-        // them — registering it here covers every setAnimation() call later.
         confettiOverlay.visibility = View.GONE
         confettiOverlay.repeatCount = LottieDrawable.INFINITE
         confettiOverlay.cancelAnimation()
         try {
-            // These compositions are large full-screen 60fps animations (some
-            // 3240x3240, hundreds of frames) drawn on top of the live camera
-            // preview continuously. AUTOMATIC render mode can still pick the
-            // software (Bitmap-backed) path on some devices/compositions,
-            // which is expensive at that size every frame — force the
-            // hardware-accelerated Canvas path, and let composition property
-            // updates run off the main thread so the animation can't stall
-            // camera/UI frame delivery.
             confettiOverlay.setRenderMode(RenderMode.HARDWARE)
             confettiOverlay.setAsyncUpdates(AsyncUpdates.ENABLED)
             confettiOverlay.setFailureListener { error ->
@@ -96,14 +88,6 @@ class ArCameraPlatformView(
         } catch (t: Throwable) {
             android.util.Log.e("ArCamera", "screen overlay setup failed", t)
         }
-
-        // Overlay compositions are no longer pre-parsed here. They used to be a
-        // fixed list of bundled assets; now they come from the backend, so the
-        // app doesn't know what to warm until the catalog has loaded. Dart
-        // drives it instead once /camera-studio/ar-overlays responds — see
-        // ArCameraBridge.prefetchOverlays / ArCameraOverlayPrefetcher — which
-        // keeps the same benefit (no JSON-parse hitch on the first tap) without
-        // parsing animations that may not even be published anymore.
 
         ArCameraBridge.syncPreviewNaturalOrientation()
         ArCameraController.start(activity, activity, previewView, faceOverlay)

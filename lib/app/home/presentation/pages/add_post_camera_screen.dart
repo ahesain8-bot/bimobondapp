@@ -85,40 +85,53 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _showFilters = false;
   bool _showPhotoEditor = false;
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
-  MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
-  bool _photoEditorMagicOn = false;
+  MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.smooth;
+  /// Retouch (Magic) On by default when the camera opens.
+  bool _photoEditorMagicOn = true;
 
   /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
   static const double _kMagicAutoSmooth = 0.50;
+  /// Face color sliders (label = value×100) applied on live camera even when
+  /// Retouch/Magic is Off.
+  /// Live color defaults (empty-frame / Retouch-Off baseline).
+  static const Map<MediaPhotoEditorTool, double> _kLiveColorDefaults = {
+    MediaPhotoEditorTool.contrast: 1.0, // max (+100)
+    MediaPhotoEditorTool.saturation: 0.10, // +10
+    MediaPhotoEditorTool.brightness: -0.47, // -47
+    MediaPhotoEditorTool.exposure: 0.06, // +6
+    MediaPhotoEditorTool.whiteBalance: -0.08, // warmth -8
+    MediaPhotoEditorTool.highlights: 0.08, // +8
+    MediaPhotoEditorTool.shadows: 0.10, // +10
+  };
   static const Map<MediaPhotoEditorTool, double> _kMagicBeautyDefaults = {
     MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
-    MediaPhotoEditorTool.contrast: 0.10,
+    MediaPhotoEditorTool.contrast: 1.0, // max — same as live baseline
     MediaPhotoEditorTool.shape: 0.08,
     MediaPhotoEditorTool.nose: 0.05,
     MediaPhotoEditorTool.eyes: 0.05,
     MediaPhotoEditorTool.tooth: 0.12,
     MediaPhotoEditorTool.mouth: 0.05,
     MediaPhotoEditorTool.saturation: 0.10,
-    MediaPhotoEditorTool.brightness: 0.20,
-    MediaPhotoEditorTool.exposure: 0.06,
-    MediaPhotoEditorTool.whiteBalance: 0.06,
-    MediaPhotoEditorTool.highlights: 0.08,
+    MediaPhotoEditorTool.brightness: -0.47, // -47
+    MediaPhotoEditorTool.exposure: 0.06, // +6
+    MediaPhotoEditorTool.whiteBalance: -0.08, // warmth -8
+    MediaPhotoEditorTool.highlights: 0.08, // +8
     MediaPhotoEditorTool.shadows: 0.10,
   };
   final Map<MediaPhotoEditorTool, double> _photoAdjustments = {
-    MediaPhotoEditorTool.smooth: 0.0,
-    MediaPhotoEditorTool.contrast: 0.0,
-    MediaPhotoEditorTool.shape: 0.0,
-    MediaPhotoEditorTool.nose: 0.0,
-    MediaPhotoEditorTool.eyes: 0.0,
-    MediaPhotoEditorTool.tooth: 0.0,
-    MediaPhotoEditorTool.mouth: 0.0,
-    MediaPhotoEditorTool.saturation: 0.0,
-    MediaPhotoEditorTool.brightness: 0.0,
-    MediaPhotoEditorTool.exposure: 0.0,
-    MediaPhotoEditorTool.whiteBalance: 0.0,
-    MediaPhotoEditorTool.highlights: 0.0,
-    MediaPhotoEditorTool.shadows: 0.0,
+    MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
+    MediaPhotoEditorTool.contrast: 1.0,
+    MediaPhotoEditorTool.shape: 0.08,
+    MediaPhotoEditorTool.nose: 0.05,
+    MediaPhotoEditorTool.eyes: 0.05,
+    MediaPhotoEditorTool.tooth: 0.12,
+    MediaPhotoEditorTool.mouth: 0.05,
+    MediaPhotoEditorTool.saturation: 0.10,
+    MediaPhotoEditorTool.brightness: -0.47,
+    MediaPhotoEditorTool.exposure: 0.06,
+    MediaPhotoEditorTool.whiteBalance: -0.08,
+    MediaPhotoEditorTool.highlights: 0.08,
+    MediaPhotoEditorTool.shadows: 0.10,
   };
   bool _catalogLoading = true;
   bool _filtersReady = false;
@@ -231,6 +244,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
       _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
+      // Retouch/Magic On by default on camera open.
+      ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+      _syncRetouchToNative();
     }
     unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
     unawaited(_loadCatalog());
@@ -437,16 +453,35 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   double _photoAdj(MediaPhotoEditorTool tool) =>
       _photoEditorMagicOn ? (_photoAdjustments[tool] ?? 0.0) : 0.0;
 
+  double _liveColorAdj(MediaPhotoEditorTool tool) {
+    // Back-camera Retouch-Off baseline only — front stays neutral unless Magic.
+    if (_isFrontCamera && !_photoEditorMagicOn) return 0.0;
+    if (_photoEditorMagicOn) {
+      return _photoAdjustments[tool] ?? 0.0;
+    }
+    return _photoAdjustments[tool] ?? _kLiveColorDefaults[tool] ?? 0.0;
+  }
+
+  void _restoreLiveColorDefaults() {
+    if (_isFrontCamera) {
+      for (final tool in _kLiveColorDefaults.keys) {
+        _photoAdjustments[tool] = 0.0;
+      }
+    } else {
+      _photoAdjustments.addAll(_kLiveColorDefaults);
+    }
+  }
+
   void _syncRetouchToNative() {
     if (!_useNativeArFilters) return;
     ArCameraBridge.setRetouchAdjustments(
-      saturation: _photoAdj(MediaPhotoEditorTool.saturation),
-      brightness: _photoAdj(MediaPhotoEditorTool.brightness),
-      contrast: _photoAdj(MediaPhotoEditorTool.contrast),
-      exposure: _photoAdj(MediaPhotoEditorTool.exposure),
-      whiteBalance: _photoAdj(MediaPhotoEditorTool.whiteBalance),
-      highlights: _photoAdj(MediaPhotoEditorTool.highlights),
-      shadows: _photoAdj(MediaPhotoEditorTool.shadows),
+      saturation: _liveColorAdj(MediaPhotoEditorTool.saturation),
+      brightness: _liveColorAdj(MediaPhotoEditorTool.brightness),
+      contrast: _liveColorAdj(MediaPhotoEditorTool.contrast),
+      exposure: _liveColorAdj(MediaPhotoEditorTool.exposure),
+      whiteBalance: _liveColorAdj(MediaPhotoEditorTool.whiteBalance),
+      highlights: _liveColorAdj(MediaPhotoEditorTool.highlights),
+      shadows: _liveColorAdj(MediaPhotoEditorTool.shadows),
       nose: _photoAdj(MediaPhotoEditorTool.nose),
       shape: _photoAdj(MediaPhotoEditorTool.shape),
       eyes: _photoAdj(MediaPhotoEditorTool.eyes),
@@ -484,6 +519,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _photoEditorTool = MediaPhotoEditorTool.smooth;
     } else {
       _photoEditorTool = MediaPhotoEditorTool.magic;
+      // Retouch Off → restore live color baseline (keep morphs cleared via sync).
+      _restoreLiveColorDefaults();
     }
     setState(() {});
     if (_useNativeArFilters) {
@@ -554,6 +591,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       for (final key in _photoAdjustments.keys) {
         _photoAdjustments[key] = 0.0;
       }
+      _restoreLiveColorDefaults();
       _photoEditorTool = MediaPhotoEditorTool.magic;
       _photoEditorMagicOn = false;
       if (_useNativeArFilters) {
@@ -1507,14 +1545,21 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         intensity: intensity,
       );
       // Color grade (Fade/Fade Warm/Fade Cool) — same engine as the Face
-      // retouch sliders. Always set explicitly (even when all-zero, e.g.
-      // "Normal") so a previously selected grade doesn't linger.
-      ArCameraBridge.setRetouchAdjustments(
-        brightness: params.brightness * intensity,
-        contrast: params.contrast * intensity,
-        saturation: params.saturation * intensity,
-        whiteBalance: params.warmth * intensity,
-      );
+      // retouch sliders. Identity grades keep the live Retouch-Off baseline.
+      if (!params.hasColorGrade) {
+        _syncRetouchToNative();
+      } else {
+        ArCameraBridge.setRetouchAdjustments(
+          brightness: params.brightness * intensity,
+          contrast: params.contrast * intensity,
+          saturation: params.saturation * intensity,
+          whiteBalance: params.warmth * intensity,
+          // Filters only grade B/C/S/WB — keep live exposure/highlights/shadows.
+          exposure: _liveColorAdj(MediaPhotoEditorTool.exposure),
+          highlights: _liveColorAdj(MediaPhotoEditorTool.highlights),
+          shadows: _liveColorAdj(MediaPhotoEditorTool.shadows),
+        );
+      }
       if (_photoEditorMagicOn) {
         ArCameraBridge.setMagicEnabled(true, strength: magicSmooth);
       }
@@ -1791,8 +1836,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         setState(() {
           _isFrontCamera = isFront;
           _selectedZoom = CameraStudioConstants.zoomSteps.first.value;
+          if (!_photoEditorMagicOn) {
+            _restoreLiveColorDefaults();
+          }
         });
         _faceDetectorService.isFrontCamera = isFront;
+        if (!_photoEditorMagicOn) {
+          _syncRetouchToNative();
+        }
         unawaited(_applyZoom(_selectedZoom, force: true));
       } catch (_) {}
       return;

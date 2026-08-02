@@ -7,6 +7,11 @@ import kotlin.math.roundToInt
 /**
  * Live camera retouch sliders (−1…1, 0 = original). Applied in GPU preview and
  * baked into captures via the same GL pipeline.
+ *
+ * [liveBaseline] color grade (contrast max, saturation +10, brightness −47,
+ * exposure +6, warmth −8, highlights +8, shadows +10) is for the **back
+ * camera only** while Retouch/Magic is Off. Front stays neutral unless Magic
+ * or a color filter pushes different values.
  */
 data class LiveRetouchAdjustments(
     val saturation: Float = 0f,
@@ -44,6 +49,18 @@ data class LiveRetouchAdjustments(
             kotlin.math.abs(tooth) < 0.01f &&
             kotlin.math.abs(mouth) < 0.01f
 
+    /** True when color channels match the back-camera Retouch-Off baseline. */
+    fun matchesLiveBaselineColors(): Boolean {
+        fun near(a: Float, b: Float) = kotlin.math.abs(a - b) < 0.005f
+        return near(saturation, DEFAULT_SATURATION) &&
+            near(brightness, DEFAULT_BRIGHTNESS) &&
+            near(contrast, DEFAULT_CONTRAST) &&
+            near(exposure, DEFAULT_EXPOSURE) &&
+            near(whiteBalance, DEFAULT_WHITE_BALANCE) &&
+            near(highlights, DEFAULT_HIGHLIGHTS) &&
+            near(shadows, DEFAULT_SHADOWS)
+    }
+
     fun toProcessorAdjustments(): BeautyFilterProcessor.Adjustments {
         fun level(v: Float) = (v * 100f).roundToInt().coerceIn(-100, 100)
         return BeautyFilterProcessor.Adjustments(
@@ -59,6 +76,28 @@ data class LiveRetouchAdjustments(
     }
 
     companion object {
+        /** Face slider labels (value×100) → back-camera Retouch-Off baseline. */
+        const val DEFAULT_SATURATION = 0.10f
+        const val DEFAULT_BRIGHTNESS = -0.47f
+        const val DEFAULT_CONTRAST = 1.0f
+        const val DEFAULT_EXPOSURE = 0.06f
+        const val DEFAULT_WHITE_BALANCE = -0.08f
+        const val DEFAULT_HIGHLIGHTS = 0.08f
+        const val DEFAULT_SHADOWS = 0.10f
+
+        fun neutral(): LiveRetouchAdjustments = LiveRetouchAdjustments()
+
+        /** Color grade only — morphs (nose/shape/eyes/…) stay at 0. */
+        fun liveBaseline(): LiveRetouchAdjustments = LiveRetouchAdjustments(
+            saturation = DEFAULT_SATURATION,
+            brightness = DEFAULT_BRIGHTNESS,
+            contrast = DEFAULT_CONTRAST,
+            exposure = DEFAULT_EXPOSURE,
+            whiteBalance = DEFAULT_WHITE_BALANCE,
+            highlights = DEFAULT_HIGHLIGHTS,
+            shadows = DEFAULT_SHADOWS,
+        )
+
         fun fromLevels(
             saturation: Int = 0,
             brightness: Int = 0,
@@ -144,7 +183,12 @@ object LiveRetouchState {
     var toothRegion: FloatArray = floatArrayOf(0f, 0f, 0f, 0f)
 
     fun clear() {
-        adjustments = LiveRetouchAdjustments()
+        // Back camera keeps Retouch-Off color baseline; front stays neutral.
+        adjustments = if (ArCameraBridge.isFrontCamera) {
+            LiveRetouchAdjustments.neutral()
+        } else {
+            LiveRetouchAdjustments.liveBaseline()
+        }
         noseWingL = floatArrayOf(0f, 0f)
         noseWingR = floatArrayOf(0f, 0f)
         noseRadius = 0f

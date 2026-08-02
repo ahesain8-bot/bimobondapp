@@ -122,6 +122,26 @@ object ArCameraBridge {
         )
     }
 
+    /** Clears stale transition state before rebuilding camera surfaces on app resume. */
+    fun prepareForHostResume() {
+        android.util.Log.i(
+            "ArCameraLifecycle",
+            "Bridge.prepareForHostResume filter=$currentFilter " +
+                "await=$awaitFirstGlFrame pending=$oesTransitionPending " +
+                "oesLive=$oesSurfaceLive revealLeft=$oesRevealFramesLeft " +
+                "glVis=${warpGlView?.visibility} previewVis=${previewView?.visibility} " +
+                "glSurface=${warpGlView?.cameraSurfaceTexture() != null}",
+        )
+        awaitFirstGlFrame = false
+        oesTransitionPending = false
+        oesSurfaceLive = false
+        oesRevealFramesLeft = 0
+        oesDiagStartMs = 0L
+        clearApplyingOverlay()
+        clearFreezeOverlay()
+        clearRebindCover()
+    }
+
     private fun diagVis(tag: String) {
         val freeze = freezeOverlay
         android.util.Log.i(

@@ -552,6 +552,7 @@ class CameraStudioOverlay extends StatelessWidget {
                   onSpeed: onSpeedTap,
                   flashEnabled: flashEnabled,
                   beautyEnabled: beautyEnabled || showRetouchPanel,
+                  beautyActiveBadge: photoEditorMagicOn,
                   filtersEnabled: showFilters || hasActiveFilter,
                   timerEnabled: timerEnabled,
                   speedLabel: '${selectedSpeed}x',
