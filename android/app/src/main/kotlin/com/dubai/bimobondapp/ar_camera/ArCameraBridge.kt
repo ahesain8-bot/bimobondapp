@@ -1108,5 +1108,6 @@ object ArCameraBridge {
         isFrontCamera = true
         letterboxTopPx = 0
         letterboxBottomPx = 0
+        BackPersonPresence.reset()
     }
 }

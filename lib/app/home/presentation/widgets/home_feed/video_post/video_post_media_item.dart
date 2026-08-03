@@ -91,6 +91,8 @@ class VideoPostMediaItem extends StatelessWidget {
             onVideoDurationReady: hasAttachedSound
                 ? onVideoDurationReady
                 : null,
+            // Full recorded frame — no cover zoom (must match capture framing).
+            fit: BoxFit.contain,
           )
         : mediaUrl.isEmpty
         ? const Icon(LucideIcons.imageOff, size: 80, color: Colors.white24)

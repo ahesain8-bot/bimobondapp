@@ -72,6 +72,7 @@ class CustomVideoPlayer extends StatefulWidget {
     this.onLongPress,
     this.loopVideo = true,
     this.segmentMaxPosition,
+    this.fit = BoxFit.contain,
   });
 
   final String url;
@@ -93,6 +94,10 @@ class CustomVideoPlayer extends StatefulWidget {
   final VoidCallback? onLongPress;
   final bool loopVideo;
   final Duration? segmentMaxPosition;
+
+  /// Feed videos use contain so the posted frame matches the recording
+  /// (no cover-zoom crop). Images still use [mediaFit].
+  final BoxFit fit;
 
   @override
   State<CustomVideoPlayer> createState() => _CustomVideoPlayerState();
@@ -1255,17 +1260,16 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
   }
 
   Widget _buildPosterLayer() {
+    final fit = widget.fit;
     return Stack(
       fit: StackFit.expand,
       children: [
         const ColoredBox(color: Colors.black),
-        // BoxFit.contain so the poster is letterboxed exactly like the video
-        // (Center + AspectRatio) — no zoomed full-screen frame that jumps to
-        // the real post size once playback starts.
+        // Match video layout — cover in feed, contain elsewhere.
         if (_resolvedPosterUrl != null)
           SafeNetworkImage(
             imageUrl: _resolvedPosterUrl!,
-            fit: BoxFit.contain,
+            fit: fit,
             width: double.infinity,
             height: double.infinity,
             blankOnError: true,
@@ -1273,13 +1277,64 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
         if (_generatedPosterBytes != null)
           Image.memory(
             _generatedPosterBytes!,
-            fit: BoxFit.contain,
+            fit: fit,
             width: double.infinity,
             height: double.infinity,
             gaplessPlayback: true,
             errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
       ],
+    );
+  }
+
+  Widget _buildVideoLayer(VideoPlayerController controller) {
+    final ratio = _readAspectRatio(controller);
+    if (widget.fit == BoxFit.cover) {
+      return ColoredBox(
+        color: Colors.black,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxW = constraints.maxWidth;
+            final maxH = constraints.maxHeight;
+            if (maxW <= 0 || maxH <= 0) {
+              return const SizedBox.shrink();
+            }
+            final screenRatio = maxW / maxH;
+            final double width;
+            final double height;
+            if (screenRatio > ratio) {
+              width = maxW;
+              height = maxW / ratio;
+            } else {
+              height = maxH;
+              width = maxH * ratio;
+            }
+            return ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.center,
+                minWidth: width,
+                maxWidth: width,
+                minHeight: height,
+                maxHeight: height,
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: VideoPlayer(controller),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: ratio,
+          child: VideoPlayer(controller),
+        ),
+      ),
     );
   }
 
@@ -1330,15 +1385,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
           if (!isReady && !_hasPosterVisual && !_hasNetworkPosterAttempt)
             const ColoredBox(color: Colors.black),
           if (canMountVideoPlayer)
-            ColoredBox(
-              color: Colors.black,
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: _readAspectRatio(controller),
-                  child: VideoPlayer(controller),
-                ),
-              ),
-            ),
+            _buildVideoLayer(controller),
           if (_shouldShowPosterOverlay())
             Positioned.fill(child: _buildPosterLayer()),
           if (showVideoLoading && !loadingOnProgressBar)

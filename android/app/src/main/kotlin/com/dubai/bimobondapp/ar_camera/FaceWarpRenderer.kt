@@ -131,6 +131,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var smoothedLowLight = 0.35f
     /** Smoothed close-up for denoise only (not brightness). */
     private var smoothedCloseUpBoost = 0f
+    /**
+     * Back-camera Step 2: extra skin brighten while a person is present.
+     * Eased so enter/exit does not flash; 0 when empty.
+     */
+    private var smoothedBackPersonBright = 0f
+    /** Eased person weight for retouch remap (−47 → open on skin). */
+    private var smoothedBackPersonWeight = 0f
     /** One-shot log confirming live OES path is running grain clean. */
     private var oesDenoiseLogged = false
 
@@ -141,6 +148,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUNoiseFloor = 0
     private var oesUBrighten = 0
     private var oesUBlemish = 0
+    private var oesUBackPersonWeight = 0
     private var oesUTexelStep = 0
     private var oesUHistory = 0
     private var oesUHistoryValid = 0
@@ -188,6 +196,18 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         cameraFrontMirror = frontMirror
         if (bufW > 0) cameraBufW = bufW
         if (bufH > 0) cameraBufH = bufH
+    }
+
+    /**
+     * Display-oriented camera buffer size (after 90/270 swap) — same aspect the
+     * OES shader uses for FIT/FILL. Used so recorded MP4s match preview FOV
+     * without baking letterbox bars.
+     */
+    fun orientedCameraSize(): Pair<Int, Int> {
+        val rot = cameraRotationDegrees
+        val w = cameraBufW.coerceAtLeast(1)
+        val h = cameraBufH.coerceAtLeast(1)
+        return if (rot == 90 || rot == 270) h to w else w to h
     }
 
     fun updateTexture(bitmap: Bitmap) {
@@ -342,6 +362,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         oesUSharpen = GLES20.glGetUniformLocation(oesProgram, "uSharpen")
         oesUNoiseFloor = GLES20.glGetUniformLocation(oesProgram, "uNoiseFloor")
         oesUBrighten = GLES20.glGetUniformLocation(oesProgram, "uBrighten")
+        oesUBackPersonWeight = GLES20.glGetUniformLocation(oesProgram, "uBackPersonWeight")
         oesUBlemish = GLES20.glGetUniformLocation(oesProgram, "uBlemish")
         oesUTexelStep = GLES20.glGetUniformLocation(oesProgram, "uTexelStep")
         oesUHistory = GLES20.glGetUniformLocation(oesProgram, "uHistory")
@@ -543,10 +564,42 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // Far framing: face is small, so the same frame-fraction blur covers most
         // of it and reads as weird soft/wax. Scale smooth with face size.
         val distScale = faceDistanceScale()
-        val targetSmooth = if (magic) {
-            LiveBeautyAdjustments.smoothFromStrength(magicStrength) * distScale
+        // Back camera: general Magic smooth (up to ~0.73-0.99 strength) was
+        // never scoped for back camera and read as unwanted heavy blur
+        // whenever a face filled enough of frame. Empty frame stays exactly
+        // 0. Person present gets a fixed, modest "normal" amount instead —
+        // enough to hide blemishes/scars without going plastic/waxy — not
+        // tied to Magic strength, and not gated by distScale (tuned for
+        // front-camera selfie fill %, back camera rarely reaches it).
+        val smoothCameraScale = if (ArCameraBridge.isFrontCamera) 1f else 0f
+        val targetSmooth = if (ArCameraBridge.isFrontCamera) {
+            if (magic) {
+                LiveBeautyAdjustments.smoothFromStrength(magicStrength) * distScale * smoothCameraScale
+            } else {
+                adaptedSmooth(beauty, lowLight) * distScale * smoothCameraScale
+            }
         } else {
-            adaptedSmooth(beauty, lowLight) * distScale
+            val personMix = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
+            // Only use the fixed "normal" amount while the Smooth slider is
+            // still at its default (magic on, untouched strength) — same
+            // problem as the retouch panel: unconditionally overriding it
+            // made the slider look dead once a person entered frame. A
+            // manual slider change is respected (still gated by personMix,
+            // not distScale — back camera rarely reaches the front-tuned
+            // fill range distScale expects).
+            val magicUntouched = magic && kotlin.math.abs(
+                magicStrength - LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH,
+            ) < 0.01f
+            if (magicUntouched) {
+                BACK_PERSON_SMOOTH_NORMAL * personMix
+            } else {
+                val userSmooth = if (magic) {
+                    LiveBeautyAdjustments.smoothFromStrength(magicStrength)
+                } else {
+                    adaptedSmooth(beauty, lowLight)
+                }
+                userSmooth * personMix
+            }
         }
         // Snap DOWN immediately when pulling away — easing left a soft trail.
         if (targetSmooth < smoothedSmooth - 0.03f ||
@@ -563,6 +616,20 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             smoothedBrighten,
             adaptedBrighten(beauty, lowLight),
         )
+        // Step 2 (back only): natural skin bright when person present; empty → 0.
+        // Use normal ease (not slow) so the lift is visible as soon as they enter.
+        val targetBackPersonWeight =
+            if (!ArCameraBridge.isFrontCamera) {
+                BackPersonPresence.presentWeight
+            } else {
+                0f
+            }
+        smoothedBackPersonWeight =
+            easeToward(smoothedBackPersonWeight, targetBackPersonWeight)
+        val targetBackPersonBright =
+            BackPersonPresence.STEP2_SKIN_BRIGHTEN * targetBackPersonWeight
+        smoothedBackPersonBright =
+            easeToward(smoothedBackPersonBright, targetBackPersonBright)
         val targetSharpen = if (magic) {
             LiveBeautyAdjustments.MAGIC_DEFAULT_SHARPEN * (1f - lowLight * 0.65f)
         } else {
@@ -581,15 +648,26 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             oesUNoiseFloor,
             measuredNoiseFloor * if (magic) 1.80f else 1.25f,
         )
-        GLES20.glUniform1f(oesUAutoLift, smoothedAutoLift * rearBrightnessScale())
-        GLES20.glUniform1f(oesUBrighten, smoothedBrighten * rearBrightnessScale())
+        GLES20.glUniform1f(oesUAutoLift, smoothedAutoLift * rearLiftScale())
+        // Skin-gated in shader (toneConf). Person boost is back-only Step 2.
+        val uBrighten =
+            smoothedBrighten * rearBrightnessScale() + smoothedBackPersonBright
+        GLES20.glUniform1f(oesUBrighten, uBrighten)
+        BackPersonPresence.logStep2Apply(
+            targetBright = targetBackPersonBright,
+            smoothedBright = smoothedBackPersonBright,
+            totalUBrighten = uBrighten,
+        )
         // Deliberately weaker than the smoothing it rides on: this pass flattens
         // toward a wide blur wherever it acts, so at parity it overwhelms the
         // band split that is doing the careful work. Magic On raises blemish so
         // scars actually clear — strength follows the Smooth slider.
+        // Back camera: always follows smoothedSmooth (the fixed "normal"
+        // person value above) — magic's own strength-based blemish ignored
+        // our scoped-down smooth and stayed at its own (stronger) level.
         GLES20.glUniform1f(
             oesUBlemish,
-            if (magic) {
+            if (magic && ArCameraBridge.isFrontCamera) {
                 LiveBeautyAdjustments.blemishFromStrength(magicStrength)
             } else {
                 smoothedSmooth * BLEMISH_OF_SMOOTH
@@ -677,6 +755,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             oesURetouchTooth,
             oesUToothRegion,
         )
+        // After retouch binds — drives −47→bright remap on skin.
+        if (oesUBackPersonWeight >= 0) {
+            GLES20.glUniform1f(oesUBackPersonWeight, smoothedBackPersonWeight)
+        }
 
         GLES20.glEnableVertexAttribArray(oesAPosition)
         GLES20.glVertexAttribPointer(oesAPosition, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
@@ -812,6 +894,23 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private fun rearBrightnessScale(): Float =
         if (ArCameraBridge.isFrontCamera) 1f else 0.25f
 
+    /**
+     * Same idea as [rearBrightnessScale] but for [smoothedAutoLift] — the
+     * face-measured "replaces face-region AE metering" exposure lift (see
+     * [autoLiftTarget]). That system already does exactly what was being
+     * asked for over and over — measure the person's actual skin luma and
+     * lift toward a flattering target — but it was dampened to 25% on back
+     * camera by the same blanket rule as the beauty slider. Once a person is
+     * confidently detected on back camera, let it run at full strength like
+     * front camera does; empty back-camera frames keep the 25% dampening so
+     * scenery/background shots are untouched.
+     */
+    private fun rearLiftScale(): Float {
+        if (ArCameraBridge.isFrontCamera) return 1f
+        val personMix = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
+        return mix(0.25f, 1f, personMix)
+    }
+
     private fun adaptedSharpen(lowLight: Float): Float =
         (SHARPEN_STRENGTH * (1f - lowLight * 0.65f)).coerceAtLeast(0f)
 
@@ -869,7 +968,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         exposureDebugCounter++
         if (exposureDebugCounter % 12 != 0) return
         val backlight = (measuredSceneLuma - measuredSkinLuma).coerceIn(-1f, 1f)
-        val applied = smoothedAutoLift * rearBrightnessScale()
+        val applied = smoothedAutoLift * rearLiftScale()
         Log.i(
             "FaceWarpExposure",
             "front=${ArCameraBridge.isFrontCamera} " +
@@ -2061,13 +2160,72 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         } else {
             adj
         }
-        if (locSaturation >= 0) GLES20.glUniform1f(locSaturation, color.saturation)
-        if (locBrightness >= 0) GLES20.glUniform1f(locBrightness, color.brightness)
-        if (locContrast >= 0) GLES20.glUniform1f(locContrast, color.contrast)
-        if (locExposure >= 0) GLES20.glUniform1f(locExposure, color.exposure)
-        if (locWhiteBalance >= 0) GLES20.glUniform1f(locWhiteBalance, color.whiteBalance)
-        if (locHighlights >= 0) GLES20.glUniform1f(locHighlights, color.highlights)
-        if (locShadows >= 0) GLES20.glUniform1f(locShadows, color.shadows)
+        // Back-camera person target grade (slider scale, ÷100 of these):
+        // contrast −100, saturation +15, highlights +40, warmth +20,
+        // exposure +70, brightness +100 — instead of the empty-frame
+        // (−0.47 brightness / max contrast / warm) baseline. Blended in by
+        // presence (personMixBase), so an empty back-camera frame or front
+        // camera keeps `color` exactly as computed above — untouched.
+        //
+        // Per-slider, not all-or-nothing: touching only Brightness used to
+        // disable the auto-override for every other slider too, leaving the
+        // empty-frame's max-contrast/warm values fighting the raised
+        // brightness — that combination is exactly what read as yellow.
+        // Each slider now independently checks whether IT is still at its
+        // own default before applying the override; an untouched slider
+        // gets the person-present default, a touched one keeps the user's
+        // exact value.
+        val personMixBase = if (ArCameraBridge.isFrontCamera) {
+            0f
+        } else {
+            smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
+        }
+        fun fieldMix(value: Float, default: Float, target: Float): Float {
+            val untouched = kotlin.math.abs(value - default) < 0.005f
+            return if (untouched) mix(value, target, personMixBase) else value
+        }
+        if (locSaturation >= 0) {
+            GLES20.glUniform1f(
+                locSaturation,
+                fieldMix(color.saturation, LiveRetouchAdjustments.DEFAULT_SATURATION, 0.15f),
+            )
+        }
+        if (locBrightness >= 0) {
+            GLES20.glUniform1f(
+                locBrightness,
+                fieldMix(color.brightness, LiveRetouchAdjustments.DEFAULT_BRIGHTNESS, 1.0f),
+            )
+        }
+        if (locContrast >= 0) {
+            GLES20.glUniform1f(
+                locContrast,
+                fieldMix(color.contrast, LiveRetouchAdjustments.DEFAULT_CONTRAST, -1.0f),
+            )
+        }
+        if (locExposure >= 0) {
+            GLES20.glUniform1f(
+                locExposure,
+                fieldMix(color.exposure, LiveRetouchAdjustments.DEFAULT_EXPOSURE, 0.70f),
+            )
+        }
+        if (locWhiteBalance >= 0) {
+            GLES20.glUniform1f(
+                locWhiteBalance,
+                fieldMix(color.whiteBalance, LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE, -0.40f),
+            )
+        }
+        if (locHighlights >= 0) {
+            GLES20.glUniform1f(
+                locHighlights,
+                fieldMix(color.highlights, LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS, 0.40f),
+            )
+        }
+        if (locShadows >= 0) {
+            GLES20.glUniform1f(
+                locShadows,
+                fieldMix(color.shadows, LiveRetouchAdjustments.DEFAULT_SHADOWS, 0f),
+            )
+        }
         if (locNose >= 0) GLES20.glUniform1f(locNose, color.nose)
         if (locWingL >= 0) {
             GLES20.glUniform2fv(locWingL, 1, LiveRetouchState.noseWingL, 0)
@@ -2164,6 +2322,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         /** Target skin luminance for auto-lift. */
         const val SKIN_LUMA_TARGET = 0.58f
 
+        /**
+         * Back-camera person smooth strength — fixed, not Magic-derived.
+         * Enough to hide blemishes/scars without going plastic/waxy; well
+         * under Magic's own floor (MAGIC_SMOOTH_MIN = 0.48).
+         */
+        private const val BACK_PERSON_SMOOTH_NORMAL = 0.35f
+
         private const val TAG = "FaceWarpRenderer"
 
         /** Consecutive camera-texture update failures before giving up on GL. */
@@ -2222,6 +2387,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uRetouchWhiteBalance;
             uniform float uRetouchHighlights;
             uniform float uRetouchShadows;
+            // Back-camera person look (0 = empty grade, 1 = person soften/bright).
+            uniform float uBackPersonWeight;
             uniform float uRetouchNose;
             uniform vec2 uNoseWingL;
             uniform vec2 uNoseWingR;
@@ -2258,52 +2425,44 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return cbW * crW * yW;
             }
 
-            // Brightness is a skin tone curve, not a white RGB layer. Luminance
-            // changes preserve pores/shading; a tiny warm-chroma reduction makes
-            // positive brightness look fresh rather than yellow or washed out.
-            //
-            // Brightness is a skin tone curve, not a white RGB layer. Luminance
-            // changes preserve pores/shading; a tiny warm-chroma reduction makes
-            // positive brightness look fresh rather than yellow or washed out.
-            vec3 applyRetouchSkinBrightness(vec3 col, float skinW) {
-                float amount = uRetouchBrightness * clamp(skinW, 0.0, 1.0);
+            // skinW / personBrightConf / lightScale are accepted for call-site
+            // compatibility (front camera and stills still pass a skin
+            // confidence in) but are otherwise unused now — the back-camera
+            // person case is handled entirely by bindRetouchUniforms feeding
+            // this function neutral-grade + brightness≈0.70 values, the same
+            // uRetouchBrightness path every other case already uses. No
+            // separate per-pixel person branch here anymore.
+            vec3 applyRetouchSkinBrightness(
+                vec3 col,
+                float skinW,
+                float personBrightConf,
+                float lightScale
+            ) {
+                float w = clamp(skinW, 0.0, 1.0);
+                float amount = uRetouchBrightness * w;
                 if (abs(amount) < 0.001) return col;
-
                 float lum = retouchLuma(col);
                 vec3 chroma = col - lum;
-                if (amount > 0.0) {
-                    float lifted = pow(
-                        clamp(lum, 0.0, 1.0),
-                        1.0 - amount * 0.28
-                    );
-                    float highlightGuard = 1.0 - smoothstep(0.68, 0.98, lum);
-                    lum = mix(lum, lifted, highlightGuard);
-                    chroma *= 1.0 - amount * 0.10;
-                    vec3 fresh = lum + chroma;
-                    fresh.r *= 1.0 - amount * 0.018;
-                    fresh.b *= 1.0 + amount * 0.035;
-                    return clamp(fresh, 0.0, 1.0);
-                }
-
                 lum *= 1.0 + amount * 0.24;
                 return clamp(lum + chroma, 0.0, 1.0);
             }
 
-            vec3 applyRetouchColor(vec3 col) {
+            // Full-frame grade. Back-camera person case: bindRetouchUniforms
+            // already blends the retouch values (saturation/contrast/
+            // exposure/whiteBalance/highlights/shadows toward 0, brightness
+            // toward ~0.70) by personMix before they ever reach this
+            // uniform, so this function does not need its own per-pixel
+            // person branch — it runs the same for every case.
+            vec3 applyRetouchColor(vec3 col, float skinW) {
                 float ev = uRetouchExposure;
                 if (abs(ev) > 0.01) {
-                    // Film-like exposure curve: keeps black black and rolls
-                    // naturally toward white instead of clipping RGB channels.
                     float lum = max(retouchLuma(col), 0.0001);
                     float exponent = pow(2.0, -ev * 0.55);
                     float exposedLum = pow(clamp(lum, 0.0, 1.0), exponent);
-                    // Preserve channel ratios so exposure changes light, not hue.
                     col = clamp(col * (exposedLum / lum), 0.0, 1.0);
                 }
                 float wb = uRetouchWhiteBalance;
                 if (abs(wb) > 0.01) {
-                    // Subtle warmth/coolness; the previous ±30% channel shift
-                    // was far too strong at the end of the slider.
                     float k = wb * 0.12;
                     col.r *= (1.0 + k);
                     col.b *= (1.0 - k);
@@ -2311,14 +2470,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 float c = uRetouchContrast;
                 if (abs(c) > 0.01) {
                     if (c > 0.0) {
-                        // Keep full slider natural; the previous 1.5x maximum
-                        // was too aggressive for a live beauty camera.
                         float alpha = 1.0 + c * 0.24;
                         col = (col - 0.5) * alpha + 0.5;
                     } else {
-                        // Lower contrast without lifting shadows at all. Any
-                        // shadow lift reads as a faint grey overlay, so only
-                        // compress mid/high luminance downward.
                         float lum = max(retouchLuma(col), 0.0001);
                         float brightW = smoothstep(0.28, 0.88, lum);
                         float resultLum =
@@ -2334,8 +2488,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     col += hl * (70.0 / 255.0) * hlW;
                 }
                 if (abs(sh) > 0.01) {
-                    // Shadow curve only: black stays black, dark detail
-                    // opens/deepens, and highlights smoothly receive no change.
                     float lum = max(retouchLuma(col), 0.0001);
                     float shadowW = 1.0 - smoothstep(0.30, 0.72, lum);
                     float exponent = sh > 0.0
@@ -2343,8 +2495,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                         : 1.0 + (-sh) * 0.32;
                     float curvedLum = pow(clamp(lum, 0.0, 1.0), exponent);
                     float resultLum = mix(lum, curvedLum, shadowW);
-                    // Scale luminance instead of adding grey, preserving colour
-                    // and texture with no dark/white overlay.
                     col = clamp(col * (resultLum / lum), 0.0, 1.0);
                 }
                 float sat = uRetouchSaturation;
@@ -2562,6 +2712,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // buffer, so the smoothing everyone already sees is unchanged.
             const float FINE_RADIUS_FRAC = 0.0023;
             const float BASE_RADIUS_FRAC = 0.0074;
+            // Wider than the smoothing radii on purpose — this feathers the
+            // colour skin-mask itself so brighten fades in across a
+            // hairline/jaw edge instead of cutting hard, which is what read
+            // as a pasted-on patch.
+            const float TONE_FEATHER_RADIUS_FRAC = 0.020;
 
             // How much of each band the smoothing removes at full strength.
             //
@@ -2677,6 +2832,25 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // keeps the result identical everywhere.
             vec2 radiusStep(float frac) {
                 return uTexelStep * (frac / max(uTexelStep.y, 0.00001));
+            }
+
+            // 9-tap average of the colour skin-mask around this pixel. The raw
+            // mask (skinConfidence on a single pixel) jumps hard at a
+            // hairline/jaw because hair and skin colour genuinely differ by a
+            // lot — averaging neighbours spreads that jump into a soft ramp
+            // instead of a visible cut-out edge.
+            float featheredSkinConf(vec2 uv, vec3 center) {
+                vec2 t = radiusStep(TONE_FEATHER_RADIUS_FRAC);
+                float sum = skinConfidence(center);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x,  0.0)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  0.0)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0,  t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0, -t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x,  t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x, -t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x, -t.y)).rgb);
+                return sum * (1.0 / 9.0);
             }
 
             // Scene grain clean: strength is driven mostly by LOCAL darkness
@@ -3038,12 +3212,22 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     );
                     float toneScale = 0.45 + toneDeficit * 0.55;
 
-                    // Brighten: shadows and midtones only. The (1-l)^2 weight
-                    // means already-bright areas are barely moved, so the lift
-                    // opens up a dim face without washing out lit areas.
-                    if (uBrighten > 0.001) {
-                        lum += uBrighten * toneConf * 0.36 * toneScale *
-                            (1.0 - lum) * (1.0 - lum);
+                    // Mild skin brighten — front camera / general slider only
+                    // here. Back-camera person brighten moved to
+                    // applyRetouchSkinBrightness: it must run AFTER
+                    // applyRetouchColor's −47/contrast empty-grade below, or
+                    // that grade crushes this lift straight back down (this
+                    // was the actual "0 effect, still dark" bug — the value
+                    // was reaching the shader fine, it just ran too early).
+                    float personMixEarly = smoothstep(
+                        0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0)
+                    );
+                    if (uBrighten > 0.001 && personMixEarly < 0.999) {
+                        float brightConf = featheredSkinConf(st, col);
+                        float gain = 1.0 + uBrighten * brightConf * 0.45 *
+                            (1.0 - personMixEarly);
+                        lum *= gain;
+                        chroma *= gain;
                     }
 
                     // Whiten: a gamma lift with a soft knee. Past the knee the
@@ -3237,10 +3421,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                         1.0
                     );
                 }
-                col = applyRetouchColor(col);
+                float feathBrightConf = featheredSkinConf(st, col);
+                col = applyRetouchColor(col, feathBrightConf);
                 col = applyRetouchSkinBrightness(
                     col,
-                    retouchBrightnessConf
+                    retouchBrightnessConf,
+                    feathBrightConf,
+                    0.60 + clamp(
+                        (SKIN_LUMA_TARGET - uSkinLuma) / SKIN_LUMA_TARGET, 0.0, 1.0
+                    ) * 1.00
                 );
                 // Last: the band split and the polish blocks above rebuild col
                 // from the original texture, which discarded an earlier tooth
@@ -3291,6 +3480,23 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 float crW = smoothstep(0.46, 0.54, cr) * (1.0 - smoothstep(0.66, 0.74, cr));
                 float yW  = smoothstep(0.05, 0.15, y);
                 return cbW * crW * yW;
+            }
+
+            // Same feathering as the live OES preview — averages the colour
+            // mask over a small neighbourhood so brighten ramps in across a
+            // hairline/jaw instead of cutting hard.
+            float featheredSkinConf(vec2 uv, vec3 center) {
+                vec2 t = uTexelStep * (0.020 / max(uTexelStep.y, 0.00001));
+                float sum = skinConfidence(center);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x,  0.0)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  0.0)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0,  t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0, -t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x,  t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x, -t.y)).rgb);
+                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x, -t.y)).rgb);
+                return sum * (1.0 / 9.0);
             }
 
             vec3 surfaceBlur(vec2 uv, vec3 center) {
@@ -3397,7 +3603,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     vec3 chroma = col - l;
                     float lum = l;
                     if (uBrighten > 0.001) {
-                        lum += uBrighten * toneConf * 0.36 * (1.0 - lum) * (1.0 - lum);
+                        float brightConf = featheredSkinConf(vTexCoord, col);
+                        float personMixEarly = smoothstep(
+                            0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0)
+                        );
+                        float gain = 1.0 + uBrighten * brightConf * 0.45 *
+                            (1.0 - personMixEarly);
+                        lum *= gain;
+                        chroma *= gain;
                     }
                     if (uWhiten > 0.001) {
                         float lifted = pow(clamp(lum, 0.0, 1.0), 1.0 - uWhiten * toneConf * 0.35);
@@ -3415,8 +3628,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     col = clamp(col * (mix(lumIn, lifted, rolloff) / lumIn), 0.0, 1.0);
                     col = clamp((col - 0.5) * (1.0 + BASE_CONTRAST) + 0.5, 0.0, 1.0);
                 }
-                col = applyRetouchColor(col);
-                col = applyRetouchSkinBrightness(col, toneConf);
+                float feathBrightConfStill = featheredSkinConf(vTexCoord, col);
+                col = applyRetouchColor(col, feathBrightConfStill);
+                col = applyRetouchSkinBrightness(
+                    col, toneConf, feathBrightConfStill, 1.0
+                );
                 // Cut yellow/warm — same as live OES.
                 {
                     float skinW = skinConfidence(col);
@@ -3445,6 +3661,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uNosePull;
             uniform vec2 uViewSize;
             uniform vec2 uTexSize;
+            // Needed by applyRetouchSkinBrightness (RETOUCH_FUNCTIONS) even
+            // though this program never binds it — an unbound uniform
+            // defaults to 0, so the person-brighten branch there simply
+            // never fires here. Missing the declaration entirely made the
+            // whole shader fail to compile/link (this is the program this
+            // filter/front path runs on), which is why every retouch effect
+            // stopped applying.
+            uniform float uBrighten;
             $RETOUCH_UNIFORMS
             $RETOUCH_FUNCTIONS
 
@@ -3519,8 +3743,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 }
 
                 vec3 col = sourceColor.rgb;
-                col = applyRetouchColor(col);
-                col = applyRetouchSkinBrightness(col, retouchSkinConfidence(col));
+                float stillSkinW = retouchSkinConfidence(col);
+                col = applyRetouchColor(col, stillSkinW);
+                col = applyRetouchSkinBrightness(col, stillSkinW, stillSkinW, 1.0);
                 col = applyRetouchToothColor(col, tc);
 
                 gl_FragColor = vec4(col, sourceColor.a);

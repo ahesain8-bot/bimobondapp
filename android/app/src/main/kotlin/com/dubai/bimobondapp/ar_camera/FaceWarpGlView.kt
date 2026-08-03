@@ -166,6 +166,9 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
     }
 
+    /** Oriented camera buffer size for letterbox-free GL recording. */
+    fun orientedCameraSize(): Pair<Int, Int> = renderer.orientedCameraSize()
+
     fun setOnFramePresented(callback: (() -> Unit)?) {
         renderer.onFramePresented = callback
     }

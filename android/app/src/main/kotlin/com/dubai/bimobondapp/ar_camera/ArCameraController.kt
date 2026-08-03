@@ -355,6 +355,23 @@ object ArCameraController {
     @Volatile
     private var camera: Camera? = null
 
+    /** True when the bound CameraX lens is the front (selfie) camera. */
+    private fun isBoundFrontLens(): Boolean {
+        val bound = camera
+        if (bound != null) {
+            return bound.cameraInfo.lensFacing == CameraSelector.LENS_FACING_FRONT
+        }
+        return ArCameraBridge.isFrontCamera
+    }
+
+    private fun notifyBackPersonPresence(faceFill: Float) {
+        if (isBoundFrontLens()) {
+            BackPersonPresence.clearForFrontCamera()
+        } else {
+            BackPersonPresence.updateFromBackCamera(faceFill)
+        }
+    }
+
     @Volatile
     private var torchEnabled = false
 
@@ -474,6 +491,10 @@ object ArCameraController {
         cachedWarpParams = FaceWarpParams.INACTIVE
         cachedSnapshot = null
         FaceLandmarkSmoother.reset()
+        BackPersonPresence.reset()
+        if (ArCameraBridge.isFrontCamera) {
+            BackPersonPresence.clearForFrontCamera()
+        }
         convertingFrame.set(false)
         faceOverlay.resetForNonPngFilter()
 
@@ -1762,6 +1783,8 @@ object ArCameraController {
             startBitmapRecording(file, onResult)
             return
         }
+        // Same canvas as the live GL preview — recorded frame must match what
+        // was on screen (no FOV/zoom change from re-aspecting to camera buffer).
         val vw = ArCameraBridge.warpViewWidth.takeIf { it > 0 }
             ?: gl.width.coerceAtLeast(1)
         val vh = ArCameraBridge.warpViewHeight.takeIf { it > 0 }
@@ -4156,11 +4179,13 @@ object ArCameraController {
     private fun decayFacePresence() {
         if (faceFillAverage < 0f) {
             ArCameraBridge.warpGlView?.updateFaceFill(0f)
+            notifyBackPersonPresence(0f)
             return
         }
-        faceFillAverage *= 0.62f
-        if (faceFillAverage < 0.015f) faceFillAverage = 0f
+        faceFillAverage *= 0.85f
+        if (faceFillAverage < 0.012f) faceFillAverage = 0f
         ArCameraBridge.warpGlView?.updateFaceFill(faceFillAverage)
+        notifyBackPersonPresence(faceFillAverage.coerceAtLeast(0f))
         if (skinLumaAverage > 0f) {
             val target = FaceWarpRenderer.SKIN_LUMA_TARGET
             skinLumaAverage += (target - skinLumaAverage) * 0.25f
@@ -4210,6 +4235,7 @@ object ArCameraController {
             faceFillAverage + (frameFill - faceFillAverage) * SKIN_TONE_EASE
         }
         ArCameraBridge.warpGlView?.updateFaceFill(faceFillAverage)
+        notifyBackPersonPresence(faceFillAverage)
 
         val scaleX = oriented.width / snapshot.imageWidth.toFloat()
         val scaleY = oriented.height / snapshot.imageHeight.toFloat()
