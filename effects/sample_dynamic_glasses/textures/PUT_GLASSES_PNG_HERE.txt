@@ -1,0 +1,1 @@
+Place a transparent PNG named glasses.png in this folder before runtime testing.

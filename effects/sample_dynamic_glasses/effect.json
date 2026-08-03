@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "0.1.0",
+  "effectId": "sample_dynamic_glasses",
+  "effectVersion": "1.0.0",
+  "minimumEngineVersion": "0.1.0",
+  "displayName": "Sample Dynamic Glasses",
+  "maxFaces": 1,
+  "graph": {
+    "nodes": [
+      {
+        "id": "glasses",
+        "type": "sticker_2d",
+        "enabled": true,
+        "faceTarget": "all",
+        "asset": "textures/glasses.png",
+        "opacity": 1.0,
+        "zIndex": 10,
+        "blendMode": "normal",
+        "anchor": {
+          "leftLandmark": 33,
+          "rightLandmark": 263,
+          "anchorLandmark": 168,
+          "secondaryAnchorLandmark": -1,
+          "secondaryBlendY": 0.0,
+          "pinX": "nose_bridge",
+          "pinY": "eye_line",
+          "useAveragedEyes": true
+        },
+        "transform": {
+          "offsetXFaceFrac": 0.0,
+          "offsetYFaceFrac": 0.0,
+          "widthScreenMult": 3.5,
+          "widthFaceFrac": 0.0,
+          "widthMinFaceFrac": 0.7,
+          "maxFaceWidthFrac": 0.0,
+          "pivotU": 0.5,
+          "pivotV": 0.5,
+          "rotationOffsetDeg": 0.0,
+          "yawSqueeze": 0.0,
+          "scaleFromFaceBox": false,
+          "heightSpanFrac": 0.0,
+          "heightAnchorTopLandmark": -1,
+          "heightAnchorBottomLandmark": -1
+        }
+      }
+    ]
+  }
+}
