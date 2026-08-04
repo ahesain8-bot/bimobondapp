@@ -103,6 +103,24 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     MediaPhotoEditorTool.highlights: 0.08, // +8
     MediaPhotoEditorTool.shadows: 0.10, // +10
   };
+  /// Front-camera live color defaults — must match the front-camera target
+  /// values in FaceWarpRenderer.bindRetouchUniforms (the "frontTarget"
+  /// argument of each fieldMix call). Kept in sync manually: previously this
+  /// screen sent [_kLiveColorDefaults] (the back-camera baseline) or zeros for
+  /// front, so the slider thumbs showed a value (e.g. contrast +100) that
+  /// didn't match what the native override actually rendered, and flipping to
+  /// front camera reset the look instead of reapplying it. Sending the real
+  /// front values here means the slider position and the rendered look agree,
+  /// on cold open and after every camera flip.
+  static const Map<MediaPhotoEditorTool, double> _kFrontLiveColorDefaults = {
+    MediaPhotoEditorTool.contrast: 0.0, // 0
+    MediaPhotoEditorTool.saturation: -0.10, // -10
+    MediaPhotoEditorTool.brightness: 0.45, // +45
+    MediaPhotoEditorTool.exposure: 0.15, // +15
+    MediaPhotoEditorTool.whiteBalance: -0.50, // warmth -50
+    MediaPhotoEditorTool.highlights: 0.10, // +10
+    MediaPhotoEditorTool.shadows: 0.25, // +25
+  };
   static const Map<MediaPhotoEditorTool, double> _kMagicBeautyDefaults = {
     MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
     MediaPhotoEditorTool.contrast: 1.0, // max — same as live baseline
@@ -240,6 +258,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
     if (_useNativeArFilters) {
       _isFrontCamera = true;
+      // Cold open starts on front camera — match what a flip-to-front does,
+      // so the slider thumbs and the rendered look agree from the first
+      // frame instead of only after the user flips away and back.
+      _restoreLiveColorDefaults();
       ArCameraBridge.installPlatformCallbacks();
       ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
@@ -332,6 +354,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     _recordTimer?.cancel();
     _countdownTimer?.cancel();
     _arFilterIntensityDebounce?.cancel();
+    _smoothAdjustDebounce?.cancel();
+    _retouchAdjustDebounce?.cancel();
     unawaited(SoundAudioPreview.stop());
     _clearLayoutCapture();
     if (_useNativeArFilters) {
@@ -463,13 +487,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _restoreLiveColorDefaults() {
-    if (_isFrontCamera) {
-      for (final tool in _kLiveColorDefaults.keys) {
-        _photoAdjustments[tool] = 0.0;
-      }
-    } else {
-      _photoAdjustments.addAll(_kLiveColorDefaults);
-    }
+    _photoAdjustments.addAll(
+      _isFrontCamera ? _kFrontLiveColorDefaults : _kLiveColorDefaults,
+    );
   }
 
   void _syncRetouchToNative() {
@@ -560,6 +580,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
   }
 
+  Timer? _smoothAdjustDebounce;
+  Timer? _retouchAdjustDebounce;
+
   void _onPhotoEditorAdjustmentChanged(
     MediaPhotoEditorTool tool,
     double value,
@@ -574,16 +597,32 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         }
       });
       if (_useNativeArFilters) {
-        if (_photoEditorMagicOn) {
-          ArCameraBridge.setMagicEnabled(true, strength: strength);
-        } else {
-          ArCameraBridge.setMagicEnabled(false);
-        }
+        // Slider fires on every pixel of drag movement — keep the visible
+        // thumb instant (setState above), but debounce the native push.
+        // Same fix already applied to the filter-intensity slider (see
+        // _onArFilterIntensityChanged) for the identical "spamming native
+        // calls on every tick during drag" freeze — this one was missed.
+        _smoothAdjustDebounce?.cancel();
+        _smoothAdjustDebounce = Timer(const Duration(milliseconds: 40), () {
+          if (_photoEditorMagicOn) {
+            ArCameraBridge.setMagicEnabled(true, strength: strength);
+          } else {
+            ArCameraBridge.setMagicEnabled(false);
+          }
+        });
       }
       return;
     }
     setState(() => _photoAdjustments[tool] = value);
-    _syncRetouchToNative();
+    if (_useNativeArFilters) {
+      // Same "fires on every drag pixel" issue as Smooth above — debounce
+      // the native push, keep the visible slider instant via setState.
+      _retouchAdjustDebounce?.cancel();
+      _retouchAdjustDebounce = Timer(
+        const Duration(milliseconds: 40),
+        _syncRetouchToNative,
+      );
+    }
   }
 
   void _resetPhotoEditor() {
@@ -1836,14 +1875,16 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         setState(() {
           _isFrontCamera = isFront;
           _selectedZoom = CameraStudioConstants.zoomSteps.first.value;
-          if (!_photoEditorMagicOn) {
-            _restoreLiveColorDefaults();
-          }
+          // Always reset on flip, not just when Magic/Retouch is off. Each
+          // camera's color values are independent (front's own set, back's
+          // empty/person-present set computed natively) — gating this on
+          // Magic being off meant that, in the default Magic-on state,
+          // flipping cameras never reset or re-sent the color values, so the
+          // new camera just kept whatever the previous camera had applied.
+          _restoreLiveColorDefaults();
         });
         _faceDetectorService.isFrontCamera = isFront;
-        if (!_photoEditorMagicOn) {
-          _syncRetouchToNative();
-        }
+        _syncRetouchToNative();
         unawaited(_applyZoom(_selectedZoom, force: true));
       } catch (_) {}
       return;

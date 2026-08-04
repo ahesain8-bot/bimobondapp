@@ -12,7 +12,20 @@ class NativeVideoProcessor {
   NativeVideoProcessor._();
 
   static const _maxVideoFilterSeconds = 60;
-  static const _highQualityVideoBitrate = 8 * 1000 * 1000;
+  /// Bitrate for every editor re-encode (music mux, colour filter, trim, text
+  /// overlay, effect overlay).
+  ///
+  /// Must not sit below what the camera recorded at, which is the mistake this
+  /// replaces: capture runs at roughly 0.3 bits per pixel per frame — about
+  /// 14.6 Mbps for an 851x1918 clip — so re-encoding at 8 Mbps threw away
+  /// nearly half the bitrate. Because adding a sound alone triggers a render,
+  /// virtually every posted video went through that downgrade, which is exactly
+  /// the "video looks blocky/blurry after posting" report. 16 Mbps keeps the
+  /// re-encode at or above capture, so an edit is visually a passthrough.
+  ///
+  /// Raising this raises the size of EDITED clips only; untouched recordings
+  /// are uploaded as-is (see VideoCompressUtils.compressIfNeeded).
+  static const _highQualityVideoBitrate = 16 * 1000 * 1000;
 
   /// Preserve the input pixel dimensions while giving 1080p camera footage
   /// enough bitrate to survive an editor render without visible degradation.

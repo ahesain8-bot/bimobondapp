@@ -84,8 +84,6 @@ object ArCameraBridge {
     @Volatile
     private var coldStartBindDone: Boolean = false
 
-    private var coldStartPreviewObserver: Observer<PreviewView.StreamState>? = null
-
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var freezeOverlay: ImageView? = null
@@ -93,6 +91,22 @@ object ArCameraBridge {
     private var applyingOverlay: View? = null
 
     private var oesRevealFramesLeft = 0
+
+    /**
+     * GL frames to let through before dropping the freeze overlay and showing the
+     * live beauty preview.
+     *
+     * The countdown is armed in [onOesSurfaceProvided], i.e. only once CameraX has
+     * actually handed the OES SurfaceTexture over, so every frame counted here is
+     * a real post-bind frame — the empty pre-bind ones are already excluded. A
+     * measured cold open showed these frames landing at +284, +370, +522, +537,
+     * +806, +832, +858 and +902ms after the transition started: waiting for all
+     * eight held the frozen still on screen for ~617ms, of which the last ~380ms
+     * bought nothing, because the pipeline was plainly already streaming by the
+     * third frame. Three keeps the "don't reveal a half-started pipeline" guard
+     * this exists for while cutting most of the visible freeze.
+     */
+    private const val OES_REVEAL_FRAMES = 3
 
     @Volatile
     private var oesTransitionPending = false
@@ -115,7 +129,7 @@ object ArCameraBridge {
     fun onOesSurfaceProvided() {
         if (!awaitFirstGlFrame && !oesTransitionPending) return
         oesSurfaceLive = true
-        oesRevealFramesLeft = 8
+        oesRevealFramesLeft = OES_REVEAL_FRAMES
         android.util.Log.i(
             "ArFilterTap",
             "oesSurfaceLive armed frames=$oesRevealFramesLeft +${oesDiagElapsedMs()}ms",
@@ -261,49 +275,32 @@ object ArCameraBridge {
     }
 
     /**
-     * Cold-open path: show CameraX's first raw frame immediately, then hand off
-     * to the beauty OES pipeline under that frame. Binding OES before the first
-     * PreviewView frame made the route sit black for the whole camera-session
-     * startup; this keeps startup visible without changing the final renderer.
+     * Cold-open path: hand straight over to the beauty OES pipeline without
+     * waiting for the plain PreviewView to produce a frame first.
+     *
+     * This previously waited for PreviewView.StreamState.STREAMING before handing
+     * off, so that CameraX's first raw frame was on screen during the switch. A
+     * measured cold open showed what that actually costs: the camera session is
+     * started, the route waits ~445ms for its first frame, a 1080x2436 bitmap of
+     * that frame is captured (~117ms), and the session is then torn down and
+     * rebound onto the OES surface (~272ms) — the camera effectively starts twice,
+     * and the "raw frame" it waits for is only ever shown as a frozen still that
+     * the reveal then fades out.
+     *
+     * Handing off immediately makes the sensor start once, directly onto the
+     * pipeline that will actually render. There is no frame to freeze at this
+     * point, so showFreezeFromPreview reports no freeze frame and
+     * [beginOesTransitionWithFreeze] takes its existing no-freeze branch, which
+     * binds OES directly. The wait is black rather than black-then-frozen-still,
+     * but it is roughly 400ms shorter overall.
      */
     private fun beginOesDirectNoFreeze() {
         if (ArCameraController.isBoundToOes()) return
         if (!ArCameraController.canRebindCamera()) return
-        val preview = previewView ?: return
-        val owner = lifecycleOwner ?: return
+        previewView ?: return
+        lifecycleOwner ?: return
 
-        fun handOffToOes() {
-            coldStartPreviewObserver?.let { observer ->
-                try {
-                    preview.previewStreamState.removeObserver(observer)
-                } catch (_: Throwable) {
-                }
-            }
-            coldStartPreviewObserver = null
-            if (!ArCameraController.isBoundToOes() &&
-                ArCameraController.canRebindCamera()
-            ) {
-                beginOesTransitionWithFreeze()
-            }
-        }
-
-        if (preview.previewStreamState.value == PreviewView.StreamState.STREAMING) {
-            handOffToOes()
-            return
-        }
-        if (coldStartPreviewObserver != null) return
-
-        val observer = Observer<PreviewView.StreamState> { state ->
-            if (state == PreviewView.StreamState.STREAMING) {
-                mainHandler.post { handOffToOes() }
-            }
-        }
-        coldStartPreviewObserver = observer
-        try {
-            preview.previewStreamState.observe(owner, observer)
-        } catch (_: Throwable) {
-            coldStartPreviewObserver = null
-        }
+        beginOesTransitionWithFreeze()
     }
 
     fun beginOesTransitionWithFreeze() {
@@ -350,7 +347,7 @@ object ArCameraBridge {
             diagVis("beginOes.freezeReady")
             awaitFirstGlFrame = true
             // Real countdown starts in onOesSurfaceProvided — ignore empty pre-bind frames.
-            oesRevealFramesLeft = 8
+            oesRevealFramesLeft = OES_REVEAL_FRAMES
 
             if (hasFreezeFrame) {
                 // Freeze stays on top covering the rebind — never expose black GL/Preview.
@@ -381,8 +378,7 @@ object ArCameraBridge {
                 if (ready) {
                     ArCameraController.ensureOesPreviewBound()
                 } else {
-                    gl.onCameraSurfaceReady = {
-                        gl.onCameraSurfaceReady = null
+                    gl.awaitCameraSurface {
                         android.util.Log.i(
                             "ArFilterTap",
                             "beginOes: onCameraSurfaceReady → ensureOes +${oesDiagElapsedMs()}ms",
@@ -1071,13 +1067,6 @@ object ArCameraBridge {
 
     fun clear() {
         ArCameraController.abortCapture()
-        coldStartPreviewObserver?.let { observer ->
-            try {
-                previewView?.previewStreamState?.removeObserver(observer)
-            } catch (_: Throwable) {
-            }
-        }
-        coldStartPreviewObserver = null
         coldStartBindDone = false
         warpGlView?.releaseGl()
         clearApplyingOverlay()

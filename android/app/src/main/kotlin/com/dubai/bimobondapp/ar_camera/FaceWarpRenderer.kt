@@ -261,7 +261,66 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         onCameraSurfaceReady?.invoke(st)
     }
 
+    /**
+     * Drops every cached GL object handle because a NEW EGL context is being set
+     * up and the old names are dead.
+     *
+     * Deliberately zeroes rather than deletes: these names belong to the
+     * destroyed context, so glDelete* here would at best be a no-op and at worst
+     * free an unrelated object that the new context has since been given the
+     * same name for.
+     *
+     * Without this, [onSurfaceCreated] rebuilt the programs and textures but left
+     * the lazily-created buffers' handles and cached dimensions intact, so their
+     * ensure* guards (which return early when the id is non-zero and the size
+     * matches) handed back framebuffers belonging to the dead context.
+     * [ensureHistoryBuffers] runs inside drawOes on every frame, so the result
+     * was a camera that bound and reported healthy — the preview surface visible,
+     * CameraX streaming — while GL quietly failed to draw: the intermittent black
+     * preview after returning from another app. Intermittent because
+     * preserveEGLContextOnPause is best-effort; the context usually survives, and
+     * only the times the driver actually dropped it went black.
+     */
+    private fun forgetGlObjectsForNewContext() {
+        captureFboId = 0
+        captureFboTexId = 0
+        captureFboW = 0
+        captureFboH = 0
+
+        encoderFboId = 0
+        encoderFboTexId = 0
+        encoderFboW = 0
+        encoderFboH = 0
+
+        historyTexId[0] = 0
+        historyTexId[1] = 0
+        historyFboId[0] = 0
+        historyFboId[1] = 0
+        historyW = 0
+        historyH = 0
+        historyReadIndex = 0
+        historyValid = false
+        history2Valid = false
+
+        skinMaskTexId = 0
+        skinMaskValid = false
+
+        stillProgram = 0
+        stillTexId = 0
+        stillFboId = 0
+        stillFboTexId = 0
+
+        blitProgram = 0
+
+        // Same reasoning for the encoder's window surface: it was created
+        // against the old context/display, so the handle must be dropped rather
+        // than eglDestroySurface'd. presentToEncoder recreates it on demand.
+        encoderEglSurface = null
+        lastEncoderSwapMs = 0L
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        forgetGlObjectsForNewContext()
         program = buildProgram(VERTEX_SHADER, FRAGMENT_SHADER)
         if (program == 0) reportGlUnusable("bitmap program")
         aPosition = GLES20.glGetAttribLocation(program, "aPosition")
@@ -386,6 +445,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         onCameraSurfaceReady?.invoke(st)
 
         texMatrixReady = false
+
+        blitProgram = buildProgram(BLIT_VERTEX_SHADER, BLIT_FRAGMENT_SHADER)
+        if (blitProgram == 0) reportGlUnusable("blit program")
+        blitAPosition = GLES20.glGetAttribLocation(blitProgram, "aPosition")
+        blitATexCoord = GLES20.glGetAttribLocation(blitProgram, "aTexCoord")
+        blitUTexture = GLES20.glGetUniformLocation(blitProgram, "uTexture")
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -564,42 +629,32 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // Far framing: face is small, so the same frame-fraction blur covers most
         // of it and reads as weird soft/wax. Scale smooth with face size.
         val distScale = faceDistanceScale()
-        // Back camera: general Magic smooth (up to ~0.73-0.99 strength) was
-        // never scoped for back camera and read as unwanted heavy blur
-        // whenever a face filled enough of frame. Empty frame stays exactly
-        // 0. Person present gets a fixed, modest "normal" amount instead —
-        // enough to hide blemishes/scars without going plastic/waxy — not
-        // tied to Magic strength, and not gated by distScale (tuned for
-        // front-camera selfie fill %, back camera rarely reaches it).
-        val smoothCameraScale = if (ArCameraBridge.isFrontCamera) 1f else 0f
-        val targetSmooth = if (ArCameraBridge.isFrontCamera) {
-            if (magic) {
-                LiveBeautyAdjustments.smoothFromStrength(magicStrength) * distScale * smoothCameraScale
-            } else {
-                adaptedSmooth(beauty, lowLight) * distScale * smoothCameraScale
-            }
+        // Same "normal" clean-not-blur behaviour on both cameras now:
+        // - own linear range (0 → SMOOTH_MAX) instead of smoothFromStrength,
+        //   whose curve floors at 0.48 even at slider=0 (so capping only the
+        //   top used to squeeze the whole slider into a useless 0.48–0.55
+        //   band — 0 and 100 looked identical);
+        // - not gated by distScale, which front's old path used and which
+        //   silently zeroed smoothing out whenever the face didn't fill
+        //   18–40% of frame (easy to miss in a quick test).
+        // Back camera additionally requires a detected person (personMix);
+        // front camera's own face is always the subject, so no such gate.
+        val isFrontSmooth = ArCameraBridge.isFrontCamera
+        val personMix = if (isFrontSmooth) {
+            1f
         } else {
-            val personMix = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
-            // Only use the fixed "normal" amount while the Smooth slider is
-            // still at its default (magic on, untouched strength) — same
-            // problem as the retouch panel: unconditionally overriding it
-            // made the slider look dead once a person entered frame. A
-            // manual slider change is respected (still gated by personMix,
-            // not distScale — back camera rarely reaches the front-tuned
-            // fill range distScale expects).
-            val magicUntouched = magic && kotlin.math.abs(
-                magicStrength - LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH,
-            ) < 0.01f
-            if (magicUntouched) {
-                BACK_PERSON_SMOOTH_NORMAL * personMix
-            } else {
-                val userSmooth = if (magic) {
-                    LiveBeautyAdjustments.smoothFromStrength(magicStrength)
-                } else {
-                    adaptedSmooth(beauty, lowLight)
-                }
-                userSmooth * personMix
-            }
+            smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
+        }
+        val smoothNormal = if (isFrontSmooth) FRONT_SMOOTH_NORMAL else BACK_PERSON_SMOOTH_NORMAL
+        val smoothMax = if (isFrontSmooth) FRONT_SMOOTH_MAX else BACK_PERSON_SMOOTH_MAX
+        val magicUntouched = magic && kotlin.math.abs(
+            magicStrength - LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH,
+        ) < 0.01f
+        val targetSmooth = if (magicUntouched) {
+            smoothNormal * personMix
+        } else {
+            val sliderPos = if (magic) magicStrength else beauty.smooth
+            (sliderPos.coerceIn(0f, 1f) * smoothMax) * personMix
         }
         // Snap DOWN immediately when pulling away — easing left a soft trail.
         if (targetSmooth < smoothedSmooth - 0.03f ||
@@ -697,8 +752,20 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         val closeUpBoost = smoothedCloseUpBoost
         // Spatial grain clean: when far, dial down so cleanup does not read as
         // face blur on a small head (same frame-fraction taps).
+        // distScale alone was the front-tuned 18–40% fill range — back
+        // camera typically reads 5–12%, so this term sat near its 0.35
+        // floor for a person who is very much "close" by back-camera
+        // standards, under-cleaning grain on their face. Only back+person
+        // gets the boost (front camera and an empty back frame keep the
+        // exact original distScale-only value).
+        val denoiseDistScale = if (ArCameraBridge.isFrontCamera) {
+            distScale
+        } else {
+            val personMixGrain = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
+            maxOf(distScale, personMixGrain)
+        }
         val denoiseDrive =
-            ((lowLight * 0.35f + closeUpBoost * 0.55f + 0.32f) * mix(0.35f, 1f, distScale))
+            ((lowLight * 0.35f + closeUpBoost * 0.55f + 0.32f) * mix(0.35f, 1f, denoiseDistScale))
                 .coerceIn(0f, 1f)
         GLES20.glUniform1f(oesUSceneDenoise, denoiseDrive)
         GLES20.glUniform1f(oesUCloseUpBoost, closeUpBoost)
@@ -1162,6 +1229,61 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         return configs[0]
     }
 
+    /**
+     * Renders [draw] (the full beauty shader) at a reduced internal size and
+     * returns the FBO texture holding the result, or 0 on failure.
+     *
+     * Recording at genuine 1080x1920 (see [ArCameraController]'s
+     * startGlSurfaceRecording) meant this same per-pixel-expensive shader was
+     * suddenly running on ~27% more pixels than the previous screen-cropped
+     * recording size, which measured out as visible lag during recording.
+     * Rendering the shader itself at a capped budget and blitting the result up
+     * to the real encoder size in [presentToEncoder] keeps the OUTPUT file at
+     * full 1080x1920 — same as [FaceWarpGlView]'s live-preview render cap, which
+     * uses the same trade for the same reason (see its doc for the fetch-count
+     * math this is working around).
+     */
+    private fun renderShaderAtBudget(draw: () -> Unit, fullW: Int, fullH: Int): Int {
+        val pixels = fullW.toLong() * fullH.toLong()
+        val scale = kotlin.math.sqrt(
+            (ENCODER_RENDER_MAX_PIXELS.toDouble() / pixels.toDouble()).coerceAtMost(1.0),
+        )
+        val renderW = ((fullW * scale).toInt() and 1.inv()).coerceAtLeast(2)
+        val renderH = ((fullH * scale).toInt() and 1.inv()).coerceAtLeast(2)
+
+        if (!ensureEncoderFbo(renderW, renderH)) return 0
+        val prevViewport = IntArray(4)
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, prevViewport, 0)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, encoderFboId)
+        GLES20.glViewport(0, 0, renderW, renderH)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        draw()
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        GLES20.glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3])
+        return encoderFboTexId
+    }
+
+    private fun blitFullScreen(texId: Int) {
+        GLES20.glUseProgram(blitProgram)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId)
+        GLES20.glUniform1i(blitUTexture, 0)
+
+        GLES20.glEnableVertexAttribArray(blitAPosition)
+        GLES20.glVertexAttribPointer(blitAPosition, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
+
+        GLES20.glEnableVertexAttribArray(blitATexCoord)
+        vertexBuffer.position(2)
+        GLES20.glVertexAttribPointer(blitATexCoord, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
+        vertexBuffer.position(0)
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+        GLES20.glDisableVertexAttribArray(blitAPosition)
+        GLES20.glDisableVertexAttribArray(blitATexCoord)
+    }
+
     private fun presentToEncoder(draw: () -> Unit) {
         val androidSurface = encoderAndroidSurface ?: return
         if (!androidSurface.isValid) return
@@ -1171,6 +1293,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         val now = SystemClock.elapsedRealtime()
         if (now - lastEncoderSwapMs < encoderMinIntervalMs) return
+
+        // Rendered before touching the encoder's own EGL surface — this is plain
+        // FBO rendering, unrelated to which window surface happens to be current.
+        val renderedTex = renderShaderAtBudget(draw, encW, encH)
+        if (renderedTex == 0) return
 
         val eglDisplay = EGL14.eglGetCurrentDisplay()
         val eglContext = EGL14.eglGetCurrentContext()
@@ -1230,7 +1357,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glViewport(0, 0, encW, encH)
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-            draw()
+            blitFullScreen(renderedTex)
             EGLExt.eglPresentationTimeANDROID(
                 eglDisplay,
                 eglSurf,
@@ -1335,6 +1462,29 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var captureFboTexId = 0
     private var captureFboW = 0
     private var captureFboH = 0
+
+    // Encoder render-then-upscale (see presentToEncoder): drawOes() renders the
+    // full beauty pipeline into this FBO at a reduced size, and blitProgram then
+    // upscales it into the actual encoder surface at full recording resolution.
+    // Kept separate from captureFboId/captureFboW/H — capture is a rare
+    // still-photo readback while this runs on every recorded video frame, and
+    // sharing one FBO between the two would mean whichever ran last silently
+    // resizes it out from under the other on its next use.
+    private var encoderFboId = 0
+    private var encoderFboTexId = 0
+    private var encoderFboW = 0
+    private var encoderFboH = 0
+
+    // Minimal textured-quad program for the upscale blit above. Deliberately its
+    // own program rather than reusing `program` (drawBitmapFrame's): that one
+    // also applies uFilterType warps and the full retouch uniform set, neither
+    // of which this blit wants — drawOes() already applied the beauty pipeline
+    // once when it rendered into encoderFboTexId, so blitting it a second time
+    // through the same effects would double them up.
+    private var blitProgram = 0
+    private var blitAPosition = 0
+    private var blitATexCoord = 0
+    private var blitUTexture = 0
 
     // Stage 3 — temporal denoise: ping-pong history of the last blended frame,
     // sampled + re-blended each frame in drawOes() (screen-space UV, since both
@@ -1799,6 +1949,78 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         captureFboH = 0
     }
 
+    private fun ensureEncoderFbo(w: Int, h: Int): Boolean {
+        if (encoderFboId != 0 && encoderFboW == w && encoderFboH == h) return true
+        releaseEncoderFbo()
+
+        val maxTex = IntArray(1)
+        GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTex, 0)
+        val limit = maxTex[0].takeIf { it > 0 } ?: 2048
+        if (w > limit || h > limit) {
+            Log.e(TAG, "encoder render size ${w}x$h exceeds GL_MAX_TEXTURE_SIZE ($limit)")
+            return false
+        }
+
+        val tex = IntArray(1)
+        GLES20.glGenTextures(1, tex, 0)
+        encoderFboTexId = tex[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, encoderFboTexId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D,
+            0,
+            GLES20.GL_RGBA,
+            w,
+            h,
+            0,
+            GLES20.GL_RGBA,
+            GLES20.GL_UNSIGNED_BYTE,
+            null,
+        )
+        val fbo = IntArray(1)
+        GLES20.glGenFramebuffers(1, fbo, 0)
+        encoderFboId = fbo[0]
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, encoderFboId)
+        GLES20.glFramebufferTexture2D(
+            GLES20.GL_FRAMEBUFFER,
+            GLES20.GL_COLOR_ATTACHMENT0,
+            GLES20.GL_TEXTURE_2D,
+            encoderFboTexId,
+            0,
+        )
+        val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+            Log.e(
+                TAG,
+                "encoder framebuffer incomplete (0x${Integer.toHexString(status)}) " +
+                    "at ${w}x$h",
+            )
+            releaseEncoderFbo()
+            return false
+        }
+
+        encoderFboW = w
+        encoderFboH = h
+        return true
+    }
+
+    private fun releaseEncoderFbo() {
+        if (encoderFboId != 0) {
+            GLES20.glDeleteFramebuffers(1, intArrayOf(encoderFboId), 0)
+            encoderFboId = 0
+        }
+        if (encoderFboTexId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(encoderFboTexId), 0)
+            encoderFboTexId = 0
+        }
+        encoderFboW = 0
+        encoderFboH = 0
+    }
+
     private fun ensureHistoryBuffers(w: Int, h: Int) {
         if (historyTexId[0] != 0 && historyW == w && historyH == h) return
         releaseHistoryBuffers()
@@ -1898,7 +2120,16 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         val maxEdge = captureMaxEdge.coerceAtLeast(2)
         val largest = maxOf(screenW, screenH)
-        val useFbo = redraw != null && largest > maxEdge
+        // Always redraw into the capture FBO when a redraw is available, and size
+        // it from captureMaxEdge rather than from the on-screen surface.
+        //
+        // The preview surface is deliberately rendered below display resolution
+        // for performance (see FaceWarpGlView's render-resolution cap), so reading
+        // the screen back directly would silently bake that reduction into saved
+        // photos and recorded frames. Re-rendering into the FBO instead re-samples
+        // the full-resolution camera texture, so captures keep their own quality
+        // regardless of how few pixels the live preview is shaded at.
+        val useFbo = redraw != null
         val readW: Int
         val readH: Int
         if (useFbo) {
@@ -2000,6 +2231,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         captureRowBuf = null
         captureBufBytes = 0
         releaseCaptureFbo()
+        releaseEncoderFbo()
         releaseHistoryBuffers()
         pendingSkinMaskBitmap?.recycle()
         pendingSkinMaskBitmap = null
@@ -2175,55 +2407,61 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // own default before applying the override; an untouched slider
         // gets the person-present default, a touched one keeps the user's
         // exact value.
-        val personMixBase = if (ArCameraBridge.isFrontCamera) {
+        val isFrontCamera = ArCameraBridge.isFrontCamera
+        val personMixBase = if (isFrontCamera) {
             0f
         } else {
             smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
         }
-        fun fieldMix(value: Float, default: Float, target: Float): Float {
+        // Front camera's own untouched-slider targets. Independent of the back
+        // camera's empty/person-present targets below — a slider left alone on
+        // front always reads as these values; back camera's behaviour (both
+        // empty-frame and person-present) is unaffected either way.
+        fun fieldMix(value: Float, default: Float, backTarget: Float, frontTarget: Float): Float {
             val untouched = kotlin.math.abs(value - default) < 0.005f
-            return if (untouched) mix(value, target, personMixBase) else value
+            if (!untouched) return value
+            return if (isFrontCamera) frontTarget else mix(value, backTarget, personMixBase)
         }
         if (locSaturation >= 0) {
             GLES20.glUniform1f(
                 locSaturation,
-                fieldMix(color.saturation, LiveRetouchAdjustments.DEFAULT_SATURATION, 0.15f),
+                fieldMix(color.saturation, LiveRetouchAdjustments.DEFAULT_SATURATION, 0.15f, -0.10f),
             )
         }
         if (locBrightness >= 0) {
             GLES20.glUniform1f(
                 locBrightness,
-                fieldMix(color.brightness, LiveRetouchAdjustments.DEFAULT_BRIGHTNESS, 1.0f),
+                fieldMix(color.brightness, LiveRetouchAdjustments.DEFAULT_BRIGHTNESS, 1.0f, 0.45f),
             )
         }
         if (locContrast >= 0) {
             GLES20.glUniform1f(
                 locContrast,
-                fieldMix(color.contrast, LiveRetouchAdjustments.DEFAULT_CONTRAST, -1.0f),
+                fieldMix(color.contrast, LiveRetouchAdjustments.DEFAULT_CONTRAST, -1.0f, 0.0f),
             )
         }
         if (locExposure >= 0) {
             GLES20.glUniform1f(
                 locExposure,
-                fieldMix(color.exposure, LiveRetouchAdjustments.DEFAULT_EXPOSURE, 0.70f),
+                fieldMix(color.exposure, LiveRetouchAdjustments.DEFAULT_EXPOSURE, 0.70f, 0.15f),
             )
         }
         if (locWhiteBalance >= 0) {
             GLES20.glUniform1f(
                 locWhiteBalance,
-                fieldMix(color.whiteBalance, LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE, -0.40f),
+                fieldMix(color.whiteBalance, LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE, -0.40f, -0.50f),
             )
         }
         if (locHighlights >= 0) {
             GLES20.glUniform1f(
                 locHighlights,
-                fieldMix(color.highlights, LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS, 0.40f),
+                fieldMix(color.highlights, LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS, 0.40f, 0.10f),
             )
         }
         if (locShadows >= 0) {
             GLES20.glUniform1f(
                 locShadows,
-                fieldMix(color.shadows, LiveRetouchAdjustments.DEFAULT_SHADOWS, 0f),
+                fieldMix(color.shadows, LiveRetouchAdjustments.DEFAULT_SHADOWS, 0f, 0.25f),
             )
         }
         if (locNose >= 0) GLES20.glUniform1f(locNose, color.nose)
@@ -2329,6 +2567,37 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
          */
         private const val BACK_PERSON_SMOOTH_NORMAL = 0.35f
 
+        /**
+         * Ceiling on person-present smooth (front and back) even when the
+         * user manually pushes the slider to its top — Magic's own top end
+         * (0.99) flattens skin into visible blur/wax. This keeps texture/
+         * pores intact and only clears blemishes at the slider's highest
+         * setting. Also caps the blur radius (radiusScale rides the same
+         * uSmoothStrength value) — 0.55 was still reading as a faint general
+         * softening rather than pure spot cleanup.
+         */
+        private const val BACK_PERSON_SMOOTH_MAX = 0.65f
+
+        /**
+         * Front-camera-only smooth strength, stronger than the back-camera
+         * pair above. Split out on request rather than raising
+         * BACK_PERSON_SMOOTH_NORMAL/MAX themselves, which stay exactly as
+         * documented above for back-camera person smoothing.
+         */
+        private const val FRONT_SMOOTH_NORMAL = 0.50f
+        private const val FRONT_SMOOTH_MAX = 0.80f
+
+        /**
+         * Pixel budget for [renderShaderAtBudget]'s recording-time render — same
+         * value as [FaceWarpGlView]'s live-preview render cap, chosen for the
+         * same reason (the shader's per-pixel texture-fetch cost, see that
+         * class's doc). The recorded/saved video is still exported at the full
+         * requested size (e.g. 1080x1920) via the upscale blit in
+         * [presentToEncoder]; this only caps how many pixels the expensive part
+         * of the pipeline actually runs on.
+         */
+        private const val ENCODER_RENDER_MAX_PIXELS = 1_200_000L
+
         private const val TAG = "FaceWarpRenderer"
 
         /** Consecutive camera-texture update failures before giving up on GL. */
@@ -2376,6 +2645,25 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             void main() {
                 gl_Position = aPosition;
                 vTexCoord = aTexCoord;
+            }
+        """
+
+        // Trivial textured-quad pass for presentToEncoder's upscale blit — deliberately
+        // its own tiny program (see blitProgram's field doc for why it isn't
+        // `program`/`FRAGMENT_SHADER`). Reuses VERTEX_SHADER above.
+        private const val BLIT_VERTEX_SHADER = VERTEX_SHADER
+
+        private const val BLIT_FRAGMENT_SHADER = """
+            precision mediump float;
+            varying vec2 vTexCoord;
+            uniform sampler2D uTexture;
+            void main() {
+                // FBO-attached textures read back Y-flipped relative to a normal
+                // window-surface draw — renderShaderAtBudget renders drawOes()
+                // into encoderFboTexId with the same UVs drawOes() always uses
+                // for on-screen output, so this flip is only needed here, at the
+                // point that texture gets sampled back out, not at render time.
+                gl_FragColor = texture2D(uTexture, vec2(vTexCoord.x, 1.0 - vTexCoord.y));
             }
         """
 
@@ -2834,11 +3122,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return uTexelStep * (frac / max(uTexelStep.y, 0.00001));
             }
 
-            // 9-tap average of the colour skin-mask around this pixel. The raw
-            // mask (skinConfidence on a single pixel) jumps hard at a
-            // hairline/jaw because hair and skin colour genuinely differ by a
-            // lot — averaging neighbours spreads that jump into a soft ramp
-            // instead of a visible cut-out edge.
+            // 5-tap (cross pattern) average of the colour skin-mask around
+            // this pixel — was 9-tap (full 3x3); the 4 diagonal samples added
+            // GPU cost without materially changing the feather (this only
+            // needs to spread a hard edge into a soft ramp, not produce a
+            // precise blur). Called once per pixel now (see feathSkinConf in
+            // main()), so this is the last remaining cost to trim here.
             float featheredSkinConf(vec2 uv, vec3 center) {
                 vec2 t = radiusStep(TONE_FEATHER_RADIUS_FRAC);
                 float sum = skinConfidence(center);
@@ -2846,18 +3135,20 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  0.0)).rgb);
                 sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0,  t.y)).rgb);
                 sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0, -t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x,  t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x, -t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x, -t.y)).rgb);
-                return sum * (1.0 / 9.0);
+                return sum * 0.2;
             }
 
             // Scene grain clean: strength is driven mostly by LOCAL darkness
             // (black shirt / hair / shadow), not only whole-room brightness.
             // A lit face in a bright room still leaves dark fabric full of ISO
             // grain — that case must clean hard even when uSceneDenoise is low.
-            vec3 sceneGrainClean(vec2 uv, vec3 center) {
+            // personBoost (0 front camera / empty back frame, up to 1 once a
+            // back-camera person is confidently detected) relaxes the
+            // dark-area bias and the edge-stop so cleanup also reaches
+            // well-lit, slightly textured skin — not just shadows/flat
+            // background. 0 reproduces the exact original numbers, so
+            // front camera and an empty back-camera frame are unaffected.
+            vec3 sceneGrainClean(vec2 uv, vec3 center, float personBoost) {
                 float scene = clamp(uSceneDenoise, 0.0, 1.0);
 
                 vec2 t = radiusStep(FINE_RADIUS_FRAC * 1.0);
@@ -2895,25 +3186,43 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 float localDark = 1.0 - smoothstep(0.05, 0.38, cLum);
                 float closeUp = clamp(uCloseUpBoost, 0.0, 1.0);
                 // Milder than before — aggressive denoise looked artificial.
-                float strength = mix(0.45, 0.82, scene);
+                float strengthMax = mix(0.82, 0.95, personBoost);
+                float strength = mix(0.45, strengthMax, scene);
                 strength = mix(strength, max(strength, 0.72), closeUp);
+                float darkFloor = mix(0.35, 0.75, personBoost);
                 float amt = clamp(
-                    strength * mix(0.35, 1.0, localDark),
+                    strength * mix(darkFloor, 1.0, localDark),
                     0.0,
                     1.0
                 );
                 // Hard edges (hair outline): skip cleanup entirely.
-                float edgeStop = 1.0 - smoothstep(0.035, 0.10, maxDl);
+                float edgeLo = mix(0.035, 0.05, personBoost);
+                float edgeHi = mix(0.10, 0.16, personBoost);
+                float edgeStop = 1.0 - smoothstep(edgeLo, edgeHi, maxDl);
                 amt *= edgeStop;
 
                 float grain = cLum - avgLum;
+                // Wider detection window + less dark-only bias on the
+                // flat-area pull once a back-camera person is confidently
+                // present — the corner-patch noise-floor sample is measured
+                // once from a fixed background corner, which does not
+                // always match the actual grain amplitude on the person's
+                // (differently lit) face, and the original flatPull term
+                // was gated by localDark, silently weak on bright/mid-tone
+                // skin. 0 at personBoost reproduces the exact original
+                // numbers for front camera / empty back frame.
                 float isGrain = 1.0 - smoothstep(
-                    uNoiseFloor * 0.35,
-                    uNoiseFloor * 3.8,
+                    uNoiseFloor * mix(0.35, 0.18, personBoost),
+                    uNoiseFloor * mix(3.8, 5.5, personBoost),
                     abs(grain)
                 );
-                float flatPull = amt * localDark * 0.55 *
-                    (1.0 - smoothstep(0.015, 0.09, abs(grain)));
+                float flatPullDark = mix(localDark, max(localDark, 0.6), personBoost);
+                float flatPull = amt * flatPullDark * 0.55 *
+                    (1.0 - smoothstep(
+                        mix(0.015, 0.010, personBoost),
+                        mix(0.09, 0.14, personBoost),
+                        abs(grain)
+                    ));
                 float cleanLum = mix(
                     cLum,
                     avgLum,
@@ -3046,7 +3355,18 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
                 vec3 col = texture2D(uTexture, st).rgb;
                 // Scene-aware grain clean before beauty lifts amplify speckles.
-                col = sceneGrainClean(st, col);
+                float grainPersonBoost = uIsFrontCamera > 0.5
+                    ? 0.0
+                    : smoothstep(0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0));
+                col = sceneGrainClean(st, col, grainPersonBoost);
+                // Computed once and reused everywhere below instead of
+                // recalling this 9-tap function 3x per pixel (27 texture
+                // fetches) — it was a real cost on every live-preview and
+                // recording frame. Skin colour barely shifts across the
+                // grain-clean/smooth/sharpen stages that follow, so reusing
+                // this one sample does not change what any of the 3 call
+                // sites actually decide.
+                float feathSkinConf = featheredSkinConf(st, col);
 
                 // Skin mask needs its own unzoomed mapping — the mask texture was
                 // built from raw (pre-wideZoom) landmark/analysis-frame geometry,
@@ -3084,7 +3404,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     uSkinMaskValid > 0.5 ? maskConfidence(stLandmark) : 0.0;
                 float colourConf =
                     uSkinFallback > 0.5 ? skinConfidence(col) : 0.0;
-                float smoothConf = max(maskConf, colourConf);
+                // Also allow the feathered colour mask regardless of
+                // landmark-mask validity or the fallback grace period —
+                // Smooth was silently doing nothing whenever the landmark
+                // mask never validated in time. Front camera: always on
+                // (the user's own face is always the subject). Back camera:
+                // only once a person is confidently detected.
+                float smoothColourGate = uIsFrontCamera > 0.5
+                    ? 1.0
+                    : smoothstep(0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0));
+                float smoothConf = max(
+                    max(maskConf, colourConf),
+                    feathSkinConf * smoothColourGate
+                );
                 float toneConf = skinConfidence(col);
                 // Retouch brightness: prefer live skin colour so a lagged landmark
                 // mask cannot leave a bright ghost beside the face while moving.
@@ -3110,7 +3442,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     float amount = uSmoothStrength * smoothConf;
                     // Keep smooth in the face CORE only — hairline/mask edge is
                     // where artificial dark outlines and wax seams appear.
-                    float faceCore = smoothstep(0.22, 0.70, smoothConf);
+                    // Lower band than before: an angled face is partly in
+                    // shadow, which pulls colour-based smoothConf down even
+                    // on real skin — the old 0.22 floor was cutting smooth
+                    // out almost entirely off dead-on angles.
+                    float faceCore = smoothstep(0.10, 0.50, smoothConf);
                     amount *= faceCore;
                     // Magic: mid-band blotch cut for plastic/scar cleanup.
                     float highSlider = smoothstep(0.90, 1.0, uMagicStrength);
@@ -3223,7 +3559,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                         0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0)
                     );
                     if (uBrighten > 0.001 && personMixEarly < 0.999) {
-                        float brightConf = featheredSkinConf(st, col);
+                        float brightConf = feathSkinConf;
                         float gain = 1.0 + uBrighten * brightConf * 0.45 *
                             (1.0 - personMixEarly);
                         lum *= gain;
@@ -3421,7 +3757,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                         1.0
                     );
                 }
-                float feathBrightConf = featheredSkinConf(st, col);
+                float feathBrightConf = feathSkinConf;
                 col = applyRetouchColor(col, feathBrightConf);
                 col = applyRetouchSkinBrightness(
                     col,
@@ -3492,11 +3828,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  0.0)).rgb);
                 sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0,  t.y)).rgb);
                 sum += skinConfidence(texture2D(uTexture, uv + vec2( 0.0, -t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x,  t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x,  t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2( t.x, -t.y)).rgb);
-                sum += skinConfidence(texture2D(uTexture, uv + vec2(-t.x, -t.y)).rgb);
-                return sum * (1.0 / 9.0);
+                return sum * 0.2;
             }
 
             vec3 surfaceBlur(vec2 uv, vec3 center) {
@@ -3588,6 +3920,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             void main() {
                 vec3 col = texture2D(uTexture, vTexCoord).rgb;
                 col = stillGrainClean(vTexCoord, col);
+                // Computed once and reused below instead of twice per pixel.
+                float feathSkinConf = featheredSkinConf(vTexCoord, col);
                 float toneConf = skinConfidence(col);
                 if (uSmoothStrength > 0.001) {
                     float skinConf = toneConf;
@@ -3603,7 +3937,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     vec3 chroma = col - l;
                     float lum = l;
                     if (uBrighten > 0.001) {
-                        float brightConf = featheredSkinConf(vTexCoord, col);
+                        float brightConf = feathSkinConf;
                         float personMixEarly = smoothstep(
                             0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0)
                         );
@@ -3628,7 +3962,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     col = clamp(col * (mix(lumIn, lifted, rolloff) / lumIn), 0.0, 1.0);
                     col = clamp((col - 0.5) * (1.0 + BASE_CONTRAST) + 0.5, 0.0, 1.0);
                 }
-                float feathBrightConfStill = featheredSkinConf(vTexCoord, col);
+                float feathBrightConfStill = feathSkinConf;
                 col = applyRetouchColor(col, feathBrightConfStill);
                 col = applyRetouchSkinBrightness(
                     col, toneConf, feathBrightConfStill, 1.0

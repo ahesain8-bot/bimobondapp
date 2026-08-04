@@ -12,10 +12,13 @@ import android.media.MediaMuxer
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
@@ -42,6 +45,19 @@ class ArFilteredVideoRecorder {
     private val running = AtomicBoolean(false)
     private var drainThread: HandlerThread? = null
     private var drainHandler: Handler? = null
+
+    /**
+     * Set by [stop] between clearing [running] and signalling end-of-stream, so
+     * [drainLoop] keeps polling for the encoder's final samples instead of
+     * exiting the moment `running` goes false.
+     */
+    @Volatile
+    private var awaitingEos = false
+
+    /** Counted down when [drainLoop] exits, so [stop] can wait for the real
+     *  end of the encoded stream rather than sleeping a fixed guess. */
+    @Volatile
+    private var drainDone: CountDownLatch? = null
 
     @Volatile
     private var surfaceSession = false
@@ -124,18 +140,30 @@ class ArFilteredVideoRecorder {
 
     fun stop(): File? {
         synchronized(lock) {
+            val tStop = SystemClock.elapsedRealtime()
             armed.set(false)
             val hadVideo = running.getAndSet(false)
             if (hadVideo) {
+                // Wait for the encoder's actual end-of-stream instead of sleeping
+                // a fixed 150ms guess. The drain loop already recognises
+                // BUFFER_FLAG_END_OF_STREAM and exits on it, so the fixed sleep
+                // was both slower than needed in the common case (the encoder
+                // typically drains in a few tens of ms — that difference is dead
+                // time in the post-record "Processing..." state) and no guarantee
+                // in the rare slow case. The timeout keeps the old worst-case
+                // behaviour of giving up rather than hanging.
+                awaitingEos = true
                 try {
                     codec?.signalEndOfInputStream()
                 } catch (_: Exception) {
                 }
                 try {
-                    Thread.sleep(150)
+                    drainDone?.await(EOS_DRAIN_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
                 }
+                awaitingEos = false
             }
+            val tDrained = SystemClock.elapsedRealtime()
             releaseVideoEncoder()
             stopMicRecorder()
             surfaceSession = false
@@ -156,6 +184,7 @@ class ArFilteredVideoRecorder {
                 }
                 else -> null
             }
+            val tMuxed = SystemClock.elapsedRealtime()
 
             // A non-empty file is not the same as a playable one. On devices whose
             // encoder quietly produced a stream it couldn't actually encode, the
@@ -174,6 +203,13 @@ class ArFilteredVideoRecorder {
 
             cleanupTemps()
             finalOutputFile = null
+            val tEnd = SystemClock.elapsedRealtime()
+            Log.i(
+                TAG,
+                "stop timing: drain=${tDrained - tStop}ms " +
+                    "release+mux=${tMuxed - tDrained}ms " +
+                    "verify+cleanup=${tEnd - tMuxed}ms total=${tEnd - tStop}ms",
+            )
             return result
         }
     }
@@ -320,6 +356,8 @@ class ArFilteredVideoRecorder {
         val thread = HandlerThread("ar-video-drain").also { it.start() }
         drainThread = thread
         drainHandler = Handler(thread.looper)
+        awaitingEos = false
+        drainDone = CountDownLatch(1)
         running.set(true)
         armed.set(false)
         startMicRecorder()
@@ -351,6 +389,11 @@ class ArFilteredVideoRecorder {
     private fun abortInternal() {
         running.set(false)
         armed.set(false)
+        // Must clear before releasing the encoder: a drain loop still parked on
+        // dequeueOutputBuffer would otherwise keep polling for an end-of-stream
+        // that an aborted session never sends.
+        awaitingEos = false
+        drainDone?.countDown()
         surfaceSession = false
         releaseVideoEncoder()
         stopMicRecorder()
@@ -359,6 +402,14 @@ class ArFilteredVideoRecorder {
     }
 
     private fun drainLoop() {
+        try {
+            drainLoopInner()
+        } finally {
+            drainDone?.countDown()
+        }
+    }
+
+    private fun drainLoopInner() {
         val bufferInfo = MediaCodec.BufferInfo()
         while (running.get() || muxerStarted) {
             val encoder = codec ?: break
@@ -369,7 +420,10 @@ class ArFilteredVideoRecorder {
             }
             when {
                 outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    if (!running.get()) break
+                    // While stopping, keep polling: the end-of-stream buffer has
+                    // been requested but has not arrived yet, and breaking here
+                    // would drop the clip's final samples.
+                    if (!running.get() && !awaitingEos) break
                 }
                 outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     val mux = muxer ?: break
@@ -629,6 +683,11 @@ class ArFilteredVideoRecorder {
 
     companion object {
         private const val TAG = "ArFilteredVideoRecorder"
+
+        /** Upper bound on waiting for the encoder's end-of-stream in [stop].
+         *  Generous on purpose — it is a safety net, not the expected path;
+         *  a healthy encoder drains in far less and [stop] returns immediately. */
+        private const val EOS_DRAIN_TIMEOUT_MS = 600L
         const val MAX_EDGE = 1280
         const val FRAME_RATE = 30
     }

@@ -42,6 +42,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCase
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -72,7 +73,30 @@ import androidx.camera.core.Camera
 import android.util.Log
 
 object ArCameraController {
-    /** High live Preview target (9:16 HD portrait) — matches tall phone / TikTok FOV. */
+    /**
+     * Live Preview target (9:16 portrait) — matches tall phone / TikTok FOV.
+     *
+     * This stream is the ceiling on recorded and captured quality, not just on
+     * what the viewfinder shows: the OES pipeline records and photographs from
+     * this same texture. At 1080x1920 the portrait frame cropped to a tall phone
+     * aspect left only ~851px of recorded width, below 1080p.
+     *
+     * Two higher targets were tried and both hit the same real limit: with the
+     * skin-mask analysis stream also bound (Normal Mode's actual recording
+     * condition, not the cold-open preview-only bind), CameraX silently drops
+     * back to 1920x1080 regardless of what's requested — confirmed via the
+     * "supported preview (SurfaceTexture) sizes" log ([logSupportedPreviewSizes])
+     * showing 3072x1728 is on this device's list, yet "bindPreviewToOes cam=..."
+     * during an actual recording still read 1920x1080. This is a genuine Camera2
+     * guaranteed-stream-combination cap for 2+ concurrent streams on this chip,
+     * not a config mistake — asking higher only pays for a resolution search
+     * that gets discarded. 1080p is this device's real multi-stream ceiling; the
+     * fix for reaching a full 1080x1920 *recording* despite the crop is in
+     * [startSurfaceRecording]'s encoder-size calculation, not here.
+     *
+     * Note this is passed to CameraX in sensor/landscape order (see
+     * [buildLivePreview]) — width/height here are the portrait orientation.
+     */
     private const val PREVIEW_TARGET_WIDTH = 1080
     private const val PREVIEW_TARGET_HEIGHT = 1920
 
@@ -120,19 +144,63 @@ object ArCameraController {
      */
     private const val CAPTURE_SMOOTH_STRENGTH = 0.10f
 
+    /**
+     * How long [onHostResume] waits for a replacement OES SurfaceTexture before
+     * binding without one. Comfortably longer than a healthy resume, which
+     * publishes the new surface in well under this — it only ever fires when the
+     * surface genuinely never arrives.
+     */
+    private const val RESUME_SURFACE_TIMEOUT_MS = 1_200L
+
+    /** Delay before each post-resume frame/visibility health check. */
+    private const val RESUME_HEALTH_CHECK_MS = 1_500L
+
+    /**
+     * Frames that must have arrived within [RESUME_HEALTH_CHECK_MS] for a resume
+     * to count as healthy. A working resume measured ~39 in two seconds and a
+     * black one ~5, so this sits far enough below the healthy figure to avoid
+     * false alarms on a slow start while still catching a stalled pipeline.
+     */
+    private const val RESUME_MIN_HEALTHY_FRAMES = 12
+
+    /** Bounded retries so a genuinely broken device falls through to simple mode. */
+    private const val RESUME_RECOVERY_ATTEMPTS = 2
+
     private const val PREVIEW_QUALITY_TAG = "ArPreviewQuality"
     private const val DETECT_MAX_DIMENSION = 384
 
-    /** Skin-mask analysis/rasterize edge — small is fine, it's a soft gating mask. */
-    private const val SKIN_MASK_ANALYSIS_EDGE = 256
+    /** Skin-mask analysis/rasterize edge — small is fine, it's a soft gating mask.
+     *  Lowered from 256: smaller analysis bitmap means less per-detect work
+     *  (scaling, MediaPipe inference, mask rasterize) without changing what
+     *  the mask visually does — it was already a soft gate, not a precise one. */
+    private const val SKIN_MASK_ANALYSIS_EDGE = 144
 
     /** Run landmark detect + mask rasterize every Nth analysis frame — mask
-     *  changes slowly, so a soft gating mask doesn't need every-frame updates. */
-    private const val SKIN_MASK_DETECT_EVERY = 2
+     *  changes slowly, so a soft gating mask doesn't need every-frame updates.
+     *  Raised from 2: MediaPipe inference + bitmap allocation every other
+     *  frame is sustained CPU/GC pressure — a likely source of the
+     *  continuous lag reported across live preview and recording. Mask,
+     *  brightness and smooth all ease/smooth over several frames already, so
+     *  a less frequent detect does not make them look stale. */
+    private const val SKIN_MASK_DETECT_EVERY = 10
     /** Sticker video encode edge — keep modest so preview stays responsive while recording. */
     private const val PNG_RECORD_EDGE = 640
     private const val PNG_RECORD_INTERVAL_MS = 66L
     private const val GL_MAX_EDGE = 1280
+
+    /**
+     * Long-edge ceiling for the OES texture buffer, photo readback and GL video
+     * encode.
+     *
+     * Must not exceed what the Preview stream actually delivers — raising this
+     * past the camera's real bound size does not add detail, it just upscales
+     * (confirmed twice: 2560 and 3072 both got silently downgraded to 1920x1080
+     * by the camera itself once a second stream was bound — see
+     * PREVIEW_TARGET_WIDTH/HEIGHT's comment — so the encoder recorded an
+     * upscale from a 1080p source instead of genuine extra detail, costing GPU
+     * time and file size for nothing). 1920 matches this device's real
+     * multi-stream ceiling.
+     */
     private const val CAPTURE_MAX_EDGE = 1920
     /**
      * Warm-buffer edge for the OES photo path. This is only the size the GL view
@@ -1783,16 +1851,22 @@ object ArCameraController {
             startBitmapRecording(file, onResult)
             return
         }
-        // Same canvas as the live GL preview — recorded frame must match what
-        // was on screen (no FOV/zoom change from re-aspecting to camera buffer).
-        val vw = ArCameraBridge.warpViewWidth.takeIf { it > 0 }
-            ?: gl.width.coerceAtLeast(1)
-        val vh = ArCameraBridge.warpViewHeight.takeIf { it > 0 }
-            ?: gl.height.coerceAtLeast(1)
+        // Standard 9:16 export, not the screen's own (narrower) shape.
+        //
+        // The screen-matched canvas used before this (warpViewWidth/Height, e.g.
+        // 1080x2436) cropped the camera's 1080-wide portrait frame down to
+        // ~851px to fit that narrower shape — recorded video came out below
+        // 1080p no matter how large the encoder itself was allowed to be. This
+        // camera's native portrait frame (rotated 1920x1080 sensor output) is
+        // already exactly 9:16, so exporting at 9:16 instead uses the full
+        // 1080px the sensor provides: no crop, no upscale, genuinely 1080x1920.
+        //
+        // Trade-off, deliberately accepted: the saved video now shows a little
+        // more top/bottom than what was framed live on a taller screen. Live
+        // preview framing itself is unchanged — this only affects what's saved.
         val maxEdge = RECORD_GL_EDGE
-        val scale = minOf(1f, maxEdge.toFloat() / maxOf(vw, vh))
-        val encW = ((vw * scale).toInt() and 1.inv()).coerceAtLeast(2)
-        val encH = ((vh * scale).toInt() and 1.inv()).coerceAtLeast(2)
+        val encH = (maxEdge.toInt() and 1.inv()).coerceAtLeast(2)
+        val encW = ((maxEdge * 9 / 16).toInt() and 1.inv()).coerceAtLeast(2)
 
         val surface = try {
             videoRecorder.startSurfaceSession(file, encW, encH)
@@ -2761,7 +2835,17 @@ object ArCameraController {
             )
             .setResolutionStrategy(
                 ResolutionStrategy(
-                    Size(PREVIEW_TARGET_WIDTH, PREVIEW_TARGET_HEIGHT),
+                    // CameraX matches this bound size against the camera's stream
+                    // sizes, which are always reported in sensor/landscape order
+                    // (width >= height) regardless of final display rotation —
+                    // passing our portrait 1080x1920 target here (width < height)
+                    // fed it a shape that doesn't exist in that list, and the
+                    // higher-then-lower fallback jumped to the nearest 16:9 match
+                    // it could find: 3072x1728 (~5.3MP, 2.5x the intended ~2MP).
+                    // Swapping to landscape order (1920x1080) matches CameraX's
+                    // expected convention; AspectRatioStrategy above still locks
+                    // it to 16:9, and setTargetRotation handles final rotation.
+                    Size(PREVIEW_TARGET_HEIGHT, PREVIEW_TARGET_WIDTH),
                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                 ),
             )
@@ -2785,6 +2869,8 @@ object ArCameraController {
             ?: CaptureRequest.NOISE_REDUCTION_MODE_FAST
         val edgeMode = previewCameraInfo?.let { bestEdgeMode(it) }
             ?: CaptureRequest.EDGE_MODE_FAST
+        Log.i(PREVIEW_QUALITY_TAG, "live preview quality: noiseMode=$noiseMode edgeMode=$edgeMode")
+        logSupportedPreviewSizes(previewCameraInfo)
 
         Camera2Interop.Extender(builder)
             .setCaptureRequestOption(
@@ -2833,11 +2919,46 @@ object ArCameraController {
     }
 
     /**
+     * One-time dump of the sizes this camera can actually hand a SurfaceTexture,
+     * so stream resolution is chosen from what the device offers rather than
+     * guessed. Asking for a size the camera does not publish gets silently
+     * resolved to something else — which is how a QHD request ended up still
+     * delivering 1920x1080 while downstream stages had already been widened to
+     * expect more.
+     */
+    @OptIn(ExperimentalCamera2Interop::class)
+    private fun logSupportedPreviewSizes(info: CameraInfo?) {
+        if (info == null || loggedPreviewSizes) return
+        loggedPreviewSizes = true
+        try {
+            val map = Camera2CameraInfo.from(info).getCameraCharacteristic(
+                CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP,
+            ) ?: return
+            val sizes = map.getOutputSizes(android.graphics.SurfaceTexture::class.java)
+                ?.sortedByDescending { it.width.toLong() * it.height.toLong() }
+                ?.joinToString(", ") { "${it.width}x${it.height}" }
+            Log.i(PREVIEW_QUALITY_TAG, "supported preview (SurfaceTexture) sizes: $sizes")
+        } catch (t: Throwable) {
+            Log.w(PREVIEW_QUALITY_TAG, "preview size query failed", t)
+        }
+    }
+
+    @Volatile
+    private var loggedPreviewSizes = false
+
+    /**
      * Strongest noise reduction the device advertises. HIGH_QUALITY gives the
      * cleanest result (fewer visible grain "dots") and is preferred even though
      * it's the mode documented as possibly reducing frame rate — noise was the
      * user-visible complaint, not preview smoothness. FAST is the next choice;
      * MINIMAL deliberately performs less denoising and is only a last resort.
+     *
+     * Measured, not assumed: this was tested as a suspected cause of camera lag by
+     * forcing FAST on every device, and it made no measurable difference —
+     * `camerahalserver` stayed at ~154% CPU either way. The real cause was the
+     * beauty shader's per-pixel texture-fetch load (see FaceWarpGlView's
+     * render-resolution cap). Leaving this at HIGH_QUALITY keeps the image quality
+     * it was chosen for; do not "optimise" it again without re-measuring.
      */
     private fun bestNoiseReductionMode(info: CameraInfo): Int {
         val modes = try {
@@ -2862,6 +2983,8 @@ object ArCameraController {
      * Strongest edge/sharpening mode the device advertises. FAST's more aggressive
      * sharpening amplifies sensor grain into visible speckle on top of it — HIGH_QUALITY
      * sharpens less naively and reads as cleaner paired with [bestNoiseReductionMode].
+     * Same measured finding as that function: forcing FAST here changed nothing about
+     * lag, so it stays on the setting chosen for image quality.
      */
     private fun bestEdgeMode(info: CameraInfo): Int {
         val modes = try {
@@ -3051,7 +3174,17 @@ object ArCameraController {
         }
     }
 
+    /**
+     * GL frames presented since the last resume — diagnostic only, read by the
+     * post-resume health check in [onHostResume]. Distinguishes "the camera
+     * rebound but no frames are flowing" from "frames are flowing but nothing is
+     * visible", which the bind logs alone cannot tell apart.
+     */
+    @Volatile
+    private var framesSinceResume = 0
+
     private fun onOesFramePresented() {
+        framesSinceResume++
         ArCameraWatchdog.onFrame()
         ArCameraBridge.onGlFramePresented()
         warmOesPhotoCaptureIfNeeded()
@@ -3219,6 +3352,73 @@ object ArCameraController {
         }
     }
 
+    /**
+     * Watches for a resume that bound successfully but is not actually producing
+     * frames, and rebuilds the GL producer when it finds one.
+     *
+     * A black preview after returning from another app does not show up in the
+     * bind logs at all — CameraX reports the session opening normally and the GL
+     * view is visible; what is missing is frames. Measured on a failing resume:
+     * ~5 frames in two seconds against ~39 on a healthy one. Rather than depend
+     * on having found every root cause (the stale-GL-handle fix in
+     * FaceWarpRenderer.forgetGlObjectsForNewContext addresses one), this notices
+     * the symptom directly and recreates the camera SurfaceTexture and camera
+     * binding, which is the same recovery the resume path itself performs.
+     *
+     * Retries a bounded number of times so a genuinely broken device settles into
+     * the existing simple-mode fallback instead of looping forever.
+     */
+    private fun scheduleResumeHealthCheck(
+        gl: FaceWarpGlView?,
+        resumeGeneration: Int,
+        attempt: Int,
+    ) {
+        mainHandler.postDelayed({
+            if (resumeGeneration != hostResumeGeneration) return@postDelayed
+            if (!started || previewSuspended || isRecordingActive()) return@postDelayed
+
+            val frames = framesSinceResume
+            val healthy = frames >= RESUME_MIN_HEALTHY_FRAMES
+            Log.i(
+                "ArCameraLifecycle",
+                "Controller.resumeHealth attempt=$attempt frames=$frames " +
+                    "healthy=$healthy boundOes=$boundToOes glVis=${gl?.visibility} " +
+                    "previewVis=${ArCameraBridge.previewView?.visibility} " +
+                    "gl=${gl?.width}x${gl?.height} " +
+                    "glSurface=${gl?.cameraSurfaceTexture() != null}",
+            )
+            if (healthy) return@postDelayed
+
+            if (attempt > RESUME_RECOVERY_ATTEMPTS || gl == null) {
+                Log.e(
+                    "ArCameraLifecycle",
+                    "Controller.resumeHealth GAVE UP after $attempt attempts — " +
+                        "leaving watchdog to degrade",
+                )
+                return@postDelayed
+            }
+
+            Log.w(
+                "ArCameraLifecycle",
+                "Controller.resumeHealth RECOVERING attempt=$attempt frames=$frames",
+            )
+            framesSinceResume = 0
+            boundToOes = false
+            rebindPosted = false
+            gl.awaitCameraSurface {
+                if (resumeGeneration == hostResumeGeneration) {
+                    Log.i("ArCameraLifecycle", "Controller.resumeHealth recovery surface ready")
+                    requestPreviewRebind()
+                }
+            }
+            gl.setOesEnabled(true)
+            gl.recreateCameraSurfaceTexture()
+            gl.requestRender()
+
+            scheduleResumeHealthCheck(gl, resumeGeneration, attempt + 1)
+        }, RESUME_HEALTH_CHECK_MS)
+    }
+
     fun onHostResume(force: Boolean = false) {
         Log.i(
             "ArCameraLifecycle",
@@ -3298,6 +3498,9 @@ object ArCameraController {
             gl?.ensureGlInitialized()
             gl?.resetAfterRouteResume()
             ArCameraBridge.prepareForHostResume()
+            framesSinceResume = 0
+
+            scheduleResumeHealthCheck(gl, resumeGeneration, attempt = 1)
 
             val filter = ArCameraBridge.currentFilter
             preferOesBinding = !filter.useShader() && !filter.isPngOverlay()
@@ -3344,9 +3547,10 @@ object ArCameraController {
                 // OES SurfaceTexture but no GL frames arriving afterwards. The
                 // Activity's SurfaceViews were destroyed/recreated, so replace
                 // the OES producer too and only bind once the new one exists.
-                gl.onCameraSurfaceReady = {
-                    gl.onCameraSurfaceReady = null
+                var boundFromSurface = false
+                gl.awaitCameraSurface {
                     if (resumeGeneration == hostResumeGeneration) {
+                        boundFromSurface = true
                         Log.i(
                             "ArCameraLifecycle",
                             "Controller.resumeRebind NEW_OES_SURFACE ready",
@@ -3356,6 +3560,29 @@ object ArCameraController {
                 }
                 gl.setOesEnabled(true)
                 gl.recreateCameraSurfaceTexture()
+
+                // Safety net: bind anyway if no new surface ever arrives.
+                // recreateCameraSurfaceTexture() is a no-op when GL is not
+                // initialised, and the waiter above is also skipped when its
+                // generation went stale — in both cases nothing else would ever
+                // rebind and the preview stays black until the screen is
+                // reopened. Guarded by boundFromSurface/boundToOes so a normal
+                // resume, which binds well inside this window, is untouched.
+                mainHandler.postDelayed({
+                    if (!boundFromSurface &&
+                        !boundToOes &&
+                        started &&
+                        !previewSuspended &&
+                        !isRecordingActive() &&
+                        resumeGeneration == hostResumeGeneration
+                    ) {
+                        Log.w(
+                            "ArCameraLifecycle",
+                            "Controller.resumeRebind NO_OES_SURFACE — forcing bind",
+                        )
+                        requestFreshBind()
+                    }
+                }, RESUME_SURFACE_TIMEOUT_MS)
             } else {
                 requestFreshBind()
             }
@@ -3392,8 +3619,7 @@ object ArCameraController {
             requestPreviewRebind()
         } else {
 
-            gl.onCameraSurfaceReady = {
-                gl.onCameraSurfaceReady = null
+            gl.awaitCameraSurface {
                 android.util.Log.i(
                     "ArCameraOES",
                     "ensureOes: surfaceReady → rebind +${ArCameraBridge.oesDiagElapsedMs()}ms",
@@ -3552,14 +3778,23 @@ object ArCameraController {
                 glView.setOesEnabled(true)
                 glView.setOnFramePresented { onOesFramePresented() }
                 bindPreviewToOes(preview, glView, activity)
-                // Always the sensor's best here. This path binds only Preview +
-                // ImageCapture, and CameraX guarantees that pairing at maximum
-                // capture resolution on every device, down to LEGACY. Gating it on
-                // the FULL/LEVEL_3 hardware level was wrong: most phones report
-                // LIMITED, so photos were being capped near 6MP on sensors that do
-                // several times that. The hardware-level gate belongs on the
-                // sticker/overlay binds, which stack four streams plus an effect.
-                val capture = buildImageCapture(displayRotation, allowFullSensor = true)
+                // Lazy, same as the non-OES bind path below ("Capture binds
+                // on shutter"): idle Normal Mode is Preview + Analysis only —
+                // two streams, not three. takePhotoWithImageCaptureToFile
+                // already handles imageCapture being null (sets
+                // preferCaptureBinding + requestPreviewRebind, this same
+                // function then runs again with it true) and its own
+                // callback already resets preferCaptureBinding back to false
+                // for FilterType.NONE afterward — this plumbing already
+                // existed, Normal Mode just never used it, and instead bound
+                // ImageCapture (even at the now-reduced moderate resolution)
+                // continuously, which was keeping the camera HAL close to
+                // saturated (measured ~97% on camerahalserver).
+                val capture = if (preferCaptureBinding) {
+                    buildImageCapture(displayRotation, allowFullSensor = false)
+                } else {
+                    null
+                }
                 imageCapture = capture
 
                 // Normal Mode only — small background analysis stream feeding the
@@ -3589,22 +3824,16 @@ object ArCameraController {
                 imageAnalysis = skinMaskAnalysis
 
                 try {
-                    val bound = if (skinMaskAnalysis != null) {
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            selector,
-                            preview,
-                            capture,
-                            skinMaskAnalysis,
-                        )
-                    } else {
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            selector,
-                            preview,
-                            capture,
-                        )
+                    val useCases = buildList<UseCase> {
+                        add(preview)
+                        capture?.let { add(it) }
+                        skinMaskAnalysis?.let { add(it) }
                     }
+                    val bound = cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        selector,
+                        *useCases.toTypedArray(),
+                    )
                     applyTorchAfterBind(bound)
                     android.util.Log.i(
                         "ArCameraOES",
@@ -3622,12 +3851,15 @@ object ArCameraController {
                     try {
                         cameraProvider.unbindAll()
                         imageAnalysis = null
+                        val fallbackUseCases = buildList<UseCase> {
+                            add(preview)
+                            capture?.let { add(it) }
+                        }
                         applyTorchAfterBind(
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
                                 selector,
-                                preview,
-                                capture,
+                                *fallbackUseCases.toTypedArray(),
                             ),
                         )
                         analysisUseCaseBound = false
