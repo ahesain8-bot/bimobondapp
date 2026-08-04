@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:bimobondapp/app/auth/domain/entities/gifter_level_info.dart';
 
 class UserEntity extends Equatable {
   final String id;
@@ -15,6 +16,14 @@ class UserEntity extends Equatable {
   final String? fcmToken;
   final String? instagramUrl;
   final String? youtubeUrl;
+  final String? websiteUrl;
+  final String? tiktokUrl;
+  final String? twitterUrl;
+  final String? snapchatUrl;
+  final String? spotifyUrl;
+  final String? pronouns;
+  final String? creatorCategory;
+  final String? accountType;
   final bool? isPrivate;
   final bool? allowComments;
   final bool? allowDirectMsgs;
@@ -34,6 +43,26 @@ class UserEntity extends Equatable {
   final int? deviceCount;
   final bool? isFollowing;
   final bool? isFollowedBy;
+  final bool? isFriend;
+  final bool? isOnline;
+  final String? lastSeenAt;
+  final String? riskLevel;
+  final int? gifterLevel;
+  final GifterLevelInfo? gifterLevelInfo;
+  final String? likedVideosVisibility;
+  final String? followersListVisibility;
+  final String? followingListVisibility;
+  final bool? profileViewHistoryEnabled;
+  final bool? showActivityStatus;
+  final bool? discoverable;
+  final bool? suggestToContacts;
+  final bool? restrictedMode;
+  final bool? showShopOnProfile;
+  final bool? allowDuetsDefault;
+  final bool? allowStitchDefault;
+  final bool? allowDownloadsDefault;
+  final bool? allowRepostsDefault;
+  final bool? showRepostsOnProfile;
   final bool? isBanned;
   final String? banReason;
   final String? bannedUntil;
@@ -60,6 +89,14 @@ class UserEntity extends Equatable {
     this.fcmToken,
     this.instagramUrl,
     this.youtubeUrl,
+    this.websiteUrl,
+    this.tiktokUrl,
+    this.twitterUrl,
+    this.snapchatUrl,
+    this.spotifyUrl,
+    this.pronouns,
+    this.creatorCategory,
+    this.accountType,
     this.isPrivate,
     this.allowComments,
     this.allowDirectMsgs,
@@ -78,6 +115,26 @@ class UserEntity extends Equatable {
     this.deviceCount,
     this.isFollowing,
     this.isFollowedBy,
+    this.isFriend,
+    this.isOnline,
+    this.lastSeenAt,
+    this.riskLevel,
+    this.gifterLevel,
+    this.gifterLevelInfo,
+    this.likedVideosVisibility,
+    this.followersListVisibility,
+    this.followingListVisibility,
+    this.profileViewHistoryEnabled,
+    this.showActivityStatus,
+    this.discoverable,
+    this.suggestToContacts,
+    this.restrictedMode,
+    this.showShopOnProfile,
+    this.allowDuetsDefault,
+    this.allowStitchDefault,
+    this.allowDownloadsDefault,
+    this.allowRepostsDefault,
+    this.showRepostsOnProfile,
     this.isBanned,
     this.banReason,
     this.bannedUntil,
@@ -114,6 +171,14 @@ class UserEntity extends Equatable {
     fcmToken,
     instagramUrl,
     youtubeUrl,
+    websiteUrl,
+    tiktokUrl,
+    twitterUrl,
+    snapchatUrl,
+    spotifyUrl,
+    pronouns,
+    creatorCategory,
+    accountType,
     isPrivate,
     allowComments,
     allowDirectMsgs,
@@ -132,6 +197,26 @@ class UserEntity extends Equatable {
     deviceCount,
     isFollowing,
     isFollowedBy,
+    isFriend,
+    isOnline,
+    lastSeenAt,
+    riskLevel,
+    gifterLevel,
+    gifterLevelInfo,
+    likedVideosVisibility,
+    followersListVisibility,
+    followingListVisibility,
+    profileViewHistoryEnabled,
+    showActivityStatus,
+    discoverable,
+    suggestToContacts,
+    restrictedMode,
+    showShopOnProfile,
+    allowDuetsDefault,
+    allowStitchDefault,
+    allowDownloadsDefault,
+    allowRepostsDefault,
+    showRepostsOnProfile,
     isBanned,
     banReason,
     bannedUntil,
@@ -144,3 +229,4 @@ class UserEntity extends Equatable {
     deviceToken,
   ];
 }
+

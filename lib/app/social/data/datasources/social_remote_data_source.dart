@@ -1,4 +1,6 @@
+import 'package:bimobondapp/app/social/data/models/profile_visitor_model.dart';
 import 'package:bimobondapp/app/social/data/models/social_user_model.dart';
+
 import 'package:bimobondapp/app/social/data/models/social_user_page_model.dart';
 import 'package:bimobondapp/app/social/data/models/user_comment_model.dart';
 import 'package:bimobondapp/app/social/data/models/user_comments_page_model.dart';
@@ -44,10 +46,17 @@ abstract class SocialRemoteDataSource {
     required int page,
     required int limit,
   });
+
+  Future<List<ProfileVisitorModel>> getProfileVisitors();
+
+  Future<bool> recordProfileView(String userId);
+
+  Future<List<ProfileVisitorModel>> syncContacts(List<String> phoneNumbers);
 }
 
 class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
   SocialRemoteDataSourceImpl({required this.apiClient});
+
 
   final ApiClient apiClient;
 
@@ -389,4 +398,63 @@ class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
       throw DioHandler.handle(e);
     }
   }
+
+  @override
+  Future<List<ProfileVisitorModel>> getProfileVisitors() async {
+    try {
+      final response = await apiClient.dio.get(
+        ApiConstants.myVisitors,
+        options: Options(headers: await _authHeaders()),
+      );
+      if (response.statusCode == 200) {
+        final list = _extractList(response.data['visitors'] ?? response.data);
+        return list
+            .whereType<Map>()
+            .map((e) => ProfileVisitorModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      throw ServerException(
+        message: _extractErrorMessage(response.data) ?? 'Failed to load profile visitors',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<bool> recordProfileView(String userId) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiConstants.viewUserProfile(userId),
+        options: Options(headers: await _authHeaders()),
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<List<ProfileVisitorModel>> syncContacts(List<String> phoneNumbers) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiConstants.syncContacts,
+        data: {'phoneNumbers': phoneNumbers},
+        options: Options(headers: await _authHeaders()),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final list = _extractList(response.data);
+        return list
+            .whereType<Map>()
+            .map((e) => ProfileVisitorModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      throw ServerException(
+        message: _extractErrorMessage(response.data) ?? 'Failed to sync contacts',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
 }
+

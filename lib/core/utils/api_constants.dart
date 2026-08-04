@@ -1,5 +1,6 @@
 class ApiConstants {
   static const String baseUrl = 'http://134.209.2.225';
+  //http://192.168.1.123:3000
   static const String apiKey =
       'YOUR_API_KEY'; // Replace with your ReqRes API Key
   static const String backendLogin = '/auth/login';
@@ -183,6 +184,17 @@ class ApiConstants {
   // Countries catalog (public)
   static const String countries = '/countries';
   static String countryCities(String code) => '/countries/$code/cities';
+
+  // Users API extensions
+  static const String userActivePing = '/users/me/active';
+  static const String myVisitors = '/users/me/visitors';
+  static String viewUserProfile(String userId) => '/users/$userId/view-profile';
+  static const String syncContacts = '/users/sync-contacts';
+  static const String myProfileLinks = '/users/me/profile-links';
+  static const String myCloseFriends = '/users/me/close-friends';
+  static const String deactivateAccount = '/users/me/deactivate';
+  static const String reactivateAccount = '/users/me/reactivate';
+  static const String scheduleAccountDeletion = '/users/me/schedule-deletion';
 
   // User interests
   static const String userInterests = '/users/me/interests';

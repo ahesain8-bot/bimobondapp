@@ -13,6 +13,8 @@ class UserSuggestionModel extends UserSuggestionEntity {
     super.reason,
     super.isFollowing = false,
     super.isFollowedBy = false,
+    super.isActive = false,
+    super.isOnline = false,
   });
 
   factory UserSuggestionModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,9 @@ class UserSuggestionModel extends UserSuggestionEntity {
       reason: json['reason']?.toString(),
       isFollowing: social.isFollowing,
       isFollowedBy: social.isFollowedBy,
+      isActive: social.isActive ?? (json['isActive'] as bool? ?? false),
+      isOnline: json['isOnline'] as bool? ?? false,
     );
   }
 }
+

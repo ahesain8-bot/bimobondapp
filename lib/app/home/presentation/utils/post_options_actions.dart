@@ -20,6 +20,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:bimobondapp/app/posts/presentation/widgets/report_post_sheet.dart';
+
 class PostOptionsActions {
   PostOptionsActions(this.context, this.post);
 
@@ -27,18 +29,6 @@ class PostOptionsActions {
   final PostEntity post;
 
   AppLocalizations get l10n => AppLocalizations.of(context)!;
-
-  static const List<String> reportReasonCodes = [
-    'SPAM',
-    'HARASSMENT',
-    'HATE_SPEECH',
-    'VIOLENCE',
-    'NUDITY',
-    'FALSE_INFO',
-    'SCAM',
-    'COPYRIGHT',
-    'OTHER',
-  ];
 
   bool _ensureLoggedIn() {
     final authState = context.read<AuthBloc>().state;
@@ -55,91 +45,39 @@ class PostOptionsActions {
     return false;
   }
 
-  String _labelForReason(String code) {
-    switch (code) {
-      case 'SPAM':
-        return l10n.postReportReasonSpam;
-      case 'HARASSMENT':
-        return l10n.postReportReasonHarassment;
-      case 'HATE_SPEECH':
-        return l10n.postReportReasonHateSpeech;
-      case 'VIOLENCE':
-        return l10n.postReportReasonViolence;
-      case 'NUDITY':
-        return l10n.postReportReasonNudity;
-      case 'FALSE_INFO':
-        return l10n.postReportReasonFalseInfo;
-      case 'SCAM':
-        return l10n.postReportReasonScam;
-      case 'COPYRIGHT':
-        return l10n.postReportReasonCopyright;
-      case 'OTHER':
-      default:
-        return l10n.postReportReasonOther;
-    }
-  }
-
   Future<void> report() async {
     if (!_ensureLoggedIn()) return;
 
-    final reason = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Text(
-                  l10n.postReportTitle,
-                  style: Theme.of(sheetContext).textTheme.titleMedium,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  l10n.postReportMessage,
-                  style: Theme.of(sheetContext).textTheme.bodyMedium,
-                ),
-              ),
-              ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final code in reportReasonCodes)
-                    ListTile(
-                      title: Text(_labelForReason(code)),
-                      onTap: () => Navigator.pop(sheetContext, code),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    final postsBloc = context.read<PostsBloc>();
+    final currentL10n = l10n;
 
-    if (reason == null || !context.mounted) return;
+    final reportResult = await ReportPostBottomSheet.show(context);
+    if (reportResult == null) return;
 
     final result = await posts_di.sl<ReportPostUseCase>()(
-      ReportPostParams(postId: post.id, reason: reason),
+      ReportPostParams(
+        postId: post.id,
+        reason: reportResult.reason,
+        details: reportResult.details,
+      ),
     );
-
-    if (!context.mounted) return;
 
     result.fold(
       (failure) {
-        PopupDialogs.showErrorDialog(context, failure.message);
+        if (context.mounted) {
+          PopupDialogs.showErrorDialog(context, failure.message);
+        }
       },
       (_) {
-        context.read<PostsBloc>().add(
+        postsBloc.add(
           HidePostFromFeedEvent(post.id, syncApi: false),
         );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.postReportSubmitted)),
-        );
+        if (context.mounted) {
+          PopupDialogs.showSuccessDialog(
+            context,
+            currentL10n.postReportSubmitted,
+          );
+        }
       },
     );
   }
@@ -194,6 +132,7 @@ class PostOptionsActions {
   Future<void> addToStory() async {
     if (!_ensureLoggedIn()) return;
     await PostShareTracker.trackAndResolveLink(post, channel: 'STORY');
+    if (!context.mounted) return;
     ChatSharedPostCache.put(post);
     await StoryFlow.start(context);
     if (!context.mounted) return;

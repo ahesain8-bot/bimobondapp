@@ -18,6 +18,7 @@ class StoryProfileAvatar extends StatelessWidget {
     this.username,
     this.fullName,
     this.isFollowing,
+    this.isOnline = false,
     super.key,
   });
 
@@ -30,6 +31,7 @@ class StoryProfileAvatar extends StatelessWidget {
   final String? username;
   final String? fullName;
   final bool? isFollowing;
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +46,8 @@ class StoryProfileAvatar extends StatelessWidget {
         final group = id.isEmpty ? null : registry.groupFor(id);
         final hasStories =
             group != null && registry.activeStoriesFor(id).isNotEmpty;
-        final isViewed = hasStories && viewedStore.isGroupFullyViewed(group!.stories);
+        final isViewed = hasStories && viewedStore.isGroupFullyViewed(group.stories);
+
 
         Widget avatar = hasStories
             ? StoryRingAvatar(
@@ -60,6 +63,32 @@ class StoryProfileAvatar extends StatelessWidget {
                 fallbackText: fallbackText,
                 backgroundColor: backgroundColor,
               );
+
+        if (isOnline) {
+          final dotSize = (radius * 0.55).clamp(8.0, 14.0);
+          avatar = Stack(
+            clipBehavior: Clip.none,
+            children: [
+              avatar,
+              PositionedDirectional(
+                end: 0,
+                bottom: 0,
+                child: Container(
+                  width: dotSize,
+                  height: dotSize,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.scaffoldBackgroundColor,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
 
         final handler = onTap ??
             (id.isEmpty
@@ -81,3 +110,4 @@ class StoryProfileAvatar extends StatelessWidget {
     );
   }
 }
+

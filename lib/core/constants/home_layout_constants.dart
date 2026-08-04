@@ -50,8 +50,9 @@ class HomeLayoutConstants {
   static const double tabSelectedFontSize = 17;
   static const double tabUnselectedFontSize = 16;
 
-  static const double progressBarMinHeight = 3.0;
-  static const double progressBarScrubHeight = 8.0;
+  static const double progressBarPlayingHeight = 2.0;
+  static const double progressBarMinHeight = 4;
+  static const double progressBarScrubHeight = 6.0;
 
   /// Visible progress strip when stacked above the bottom nav (playhead may overflow).
   static const double feedStackedProgressLayoutHeight = progressBarMinHeight;
@@ -65,9 +66,9 @@ class HomeLayoutConstants {
   static const double progressBarHorizontalPadding = 12.0;
 
   /// Side inset for the progress line in the home feed search/progress stack.
-  static const double progressBarFeedColumnHorizontalPadding = 12.0;
-  static const double progressBarDotSize = 6.0;
-  static const double progressBarDotScrubSize = 8.0;
+  static const double progressBarFeedColumnHorizontalPadding = 9.0;
+  static const double progressBarDotSize = 0.0;
+  static const double progressBarDotScrubSize = 13.0;
 
   /// Extra caption/side-action inset for search pill + progress (excl. safe area).
   static const double feedVideoChromeAboveNav =

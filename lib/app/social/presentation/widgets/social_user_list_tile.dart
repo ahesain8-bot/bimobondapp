@@ -144,7 +144,9 @@ class SocialUserListTile extends StatelessWidget {
         username: user.username,
         fullName: user.fullName,
         isFollowing: user.isFollowing,
+        isOnline: user.isActive == true,
       ),
+
       title: Text(
         _titleText(showUsernameSubtitle),
         maxLines: 1,

@@ -17,7 +17,10 @@ import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
+import 'package:bimobondapp/app/social/domain/entities/profile_visitor_entity.dart';
+
 class SocialRepositoryImpl implements SocialRepository {
+
   SocialRepositoryImpl({required this.remoteDataSource});
 
   final SocialRemoteDataSource remoteDataSource;
@@ -293,4 +296,37 @@ class SocialRepositoryImpl implements SocialRepository {
       return Left(_mapException(e));
     }
   }
+
+  @override
+  Future<Either<Failure, List<ProfileVisitorEntity>>> getProfileVisitors() async {
+    try {
+      final visitors = await remoteDataSource.getProfileVisitors();
+      return Right(visitors);
+    } catch (e) {
+      return Left(_mapException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> recordProfileView(String userId) async {
+    try {
+      final success = await remoteDataSource.recordProfileView(userId);
+      return Right(success);
+    } catch (e) {
+      return Left(_mapException(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<ProfileVisitorEntity>>> syncContacts(
+    List<String> phoneNumbers,
+  ) async {
+    try {
+      final matches = await remoteDataSource.syncContacts(phoneNumbers);
+      return Right(matches);
+    } catch (e) {
+      return Left(_mapException(e));
+    }
+  }
 }
+

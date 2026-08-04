@@ -32,7 +32,7 @@ abstract final class FeedVideoPostsViewerLayout {
   /// [Positioned] `bottom` for [FeedVideoSearchProgressColumn] on the post stack.
   static double homeFeedPostStackChromeBottom(BuildContext context) {
     return homeFeedBottomNavReservedHeight(context) +
-        HomeLayoutConstants.feedPostStackChromeGapAboveNav;
+        (HomeLayoutConstants.feedPostStackChromeGapAboveNav - 10);
   }
 
   /// Caption / side-action inset when search + progress sit on the post stack.
@@ -49,8 +49,13 @@ abstract final class FeedVideoPostsViewerLayout {
   }
 
   /// [Positioned] `bottom` for [FeedVideoSearchProgressColumn].
-  static double progressColumnBottom(double bottomChromeStackHeight) {
-    return bottomChromeStackHeight + HomeLayoutConstants.progressBarBottomInset;
+  static double progressColumnBottom(
+    double bottomChromeStackHeight, {
+    double extraInset = 0.0,
+  }) {
+    return bottomChromeStackHeight +
+        HomeLayoutConstants.progressBarBottomInset +
+        extraInset;
   }
 
   /// Total height of search + progress + bottom nav (home feed media inset).
@@ -76,13 +81,18 @@ abstract final class FeedVideoPostsViewerLayout {
     double captionGap = ProfileLayoutConstants.postsViewerBottomPadding,
     bool showProgressBar = true,
     bool showSearchRow = true,
+    double extraInset = 0.0,
   }) {
-    return progressColumnBottom(bottomChromeStackHeight) +
+    return progressColumnBottom(
+          bottomChromeStackHeight,
+          extraInset: extraInset,
+        ) +
         FeedVideoSearchProgressColumn.totalHeight(
           post,
           showProgressBar: showProgressBar,
           showSearchRow: showSearchRow,
         ) +
-        captionGap;
+        captionGap -
+        10;
   }
 }

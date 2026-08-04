@@ -12,6 +12,8 @@ class UserSuggestionEntity extends Equatable {
     this.reason,
     this.isFollowing = false,
     this.isFollowedBy = false,
+    this.isActive = false,
+    this.isOnline = false,
   });
 
   final String id;
@@ -24,6 +26,8 @@ class UserSuggestionEntity extends Equatable {
   final String? reason;
   final bool isFollowing;
   final bool isFollowedBy;
+  final bool isActive;
+  final bool isOnline;
 
   String get displayName =>
       (fullName?.trim().isNotEmpty == true ? fullName : username) ?? 'User';
@@ -40,6 +44,8 @@ class UserSuggestionEntity extends Equatable {
       reason: other.reason,
       isFollowing: other.isFollowing,
       isFollowedBy: other.isFollowedBy,
+      isActive: other.isActive,
+      isOnline: other.isOnline,
     );
   }
 
@@ -54,6 +60,8 @@ class UserSuggestionEntity extends Equatable {
     String? reason,
     bool? isFollowing,
     bool? isFollowedBy,
+    bool? isActive,
+    bool? isOnline,
   }) {
     return UserSuggestionEntity(
       id: id ?? this.id,
@@ -66,6 +74,8 @@ class UserSuggestionEntity extends Equatable {
       reason: reason ?? this.reason,
       isFollowing: isFollowing ?? this.isFollowing,
       isFollowedBy: isFollowedBy ?? this.isFollowedBy,
+      isActive: isActive ?? this.isActive,
+      isOnline: isOnline ?? this.isOnline,
     );
   }
 
@@ -81,5 +91,8 @@ class UserSuggestionEntity extends Equatable {
         reason,
         isFollowing,
         isFollowedBy,
+        isActive,
+        isOnline,
       ];
 }
+

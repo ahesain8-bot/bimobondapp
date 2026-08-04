@@ -39,6 +39,7 @@ class PostOptionsSheet {
       child: Theme(
         data: sheetTheme,
         child: _PostOptionsSheetContent(
+          hostContext: context,
           post: post,
           isOwner: isOwner,
           onEdit: onEdit,
@@ -57,6 +58,7 @@ class _PostOptionsSheetContent extends StatefulWidget {
   const _PostOptionsSheetContent({
     required this.post,
     required this.isOwner,
+    this.hostContext,
     this.onEdit,
     this.onPromote,
     this.onDelete,
@@ -65,6 +67,7 @@ class _PostOptionsSheetContent extends StatefulWidget {
     this.isReposted = false,
   });
 
+  final BuildContext? hostContext;
   final PostEntity post;
   final bool isOwner;
   final VoidCallback? onEdit;
@@ -622,7 +625,8 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
       return _buildSearchMode(l10n);
     }
 
-    final actions = PostOptionsActions(context, widget.post);
+    final actions =
+        PostOptionsActions(widget.hostContext ?? context, widget.post);
     final appActions = _buildAppActions(l10n);
     final optionActions = _buildOptionActions(actions);
 

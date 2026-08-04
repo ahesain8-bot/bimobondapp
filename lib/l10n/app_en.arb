@@ -1718,5 +1718,8 @@
   "retry": "Try again",
   "seeTranslation": "See translation",
   "seeOriginal": "See original",
-  "translationFailed": "Could not translate"
+  "translationFailed": "Could not translate",
+  "postLinksTitle": "Links",
+  "tryEffectAction": "Try effect",
+  "effectsSubtitle": "Effects"
 }

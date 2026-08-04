@@ -41,6 +41,9 @@ class ProfileLayoutConstants {
   /// Space reserved for the TikTok-style comment bar (excludes safe area).
   static const double postsViewerCommentBarHeight = 56;
 
+  /// Bottom spacing above the comment bar for the video progress bar on profile videos.
+  static const double postsViewerProgressBarBottomInset = 0;
+
   /// Feed API sort: newest posts first (`LATEST`).
   static const String postsSortNewestFirst = 'LATEST';
   static const double scrollLoadMoreThreshold = 200;

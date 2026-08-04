@@ -138,8 +138,10 @@ class MessagesSuggestionsStrip extends StatelessWidget {
                         username: suggestion.username,
                         fullName: suggestion.fullName,
                         isFollowing: isFollowing,
+                        isOnline: suggestion.isActive || suggestion.isOnline,
                         onTap: openProfile,
                       ),
+
                       const SizedBox(height: AppSizes.p12),
                       GestureDetector(
                         onTap: openProfile,

@@ -64,7 +64,7 @@ class _FeedVideoProgressBarState extends State<FeedVideoProgressBar> {
       width: barWidth,
       child: Stack(
         clipBehavior: Clip.none,
-        alignment: Alignment.centerLeft,
+        alignment: Alignment.bottomLeft,
         children: [
           DecoratedBox(
             decoration: BoxDecoration(
@@ -81,20 +81,27 @@ class _FeedVideoProgressBarState extends State<FeedVideoProgressBar> {
               ),
               child: SizedBox(height: barHeight, width: fillWidth),
             ),
-          if (showPlayhead && p > 0)
+          if (showPlayhead && p > 0 && dotSize > 0)
             Positioned(
               left: dotLeft,
-              top: (barHeight - dotSize) / 2,
-              child: Container(
+              bottom: (barHeight - dotSize) / 2,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                curve: Curves.easeOut,
                 width: dotSize,
                 height: dotSize,
                 decoration: BoxDecoration(
                   color: fill,
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    width: 0.5,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 3,
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 5,
+                      spreadRadius: 0.5,
                       offset: const Offset(0, 1),
                     ),
                   ],
@@ -142,12 +149,10 @@ class _FeedVideoProgressBarState extends State<FeedVideoProgressBar> {
           ? () => _endScrub(commit: false)
           : null,
       onTapDown: notifier.canSeek
-          ? (details) {
-              final p = _progressForDx(details.localPosition.dx, barWidth);
-              notifier.beginScrub(p);
-              unawaited(notifier.endScrub(commit: true));
-            }
+          ? (details) => _startScrub(details.localPosition.dx, barWidth)
           : null,
+      onTapUp: notifier.canSeek ? (_) => _endScrub(commit: true) : null,
+      onTapCancel: notifier.canSeek ? () => _endScrub(commit: false) : null,
       child: Stack(
         alignment: trackAlignment,
         clipBehavior: Clip.none,
@@ -179,7 +184,7 @@ class _FeedVideoProgressBarState extends State<FeedVideoProgressBar> {
         : HomeLayoutConstants.progressBarHorizontalPadding;
     final trackAlignment = widget.feedColumnLayout
         ? Alignment.bottomCenter
-        : Alignment.bottomCenter;
+        : Alignment.center;
     final layoutHeight = widget.feedColumnLayout
         ? HomeLayoutConstants.feedStackedProgressLayoutHeight
         : HomeLayoutConstants.progressBarHitHeight;
@@ -193,7 +198,13 @@ class _FeedVideoProgressBarState extends State<FeedVideoProgressBar> {
           clipBehavior: Clip.none,
           alignment: Alignment.bottomCenter,
           children: [
-            SizedBox(height: hitHeight, width: double.infinity, child: child),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: hitHeight,
+              child: child,
+            ),
           ],
         ),
       );
@@ -236,15 +247,13 @@ class _FeedVideoProgressBarState extends State<FeedVideoProgressBar> {
             ? HomeLayoutConstants.progressBarScrubHeight
             : HomeLayoutConstants.progressBarMinHeight;
 
-        if (widget.feedColumnLayout &&
-            notifier.videoLoading &&
-            !scrubbing) {
+        if (widget.feedColumnLayout && notifier.videoLoading && !scrubbing) {
           return wrapHitTarget(
             Padding(
               padding: EdgeInsets.symmetric(horizontal: hPad),
-              child: const Align(
-                alignment: Alignment.bottomCenter,
-                child: VideoLoadingIndicator(),
+              child: Align(
+                alignment: trackAlignment,
+                child: const VideoLoadingIndicator(),
               ),
             ),
           );

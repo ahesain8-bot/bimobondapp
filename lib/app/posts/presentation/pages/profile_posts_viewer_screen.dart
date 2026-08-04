@@ -331,6 +331,8 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
                     final progressBottom =
                         FeedVideoPostsViewerLayout.progressColumnBottom(
                           bottomChrome,
+                          extraInset: ProfileLayoutConstants
+                              .postsViewerProgressBarBottomInset,
                         );
                     final topClearance = ProfilePostsViewerTopBar.stackHeight(
                       context,
@@ -371,6 +373,8 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
                                         .feedCaptionGapBelowSearchChrome,
                                     showProgressBar: feedPostHasVideo(post),
                                     showSearchRow: true,
+                                    extraInset: ProfileLayoutConstants
+                                        .postsViewerProgressBarBottomInset,
                                   ),
                               feedTopBarClearance: topClearance,
                               pageController: _pageController,

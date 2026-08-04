@@ -131,9 +131,10 @@ InboxChatItem inboxChatItemFromEntity(
     time: formatInboxTime(last?.createdAt ?? chat.updatedAt, l10n),
     unread: chat.unreadCount > 0,
     peerUserId: chat.isGroup ? null : other?.id,
-    active: other?.isActive ?? false,
+    active: other?.isActive == true || other?.isOnline == true,
   );
 }
+
 
 int _chatActivityMillis(ChatEntity chat) {
   final last = chat.lastMessage?.createdAt ?? chat.updatedAt;

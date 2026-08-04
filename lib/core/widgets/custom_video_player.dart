@@ -316,9 +316,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
   /// progress bar interactive even when the feed gate would block playback.
   bool get _allowsFeedScrub {
     if (!widget.isActive || !_appInForeground) return false;
-    if (!_isControllerReady(_controller)) return false;
-    if (!widget.respectFeedPlaybackGate) return true;
-    return _shouldPlay;
+    return _isControllerReady(_controller);
   }
 
   bool get _shouldSyncFeedProgress =>
@@ -507,8 +505,9 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _progressNotifier = FeedVideoProgressScope.maybeOf(context);
-    if (widget.isActive && _shouldPlay) {
-      _syncFeedHandoffGeneration();
+    if (widget.isActive) {
+      if (_shouldPlay) _syncFeedHandoffGeneration();
+      _syncFeedProgress(force: true);
     }
   }
 
@@ -1117,10 +1116,18 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
     }
     try {
       final value = controller.value;
+      double bufProgress = 0.0;
+      final totalMs = value.duration.inMilliseconds;
+      if (totalMs > 0 && value.buffered.isNotEmpty) {
+        final endMs = value.buffered.last.end.inMilliseconds;
+        bufProgress = (endMs / totalMs).clamp(0.0, 1.0);
+      }
       notifier.updateFromPlayback(
         position: value.position,
         duration: value.duration,
         isPlaying: value.isPlaying && !_userPaused,
+        isBuffering: value.isBuffering,
+        bufferedProgress: bufProgress,
       );
     } catch (_) {}
   }

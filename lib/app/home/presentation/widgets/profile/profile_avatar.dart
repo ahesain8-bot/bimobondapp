@@ -42,12 +42,14 @@ class ProfileAvatar extends StatelessWidget {
             backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
             username: user.username,
             fullName: user.fullName,
+            isOnline: user.isOnline == true,
             onTap: () => handleProfileScreenAvatarTap(
               context,
               userId: user.id,
               avatarUrl: user.avatarUrl,
             ),
           ),
+
         ),
         PositionedDirectional(
           bottom: 2,

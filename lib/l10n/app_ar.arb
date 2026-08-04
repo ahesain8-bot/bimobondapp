@@ -1702,5 +1702,8 @@
   "retry": "حاول مرة أخرى",
   "seeTranslation": "عرض الترجمة",
   "seeOriginal": "عرض النص الأصلي",
-  "translationFailed": "تعذر الترجمة"
+  "translationFailed": "تعذر الترجمة",
+  "postLinksTitle": "الروابط",
+  "tryEffectAction": "تجربة التأثير",
+  "effectsSubtitle": "المؤثرات"
 }

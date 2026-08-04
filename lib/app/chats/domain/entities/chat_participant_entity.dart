@@ -7,6 +7,8 @@ class ChatParticipantEntity extends Equatable {
     this.fullName,
     this.avatarUrl,
     this.isActive,
+    this.isOnline,
+    this.lastSeenAt,
   });
 
   final String id;
@@ -14,10 +16,21 @@ class ChatParticipantEntity extends Equatable {
   final String? fullName;
   final String? avatarUrl;
   final bool? isActive;
+  final bool? isOnline;
+  final String? lastSeenAt;
 
   String get displayName =>
       (fullName?.trim().isNotEmpty == true ? fullName : username) ?? 'User';
 
   @override
-  List<Object?> get props => [id, username, fullName, avatarUrl, isActive];
+  List<Object?> get props => [
+        id,
+        username,
+        fullName,
+        avatarUrl,
+        isActive,
+        isOnline,
+        lastSeenAt,
+      ];
 }
+

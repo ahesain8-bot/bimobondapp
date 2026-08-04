@@ -28,6 +28,9 @@ class ChatView extends StatefulWidget {
     required this.imageUrl,
     required this.currentUserId,
     this.peerUserId,
+    this.isPeerActive = false,
+    this.lastSeenAt,
+    this.lastSeenText,
     this.openCamera = false,
     super.key,
   });
@@ -37,6 +40,9 @@ class ChatView extends StatefulWidget {
   final String imageUrl;
   final String currentUserId;
   final String? peerUserId;
+  final bool isPeerActive;
+  final String? lastSeenAt;
+  final String? lastSeenText;
   final bool openCamera;
 
   @override
@@ -454,8 +460,12 @@ class _ChatViewState extends State<ChatView> {
             username: widget.username,
             imageUrl: widget.imageUrl,
             userId: widget.peerUserId,
+            isPeerActive: widget.isPeerActive,
+            lastSeenAt: widget.lastSeenAt,
+            lastSeenText: widget.lastSeenText,
             onProfileTap: _onPeerHeaderTap,
           ),
+
           body: Stack(
             children: [
               ChatPatternBackground(

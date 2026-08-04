@@ -50,7 +50,7 @@ class PostFilterChip extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(3, 4, 9, 4),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(4),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -58,9 +58,9 @@ class PostFilterChip extends StatelessWidget {
               Container(
                 width: 20,
                 height: 16,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: _effectBadgeGradient,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 alignment: Alignment.center,
                 child: const Icon(

@@ -49,8 +49,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final bottomChrome = MediaQuery.viewPaddingOf(context).bottom;
     final showProgressBar = feedPostHasVideo(_post);
     final showSearchRow = feedPostShowsProfileSearchChrome(_post);
-    final progressBottom =
-        FeedVideoPostsViewerLayout.progressColumnBottom(bottomChrome);
+    final progressBottom = FeedVideoPostsViewerLayout.progressColumnBottom(
+      bottomChrome,
+    );
 
     return BlocListener<PostsBloc, PostsState>(
       listener: (context, state) {

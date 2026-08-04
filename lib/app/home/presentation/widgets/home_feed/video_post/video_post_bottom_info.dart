@@ -1,8 +1,7 @@
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_repost_overlay.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_caption_tags.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_filter_chip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_hashtag_chips.dart';
-import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_location_chip.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/post_links_chip.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_music_label.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_page_dots.dart';
@@ -89,47 +88,7 @@ class VideoPostBottomInfo extends StatelessWidget {
                     feedItem: feedItem,
                     repostQuote: repostQuote,
                   ),
-                  if (post.isPromoted || post.isAd) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.white30),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            LucideIcons.flame,
-                            size: 12,
-                            color: Color(0xFFFF8C42),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            post.promotion?.label ?? l10n.promotedBadge,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  if (post.location != null && post.location!.hasDisplayLabel)
-                    PostLocationChip(location: post.location!),
-                  if (post.hasDisplayableFilter)
-                    PostFilterChip(
-                      filterId: post.effectiveFilterId!,
-                      filterLabel: post.effectiveFilterLabel,
-                      filterCategory: post.filterCategory,
-                    ),
+                  PostLinksChip(post: post),
                   if (hasDisplayName) ...[
                     GestureDetector(
                       onTap: () => _openAuthor(context),
@@ -164,6 +123,42 @@ class VideoPostBottomInfo extends StatelessWidget {
                     postUsername: displayName ?? username,
                     onTap: onMusicTap,
                   ),
+                  if (post.isPromoted || post.isAd) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            LucideIcons.flame,
+                            size: 12,
+                            color: Color(0xFFFF8C42),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            post.promotion?.label ?? l10n.promotedBadge,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

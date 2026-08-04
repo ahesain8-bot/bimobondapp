@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:flutter/material.dart';
 
 /// TikTok-style video loading indicator: a thin white line at the bottom of
@@ -30,27 +31,37 @@ class _VideoLoadingIndicatorState extends State<VideoLoadingIndicator>
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _stretch,
-        builder: (context, _) {
-          final t = _stretch.value;
-          return FractionallySizedBox(
-            widthFactor: 0.12 + 0.58 * t,
-            child: Opacity(
-              opacity: (1 - t) * 0.75 + 0.15,
-              child: Container(
-                height: 3,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(2),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 4),
-                  ],
+      child: SizedBox(
+        height: HomeLayoutConstants.progressBarMinHeight,
+        width: double.infinity,
+        child: AnimatedBuilder(
+          animation: _stretch,
+          builder: (context, _) {
+            final t = _stretch.value;
+            return Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                widthFactor: 0.12 + 0.58 * t,
+                alignment: Alignment.bottomCenter,
+                child: Opacity(
+                  opacity: (1 - t) * 0.75 + 0.15,
+                  child: Container(
+                    height: HomeLayoutConstants.progressBarMinHeight,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(
+                        HomeLayoutConstants.progressBarMinHeight / 2,
+                      ),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black26, blurRadius: 4),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

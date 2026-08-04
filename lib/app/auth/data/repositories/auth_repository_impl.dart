@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:bimobondapp/app/home/presentation/utils/feed_author_follow_cache.dart';
-import 'package:bimobondapp/app/auth/data/models/user_model.dart';
 import 'package:dartz/dartz.dart';
+
 import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';

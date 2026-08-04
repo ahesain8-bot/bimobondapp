@@ -8,6 +8,8 @@ import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.da
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
+import 'package:bimobondapp/app/social/domain/entities/profile_visitor_entity.dart';
+
 abstract class SocialRepository {
   Future<Either<Failure, FollowStatus>> toggleFollow(String userId);
 
@@ -47,4 +49,13 @@ abstract class SocialRepository {
     required String currentUserId,
     required String targetUserId,
   });
+
+  Future<Either<Failure, List<ProfileVisitorEntity>>> getProfileVisitors();
+
+  Future<Either<Failure, bool>> recordProfileView(String userId);
+
+  Future<Either<Failure, List<ProfileVisitorEntity>>> syncContacts(
+    List<String> phoneNumbers,
+  );
 }
+
