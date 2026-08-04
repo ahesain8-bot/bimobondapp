@@ -31,6 +31,7 @@ import 'package:bimobondapp/app/posts/presentation/widgets/hashtag_picker_sheet.
 import 'package:bimobondapp/app/social/presentation/widgets/mention_picker_sheet.dart';
 import 'package:bimobondapp/core/constants/add_post_layout_constants.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
+import 'package:bimobondapp/core/utils/media_upload_utils.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -112,6 +113,11 @@ class _AddPostScreenState extends State<AddPostScreen>
   void initState() {
     super.initState();
     _selectedFiles = widget.initialFiles ?? [];
+    // Start compressing now rather than on the Post tap. Video preparation is a
+    // full re-encode whose cost scales with clip length, so paying it here —
+    // while the caption is still being written — is usually enough to make Post
+    // return immediately instead of stalling for seconds on a long recording.
+    MediaUploadUtils.prewarmAll(_selectedFiles);
     _type = widget.initialType ?? 'VIDEO';
     final now = DateTime.now();
     _auctionStartDate = now;
@@ -212,6 +218,9 @@ class _AddPostScreenState extends State<AddPostScreen>
     );
     if (!mounted || edited == null || edited.files.isEmpty) return;
 
+    // Editing produces new files, so anything prewarmed for the old ones no
+    // longer applies — start again on the replacements.
+    MediaUploadUtils.prewarmAll(edited.files);
     setState(() {
       _selectedFiles = edited.files;
       if (edited.sound != null) {

@@ -20,11 +20,17 @@ class FaceLandmarkerHelper(context: Context) {
     fun setup() {
         if (faceLandmarker != null) return
 
+        // CPU first, not GPU: this inference shares the same Mali GPU as the
+        // beauty-shader rendering pipeline (FaceWarpRenderer's OES program).
+        // Two concurrent GPU workloads was reading as system-wide lag (camera
+        // HAL, surfaceflinger and our own GL thread all elevated together —
+        // GPU contention, not one slow thread). Same model, same landmark
+        // accuracy either way; only the compute backend changes.
         faceLandmarker = try {
-            createLandmarker(Delegate.GPU)
-        } catch (e: Exception) {
-            Log.w(TAG, "GPU delegate unavailable, falling back to CPU", e)
             createLandmarker(Delegate.CPU)
+        } catch (e: Exception) {
+            Log.w(TAG, "CPU delegate unavailable, falling back to GPU", e)
+            createLandmarker(Delegate.GPU)
         } catch (e: LinkageError) {
             Log.e(TAG, "MediaPipe native library missing", e)
             throw e
