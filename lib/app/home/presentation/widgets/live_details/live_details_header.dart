@@ -31,6 +31,7 @@ class LiveDetailsHeader extends StatelessWidget {
     this.countdownBelowProfile,
     required this.onClose,
     required this.onFollowTap,
+    this.belowHostProfile,
   });
 
   final String hostName;
@@ -55,6 +56,9 @@ class LiveDetailsHeader extends StatelessWidget {
   final Widget? countdownBelowProfile;
   final VoidCallback onClose;
   final VoidCallback onFollowTap;
+
+  /// Own gift combos — left side under host profile (opposite the LIVE chip).
+  final Widget? belowHostProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +176,13 @@ class LiveDetailsHeader extends StatelessWidget {
                   if (countdownBelowProfile != null) ...[
                     const SizedBox(height: AppSizes.p6),
                     countdownBelowProfile!,
+                  ],
+                  if (belowHostProfile != null) ...[
+                    const SizedBox(height: AppSizes.p32),
+                    const SizedBox(height: AppSizes.p32),
+                    const SizedBox(height: AppSizes.p32),
+
+                    belowHostProfile!,
                   ],
                 ],
               ),

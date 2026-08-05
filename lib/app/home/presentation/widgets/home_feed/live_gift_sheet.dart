@@ -11,6 +11,9 @@ import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
     as gifts_di;
 import 'dart:async';
 
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
+    as auctions_di;
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_accent_color.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_catalog_audio_preview.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
@@ -57,6 +60,7 @@ class LiveGiftSheet {
     String? liveId,
     bool canSendToHost = true,
     OnGiftSentCallback? onGiftSent,
+    OnGiftSentCallback? onSmallGiftOptimistic,
   }) {
     return GlassBottomSheet.open<void>(
       context,
@@ -68,6 +72,7 @@ class LiveGiftSheet {
         liveId: liveId,
         canSendToHost: canSendToHost,
         onGiftSent: onGiftSent,
+        onSmallGiftOptimistic: onSmallGiftOptimistic,
       ),
     );
   }
@@ -81,6 +86,7 @@ class _LiveGiftSheetBody extends StatefulWidget {
     this.liveId,
     this.canSendToHost = true,
     this.onGiftSent,
+    this.onSmallGiftOptimistic,
   });
 
   final String? postId;
@@ -89,6 +95,7 @@ class _LiveGiftSheetBody extends StatefulWidget {
   final String? liveId;
   final bool canSendToHost;
   final OnGiftSentCallback? onGiftSent;
+  final OnGiftSentCallback? onSmallGiftOptimistic;
 
   @override
   State<_LiveGiftSheetBody> createState() => _LiveGiftSheetBodyState();
@@ -336,6 +343,8 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     );
   }
 
+  Future<void> _giftSendTaskChain = Future.value();
+
   Future<void> _send(GiftEntity gift) async {
     if (!_isLoggedIn) {
       _showLoginRequired();
@@ -359,6 +368,25 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final needsPurchase = _ownedQuantity(gift.id) < 1;
     if (needsPurchase && !_canAfford(gift)) {
       await _offerTopUp();
+      return;
+    }
+
+    final isSmallGift = !gift.isAudioGift && gift.size == GiftCatalogSize.small;
+
+    // Small gifts: keep sheet open, no loading spinner — same as suggested shelf.
+    if (isSmallGift) {
+      // Instant combo card — do not wait for socket.
+      widget.onSmallGiftOptimistic?.call(gift);
+      _giftSendTaskChain = _giftSendTaskChain
+          .then((_) async {
+            if (!mounted) return;
+            await _sendSmallGiftKeepOpen(gift);
+          })
+          .catchError((Object err) {
+            if (mounted) {
+              PopupDialogs.showErrorDialog(context, err.toString());
+            }
+          });
       return;
     }
 
@@ -396,10 +424,64 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final liveId = widget.liveId?.trim();
     final hasLive = liveId != null && liveId.isNotEmpty;
 
+    // Prefer socket sendGift for live/auction (qty 1); HTTP for post gifts / offline.
+    if (hasLive || hasAuction) {
+      final socket = auctions_di.sl<AuctionSocketService>();
+      await socket.ensureJoined(
+        postId: hasPost ? postId : null,
+        auctionId: hasAuction ? auctionId : null,
+        liveId: hasLive ? liveId : null,
+      );
+      final socketResult = await socket.sendGift(
+        giftId: gift.id,
+        liveId: hasLive ? liveId : null,
+        auctionId: hasAuction ? auctionId : null,
+        quantity: 1,
+        receiverId: receiverId,
+      );
+
+      if (socketResult != null) {
+        if (!mounted) return;
+        if (!socketResult.isSuccess) {
+          setState(() => _busy = false);
+          PopupDialogs.showErrorDialog(
+            context,
+            socketResult.errorMessage ?? 'Failed to send gift',
+          );
+          return;
+        }
+
+        final invGiftId = socketResult.inventoryGiftId ?? gift.id;
+        final invQty = socketResult.inventoryQuantity;
+        if (invQty != null) {
+          _applyInventoryUpdate(
+            GiftInventoryModel(
+              balanceCoins: _inventory?.balanceCoins ?? 0,
+              items: [
+                GiftInventoryItemModel(giftId: invGiftId, quantity: invQty),
+              ],
+            ),
+          );
+        }
+        final inventoryResult = await _getInventory(NoParams());
+        if (!mounted) return;
+        inventoryResult.fold((_) {}, _applyInventoryUpdate);
+
+        if (!mounted) return;
+        setState(() => _busy = false);
+        final onSent = widget.onGiftSent;
+        Navigator.of(context).pop();
+        // Medium/large video from auctionGiftCombo; refresh totals/comments only.
+        onSent?.call(gift);
+        return;
+      }
+    }
+
     final result = await _sendGift(
       SendGiftParams(
         giftId: gift.id,
         receiverId: receiverId,
+        quantity: 1,
         postId: hasPost ? postId : null,
         auctionId: hasAuction ? auctionId : null,
         liveId: hasLive ? liveId : null,
@@ -413,8 +495,6 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
         PopupDialogs.showErrorDialog(context, failure.message);
       },
       (inventoryUpdate) async {
-        // Docs: refresh inventory after send. Prefer senderInventory merge,
-        // then always re-fetch for accurate qty + wallet balance.
         if (inventoryUpdate != null) {
           _applyInventoryUpdate(inventoryUpdate);
         }
@@ -428,6 +508,112 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
         Navigator.of(context).pop();
         await Future<void>.delayed(const Duration(milliseconds: 300));
         onSent?.call(gift);
+      },
+    );
+  }
+
+  /// Fire-and-forget small gift: socket only, sheet stays open, no busy spinner.
+  Future<void> _sendSmallGiftKeepOpen(GiftEntity gift) async {
+    final needsPurchase = _ownedQuantity(gift.id) < 1;
+    if (needsPurchase) {
+      if (!_canAfford(gift)) {
+        if (mounted) await _offerTopUp();
+        return;
+      }
+      final purchased = await _purchaseGiftInternal(gift);
+      if (!purchased || !mounted) return;
+    }
+
+    final receiverId = widget.receiverId?.trim() ?? '';
+    if (receiverId.isEmpty) {
+      if (mounted) {
+        PopupDialogs.showErrorDialog(
+          context,
+          AppLocalizations.of(context)!.liveGiftNoRecipient,
+        );
+      }
+      return;
+    }
+
+    final auctionId = widget.auctionId?.trim();
+    final hasAuction = auctionId != null && auctionId.isNotEmpty;
+    final postId = widget.postId?.trim();
+    final hasPost = postId != null && postId.isNotEmpty;
+    final liveId = widget.liveId?.trim();
+    final hasLive = liveId != null && liveId.isNotEmpty;
+
+    if (hasLive || hasAuction) {
+      final socket = auctions_di.sl<AuctionSocketService>();
+      await socket.ensureJoined(
+        postId: hasPost ? postId : null,
+        auctionId: hasAuction ? auctionId : null,
+        liveId: hasLive ? liveId : null,
+      );
+      final socketResult = await socket.sendGift(
+        giftId: gift.id,
+        liveId: hasLive ? liveId : null,
+        auctionId: hasAuction ? auctionId : null,
+        quantity: 1,
+        receiverId: receiverId,
+      );
+
+      if (socketResult != null) {
+        if (!mounted) return;
+        if (!socketResult.isSuccess) {
+          PopupDialogs.showErrorDialog(
+            context,
+            socketResult.errorMessage ?? 'Failed to send gift',
+          );
+          return;
+        }
+
+        final invGiftId = socketResult.inventoryGiftId ?? gift.id;
+        final invQty = socketResult.inventoryQuantity;
+        if (invQty != null) {
+          _applyInventoryUpdate(
+            GiftInventoryModel(
+              balanceCoins: _inventory?.balanceCoins ?? 0,
+              items: [
+                GiftInventoryItemModel(giftId: invGiftId, quantity: invQty),
+              ],
+            ),
+          );
+        } else {
+          final inventoryResult = await _getInventory(NoParams());
+          if (!mounted) return;
+          inventoryResult.fold((_) {}, _applyInventoryUpdate);
+        }
+        // Keep sheet open — combo card comes from auctionGiftCombo.
+        widget.onGiftSent?.call(gift);
+        return;
+      }
+    }
+
+    final result = await _sendGift(
+      SendGiftParams(
+        giftId: gift.id,
+        receiverId: receiverId,
+        quantity: 1,
+        postId: hasPost ? postId : null,
+        auctionId: hasAuction ? auctionId : null,
+        liveId: hasLive ? liveId : null,
+      ),
+    );
+    if (!mounted) return;
+
+    await result.fold(
+      (failure) async {
+        PopupDialogs.showErrorDialog(context, failure.message);
+      },
+      (inventoryUpdate) async {
+        if (inventoryUpdate != null) {
+          _applyInventoryUpdate(inventoryUpdate);
+        } else {
+          final inventoryResult = await _getInventory(NoParams());
+          if (!mounted) return;
+          inventoryResult.fold((_) {}, _applyInventoryUpdate);
+        }
+        widget.onGiftSent?.call(gift);
       },
     );
   }
@@ -572,10 +758,12 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       itemCount: ordered.length,
       itemBuilder: (context, index) {
         final gift = ordered[index];
-        final audioPlaying = gift.isAudioGift &&
+        final audioPlaying =
+            gift.isAudioGift &&
             _selectedIndex == index &&
             _giftAudioPreview.isPlayingGift(gift.id);
-        final audioPaused = gift.isAudioGift &&
+        final audioPaused =
+            gift.isAudioGift &&
             _selectedIndex == index &&
             _giftAudioPreview.isPausedGift(gift.id);
         return _GiftTile(
@@ -704,11 +892,7 @@ class _SongRecommendationBanner extends StatelessWidget {
                       isSelected: true,
                       showPauseIcon: true,
                     )
-                  : GiftVinylRecordIcon(
-                      gift: gift,
-                      size: 40,
-                      isSelected: true,
-                    ),
+                  : GiftVinylRecordIcon(gift: gift, size: 40, isSelected: true),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -864,8 +1048,8 @@ class _GiftTile extends StatelessWidget {
                                 scale: !isSelected
                                     ? 1.0
                                     : isAudioSpinning
-                                        ? 1.22
-                                        : 1.08,
+                                    ? 1.22
+                                    : 1.08,
                                 duration: const Duration(milliseconds: 260),
                                 curve: Curves.easeOutBack,
                                 child: _GiftIcon(
@@ -1002,11 +1186,7 @@ class _GiftTile extends StatelessWidget {
                 ),
               )
             else if (gift.tag != null)
-              Positioned(
-                top: 4,
-                left: 4,
-                child: _GiftTagBadge(tag: gift.tag!),
-              ),
+              Positioned(top: 4, left: 4, child: _GiftTagBadge(tag: gift.tag!)),
           ],
         ),
       ),

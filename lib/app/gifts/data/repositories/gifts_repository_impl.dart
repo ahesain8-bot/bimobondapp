@@ -94,6 +94,7 @@ class GiftsRepositoryImpl implements GiftsRepository {
   Future<Either<Failure, GiftInventoryEntity?>> sendGift({
     required String giftId,
     required String receiverId,
+    int quantity = 1,
     String? postId,
     String? auctionId,
     String? liveId,
@@ -103,6 +104,7 @@ class GiftsRepositoryImpl implements GiftsRepository {
       final inventory = await remoteDataSource.sendGift(
         giftId: giftId,
         receiverId: receiverId,
+        quantity: quantity,
         postId: postId,
         auctionId: auctionId,
         liveId: liveId,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -19,6 +20,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     this.thumbnailUrl,
     this.senderName,
     this.giftName,
+    this.size,
     this.onCompleted,
     super.key,
   });
@@ -27,6 +29,7 @@ class GiftAnimationOverlay extends StatefulWidget {
   final String? thumbnailUrl;
   final String? senderName;
   final String? giftName;
+  final dynamic size;
   final VoidCallback? onCompleted;
 
   static OverlayEntry? _activeEntry;
@@ -38,6 +41,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     String? thumbnailUrl,
     String? senderName,
     String? giftName,
+    dynamic size,
   }) {
     final resolved = MediaUtils.resolveAbsoluteUrl(animationUrl);
     if (resolved.trim().isEmpty) return Future.value();
@@ -82,6 +86,7 @@ class GiftAnimationOverlay extends StatefulWidget {
             : MediaUtils.resolveAbsoluteUrl(thumbnailUrl),
         senderName: senderName,
         giftName: giftName,
+        size: size,
         onCompleted: remove,
       ),
     );
@@ -276,11 +281,108 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     super.dispose();
   }
 
+  bool get _isSmall {
+    final s = widget.size;
+    if (s == GiftCatalogSize.small) return true;
+    if (s is String && s.trim().toUpperCase() == 'SMALL') return true;
+    return false;
+  }
+
+  bool get _isMedium {
+    final s = widget.size;
+    if (s == GiftCatalogSize.medium) return true;
+    if (s is String && s.trim().toUpperCase() == 'MEDIUM') return true;
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    // Gift assets are authored at 1080×1080 — keep a 1:1 stage, full width.
-    final giftSize = size.width.clamp(0.0, size.height);
+    final screenSize = MediaQuery.sizeOf(context);
+    final isSmall = _isSmall;
+    final isMedium = _isMedium;
+    final isLarge = !isSmall && !isMedium;
+
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final double stageSize;
+    if (isSmall) {
+      stageSize = (screenSize.width * 0.28).clamp(80.0, 120.0);
+    } else if (isMedium) {
+      stageSize = (screenSize.width * 0.72).clamp(240.0, 340.0);
+    } else {
+      stageSize = screenSize.width.clamp(0.0, screenSize.height);
+    }
+
+    Widget stage = _withEdgeFade(
+      SizedBox(
+        width: stageSize,
+        height: stageSize,
+        child: _buildMedia(),
+      ),
+    );
+
+    Widget animatedStage;
+    if (isLarge) {
+      animatedStage = SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOutCubic,
+          ),
+        ),
+        child: FadeTransition(
+          opacity: CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOut,
+          ),
+          child: stage,
+        ),
+      );
+    } else {
+      animatedStage = ScaleTransition(
+        scale: Tween<double>(begin: 0.75, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOutBack,
+          ),
+        ),
+        child: FadeTransition(
+          opacity: CurvedAnimation(
+            parent: _entranceController,
+            curve: Curves.easeOut,
+          ),
+          child: stage,
+        ),
+      );
+    }
+
+    // Position calculation:
+    // - SMALL: very small, left-aligned above comments and highest price card (bottom: 230px, left/right: 16px)
+    // - MEDIUM: center of screen
+    // - LARGE: bottom of screen
+    final double? topPosition;
+    final double? bottomPosition;
+    final double? leftPosition;
+    final double? rightPosition;
+
+    if (isSmall) {
+      topPosition = null;
+      bottomPosition = 350.0; // Positioned on top of comments area and on top of highest price card
+      leftPosition = isRtl ? null : 16.0;
+      rightPosition = isRtl ? 16.0 : null;
+    } else if (isMedium) {
+      topPosition = (screenSize.height - stageSize) / 2;
+      bottomPosition = null;
+      leftPosition = (screenSize.width - stageSize) / 2;
+      rightPosition = null;
+    } else {
+      topPosition = null;
+      bottomPosition = 0;
+      leftPosition = (screenSize.width - stageSize) / 2;
+      rightPosition = null;
+    }
 
     return Material(
       type: MaterialType.transparency,
@@ -294,36 +396,14 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
               child: const SizedBox.expand(),
             ),
           ),
-          // Square gift stage anchored to the bottom; slides up on enter.
           Positioned(
-            left: (size.width - giftSize) / 2,
-            bottom: 0,
-            width: giftSize,
-            height: giftSize,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(
-                CurvedAnimation(
-                  parent: _entranceController,
-                  curve: Curves.easeOutCubic,
-                ),
-              ),
-              child: FadeTransition(
-                opacity: CurvedAnimation(
-                  parent: _entranceController,
-                  curve: Curves.easeOut,
-                ),
-                child: _withEdgeFade(
-                  SizedBox(
-                    width: giftSize,
-                    height: giftSize,
-                    child: _buildMedia(),
-                  ),
-                ),
-              ),
-            ),
+            left: leftPosition,
+            right: rightPosition,
+            top: topPosition,
+            bottom: bottomPosition,
+            width: stageSize,
+            height: stageSize,
+            child: animatedStage,
           ),
         ],
       ),

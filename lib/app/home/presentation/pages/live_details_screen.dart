@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
@@ -38,6 +39,15 @@ import 'package:bimobondapp/app/auctions/presentation/widgets/auction_gifts_shee
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_bar.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:bimobondapp/app/gifts/domain/repositories/gifts_repository.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/get_gift_inventory_usecase.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/get_gifts_usecase.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/purchase_gift_usecase.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/send_gift_usecase.dart';
+import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
+    as gifts_di;
+import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_parts.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/auction_audio_gift_chip_session.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/auction_last_gift_parser.dart';
@@ -64,6 +74,7 @@ class LiveDetailsScreen extends StatefulWidget {
   final int index;
   final PostEntity? post;
   final bool embeddedInFeed;
+
   /// Real auction UUID when known from navigation (never the post id).
   final String? auctionId;
 
@@ -100,17 +111,263 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   AuctionSocketService? _auctionSocket;
   StreamSubscription<AuctionUpdatedPayload>? _auctionUpdatedSub;
   StreamSubscription<CommentEntity>? _newCommentSub;
+  StreamSubscription<GiftComboPayload>? _giftComboSub;
   StreamSubscription<bool>? _socketConnectionSub;
   String? _joinedAuctionId;
   String? _joinedPostId;
+  String? _joinedLiveId;
   String? _lastGiftPlayedKey;
   DateTime? _lastGiftPlayedAt;
+
   /// Resolved auction UUID when `post.auction.id` is missing from feed payload.
   String? _resolvedAuctionId;
+  String? _resolvedLiveId;
   Completer<String?>? _auctionIdResolveCompleter;
   final _audioGiftChipSession = AuctionAudioGiftChipSession();
   String? _ephemeralAudioGiftLabel;
   String? _ephemeralAudioGiftColor;
+  final Map<String, GiftComboItem> _activeGiftCombos = {};
+  final Map<String, Timer> _giftComboTimers = {};
+
+  /// Full catalog keyed by gift id — used to resolve media for flat socket payloads.
+  final Map<String, GiftEntity> _giftCatalogById = {};
+  List<GiftEntity> _recommendedSmallGifts = _initialRecommendedSmallGifts;
+
+  static const List<GiftEntity> _initialRecommendedSmallGifts = [];
+
+  Future<void> _loadRecommendedSmallGifts() async {
+    try {
+      final getGifts = gifts_di.sl<GetGiftsUseCase>();
+      final result = await getGifts(const GetGiftsParams());
+      if (!mounted) return;
+      result.fold((_) {}, (allGifts) {
+        _giftCatalogById
+          ..clear()
+          ..addEntries(allGifts.map((g) => MapEntry(g.id, g)));
+        final smalls = allGifts
+            .where((g) => !g.isAudioGift && g.size == GiftCatalogSize.small)
+            .toList();
+        smalls.sort((a, b) => a.priceCoins.compareTo(b.priceCoins));
+        if (mounted && smalls.isNotEmpty) {
+          setState(() {
+            _recommendedSmallGifts = smalls.take(8).toList();
+          });
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _giftSendTaskChain = Future.value();
+
+  /// Show the small gift combo card immediately on tap; socket updates the ×N later.
+  void _showOptimisticSmallGiftCombo(GiftEntity gift) {
+    if (!mounted) return;
+    if (gift.isAudioGift || gift.size != GiftCatalogSize.small) return;
+
+    final authState = context.read<AuthBloc>().state;
+    final me = authState is AuthSuccess ? authState.user : null;
+    if (me == null || me.id.isEmpty) return;
+
+    final senderName =
+        _displaySenderName(fullName: me.fullName, username: me.username) ??
+        'User';
+    final mediaUrl = gift.animationUrl?.trim().isNotEmpty == true
+        ? gift.animationUrl!.trim()
+        : (gift.displayImageUrl?.trim() ?? '');
+    final comboKey = '${me.id}_${gift.id}';
+    final existing = _activeGiftCombos[comboKey];
+    final nextCombo = (existing?.combo ?? 0) + 1;
+
+    _updateOrAddGiftCombo(
+      giftId: gift.id,
+      giftName: gift.name,
+      animationUrl: mediaUrl,
+      thumbnailUrl: gift.displayImageUrl,
+      senderId: me.id,
+      senderName: senderName,
+      senderAvatarUrl: me.avatarUrl,
+      comboCount: nextCombo,
+      overlayKey: comboKey,
+    );
+  }
+
+  Future<void> _onQuickSendSmallGift(GiftEntity gift) async {
+    if (!_checkAuth()) return;
+    if (!_canSendGiftToHost) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.liveGiftCannotSendToSelf)));
+      return;
+    }
+
+    // Instant UI — do not wait for purchase / socket / auctionGiftCombo.
+    _showOptimisticSmallGiftCombo(gift);
+
+    // Fire-and-forget socket send; combo ×N syncs from auctionGiftCombo.
+    _giftSendTaskChain = _giftSendTaskChain
+        .then((_) async {
+          if (!mounted) return;
+          try {
+            await _executeGiftSendApi(gift);
+          } catch (err) {
+            developer.log('Gift send queue error: $err', name: 'LiveDetails');
+            if (mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(err.toString())));
+            }
+          }
+        })
+        .catchError((err) {
+          developer.log('Gift send queue error: $err', name: 'LiveDetails');
+        });
+  }
+
+  Future<void> _executeGiftSendApi(GiftEntity gift) async {
+    final post = widget.post;
+    final receiverId = _hostUserId ?? post?.userId;
+    if (receiverId == null || receiverId.isEmpty) {
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.liveGiftNoRecipient)));
+      }
+      return;
+    }
+
+    String? auctionId;
+    if (_isAuctionPost) {
+      auctionId = await _ensureGiftAuctionId();
+    }
+
+    try {
+      final purchaseGift = gifts_di.sl<PurchaseGiftUseCase>();
+      final sendGift = gifts_di.sl<SendGiftUseCase>();
+      final getInventory = gifts_di.sl<GetGiftInventoryUseCase>();
+
+      // 1. Resolve real gift entity from catalog if tapped from static fallback
+      String realGiftId = gift.id;
+      GiftEntity targetGift = gift;
+      if (realGiftId.startsWith('rec-')) {
+        final catalogResult = await gifts_di.sl<GetGiftsUseCase>()(
+          const GetGiftsParams(),
+        );
+        catalogResult.fold((_) {}, (catalog) {
+          final matched = catalog.firstWhere(
+            (g) => g.name.toLowerCase() == gift.name.toLowerCase(),
+            orElse: () => catalog.firstWhere(
+              (g) => g.size == GiftCatalogSize.small,
+              orElse: () => gift,
+            ),
+          );
+          if (!matched.id.startsWith('rec-')) {
+            realGiftId = matched.id;
+            targetGift = matched;
+          }
+        });
+      }
+
+      if (realGiftId.startsWith('rec-')) return;
+
+      // 2. Fetch inventory & balance
+      final inventoryResult = await getInventory(NoParams());
+      GiftInventoryEntity? inventory;
+      inventoryResult.fold((_) {}, (inv) => inventory = inv);
+
+      final ownedQty = inventory?.quantityFor(realGiftId) ?? 0;
+      final balanceCoins = inventory?.balanceCoins ?? 0;
+
+      // 3. Purchase using POST /gifts/purchase if not in inventory
+      if (ownedQty < 1) {
+        if (balanceCoins < targetGift.priceCoins) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Insufficient coins (${targetGift.priceCoins} required). Please recharge.',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
+        final purchaseResult = await purchaseGift(
+          PurchaseGiftParams(giftId: realGiftId),
+        );
+        final purchased = purchaseResult.fold((failure) {
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(failure.message)));
+          }
+          return false;
+        }, (_) => true);
+        if (!purchased) return;
+      }
+
+      // 4. Prefer socket sendGift (qty 1); HTTP fallback if socket offline.
+      await _ensureAuctionRoomsJoined();
+      final liveId = _liveRoomId;
+      final socket = _auctionSocket;
+      GiftSocketSendResult? socketResult;
+      if (socket != null &&
+          (liveId != null && liveId.isNotEmpty ||
+              (auctionId != null && auctionId.isNotEmpty))) {
+        socketResult = await socket.sendGift(
+          giftId: realGiftId,
+          liveId: liveId,
+          auctionId: auctionId,
+          quantity: 1,
+          receiverId: receiverId,
+        );
+      }
+
+      if (socketResult != null) {
+        if (!socketResult.isSuccess) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  socketResult.errorMessage ?? 'Failed to send gift',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+        // Animation / combo come from gift_combo broadcast.
+        return;
+      }
+
+      final sendResult = await sendGift(
+        SendGiftParams(
+          giftId: realGiftId,
+          receiverId: receiverId,
+          quantity: 1,
+          postId: post?.id,
+          auctionId: auctionId,
+          liveId: liveId,
+        ),
+      );
+
+      await sendResult.fold((failure) async {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(failure.message)));
+        }
+      }, (_) async {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -212,6 +469,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     _syncAuctionFinishedState();
     _recordPostViewIfNeeded();
     unawaited(_startAuctionRealtime());
+    unawaited(_loadRecommendedSmallGifts());
     if (_isAuctionPost) {
       unawaited(_ensureGiftAuctionId());
       unawaited(_prefetchAuctionDetails());
@@ -222,7 +480,13 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     AuctionDetailsEntity details, {
     bool animateBid = false,
   }) {
+    final liveId = details.liveId?.trim();
+    final shouldRejoinLive =
+        liveId != null && liveId.isNotEmpty && liveId != _resolvedLiveId;
     setState(() {
+      if (liveId != null && liveId.isNotEmpty) {
+        _resolvedLiveId = liveId;
+      }
       _startingPriceOverride = details.startingPriceCoins;
       _giftContributionOverride = details.currentTotalCoins;
       if (details.targetPriceCoins > 0) {
@@ -238,6 +502,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       }
       _syncAuctionFinishedState();
     });
+    if (shouldRejoinLive) {
+      unawaited(_ensureAuctionRoomsJoined());
+    }
   }
 
   Future<void> _prefetchAuctionDetails() async {
@@ -348,6 +615,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     await _auctionUpdatedSub?.cancel();
     await _newCommentSub?.cancel();
+    await _giftComboSub?.cancel();
     await _socketConnectionSub?.cancel();
 
     // Post room: newComment events (comment list + gift comments).
@@ -356,6 +624,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     _auctionUpdatedSub = _auctionSocket!.onAuctionUpdated.listen(
       _onRealtimeAuctionUpdate,
     );
+    // Live Gift Combo Aggregator Engine (Redis 5s combo window events)
+    _giftComboSub = _auctionSocket!.onGiftCombo.listen(_onRealtimeGiftCombo);
     _socketConnectionSub = _auctionSocket!.onConnectionChanged.listen((
       connected,
     ) {
@@ -367,15 +637,30 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     await _ensureAuctionRoomsJoined();
   }
 
+  /// Live room id for socket gifts — auction.liveId when known, else post id.
+  String? get _liveRoomId {
+    final fromAuction = _resolvedLiveId?.trim();
+    if (fromAuction != null && fromAuction.isNotEmpty) return fromAuction;
+    final postId = widget.post?.id.trim();
+    if (postId != null && postId.isNotEmpty) return postId;
+    return null;
+  }
+
   Future<void> _ensureAuctionRoomsJoined() async {
     final post = widget.post;
     final socket = _auctionSocket;
     if (post == null || socket == null || post.id.isEmpty) return;
 
     final auctionId = _auctionRoomId;
-    await socket.ensureJoined(postId: post.id, auctionId: auctionId);
+    final liveId = _liveRoomId;
+    await socket.ensureJoined(
+      postId: post.id,
+      auctionId: auctionId,
+      liveId: liveId,
+    );
     _joinedPostId = post.id;
     _joinedAuctionId = auctionId;
+    _joinedLiveId = liveId;
   }
 
   void _stopAuctionRealtime() {
@@ -385,6 +670,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       if (auctionId != null && auctionId.isNotEmpty) {
         socket.leaveAuction(auctionId);
       }
+      final liveId = _joinedLiveId;
+      if (liveId != null && liveId.isNotEmpty) {
+        socket.leaveLive(liveId);
+      }
       final postId = _joinedPostId;
       if (postId != null && postId.isNotEmpty) {
         socket.leavePost(postId);
@@ -393,12 +682,15 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     unawaited(_auctionUpdatedSub?.cancel());
     unawaited(_newCommentSub?.cancel());
+    unawaited(_giftComboSub?.cancel());
     unawaited(_socketConnectionSub?.cancel());
     _auctionUpdatedSub = null;
     _newCommentSub = null;
+    _giftComboSub = null;
     _socketConnectionSub = null;
     _joinedAuctionId = null;
     _joinedPostId = null;
+    _joinedLiveId = null;
   }
 
   void _onRealtimeComment(CommentEntity comment) {
@@ -409,26 +701,24 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
     if (comment.isGift) {
       _bidPopController.forward(from: 0);
-      if (comment.isAudioGiftComment) {
-        unawaited(
-          _audioGiftChipSession.play(
-            onUpdate: _onEphemeralAudioGiftChipUpdate,
-            label: comment.giftName ?? 'Gift',
-            colorHex: comment.giftColor,
-            audioUrl: comment.giftAudioUrl,
-          ),
-        );
-      } else {
-        _playGiftAnimation(
-          animationUrl: comment.giftAnimationUrl,
-          thumbnailUrl: comment.giftThumbnailUrl ?? comment.giftIcon,
-          senderName: _displaySenderName(
-            fullName: comment.user.fullName,
-            username: comment.user.username,
-          ),
-          giftName: comment.giftName,
-        );
-      }
+      // First socket event wins — gift comment can paint before auctionGiftCombo.
+      _showGiftVisualFromRealtime(
+        giftId: comment.giftName ?? comment.id,
+        senderId: comment.user.id,
+        giftName: comment.giftName ?? 'Gift',
+        animationUrl: comment.giftAnimationUrl,
+        thumbnailUrl: comment.giftThumbnailUrl ?? comment.giftIcon,
+        size: comment.giftSize,
+        combo: 1,
+        senderName: _displaySenderName(
+          fullName: comment.user.fullName,
+          username: comment.user.username,
+        ),
+        senderAvatarUrl: comment.user.avatarUrl,
+        audioUrl: comment.giftAudioUrl,
+        colorHex: comment.giftColor,
+        isAudio: comment.isAudioGiftComment,
+      );
     }
   }
 
@@ -440,14 +730,283 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     });
   }
 
+  /// Paint gift UI from whichever room event arrives first
+  /// (`auctionGiftCombo` / `auctionUpdated.lastGift` / gift comment).
+  void _showGiftVisualFromRealtime({
+    required String giftId,
+    required String senderId,
+    required String giftName,
+    String? animationUrl,
+    String? thumbnailUrl,
+    dynamic size,
+    int combo = 1,
+    String? senderName,
+    String? senderAvatarUrl,
+    String? audioUrl,
+    String? colorHex,
+    bool isAudio = false,
+  }) {
+    if (!mounted) return;
+
+    // Normalize id so comment / auctionUpdated / auctionGiftCombo share one card.
+    var resolvedGiftId = giftId.trim();
+    GiftEntity? catalogGift = resolvedGiftId.isNotEmpty
+        ? _giftCatalogById[resolvedGiftId]
+        : null;
+    if (catalogGift == null && giftName.trim().isNotEmpty) {
+      final lower = giftName.trim().toLowerCase();
+      for (final g in _giftCatalogById.values) {
+        if (g.name.toLowerCase() == lower) {
+          catalogGift = g;
+          resolvedGiftId = g.id;
+          break;
+        }
+      }
+    }
+
+    final resolvedName = giftName.trim().isNotEmpty
+        ? giftName.trim()
+        : (catalogGift?.name ?? 'Gift');
+    final resolvedAudio = isAudio || catalogGift?.isAudioGift == true;
+
+    if (resolvedAudio) {
+      unawaited(
+        _audioGiftChipSession.play(
+          onUpdate: _onEphemeralAudioGiftChipUpdate,
+          label: resolvedName,
+          colorHex: colorHex ?? catalogGift?.color,
+          audioUrl: audioUrl ?? catalogGift?.audioUrl,
+        ),
+      );
+      return;
+    }
+
+    final resolvedAnim =
+        (animationUrl?.trim().isNotEmpty == true
+            ? animationUrl!.trim()
+            : null) ??
+        catalogGift?.animationUrl;
+    final resolvedThumb =
+        (thumbnailUrl?.trim().isNotEmpty == true
+            ? thumbnailUrl!.trim()
+            : null) ??
+        catalogGift?.displayImageUrl;
+    final resolvedSize = size ?? catalogGift?.size;
+    final mediaUrl = resolvedAnim ?? resolvedThumb ?? '';
+
+    final authState = context.read<AuthBloc>().state;
+    final me = authState is AuthSuccess ? authState.user : null;
+    final isMyOwnSend =
+        me != null &&
+        me.id.isNotEmpty &&
+        senderId.isNotEmpty &&
+        senderId == me.id;
+
+    final resolvedSenderId = senderId.isNotEmpty
+        ? senderId
+        : (isMyOwnSend ? me.id : (senderName ?? 'User'));
+    final resolvedSenderName = isMyOwnSend
+        ? (_displaySenderName(fullName: me.fullName, username: me.username) ??
+              'User')
+        : (senderName?.trim().isNotEmpty == true ? senderName!.trim() : 'User');
+    final resolvedAvatar = isMyOwnSend ? me.avatarUrl : senderAvatarUrl;
+
+    final isSmall =
+        resolvedSize == GiftCatalogSize.small ||
+        resolvedSize?.toString().toUpperCase() == 'SMALL' ||
+        // Flat payloads often omit size — prefer combo card when no video URL.
+        (resolvedSize == null &&
+            (resolvedAnim == null || resolvedAnim.trim().isEmpty));
+
+    final keyGiftId = resolvedGiftId.isNotEmpty ? resolvedGiftId : resolvedName;
+    final comboKey = '${resolvedSenderId}_$keyGiftId';
+
+    if (isSmall) {
+      _updateOrAddGiftCombo(
+        giftId: keyGiftId,
+        giftName: resolvedName,
+        animationUrl: mediaUrl,
+        thumbnailUrl: resolvedThumb,
+        senderId: resolvedSenderId,
+        senderName: resolvedSenderName,
+        senderAvatarUrl: resolvedAvatar,
+        comboCount: combo > 0 ? combo : 1,
+        overlayKey: comboKey,
+      );
+      return;
+    }
+
+    // Medium / large: full-screen only (deduped inside _playGiftAnimation).
+    if (mediaUrl.isNotEmpty) {
+      _playGiftAnimation(
+        animationUrl: resolvedAnim ?? resolvedThumb,
+        thumbnailUrl: resolvedThumb,
+        giftName: resolvedName,
+        giftId: keyGiftId,
+        senderId: resolvedSenderId,
+        senderName: resolvedSenderName,
+        senderAvatarUrl: resolvedAvatar,
+        size: resolvedSize,
+        quantity: combo > 0 ? combo : 1,
+        comboCount: combo > 0 ? combo : 1,
+        skipComboBadge: true,
+      );
+    }
+  }
+
+  void _onRealtimeGiftCombo(GiftComboPayload payload) {
+    if (!mounted) return;
+
+    final catalogGift = _giftCatalogById[payload.giftId];
+    final giftMap = payload.gift;
+    final senderMap = payload.sender;
+    final giftName =
+        (payload.giftName ?? giftMap?['name'] ?? catalogGift?.name ?? 'Gift')
+            .toString();
+
+    _showGiftVisualFromRealtime(
+      giftId: payload.giftId,
+      senderId: payload.senderId,
+      giftName: giftName,
+      animationUrl:
+          (giftMap?['animationUrl'] ??
+                  giftMap?['animation_url'] ??
+                  giftMap?['imageUrl'])
+              ?.toString(),
+      thumbnailUrl:
+          (giftMap?['thumbnailUrl'] ??
+                  giftMap?['thumbnail_url'] ??
+                  giftMap?['imageUrl'])
+              ?.toString(),
+      size: giftMap?['size'] ?? giftMap?['giftSize'] ?? catalogGift?.size,
+      combo: payload.combo,
+      senderName:
+          payload.senderName ??
+          (senderMap?['fullName'] ?? senderMap?['username'])?.toString(),
+      senderAvatarUrl:
+          payload.senderAvatarUrl ??
+          (senderMap?['avatarUrl'] ?? senderMap?['avatar'])?.toString(),
+      audioUrl: catalogGift?.audioUrl,
+      colorHex: catalogGift?.color,
+      isAudio: catalogGift?.isAudioGift == true,
+    );
+  }
+
+  void _updateOrAddGiftCombo({
+    required String giftId,
+    required String giftName,
+    required String animationUrl,
+    String? thumbnailUrl,
+    required String senderId,
+    required String senderName,
+    String? senderAvatarUrl,
+    required int comboCount,
+    String? overlayKey,
+  }) {
+    final comboKey = (overlayKey != null && overlayKey.isNotEmpty)
+        ? overlayKey
+        : '${senderId}_$giftId';
+    final existing = _activeGiftCombos[comboKey];
+
+    _giftComboTimers[comboKey]?.cancel();
+
+    final targetCombo = comboCount > 0
+        ? (existing != null && comboCount < existing.combo
+              ? existing.combo
+              : comboCount)
+        : ((existing?.combo ?? 0) + 1);
+
+    setState(() {
+      if (existing != null) {
+        existing.combo = targetCombo;
+      } else {
+        _activeGiftCombos[comboKey] = GiftComboItem(
+          senderId: senderId,
+          senderName: senderName,
+          senderAvatarUrl: senderAvatarUrl,
+          giftId: giftId,
+          giftName: giftName,
+          animationUrl: animationUrl,
+          thumbnailUrl: thumbnailUrl,
+          combo: targetCombo,
+        );
+      }
+    });
+
+    // 5-second TTL window matching Redis EXPIRE 5
+    _giftComboTimers[comboKey] = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _activeGiftCombos.remove(comboKey);
+          _giftComboTimers.remove(comboKey)?.cancel();
+        });
+      }
+    });
+  }
+
+  void _playSmallGiftBadge({
+    required String animationUrl,
+    String? thumbnailUrl,
+    String? giftName,
+    String? giftId,
+    String? senderName,
+    String? senderId,
+    String? senderAvatarUrl,
+    int quantity = 1,
+    int? comboCount,
+  }) {
+    final gName = giftName ?? 'Gift';
+    final gId = (giftId != null && giftId.isNotEmpty) ? giftId : gName;
+    final sName = senderName ?? 'User';
+    final sId = (senderId != null && senderId.isNotEmpty) ? senderId : sName;
+
+    _updateOrAddGiftCombo(
+      giftId: gId,
+      giftName: gName,
+      animationUrl: animationUrl,
+      thumbnailUrl: thumbnailUrl,
+      senderId: sId,
+      senderName: sName,
+      senderAvatarUrl: senderAvatarUrl,
+      comboCount: comboCount ?? quantity,
+    );
+  }
+
   void _playGiftAnimation({
     String? animationUrl,
     String? thumbnailUrl,
     String? senderName,
+    String? senderAvatarUrl,
     String? giftName,
+    String? giftId,
+    String? senderId,
+    dynamic size,
+    int quantity = 1,
+    int? comboCount,
+    bool skipComboBadge = false,
   }) async {
     final url = animationUrl?.trim();
     if (url == null || url.isEmpty || !mounted) return;
+
+    final isSmall =
+        size == GiftCatalogSize.small ||
+        size?.toString().toUpperCase() == 'SMALL';
+    if (isSmall) {
+      if (!skipComboBadge) {
+        _playSmallGiftBadge(
+          animationUrl: url,
+          thumbnailUrl: thumbnailUrl,
+          giftName: giftName,
+          giftId: giftId,
+          senderName: senderName,
+          senderId: senderId,
+          senderAvatarUrl: senderAvatarUrl,
+          quantity: quantity,
+          comboCount: comboCount,
+        );
+      }
+      return;
+    }
 
     // Wait until any open bottom sheet or dialog has completely closed.
     while (mounted && ModalRoute.of(context)?.isCurrent != true) {
@@ -479,6 +1038,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         thumbnailUrl: thumbnailUrl,
         senderName: senderName,
         giftName: giftName,
+        size: size,
       ),
     );
   }
@@ -512,43 +1072,35 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (comment.isGift) {
       final senderId = comment.user.id;
       final giftName = comment.giftName?.trim().toLowerCase() ?? '';
-      final alreadyShown = _postComments.any((existing) {
+
+      final isServerComment =
+          !comment.id.startsWith('local-gift-') &&
+          !comment.id.startsWith('socket-gift-');
+
+      // Check if there is a matching temporary/local gift comment
+      final localIndex = _postComments.indexWhere((existing) {
         if (!existing.isGift) return false;
-        if (senderId.isNotEmpty && existing.user.id != senderId) return false;
-        if (giftName.isNotEmpty) {
-          final existingName = existing.giftName?.trim().toLowerCase() ?? '';
-          if (existingName.isNotEmpty && existingName != giftName) return false;
-        }
-        final existingAt = DateTime.tryParse(existing.createdAt);
-        final incomingAt = DateTime.tryParse(comment.createdAt);
-        if (existingAt != null && incomingAt != null) {
-          return existingAt.difference(incomingAt).abs() <
-              const Duration(seconds: 8);
-        }
-        return existing.id.startsWith('local-gift-') ||
-            existing.id.startsWith('socket-gift-') ||
-            comment.id.startsWith('local-gift-') ||
-            comment.id.startsWith('socket-gift-');
+        final isTemp =
+            existing.id.startsWith('local-gift-') ||
+            existing.id.startsWith('socket-gift-');
+        if (!isTemp) return false;
+
+        final sameSender =
+            senderId.isEmpty ||
+            existing.user.id == senderId ||
+            existing.user.username == comment.user.username;
+        final sameGift =
+            giftName.isEmpty ||
+            (existing.giftName?.trim().toLowerCase() ?? '') == giftName;
+
+        return sameSender && sameGift;
       });
-      if (alreadyShown) {
-        // Prefer the server comment over a temporary local/socket placeholder.
-        if (!comment.id.startsWith('local-gift-') &&
-            !comment.id.startsWith('socket-gift-')) {
+
+      if (localIndex != -1) {
+        if (isServerComment) {
+          // Replace temporary local comment with permanent server comment
           setState(() {
-            _postComments.removeWhere(
-              (existing) =>
-                  existing.isGift &&
-                  (existing.id.startsWith('local-gift-') ||
-                      existing.id.startsWith('socket-gift-')) &&
-                  (senderId.isEmpty || existing.user.id == senderId) &&
-                  (giftName.isEmpty ||
-                      (existing.giftName?.trim().toLowerCase() ?? '') ==
-                          giftName),
-            );
-            final updated = sortCommentsOldest([..._postComments, comment]);
-            _postComments
-              ..clear()
-              ..addAll(updated);
+            _postComments[localIndex] = comment;
           });
           _scrollChatToBottom();
         }
@@ -598,57 +1150,62 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       final parsedLastGift = PostAuctionLastGiftEntity.fromMap(
         Map<String, dynamic>.from(gift),
       );
-      final giftName = gift['name']?.toString();
+      final giftName = (gift['name'] ?? gift['giftName'])?.toString();
       final thumb =
           (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
               ?.toString();
       final animationUrl =
-          (gift['animationUrl'] ?? gift['animation_url'])?.toString();
-      final audioUrl =
-          (gift['audioUrl'] ?? gift['audio_url'])?.toString();
+          (gift['animationUrl'] ?? gift['animation_url'] ?? thumb)?.toString();
+      final audioUrl = (gift['audioUrl'] ?? gift['audio_url'])?.toString();
+      final giftId =
+          (gift['giftId'] ?? gift['id'] ?? parsedLastGift?.id)?.toString() ??
+          '';
 
-      if (parsedLastGift?.isAudioGift == true) {
-        unawaited(
-          _audioGiftChipSession.play(
-            onUpdate: _onEphemeralAudioGiftChipUpdate,
-            label: parsedLastGift!.name,
-            colorHex: parsedLastGift.color,
-            audioUrl: audioUrl,
-          ),
-        );
-      } else {
-        _playGiftAnimation(
-          animationUrl: animationUrl,
-          thumbnailUrl: thumb,
-          giftName: giftName,
-          senderName: _displaySenderName(
-            fullName: (gift['senderFullName'] ??
-                    gift['senderName'] ??
-                    gift['fullName'] ??
-                    gift['nameSender'])
-                ?.toString(),
-            username: (gift['senderUsername'] ?? gift['username'])?.toString(),
-          ),
-        );
-      }
-
+      final senderId =
+          (gift['senderId'] ?? gift['sender_id'] ?? gift['userId'])
+              ?.toString() ??
+          '';
+      final senderObj = gift['sender'] is Map ? gift['sender'] as Map : null;
       final senderFullName =
           (gift['senderFullName'] ??
                   gift['senderName'] ??
                   gift['fullName'] ??
-                  gift['nameSender'])
+                  gift['nameSender'] ??
+                  senderObj?['fullName'])
               ?.toString();
       final senderUsername =
-          (gift['senderUsername'] ?? gift['username'])?.toString();
-      final senderId =
-          (gift['senderId'] ?? gift['userId'])?.toString() ?? '';
+          (gift['senderUsername'] ?? gift['username'] ?? senderObj?['username'])
+              ?.toString();
+      final senderAvatar =
+          (gift['senderAvatarUrl'] ??
+                  gift['avatarUrl'] ??
+                  senderObj?['avatarUrl'] ??
+                  senderObj?['avatar'])
+              ?.toString();
+
+      // Show gift UI immediately — do not wait for auctionGiftCombo.
+      _showGiftVisualFromRealtime(
+        giftId: giftId,
+        senderId: senderId,
+        giftName: giftName ?? parsedLastGift?.name ?? 'Gift',
+        animationUrl: animationUrl,
+        thumbnailUrl: thumb,
+        size: gift['size'] ?? gift['giftSize'],
+        combo: payload.combo ?? parsedLastGift?.quantity ?? 1,
+        senderName: _displaySenderName(
+          fullName: senderFullName,
+          username: senderUsername,
+        ),
+        senderAvatarUrl: senderAvatar,
+        audioUrl: audioUrl,
+        colorHex: parsedLastGift?.color ?? gift['color']?.toString(),
+        isAudio: parsedLastGift?.isAudioGift == true,
+      );
 
       // auctionUpdated gift variant may omit lastComment — still show in list.
       if (payload.lastComment == null) {
         final postId = widget.post?.id;
         if (postId != null) {
-          final giftId =
-              (gift['giftId'] ?? gift['id'])?.toString() ?? 'unknown';
           final now = DateTime.now().toUtc().toIso8601String();
           _appendCommentIfNew(
             CommentEntity(
@@ -664,10 +1221,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
               ),
               isGift: true,
               giftName: giftName,
-              giftThumbnailUrl:
-                  parsedLastGift?.isAudioGift == true ? null : thumb,
-              giftAnimationUrl:
-                  parsedLastGift?.isAudioGift == true ? null : animationUrl,
+              giftThumbnailUrl: parsedLastGift?.isAudioGift == true
+                  ? null
+                  : thumb,
+              giftAnimationUrl: parsedLastGift?.isAudioGift == true
+                  ? null
+                  : animationUrl,
               giftCatalogType: parsedLastGift?.isAudioGift == true
                   ? GiftCatalogType.audio
                   : GiftCatalogType.image,
@@ -783,10 +1342,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     if (auction == null || _isAuctionFinished) return;
 
     final endedByStatusOrDate = AuctionSearchFilters.isPostEnded(post!);
-    final targetCoins = resolveAuctionTargetPriceCoins(
-      auction,
-      overrideCoins: _targetPriceCoinsOverride,
-    ) ?? 0;
+    final targetCoins =
+        resolveAuctionTargetPriceCoins(
+          auction,
+          overrideCoins: _targetPriceCoinsOverride,
+        ) ??
+        0;
     final targetReached = targetCoins > 0 && _highestBidCoins >= targetCoins;
 
     if (endedByStatusOrDate || targetReached) {
@@ -1095,39 +1656,16 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     AuctionGiftsSheet.show(context, auctionId: auctionId);
   }
 
-  Future<void> _refreshAfterGift(GiftEntity gift) async {
-    // Let the gift sheet finish completely closing before inserting overlay or comment.
-    while (mounted && ModalRoute.of(context)?.isCurrent != true) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 150));
+  Future<void> _refreshAfterGift(
+    GiftEntity gift, {
+    bool isUserTap = false,
+    int quantity = 1,
+  }) async {
+    // Gift card / video come only from socket auctionGiftCombo / gift_combo.
     if (!mounted) return;
 
     final authState = context.read<AuthBloc>().state;
     final me = authState is AuthSuccess ? authState.user : null;
-    if (gift.isAudioGift) {
-      unawaited(
-        _audioGiftChipSession.play(
-          onUpdate: _onEphemeralAudioGiftChipUpdate,
-          label: gift.name,
-          colorHex: gift.color,
-          audioUrl: gift.audioUrl,
-        ),
-      );
-    } else {
-      final animationUrl = gift.animationUrl?.trim().isNotEmpty == true
-          ? gift.animationUrl
-          : gift.displayImageUrl;
-      _playGiftAnimation(
-        animationUrl: animationUrl,
-        thumbnailUrl: gift.displayImageUrl,
-        giftName: gift.name,
-        senderName: _displaySenderName(
-          fullName: me?.fullName,
-          username: me?.username,
-        ),
-      );
-    }
 
     // Optimistic gift comment so the sender sees it immediately even if the
     // socket/refetch is slightly delayed.
@@ -1143,11 +1681,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
           isGift: true,
           giftName: gift.name,
           giftIcon: gift.isAudioGift ? null : gift.icon,
-          giftThumbnailUrl:
-              gift.isAudioGift ? null : gift.displayImageUrl,
+          giftThumbnailUrl: gift.isAudioGift ? null : gift.displayImageUrl,
           giftAnimationUrl: gift.isAudioGift ? null : gift.animationUrl,
-          giftCatalogType:
-              gift.isAudioGift ? GiftCatalogType.audio : GiftCatalogType.image,
+          giftCatalogType: gift.isAudioGift
+              ? GiftCatalogType.audio
+              : GiftCatalogType.image,
           giftColor: gift.color,
           giftAudioUrl: gift.audioUrl,
           createdAt: now,
@@ -1204,9 +1742,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       if (!mounted) return;
       if (auctionId == null || auctionId.isEmpty) {
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.liveGiftNoRecipient)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.liveGiftNoRecipient)));
         return;
       }
       // Ensure auction room uses the real UUID (not a post-id fallback).
@@ -1220,7 +1758,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       // Prefer nested user.id — feed sometimes omits top-level userId.
       receiverId: _hostUserId ?? post?.userId,
       auctionId: auctionId,
+      liveId: _liveRoomId,
       canSendToHost: _canSendGiftToHost,
+      onSmallGiftOptimistic: _showOptimisticSmallGiftCombo,
       onGiftSent: _refreshAfterGift,
     );
   }
@@ -1330,6 +1870,53 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       seconds: diff.inSeconds.remainder(60),
       isUpcoming: isUpcoming,
       isActive: !isUpcoming && !_isAuctionFinished,
+    );
+  }
+
+  String? get _currentUserId {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthSuccess && authState.user.id.isNotEmpty) {
+      return authState.user.id;
+    }
+    return null;
+  }
+
+  List<GiftComboItem> get _myActiveGiftCombos {
+    final me = _currentUserId;
+    if (me == null) return const [];
+    return _activeGiftCombos.values
+        .where((item) => item.senderId == me)
+        .toList();
+  }
+
+  List<GiftComboItem> get _othersActiveGiftCombos {
+    final me = _currentUserId;
+    if (me == null) return _activeGiftCombos.values.toList();
+    return _activeGiftCombos.values
+        .where((item) => item.senderId != me)
+        .toList();
+  }
+
+  Widget? _buildMyGiftCombosBesideLiveChip() {
+    final combos = _myActiveGiftCombos;
+    if (combos.isEmpty) return null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: combos.take(3).map((item) {
+        return Padding(
+          key: ValueKey<String>('my-combo-${item.key}'),
+          padding: const EdgeInsets.only(bottom: 6),
+          child: SmallGiftHighestPriceBadge(
+            animationUrl: item.animationUrl,
+            thumbnailUrl: item.thumbnailUrl,
+            giftName: item.giftName,
+            senderName: item.senderName,
+            senderAvatarUrl: item.senderAvatarUrl,
+            quantity: item.combo,
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -1475,6 +2062,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                                   parts: _auctionCountdownParts(),
                                 )
                               : null,
+                          belowHostProfile: _buildMyGiftCombosBesideLiveChip(),
                         ),
                         if (!isKeyboardOpen) ...[
                           const Expanded(
@@ -1485,6 +2073,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
                             child: AuctionPriceWithAudioBadge(
+                              activeCombos: _othersActiveGiftCombos,
                               audioGiftLabel: _ephemeralAudioGiftLabel,
                               audioGiftColor: _ephemeralAudioGiftColor,
                               topBidLabel: l10n.liveTopBid,
@@ -1520,6 +2109,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                           ],
                         ] else
                           const Spacer(),
+                        if (_biddingEnabled && _canSendGiftToHost)
+                          QuickRecommendedSmallGiftsShelf(
+                            gifts: _recommendedSmallGifts,
+                            onSendGift: _onQuickSendSmallGift,
+                          ),
                         GestureDetector(
                           onTap: () {},
                           behavior: HitTestBehavior.opaque,
@@ -1593,5 +2187,148 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
   Widget _wrapAuctionLtr(Widget child) {
     if (!_isAuctionPost) return child;
     return Directionality(textDirection: TextDirection.ltr, child: child);
+  }
+}
+
+/// TikTok-style horizontal quick recommendation bar for sending small gifts with 1 tap.
+class QuickRecommendedSmallGiftsShelf extends StatefulWidget {
+  const QuickRecommendedSmallGiftsShelf({
+    required this.gifts,
+    required this.onSendGift,
+    super.key,
+  });
+
+  final List<GiftEntity> gifts;
+  final ValueChanged<GiftEntity> onSendGift;
+
+  @override
+  State<QuickRecommendedSmallGiftsShelf> createState() =>
+      _QuickRecommendedSmallGiftsShelfState();
+}
+
+class _QuickRecommendedSmallGiftsShelfState
+    extends State<QuickRecommendedSmallGiftsShelf> {
+  Timer? _holdTimer;
+  String? _holdingGiftId;
+
+  @override
+  void dispose() {
+    _stopHold();
+    super.dispose();
+  }
+
+  void _stopHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    _holdingGiftId = null;
+  }
+
+  void _startHold(GiftEntity gift) {
+    if (_holdingGiftId == gift.id) return;
+    _stopHold();
+    _holdingGiftId = gift.id;
+    widget.onSendGift(gift);
+    _holdTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (!mounted) {
+        _stopHold();
+        return;
+      }
+      widget.onSendGift(gift);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.gifts.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      height: 28,
+      margin: const EdgeInsets.only(top: 1, bottom: 2),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: widget.gifts.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final gift = widget.gifts[index];
+
+          return GestureDetector(
+            onTap: () => widget.onSendGift(gift),
+            onLongPressStart: (_) => _startHold(gift),
+            onLongPressEnd: (_) => _stopHold(),
+            onLongPressCancel: _stopHold,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  width: 0.5,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildGiftMedia(gift),
+                  const SizedBox(width: 4),
+                  Text(
+                    gift.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          LucideIcons.coins,
+                          size: 9,
+                          color: Colors.amber,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${gift.priceCoins}',
+                          style: const TextStyle(
+                            color: Colors.amber,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGiftMedia(GiftEntity gift) {
+    final image = gift.displayImageUrl;
+    if (image != null && image.trim().isNotEmpty) {
+      return SafeNetworkImage(
+        imageUrl: image.trim(),
+        width: 20,
+        height: 20,
+        fit: BoxFit.contain,
+      );
+    }
+    return Text(gift.icon, style: const TextStyle(fontSize: 15));
   }
 }

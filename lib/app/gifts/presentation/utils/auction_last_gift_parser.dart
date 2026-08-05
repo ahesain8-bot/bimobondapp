@@ -6,12 +6,14 @@ class PostAuctionLastGiftEntity {
     required this.name,
     required this.type,
     this.color,
+    this.quantity = 1,
   });
 
   final String id;
   final String name;
   final GiftCatalogType type;
   final String? color;
+  final int quantity;
 
   bool get isAudioGift => type == GiftCatalogType.audio;
 
@@ -34,11 +36,15 @@ class PostAuctionLastGiftEntity {
     final name = (source['name'] ?? map['name'])?.toString().trim() ?? '';
     if (name.isEmpty && (id == null || id.isEmpty)) return null;
 
+    final rawQty = map['quantity'] ?? map['qty'] ?? source['quantity'] ?? source['qty'];
+    final qty = rawQty is int ? rawQty : (int.tryParse('$rawQty') ?? 1);
+
     return PostAuctionLastGiftEntity(
       id: id ?? '',
       name: name.isEmpty ? 'Gift' : name,
       type: _parseType(source['type'] ?? map['type']),
       color: (source['color'] ?? map['color'])?.toString().trim(),
+      quantity: qty > 0 ? qty : 1,
     );
   }
 

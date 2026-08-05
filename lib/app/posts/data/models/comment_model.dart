@@ -21,6 +21,7 @@ class CommentModel extends CommentEntity {
     super.giftCatalogType,
     super.giftColor,
     super.giftAudioUrl,
+    super.giftSize,
     required super.createdAt,
     required super.updatedAt,
     super.mentions = const [],
@@ -150,6 +151,7 @@ class CommentModel extends CommentEntity {
       giftCatalogType: catalogType,
       giftColor: _giftColor(json),
       giftAudioUrl: _giftAudioUrl(json),
+      giftSize: _giftSize(json),
       createdAt: json['createdAt']?.toString() ?? now,
       updatedAt: json['updatedAt']?.toString() ?? now,
       mentions: MentionRefModel.listFromJson(json['mentions']),
@@ -168,6 +170,18 @@ class CommentModel extends CommentEntity {
       'isGift': isGift,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+    };
+  }
+
+  static GiftCatalogSize? _giftSize(Map<String, dynamic> json) {
+    final raw = _giftField(json, 'size');
+    if (raw == null || raw.isEmpty) return null;
+    final value = raw.toUpperCase();
+    return switch (value) {
+      'MEDIUM' => GiftCatalogSize.medium,
+      'LARGE' => GiftCatalogSize.large,
+      'SMALL' => GiftCatalogSize.small,
+      _ => null,
     };
   }
 }

@@ -15,6 +15,7 @@ class SendGiftUseCase implements UseCase<GiftInventoryEntity?, SendGiftParams> {
     return repository.sendGift(
       giftId: params.giftId,
       receiverId: params.receiverId,
+      quantity: params.quantity,
       postId: params.postId,
       auctionId: params.auctionId,
       liveId: params.liveId,
@@ -27,6 +28,7 @@ class SendGiftParams extends Equatable {
   const SendGiftParams({
     required this.giftId,
     required this.receiverId,
+    this.quantity = 1,
     this.postId,
     this.auctionId,
     this.liveId,
@@ -34,14 +36,23 @@ class SendGiftParams extends Equatable {
   });
 
   final String giftId;
+
   /// Required by API; overridden to host for live/auction on the server.
   final String receiverId;
+  final int quantity;
   final String? postId;
   final String? auctionId;
   final String? liveId;
   final String? message;
 
   @override
-  List<Object?> get props =>
-      [giftId, receiverId, postId, auctionId, liveId, message];
+  List<Object?> get props => [
+    giftId,
+    receiverId,
+    quantity,
+    postId,
+    auctionId,
+    liveId,
+    message,
+  ];
 }

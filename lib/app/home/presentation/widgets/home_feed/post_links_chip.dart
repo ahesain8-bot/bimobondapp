@@ -37,8 +37,6 @@ List<PostLinkItem> getPostLinkItems(BuildContext context, PostEntity post) {
   final effectSquareBg = isDark
       ? const Color(0xFF2C2C2E)
       : const Color(0xFFE5E5EA);
-  final chevronColor = isDark ? Colors.white54 : Colors.black45;
-
   final links = <PostLinkItem>[];
 
   // 1. Camera Filter / Effect
@@ -142,11 +140,6 @@ List<PostLinkItem> getPostLinkItems(BuildContext context, PostEntity post) {
           child: const Center(
             child: Icon(LucideIcons.mapPin, size: 24, color: Colors.white),
           ),
-        ),
-        trailingWidget: Icon(
-          LucideIcons.chevronRight,
-          size: 20,
-          color: chevronColor,
         ),
         onTap: () async {
           final label = Uri.encodeComponent(location.feedDisplayLabel);

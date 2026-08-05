@@ -18,6 +18,7 @@ abstract class GiftsRemoteDataSource {
   Future<GiftInventoryModel?> sendGift({
     required String giftId,
     required String receiverId,
+    int quantity = 1,
     String? postId,
     String? auctionId,
     String? liveId,
@@ -204,6 +205,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
   Future<GiftInventoryModel?> sendGift({
     required String giftId,
     required String receiverId,
+    int quantity = 1,
     String? postId,
     String? auctionId,
     String? liveId,
@@ -213,6 +215,7 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       final data = <String, dynamic>{
         'giftId': giftId,
         'receiverId': receiverId,
+        if (quantity > 1) 'quantity': quantity,
       };
       if (postId != null && postId.isNotEmpty) {
         data['postId'] = postId;

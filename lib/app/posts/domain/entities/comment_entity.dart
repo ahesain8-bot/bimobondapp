@@ -20,6 +20,7 @@ class CommentEntity extends Equatable {
   final GiftCatalogType? giftCatalogType;
   final String? giftColor;
   final String? giftAudioUrl;
+  final GiftCatalogSize? giftSize;
   final String createdAt;
   final String updatedAt;
   final List<MentionRefEntity> mentions;
@@ -41,6 +42,7 @@ class CommentEntity extends Equatable {
     this.giftCatalogType,
     this.giftColor,
     this.giftAudioUrl,
+    this.giftSize,
     required this.createdAt,
     required this.updatedAt,
     this.mentions = const [],

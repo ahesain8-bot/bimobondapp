@@ -63,7 +63,7 @@ class CommentSheetWidget extends StatefulWidget {
 
   static const double sheetInitialFraction = 0.55;
   static const double sheetMinFraction = 0.38;
-  static const double sheetMaxFraction = 0.75;
+  static const double sheetMaxFraction = 0.95;
 
   /// Engagement sheet: Comments / Likes (+ Views for owner).
   /// Returns the latest comment count when the sheet closes.
@@ -167,7 +167,28 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
     );
     _tabController.addListener(_onTabIndexChanged);
     _commentController.addListener(_onCommentChanged);
+    _commentFocusNode.addListener(_onCommentFocusChanged);
     _sheetScrollController.addListener(_onCommentsScroll);
+  }
+
+  void _onCommentFocusChanged() {
+    if (_commentFocusNode.hasFocus) {
+      _expandSheetToMax();
+    }
+  }
+
+  void _expandSheetToMax() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final extent = DraggableSheetExtent.maybeOf(context);
+      if (extent != null && extent.controller.isAttached) {
+        extent.controller.animateTo(
+          extent.maxChildSize,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   void _onTabIndexChanged() {
@@ -223,6 +244,7 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
 
   @override
   void dispose() {
+    _commentFocusNode.removeListener(_onCommentFocusChanged);
     _commentController.removeListener(_onCommentChanged);
     _tabController.removeListener(_onTabIndexChanged);
     _tabController.dispose();
@@ -393,7 +415,10 @@ class _CommentSheetWidgetState extends State<CommentSheetWidget>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomPadding = keyboardInset > 0
+        ? 0.0
+        : MediaQuery.viewPaddingOf(context).bottom;
     final theme = Theme.of(context);
 
     return BlocProvider.value(

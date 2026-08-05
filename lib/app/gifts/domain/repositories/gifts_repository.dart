@@ -28,6 +28,7 @@ abstract class GiftsRepository {
   Future<Either<Failure, GiftInventoryEntity?>> sendGift({
     required String giftId,
     required String receiverId,
+    int quantity = 1,
     String? postId,
     String? auctionId,
     String? liveId,
