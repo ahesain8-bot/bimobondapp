@@ -616,6 +616,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         ) < 0.01f
         val targetSmooth = if (magicUntouched) {
             smoothNormal * personMix
+        } else if (!magic && !isFrontSmooth) {
+            0f
         } else {
             val sliderPos = if (magic) magicStrength else beauty.smooth
             (sliderPos.coerceIn(0f, 1f) * smoothMax) * personMix
@@ -627,6 +629,18 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             smoothedSmooth = targetSmooth
         } else {
             smoothedSmooth = easeToward(smoothedSmooth, targetSmooth)
+        }
+        beautyDebugCounter++
+        if (beautyDebugCounter % 12 == 0) {
+            Log.i(
+                "FaceWarpBeautyDbg",
+                "front=$isFrontSmooth magic=$magic magicStrength=$magicStrength " +
+                    "personMix=${"%.3f".format(personMix)} " +
+                    "backPersonWeight=${"%.3f".format(smoothedBackPersonWeight)} " +
+                    "smoothNormal=$smoothNormal smoothMax=$smoothMax " +
+                    "targetSmooth=${"%.3f".format(targetSmooth)} " +
+                    "smoothedSmooth=${"%.3f".format(smoothedSmooth)}",
+            )
         }
         val targetWhiten = adaptedWhiten(LiveBeautyState.effectiveWhiten(), lowLight)
         smoothedWhiten = easeToward(smoothedWhiten, targetWhiten)
@@ -645,8 +659,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             }
         smoothedBackPersonWeight =
             easeToward(smoothedBackPersonWeight, targetBackPersonWeight)
-        val targetBackPersonBright =
+        val targetBackPersonBright = if (magic) {
             BackPersonPresence.STEP2_SKIN_BRIGHTEN * targetBackPersonWeight
+        } else {
+            0f
+        }
         smoothedBackPersonBright =
             easeToward(smoothedBackPersonBright, targetBackPersonBright)
         val targetSharpen = if (magic) {
@@ -914,6 +931,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     }
 
     private var exposureDebugCounter = 0
+    private var beautyDebugCounter = 0
 
     /** Throttled log while moving the phone — filter logcat: FaceWarpExposure */
     private fun logExposureDebug(autoLiftTarget: Float, lowLight: Float) {

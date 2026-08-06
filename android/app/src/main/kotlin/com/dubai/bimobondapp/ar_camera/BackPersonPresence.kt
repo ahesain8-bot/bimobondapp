@@ -38,7 +38,7 @@ object BackPersonPresence {
      * fill drops roughly with distance², so reaching ~1m needed a much
      * lower floor than the arm's-length-tuned 0.040.
      */
-    private const val ENTER_FILL = 0.012f
+    private const val ENTER_FILL = 0.007f
 
     /** Face fill must stay below this to leave present. */
     private const val EXIT_FILL = 0.005f
@@ -134,7 +134,7 @@ object BackPersonPresence {
 
         // Only drive weight when fully present — no partial −47 remap.
         val targetW = if (isPresent) {
-            max(0.85f, smoothstep(EXIT_FILL, 0.12f, smoothedFill))
+            max(0.70f, smoothstep(EXIT_FILL, 0.08f, smoothedFill))
         } else {
             0f
         }
