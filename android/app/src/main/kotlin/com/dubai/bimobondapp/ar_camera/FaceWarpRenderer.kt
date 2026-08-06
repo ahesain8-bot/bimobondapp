@@ -112,16 +112,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUMouthRadius = 0
     private var oesURetouchTooth = 0
     private var oesUToothRegion = 0
-    /**
-     * Beauty strengths as currently applied, eased toward whatever
-     * [LiveBeautyState] holds instead of jumping to it.
-     *
-     * Switching preset or dragging a slider otherwise changes the look between
-     * one frame and the next, which reads as a flicker. It also matters for the
-     * later stages of this work, where these values stop being constants and
-     * start tracking the scene — a value that reacts to lighting has to move
-     * smoothly or the whole image pulses as the light shifts.
-     */
+    /** Beauty strengths as applied, eased toward [LiveBeautyState] to avoid flicker. */
     private var smoothedSharpen = SHARPEN_STRENGTH
     private var smoothedAutoLift = 0f
     private var smoothedSmooth = LiveBeautyState.adjustments.smooth
@@ -262,24 +253,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     }
 
     /**
-     * Drops every cached GL object handle because a NEW EGL context is being set
-     * up and the old names are dead.
-     *
-     * Deliberately zeroes rather than deletes: these names belong to the
-     * destroyed context, so glDelete* here would at best be a no-op and at worst
-     * free an unrelated object that the new context has since been given the
-     * same name for.
-     *
-     * Without this, [onSurfaceCreated] rebuilt the programs and textures but left
-     * the lazily-created buffers' handles and cached dimensions intact, so their
-     * ensure* guards (which return early when the id is non-zero and the size
-     * matches) handed back framebuffers belonging to the dead context.
-     * [ensureHistoryBuffers] runs inside drawOes on every frame, so the result
-     * was a camera that bound and reported healthy — the preview surface visible,
-     * CameraX streaming — while GL quietly failed to draw: the intermittent black
-     * preview after returning from another app. Intermittent because
-     * preserveEGLContextOnPause is best-effort; the context usually survives, and
-     * only the times the driver actually dropped it went black.
+     * Zeroes (not deletes — the names belong to the dead context) every cached GL
+     * handle on a new EGL context, so stale ensure* guards don't hand back
+     * framebuffers from the destroyed one (caused the intermittent black preview
+     * after returning from another app).
      */
     private fun forgetGlObjectsForNewContext() {
         captureFboId = 0
@@ -613,11 +590,6 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             1f / cameraBufH.coerceAtLeast(1),
         )
         val beauty = LiveBeautyState.adjustments
-        // Adapted to the light first, then eased toward rather than snapped to —
-        // so the shader sees a value that moves smoothly even while the scene
-        // brightness is changing underneath it. See [sceneAdaptedTargets] and
-        // [easeToward]. Large intentional jumps (e.g. Magic Off→On) snap so the
-        // toggle is visible immediately instead of easing over many frames.
         val lowLightRaw = lowLightWeight()
         // Brightness / beauty strength follow a slow scene average so waving the
         // phone does not re-expose the face every frame.
@@ -629,16 +601,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // Far framing: face is small, so the same frame-fraction blur covers most
         // of it and reads as weird soft/wax. Scale smooth with face size.
         val distScale = faceDistanceScale()
-        // Same "normal" clean-not-blur behaviour on both cameras now:
-        // - own linear range (0 → SMOOTH_MAX) instead of smoothFromStrength,
-        //   whose curve floors at 0.48 even at slider=0 (so capping only the
-        //   top used to squeeze the whole slider into a useless 0.48–0.55
-        //   band — 0 and 100 looked identical);
-        // - not gated by distScale, which front's old path used and which
-        //   silently zeroed smoothing out whenever the face didn't fill
-        //   18–40% of frame (easy to miss in a quick test).
-        // Back camera additionally requires a detected person (personMix);
-        // front camera's own face is always the subject, so no such gate.
+        // Own linear range (0..SMOOTH_MAX), not gated by distScale — back needs a
+        // detected person too; front's own face is always the subject.
         val isFrontSmooth = ArCameraBridge.isFrontCamera
         val personMix = if (isFrontSmooth) {
             1f
@@ -750,16 +714,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             closeUpDenoiseBoost(),
         )
         val closeUpBoost = smoothedCloseUpBoost
-        // Spatial grain clean: when far, dial down so cleanup does not read as
-        // face blur on a small head (same frame-fraction taps).
-        // distScale alone was the front-tuned 18–40% fill range — back
-        // camera typically reads 5–12%, so this term sat near its 0.35
-        // floor for a person who is very much "close" by back-camera
-        // standards, under-cleaning grain on their face. Only back+person
-        // gets the boost (front camera and an empty back frame keep the
-        // exact original distScale-only value).
+        // Front camera pinned to full strength regardless of framing distance —
+        // grain must be gone whether close or far. Back scales with distance/person.
         val denoiseDistScale = if (ArCameraBridge.isFrontCamera) {
-            distScale
+            1f
         } else {
             val personMixGrain = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
             maxOf(distScale, personMixGrain)
@@ -880,21 +838,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
     }
 
-    /**
-     * Tells the rest of the camera that GL cannot render on this device, so it
-     * switches to the plain preview pipeline instead of showing a black screen.
-     * Routed through the watchdog so there is a single place that decides to
-     * degrade, and a single place it can be observed from.
-     */
     /** Consecutive [android.graphics.SurfaceTexture.updateTexImage] failures. */
     private var oesUpdateFailures = 0
 
-    /**
-     * Live-measured noise floor, replacing the fixed NOISE_FLOOR_BRIGHT/DARK
-     * constants. Estimated from a background patch of the actual frame, so it
-     * adapts to whatever sensor/lighting this specific device+scene has,
-     * instead of assuming the same amplitude for every phone.
-     */
+    /** Live-measured noise floor from a background patch, replacing fixed constants. */
     @Volatile
     private var measuredNoiseFloor = NOISE_FLOOR_BRIGHT
 
@@ -907,26 +854,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     private var glErrorProbeCounter = 0
 
-    /**
-     * Periodic GL error check. GL fails silently by design — an invalid draw
-     * leaves an error flag and produces nothing, which is indistinguishable from
-     * a black frame unless someone asks. Probing occasionally (not every frame,
-     * glGetError forces a pipeline sync) means a broken draw shows up in logcat
-     * instead of only as a black screen on a device we don't have.
-     */
-    /**
-     * How dark the scene is, 1 in a dim room and 0 in good light.
-     *
-     * A single fixed beauty strength cannot serve both ends, which is why this
-     * exists. In a dim room the sensor is pushing gain, so the frame carries real
-     * noise: smoothing is doing useful work there and sharpening mostly amplifies
-     * grain. In good light the opposite holds — the frame has genuine detail worth
-     * keeping, and that same smoothing only softens it away.
-     *
-     * Reacting to the light is also what keeps the effect from reading as a
-     * filter. A fixed amount looks applied precisely because it stays put while
-     * everything else in the picture changes.
-     */
+    /** How dark the scene is (1 = dim room, 0 = good light) — drives smooth/sharpen balance. */
     private fun lowLightWeight(): Float =
         1f - smoothstep(SCENE_DARK, SCENE_BRIGHT, measuredSceneLuma)
 
@@ -961,17 +889,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private fun rearBrightnessScale(): Float =
         if (ArCameraBridge.isFrontCamera) 1f else 0.25f
 
-    /**
-     * Same idea as [rearBrightnessScale] but for [smoothedAutoLift] — the
-     * face-measured "replaces face-region AE metering" exposure lift (see
-     * [autoLiftTarget]). That system already does exactly what was being
-     * asked for over and over — measure the person's actual skin luma and
-     * lift toward a flattering target — but it was dampened to 25% on back
-     * camera by the same blanket rule as the beauty slider. Once a person is
-     * confidently detected on back camera, let it run at full strength like
-     * front camera does; empty back-camera frames keep the 25% dampening so
-     * scenery/background shots are untouched.
-     */
+    /** Same idea as [rearBrightnessScale], for [smoothedAutoLift]. */
     private fun rearLiftScale(): Float {
         if (ArCameraBridge.isFrontCamera) return 1f
         val personMix = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
@@ -981,27 +899,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private fun adaptedSharpen(lowLight: Float): Float =
         (SHARPEN_STRENGTH * (1f - lowLight * 0.65f)).coerceAtLeast(0f)
 
-    /**
-     * Where the shader should stop calling high-frequency detail "texture" and
-     * start calling it grain.
-     *
-     * It has to move with the light. Sensor grain in good light is a fraction of
-     * a level and sits well below pore detail; in a dim room the same sensor is
-     * amplifying hard and the grain grows past where that detail used to be. A
-     * fixed threshold therefore either leaves grain in the dark or scrubs texture
-     * off in the light.
-     */
-    /**
-     * Whether smoothing may fall back to the colour-based skin gate.
-     *
-     * Only once the landmark mask has clearly failed to turn up. The colour gate
-     * matches skin *tones*, not faces, so in a beige room it selects the walls
-     * too — using it while the first mask was still on its way softened the
-     * entire frame for the half-second before landmarks arrived. Waiting the
-     * grace period out costs nothing (there is no face to smooth in that window
-     * anyway) and still leaves a working, if coarser, gate on a device where
-     * landmark detection never runs.
-     */
+    /** Colour-based skin gate is only a fallback once the landmark mask has had time to arrive. */
     private fun colourGateAllowed(): Boolean {
         if (skinMaskValid) return false
         val started = oesStartedMs
@@ -1009,20 +907,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             SystemClock.elapsedRealtime() - started > SKIN_MASK_GRACE_MS
     }
 
-    /**
-     * How much exposure the frame is short of, judged by how bright the person's
-     * skin actually came out.
-     *
-     * This is the job face-region AE metering used to do, moved off the sensor.
-     * Asking the camera to meter on the face worked, but re-issuing the request
-     * made it re-converge in full view — the visible wash-out on open, on
-     * movement, and on a face returning to frame. Measuring the result instead
-     * and correcting it afterwards reaches the same place with nothing to
-     * converge.
-     *
-     * Zero until a face has actually been measured, so an empty frame is left
-     * exactly as the camera produced it.
-     */
+    /** How much exposure the frame is short of, judged by measured skin brightness. */
     private fun autoLiftTarget(): Float {
         val deficit = (SKIN_LUMA_TARGET - measuredSkinLuma) / SKIN_LUMA_TARGET
         return deficit.coerceIn(0f, AUTO_LIFT_MAX)
@@ -1463,32 +1348,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var captureFboW = 0
     private var captureFboH = 0
 
-    // Encoder render-then-upscale (see presentToEncoder): drawOes() renders the
-    // full beauty pipeline into this FBO at a reduced size, and blitProgram then
-    // upscales it into the actual encoder surface at full recording resolution.
-    // Kept separate from captureFboId/captureFboW/H — capture is a rare
-    // still-photo readback while this runs on every recorded video frame, and
-    // sharing one FBO between the two would mean whichever ran last silently
-    // resizes it out from under the other on its next use.
+    
     private var encoderFboId = 0
     private var encoderFboTexId = 0
     private var encoderFboW = 0
     private var encoderFboH = 0
 
-    // Minimal textured-quad program for the upscale blit above. Deliberately its
-    // own program rather than reusing `program` (drawBitmapFrame's): that one
-    // also applies uFilterType warps and the full retouch uniform set, neither
-    // of which this blit wants — drawOes() already applied the beauty pipeline
-    // once when it rendered into encoderFboTexId, so blitting it a second time
-    // through the same effects would double them up.
+   
     private var blitProgram = 0
     private var blitAPosition = 0
     private var blitATexCoord = 0
     private var blitUTexture = 0
 
-    // Stage 3 — temporal denoise: ping-pong history of the last blended frame,
-    // sampled + re-blended each frame in drawOes() (screen-space UV, since both
-    // slots are always sized to match the current viewport).
+   
     private val historyTexId = IntArray(2)
     private val historyFboId = IntArray(2)
     private var historyW = 0
@@ -1499,42 +1371,24 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var history2Valid = false
     private val historyRestoreViewport = IntArray(4)
 
-    // Skin mask (landmark-rasterized, see ArCameraController.buildFaceSkinMaskBitmap)
-    // — ALPHA_8 bitmap, alpha=skin confidence directly, uploaded from a background
-    // analysis frame, sampled in the shader to gate skin-smoothing precisely
-    // instead of the color-tone guess. Uploaded occasionally (analysis is
-    // throttled), not every frame like the OES texture.
+   
     private var skinMaskTexId = 0
     @Volatile
     private var pendingSkinMaskBitmap: Bitmap? = null
     private var skinMaskValid = false
 
-    /**
-     * When the OES path started drawing, used to decide whether the absence of a
-     * skin mask means "not yet" or "not on this device" — see [colourGateAllowed].
-     */
+   
     private var oesStartedMs = 0L
 
-    /**
-     * Average luminance of this person's skin, measured from the camera each
-     * time landmarks are detected. Drives the tone curve — see the shader's
-     * toneDeficit. Starts at the neutral target so the first frames behave as if
-     * no adjustment were needed rather than over-correcting.
-     */
+   
     @Volatile
     private var measuredSkinLuma = SKIN_LUMA_TARGET
 
-    /**
-     * Average brightness of the whole frame, as measured from the camera.
-     * Drives how hard the beauty pass works — see [sceneAdaptedTargets].
-     */
+   
     @Volatile
     private var measuredSceneLuma = 0.35f
 
-    /**
-     * Face oval area / frame area from MediaPipe. Rises when the user leans in;
-     * used to boost denoise so magnified sensor grain stays down (TikTok-like).
-     */
+   
     @Volatile
     private var measuredFaceFill = 0f
 
@@ -1542,10 +1396,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     private var prevFaceFillSample = -1f
 
-    /**
-     * Set from analysis thread when face size jumps (lean-in / pull-back).
-     * Consumed on the GL thread to drop history so temporal cannot trail.
-     */
+  
     @Volatile
     private var pendingHistoryInvalidate = false
 
@@ -1566,8 +1417,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (prev >= 0f) {
             val shrink = prev - f
             val jump = kotlin.math.abs(f - prev)
-            // Pull camera away (face shrinks) or sudden zoom jump → clear
-            // temporal history so the face/halo cannot ghost.
+          
             if (shrink > 0.018f || jump > 0.055f) {
                 pendingHistoryInvalidate = true
             }
@@ -1576,10 +1426,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         measuredFaceFill = f
     }
 
-    /**
-     * Extra denoise when face is close and/or bright (lean-in / toward light).
-     * Close-up magnifies grain; bright-face AE often underexposes fabric → grain.
-     */
+
     private fun closeUpDenoiseBoost(): Float {
         val closeUp = smoothstep(0.10f, 0.32f, measuredFaceFill)
         val brightFace = smoothstep(0.48f, 0.70f, measuredSkinLuma)
@@ -1629,21 +1476,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
     }
 
-    /**
-     * Builds the offscreen framebuffer used to read captured frames back.
-     * Returns false when the driver won't give us a usable one.
-     *
-     * That check is the point. This used to bind whatever came out of
-     * glGenFramebuffers and draw into it regardless, so an incomplete FBO
-     * produced a stream of GL_INVALID_FRAMEBUFFER_OPERATION and captured
-     * nothing — no photo, no recorded frame, and no error the app could act on.
-     */
+   
     private fun ensureCaptureFbo(w: Int, h: Int): Boolean {
         if (captureFboId != 0 && captureFboW == w && captureFboH == h) return true
         releaseCaptureFbo()
 
-        // A texture larger than the driver allows is one way to end up with an
-        // incomplete framebuffer, and the limit varies widely between GPUs.
+       
         val maxTex = IntArray(1)
         GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, maxTex, 0)
         val limit = maxTex[0].takeIf { it > 0 } ?: 2048
@@ -1714,14 +1552,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var stillFboId = 0
     private var stillFboTexId = 0
 
-    /**
-     * Runs [src] through the beauty shader at its own resolution and returns the
-     * result. GL thread only — call it via FaceWarpGlView.renderStillBlocking.
-     *
-     * Self-contained on purpose: its own program, texture and framebuffer, and it
-     * restores the framebuffer binding and viewport before returning, so the live
-     * preview is not disturbed by a photo being taken.
-     */
+   
     fun renderStill(src: Bitmap): Bitmap? {
         if (src.isRecycled || src.width < 2 || src.height < 2) return null
 
@@ -2081,13 +1912,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         history2Valid = false
     }
 
-    /**
-     * Copies the just-drawn screen frame into the "write" history slot, then
-     * flips it to become next frame's "read" slot. Same exponential temporal
-     * blend as re-drawing into an FBO (the screen buffer already IS that blend),
-     * but without a second full beauty-shader pass every frame.
-     * After two writes the older slot is frame N-2 for dual-tap temporal.
-     */
+
     private fun writeHistoryFrame() {
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, historyRestoreViewport, 0)
         val x = historyRestoreViewport[0]
@@ -2120,15 +1945,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         val maxEdge = captureMaxEdge.coerceAtLeast(2)
         val largest = maxOf(screenW, screenH)
-        // Always redraw into the capture FBO when a redraw is available, and size
-        // it from captureMaxEdge rather than from the on-screen surface.
-        //
-        // The preview surface is deliberately rendered below display resolution
-        // for performance (see FaceWarpGlView's render-resolution cap), so reading
-        // the screen back directly would silently bake that reduction into saved
-        // photos and recorded frames. Re-rendering into the FBO instead re-samples
-        // the full-resolution camera texture, so captures keep their own quality
-        // regardless of how few pixels the live preview is shaded at.
+    
         val useFbo = redraw != null
         val readW: Int
         val readH: Int
@@ -2279,18 +2096,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         bitmap.recycle()
     }
 
-    /**
-     * Returns 0 when the program could not be built.
-     *
-     * This used to log the failure and hand back the broken program id anyway.
-     * That is a quiet way to produce a black screen on exactly the devices we
-     * can't test: GLSL compilers differ per GPU vendor, and a shader this size
-     * (the OES one carries the skin mask, surface blur, temporal denoise and the
-     * whole retouch block) is a realistic candidate for compiling on one vendor
-     * and failing on another. With a broken id the renderer carried on drawing
-     * nothing, with no error anywhere but logcat. Now the caller can see it and
-     * fall back.
-     */
+  
     private fun buildProgram(vertexSource: String, fragmentSource: String): Int {
         val vertexShader = compileShader(GLES20.GL_VERTEX_SHADER, vertexSource)
         val fragmentShader = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource)
@@ -2392,31 +2198,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         } else {
             adj
         }
-        // Back-camera person target grade (slider scale, ÷100 of these):
-        // contrast −100, saturation +15, highlights +40, warmth +20,
-        // exposure +70, brightness +100 — instead of the empty-frame
-        // (−0.47 brightness / max contrast / warm) baseline. Blended in by
-        // presence (personMixBase), so an empty back-camera frame or front
-        // camera keeps `color` exactly as computed above — untouched.
-        //
-        // Per-slider, not all-or-nothing: touching only Brightness used to
-        // disable the auto-override for every other slider too, leaving the
-        // empty-frame's max-contrast/warm values fighting the raised
-        // brightness — that combination is exactly what read as yellow.
-        // Each slider now independently checks whether IT is still at its
-        // own default before applying the override; an untouched slider
-        // gets the person-present default, a touched one keeps the user's
-        // exact value.
+     
         val isFrontCamera = ArCameraBridge.isFrontCamera
         val personMixBase = if (isFrontCamera) {
             0f
         } else {
             smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
         }
-        // Front camera's own untouched-slider targets. Independent of the back
-        // camera's empty/person-present targets below — a slider left alone on
-        // front always reads as these values; back camera's behaviour (both
-        // empty-frame and person-present) is unaffected either way.
+        
         fun fieldMix(value: Float, default: Float, backTarget: Float, frontTarget: Float): Float {
             val untouched = kotlin.math.abs(value - default) < 0.005f
             if (!untouched) return value
@@ -2431,7 +2220,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (locBrightness >= 0) {
             GLES20.glUniform1f(
                 locBrightness,
-                fieldMix(color.brightness, LiveRetouchAdjustments.DEFAULT_BRIGHTNESS, 1.0f, 0.45f),
+                fieldMix(color.brightness, LiveRetouchAdjustments.DEFAULT_BRIGHTNESS, 1.0f, 1.0f),
             )
         }
         if (locContrast >= 0) {
@@ -2443,7 +2232,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (locExposure >= 0) {
             GLES20.glUniform1f(
                 locExposure,
-                fieldMix(color.exposure, LiveRetouchAdjustments.DEFAULT_EXPOSURE, 0.70f, 0.15f),
+                fieldMix(color.exposure, LiveRetouchAdjustments.DEFAULT_EXPOSURE, 0.70f, 0.30f),
             )
         }
         if (locWhiteBalance >= 0) {
@@ -2455,7 +2244,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (locHighlights >= 0) {
             GLES20.glUniform1f(
                 locHighlights,
-                fieldMix(color.highlights, LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS, 0.40f, 0.10f),
+                fieldMix(color.highlights, LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS, 0.40f, -0.10f),
             )
         }
         if (locShadows >= 0) {
@@ -2494,8 +2283,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
         if (locMouthRadius >= 0) GLES20.glUniform1f(locMouthRadius, LiveRetouchState.mouthRadius)
         if (locTooth >= 0) {
-            // Inner-lip landmarks drive visibility: closed mouth = exactly zero,
-            // so bright skin/lip highlights can never be mistaken for teeth.
+            
             GLES20.glUniform1f(
                 locTooth,
                 adj.tooth * LiveRetouchState.toothVisibility,
@@ -2507,49 +2295,25 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     }
 
     companion object {
-        /**
-         * Upper bound for the still render. Bounded by the driver's real limit
-         * too — see [renderStill]. A 12MP RGBA texture is already ~48MB, and this
-         * path allocates a texture, a framebuffer and a readback buffer.
-         */
+       
         private const val STILL_MAX_EDGE = 4096
 
-        /**
-         * Sharpen amount applied outside the smoothed skin region.
-         *
-         * A single constant for now — it exists to restore the clarity the skin
-         * blur costs, which is a property of the pipeline rather than something a
-         * preset should be dialling independently. If presets ever need their own
-         * value it belongs in LiveBeautyAdjustments alongside the rest.
-         */
+       
         private const val SHARPEN_STRENGTH = 0.0f
 
-        /** Per-frame easing fraction for beauty strengths — see [easeToward]. */
         private const val BEAUTY_EASE = 0.18f
-        /**
-         * Exposure ease: open fast for backlight, close slowly to avoid pump.
-         */
+       
         private const val BRIGHTNESS_EASE_UP = 0.20f
         private const val BRIGHTNESS_EASE_DOWN = 0.04f
         private const val SCENE_BRIGHTNESS_EASE = 0.035f
 
-        /**
-         * Frame luminance at or below which the scene counts as fully dark, and
-         * at or above which it counts as well lit. Between the two the strengths
-         * blend, so walking from a lit room into a dim one has no visible step.
-         */
         private const val SCENE_DARK = 0.12f
         private const val SCENE_BRIGHT = 0.42f
 
-        /**
-         * Noise-floor endpoints, as high-band amplitude in 0..1 colour — roughly
-         * two levels out of 255 in good light and eight in the dark.
-         */
-        /** How long to wait for a first landmark mask — see colourGateAllowed. */
+        
         private const val SKIN_MASK_GRACE_MS = 2_500L
 
-        /** Blemish strength as a fraction of the smoothing strength. */
-        /** Ceiling on the face-driven exposure lift. */
+        
         private const val AUTO_LIFT_MAX = 0.35f
 
         private const val BLEMISH_OF_SMOOTH = 0.28f
@@ -2560,42 +2324,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         /** Target skin luminance for auto-lift. */
         const val SKIN_LUMA_TARGET = 0.58f
 
-        /**
-         * Back-camera person smooth strength — fixed, not Magic-derived.
-         * Enough to hide blemishes/scars without going plastic/waxy; well
-         * under Magic's own floor (MAGIC_SMOOTH_MIN = 0.48).
-         */
+        
         private const val BACK_PERSON_SMOOTH_NORMAL = 0.35f
 
-        /**
-         * Ceiling on person-present smooth (front and back) even when the
-         * user manually pushes the slider to its top — Magic's own top end
-         * (0.99) flattens skin into visible blur/wax. This keeps texture/
-         * pores intact and only clears blemishes at the slider's highest
-         * setting. Also caps the blur radius (radiusScale rides the same
-         * uSmoothStrength value) — 0.55 was still reading as a faint general
-         * softening rather than pure spot cleanup.
-         */
+        
         private const val BACK_PERSON_SMOOTH_MAX = 0.65f
 
-        /**
-         * Front-camera-only smooth strength, stronger than the back-camera
-         * pair above. Split out on request rather than raising
-         * BACK_PERSON_SMOOTH_NORMAL/MAX themselves, which stay exactly as
-         * documented above for back-camera person smoothing.
-         */
-        private const val FRONT_SMOOTH_NORMAL = 0.50f
+        
+        private const val FRONT_SMOOTH_NORMAL = 0.80f
         private const val FRONT_SMOOTH_MAX = 0.80f
 
-        /**
-         * Pixel budget for [renderShaderAtBudget]'s recording-time render — same
-         * value as [FaceWarpGlView]'s live-preview render cap, chosen for the
-         * same reason (the shader's per-pixel texture-fetch cost, see that
-         * class's doc). The recorded/saved video is still exported at the full
-         * requested size (e.g. 1080x1920) via the upscale blit in
-         * [presentToEncoder]; this only caps how many pixels the expensive part
-         * of the pipeline actually runs on.
-         */
+        
         private const val ENCODER_RENDER_MAX_PIXELS = 1_200_000L
 
         private const val TAG = "FaceWarpRenderer"
@@ -2606,26 +2345,12 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         /** glGetError forces a sync, so only probe every Nth frame. */
         private const val GL_ERROR_PROBE_EVERY = 60
 
-        // Skin-smooth strength and lip-tint color/strength are no longer fixed
-        // constants — they come from LiveBeautyState, driven by the named
-        // filter picker (Soft Glow, Pure, Rosy, Clean, ...) in Dart, defaulting
-        // to the same baseline these constants used to hardcode.
-
-        /**
-         * Live-preview temporal denoise ceiling (0..1), OES path only — Stage 3.
-         * Actual strength is scaled by scene brightness in drawOes(); the shader
-         * then motion-gates per pixel (static → clean grain, moving → keep sharp).
-         */
+       
         private const val TEMPORAL_STRENGTH = 0.48f
         // Below plain temporal so Magic spatial cleanup + frames do not wax the face.
         private const val MAGIC_TEMPORAL_STRENGTH = 0.22f
 
-        /**
-         * Front camera only — how far to ease from FILL_CENTER toward FIT_CENTER
-         * (1.0 = fill/tight, 2.0 = full fit/widest). Values above 1 zoom out while
-         * keeping aspect ratio. Out-of-bounds fit samples draw black (no clamp
-         * streak bars, no vertical stretch from single-axis crop hacks).
-         */
+    
         private const val FRONT_WIDE_ZOOM_OUT = 2.0f
 
         /** Back camera — TikTok-like wide (near full FIT_CENTER). */
@@ -2648,9 +2373,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             }
         """
 
-        // Trivial textured-quad pass for presentToEncoder's upscale blit — deliberately
-        // its own tiny program (see blitProgram's field doc for why it isn't
-        // `program`/`FRAGMENT_SHADER`). Reuses VERTEX_SHADER above.
+       
         private const val BLIT_VERTEX_SHADER = VERTEX_SHADER
 
         private const val BLIT_FRAGMENT_SHADER = """
@@ -3355,8 +3078,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 vec2 st = (uStMatrix * vec4(uv, 0.0, 1.0)).xy;
                 vec3 col = texture2D(uTexture, st).rgb;
                 // Scene-aware grain clean before beauty lifts amplify speckles.
+                // Front camera pinned to full boost unconditionally — same
+                // reasoning as denoiseDistScale above: grain must be gone at any
+                // distance from the camera, not just cleaned better close-up.
                 float grainPersonBoost = uIsFrontCamera > 0.5
-                    ? 0.0
+                    ? 1.0
                     : smoothstep(0.30, 0.55, clamp(uBackPersonWeight, 0.0, 1.0));
                 col = sceneGrainClean(st, col, grainPersonBoost);
                 // Computed once and reused everywhere below instead of
