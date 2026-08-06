@@ -115,26 +115,27 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   static const Map<MediaPhotoEditorTool, double> _kFrontLiveColorDefaults = {
     MediaPhotoEditorTool.contrast: 0.0, // 0
     MediaPhotoEditorTool.saturation: -0.10, // -10
-    MediaPhotoEditorTool.brightness: 0.45, // +45
-    MediaPhotoEditorTool.exposure: 0.15, // +15
+    MediaPhotoEditorTool.brightness: 1.0, // +100
+    MediaPhotoEditorTool.exposure: 0.30, // +30
     MediaPhotoEditorTool.whiteBalance: -0.50, // warmth -50
-    MediaPhotoEditorTool.highlights: 0.10, // +10
+    MediaPhotoEditorTool.highlights: -0.10, // -10
     MediaPhotoEditorTool.shadows: 0.25, // +25
   };
+  // Beauty/morph fields only — deliberately no colour-grade keys (contrast,
+  // saturation, brightness, exposure, whiteBalance, highlights, shadows).
+  // They used to be here, hardcoded to the back-camera baseline, and every
+  // Magic-on toggle overwrote whatever colour values were actually correct
+  // for the current camera (e.g. front's brightness) with those stale
+  // numbers — reported as "slider shows -47 even though we set 100".
+  // _restoreLiveColorDefaults() already owns colour grade per-camera;
+  // touching it here duplicated that and went out of sync.
   static const Map<MediaPhotoEditorTool, double> _kMagicBeautyDefaults = {
     MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
-    MediaPhotoEditorTool.contrast: 1.0, // max — same as live baseline
     MediaPhotoEditorTool.shape: 0.08,
     MediaPhotoEditorTool.nose: 0.05,
     MediaPhotoEditorTool.eyes: 0.05,
     MediaPhotoEditorTool.tooth: 0.12,
     MediaPhotoEditorTool.mouth: 0.05,
-    MediaPhotoEditorTool.saturation: 0.10,
-    MediaPhotoEditorTool.brightness: -0.47, // -47
-    MediaPhotoEditorTool.exposure: 0.06, // +6
-    MediaPhotoEditorTool.whiteBalance: -0.08, // warmth -8
-    MediaPhotoEditorTool.highlights: 0.08, // +8
-    MediaPhotoEditorTool.shadows: 0.10,
   };
   final Map<MediaPhotoEditorTool, double> _photoAdjustments = {
     MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
