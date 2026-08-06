@@ -417,12 +417,14 @@ class PostsRepositoryImpl implements PostsRepository {
     String postId, {
     int? watchedDuration,
     String? campaignId,
+    String? trafficSource,
   }) async {
     try {
       final count = await remoteDataSource.recordPostView(
         postId,
         watchedDuration: watchedDuration,
         campaignId: campaignId,
+        trafficSource: trafficSource,
       );
       return Right(count);
     } catch (e) {

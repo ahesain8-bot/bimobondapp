@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_comment_entity.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/widgets/activity_feed_list_row.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -42,6 +43,7 @@ class UserCommentListTile extends StatelessWidget {
       postId,
       openComments: true,
       highlightCommentId: commentId.isNotEmpty ? commentId : null,
+      trafficSource: TrafficSource.notification,
     );
   }
 

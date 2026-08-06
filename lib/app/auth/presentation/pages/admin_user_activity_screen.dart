@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
 import 'package:bimobondapp/app/auth/presentation/widgets/admin/admin_activity_tile.dart';
 import 'package:bimobondapp/core/utils/admin_activity_labels.dart';
 import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -141,7 +142,11 @@ class _AdminUserActivityScreenState extends State<AdminUserActivityScreen> {
   void _onActivityTap(UserActivityEntity activity) {
     final postId = activityPostId(activity);
     if (postId != null) {
-      openPostById(context, postId);
+      openPostById(
+        context,
+        postId,
+        trafficSource: PostTrafficSource.other,
+      );
       return;
     }
 

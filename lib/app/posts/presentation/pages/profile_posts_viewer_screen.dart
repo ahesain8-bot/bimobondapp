@@ -357,6 +357,8 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
                                 post: post,
                                 embeddedInFeed: true,
                                 auctionId: post.auction?.id,
+                                trafficSource: widget.args.trafficSource,
+                                isActive: index == _currentIndex,
                               );
                             }
                             return VideoPostWidget(
@@ -380,6 +382,7 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
                               pageController: _pageController,
                               pageIndex: index,
                               feedMediaFit: BoxFit.cover,
+                              trafficSource: widget.args.trafficSource,
                             );
                           },
                         ),

@@ -42,6 +42,15 @@ class PostShareDestinations {
     );
   }
 
+  /// Instagram has no public link-share scheme — copy then open the app.
+  static Future<void> instagram(String link) async {
+    await copyLink(link);
+    final opened = await _open(Uri.parse('instagram://app'));
+    if (!opened) {
+      await _open(Uri.parse('https://www.instagram.com/'));
+    }
+  }
+
   static Future<void> whatsApp(String link) async {
     final text = Uri.encodeComponent(link);
     final opened = await _open(Uri.parse('whatsapp://send?text=$text'));

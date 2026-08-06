@@ -17,12 +17,16 @@ class GlassBottomSheet {
     required WidgetBuilder builder,
     bool isScrollControlled = false,
     Color? barrierColor,
+    bool isDismissible = true,
+    bool enableDrag = true,
   }) async {
     FeedPlaybackGate.instance.pushModalOverlay();
     try {
       return await showModalBottomSheet<T>(
         context: context,
         isScrollControlled: isScrollControlled,
+        isDismissible: isDismissible,
+        enableDrag: enableDrag,
         useRootNavigator: true,
         backgroundColor: Colors.transparent,
         barrierColor: barrierColor ?? Colors.black.withValues(alpha: 0.55),
@@ -108,6 +112,8 @@ class GlassBottomSheet {
       context,
       isScrollControlled: isScrollControlled,
       builder: (ctx) {
+        final media = MediaQuery.of(ctx);
+        final keyboard = media.viewInsets.bottom;
         Widget body = GlassBottomSheetShell(
           title: title,
           scrollable: scrollable,
@@ -119,11 +125,28 @@ class GlassBottomSheet {
               : Padding(padding: padding, child: child),
         );
         if (isScrollControlled) {
+          // Cap height above the keyboard. Full-height scroll-controlled sheets
+          // swallow barrier taps — add an explicit dismiss layer behind content.
+          final maxHeight = media.size.height - keyboard;
           body = Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+            padding: EdgeInsets.only(bottom: keyboard),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(ctx).maybePop(),
+                  child: const SizedBox.expand(),
+                ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: maxHeight),
+                    child: body,
+                  ),
+                ),
+              ],
             ),
-            child: body,
           );
         }
         if (lightSurface) {
@@ -508,44 +531,57 @@ class GlassBottomSheetFrame extends StatelessWidget {
           : decoration(),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-          children: [
-            if (showHandle)
-              DraggableSheetDragRegion(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 10),
-                    handle(lightSurface: lightSurface),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              ),
-            if (title != null) ...[
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    title!,
-                    style: TextStyle(
-                      color: lightSurface
-                          ? theme.colorScheme.onSurface
-                          : Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
+        // Avoid double bottom inset when the keyboard is open (parent already
+        // pads by viewInsets).
+        bottom: MediaQuery.viewInsetsOf(context).bottom == 0,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final bounded = constraints.hasBoundedHeight;
+            return Column(
+              mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                if (showHandle)
+                  DraggableSheetDragRegion(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 10),
+                        handle(lightSurface: lightSurface),
+                        const SizedBox(height: 10),
+                      ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            child,
-            if (!expand) const SizedBox(height: AppSizes.p8),
-          ],
+                if (title != null) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        title!,
+                        style: TextStyle(
+                          color: lightSurface
+                              ? theme.colorScheme.onSurface
+                              : Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (expand)
+                  Expanded(child: child)
+                else if (bounded)
+                  Flexible(fit: FlexFit.loose, child: child)
+                else
+                  child,
+                if (!expand) const SizedBox(height: AppSizes.p8),
+              ],
+            );
+          },
         ),
       ),
     );

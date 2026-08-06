@@ -1,3 +1,5 @@
+import 'package:bimobondapp/core/constants/traffic_source.dart';
+
 enum HomeFeedTab {
   following,
   forYou,
@@ -14,6 +16,15 @@ extension HomeFeedTabX on HomeFeedTab {
         return null;
       case HomeFeedTab.following:
         return 'FRIEND';
+    }
+  }
+
+  String get trafficSource {
+    switch (this) {
+      case HomeFeedTab.forYou:
+        return TrafficSource.forYou;
+      case HomeFeedTab.following:
+        return TrafficSource.following;
     }
   }
 }

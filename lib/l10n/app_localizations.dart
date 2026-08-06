@@ -3023,6 +3023,30 @@ abstract class AppLocalizations {
   /// **'Not interested'**
   String get postOptionNotInterested;
 
+  /// No description provided for @feedInterestPromptQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you interested in this kind of content?'**
+  String get feedInterestPromptQuestion;
+
+  /// No description provided for @feedInterestPromptYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get feedInterestPromptYes;
+
+  /// No description provided for @feedInterestPromptNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get feedInterestPromptNo;
+
+  /// No description provided for @feedInterestPromptThanks.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks — we\'ll show more like this'**
+  String get feedInterestPromptThanks;
+
   /// No description provided for @postOptionDownload.
   ///
   /// In en, this message translates to:
@@ -3209,6 +3233,12 @@ abstract class AppLocalizations {
   /// **'Facebook'**
   String get postShareFacebook;
 
+  /// No description provided for @postShareInstagram.
+  ///
+  /// In en, this message translates to:
+  /// **'Instagram'**
+  String get postShareInstagram;
+
   /// No description provided for @postShareWhatsApp.
   ///
   /// In en, this message translates to:
@@ -3250,6 +3280,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More'**
   String get postShareMore;
+
+  /// No description provided for @postOptionCast.
+  ///
+  /// In en, this message translates to:
+  /// **'Cast'**
+  String get postOptionCast;
+
+  /// No description provided for @postShareInstagramHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied — paste in Instagram'**
+  String get postShareInstagramHint;
+
+  /// No description provided for @postOptionCastUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Casting is not available yet'**
+  String get postOptionCastUnavailable;
 
   /// No description provided for @postShareSendFailed.
   ///
@@ -7276,6 +7324,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not translate'**
   String get translationFailed;
+
+  /// No description provided for @postLinksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Links'**
+  String get postLinksTitle;
+
+  /// No description provided for @tryEffectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try effect'**
+  String get tryEffectAction;
+
+  /// No description provided for @effectsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Effects'**
+  String get effectsSubtitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

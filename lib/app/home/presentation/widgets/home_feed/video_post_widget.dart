@@ -31,6 +31,7 @@ import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -76,6 +77,9 @@ class VideoPostWidget extends StatefulWidget {
   /// Keeps the parent feed list in sync when like/comment/save changes locally.
   final FeedPostPatch? onFeedPostPatch;
 
+  /// Discovery surface for `POST /posts/:id/view` — see [TrafficSource].
+  final String trafficSource;
+
   const VideoPostWidget({
     super.key,
     required this.post,
@@ -92,6 +96,7 @@ class VideoPostWidget extends StatefulWidget {
     this.pageController,
     this.pageIndex,
     this.onFeedPostPatch,
+    this.trafficSource = TrafficSource.forYou,
   });
 
   @override
@@ -187,7 +192,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
     if (_playbackActive) {
       resolveFollowStatusIfNeeded();
-      recordViewIfNeeded();
+      _startViewWatchTracking();
       unawaited(SoundAudioPreview.stop());
       unawaited(syncPostSoundPlayback());
     }
@@ -203,20 +208,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (_playbackActive) {
+        _startViewWatchTracking();
         unawaited(syncPostSoundPlayback());
       }
       return;
     }
-    // Locked / backgrounded — stop image soundtrack immediately.
+    // Locked / backgrounded — flush watch duration and stop soundtrack.
+    flushPostViewWithWatchDuration();
     unawaited(pausePostSound());
     unawaited(SoundAudioPreview.stop());
   }
 
   void _onFeedPlaybackGateChanged() {
     if (!_playbackActive) {
+      _pauseViewWatchTracking();
       unawaited(pausePostSound());
     } else if (widget.isActive) {
-      recordViewIfNeeded();
+      _startViewWatchTracking();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_playbackActive) return;
         unawaited(syncPostSoundPlayback());
@@ -235,15 +243,32 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
       syncEngagementFromPost();
     }
 
+    if (widget.post.id != oldWidget.post.id) {
+      final oldCampaign = oldWidget.post.isPromoted || oldWidget.post.isAd
+          ? oldWidget.post.promotion?.id
+          : null;
+      flushPostViewWithWatchDuration(
+        postId: oldWidget.post.id,
+        trafficSource: oldWidget.trafficSource,
+        campaignId: oldCampaign,
+      );
+      resetViewWatchSession();
+      if (_playbackActive) {
+        _startViewWatchTracking();
+      }
+    }
+
     if (_playbackActive && !oldWidget.isActive) {
       _playChromeEntranceNow();
       resolveFollowStatusIfNeeded();
-      recordViewIfNeeded();
+      _startViewWatchTracking();
       unawaited(SoundAudioPreview.stop());
       unawaited(syncPostSoundPlayback());
     } else if (!widget.isActive && oldWidget.isActive) {
+      flushPostViewWithWatchDuration();
       unawaited(stopPostSound());
     } else if (!_playbackActive && oldWidget.isActive && widget.isActive) {
+      _pauseViewWatchTracking();
       unawaited(pausePostSound());
     } else if (_playbackActive &&
         (widget.post.id != oldWidget.post.id ||
@@ -304,6 +329,8 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
 
   @override
   void dispose() {
+    _cancelViewEligibleTimer();
+    flushPostViewWithWatchDuration();
     WidgetsBinding.instance.removeObserver(this);
     FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
     _detachRouteListener();

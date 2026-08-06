@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
@@ -240,7 +241,11 @@ class _HashtagFeedScreenState extends State<HashtagFeedScreen> {
                           post: post,
                           tabIndex: 0,
                           theme: theme,
-                          onTap: () => openPost(context, post),
+                          onTap: () => openPost(
+                            context,
+                            post,
+                            trafficSource: TrafficSource.hashtags,
+                          ),
                         );
                       },
                       childCount: _posts.length + (_isLoadingMore ? 1 : 0),

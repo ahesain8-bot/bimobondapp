@@ -4,9 +4,11 @@ import 'package:bimobondapp/app/home/presentation/utils/post_share_people.dart';
 import 'package:bimobondapp/app/home/presentation/utils/post_share_tracker.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
+import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/utils/app_assets.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
+import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -178,12 +180,15 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
     return PostShareTracker.trackAndResolveLink(widget.post, channel: channel);
   }
 
-  List<_CircleAction> _buildAppActions(AppLocalizations l10n) {
+  List<_CircleAction> _buildExternalShareActions(AppLocalizations l10n) {
+    final cs = Theme.of(context).colorScheme;
+    final mutedBg = AppTheme.shareIconMutedBackground(cs);
+    final showRepost = !widget.isOwner && widget.onRepost != null;
     return [
-      if (!widget.isOwner && widget.onRepost != null)
+      if (showRepost)
         _CircleAction(
           label: widget.isReposted ? l10n.repostUndo : l10n.repostAction,
-          background: const Color(0xFFFACC15),
+          background: AppTheme.shareRepostBackground,
           assetPath: AppAssets.repostIcon,
           iconColor: Colors.white,
           onTap: () {
@@ -192,18 +197,8 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           },
         ),
       _CircleAction(
-        label: l10n.postShareWhatsApp,
-        background: const Color(0xFF25D366),
-        assetPath: AppAssets.shareWhatsAppIcon,
-        onTap: () async {
-          final link = await _trackedLink('EXTERNAL');
-          if (!mounted) return;
-          await PostShareDestinations.whatsApp(link);
-        },
-      ),
-      _CircleAction(
         label: l10n.postShareCopyLink,
-        background: const Color(0xFF3B82F6),
+        background: Color.lerp(cs.secondary, Colors.white, 0.38)!,
         icon: LucideIcons.link,
         iconColor: Colors.white,
         onTap: () async {
@@ -217,19 +212,51 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         },
       ),
       _CircleAction(
-        label: l10n.postShareTelegram,
-        background: const Color.fromARGB(255, 70, 182, 238),
-        assetPath: AppAssets.shareTelegramIcon,
+        label: l10n.postShareInstagram,
+        background: Colors.transparent,
+        assetPath: AppAssets.shareInstagramIcon,
+        assetSize: 52,
+        clipAssetToCircle: true,
         onTap: () async {
           final link = await _trackedLink('EXTERNAL');
           if (!mounted) return;
-          await PostShareDestinations.telegram(link);
+          await PostShareDestinations.instagram(link);
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.postShareInstagramHint)));
+        },
+      ),
+      _CircleAction(
+        label: l10n.postShareFacebook,
+        background: Colors.transparent,
+        assetPath: AppAssets.shareFacebookIcon,
+        assetSize: 52,
+        clipAssetToCircle: true,
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.facebook(link);
+        },
+      ),
+      _CircleAction(
+        label: l10n.postShareWhatsApp,
+        background: Colors.transparent,
+        assetPath: AppAssets.shareWhatsAppIcon,
+        assetSize: 52,
+        clipAssetToCircle: true,
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.whatsApp(link);
         },
       ),
       _CircleAction(
         label: l10n.postShareMessenger,
-        background: const Color.fromARGB(255, 190, 209, 248),
+        background: Colors.transparent,
         assetPath: AppAssets.shareMessengerIcon,
+        assetSize: 52,
+        clipAssetToCircle: true,
         onTap: () async {
           final link = await _trackedLink('EXTERNAL');
           if (!mounted) return;
@@ -237,10 +264,22 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         },
       ),
       _CircleAction(
+        label: l10n.postShareTelegram,
+        background: Colors.transparent,
+        assetPath: AppAssets.shareTelegramIcon,
+        assetSize: 52,
+        clipAssetToCircle: true,
+        onTap: () async {
+          final link = await _trackedLink('EXTERNAL');
+          if (!mounted) return;
+          await PostShareDestinations.telegram(link);
+        },
+      ),
+      _CircleAction(
         label: l10n.postShareMore,
-        background: Theme.of(context).colorScheme.surfaceContainerHighest,
+        background: mutedBg,
         icon: LucideIcons.ellipsis,
-        iconColor: Theme.of(context).colorScheme.onSurface,
+        iconColor: cs.onSurface,
         onTap: () async {
           final link = await _trackedLink('EXTERNAL');
           if (!mounted) return;
@@ -252,9 +291,9 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
 
   List<_CircleAction> _buildOptionActions(PostOptionsActions actions) {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final mutedBg = theme.colorScheme.surfaceContainerHighest;
-    final onSurface = theme.colorScheme.onSurface;
+    final cs = Theme.of(context).colorScheme;
+    final mutedBg = AppTheme.shareIconMutedBackground(cs);
+    final onMuted = cs.onSurface;
 
     return [
       if (!widget.isOwner)
@@ -262,7 +301,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.postOptionReport,
           background: mutedBg,
           icon: LucideIcons.flag,
-          iconColor: onSurface,
+          iconColor: onMuted,
           onTap: () {
             Navigator.pop(context);
             actions.report();
@@ -273,17 +312,27 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.postOptionNotInterested,
           background: mutedBg,
           icon: LucideIcons.heartOff,
-          iconColor: onSurface,
+          iconColor: onMuted,
           onTap: () {
             Navigator.pop(context);
             actions.notInterested();
           },
         ),
       _CircleAction(
+        label: l10n.postOptionDownload,
+        background: mutedBg,
+        icon: LucideIcons.download,
+        iconColor: onMuted,
+        onTap: () {
+          Navigator.pop(context);
+          actions.download();
+        },
+      ),
+      _CircleAction(
         label: l10n.postOptionAddToStory,
         background: mutedBg,
         icon: LucideIcons.circlePlus,
-        iconColor: onSurface,
+        iconColor: onMuted,
         onTap: () {
           Navigator.pop(context);
           actions.addToStory();
@@ -296,30 +345,32 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.promotePostAction,
           background: mutedBg,
           icon: LucideIcons.flame,
-          iconColor: onSurface,
+          iconColor: onMuted,
           onTap: () {
             Navigator.pop(context);
             widget.onPromote!();
           },
         ),
       _CircleAction(
-        label: l10n.postOptionShareAsGif,
+        label: l10n.postOptionCast,
         background: mutedBg,
-        icon: LucideIcons.film,
-        iconColor: onSurface,
+        icon: LucideIcons.cast,
+        iconColor: onMuted,
         onTap: () {
           Navigator.pop(context);
-          actions.shareAsGif();
+          ScaffoldMessenger.of(widget.hostContext ?? context).showSnackBar(
+            SnackBar(content: Text(l10n.postOptionCastUnavailable)),
+          );
         },
       ),
       _CircleAction(
-        label: l10n.postOptionDownload,
+        label: l10n.postOptionShareAsGif,
         background: mutedBg,
-        icon: LucideIcons.download,
-        iconColor: onSurface,
+        icon: LucideIcons.film,
+        iconColor: onMuted,
         onTap: () {
           Navigator.pop(context);
-          actions.download();
+          actions.shareAsGif();
         },
       ),
       if (widget.isOwner && widget.onEdit != null)
@@ -327,7 +378,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.editPost,
           background: mutedBg,
           icon: LucideIcons.pencil,
-          iconColor: onSurface,
+          iconColor: onMuted,
           onTap: () {
             Navigator.pop(context);
             widget.onEdit!();
@@ -338,7 +389,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.auctionCancelAction,
           background: mutedBg,
           icon: LucideIcons.ban,
-          iconColor: onSurface,
+          iconColor: onMuted,
           onTap: () {
             Navigator.pop(context);
             widget.onCancelAuction!();
@@ -349,7 +400,7 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           label: l10n.deletePost,
           background: mutedBg,
           icon: LucideIcons.trash2,
-          iconColor: theme.colorScheme.error,
+          iconColor: cs.error,
           onTap: () {
             Navigator.pop(context);
             widget.onDelete!();
@@ -365,11 +416,6 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
   }) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final titleStyle = theme.textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontSize: 16,
-      color: onSurface,
-    );
 
     return SizedBox(
       height: 40,
@@ -377,10 +423,11 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
         children: [
           SizedBox(width: 40, child: leading ?? const SizedBox.shrink()),
           Expanded(
-            child: Text(
+            child: CustomText(
               l10n.postShareSendToTitle,
               textAlign: TextAlign.center,
-              style: titleStyle,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
           ),
           IconButton(
@@ -398,18 +445,17 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
   Widget _searchTitleBar(AppLocalizations l10n) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final titleStyle = theme.textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontSize: 16,
-      color: onSurface,
-    );
 
     return SizedBox(
       height: 40,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Text(l10n.postShareSendToTitle, style: titleStyle),
+          CustomText(
+            l10n.postShareSendToTitle,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
           PositionedDirectional(
             end: 0,
             top: 0,
@@ -520,23 +566,21 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
 
   Widget _buildFriendSearchList(AppLocalizations l10n) {
     final people = _searchListPeople;
-    final theme = Theme.of(context);
     if (_loadingPeople) {
       return const Center(child: CustomLoadingWidget(size: 40));
     }
     if (people.isEmpty) {
       return Center(
-        child: Text(
+        child: CustomText(
           l10n.postShareNoUsers,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          variant: TextVariant.muted,
         ),
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.only(top: 2, bottom: 4),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       itemCount: people.length,
       itemBuilder: (context, index) {
         final user = people[index];
@@ -553,38 +597,36 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
   }
 
   Widget _buildSearchMode(AppLocalizations l10n) {
-    final screenH = MediaQuery.sizeOf(context).height;
-    final viewInsets = MediaQuery.viewInsetsOf(context);
-    final theme = Theme.of(context);
-    final panelHeight = screenH * 0.88;
+    final media = MediaQuery.of(context);
+    final keyboard = media.viewInsets.bottom;
+    final bottomSafe = keyboard > 0 ? 0.0 : media.padding.bottom;
+    // Sit above the keyboard at 80% of the visible area (not full screen).
+    final availableHeight = (media.size.height - keyboard).clamp(280.0, media.size.height);
+    final panelHeight = availableHeight * 0.80;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
+    return SizedBox(
       height: panelHeight,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           AppSizes.p16,
           0,
           AppSizes.p16,
-          6 + viewInsets.bottom,
+          bottomSafe > 0 ? bottomSafe : AppSizes.p6,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _searchTitleBar(l10n),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSizes.p8),
             _buildSearchField(l10n),
-            const SizedBox(height: 8),
-            Text(
+            const SizedBox(height: AppSizes.p8),
+            CustomText(
               l10n.postShareRecentChats,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
+              variant: TextVariant.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSizes.p6),
             Expanded(child: _buildFriendSearchList(l10n)),
             if (_selected.isNotEmpty) _buildSendButton(l10n, compact: true),
           ],
@@ -595,15 +637,58 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
 
   Widget _horizontalActions(List<_CircleAction> actions) {
     return SizedBox(
-      height: 88,
+      height: 92,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
         itemCount: actions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final action = actions[index];
           return _CircleActionButton(action: action);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSendToRow(AppLocalizations l10n) {
+    final people = _horizontalPeople;
+    final itemCount = _loadingPeople ? 0 : people.length;
+
+    if (_loadingPeople) {
+      return const SizedBox(
+        height: 92,
+        child: Center(child: CustomLoadingWidget(size: 36)),
+      );
+    }
+
+    if (people.isEmpty) {
+      return SizedBox(
+        height: 92,
+        child: Center(
+          child: CustomText(
+            l10n.postShareNoUsers,
+            variant: TextVariant.muted,
+            fontSize: 12,
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 92,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: itemCount,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final user = people[index];
+          return _FriendShareAvatar(
+            user: user,
+            selected: _selected.contains(user.id),
+            sent: _sentTo.contains(user.id),
+            onTap: () => _toggleUser(user),
+          );
         },
       ),
     );
@@ -627,14 +712,14 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
 
     final actions =
         PostOptionsActions(widget.hostContext ?? context, widget.post);
-    final appActions = _buildAppActions(l10n);
+    final externalActions = _buildExternalShareActions(l10n);
     final optionActions = _buildOptionActions(actions);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSizes.p12,
+        AppSizes.p16,
         0,
-        AppSizes.p12,
+        AppSizes.p16,
         AppSizes.p8,
       ),
       child: Column(
@@ -648,43 +733,18 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               onPressed: _openSearchMode,
-              icon: Icon(LucideIcons.search, size: 20, color: onSurface),
+              icon: Icon(LucideIcons.search, size: 22, color: onSurface),
             ),
           ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 88,
-            child: _loadingPeople
-                ? const Center(child: CustomLoadingWidget(size: 36))
-                : _horizontalPeople.isEmpty
-                ? Center(
-                    child: Text(
-                      l10n.postShareNoUsers,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
-                    ),
-                  )
-                : ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _horizontalPeople.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final user = _horizontalPeople[index];
-                      return _FriendShareAvatar(
-                        user: user,
-                        selected: _selected.contains(user.id),
-                        sent: _sentTo.contains(user.id),
-                        onTap: () => _toggleUser(user),
-                      );
-                    },
-                  ),
-          ),
+          const SizedBox(height: 10),
+          // Row 1 — friends (Send to)
+          _buildSendToRow(l10n),
           if (_selected.isNotEmpty) _buildSendButton(l10n, compact: true),
-          const SizedBox(height: 8),
-          _horizontalActions(appActions),
-          const SizedBox(height: 6),
+          const SizedBox(height: 14),
+          // Row 2 — Repost + external apps
+          _horizontalActions(externalActions),
+          const SizedBox(height: 10),
+          // Row 3 — in-app actions
           _horizontalActions(optionActions),
         ],
       ),
@@ -716,8 +776,6 @@ class _FriendSearchRow extends StatelessWidget {
     return user.isFollowing && user.isFollowedBy;
   }
 
-  static const _onlineGreen = Color(0xFF22C55E);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -732,7 +790,7 @@ class _FriendSearchRow extends StatelessWidget {
       child: InkWell(
         onTap: sent ? null : onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
           child: Row(
             children: [
               Stack(
@@ -751,7 +809,7 @@ class _FriendSearchRow extends StatelessWidget {
                         width: 12,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: _onlineGreen,
+                          color: cs.tertiary,
                           shape: BoxShape.circle,
                           border: Border.all(color: cs.surface, width: 1.5),
                         ),
@@ -871,6 +929,8 @@ class _CircleAction {
     this.icon,
     this.iconColor,
     this.assetPath,
+    this.assetSize = 24,
+    this.clipAssetToCircle = false,
   });
 
   final String label;
@@ -879,6 +939,8 @@ class _CircleAction {
   final IconData? icon;
   final Color? iconColor;
   final String? assetPath;
+  final double assetSize;
+  final bool clipAssetToCircle;
 }
 
 class _CircleActionButton extends StatelessWidget {
@@ -886,60 +948,67 @@ class _CircleActionButton extends StatelessWidget {
 
   final _CircleAction action;
 
+  Widget _buildAssetIcon(_CircleAction action) {
+    Widget svg = SvgPicture.asset(
+      action.assetPath!,
+      width: action.assetSize,
+      height: action.assetSize,
+      fit: BoxFit.cover,
+      colorFilter: action.iconColor != null
+          ? ColorFilter.mode(action.iconColor!, BlendMode.srcIn)
+          : null,
+    );
+    if (action.clipAssetToCircle) {
+      return ClipOval(child: svg);
+    }
+    return svg;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
-    final labelStyle = theme.textTheme.labelSmall?.copyWith(
-      color: onSurface.withValues(alpha: 0.85),
-      fontWeight: FontWeight.w600,
-      height: 1.2,
-    );
+    final cs = theme.colorScheme;
 
     return SizedBox(
-      width: 60,
+      width: 64,
       child: InkWell(
         onTap: action.onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: action.background,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
+              clipBehavior: Clip.antiAlias,
               child: action.assetPath != null
-                  ? SvgPicture.asset(
-                      action.assetPath!,
-                      width: 22,
-                      height: 22,
-                      colorFilter: action.iconColor != null
-                          ? ColorFilter.mode(
-                              action.iconColor!,
-                              BlendMode.srcIn,
-                            )
-                          : null,
-                    )
+                  ? _buildAssetIcon(action)
                   : Icon(
                       action.icon,
-                      size: 20,
-                      color: action.iconColor ?? onSurface,
+                      size: 22,
+                      color: action.iconColor ?? cs.onSurface,
                     ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSizes.p6),
             SizedBox(
-              height: 26,
-              width: 60,
+              height: 28,
+              width: 64,
               child: Text(
                 action.label,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: labelStyle?.copyWith(fontSize: 10),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  height: 1.15,
+                ),
               ),
             ),
           ],
@@ -975,7 +1044,7 @@ class _FriendShareAvatar extends StatelessWidget {
     final badgeBorder = cs.surface;
 
     return SizedBox(
-      width: 56,
+      width: 64,
       child: InkWell(
         onTap: sent ? null : onTap,
         borderRadius: BorderRadius.circular(12),
@@ -994,7 +1063,7 @@ class _FriendShareAvatar extends StatelessWidget {
                   SafeNetworkAvatar(
                     imageUrl: user.avatarUrl,
                     fallbackText: user.displayName,
-                    radius: 21,
+                    radius: 24,
                   ),
                   if (selected || sent)
                     Positioned(
@@ -1017,19 +1086,19 @@ class _FriendShareAvatar extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             SizedBox(
-              height: 24,
-              width: 56,
+              height: 26,
+              width: 64,
               child: Text(
                 user.displayName,
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: cs.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 10,
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
                   height: 1.15,
                 ),
               ),

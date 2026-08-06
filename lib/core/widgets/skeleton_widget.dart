@@ -92,9 +92,7 @@ class FeedSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = HomeLayoutConstants.feedPostBottomPadding;
-    // Same rule as VideoPostWidget: actions on the right in Arabic, left in English.
-    final actionsOnRight =
-        Localizations.localeOf(context).languageCode == 'ar';
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     return ColoredBox(
       color: _background,
@@ -128,61 +126,55 @@ class FeedSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            // Side actions — same side as live posts for the current language.
-            Positioned(
-              right: actionsOnRight ? _actionColumnInset : null,
-              left: actionsOnRight ? null : _actionColumnInset,
+            // Side actions — end side follows locale (LTR: right, RTL: left).
+            Positioned.directional(
+              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+              end: _actionColumnInset,
               bottom: bottom + 20,
-              child: Column(
-                crossAxisAlignment: actionsOnRight
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SkeletonWidget.circular(
+                  SkeletonWidget.circular(
                     size: _profileAvatarSize,
                     onBlackBackground: true,
                   ),
-                  const SizedBox(height: 22),
-                  const SkeletonWidget.circular(
+                  SizedBox(height: 22),
+                  SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  const SizedBox(height: _actionSpacing),
-                  const SkeletonWidget.circular(
+                  SizedBox(height: _actionSpacing),
+                  SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  const SizedBox(height: _actionSpacing),
-                  const SkeletonWidget.circular(
+                  SizedBox(height: _actionSpacing),
+                  SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  const SizedBox(height: _actionSpacing),
-                  const SkeletonWidget.circular(
+                  SizedBox(height: _actionSpacing),
+                  SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  const SizedBox(height: _actionSpacing),
-                  const SkeletonWidget.circular(
+                  SizedBox(height: _actionSpacing),
+                  SkeletonWidget.circular(
                     size: _musicDiscSize,
                     onBlackBackground: true,
                   ),
                 ],
               ),
             ),
-            // Caption / sound block — clears the action column on the correct side.
+            // Caption / sound block — start side follows locale.
             Positioned(
               left: 0,
               right: 0,
               bottom: bottom,
               child: Padding(
-                padding: EdgeInsets.only(
-                  left: actionsOnRight
-                      ? _contentEdgeInset
-                      : _contentActionSidePadding,
-                  right: actionsOnRight
-                      ? _contentActionSidePadding
-                      : _contentEdgeInset,
+                padding: EdgeInsetsDirectional.only(
+                  start: _contentEdgeInset,
+                  end: _contentActionSidePadding,
                 ),
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

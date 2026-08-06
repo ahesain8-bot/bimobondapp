@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/get_feed_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as posts_di;
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
@@ -272,7 +273,9 @@ class _EndedAuctionsScreenState extends State<EndedAuctionsScreen> {
 
   void _openAuction(AuctionItem item) {
     final post = item.post;
-    if (post != null) openPost(context, post);
+    if (post != null) {
+      openPost(context, post, trafficSource: TrafficSource.live);
+    }
   }
 
   @override

@@ -19,6 +19,7 @@ import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart
 import 'package:bimobondapp/app/posts/domain/entities/post_auction_display_utils.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -78,12 +79,20 @@ class LiveDetailsScreen extends StatefulWidget {
   /// Real auction UUID when known from navigation (never the post id).
   final String? auctionId;
 
+  /// Discovery surface for post view tracking — see [TrafficSource].
+  final String trafficSource;
+
+  /// When embedded in a vertical PageView, only the visible page should track.
+  final bool isActive;
+
   const LiveDetailsScreen({
     super.key,
     this.index = 0,
     this.post,
     this.embeddedInFeed = false,
     this.auctionId,
+    this.trafficSource = TrafficSource.live,
+    this.isActive = true,
   });
 
   @override
@@ -467,7 +476,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     }
 
     _syncAuctionFinishedState();
-    _recordPostViewIfNeeded();
+    if (widget.isActive) {
+      _startPostViewWatchTracking();
+    }
     unawaited(_startAuctionRealtime());
     unawaited(_loadRecommendedSmallGifts());
     if (_isAuctionPost) {
@@ -1291,10 +1302,131 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     );
   }
 
-  void _recordPostViewIfNeeded() {
+  DateTime? _viewWatchStartedAt;
+  int _accumulatedWatchMs = 0;
+  bool _viewWatchTracking = false;
+  bool _viewEligible = false;
+  bool _viewRecorded = false;
+  Timer? _viewEligibleTimer;
+
+  static const _viewMinVisible = Duration(milliseconds: 1000);
+
+  void _startPostViewWatchTracking() {
     final post = widget.post;
-    if (post == null || post.isStory) return;
-    PostViewRecorder.recordIfNeeded(postId: post.id, isOwner: _isPostOwner());
+    if (post == null || post.isStory || _viewRecorded) return;
+    if (!widget.isActive) return;
+    if (_isPostOwnerCached()) return;
+
+    if (!_viewWatchTracking) {
+      _viewWatchTracking = true;
+      _viewWatchStartedAt = DateTime.now();
+    }
+    _scheduleViewEligibleTimer();
+  }
+
+  void _scheduleViewEligibleTimer() {
+    _viewEligibleTimer?.cancel();
+    if (_viewEligible || _viewRecorded) return;
+    final remaining = _viewMinVisible.inMilliseconds - _watchedDurationMs();
+    if (remaining <= 0) {
+      _viewEligible = true;
+      return;
+    }
+    _viewEligibleTimer = Timer(Duration(milliseconds: remaining), () {
+      if (!mounted) return;
+      _viewEligible = true;
+    });
+  }
+
+  void _pausePostViewWatchTracking() {
+    _viewEligibleTimer?.cancel();
+    _viewEligibleTimer = null;
+    if (!_viewWatchTracking) return;
+    final started = _viewWatchStartedAt;
+    if (started != null) {
+      final elapsed = DateTime.now().difference(started).inMilliseconds;
+      if (elapsed > 0) _accumulatedWatchMs += elapsed;
+    }
+    _viewWatchStartedAt = null;
+    _viewWatchTracking = false;
+  }
+
+  int _watchedDurationMs() {
+    var total = _accumulatedWatchMs;
+    final started = _viewWatchStartedAt;
+    if (_viewWatchTracking && started != null) {
+      final elapsed = DateTime.now().difference(started).inMilliseconds;
+      if (elapsed > 0) total += elapsed;
+    }
+    return total;
+  }
+
+  int _watchedDurationSeconds() {
+    final ms = _watchedDurationMs();
+    if (ms <= 0) return 0;
+    final seconds = ms ~/ 1000;
+    return seconds > 0 ? seconds : 1;
+  }
+
+  bool? _cachedIsOwner;
+
+  bool _isPostOwnerCached() {
+    try {
+      _cachedIsOwner ??= _isPostOwner();
+    } catch (_) {
+      _cachedIsOwner ??= false;
+    }
+    return _cachedIsOwner!;
+  }
+
+  void _flushPostView({
+    String? postId,
+    String? trafficSource,
+  }) {
+    final post = widget.post;
+    if ((post == null || post.isStory) && postId == null) return;
+    _pausePostViewWatchTracking();
+
+    final watchedMs = _watchedDurationMs();
+    final eligible =
+        _viewEligible || watchedMs >= _viewMinVisible.inMilliseconds;
+    if (!eligible || _viewRecorded) {
+      if (!_viewRecorded && widget.isActive && mounted) {
+        _startPostViewWatchTracking();
+      }
+      return;
+    }
+
+    final id = (postId ?? post?.id ?? '').trim();
+    if (id.isEmpty) return;
+
+    final campaignId = (post != null && (post.isPromoted || post.isAd))
+        ? post.promotion?.id
+        : null;
+
+    PostViewRecorder.recordIfNeeded(
+      postId: id,
+      isOwner: postId == null ? _isPostOwnerCached() : false,
+      watchedDuration: _watchedDurationSeconds(),
+      campaignId: (campaignId != null && campaignId.isNotEmpty)
+          ? campaignId
+          : null,
+      trafficSource: trafficSource ?? widget.trafficSource,
+    );
+    _viewRecorded = true;
+    _viewEligible = false;
+    _accumulatedWatchMs = 0;
+  }
+
+  void _resetPostViewWatchSession() {
+    _viewEligibleTimer?.cancel();
+    _viewEligibleTimer = null;
+    _viewWatchTracking = false;
+    _viewWatchStartedAt = null;
+    _accumulatedWatchMs = 0;
+    _viewEligible = false;
+    _viewRecorded = false;
+    _cachedIsOwner = null;
   }
 
   @override
@@ -1302,21 +1434,37 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     super.didUpdateWidget(oldWidget);
     final prevPostId = oldWidget.post?.id;
     final nextPostId = widget.post?.id;
-    if (prevPostId != nextPostId && nextPostId != null) {
-      _stopAuctionRealtime();
-      unawaited(_startAuctionRealtime());
-      _commentsBloc?.add(
-        FetchCommentsRequested(
-          postId: nextPostId,
-          isRefresh: true,
-          sort: 'oldest',
-        ),
-      );
-      _isAuctionFinished = false;
-      _syncAuctionFinishedState();
-      if (!_isAuctionFinished && !_pulseController.isAnimating) {
-        _pulseController.repeat(reverse: true);
+    if (prevPostId != nextPostId) {
+      if (prevPostId != null) {
+        _flushPostView(
+          postId: prevPostId,
+          trafficSource: oldWidget.trafficSource,
+        );
       }
+      _resetPostViewWatchSession();
+      if (nextPostId != null) {
+        _stopAuctionRealtime();
+        unawaited(_startAuctionRealtime());
+        _commentsBloc?.add(
+          FetchCommentsRequested(
+            postId: nextPostId,
+            isRefresh: true,
+            sort: 'oldest',
+          ),
+        );
+        _isAuctionFinished = false;
+        _syncAuctionFinishedState();
+        if (!_isAuctionFinished && !_pulseController.isAnimating) {
+          _pulseController.repeat(reverse: true);
+        }
+        if (widget.isActive) {
+          _startPostViewWatchTracking();
+        }
+      }
+    } else if (widget.isActive && !oldWidget.isActive) {
+      _startPostViewWatchTracking();
+    } else if (!widget.isActive && oldWidget.isActive) {
+      _flushPostView();
     }
 
     final prevTotal = oldWidget.post?.auction?.currentTotalCoins;
@@ -1360,6 +1508,8 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
   @override
   void dispose() {
+    _flushPostView();
+    _viewEligibleTimer?.cancel();
     _stopAuctionRealtime();
     _audioGiftChipSession.dispose();
     _chatController.dispose();

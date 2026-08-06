@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/posts/presentation/pages/profile_posts_viewer_sc
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/pages/sound_detail_screen.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
@@ -134,6 +135,7 @@ Future<void> openSoundPostsViewer(
     source: ProfilePostsViewerSource.userPosts,
     page: 1,
     hasReachedMax: true,
+    trafficSourceOverride: PostTrafficSource.sound,
   );
 
   // Must use the same navigator as sound detail, otherwise GoRouter pushes

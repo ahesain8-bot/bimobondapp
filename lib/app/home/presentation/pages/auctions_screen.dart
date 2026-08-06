@@ -27,6 +27,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dar
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as posts_di;
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/locale_format_utils.dart';
@@ -469,7 +470,12 @@ class AuctionsScreenState extends State<AuctionsScreen> {
     final post = item.post;
     final auctionId = item.auctionId?.trim();
     if (post != null) {
-      openPost(context, post, auctionId: auctionId);
+      openPost(
+        context,
+        post,
+        auctionId: auctionId,
+        trafficSource: TrafficSource.live,
+      );
       return;
     }
     final postId = item.id;
@@ -478,7 +484,12 @@ class AuctionsScreenState extends State<AuctionsScreen> {
     if (!mounted) return;
     result.fold(
       (failure) => PopupDialogs.showErrorDialog(context, failure.message),
-      (loaded) => openPost(context, loaded, auctionId: auctionId),
+      (loaded) => openPost(
+        context,
+        loaded,
+        auctionId: auctionId,
+        trafficSource: TrafficSource.live,
+      ),
     );
   }
 

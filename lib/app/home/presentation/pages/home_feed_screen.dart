@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
+import 'package:bimobondapp/app/home/presentation/utils/post_owner_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
@@ -28,6 +29,7 @@ import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/core/navigation/feed_navigation.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -59,17 +61,29 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   final FeedMediaPreloader _mediaPreloader = FeedMediaPreloader();
   bool _didRunPostFeedBootstrap = false;
 
+  /// Distinct posts viewed this session — used for every-N interest prompt.
+  final Set<String> _sessionViewedPostIds = <String>{};
+  String? _interestPromptPostId;
+
   FeedVideoProgressNotifier get feedVideoProgress => _feedVideoProgress;
 
   Listenable get bottomChromeListenable => _bottomChromeRevision;
 
+  bool get _showInterestPrompt {
+    if (_interestPromptPostId == null || _feedItems.isEmpty) return false;
+    final current =
+        _feedItems[_currentPostIndex.clamp(0, _feedItems.length - 1)];
+    return current.post.id == _interestPromptPostId;
+  }
+
   double feedMediaBottomInset(BuildContext context, PostEntity post) {
-    if (post.isAuctionable) {
-      return FeedVideoPostsViewerLayout.homeFeedBottomNavReservedHeight(
-        context,
-      );
+    final base =
+        FeedVideoPostsViewerLayout.homeFeedBottomNavReservedHeight(context);
+    if (post.isAuctionable) return base;
+    if (_showInterestPrompt && post.id == _interestPromptPostId) {
+      return base + HomeLayoutConstants.feedInterestPromptHeight;
     }
-    return FeedVideoPostsViewerLayout.homeFeedBottomNavReservedHeight(context);
+    return base;
   }
 
   void _notifyBottomChromeLayout() => _bottomChromeRevision.value++;
@@ -127,6 +141,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       _feedErrorMessage = null;
       _awaitingInitialFeed = true;
       _feedItems.clear();
+      _interestPromptPostId = null;
     });
     _feedVideoProgress.reset();
     _notifyBottomChromeLayout();
@@ -199,6 +214,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       _awaitingInitialFeed = true;
       _feedLoadFailed = false;
       _feedErrorMessage = null;
+      _interestPromptPostId = null;
     });
     _feedVideoProgress.reset();
     if (_pageController.hasClients) {
@@ -255,7 +271,10 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
     if (_feedItems.isEmpty) return;
 
     _feedVideoProgress.reset();
-    setState(() => _currentPostIndex = index);
+    setState(() {
+      _currentPostIndex = index;
+      _updateInterestPromptForIndex(index);
+    });
     _notifyBottomChromeLayout();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -270,6 +289,53 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
     if (index >= threshold) {
       _loadMorePosts();
     }
+  }
+
+  void _updateInterestPromptForIndex(int index) {
+    if (_feedItems.isEmpty) return;
+    final post = _feedItems[index.clamp(0, _feedItems.length - 1)].post;
+
+    // Hide when leaving a prompted post without answering.
+    if (_interestPromptPostId != null && _interestPromptPostId != post.id) {
+      _interestPromptPostId = null;
+    }
+
+    if (post.isAuctionable || isCurrentUserPostOwner(context, post)) {
+      return;
+    }
+
+    final isFirstView = _sessionViewedPostIds.add(post.id);
+    if (!isFirstView) return;
+
+    final every = HomeLayoutConstants.feedInterestPromptEveryNPosts;
+    if (_sessionViewedPostIds.length % every == 0) {
+      _interestPromptPostId = post.id;
+    }
+  }
+
+  void _dismissInterestPrompt() {
+    if (_interestPromptPostId == null) return;
+    setState(() => _interestPromptPostId = null);
+    _notifyBottomChromeLayout();
+  }
+
+  void _onInterestPromptYes() {
+    final l10n = AppLocalizations.of(context)!;
+    _dismissInterestPrompt();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.feedInterestPromptThanks)),
+    );
+  }
+
+  void _onInterestPromptNo() {
+    final postId = _interestPromptPostId;
+    if (postId == null) return;
+    final l10n = AppLocalizations.of(context)!;
+    _dismissInterestPrompt();
+    context.read<PostsBloc>().add(HidePostFromFeedEvent(postId));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.postNotInterestedApplied)),
+    );
   }
 
   void _handlePostsState(BuildContext context, PostsState state) {
@@ -289,6 +355,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
         _nextCursor = state.nextCursor;
         if (isFirstPage) {
           _currentPostIndex = 0;
+          _updateInterestPromptForIndex(0);
         } else if (_currentPostIndex >= _feedItems.length) {
           _currentPostIndex = _feedItems.length - 1;
         }
@@ -347,6 +414,9 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
       );
     } else if (state is PostHiddenFromFeedState) {
       setState(() {
+        if (_interestPromptPostId == state.postId) {
+          _interestPromptPostId = null;
+        }
         final index = _feedItems.indexWhere(
           (item) => item.post.id == state.postId,
         );
@@ -362,6 +432,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
           }
         }
       });
+      _notifyBottomChromeLayout();
     } else if (state is PostsFailure) {
       // Ignore unrelated PostsBloc failures (likes, stories, profile grids, etc.).
       final isFeedInitialFailure =
@@ -490,6 +561,11 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
                     bottomChromeListenable: bottomChromeListenable,
                     mediaBottomInsetFor: feedMediaBottomInset,
                     onFeedPostPatch: patchFeedPost,
+                    trafficSource: _selectedFeedTab.trafficSource,
+                    showInterestPrompt: _showInterestPrompt,
+                    onInterestPromptYes: _onInterestPromptYes,
+                    onInterestPromptNo: _onInterestPromptNo,
+                    onInterestPromptDismiss: _dismissInterestPrompt,
                   ),
                 ),
               ),

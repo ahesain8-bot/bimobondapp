@@ -27,6 +27,7 @@ import 'package:bimobondapp/app/posts/presentation/pages/post_detail_screen.dart
 import 'package:bimobondapp/app/posts/presentation/pages/profile_posts_viewer_screen.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/profile_posts_navigation.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/add_post_camera_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
@@ -278,12 +279,14 @@ class AppRouter {
               auctionId: auctionId != null && auctionId.isNotEmpty
                   ? auctionId
                   : null,
+              trafficSource: args.trafficSource,
             );
           }
           return PostDetailScreen(
             post: args.post,
             openCommentsOnLoad: args.openComments,
             highlightCommentId: args.highlightCommentId,
+            trafficSource: args.trafficSource,
           );
         },
       ),
@@ -430,10 +433,14 @@ class AppRouter {
           final index = extra?['index'] as int? ?? 0;
           final post = extra?['post'] as PostEntity?;
           final auctionId = extra?['auctionId']?.toString();
+          final trafficSource = extra?['trafficSource']?.toString();
           return LiveDetailsScreen(
             index: index,
             post: post,
             auctionId: auctionId,
+            trafficSource: (trafficSource != null && trafficSource.isNotEmpty)
+                ? trafficSource
+                : TrafficSource.live,
           );
         },
       ),

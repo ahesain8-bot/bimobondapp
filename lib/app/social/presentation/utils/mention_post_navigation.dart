@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_mention_entity.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:flutter/material.dart';
 
@@ -23,6 +24,7 @@ Future<void> openMentionPost(
           highlightCommentId != null && highlightCommentId.isNotEmpty
               ? highlightCommentId
               : null,
+      trafficSource: TrafficSource.notification,
     );
     return;
   }
@@ -35,6 +37,7 @@ Future<void> openMentionPost(
         highlightCommentId != null && highlightCommentId.isNotEmpty
             ? highlightCommentId
             : null,
+    trafficSource: TrafficSource.notification,
   );
 }
 

@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/posts/domain/repositories/posts_repository.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:dartz/dartz.dart';
@@ -16,6 +17,7 @@ class RecordPostViewUseCase implements UseCase<int, RecordPostViewParams> {
       params.postId,
       watchedDuration: params.watchedDuration,
       campaignId: params.campaignId,
+      trafficSource: params.trafficSource,
     );
   }
 }
@@ -25,6 +27,7 @@ class RecordPostViewParams extends Equatable {
     required this.postId,
     this.watchedDuration,
     this.campaignId,
+    this.trafficSource = TrafficSource.forYou,
   });
 
   final String postId;
@@ -35,6 +38,9 @@ class RecordPostViewParams extends Equatable {
   /// Required for promoted/ad feed impressions (`promotion.id`).
   final String? campaignId;
 
+  /// See [TrafficSource] — UPPER_SNAKE_CASE discovery surface.
+  final String trafficSource;
+
   @override
-  List<Object?> get props => [postId, watchedDuration, campaignId];
+  List<Object?> get props => [postId, watchedDuration, campaignId, trafficSource];
 }

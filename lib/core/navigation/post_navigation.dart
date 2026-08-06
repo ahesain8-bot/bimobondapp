@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
     as posts_di;
 import 'package:bimobondapp/app/posts/presentation/pages/post_detail_screen.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -17,11 +18,13 @@ class PostOpenArgs {
     required this.post,
     this.openComments = false,
     this.highlightCommentId,
+    this.trafficSource = TrafficSource.other,
   });
 
   final PostEntity post;
   final bool openComments;
   final String? highlightCommentId;
+  final String trafficSource;
 }
 
 PostOpenArgs? postOpenArgsFromExtra(Object? extra) {
@@ -44,6 +47,7 @@ void openStoryOrPost(
   PostEntity post, {
   bool openComments = false,
   String? highlightCommentId,
+  String trafficSource = TrafficSource.other,
 }) {
   if (post.isStory) {
     openStoryViewer(context, post);
@@ -54,6 +58,7 @@ void openStoryOrPost(
     post,
     openComments: openComments,
     highlightCommentId: highlightCommentId,
+    trafficSource: trafficSource,
   );
 }
 
@@ -91,6 +96,7 @@ void openPost(
   bool openComments = false,
   String? highlightCommentId,
   String? auctionId,
+  String trafficSource = TrafficSource.other,
 }) {
   // Stop catalog/detail sound preview so it doesn't play under the post.
   SoundAudioPreview.stop();
@@ -99,22 +105,30 @@ void openPost(
     post: post,
     openComments: openComments,
     highlightCommentId: highlightCommentId,
+    trafficSource: trafficSource,
   );
 
-  final resolvedAuctionId =
-      auctionId?.trim().isNotEmpty == true
-          ? auctionId!.trim()
-          : post.auction?.id?.trim();
+  final resolvedAuctionId = auctionId?.trim().isNotEmpty == true
+      ? auctionId!.trim()
+      : post.auction?.id?.trim();
 
   // Sound detail (and similar) sit on an imperative fullscreen route. Pushing
   // via GoRouter would open the post underneath that overlay.
   if (_isOnImperativeOverlay(context)) {
+    final resolvedSource = trafficSource == TrafficSource.other
+        ? TrafficSource.sound
+        : trafficSource;
     final page = post.isAuctionable
-        ? LiveDetailsScreen(post: post, auctionId: resolvedAuctionId)
+        ? LiveDetailsScreen(
+            post: post,
+            auctionId: resolvedAuctionId,
+            trafficSource: resolvedSource,
+          )
         : PostDetailScreen(
             post: post,
             openCommentsOnLoad: openComments,
             highlightCommentId: highlightCommentId,
+            trafficSource: resolvedSource,
           );
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(builder: (_) => page),
@@ -129,6 +143,7 @@ void openPost(
         'post': post,
         if (resolvedAuctionId != null && resolvedAuctionId.isNotEmpty)
           'auctionId': resolvedAuctionId,
+        'trafficSource': trafficSource,
       },
     );
     return;
@@ -142,6 +157,7 @@ Future<void> openPostById(
   String postId, {
   bool openComments = false,
   String? highlightCommentId,
+  String trafficSource = TrafficSource.other,
 }) async {
   final id = postId.trim();
   if (id.isEmpty) return;
@@ -164,6 +180,7 @@ Future<void> openPostById(
       post,
       openComments: openComments,
       highlightCommentId: highlightCommentId,
+      trafficSource: trafficSource,
     ),
   );
 }

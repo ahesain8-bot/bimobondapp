@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +11,23 @@ enum ProfilePostsViewerSource {
   ownLiked,
   ownSaved,
   userPosts,
+}
+
+extension ProfilePostsViewerSourceX on ProfilePostsViewerSource {
+  String get trafficSource {
+    switch (this) {
+      case ProfilePostsViewerSource.ownLiked:
+        return TrafficSource.liked;
+      case ProfilePostsViewerSource.ownSaved:
+        return TrafficSource.saved;
+      case ProfilePostsViewerSource.ownReposts:
+        return TrafficSource.repost;
+      case ProfilePostsViewerSource.ownPosts:
+      case ProfilePostsViewerSource.ownOnlyMe:
+      case ProfilePostsViewerSource.userPosts:
+        return TrafficSource.profile;
+    }
+  }
 }
 
 ProfilePostsViewerSource profilePostsSourceForTab(int tabIndex) {
@@ -35,6 +53,7 @@ class ProfilePostsOpenArgs {
     required this.page,
     required this.hasReachedMax,
     this.userId,
+    this.trafficSourceOverride,
   });
 
   final List<PostEntity> posts;
@@ -43,6 +62,12 @@ class ProfilePostsOpenArgs {
   final int page;
   final bool hasReachedMax;
   final String? userId;
+
+  /// When set (e.g. sound detail), overrides [source.trafficSource].
+  final String? trafficSourceOverride;
+
+  String get trafficSource =>
+      trafficSourceOverride ?? source.trafficSource;
 }
 
 ProfilePostsOpenArgs? profilePostsOpenArgsFromExtra(Object? extra) {

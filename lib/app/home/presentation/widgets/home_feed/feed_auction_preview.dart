@@ -14,6 +14,7 @@ import 'package:bimobondapp/app/posts/domain/entities/post_auction_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -127,6 +128,7 @@ class FeedAuctionPreview extends StatelessWidget {
     required this.post,
     this.bottomPadding = HomeLayoutConstants.feedPostBottomPadding,
     this.feedTopBarClearance,
+    this.trafficSource = TrafficSource.forYou,
     super.key,
   });
 
@@ -134,6 +136,7 @@ class FeedAuctionPreview extends StatelessWidget {
   final double bottomPadding;
   /// Extra top inset so the Active badge clears the feed Following/search bar.
   final double? feedTopBarClearance;
+  final String trafficSource;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +158,11 @@ class FeedAuctionPreview extends StatelessWidget {
             HomeLayoutConstants.feedTopBarBottomGap);
 
     return GestureDetector(
-      onTap: () => openPost(context, post),
+      onTap: () => openPost(
+        context,
+        post,
+        trafficSource: trafficSource,
+      ),
       behavior: HitTestBehavior.opaque,
       child: ColoredBox(
         color: Colors.black,

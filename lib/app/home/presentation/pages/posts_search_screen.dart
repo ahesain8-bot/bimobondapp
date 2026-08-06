@@ -26,6 +26,7 @@ import 'package:bimobondapp/core/navigation/hashtag_navigation.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
@@ -613,7 +614,11 @@ class _PostsSearchScreenState extends State<PostsSearchScreen> {
                   final post = _posts[index];
                   return SearchPostResultTile(
                     post: post,
-                    onTap: () => openPost(context, post),
+                    onTap: () => openPost(
+                      context,
+                      post,
+                      trafficSource: TrafficSource.search,
+                    ),
                   );
                 },
                 childCount: _posts.length,

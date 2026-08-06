@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/notifications/domain/entities/notification_entity.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_admin_helper.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +31,18 @@ Future<void> navigateFromNotification(
       final postId = notification.postId ?? notification.post?.id;
       if (postId == null || postId.isEmpty) return;
       if (post != null) {
-        openPost(context, post);
+        openPost(
+          context,
+          post,
+          trafficSource: TrafficSource.notification,
+        );
         return;
       }
-      await openPostById(context, postId);
+      await openPostById(
+        context,
+        postId,
+        trafficSource: TrafficSource.notification,
+      );
       return;
     case 'COMMENT_REPLY':
     case 'COMMENT_LIKE':
@@ -49,6 +58,7 @@ Future<void> navigateFromNotification(
           post,
           openComments: true,
           highlightCommentId: commentId,
+          trafficSource: TrafficSource.notification,
         );
         return;
       }
@@ -57,6 +67,7 @@ Future<void> navigateFromNotification(
         postId,
         openComments: true,
         highlightCommentId: commentId,
+        trafficSource: TrafficSource.notification,
       );
       return;
     case 'NEW_FOLLOWER':
@@ -77,11 +88,23 @@ Future<void> navigateFromNotification(
     case 'AUCTION_UPDATE':
       final auctionId = notification.data?['auctionId']?.toString();
       if (post != null && post.isAuctionable) {
-        context.pushNamed('live_details', extra: {'post': post});
+        context.pushNamed(
+          'live_details',
+          extra: {
+            'post': post,
+            'trafficSource': TrafficSource.notification,
+          },
+        );
         return;
       }
       if (auctionId != null && auctionId.isNotEmpty) {
-        context.pushNamed('live_details', extra: {'auctionId': auctionId});
+        context.pushNamed(
+          'live_details',
+          extra: {
+            'auctionId': auctionId,
+            'trafficSource': TrafficSource.notification,
+          },
+        );
       }
       return;
     case 'ADMIN_MESSAGE':

@@ -43,6 +43,7 @@ class AppAssets {
 
   static const String shareMessengerIcon = '$iconsPath/share_messenger.svg';
   static const String shareFacebookIcon = '$iconsPath/share_facebook.svg';
+  static const String shareInstagramIcon = '$iconsPath/share_instagram.svg';
   static const String shareWhatsAppIcon = '$iconsPath/share_whatsapp.svg';
   static const String shareTelegramIcon = '$iconsPath/share_telegram.svg';
   static const String shareXIcon = '$iconsPath/share_x.svg';

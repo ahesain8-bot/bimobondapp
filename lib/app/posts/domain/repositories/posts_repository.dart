@@ -105,6 +105,7 @@ abstract class PostsRepository {
     String postId, {
     int? watchedDuration,
     String? campaignId,
+    String? trafficSource,
   });
   Future<Either<Failure, bool>> toggleSave(String postId);
   Future<Either<Failure, bool>> toggleRepost(String postId, {String? quote});

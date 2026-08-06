@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_w
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/widgets/custom_app_bar.dart';
 import 'package:bimobondapp/core/widgets/directional_back_icon.dart';
 import 'package:flutter/material.dart';
@@ -16,12 +17,14 @@ class PostDetailScreen extends StatefulWidget {
   final PostEntity post;
   final bool openCommentsOnLoad;
   final String? highlightCommentId;
+  final String trafficSource;
 
   const PostDetailScreen({
     super.key,
     required this.post,
     this.openCommentsOnLoad = false,
     this.highlightCommentId,
+    this.trafficSource = TrafficSource.other,
   });
 
   @override
@@ -94,6 +97,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                 openCommentsOnLoad: widget.openCommentsOnLoad,
                 highlightCommentId: widget.highlightCommentId,
+                trafficSource: widget.trafficSource,
               ),
               const Positioned.fill(child: FeedVideoScrubTimeOverlay()),
               if (showProgressBar || showSearchRow)

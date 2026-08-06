@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 48 48">
-  <path fill="#448AFF" d="M24,4C13.5,4,5,12.1,5,22c0,5.2,2.3,9.8,6,13.1V44l7.8-4.7c1.6,0.4,3.4,0.7,5.2,0.7c10.5,0,19-8.1,19-18C43,12.1,34.5,4,24,4z"/>
-  <path fill="#FFF" d="M12 28L22 17 27 22 36 17 26 28 21 23z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="messenger_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5AD0FF"/>
+      <stop offset="50%" stop-color="#4A9BFF"/>
+      <stop offset="100%" stop-color="#9B6BE8"/>
+    </linearGradient>
+  </defs>
+  <circle cx="24" cy="24" r="24" fill="url(#messenger_grad)"/>
+  <path
+    fill="#FFFFFF"
+    d="M24 10.5C16.54 10.5 10.5 15.95 10.5 22.7c0 3.9 1.95 7.37 5 9.7V37.5l4.55-2.5c1.25.35 2.58.53 3.95.53 7.46 0 13.5-5.45 13.5-12.2S31.46 10.5 24 10.5zm1.35 16.4l-3.45-3.68-6.73 3.68 7.4-7.85 3.53 3.68 6.65-3.68-7.4 7.85z"
+  />
 </svg>

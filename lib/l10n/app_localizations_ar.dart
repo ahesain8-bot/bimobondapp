@@ -1549,6 +1549,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postOptionNotInterested => 'غير مهتم';
 
   @override
+  String get feedInterestPromptQuestion => 'هل يهمك هذا النوع من المحتوى؟';
+
+  @override
+  String get feedInterestPromptYes => 'نعم';
+
+  @override
+  String get feedInterestPromptNo => 'لا';
+
+  @override
+  String get feedInterestPromptThanks => 'شكرًا — سنعرض محتوى مشابه أكثر';
+
+  @override
   String get postOptionDownload => 'تنزيل';
 
   @override
@@ -1642,6 +1654,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postShareFacebook => 'فيسبوك';
 
   @override
+  String get postShareInstagram => 'إنستغرام';
+
+  @override
   String get postShareWhatsApp => 'واتساب';
 
   @override
@@ -1661,6 +1676,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get postShareMore => 'المزيد';
+
+  @override
+  String get postOptionCast => 'البث';
+
+  @override
+  String get postShareInstagramHint => 'تم نسخ الرابط — الصقه في إنستغرام';
+
+  @override
+  String get postOptionCastUnavailable => 'البث غير متاح حالياً';
 
   @override
   String get postShareSendFailed => 'تعذر إرسال المنشور';
@@ -3798,4 +3822,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get translationFailed => 'تعذر الترجمة';
+
+  @override
+  String get postLinksTitle => 'الروابط';
+
+  @override
+  String get tryEffectAction => 'تجربة التأثير';
+
+  @override
+  String get effectsSubtitle => 'المؤثرات';
 }

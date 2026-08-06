@@ -17,7 +17,8 @@ void navigateAfterSignUp(
 }
 
 /// Post-auth routing (auth + user-interests docs):
-/// After successful login, go directly to home tab.
+/// After login, send to interests onboarding when [UserEntity.needsInterests]
+/// is true; otherwise go to home.
 void navigateAfterAuth(
   BuildContext context, {
   UserEntity? user,
@@ -34,7 +35,7 @@ void navigateAfterAuth(
     return;
   }
 
-  if (forceInterests) {
+  if (forceInterests || user?.needsInterests == true) {
     context.goNamed(
       'interest_selection',
     );

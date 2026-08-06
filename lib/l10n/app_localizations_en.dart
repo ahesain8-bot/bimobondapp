@@ -1549,6 +1549,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postOptionNotInterested => 'Not interested';
 
   @override
+  String get feedInterestPromptQuestion => 'Are you interested in this kind of content?';
+
+  @override
+  String get feedInterestPromptYes => 'Yes';
+
+  @override
+  String get feedInterestPromptNo => 'No';
+
+  @override
+  String get feedInterestPromptThanks => 'Thanks — we\'ll show more like this';
+
+  @override
   String get postOptionDownload => 'Download';
 
   @override
@@ -1642,6 +1654,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postShareFacebook => 'Facebook';
 
   @override
+  String get postShareInstagram => 'Instagram';
+
+  @override
   String get postShareWhatsApp => 'WhatsApp';
 
   @override
@@ -1661,6 +1676,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get postShareMore => 'More';
+
+  @override
+  String get postOptionCast => 'Cast';
+
+  @override
+  String get postShareInstagramHint => 'Link copied — paste in Instagram';
+
+  @override
+  String get postOptionCastUnavailable => 'Casting is not available yet';
 
   @override
   String get postShareSendFailed => 'Could not send post';
@@ -3798,4 +3822,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get translationFailed => 'Could not translate';
+
+  @override
+  String get postLinksTitle => 'Links';
+
+  @override
+  String get tryEffectAction => 'Try effect';
+
+  @override
+  String get effectsSubtitle => 'Effects';
 }

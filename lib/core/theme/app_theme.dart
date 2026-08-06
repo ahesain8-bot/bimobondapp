@@ -12,6 +12,19 @@ class AppTheme {
   static const Color errorColor = Color(0xFFF9E7E7);
   static const Color errorAccent = Color(0xFFC62828);
 
+  /// Yellow repost chip used on the share sheet (matches prior UI).
+  static const Color shareRepostBackground = Color(0xFFFACC15);
+
+  /// Neutral circular chip behind share-sheet option icons.
+  static Color shareIconMutedBackground(ColorScheme cs) {
+    return Color.alphaBlend(
+      cs.onSurface.withValues(
+        alpha: cs.brightness == Brightness.light ? 0.08 : 0.14,
+      ),
+      cs.surface,
+    );
+  }
+
   static ThemeData get lightTheme {
     return ThemeData(
       fontFamily: 'Jannat',

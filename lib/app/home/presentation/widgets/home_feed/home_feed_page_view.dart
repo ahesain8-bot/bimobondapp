@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_auction
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/one_page_scroll_physics.dart';
 import 'package:flutter/material.dart';
 
@@ -18,6 +19,7 @@ class HomeFeedPageView extends StatelessWidget {
     required this.bottomChromeListenable,
     required this.mediaBottomInsetFor,
     this.onFeedPostPatch,
+    this.trafficSource = TrafficSource.forYou,
     super.key,
   });
 
@@ -28,8 +30,9 @@ class HomeFeedPageView extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final Listenable bottomChromeListenable;
   final double Function(BuildContext context, PostEntity post)
-  mediaBottomInsetFor;
+      mediaBottomInsetFor;
   final FeedPostPatch? onFeedPostPatch;
+  final String trafficSource;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +76,7 @@ class HomeFeedPageView extends StatelessWidget {
                 feedTopBarClearance:
                     HomeLayoutConstants.feedTopBarHeight +
                     HomeLayoutConstants.feedTopBarBottomGap,
+                trafficSource: trafficSource,
               );
             }
             return VideoPostWidget(
@@ -89,6 +93,7 @@ class HomeFeedPageView extends StatelessWidget {
               pageController: controller,
               pageIndex: index,
               onFeedPostPatch: onFeedPostPatch,
+              trafficSource: trafficSource,
             );
           },
         );

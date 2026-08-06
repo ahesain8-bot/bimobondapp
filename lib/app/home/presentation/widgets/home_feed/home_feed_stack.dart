@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_interest_prompt_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_utils.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_posts_viewer_layout.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_scrub_time_overlay.dart';
@@ -5,6 +6,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_s
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_page_view.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/core/constants/home_layout_constants.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:flutter/material.dart';
 
 /// Home feed stack: full-bleed media + search/progress docked on the post bottom.
@@ -18,6 +21,11 @@ class HomeFeedStack extends StatelessWidget {
     required this.bottomChromeListenable,
     required this.mediaBottomInsetFor,
     this.onFeedPostPatch,
+    this.trafficSource = TrafficSource.forYou,
+    this.showInterestPrompt = false,
+    this.onInterestPromptYes,
+    this.onInterestPromptNo,
+    this.onInterestPromptDismiss,
     super.key,
   });
 
@@ -28,13 +36,21 @@ class HomeFeedStack extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final Listenable bottomChromeListenable;
   final double Function(BuildContext context, PostEntity post)
-  mediaBottomInsetFor;
+      mediaBottomInsetFor;
   final FeedPostPatch? onFeedPostPatch;
+  final String trafficSource;
+  final bool showInterestPrompt;
+  final VoidCallback? onInterestPromptYes;
+  final VoidCallback? onInterestPromptNo;
+  final VoidCallback? onInterestPromptDismiss;
 
   @override
   Widget build(BuildContext context) {
-    final chromeBottom =
+    final navBottom =
         FeedVideoPostsViewerLayout.homeFeedPostStackChromeBottom(context);
+    final promptLift =
+        showInterestPrompt ? HomeLayoutConstants.feedInterestPromptHeight : 0.0;
+    final chromeBottom = navBottom + promptLift;
 
     return ListenableBuilder(
       listenable: bottomChromeListenable,
@@ -57,6 +73,7 @@ class HomeFeedStack extends StatelessWidget {
               bottomChromeListenable: bottomChromeListenable,
               mediaBottomInsetFor: mediaBottomInsetFor,
               onFeedPostPatch: onFeedPostPatch,
+              trafficSource: trafficSource,
             ),
             const Positioned.fill(child: FeedVideoScrubTimeOverlay()),
             if (showPostStackChrome)
@@ -69,6 +86,20 @@ class HomeFeedStack extends StatelessWidget {
                   post: current.post,
                   transparentBackground: true,
                   showProgressBar: currentHasVideo,
+                ),
+              ),
+            if (showInterestPrompt &&
+                onInterestPromptYes != null &&
+                onInterestPromptNo != null &&
+                onInterestPromptDismiss != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: navBottom,
+                child: FeedInterestPromptBar(
+                  onInterested: onInterestPromptYes!,
+                  onNotInterested: onInterestPromptNo!,
+                  onDismiss: onInterestPromptDismiss!,
                 ),
               ),
           ],

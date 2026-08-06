@@ -46,6 +46,7 @@ abstract class PostsRemoteDataSource {
     String postId, {
     int? watchedDuration,
     String? campaignId,
+    String? trafficSource,
   });
   Future<bool> toggleSave(String postId);
   Future<bool> toggleRepost(String postId, {String? quote});
@@ -532,6 +533,7 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
     String postId, {
     int? watchedDuration,
     String? campaignId,
+    String? trafficSource,
   }) async {
     try {
       final body = <String, dynamic>{};
@@ -540,6 +542,10 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       }
       if (campaignId != null && campaignId.isNotEmpty) {
         body['campaignId'] = campaignId;
+      }
+      final source = trafficSource?.trim();
+      if (source != null && source.isNotEmpty) {
+        body['trafficSource'] = source;
       }
 
       final response = await apiClient.dio.post(

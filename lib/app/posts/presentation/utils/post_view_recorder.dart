@@ -4,16 +4,28 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as po
 import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
 import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart'
     as stories_di;
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/data/viewed_stories_store.dart';
 
-/// Records at most one successful view per content id per session.
+/// Records at most one successful view per content id + traffic source per session.
 ///
 /// Stories use `POST /stories/:id/view`; posts use `POST /posts/:id/view`.
 class PostViewRecorder {
   PostViewRecorder._();
 
-  static final Set<String> _recordedIds = {};
-  static final Set<String> _inFlightIds = {};
+  static final Set<String> _recordedKeys = {};
+  static final Set<String> _inFlightKeys = {};
+
+  static String _key(
+    String postId,
+    String trafficSource, {
+    required bool isStory,
+  }) {
+    final source = trafficSource.trim().isEmpty
+        ? TrafficSource.forYou
+        : trafficSource.trim().toUpperCase();
+    return '${isStory ? 'story' : 'post'}:$postId:$source';
+  }
 
   static bool _wasStoryViewedBefore(String postId) {
     try {
@@ -30,20 +42,26 @@ class PostViewRecorder {
     bool isOwner = false,
     int? watchedDuration,
     String? campaignId,
+    String trafficSource = TrafficSource.forYou,
     bool checkStoryHistory = false,
     bool isStory = false,
   }) async {
+    final key = _key(
+      postId,
+      trafficSource,
+      isStory: isStory || checkStoryHistory,
+    );
     if (isOwner ||
         postId.isEmpty ||
-        _recordedIds.contains(postId) ||
-        _inFlightIds.contains(postId)) {
+        _recordedKeys.contains(key) ||
+        _inFlightKeys.contains(key)) {
       return null;
     }
     if (checkStoryHistory && _wasStoryViewedBefore(postId)) {
       return null;
     }
 
-    _inFlightIds.add(postId);
+    _inFlightKeys.add(key);
     try {
       if (isStory || checkStoryHistory) {
         final result = await stories_di.sl<RecordStoryViewUseCase>()(
@@ -53,7 +71,7 @@ class PostViewRecorder {
           ),
         );
         return result.fold((_) => null, (record) {
-          _recordedIds.add(postId);
+          _recordedKeys.add(key);
           try {
             auth_di.sl<ViewedStoriesStore>().markViewed(postId);
           } catch (_) {}
@@ -68,15 +86,16 @@ class PostViewRecorder {
           postId: postId,
           watchedDuration: watchedDuration,
           campaignId: campaignId,
+          trafficSource: trafficSource,
         ),
       );
 
       return result.fold((_) => null, (count) {
-        _recordedIds.add(postId);
+        _recordedKeys.add(key);
         return count;
       });
     } finally {
-      _inFlightIds.remove(postId);
+      _inFlightKeys.remove(key);
     }
   }
 }

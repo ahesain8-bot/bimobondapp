@@ -14,6 +14,10 @@ class HomeLayoutConstants {
   static const double feedSearchHintBarHeight = 40.0;
   static const double feedSearchHintBottomGap = 0.0;
 
+  /// Instagram-style "interested?" bar above the bottom nav (every N posts).
+  static const double feedInterestPromptHeight = 56.0;
+  static const int feedInterestPromptEveryNPosts = 20;
+
   /// Space between the home tab bar and the search/progress stack on the post.
   static const double feedPostStackChromeGapAboveNav = 0.0;
 

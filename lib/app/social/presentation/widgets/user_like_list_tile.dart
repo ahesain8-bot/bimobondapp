@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_type_style.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_like_entity.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/activity_feed_list_row.dart';
@@ -43,7 +44,11 @@ class UserLikeListTile extends StatelessWidget {
     return ActivityFeedListRow(
       actorName: likerName,
       actionPhrase: l10n.userLikeReceivedAction,
-      onTap: () => openPostById(context, like.postId),
+      onTap: () => openPostById(
+        context,
+        like.postId,
+        trafficSource: TrafficSource.notification,
+      ),
       userId: liker?.id,
       imageUrl: liker?.avatarUrl,
       username: liker?.username,

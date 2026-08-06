@@ -75,17 +75,146 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
   }
 
   void recordViewIfNeeded() {
+    _startViewWatchTracking();
+  }
+
+  DateTime? _viewWatchStartedAt;
+  int _accumulatedWatchMs = 0;
+  bool _viewWatchTracking = false;
+  bool? _cachedIsOwner;
+  Timer? _viewEligibleTimer;
+  bool _viewEligible = false;
+  bool _viewRecordedForCurrentOpen = false;
+
+  /// ~1s visible before a view may be sent (duration is measured until leave).
+  static const _viewMinVisible = Duration(milliseconds: 1000);
+
+  void _startViewWatchTracking() {
     if (!engagementPlaybackActive || widget.post.isStory) return;
-    final campaignId = widget.post.isPromoted || widget.post.isAd
-        ? widget.post.promotion?.id
-        : null;
+    _cachedIsOwner ??= _safeIsPostOwner();
+    if (_cachedIsOwner == true) return;
+    if (_viewRecordedForCurrentOpen) return;
+
+    if (!_viewWatchTracking) {
+      _viewWatchTracking = true;
+      _viewWatchStartedAt = DateTime.now();
+    }
+    _scheduleViewEligibleTimer();
+  }
+
+  void _scheduleViewEligibleTimer() {
+    _viewEligibleTimer?.cancel();
+    if (_viewEligible || _viewRecordedForCurrentOpen) return;
+
+    final remaining = _viewMinVisible.inMilliseconds - _watchedDurationMs();
+    if (remaining <= 0) {
+      _viewEligible = true;
+      return;
+    }
+    _viewEligibleTimer = Timer(Duration(milliseconds: remaining), () {
+      if (!mounted) return;
+      _viewEligible = true;
+    });
+  }
+
+  void _cancelViewEligibleTimer() {
+    _viewEligibleTimer?.cancel();
+    _viewEligibleTimer = null;
+  }
+
+  void _pauseViewWatchTracking() {
+    _cancelViewEligibleTimer();
+    if (!_viewWatchTracking) return;
+    final started = _viewWatchStartedAt;
+    if (started != null) {
+      final elapsed = DateTime.now().difference(started).inMilliseconds;
+      if (elapsed > 0) _accumulatedWatchMs += elapsed;
+    }
+    _viewWatchStartedAt = null;
+    _viewWatchTracking = false;
+  }
+
+  int _watchedDurationMs() {
+    var total = _accumulatedWatchMs;
+    final started = _viewWatchStartedAt;
+    if (_viewWatchTracking && started != null) {
+      final elapsed = DateTime.now().difference(started).inMilliseconds;
+      if (elapsed > 0) total += elapsed;
+    }
+    return total;
+  }
+
+  int _watchedDurationSeconds() {
+    final ms = _watchedDurationMs();
+    if (ms <= 0) return 0;
+    final seconds = ms ~/ 1000;
+    return seconds > 0 ? seconds : 1;
+  }
+
+  bool _safeIsPostOwner() {
+    try {
+      return isPostOwner();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Sends `POST /posts/:id/view` with full [watchedDuration] when leaving.
+  void flushPostViewWithWatchDuration({
+    String? postId,
+    String? trafficSource,
+    String? campaignId,
+  }) {
+    if (widget.post.isStory && postId == null) return;
+    _pauseViewWatchTracking();
+
+    final watchedMs = _watchedDurationMs();
+    final eligible =
+        _viewEligible || watchedMs >= _viewMinVisible.inMilliseconds;
+    if (!eligible || _viewRecordedForCurrentOpen) {
+      if (!_viewRecordedForCurrentOpen &&
+          engagementPlaybackActive &&
+          mounted) {
+        _startViewWatchTracking();
+      }
+      return;
+    }
+
+    final id = (postId ?? widget.post.id).trim();
+    if (id.isEmpty) return;
+
+    final resolvedCampaign = campaignId ??
+        ((widget.post.isPromoted || widget.post.isAd)
+            ? widget.post.promotion?.id
+            : null);
+
+    final owner = postId == null
+        ? (_cachedIsOwner ?? _safeIsPostOwner())
+        : false;
+
+    final watchedDuration = _watchedDurationSeconds();
     PostViewRecorder.recordIfNeeded(
-      postId: widget.post.id,
-      isOwner: isPostOwner(),
-      campaignId: (campaignId != null && campaignId.isNotEmpty)
-          ? campaignId
+      postId: id,
+      isOwner: owner,
+      watchedDuration: watchedDuration,
+      campaignId: (resolvedCampaign != null && resolvedCampaign.isNotEmpty)
+          ? resolvedCampaign
           : null,
+      trafficSource: trafficSource ?? widget.trafficSource,
     );
+    _viewRecordedForCurrentOpen = true;
+    _viewEligible = false;
+    _accumulatedWatchMs = 0;
+  }
+
+  void resetViewWatchSession() {
+    _cancelViewEligibleTimer();
+    _viewWatchTracking = false;
+    _viewWatchStartedAt = null;
+    _accumulatedWatchMs = 0;
+    _viewEligible = false;
+    _viewRecordedForCurrentOpen = false;
+    _cachedIsOwner = null;
   }
 
   Future<void> resolveFollowStatusIfNeeded() async {

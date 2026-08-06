@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as po
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
+import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -147,7 +148,13 @@ class _ChatStoryReplyPreviewState extends State<ChatStoryReplyPreview> {
             )
           else
             GestureDetector(
-              onTap: _post != null ? () => openStoryOrPost(context, _post!) : null,
+              onTap: _post != null
+                  ? () => openStoryOrPost(
+                        context,
+                        _post!,
+                        trafficSource: PostTrafficSource.chat,
+                      )
+                  : null,
               child: StorySharedPreview(
                 post: _post,
                 sharedStoryUi: _post == null ? widget.sharedStory : null,
