@@ -479,12 +479,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _photoEditorMagicOn ? (_photoAdjustments[tool] ?? 0.0) : 0.0;
 
   double _liveColorAdj(MediaPhotoEditorTool tool) {
-    // Back-camera Retouch-Off baseline only — front stays neutral unless Magic.
-    if (_isFrontCamera && !_photoEditorMagicOn) return 0.0;
-    if (_photoEditorMagicOn) {
-      return _photoAdjustments[tool] ?? 0.0;
-    }
-    return _photoAdjustments[tool] ?? _kLiveColorDefaults[tool] ?? 0.0;
+    // Retouch Off → fully neutral on both cameras, same as front used to be.
+    if (!_photoEditorMagicOn) return 0.0;
+    return _photoAdjustments[tool] ?? 0.0;
   }
 
   void _restoreLiveColorDefaults() {
