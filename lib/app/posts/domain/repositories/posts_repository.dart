@@ -17,7 +17,10 @@ import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
 abstract class PostsRepository {
-  Future<Either<Failure, String>> uploadMedia(File file);
+  Future<Either<Failure, String>> uploadMedia(
+    File file, {
+    void Function(int sent, int total)? onSendProgress,
+  });
   Future<Either<Failure, PostEntity>> createPost({
     String? type,
     String? videoUrl,
@@ -52,6 +55,8 @@ abstract class PostsRepository {
     String? filterCategory,
     String? effectSlug,
     bool? beautyEnabled,
+    String? videoTemplateId,
+    String? templateProjectId,
   });
 
   Future<Either<Failure, HashtagsPageEntity>> getHashtags({

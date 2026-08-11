@@ -7,6 +7,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_post_ut
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_empty_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_media_preloader.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_top_bar.dart';
+import 'package:bimobondapp/app/shop/presentation/cubit/shop_cart_cubit.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/ecommerce_home_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_progress_notifier.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/feed_video_posts_viewer_layout.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/home_feed_stack.dart';
@@ -112,6 +114,7 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
   @override
   void initState() {
     super.initState();
+    context.read<ShopCartCubit>().refresh();
     if (widget.isTabActive) {
       _loadTabData();
     }
@@ -472,11 +475,28 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
           top: 0,
           left: 0,
           right: 0,
-          child: FeedTopBar(
-            selectedTab: _selectedFeedTab,
-            onTabChanged: _onFeedTabChanged,
-            onLiveTap: () => context.pushFromFeed('lives'),
-            onSearchTap: () => context.pushFromFeed('posts_search'),
+          child: BlocBuilder<AuthBloc, AuthState>(
+            buildWhen: (previous, current) =>
+                (previous is AuthSuccess) != (current is AuthSuccess),
+            builder: (context, authState) {
+              final isLoggedIn = authState is AuthSuccess;
+              return BlocBuilder<ShopCartCubit, int>(
+                builder: (context, cartCount) {
+                  return FeedTopBar(
+                    selectedTab: _selectedFeedTab,
+                    onTabChanged: _onFeedTabChanged,
+                    onLiveTap: () => context.pushFromFeed('lives'),
+                    onShopTap: isLoggedIn
+                        ? () => context.pushFromFeed(
+                              EcommerceHomeScreen.routeName,
+                            )
+                        : null,
+                    onSearchTap: () => context.pushFromFeed('posts_search'),
+                    shopCartBadge: isLoggedIn ? cartCount : 0,
+                  );
+                },
+              );
+            },
           ),
         ),
       ],
@@ -492,6 +512,11 @@ class HomeFeedScreenState extends State<HomeFeedScreen> {
         if (!widget.isTabActive) return;
         if (authState is AuthSuccess || authState is AuthInitial) {
           _fetchFeed(refresh: true);
+        }
+        if (authState is AuthSuccess) {
+          context.read<ShopCartCubit>().refresh();
+        } else if (authState is AuthInitial) {
+          context.read<ShopCartCubit>().clear();
         }
       },
       child: Scaffold(

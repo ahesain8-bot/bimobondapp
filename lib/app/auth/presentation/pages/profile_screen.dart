@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_bar.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/ecommerce_home_screen.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_icon_tab_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_grid_sliver.dart';
@@ -14,8 +15,10 @@ import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/posts/presentation/utils/pending_post_uploads.dart';
 import 'package:bimobondapp/app/social/presentation/pages/user_connections_screen.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/core/utils/system_ui_overlay_utils.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -44,6 +47,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     ProfileLayoutConstants.tabCount,
     (_) => ProfileTabPostsState(),
   );
+  /// Dropped from grids immediately; also filtered from refetch merges so a
+  /// briefly-stale feed cannot resurrect a deleted post.
+  final Set<String> _locallyDeletedPostIds = <String>{};
 
   @override
   bool get wantKeepAlive => true;
@@ -228,9 +234,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     List<PostEntity> incoming, {
     required int tabIndex,
   }) {
-    var merged = incoming;
+    var merged = _withoutLocallyDeleted(incoming);
     if (tabIndex == ProfileLayoutConstants.postsTabIndex) {
-      merged = incoming
+      merged = merged
           .where(
             (post) =>
                 post.privacyStatus !=
@@ -243,6 +249,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       tab.posts
         ..clear()
         ..addAll(merged);
+      // Feed caught up — stop suppressing these ids.
+      if (_locallyDeletedPostIds.isNotEmpty) {
+        _locallyDeletedPostIds.removeWhere(
+          (id) => !incoming.any((post) => post.id == id),
+        );
+      }
     } else {
       final existingIds = tab.posts.map((p) => p.id).toSet();
       tab.posts.addAll(merged.where((p) => !existingIds.contains(p.id)));
@@ -255,6 +267,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     tab.posts.clear();
     tab.page = 1;
     tab.hasReachedMax = false;
+  }
+
+  void _removeDeletedPostLocally(String postId) {
+    final id = postId.trim();
+    if (id.isEmpty) return;
+    _locallyDeletedPostIds.add(id);
+    for (final tab in _tabPosts) {
+      tab.posts.removeWhere((post) => post.id == id);
+    }
+  }
+
+  List<PostEntity> _withoutLocallyDeleted(List<PostEntity> posts) {
+    if (_locallyDeletedPostIds.isEmpty) return posts;
+    return posts
+        .where((post) => !_locallyDeletedPostIds.contains(post.id))
+        .toList(growable: false);
   }
 
   void _onLikePostSuccess(LikePostSuccess state) {
@@ -362,6 +390,13 @@ class _ProfileScreenState extends State<ProfileScreen>
               return;
             }
 
+            // Create-post failures (no profileLoadKey) clear the uploading tile.
+            if (state.profileLoadKey == null &&
+                PendingPostUploads.instance.hasPending) {
+              PendingPostUploads.instance.clear();
+              PopupDialogs.showErrorDialog(context, state.message);
+            }
+
             setState(() {
               final tab = _tabPosts[tabIndex];
               if (tab.isLoadingMore && tab.page > 1) {
@@ -372,9 +407,23 @@ class _ProfileScreenState extends State<ProfileScreen>
               tab.isRefreshing = false;
             });
             _completePullRefreshIfNeeded();
+          } else if (state is DeletePostSuccess) {
+            setState(() => _removeDeletedPostLocally(state.postId));
+            context.read<AuthBloc>().add(const FetchProfileEvent());
+            // Soft refresh without wiping the grid first — avoids a stale
+            // feed response briefly putting the deleted tile back.
+            if (_selectedTabIndex == ProfileLayoutConstants.postsTabIndex ||
+                _selectedTabIndex == ProfileLayoutConstants.onlyMeTabIndex) {
+              _fetchUserPosts(refresh: true);
+            } else {
+              _invalidateProfileTab(ProfileLayoutConstants.postsTabIndex);
+              _invalidateProfileTab(ProfileLayoutConstants.onlyMeTabIndex);
+            }
           } else if (state is CreatePostSuccess ||
-              state is UpdatePostSuccess ||
-              state is DeletePostSuccess) {
+              state is UpdatePostSuccess) {
+            if (state is CreatePostSuccess) {
+              PendingPostUploads.instance.clear();
+            }
             _invalidateProfileTab(ProfileLayoutConstants.postsTabIndex);
             _invalidateProfileTab(ProfileLayoutConstants.onlyMeTabIndex);
             final tab = _tabPosts[_selectedTabIndex];
@@ -437,6 +486,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                           onWallet: () => _refreshProfileAfterNavigation(
                             context.pushNamed('wallet'),
                           ),
+                          onShop: () => _refreshProfileAfterNavigation(
+                                context.pushNamed(
+                                  EcommerceHomeScreen.routeName,
+                                ),
+                              ),
                           onSettings: () => _refreshProfileAfterNavigation(
                             context.pushNamed('settings'),
                           ),
@@ -481,6 +535,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         tabIndex: _selectedTabIndex,
                         emptyMessage: _emptyMessageForTab(l10n),
                         userId: user.id,
+                        showPendingUploads: _selectedTabIndex ==
+                            ProfileLayoutConstants.postsTabIndex,
                       ),
                     ],
                   ),

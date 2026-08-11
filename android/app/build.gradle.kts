@@ -87,6 +87,11 @@ dependencies {
     // Lottie — confetti overlay animation on the AR camera preview.
     implementation("com.airbnb.android:lottie:6.6.2")
 
+    // Media3 Transformer — Phase 11 camera_engine export / compression (HW encode).
+    implementation("androidx.media3:media3-transformer:1.5.1")
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
+
     // OpenCV Android SDK (Maven Central) — still-image beauty pipeline
     implementation("org.opencv:opencv:4.9.0")
 }

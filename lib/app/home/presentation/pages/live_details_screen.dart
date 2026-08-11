@@ -37,6 +37,8 @@ import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
 import 'package:bimobondapp/app/posts/domain/usecases/get_post_by_id_usecase.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/app/auctions/presentation/widgets/auction_gifts_sheet.dart';
+import 'package:bimobondapp/app/shop/presentation/widgets/live_product_sheet.dart';
+import 'package:bimobondapp/app/home/presentation/utils/post_delete_flow.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/auctions/auction_search_filters.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_countdown_bar.dart';
@@ -1664,7 +1666,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       confirmLabel: l10n.deleteAction,
       destructive: true,
       onConfirm: () {
-        context.read<PostsBloc>().add(DeletePostRequestedEvent(post.id));
+        unawaited(deletePostWithLoading(context, postId: post.id));
       },
     );
   }
@@ -1804,6 +1806,16 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final auctionId = _giftAuctionId;
     if (auctionId == null || auctionId.isEmpty) return;
     AuctionGiftsSheet.show(context, auctionId: auctionId);
+  }
+
+  void _showLiveProductSheet() {
+    final liveId = _liveRoomId;
+    if (liveId == null || liveId.isEmpty) return;
+    LiveProductSheet.show(
+      context,
+      liveId: liveId,
+      isHost: _isPostOwner(),
+    );
   }
 
   Future<void> _refreshAfterGift(
@@ -2196,6 +2208,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
                           showCloseButton: !widget.embeddedInFeed,
                           showAuctionGifts: _isAuctionPost,
                           onAuctionGifts: _showAuctionGiftsSheet,
+                          showShopProducts: _liveRoomId != null &&
+                              _liveRoomId!.isNotEmpty,
+                          onShopProducts: _showLiveProductSheet,
                           showOwnerMenu: isPostOwner,
                           showFollowButton:
                               !isPostOwner &&

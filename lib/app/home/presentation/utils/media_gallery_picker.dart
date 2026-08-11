@@ -46,8 +46,14 @@ class MediaGalleryPicker {
     return fromXFiles(picked);
   }
 
-  static Future<List<GalleryMediaItem>> pickSingleImage() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
+  static Future<List<GalleryMediaItem>> pickSingleImage({
+    ImageSource source = ImageSource.gallery,
+    int imageQuality = 85,
+  }) async {
+    final picked = await _picker.pickImage(
+      source: source,
+      imageQuality: imageQuality,
+    );
     if (picked == null) return const [];
     return fromXFiles([picked]);
   }

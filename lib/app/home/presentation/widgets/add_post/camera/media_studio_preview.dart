@@ -27,10 +27,23 @@ class MediaStudioPreview extends StatefulWidget {
     this.paused = false,
     this.muted = false,
     this.trimSegments = const [],
+    this.fit = BoxFit.contain,
+    this.onReady,
+    this.onLoopRestart,
   });
 
   final File file;
   final bool isVideo;
+
+  /// How media fills the preview box. Template hybrid uses [BoxFit.cover]
+  /// so overlays match the composition/export crop.
+  final BoxFit fit;
+
+  /// Fired once media is displayable (image painted / video playing).
+  final VoidCallback? onReady;
+
+  /// Fired when a looping video seeks back to the start.
+  final VoidCallback? onLoopRestart;
 
   /// Pauses video playback (e.g. while a sub-editor like Trim/Text is open on
   /// top) so its audio doesn't play behind the other screen.
@@ -63,9 +76,17 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
   bool _videoFailed = false;
   bool _isVideoLoading = false;
   File? _loopPoster;
+  bool _readyNotified = false;
+  bool _wasNearEnd = false;
 
   bool get _treatAsVideo =>
       widget.isVideo || VideoThumbnailUtils.isVideoFile(widget.file);
+
+  void _notifyReadyOnce() {
+    if (_readyNotified) return;
+    _readyNotified = true;
+    widget.onReady?.call();
+  }
 
   @override
   void initState() {
@@ -74,6 +95,10 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       _initVideo();
     } else {
       _loadImageSize();
+      // Image is shown immediately — sync soundtrack with first paint.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _notifyReadyOnce();
+      });
     }
   }
 
@@ -85,10 +110,15 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
       _videoController = null;
       _loopPoster = null;
       _videoFailed = false;
+      _readyNotified = false;
+      _wasNearEnd = false;
       if (_treatAsVideo) {
         _initVideo();
       } else {
         _loadImageSize();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _notifyReadyOnce();
+        });
       }
     } else if (oldWidget.filter?.name != widget.filter?.name &&
         oldWidget.effect?.slug != widget.effect?.slug) {
@@ -211,11 +241,30 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           _videoFailed = true;
           _isVideoLoading = false;
         });
-      } else if (controller.value.isInitialized) {
-        setState(() {
-          _mediaSize = controller.value.size;
-          _isVideoLoading = false;
-        });
+        return;
+      }
+      if (!controller.value.isInitialized) return;
+
+      setState(() {
+        _mediaSize = controller.value.size;
+        _isVideoLoading = false;
+      });
+
+      final duration = controller.value.duration;
+      final pos = controller.value.position;
+      if (duration > Duration.zero) {
+        final nearEnd = pos >=
+            duration - const Duration(milliseconds: 350);
+        if (_wasNearEnd &&
+            pos < const Duration(milliseconds: 400) &&
+            controller.value.isPlaying) {
+          widget.onLoopRestart?.call();
+        }
+        _wasNearEnd = nearEnd;
+      }
+
+      if (controller.value.isPlaying) {
+        _notifyReadyOnce();
       }
     }
 
@@ -239,6 +288,9 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
         _mediaSize = controller.value.size;
         _isVideoLoading = false;
       });
+      if (!widget.paused && controller.value.isPlaying) {
+        _notifyReadyOnce();
+      }
       // Poster sits behind the player so ExoPlayer's loop seek (or a 1-frame
       // black tail) doesn't flash the black ColoredBox behind the texture.
       unawaited(_loadLoopPoster());
@@ -318,19 +370,14 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
               if (poster != null)
                 Image.file(
                   poster,
-                  fit: BoxFit.contain,
+                  fit: widget.fit,
                   gaplessPlayback: true,
                   filterQuality: FilterQuality.low,
                 ),
-              // contain, not cover — cover crops to fill and any small
-              // mismatch between the recorded file's aspect ratio and this
-              // container's exact aspect ratio gets amplified into a visible
-              // crop/zoom (this is what made captured video look zoomed
-              // in vs. the live camera view, which never crops). contain
-              // guarantees the full, un-cropped frame always shows, matching
-              // how the photo preview already renders (BoxFit.contain below).
+              // Default contain matches live camera (no crop). Template hybrid
+              // can pass cover so overlays align with composition/export.
               FittedBox(
-                fit: BoxFit.contain,
+                fit: widget.fit,
                 clipBehavior: Clip.hardEdge,
                 child: SizedBox(
                   width: controller.value.size.width,
@@ -351,7 +398,7 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           final targetW = (constraints.maxWidth * dpr).round().clamp(1, maxDecodeEdge);
           return Image.file(
             widget.file,
-            fit: BoxFit.contain,
+            fit: widget.fit,
             width: double.infinity,
             height: double.infinity,
             gaplessPlayback: true,

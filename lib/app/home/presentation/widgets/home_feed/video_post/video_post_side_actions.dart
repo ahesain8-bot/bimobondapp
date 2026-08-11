@@ -84,6 +84,9 @@ class VideoPostSideActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarGap = VideoPostLayoutConstants.responsiveAvatarGap(context);
+    final actionGap = VideoPostLayoutConstants.responsiveActionSpacing(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -98,7 +101,7 @@ class VideoPostSideActions extends StatelessWidget {
           onTap: onAvatarTap,
           onFollow: onFollow,
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: avatarGap),
         _wrapEngagementRise(
           likeRise,
           VideoPostLikeButton(
@@ -108,7 +111,7 @@ class VideoPostSideActions extends StatelessWidget {
             onTap: onLike,
           ),
         ),
-        const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
+        SizedBox(height: actionGap),
         _wrapEngagementRise(
           commentRise,
           KeyedSubtree(
@@ -131,7 +134,7 @@ class VideoPostSideActions extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
+        SizedBox(height: actionGap),
         VideoPostActionButton(
           icon: Icons.bookmark,
           label: saveLabel,
@@ -140,7 +143,7 @@ class VideoPostSideActions extends StatelessWidget {
               : Colors.white,
           onTap: onSave,
         ),
-        const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
+        SizedBox(height: actionGap),
         KeyedSubtree(
           key: shareActionKey,
           child: VideoPostActionButton(
@@ -159,7 +162,7 @@ class VideoPostSideActions extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: VideoPostLayoutConstants.actionSpacing),
+        SizedBox(height: actionGap),
         VideoPostMusicDisc(
           soundCoverUrl: soundCoverUrl,
           avatarUrl: avatarUrl,

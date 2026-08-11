@@ -76,10 +76,16 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<Either<Failure, String>> uploadMedia(File file) async {
+  Future<Either<Failure, String>> uploadMedia(
+    File file, {
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
     final prepared = await MediaUploadUtils.prepareForUpload(file);
     try {
-      final url = await remoteDataSource.uploadMedia(prepared);
+      final url = await remoteDataSource.uploadMedia(
+        prepared,
+        onSendProgress: onSendProgress,
+      );
       return Right(url);
     } catch (e) {
       return Left(FailureMapper.from(e));
@@ -255,6 +261,8 @@ class PostsRepositoryImpl implements PostsRepository {
     String? filterCategory,
     String? effectSlug,
     bool? beautyEnabled,
+    String? videoTemplateId,
+    String? templateProjectId,
   }) async {
     try {
       final postData = {
@@ -308,6 +316,10 @@ class PostsRepositoryImpl implements PostsRepository {
         if (filterCategory != null) 'filterCategory': filterCategory,
         if (effectSlug != null && effectSlug != 'none') 'effectSlug': effectSlug,
         if (beautyEnabled != null) 'beautyEnabled': beautyEnabled,
+        if (videoTemplateId != null && videoTemplateId.isNotEmpty)
+          'videoTemplateId': videoTemplateId,
+        if (templateProjectId != null && templateProjectId.isNotEmpty)
+          'templateProjectId': templateProjectId,
       };
 
       final postModel = await remoteDataSource.createPost(postData);

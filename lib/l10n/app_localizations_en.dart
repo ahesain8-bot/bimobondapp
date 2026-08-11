@@ -685,6 +685,369 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedLive => 'Live';
 
   @override
+  String get feedShop => 'Shop';
+
+  @override
+  String get shopTitle => 'Shop';
+
+  @override
+  String get shopFeatured => 'Featured';
+
+  @override
+  String get shopFlashDeals => 'Flash Deals';
+
+  @override
+  String get shopForYou => 'For You';
+
+  @override
+  String get shopCart => 'Cart';
+
+  @override
+  String get shopCheckout => 'Checkout';
+
+  @override
+  String get shopOrders => 'Orders';
+
+  @override
+  String get shopBuyNow => 'Buy Now';
+
+  @override
+  String get shopAddToCart => 'Add to Cart';
+
+  @override
+  String get shopEmpty => 'No products found';
+
+  @override
+  String get shopRetry => 'Retry';
+
+  @override
+  String get shopAllCategories => 'All';
+
+  @override
+  String get shopProducts => 'Products';
+
+  @override
+  String get shopNoProductsYet => 'No products yet';
+
+  @override
+  String get shopEmptyHint => 'Try a different category or search term.';
+
+  @override
+  String get shopSeeAll => 'See all';
+
+  @override
+  String get shopSearchHint => 'Search products...';
+
+  @override
+  String get shopSearchForProducts => 'Search for products';
+
+  @override
+  String get shopRecentSearches => 'Recent';
+
+  @override
+  String shopNoResultsFor(String query) {
+    return 'No results for \"$query\"';
+  }
+
+  @override
+  String get shopSort => 'Sort';
+
+  @override
+  String get shopSortNewest => 'Newest';
+
+  @override
+  String get shopSortOldest => 'Oldest';
+
+  @override
+  String get shopSortPriceLow => 'Price: Low';
+
+  @override
+  String get shopSortPriceHigh => 'Price: High';
+
+  @override
+  String get shopSortTitleAsc => 'Title A-Z';
+
+  @override
+  String get shopSortTitleDesc => 'Title Z-A';
+
+  @override
+  String get shopCartEmpty => 'Your cart is empty';
+
+  @override
+  String get shopSubtotal => 'Subtotal';
+
+  @override
+  String get shopCommission => 'Commission';
+
+  @override
+  String get shopCheckoutAction => 'Checkout';
+
+  @override
+  String get shopShippingDetails => 'Shipping Details';
+
+  @override
+  String get shopPayWithCoins => 'Pay with coins';
+
+  @override
+  String get shopFirstName => 'First name';
+
+  @override
+  String get shopFirstNameHint => 'Enter your first name';
+
+  @override
+  String get shopLastName => 'Last name';
+
+  @override
+  String get shopLastNameHint => 'Enter your last name';
+
+  @override
+  String get shopStreet => 'Street';
+
+  @override
+  String get shopStreetHint => 'Enter your street';
+
+  @override
+  String get shopStreetNo => 'Street no.';
+
+  @override
+  String get shopStreetNoHint => 'No.';
+
+  @override
+  String get shopApartmentNo => 'Apartment no.';
+
+  @override
+  String get shopApartmentNoHint => 'Apt.';
+
+  @override
+  String get shopCity => 'City';
+
+  @override
+  String get shopCityHint => 'Enter your city';
+
+  @override
+  String get shopPostcode => 'Postcode';
+
+  @override
+  String get shopPostcodeHint => 'Enter your postcode';
+
+  @override
+  String get shopCountry => 'Country';
+
+  @override
+  String get shopCountryHint => 'Enter your country';
+
+  @override
+  String get shopPhone => 'Phone';
+
+  @override
+  String get shopPhoneHint => 'Enter your phone';
+
+  @override
+  String get shopFieldRequired => 'Required';
+
+  @override
+  String get shopYourBalance => 'Your balance';
+
+  @override
+  String get shopDueNow => 'Due now';
+
+  @override
+  String get shopBuyCoins => 'Buy coins';
+
+  @override
+  String shopPayCoinsAmount(int count) {
+    return 'Pay $count coins';
+  }
+
+  @override
+  String shopNeedMoreCoins(int count) {
+    return 'You need $count more coins.';
+  }
+
+  @override
+  String get shopNotEnoughCoins => 'Not enough coins. Buy more to continue.';
+
+  @override
+  String shopCoinsLabel(int count) {
+    return '$count coins';
+  }
+
+  @override
+  String get shopProductNotFound => 'Product not found';
+
+  @override
+  String get shopAddFavorite => 'Add favorite';
+
+  @override
+  String get shopRemoveFavorite => 'Remove favorite';
+
+  @override
+  String get shopShare => 'Share';
+
+  @override
+  String get shopReadMore => 'Read more';
+
+  @override
+  String get shopShowLess => 'Show less';
+
+  @override
+  String get shopVariants => 'Variants';
+
+  @override
+  String get shopQuantity => 'Quantity';
+
+  @override
+  String get shopOutOfStock => 'Out of stock';
+
+  @override
+  String get shopSelectVariantFirst => 'Select a variant first';
+
+  @override
+  String get shopAddedToCart => 'Added to cart';
+
+  @override
+  String get shopLiveBadge => 'LIVE';
+
+  @override
+  String get shopBestPrice => 'Best price';
+
+  @override
+  String get shopPurchases => 'Purchases';
+
+  @override
+  String get shopSales => 'Sales';
+
+  @override
+  String get shopNoPurchasesYet => 'No purchases yet';
+
+  @override
+  String get shopNoSalesYet => 'No sales yet';
+
+  @override
+  String get shopStatusPending => 'Pending';
+
+  @override
+  String get shopStatusPaid => 'Paid';
+
+  @override
+  String get shopStatusCancelled => 'Cancelled';
+
+  @override
+  String get shopStatusRefunded => 'Refunded';
+
+  @override
+  String get shopStatusUnknown => 'Unknown';
+
+  @override
+  String get shopFulfillmentNone => 'Not started';
+
+  @override
+  String get shopFulfillmentAwaitingShipment => 'Awaiting shipment';
+
+  @override
+  String get shopFulfillmentShipped => 'Shipped';
+
+  @override
+  String get shopFulfillmentDelivered => 'Delivered';
+
+  @override
+  String get shopFulfillmentAccepted => 'Accepted';
+
+  @override
+  String get shopFulfillmentDisputed => 'Disputed';
+
+  @override
+  String get shopStatus => 'Status';
+
+  @override
+  String get shopFulfillment => 'Fulfillment';
+
+  @override
+  String get shopTracking => 'Tracking';
+
+  @override
+  String get shopItems => 'Items';
+
+  @override
+  String shopQty(int count) {
+    return 'Qty: $count';
+  }
+
+  @override
+  String get shopTotalPaid => 'Total paid';
+
+  @override
+  String get shopShipping => 'Shipping';
+
+  @override
+  String get shopShip => 'Ship';
+
+  @override
+  String get shopShipOrder => 'Ship order';
+
+  @override
+  String get shopTrackingNumber => 'Tracking number';
+
+  @override
+  String get shopShippingNote => 'Shipping note';
+
+  @override
+  String get shopReceive => 'Receive';
+
+  @override
+  String get shopAccept => 'Accept';
+
+  @override
+  String get shopDispute => 'Dispute';
+
+  @override
+  String get shopDisputeOrder => 'Dispute order';
+
+  @override
+  String get shopNoteOptional => 'Note (optional)';
+
+  @override
+  String get shopCancel => 'Cancel';
+
+  @override
+  String get shopLiveAddProduct => 'Add product';
+
+  @override
+  String get shopLiveNoProductsToAdd => 'No products available to add';
+
+  @override
+  String get shopLiveEmptyHost => 'No products yet — tap Add product';
+
+  @override
+  String get shopLiveEmptyViewer => 'No products in this live yet';
+
+  @override
+  String get shopPinned => 'Pinned';
+
+  @override
+  String get shopPin => 'Pin';
+
+  @override
+  String get shopUnpin => 'Unpin';
+
+  @override
+  String get shopRemove => 'Remove';
+
+  @override
+  String get shopBuy => 'Buy';
+
+  @override
+  String shopItemsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get noPostsFound => 'No posts found';
 
   @override
@@ -2313,7 +2676,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatLastMessage5 => 'See you tomorrow 👋';
 
   @override
-  String get addPostAsAuction => 'List as auction';
+  String get mediaStudioAutoCut => 'AutoCut';
+
+  @override
+  String get addPostAsAuction => 'Show on live';
 
   @override
   String get auctionItemName => 'Item name';
@@ -3812,6 +4178,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsInterests => 'Interests';
 
   @override
+  String get settingsMyProducts => 'My Products';
+
+  @override
+  String get shopGoToMyProducts => 'Go to My Products';
+
+  @override
+  String get shopMakeAuction => 'Show on live';
+
+  @override
+  String get shopMyProductsSearchHint => 'Search my products...';
+
+  @override
+  String get shopFilterAll => 'All';
+
+  @override
+  String get shopNoMatchingProducts => 'No matching products';
+
+  @override
+  String get shopSortQuantityHigh => 'Qty: High';
+
+  @override
+  String get shopSortQuantityLow => 'Qty: Low';
+
+  @override
+  String get shopFilters => 'Filters';
+
+  @override
+  String get shopMediaType => 'Media';
+
+  @override
+  String get shopMediaImage => 'Image';
+
+  @override
+  String get shopMediaVideo => 'Video';
+
+  @override
+  String get shopMediaCarousel => 'Carousel';
+
+  @override
+  String get shopMinPriceCoins => 'Min coins';
+
+  @override
+  String get shopMaxPriceCoins => 'Max coins';
+
+  @override
+  String get shopApplyFilters => 'Apply';
+
+  @override
+  String get shopClearFilters => 'Clear';
+
+  @override
   String get retry => 'Try again';
 
   @override
@@ -3831,4 +4248,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get effectsSubtitle => 'Effects';
+
+  @override
+  String get templateExportPreparing => 'Preparing…';
+
+  @override
+  String get templateExportUploading => 'Uploading…';
+
+  @override
+  String get templateExportUploaded => 'Uploaded';
+
+  @override
+  String get templateExportPreparingSlots => 'Preparing slots…';
+
+  @override
+  String get templateExportRendering => 'Rendering…';
+
+  @override
+  String get templateExportAlmostDone => 'Almost done…';
+
+  @override
+  String get templateExportDownloading => 'Downloading…';
+
+  @override
+  String get templateExportDone => 'Done';
+
+  @override
+  String get templateExportFailed => 'Template export failed — try again';
+
+  @override
+  String get templateCouldNotLoad => 'Could not load template';
+
+  @override
+  String get templatePreviewFailed => 'Template preview failed';
+
+  @override
+  String get templateHandoffFailed => 'Could not hand off template video';
+
+  @override
+  String get templateApplying => 'Applying template…';
+
+  @override
+  String get templateAddMediaToPreview => 'Add media to preview';
+
+  @override
+  String get templateNeedMediaFirst => 'Take or add a photo/video first';
+
+  @override
+  String get mediaStudioTemplates => 'Templates';
 }

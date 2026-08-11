@@ -80,18 +80,46 @@ class HomeLayoutConstants {
       feedStackedProgressLayoutHeight +
       progressBarBottomInset;
 
+  /// Returns a responsive height multiplier relative to standard phone height (844.0).
+  static double heightScale(
+    BuildContext context, {
+    double baseHeight = 844.0,
+    double minScale = 0.8,
+    double maxScale = 1.25,
+  }) {
+    final height = MediaQuery.sizeOf(context).height;
+    if (height <= 0) return 1.0;
+    return (height / baseHeight).clamp(minScale, maxScale);
+  }
+
+  /// Returns a responsive width multiplier relative to standard phone width (390.0).
+  static double widthScale(
+    BuildContext context, {
+    double baseWidth = 390.0,
+    double minScale = 0.85,
+    double maxScale = 1.2,
+  }) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width <= 0) return 1.0;
+    return (width / baseWidth).clamp(minScale, maxScale);
+  }
+
   /// Matches [LiquidGlassBottomNav] vertical size (for overlay alignment).
   /// Uses [MediaQuery.viewPadding] so it stays correct when the scaffold body
   /// strips bottom padding ([extendBody]).
   static double homeBottomNavExtent(BuildContext context) {
     final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
-    const tabLabelHeight = navLabelFontSize * 1.25;
-    const tabColumnHeight = navIconSize + navIconLabelGap + tabLabelHeight;
-    const centerSlotHeight = addButtonHeight + navItemBottomPadding;
+    final scale = heightScale(context, minScale: 0.85, maxScale: 1.15);
+    final iconSize = navIconSize * scale;
+    final topPadding = bottomNavTopPadding * scale;
+    final safeExtra = bottomNavSafeExtra * scale;
+    final tabLabelHeight = navLabelFontSize * 1.25 * scale;
+    final tabColumnHeight = iconSize + (navIconLabelGap * scale) + tabLabelHeight;
+    final centerSlotHeight = (addButtonHeight * scale) + (navItemBottomPadding * scale);
     final rowHeight = tabColumnHeight > centerSlotHeight
         ? tabColumnHeight
         : centerSlotHeight;
-    return bottomNavTopPadding + rowHeight + safeBottom + bottomNavSafeExtra;
+    return topPadding + rowHeight + safeBottom + safeExtra;
   }
 
   /// Bottom inset for feed media/overlays when search is collapsed: matches the
@@ -99,7 +127,8 @@ class HomeLayoutConstants {
   static double homeFeedBottomBarReservedHeight(BuildContext context) {
     final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
     final nav = homeBottomNavExtent(context);
-    final design = mainBottomNavHeight + safeBottom;
+    final scaledNavHeight = mainBottomNavHeight * heightScale(context, minScale: 0.85, maxScale: 1.1);
+    final design = scaledNavHeight + safeBottom;
     return nav > design ? nav : design;
   }
 

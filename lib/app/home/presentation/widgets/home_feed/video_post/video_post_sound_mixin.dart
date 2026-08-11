@@ -42,21 +42,27 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     return Duration(milliseconds: ms);
   }
 
-  /// Playback window on the video timeline (0 → this duration), capped by video
-  /// length when the sound segment is longer than the clip.
-  Duration? get _segmentPlaybackDuration {
+  /// Length of the attached sound clip (endMs − startMs), if configured.
+  Duration? get _soundSegmentLength {
     if (!_hasSegmentWindow) return null;
     final sound = widget.post.sound!;
     final segmentLenMs = sound.endMs! - sound.startMs!;
     if (segmentLenMs <= 0) return null;
-
-    if (_syncSoundWithVideoSlide) {
-      final videoMs = _resolvedVideoDurationMs();
-      if (videoMs != null && videoMs > 0 && videoMs < segmentLenMs) {
-        return Duration(milliseconds: videoMs);
-      }
-    }
     return Duration(milliseconds: segmentLenMs);
+  }
+
+  /// Max position for [CustomVideoPlayer.segmentMaxPosition].
+  ///
+  /// Image + sound: the sound window is the playback length.
+  /// Video + sound: always play the full video — never shorten a long clip to
+  /// a short soundtrack (that made 27s videos loop at ~12s while UI showed 27).
+  Duration? get _segmentPlaybackDuration {
+    if (!_hasSegmentWindow) return null;
+    if (_syncSoundWithVideoSlide) {
+      // Full video; soundtrack loops via [LoopMode.one] / segment-end handler.
+      return null;
+    }
+    return _soundSegmentLength;
   }
 
   /// For feed chrome: pass to [CustomVideoPlayer.segmentMaxPosition].
@@ -73,15 +79,23 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     return ms > 0 ? ms : null;
   }
 
+  /// End of the clipped soundtrack on the source audio timeline.
+  /// When the video is shorter than the sound segment, trim audio to the clip.
   Duration? _effectiveClipEndOnSource() {
     final start = _segmentStart ?? Duration.zero;
     final end = _segmentEnd;
     if (end == null || end <= start) return null;
 
-    final playWindow = _segmentPlaybackDuration;
-    if (playWindow == null) return end;
-    final cappedEnd = start + playWindow;
-    return cappedEnd > end ? end : cappedEnd;
+    if (_syncSoundWithVideoSlide) {
+      final videoMs = _resolvedVideoDurationMs();
+      if (videoMs != null && videoMs > 0) {
+        final maxEnd = start.inMilliseconds + videoMs;
+        if (end.inMilliseconds > maxEnd) {
+          return Duration(milliseconds: maxEnd);
+        }
+      }
+    }
+    return end;
   }
 
   String _clipSignature(String audioUrl) {
@@ -163,6 +177,14 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
       }
     }
 
+    // Short sound posts: video hits EOF before the sound window is known —
+    // don't kill the soundtrack while the player is restarting the loop.
+    final videoDuration = controller?.playbackDuration ?? Duration.zero;
+    if (videoDuration > Duration.zero &&
+        pos >= videoDuration - const Duration(milliseconds: 200)) {
+      return;
+    }
+
     unawaited(pausePostSound());
   }
 
@@ -175,13 +197,74 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     if (!_hasExternalSoundtrack || !soundPlaybackActive) return;
     final player = _postSoundPlayer;
     if (player == null) return;
+
+    // Video + soundtrack: never restart audio alone while the clip is still
+    // seeking/loading — wait until video is playing near the start again.
+    if (_syncSoundWithVideoSlide) {
+      final controller = soundVideoControllers[soundCurrentPage];
+      final pos = controller?.playbackPosition ?? Duration.zero;
+      final duration = controller?.playbackDuration ?? Duration.zero;
+      final nearStart = pos <= const Duration(milliseconds: 450);
+      final nearEnd = duration > Duration.zero &&
+          pos >= duration - const Duration(milliseconds: 450);
+      final videoPlaying = controller?.isPlaying ?? false;
+
+      // Sound clip ended mid-video — realign to the video clock, don't hard reset.
+      if (!nearStart && !nearEnd && videoPlaying) {
+        try {
+          await _alignPostSoundToVideo(force: true);
+          if (_postSoundVolume > 0) {
+            await player.setVolume(_postSoundVolume);
+            if (!player.playing) await player.play();
+          }
+        } catch (_) {}
+        return;
+      }
+
+      try {
+        await player.pause();
+        await player.seek(Duration.zero);
+      } catch (_) {}
+
+      final ready = await _waitForVideoReplayReady();
+      if (!ready || !mounted || !soundPlaybackActive) return;
+
+      try {
+        if (_postSoundVolume > 0) {
+          await player.setVolume(_postSoundVolume);
+          await player.play();
+        }
+      } catch (_) {}
+      return;
+    }
+
+    // Image + soundtrack: restart the bed immediately.
     try {
       await player.seek(Duration.zero);
-      if (_postSoundVolume > 0 && !player.playing) {
+      if (_postSoundVolume > 0) {
         await player.setVolume(_postSoundVolume);
-        await player.play();
+        if (!player.playing) {
+          await player.play();
+        }
       }
     } catch (_) {}
+  }
+
+  /// True once the video has seeked back and is actually playing near 0:00.
+  Future<bool> _waitForVideoReplayReady() async {
+    final controller = soundVideoControllers[soundCurrentPage];
+    if (controller == null) return false;
+
+    for (var i = 0; i < 50; i++) {
+      if (!mounted || !soundPlaybackActive) return false;
+      final playing = controller.isPlaying;
+      final pos = controller.playbackPosition;
+      if (playing && pos < const Duration(milliseconds: 600)) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+    return soundVideoControllers[soundCurrentPage]?.isPlaying ?? false;
   }
 
   Future<void> onVideoSeekSync(
@@ -281,6 +364,12 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
       return;
     }
     await _restartSegmentIfAtEnd();
+    // Hold audio until the video texture is actually playing (not just queued).
+    final ready = await _waitForVideoReplayReady();
+    if (!ready || !_videoSlideSoundShouldPlay()) {
+      await pausePostSound();
+      return;
+    }
     await ensurePostSoundPrepared();
     if (!_videoSlideSoundShouldPlay()) {
       await pausePostSound();
@@ -336,8 +425,25 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     return videoPosition;
   }
 
+  /// Map video clock → position inside the clipped soundtrack.
+  /// When video is longer than the sound clip, wrap with modulo so audio stays
+  /// in sync across the full clip.
   Duration _playerSeekPosition(Duration videoPosition) {
-    return _clampVideoPosition(videoPosition);
+    final clipped = _clampVideoPosition(videoPosition);
+    if (!_syncSoundWithVideoSlide) return clipped;
+
+    final soundLen = _soundSegmentLength;
+    if (soundLen == null || soundLen.inMilliseconds <= 0) return clipped;
+
+    final videoMs = _resolvedVideoDurationMs();
+    // Video shorter than / equal to sound — 1:1 mapping inside the clip.
+    if (videoMs != null && videoMs > 0 && videoMs <= soundLen.inMilliseconds) {
+      return clipped;
+    }
+
+    final lenMs = soundLen.inMilliseconds;
+    final posMs = videoPosition.isNegative ? 0 : videoPosition.inMilliseconds;
+    return Duration(milliseconds: posMs % lenMs);
   }
 
   Future<void> seekPostSoundToVideoPosition(Duration videoPosition) async {

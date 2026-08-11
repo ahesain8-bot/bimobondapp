@@ -28,6 +28,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/comments_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
+import 'package:bimobondapp/app/video_templates/domain/usecases/video_templates_usecases.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
@@ -89,6 +90,13 @@ Future<void> initPosts() async {
       createStoryUseCase: sl(),
       getStoryRingsUseCase: sl(),
       deleteStoryUseCase: sl(),
+      applyVideoTemplateUseCase: sl.isRegistered<ApplyVideoTemplateUseCase>()
+          ? sl<ApplyVideoTemplateUseCase>()
+          : null,
+      completeVideoTemplateProjectUseCase:
+          sl.isRegistered<CompleteVideoTemplateProjectUseCase>()
+              ? sl<CompleteVideoTemplateProjectUseCase>()
+              : null,
     ),
   );
 

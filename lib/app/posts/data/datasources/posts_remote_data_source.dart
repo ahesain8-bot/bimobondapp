@@ -22,7 +22,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 abstract class PostsRemoteDataSource {
   Future<PostModel> createPost(Map<String, dynamic> postData);
-  Future<String> uploadMedia(File file);
+  Future<String> uploadMedia(
+    File file, {
+    void Function(int sent, int total)? onSendProgress,
+  });
   Future<FeedRemotePage> getFeed(Map<String, dynamic> queryParams);
   Future<HashtagsPageModel> getHashtags({
     int page = 1,
@@ -100,6 +103,20 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
 
   /// Feed payloads can be large; allow longer than the default API client.
   static const Duration _feedRequestTimeout = Duration(seconds: 30);
+
+  /// Async add-post uploads (video/template) often exceed the 10s ApiClient
+  /// default. Scale with file size so the request can finish instead of
+  /// timing out while still uploading.
+  static Duration _uploadTimeoutForFile(File file) {
+    int bytes = 0;
+    try {
+      bytes = file.lengthSync();
+    } catch (_) {}
+    final mb = bytes / (1024 * 1024);
+    // Base 3 min + ~1 min per MB; clamp 3–45 min.
+    final seconds = (180 + (mb * 60)).round().clamp(180, 2700);
+    return Duration(seconds: seconds);
+  }
 
   /// Firebase token when available; otherwise relies on [ApiClient] AUTH_TOKEN.
   Future<Map<String, dynamic>> _optionalAuthHeaders() async {
@@ -384,7 +401,10 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
   }
 
   @override
-  Future<String> uploadMedia(File file) async {
+  Future<String> uploadMedia(
+    File file, {
+    void Function(int sent, int total)? onSendProgress,
+  }) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -396,15 +416,20 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       final formData = FormData.fromMap({
         'files': await MultipartFile.fromFile(file.path, filename: fileName),
       });
+      final uploadTimeout = _uploadTimeoutForFile(file);
 
       final response = await apiClient.dio.post(
         ApiConstants.uploadMedia,
         data: formData,
+        onSendProgress: onSendProgress,
         options: Options(
           headers: {
             'Authorization': 'Bearer $idToken',
             'Content-Type': 'multipart/form-data',
           },
+          // Override ApiClient 10s defaults — wait for the full upload.
+          sendTimeout: uploadTimeout,
+          receiveTimeout: uploadTimeout,
         ),
       );
 
@@ -450,7 +475,12 @@ class PostsRemoteDataSourceImpl implements PostsRemoteDataSource {
       final response = await apiClient.dio.post(
         ApiConstants.createPost,
         data: postData,
-        options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+        options: Options(
+          headers: {'Authorization': 'Bearer $idToken'},
+          // Server may validate media after upload; don't use the 10s default.
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

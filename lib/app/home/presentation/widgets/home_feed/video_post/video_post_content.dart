@@ -67,6 +67,11 @@ class VideoPostContent extends StatelessWidget {
       size.height,
     );
 
+    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.75, maxScale: 1.2);
+    final sideActionsBottomOffset = bottom + (16.0 * heightScale).clamp(10.0, 24.0);
+    final topClearance = (feedTopBarClearance ??
+        (HomeLayoutConstants.feedTopTabsTopPadding * heightScale)).clamp(10.0, 24.0);
+
     return Container(
       height: size.height,
       width: size.width,
@@ -104,10 +109,7 @@ class VideoPostContent extends StatelessWidget {
           ),
           if (displayMedia.length > 1)
             Positioned(
-              top:
-                  MediaQuery.of(context).padding.top +
-                  (feedTopBarClearance ??
-                      HomeLayoutConstants.feedTopTabsTopPadding),
+              top: MediaQuery.of(context).padding.top + topClearance,
               left: 0,
               right: 0,
               child: Center(
@@ -119,7 +121,7 @@ class VideoPostContent extends StatelessWidget {
             ),
           Positioned(
             right: VideoPostLayoutConstants.actionColumnInset,
-            bottom: bottom + 20,
+            bottom: sideActionsBottomOffset,
             child: VideoPostTransitionDim(
               pageController: pageController,
               pageIndex: pageIndex,

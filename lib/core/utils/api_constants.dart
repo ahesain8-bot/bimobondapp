@@ -1,6 +1,7 @@
 class ApiConstants {
   static const String baseUrl = 'http://134.209.2.225';
   //http://192.168.1.123:3000
+  // http://134.209.2.225
   static const String apiKey =
       'YOUR_API_KEY'; // Replace with your ReqRes API Key
   static const String backendLogin = '/auth/login';
@@ -124,6 +125,41 @@ class ApiConstants {
   static const String cameraStudioEffectPlacementSchema =
       '/camera-studio/effect-placement/schema';
 
+  /// Phase 8 native-camera backend effects catalog (NestJS `GET /effects`).
+  static const String cameraEngineEffects = '/effects';
+
+  // Video / photo templates (TikTok-style)
+  static const String videoTemplates = '/video-templates';
+  static const String videoTemplatesPhoto = '/video-templates/photo';
+  static const String videoTemplatesFeatured = '/video-templates/featured';
+  static const String videoTemplatesTrending = '/video-templates/trending';
+  static const String videoTemplatesCategories = '/video-templates/categories';
+  static const String videoTemplatesSearch = '/video-templates/search';
+  static const String videoTemplateProjects = '/video-templates/projects';
+  static String videoTemplateById(String id) => '/video-templates/$id';
+  static String videoTemplateRecipe(String id) => '/video-templates/$id/recipe';
+  static String videoTemplateUse(String id) => '/video-templates/$id/use';
+  static String videoTemplatesBySound(String soundId) =>
+      '/video-templates/by-sound/$soundId';
+  static String videoTemplateProjectById(String projectId) =>
+      '/video-templates/projects/$projectId';
+  static String videoTemplateProjectSlot(String projectId, String slotId) =>
+      '/video-templates/projects/$projectId/slots/$slotId';
+  static String videoTemplateProjectComplete(String projectId) =>
+      '/video-templates/projects/$projectId/complete';
+  static String videoTemplateProjectExport(String projectId) =>
+      '/video-templates/projects/$projectId/export';
+  static String videoTemplateProjectExportById(
+    String projectId,
+    String exportId,
+  ) => '/video-templates/projects/$projectId/exports/$exportId';
+
+  /// SSE progress stream (preferred over polling while PROCESSING).
+  static String videoTemplateProjectExportStream(
+    String projectId,
+    String exportId,
+  ) => '/video-templates/projects/$projectId/exports/$exportId/stream';
+
   static String get cameraStudioCatalogUrl => '$baseUrl$cameraStudioCatalog';
 
   // Chats
@@ -198,4 +234,33 @@ class ApiConstants {
 
   // User interests
   static const String userInterests = '/users/me/interests';
+
+  // Shop / products (platform catalog — browse & buy; admin manages listings)
+  static const String products = '/products';
+  static const String productsShop = '/products/shop';
+  static const String productCategories = '/product-categories';
+  static const String productsCart = '/products/cart';
+  static const String productsCartItems = '/products/cart/items';
+  static const String productsCheckoutPreview = '/products/checkout/preview';
+  static const String productsCheckout = '/products/checkout';
+  static const String productsOrdersMine = '/products/orders/mine';
+  static const String productsOrdersSales = '/products/orders/sales';
+  static const String productsPurchased = '/products/purchased';
+  static String productById(String id) => '/products/$id';
+  static String productsCartItem(String id) => '/products/cart/items/$id';
+  static String productsOrderById(String id) => '/products/orders/$id';
+  static String productsOrderShip(String id) => '/products/orders/$id/ship';
+  static String productsOrderReceive(String id) =>
+      '/products/orders/$id/receive';
+  static String productsOrderAccept(String id) => '/products/orders/$id/accept';
+  static String productsOrderDispute(String id) =>
+      '/products/orders/$id/dispute';
+  static String productsLiveItems(String liveId) =>
+      '/products/lives/$liveId/items';
+  static String productsLiveItem(String liveId, String productId) =>
+      '/products/lives/$liveId/items/$productId';
+  static String productsLiveItemPin(String liveId, String productId) =>
+      '/products/lives/$liveId/items/$productId/pin';
+  static String productsLiveItemsReorder(String liveId) =>
+      '/products/lives/$liveId/items/reorder';
 }

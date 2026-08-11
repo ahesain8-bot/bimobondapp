@@ -140,6 +140,15 @@ class UpdatePostSuccess extends PostsState {
   List<Object?> get props => [post];
 }
 
+class DeletePostLoading extends PostsState {
+  final String postId;
+
+  const DeletePostLoading(this.postId);
+
+  @override
+  List<Object?> get props => [postId];
+}
+
 class DeletePostSuccess extends PostsState {
   final String postId;
 
@@ -147,6 +156,16 @@ class DeletePostSuccess extends PostsState {
 
   @override
   List<Object?> get props => [postId];
+}
+
+class DeletePostFailure extends PostsState {
+  final String postId;
+  final String message;
+
+  const DeletePostFailure(this.postId, this.message);
+
+  @override
+  List<Object?> get props => [postId, message];
 }
 
 class PostHiddenFromFeedState extends PostsState {

@@ -31,8 +31,11 @@ abstract final class FeedVideoPostsViewerLayout {
 
   /// [Positioned] `bottom` for [FeedVideoSearchProgressColumn] on the post stack.
   static double homeFeedPostStackChromeBottom(BuildContext context) {
+    final scale = HomeLayoutConstants.heightScale(context, minScale: 0.8, maxScale: 1.15);
+    final gapOffset = (-10.0 * scale).clamp(-12.0, -6.0);
     return homeFeedBottomNavReservedHeight(context) +
-        (HomeLayoutConstants.feedPostStackChromeGapAboveNav - 10);
+        HomeLayoutConstants.feedPostStackChromeGapAboveNav +
+        gapOffset;
   }
 
   /// Caption / side-action inset when search + progress sit on the post stack.

@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_layout_constants.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/constants/home_layout_constants.dart';
 import 'package:bimobondapp/core/constants/messages_layout_constants.dart';
@@ -81,10 +82,6 @@ class FeedSkeleton extends StatelessWidget {
   static const Color _background = Colors.black;
 
   // Match [VideoPostWidget] action column layout.
-  static const double _actionColumnInset = 8;
-  static const double _actionSpacing = 20;
-  static const double _contentActionSidePadding = 68;
-  static const double _contentEdgeInset = 16;
   static const double _profileAvatarSize = 48;
   static const double _actionIconSize = 40;
   static const double _musicDiscSize = 40;
@@ -92,7 +89,13 @@ class FeedSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = HomeLayoutConstants.feedPostBottomPadding;
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.75, maxScale: 1.2);
+    final sideActionsBottomOffset = bottom + (16.0 * heightScale).clamp(10.0, 24.0);
+    final avatarGap = VideoPostLayoutConstants.responsiveAvatarGap(context);
+    final actionGap = VideoPostLayoutConstants.responsiveActionSpacing(context);
+    final leftInset = VideoPostLayoutConstants.responsiveContentEdgeInset(context);
+    final rightInset = VideoPostLayoutConstants.responsiveContentActionSidePadding(context);
 
     return ColoredBox(
       color: _background,
@@ -126,84 +129,86 @@ class FeedSkeleton extends StatelessWidget {
                 ),
               ),
             ),
-            // Side actions — end side follows locale (LTR: right, RTL: left).
-            Positioned.directional(
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              end: _actionColumnInset,
-              bottom: bottom + 20,
-              child: const Column(
+            // Side actions — ALWAYS pinned to physical RIGHT (matching VideoPostContent layout in all locales).
+            Positioned(
+              right: VideoPostLayoutConstants.actionColumnInset,
+              bottom: sideActionsBottomOffset,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SkeletonWidget.circular(
+                  const SkeletonWidget.circular(
                     size: _profileAvatarSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: 22),
-                  SkeletonWidget.circular(
+                  SizedBox(height: avatarGap),
+                  const SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: _actionSpacing),
-                  SkeletonWidget.circular(
+                  SizedBox(height: actionGap),
+                  const SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: _actionSpacing),
-                  SkeletonWidget.circular(
+                  SizedBox(height: actionGap),
+                  const SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: _actionSpacing),
-                  SkeletonWidget.circular(
+                  SizedBox(height: actionGap),
+                  const SkeletonWidget.circular(
                     size: _actionIconSize,
                     onBlackBackground: true,
                   ),
-                  SizedBox(height: _actionSpacing),
-                  SkeletonWidget.circular(
+                  SizedBox(height: actionGap),
+                  const SkeletonWidget.circular(
                     size: _musicDiscSize,
                     onBlackBackground: true,
                   ),
                 ],
               ),
             ),
-            // Caption / sound block — start side follows locale.
+            // Caption / sound block — ALWAYS pinned to physical LEFT (matching VideoPostBottomInfo LTR alignment).
             Positioned(
               left: 0,
               right: 0,
               bottom: bottom,
-              child: Padding(
-                padding: EdgeInsetsDirectional.only(
-                  start: _contentEdgeInset,
-                  end: _contentActionSidePadding,
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SkeletonWidget(
-                      height: 16,
-                      width: 140,
-                      onBlackBackground: true,
-                    ),
-                    SizedBox(height: 10),
-                    SkeletonWidget(
-                      height: 14,
-                      width: double.infinity,
-                      onBlackBackground: true,
-                    ),
-                    SizedBox(height: 6),
-                    SkeletonWidget(
-                      height: 14,
-                      width: 180,
-                      onBlackBackground: true,
-                    ),
-                    SizedBox(height: 10),
-                    SkeletonWidget(
-                      height: 12,
-                      width: 120,
-                      onBlackBackground: true,
-                    ),
-                  ],
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: leftInset,
+                    right: rightInset,
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SkeletonWidget(
+                        height: 16,
+                        width: 140,
+                        onBlackBackground: true,
+                      ),
+                      SizedBox(height: 10),
+                      SkeletonWidget(
+                        height: 14,
+                        width: double.infinity,
+                        onBlackBackground: true,
+                      ),
+                      SizedBox(height: 6),
+                      SkeletonWidget(
+                        height: 14,
+                        width: 180,
+                        onBlackBackground: true,
+                      ),
+                      SizedBox(height: 10),
+                      SkeletonWidget(
+                        height: 12,
+                        width: 120,
+                        onBlackBackground: true,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

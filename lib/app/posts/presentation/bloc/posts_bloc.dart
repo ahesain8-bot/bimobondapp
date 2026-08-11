@@ -19,11 +19,16 @@ import 'package:bimobondapp/app/posts/domain/usecases/update_post_usecase.dart';
 import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/posts/presentation/utils/pending_post_uploads.dart';
 import 'package:bimobondapp/app/stories/domain/entities/story_entities.dart';
 import 'package:bimobondapp/app/stories/domain/usecases/stories_usecases.dart';
+import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/app/video_templates/domain/usecases/video_templates_usecases.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
 import 'package:bimobondapp/core/utils/media_upload_utils.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PostsBloc extends Bloc<PostsEvent, PostsState> {
@@ -40,6 +45,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
   final CreateStoryUseCase createStoryUseCase;
   final GetStoryRingsUseCase getStoryRingsUseCase;
   final DeleteStoryUseCase deleteStoryUseCase;
+  final ApplyVideoTemplateUseCase? applyVideoTemplateUseCase;
+  final CompleteVideoTemplateProjectUseCase? completeVideoTemplateProjectUseCase;
 
   PostsBloc({
     required this.createPostUseCase,
@@ -55,6 +62,8 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     required this.createStoryUseCase,
     required this.getStoryRingsUseCase,
     required this.deleteStoryUseCase,
+    this.applyVideoTemplateUseCase,
+    this.completeVideoTemplateProjectUseCase,
   }) : super(PostsInitial()) {
     on<UploadMediaRequestedEvent>(_onUploadMediaRequested);
     on<CreatePostRequestedEvent>(_onCreatePostRequested);
@@ -104,17 +113,18 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     DeletePostRequestedEvent event,
     Emitter<PostsState> emit,
   ) async {
+    emit(DeletePostLoading(event.postId));
     if (event.isStory) {
       final result = await deleteStoryUseCase(event.postId);
       result.fold(
-        (failure) => emit(PostsFailure(failure.message)),
+        (failure) => emit(DeletePostFailure(event.postId, failure.message)),
         (_) => emit(DeletePostSuccess(event.postId)),
       );
       return;
     }
     final result = await deletePostUsecase(event.postId);
     result.fold(
-      (failure) => emit(PostsFailure(failure.message)),
+      (failure) => emit(DeletePostFailure(event.postId, failure.message)),
       (_) => emit(DeletePostSuccess(event.postId)),
     );
   }
@@ -183,16 +193,37 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
     );
   }
 
-  Future<String> _uploadMediaFile(File file) async {
+  Future<String> _uploadMediaFile(
+    File file, {
+    double rangeStart = 0,
+    double rangeEnd = 1,
+  }) async {
     final prepared = await MediaUploadUtils.prepareForUpload(file);
     try {
-      final result = await uploadMediaUseCase(prepared);
+      final result = await uploadMediaUseCase(
+        prepared,
+        onSendProgress: (sent, total) {
+          if (!PendingPostUploads.instance.hasPending) return;
+          if (total <= 0) return;
+          final local = (sent / total).clamp(0.0, 1.0);
+          final overall =
+              rangeStart + (rangeEnd - rangeStart) * local;
+          // Reserve the last 5% for create-post.
+          PendingPostUploads.instance.updateProgress(overall * 0.95);
+        },
+      );
       return result.fold(
         (failure) => throw Exception(failure.message),
         (url) => url,
       );
     } finally {
       await MediaUploadUtils.deleteIfTemp(file, prepared);
+    }
+  }
+
+  void _markPendingPublishing() {
+    if (PendingPostUploads.instance.hasPending) {
+      PendingPostUploads.instance.updateProgress(0.97);
     }
   }
 
@@ -220,27 +251,168 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
       String? videoUrl;
       String? thumbnailUrl;
       File? primaryVideoFile;
+      var postType = event.type;
+      var templateProjectId = event.templateProjectId;
+      var soundSegmentId = event.soundSegmentId;
+      var videoTemplateId = event.videoTemplateId?.trim();
+      if (videoTemplateId != null && videoTemplateId.isEmpty) {
+        videoTemplateId = null;
+      }
 
-      for (int i = 0; i < event.files.length; i++) {
-        final file = event.files[i];
-        final isVideo = VideoThumbnailUtils.isVideoFile(file);
+      final applyUseCase = applyVideoTemplateUseCase;
+      final isTemplatePost = videoTemplateId != null &&
+          applyUseCase != null &&
+          !event.isStory;
 
-        if (isVideo) {
-          thumbnailUrl ??= await _uploadVideoThumbnail(file);
-          primaryVideoFile ??= file;
+      if (isTemplatePost) {
+        // Forced: always server export with quality=draft.
+        if (PendingPostUploads.instance.hasPending) {
+          PendingPostUploads.instance.updateProgress(0.05);
+        }
+        final slotFiles = (event.templateSlotFiles != null &&
+                event.templateSlotFiles!.isNotEmpty)
+            ? event.templateSlotFiles!
+            : event.files;
 
-          final url = await _uploadMediaFile(file);
-          videoUrl ??= url;
-          mediaEntities.add(
-            PostMediaEntity(url: url, mediaType: 'VIDEO', order: i),
-          );
+        final existingExport = MediaUtils.toServerUploadPath(
+          event.templateServerExportUrl?.trim() ?? '',
+        );
+
+        if (existingExport.isNotEmpty) {
+          videoUrl = existingExport;
+          postType = 'VIDEO';
+          templateProjectId =
+              VideoTemplateProjectIds.normalizeServerId(templateProjectId) ??
+                  templateProjectId;
+          if (slotFiles.isNotEmpty &&
+              !VideoThumbnailUtils.isVideoFile(slotFiles.first)) {
+            thumbnailUrl = await _uploadMediaFile(
+              slotFiles.first,
+              rangeStart: 0.55,
+              rangeEnd: 0.95,
+            );
+          }
+          if (PendingPostUploads.instance.hasPending) {
+            PendingPostUploads.instance.updateProgress(0.9);
+          }
         } else {
-          final url = await _uploadMediaFile(file);
-          mediaEntities.add(
-            PostMediaEntity(url: url, mediaType: 'IMAGE', order: i),
+          final applyResult = await applyUseCase(
+            selection: VideoTemplateSelection(
+              templateId: videoTemplateId,
+              name: '',
+              projectId:
+                  VideoTemplateProjectIds.normalizeServerId(templateProjectId),
+              soundSegmentId: soundSegmentId,
+            ),
+            localFiles: slotFiles,
+            preferServerExport: true,
+            allowClientFallback: false,
+            renderClientVideo: false,
+            exportQuality: 'draft',
           );
+          final applied = applyResult.fold<VideoTemplateApplyResult?>(
+            (_) => null,
+            (r) => r,
+          );
+          if (applied == null) {
+            applyResult.fold(
+              (f) => emit(PostsFailure(f.message)),
+              (_) => emit(PostsFailure('template_apply_failed')),
+            );
+            return;
+          }
+          if (PendingPostUploads.instance.hasPending) {
+            PendingPostUploads.instance.updateProgress(0.55);
+          }
+          templateProjectId = applied.projectId;
+          soundSegmentId =
+              applied.selection.soundSegmentId ?? soundSegmentId;
+          if (!applied.recipe.canAttachTemplateToPost) {
+            videoTemplateId = null;
+          }
+
+          final serverUrl = applied.serverExportUrl;
+          var rendered = applied.renderedVideo;
+          if (rendered != null && !await rendered.exists()) {
+            rendered = null;
+          }
+
+          if (serverUrl != null && serverUrl.isNotEmpty) {
+            videoUrl = serverUrl;
+            postType = 'VIDEO';
+            if (slotFiles.isNotEmpty &&
+                !VideoThumbnailUtils.isVideoFile(slotFiles.first)) {
+              thumbnailUrl = await _uploadMediaFile(
+                slotFiles.first,
+                rangeStart: 0.55,
+                rangeEnd: 0.95,
+              );
+            }
+            if (PendingPostUploads.instance.hasPending) {
+              PendingPostUploads.instance.updateProgress(0.9);
+            }
+          } else if (rendered != null) {
+            primaryVideoFile = rendered;
+            thumbnailUrl = await _uploadVideoThumbnail(rendered);
+            if (PendingPostUploads.instance.hasPending) {
+              PendingPostUploads.instance.updateProgress(0.65);
+            }
+            videoUrl = await _uploadMediaFile(
+              rendered,
+              rangeStart: 0.65,
+              rangeEnd: 0.95,
+            );
+            postType = 'VIDEO';
+          } else {
+            emit(
+              const PostsFailure(
+                'Template export failed — try again or check connection',
+              ),
+            );
+            return;
+          }
+        }
+      } else {
+        final n = event.files.length;
+        for (int i = 0; i < n; i++) {
+          final file = event.files[i];
+          final isVideo = VideoThumbnailUtils.isVideoFile(file);
+          final start = n == 0 ? 0.0 : i / n;
+          final end = n == 0 ? 1.0 : (i + 1) / n;
+
+          if (isVideo) {
+            // Thumbnail is a small share of this file's range.
+            final mid = start + (end - start) * 0.15;
+            thumbnailUrl ??= await _uploadVideoThumbnail(file);
+            // Rough bump after thumb (no Dio bytes for nested call weight).
+            if (PendingPostUploads.instance.hasPending) {
+              PendingPostUploads.instance.updateProgress(mid * 0.95);
+            }
+            primaryVideoFile ??= file;
+
+            final url = await _uploadMediaFile(
+              file,
+              rangeStart: mid,
+              rangeEnd: end,
+            );
+            videoUrl ??= url;
+            mediaEntities.add(
+              PostMediaEntity(url: url, mediaType: 'VIDEO', order: i),
+            );
+          } else {
+            final url = await _uploadMediaFile(
+              file,
+              rangeStart: start,
+              rangeEnd: end,
+            );
+            mediaEntities.add(
+              PostMediaEntity(url: url, mediaType: 'IMAGE', order: i),
+            );
+          }
         }
       }
+
+      _markPendingPublishing();
 
       PostAuctionInput? auction = event.auction;
       if (event.isAuctionable && auction != null) {
@@ -250,8 +422,6 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
         auction = auction.copyWith(itemImageUrl: coverUrl);
       }
 
-      // No library sound: register the recorded video audio as an original
-      // `newSound` so the post gets a reusable sound entity.
       final newSound = await _resolveNewSound(
         event: event,
         videoUrl: videoUrl,
@@ -291,7 +461,7 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
 
       final result = await createPostUseCase(
         CreatePostParams(
-          type: event.type,
+          type: postType,
           videoUrl: videoUrl,
           thumbnailUrl: thumbnailUrl,
           description: event.description,
@@ -303,9 +473,9 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           allowStitch: event.allowStitch,
           isAuctionable: event.isAuctionable,
           auction: event.isAuctionable ? auction : null,
-          media: mediaEntities,
+          media: mediaEntities.isEmpty ? null : mediaEntities,
           soundId: event.soundId,
-          soundSegmentId: event.soundSegmentId,
+          soundSegmentId: soundSegmentId,
           startMs: event.startMs,
           endMs: event.endMs,
           newSound: newSound,
@@ -314,28 +484,44 @@ class PostsBloc extends Bloc<PostsEvent, PostsState> {
           effectSlug: event.effectSlug,
           beautyEnabled: event.beautyEnabled,
           location: event.location,
+          videoTemplateId: videoTemplateId,
+          // Only link project when template id is attached (Nest photo-slot rule).
+          templateProjectId:
+              videoTemplateId != null ? templateProjectId : null,
         ),
       );
 
-      result.fold((failure) => emit(PostsFailure(failure.message)), (post) {
-        final chosen = event.sound;
-        PostEntity finalPost = post;
-        if (chosen != null) {
-          final enrichedSound = PostSoundEntity(
-            id: chosen.id,
-            name: chosen.name,
-            author: chosen.author,
-            duration: chosen.duration,
-            useCount: chosen.useCount,
-            audioUrl: chosen.resolvedAudioUrl,
-            segmentId: event.soundSegmentId ?? post.sound?.segmentId,
-            startMs: event.startMs ?? post.sound?.startMs,
-            endMs: event.endMs ?? post.sound?.endMs,
-          );
-          finalPost = post.copyWith(sound: enrichedSound);
-        }
-        emit(CreatePostSuccess(finalPost));
-      });
+      await result.fold(
+        (failure) async => emit(PostsFailure(failure.message)),
+        (post) async {
+          // Complete project after successful post (mobile-api sequence).
+          final projectId = templateProjectId?.trim();
+          final complete = completeVideoTemplateProjectUseCase;
+          if (projectId != null &&
+              projectId.isNotEmpty &&
+              complete != null) {
+            await complete(projectId);
+          }
+
+          final chosen = event.sound;
+          PostEntity finalPost = post;
+          if (chosen != null) {
+            final enrichedSound = PostSoundEntity(
+              id: chosen.id,
+              name: chosen.name,
+              author: chosen.author,
+              duration: chosen.duration,
+              useCount: chosen.useCount,
+              audioUrl: chosen.resolvedAudioUrl,
+              segmentId: soundSegmentId ?? post.sound?.segmentId,
+              startMs: event.startMs ?? post.sound?.startMs,
+              endMs: event.endMs ?? post.sound?.endMs,
+            );
+            finalPost = post.copyWith(sound: enrichedSound);
+          }
+          emit(CreatePostSuccess(finalPost));
+        },
+      );
     } catch (e) {
       emit(PostsFailure(ErrorMessageResolver.resolve(e)));
     }

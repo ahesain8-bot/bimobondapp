@@ -35,12 +35,47 @@ class SoundAudioPreview {
     await playAt(soundId, audioUrl);
   }
 
+  static Future<void>? _playLock;
+
   /// Plays [audioUrl] from [startOffset] for up to [window] (default 15s).
   ///
   /// When [loop] is false (picker preview), playback stops at the window end.
   /// When [loop] is true (media-studio bed), the window restarts so music keeps
   /// playing under the looping video preview.
   static Future<void> playAt(
+    String soundId,
+    String audioUrl, {
+    Duration startOffset = Duration.zero,
+    Duration window = const Duration(seconds: 15),
+    bool loop = false,
+  }) async {
+    // Serialize starts so overlapping template ready signals can't leave
+    // two AudioPlayers running (double music under preview).
+    final previous = _playLock;
+    final gate = Completer<void>();
+    _playLock = gate.future;
+    if (previous != null) {
+      try {
+        await previous;
+      } catch (_) {}
+    }
+    try {
+      await _playAtUnlocked(
+        soundId,
+        audioUrl,
+        startOffset: startOffset,
+        window: window,
+        loop: loop,
+      );
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      if (identical(_playLock, gate.future)) {
+        _playLock = null;
+      }
+    }
+  }
+
+  static Future<void> _playAtUnlocked(
     String soundId,
     String audioUrl, {
     Duration startOffset = Duration.zero,
@@ -104,6 +139,26 @@ class SoundAudioPreview {
         } catch (_) {}
       }
     }
+  }
+
+  static Future<void> pause() async {
+    final player = _player;
+    if (player == null) return;
+    try {
+      await player.pause();
+    } catch (_) {}
+  }
+
+  /// Seek the current bed back to its clip start and play (loop sync).
+  static Future<void> restartFromStart() async {
+    final player = _player;
+    if (player == null) return;
+    try {
+      await player.seek(Duration.zero);
+      if (!player.playing) {
+        await player.play();
+      }
+    } catch (_) {}
   }
 
   static Future<void> stop() async {

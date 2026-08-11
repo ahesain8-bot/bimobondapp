@@ -20,6 +20,21 @@ class MediaUtils {
     return '${ApiConstants.baseUrl}/$trimmed';
   }
 
+  /// Server render / slot PATCH require local `/uploads/...` paths, not CDN URLs.
+  /// Returns the path starting at `/uploads`, or the original trimmed string.
+  static String toServerUploadPath(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final uploadsIdx = trimmed.indexOf('/uploads/');
+    if (uploadsIdx >= 0) {
+      return trimmed.substring(uploadsIdx).split('?').first.split('#').first;
+    }
+    if (trimmed.startsWith('uploads/')) {
+      return '/$trimmed'.split('?').first.split('#').first;
+    }
+    return trimmed.split('?').first.split('#').first;
+  }
+
   static const List<String> videoExtensions = [
     '.mp4',
     '.mov',

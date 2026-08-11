@@ -157,6 +157,10 @@ class LiquidGlassBottomNav extends StatelessWidget {
         ? feedOverlay.overlayForegroundMuted
         : theme.colorScheme.onSurface.withValues(alpha: 0.45);
 
+    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.85, maxScale: 1.15);
+    final topPadding = (HomeLayoutConstants.bottomNavTopPadding * heightScale).clamp(4.0, 12.0);
+    final safeExtra = (HomeLayoutConstants.bottomNavSafeExtra * heightScale).clamp(4.0, 12.0);
+
     Widget navBar = Container(
       decoration: BoxDecoration(
         color: glassStyle ? Colors.black : theme.scaffoldBackgroundColor,
@@ -171,8 +175,8 @@ class LiquidGlassBottomNav extends StatelessWidget {
       padding: EdgeInsets.only(
         bottom:
             MediaQuery.viewPaddingOf(context).bottom +
-            HomeLayoutConstants.bottomNavSafeExtra,
-        top: HomeLayoutConstants.bottomNavTopPadding,
+            safeExtra,
+        top: topPadding,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -253,7 +257,11 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected ? selectedColor : unselectedColor;
 
-    final size = HomeLayoutConstants.navIconSize;
+    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.85, maxScale: 1.15);
+    final size = (HomeLayoutConstants.navIconSize * heightScale).clamp(22.0, 32.0);
+    final fontSize = (HomeLayoutConstants.navLabelFontSize * heightScale).clamp(8.0, 11.0);
+    final iconLabelGap = (HomeLayoutConstants.navIconLabelGap * heightScale).clamp(1.0, 4.0);
+
     final resolvedAsset = isSelected
         ? (selectedAssetPath ?? assetPath)
         : assetPath;
@@ -287,12 +295,12 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           iconWidget,
-          const SizedBox(height: HomeLayoutConstants.navIconLabelGap),
+          SizedBox(height: iconLabelGap),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: color,
-              fontSize: HomeLayoutConstants.navLabelFontSize,
+              fontSize: fontSize,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             ),
           ),

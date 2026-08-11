@@ -11,6 +11,7 @@ class ProfileHeaderBar extends StatelessWidget {
     required this.onAddFriends,
     required this.onWallet,
     required this.onSettings,
+    this.onShop,
     this.onShare,
     super.key,
   });
@@ -18,6 +19,7 @@ class ProfileHeaderBar extends StatelessWidget {
   final VoidCallback onAddFriends;
   final VoidCallback onWallet;
   final VoidCallback onSettings;
+  final VoidCallback? onShop;
   final VoidCallback? onShare;
 
   @override
@@ -52,6 +54,17 @@ class ProfileHeaderBar extends StatelessWidget {
                 color: AppCoinColors.icon,
               ),
             ),
+            if (onShop != null)
+              IconButton(
+                onPressed: onShop,
+                tooltip: 'Shop',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  LucideIcons.shoppingBag,
+                  size: ProfileLayoutConstants.headerMenuIconSize,
+                  color: iconColor,
+                ),
+              ),
             const Spacer(),
             if (onShare != null)
               IconButton(

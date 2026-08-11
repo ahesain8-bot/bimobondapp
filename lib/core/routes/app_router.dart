@@ -33,6 +33,7 @@ import 'package:bimobondapp/app/home/presentation/pages/add_post_camera_screen.d
 import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/camera_filter_catalog.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.dart';
+import 'package:bimobondapp/app/video_templates/presentation/pages/video_templates_browser_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
@@ -50,8 +51,17 @@ import 'package:bimobondapp/app/wallets/presentation/pages/balance_transaction_d
 import 'package:bimobondapp/app/wallets/presentation/pages/add_payout_method_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
+import 'package:bimobondapp/app/shop/domain/entities/checkout_entity.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/cart_screen.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/checkout_screen.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/ecommerce_home_screen.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/order_details_screen.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/orders_screen.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/product_details_screen.dart';
+import 'package:bimobondapp/app/shop/presentation/pages/shop_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/hashtag_feed_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/camera_effect_test_screen.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_phase1_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/posts_search_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/ended_auctions_screen.dart';
 import 'package:bimobondapp/app/seller_verification/presentation/pages/seller_verification_screen.dart';
@@ -330,9 +340,98 @@ class AppRouter {
         builder: (context, state) => const LivesScreen(),
       ),
       GoRoute(
+        path: '/shop',
+        name: EcommerceHomeScreen.routeName,
+        builder: (context, state) => const EcommerceHomeScreen(),
+      ),
+      GoRoute(
+        path: '/shop/search',
+        name: ShopSearchScreen.routeName,
+        builder: (context, state) => const ShopSearchScreen(),
+      ),
+      GoRoute(
+        path: '/shop/cart',
+        name: CartScreen.routeName,
+        builder: (context, state) => const CartScreen(),
+      ),
+      GoRoute(
+        path: '/shop/checkout',
+        name: CheckoutScreen.routeName,
+        builder: (context, state) {
+          final liveId = state.uri.queryParameters['liveId'];
+          final postId = state.uri.queryParameters['postId'];
+          final extra = state.extra;
+          List<CheckoutItemInput>? items;
+          if (extra is Map) {
+            final raw = extra['items'];
+            if (raw is List) {
+              items = raw.whereType<CheckoutItemInput>().toList();
+            }
+          } else if (extra is List) {
+            items = extra.whereType<CheckoutItemInput>().toList();
+          }
+          if (items != null && items.isEmpty) items = null;
+          return CheckoutScreen(
+            liveId: liveId,
+            postId: postId,
+            items: items,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/orders',
+        name: OrdersScreen.routeName,
+        builder: (context, state) {
+          final tab = state.uri.queryParameters['tab'];
+          final purchasesOnly =
+              state.uri.queryParameters['only'] == 'purchases' ||
+                  tab == 'purchases_only';
+          final initialTabIndex = switch (tab) {
+            'sales' || '1' => 1,
+            _ => 0,
+          };
+          return OrdersScreen(
+            initialTabIndex: initialTabIndex,
+            purchasesOnly: purchasesOnly,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/orders/:orderId',
+        name: OrderDetailsScreen.routeName,
+        builder: (context, state) {
+          final orderId = state.pathParameters['orderId'] ?? '';
+          final fromCheckout =
+              state.uri.queryParameters['fromCheckout'] == '1';
+          return OrderDetailsScreen(
+            orderId: orderId,
+            showGoToMyProducts: fromCheckout,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/products/:productId',
+        name: ProductDetailsScreen.routeName,
+        builder: (context, state) {
+          final productId = state.pathParameters['productId'] ?? '';
+          final liveId = state.uri.queryParameters['liveId'];
+          final postId = state.uri.queryParameters['postId'];
+          return ProductDetailsScreen(
+            productId: productId,
+            liveId: liveId,
+            postId: postId,
+          );
+        },
+      ),
+      GoRoute(
         path: '/effect-test',
         name: 'effect_test',
         builder: (context, state) => const CameraEffectTestScreen(),
+      ),
+      GoRoute(
+        path: '/native-camera-phase1',
+        name: 'native_camera_phase1',
+        builder: (context, state) => const NativeCameraPhase1Screen(),
       ),
       GoRoute(
         path: '/posts-search',
@@ -482,6 +581,16 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/video-templates',
+        name: 'video_templates_browser',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return VideoTemplatesBrowserScreen(
+            initialKind: extra?['templateKind'] as String?,
+          );
+        },
+      ),
+      GoRoute(
         path: '/media-studio-editor',
         name: 'media_studio_editor',
         pageBuilder: (context, state) {
@@ -509,6 +618,11 @@ class AppRouter {
                 extra['initialMuteOriginal'] as bool? ?? false,
             popOnDone: extra['popOnDone'] as bool? ?? false,
             initialEdit: MediaEditorSeed.fromExtra(extra['initialEdit']),
+            initialVideoTemplateId: extra['videoTemplateId'] as String?,
+            initialVideoTemplateName: extra['videoTemplateName'] as String?,
+            initialVideoTemplateSlotCount:
+                extra['videoTemplateSlotCount'] as int?,
+            initialTemplateProjectId: extra['templateProjectId'] as String?,
           );
           // Instant push after capture — avoids a blank/flashy default transition.
           return CustomTransitionPage<MediaStudioExportResult>(
@@ -549,6 +663,19 @@ class AppRouter {
             initialFilterCategory: extra?['filterCategory'] as String?,
             initialEffectSlug: extra?['effectSlug'] as String?,
             initialBeautyEnabled: extra?['beautyEnabled'] as bool? ?? false,
+            initialVideoTemplateId: extra?['videoTemplateId'] as String?,
+            initialVideoTemplateName: extra?['videoTemplateName'] as String?,
+            initialVideoTemplateSlotCount:
+                extra?['videoTemplateSlotCount'] as int?,
+            initialTemplateProjectId: extra?['templateProjectId'] as String?,
+            initialTemplateRenderedVideo:
+                extra?['templateRenderedVideo'] as File?,
+            initialTemplateSlotFiles:
+                (extra?['templateSlotFiles'] as List?)?.whereType<File>().toList(),
+            initialTemplateServerExportUrl:
+                extra?['templateServerExportUrl'] as String?,
+            initialTemplateClientExportQuality:
+                extra?['templateClientExportQuality'] as String?,
           );
         },
       ),

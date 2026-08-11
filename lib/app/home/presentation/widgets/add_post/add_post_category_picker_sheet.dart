@@ -18,6 +18,7 @@ class AddPostCategoryPickerSheet {
     required List<CategoryEntity> categories,
     required CategoryEntity? selectedCategory,
     required ValueChanged<CategoryEntity> onSelected,
+    VoidCallback? onCleared,
   }) {
     if (categories.isEmpty) return Future.value();
 
@@ -37,6 +38,8 @@ class AddPostCategoryPickerSheet {
           categories: categories,
           selectedCategory: selectedCategory,
           onSelected: onSelected,
+          onCleared: onCleared,
+          noneLabel: l10n.soundNoneSelected,
         ),
       ),
     );
@@ -49,12 +52,16 @@ class _CategoryPickerBody extends StatelessWidget {
     required this.categories,
     required this.selectedCategory,
     required this.onSelected,
+    required this.noneLabel,
+    this.onCleared,
   });
 
   final String title;
   final List<CategoryEntity> categories;
   final CategoryEntity? selectedCategory;
   final ValueChanged<CategoryEntity> onSelected;
+  final VoidCallback? onCleared;
+  final String noneLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +69,8 @@ class _CategoryPickerBody extends StatelessWidget {
     final cardColor = theme.brightness == Brightness.dark
         ? const Color(0xFF2A2A2D)
         : const Color(0xFFF1F1F2);
+    final showNone = onCleared != null;
+    final itemCount = categories.length + (showNone ? 1 : 0);
 
     return Material(
       color: theme.colorScheme.surface,
@@ -103,7 +112,7 @@ class _CategoryPickerBody extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  itemCount: categories.length,
+                  itemCount: itemCount,
                   separatorBuilder: (_, _) => Divider(
                     height: 1,
                     indent: 72,
@@ -111,7 +120,18 @@ class _CategoryPickerBody extends StatelessWidget {
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
                   ),
                   itemBuilder: (context, index) {
-                    final category = categories[index];
+                    if (showNone && index == 0) {
+                      final selected = selectedCategory == null;
+                      return _NoneCategoryTile(
+                        label: noneLabel,
+                        selected: selected,
+                        onTap: () {
+                          onCleared!();
+                          Navigator.pop(context);
+                        },
+                      );
+                    }
+                    final category = categories[showNone ? index - 1 : index];
                     final selected = selectedCategory?.id == category.id;
                     return _CategoryTile(
                       category: category,
@@ -127,6 +147,75 @@ class _CategoryPickerBody extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NoneCategoryTile extends StatelessWidget {
+  const _NoneCategoryTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    final primary = theme.colorScheme.primary;
+
+    return Material(
+      color: selected
+          ? primary.withValues(alpha: 0.08)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.p16,
+            vertical: AppSizes.p12,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? primary.withValues(alpha: 0.14)
+                      : onSurface.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: selected
+                        ? primary.withValues(alpha: 0.35)
+                        : onSurface.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Icon(
+                  LucideIcons.circleSlash,
+                  size: 20,
+                  color: selected ? primary : onSurface.withValues(alpha: 0.75),
+                ),
+              ),
+              const SizedBox(width: AppSizes.p16),
+              Expanded(
+                child: CustomText(
+                  label,
+                  fontSize: 16,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: onSurface,
+                ),
+              ),
+              if (selected)
+                Icon(LucideIcons.check, size: 20, color: primary),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/theme/feed_overlay_theme.dart';
+import 'package:bimobondapp/app/shop/presentation/theme/shop_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -68,6 +69,16 @@ class AppTheme {
       ),
       extensions: [
         FeedOverlayTheme.forBrightness(Brightness.light),
+        ShopTheme.forBrightness(
+          Brightness.light,
+          ColorScheme.fromSeed(
+            seedColor: primaryColor,
+            brightness: Brightness.light,
+            primary: primaryColor,
+            secondary: secondaryColor,
+            surface: Colors.white,
+          ),
+        ),
         ChatTheme.forBrightness(
           Brightness.light,
           ColorScheme.fromSeed(
@@ -124,6 +135,16 @@ class AppTheme {
       ),
       extensions: [
         FeedOverlayTheme.forBrightness(Brightness.dark),
+        ShopTheme.forBrightness(
+          Brightness.dark,
+          ColorScheme.fromSeed(
+            seedColor: primaryColor,
+            brightness: Brightness.dark,
+            primary: primaryColor,
+            secondary: secondaryColor,
+            surface: const Color(0xFF1F1F1F),
+          ),
+        ),
         ChatTheme.forBrightness(
           Brightness.dark,
           ColorScheme.fromSeed(

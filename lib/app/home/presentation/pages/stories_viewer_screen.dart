@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_caption_display.dart';
+import 'package:bimobondapp/app/home/presentation/utils/post_delete_flow.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_grouping.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_l10n_format.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_insights_sheet.dart';
@@ -406,8 +407,8 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       confirmLabel: l10n.deleteAction,
       destructive: true,
       onConfirm: () {
-        context.read<PostsBloc>().add(
-          DeletePostRequestedEvent(post.id, isStory: true),
+        unawaited(
+          deletePostWithLoading(context, postId: post.id, isStory: true),
         );
       },
     ).whenComplete(() {

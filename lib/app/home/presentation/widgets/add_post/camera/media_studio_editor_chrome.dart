@@ -517,6 +517,9 @@ class MediaStudioBottomActions extends StatelessWidget {
     required this.nextLabel,
     required this.onYourStory,
     required this.onNext,
+    this.autoCutLabel = 'AutoCut',
+    this.onAutoCut,
+    this.autoCutActive = false,
     this.avatarUrl,
     this.enabled = true,
   });
@@ -525,60 +528,135 @@ class MediaStudioBottomActions extends StatelessWidget {
   final String nextLabel;
   final VoidCallback onYourStory;
   final VoidCallback onNext;
+  /// TikTok-style entry above the action pills — opens templates.
+  final String autoCutLabel;
+  final VoidCallback? onAutoCut;
+  final bool autoCutActive;
   final String? avatarUrl;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: _PillButton(
-              onTap: enabled ? onYourStory : null,
-              background: Colors.white,
-              foreground: Colors.black,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _StoryAvatar(avatarUrl: avatarUrl),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      yourStoryLabel,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
+          if (onAutoCut != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 28),
+              child: Center(
+                child: _AutoCutChip(
+                  label: autoCutLabel,
+                  active: autoCutActive,
+                  enabled: enabled,
+                  onTap: onAutoCut,
+                ),
+              ),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: _PillButton(
+                  onTap: enabled ? onYourStory : null,
+                  background: Colors.white,
+                  foreground: Colors.black,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _StoryAvatar(avatarUrl: avatarUrl),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          yourStoryLabel,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 1,
+                child: _PillButton(
+                  onTap: enabled ? onNext : null,
+                  background: LivesLayoutConstants.liveBadgeColor,
+                  foreground: Colors.white,
+                  child: Text(
+                    nextLabel,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
                     ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sparkle + label chip (TikTok AutoCut) that opens the template carousel.
+class _AutoCutChip extends StatelessWidget {
+  const _AutoCutChip({
+    required this.label,
+    required this.onTap,
+    this.active = false,
+    this.enabled = true,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool active;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final canTap = enabled && onTap != null;
+    return GestureDetector(
+      onTap: canTap ? onTap : null,
+      behavior: HitTestBehavior.opaque,
+      child: Opacity(
+        opacity: canTap ? 1 : 0.5,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              LucideIcons.sparkles,
+              size: 18,
+              color: active ? const Color(0xFFFF2D55) : Colors.white,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? const Color(0xFFFF2D55) : Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                shadows: const [
+                  Shadow(
+                    color: Colors.black54,
+                    blurRadius: 6,
+                    offset: Offset(0, 1),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            flex: 1,
-            child: _PillButton(
-              onTap: enabled ? onNext : null,
-              background: LivesLayoutConstants.liveBadgeColor,
-              foreground: Colors.white,
-              child: Text(
-                nextLabel,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

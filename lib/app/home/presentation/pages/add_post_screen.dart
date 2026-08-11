@@ -26,6 +26,7 @@ import 'package:bimobondapp/app/posts/domain/entities/post_location_entity.dart'
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
+import 'package:bimobondapp/app/posts/presentation/utils/pending_post_uploads.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/mention_composer_field.dart';
 import 'package:bimobondapp/app/posts/presentation/widgets/hashtag_picker_sheet.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/mention_picker_sheet.dart';
@@ -62,6 +63,14 @@ class AddPostScreen extends StatefulWidget {
     this.initialFilterCategory,
     this.initialEffectSlug,
     this.initialBeautyEnabled = false,
+    this.initialVideoTemplateId,
+    this.initialVideoTemplateName,
+    this.initialVideoTemplateSlotCount,
+    this.initialTemplateProjectId,
+    this.initialTemplateRenderedVideo,
+    this.initialTemplateSlotFiles,
+    this.initialTemplateServerExportUrl,
+    this.initialTemplateClientExportQuality,
   });
 
   final List<File>? initialFiles;
@@ -76,6 +85,14 @@ class AddPostScreen extends StatefulWidget {
   final String? initialFilterCategory;
   final String? initialEffectSlug;
   final bool initialBeautyEnabled;
+  final String? initialVideoTemplateId;
+  final String? initialVideoTemplateName;
+  final int? initialVideoTemplateSlotCount;
+  final String? initialTemplateProjectId;
+  final File? initialTemplateRenderedVideo;
+  final List<File>? initialTemplateSlotFiles;
+  final String? initialTemplateServerExportUrl;
+  final String? initialTemplateClientExportQuality;
 
   @override
   State<AddPostScreen> createState() => _AddPostScreenState();
@@ -108,17 +125,50 @@ class _AddPostScreenState extends State<AddPostScreen>
   bool _soundDidTrim = false;
   String? _pickedSoundSegmentId;
   AddPostLocationSelection? _selectedLocation;
+  String? _videoTemplateId;
+  String? _videoTemplateName;
+  int? _videoTemplateSlotCount;
+  String? _templateProjectId;
+  File? _templateRenderedVideo;
+  List<File> _templateSlotFiles = const [];
+  String? _templateServerExportUrl;
+  String? _templateClientExportQuality;
 
   @override
   void initState() {
     super.initState();
-    _selectedFiles = widget.initialFiles ?? [];
+    _templateRenderedVideo = widget.initialTemplateRenderedVideo;
+    _templateSlotFiles = widget.initialTemplateSlotFiles ?? const [];
+    _templateServerExportUrl = widget.initialTemplateServerExportUrl;
+    _templateClientExportQuality = widget.initialTemplateClientExportQuality;
+    // Prefer showing the rendered template video in the composer.
+    if (_templateRenderedVideo != null) {
+      _selectedFiles = [_templateRenderedVideo!];
+      _type = 'VIDEO';
+    } else {
+      _selectedFiles = widget.initialFiles ?? [];
+      _type = widget.initialType ?? 'VIDEO';
+    }
+    _videoTemplateId = widget.initialVideoTemplateId;
+    _videoTemplateName = widget.initialVideoTemplateName;
+    _videoTemplateSlotCount = widget.initialVideoTemplateSlotCount;
+    _templateProjectId = widget.initialTemplateProjectId;
+    // Studio may hand off the baked MP4 only via [files].
+    if (_templateRenderedVideo == null &&
+        _videoTemplateId != null &&
+        _selectedFiles.length == 1 &&
+        addPostIsVideoFile(_selectedFiles.first)) {
+      _templateRenderedVideo = _selectedFiles.first;
+      _type = 'VIDEO';
+    }
     // Start compressing now rather than on the Post tap. Video preparation is a
     // full re-encode whose cost scales with clip length, so paying it here —
     // while the caption is still being written — is usually enough to make Post
     // return immediately instead of stalling for seconds on a long recording.
     MediaUploadUtils.prewarmAll(_selectedFiles);
-    _type = widget.initialType ?? 'VIDEO';
+    if (_templateSlotFiles.isNotEmpty) {
+      MediaUploadUtils.prewarmAll(_templateSlotFiles);
+    }
     final now = DateTime.now();
     _auctionStartDate = now;
     _auctionEndDate = now.add(
@@ -137,7 +187,8 @@ class _AddPostScreenState extends State<AddPostScreen>
         : null;
     _loadCategories();
     if (widget.isStory &&
-        (widget.initialFiles == null || widget.initialFiles!.isEmpty)) {
+        (widget.initialFiles == null || widget.initialFiles!.isEmpty) &&
+        _templateRenderedVideo == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _openStoryCamera();
       });
@@ -218,11 +269,37 @@ class _AddPostScreenState extends State<AddPostScreen>
     );
     if (!mounted || edited == null || edited.files.isEmpty) return;
 
+    final postFiles = MediaGalleryImportFlow.composerFiles(edited);
     // Editing produces new files, so anything prewarmed for the old ones no
     // longer applies — start again on the replacements.
-    MediaUploadUtils.prewarmAll(edited.files);
+    MediaUploadUtils.prewarmAll(postFiles);
+    if (edited.templateSlotFiles != null &&
+        edited.templateSlotFiles!.isNotEmpty) {
+      MediaUploadUtils.prewarmAll(edited.templateSlotFiles!);
+    }
     setState(() {
-      _selectedFiles = edited.files;
+      _selectedFiles = postFiles;
+      _templateRenderedVideo = edited.templateRenderedVideo ??
+          (MediaGalleryImportFlow.composerType(edited) == 'VIDEO' &&
+                  postFiles.length == 1
+              ? postFiles.first
+              : null);
+      if (edited.templateSlotFiles != null &&
+          edited.templateSlotFiles!.isNotEmpty) {
+        _templateSlotFiles = edited.templateSlotFiles!;
+      }
+      if (edited.videoTemplateId != null) {
+        _videoTemplateId = edited.videoTemplateId;
+        _videoTemplateName = edited.videoTemplateName;
+        _videoTemplateSlotCount = edited.videoTemplateSlotCount;
+        _templateProjectId = edited.templateProjectId;
+      }
+      if (edited.templateServerExportUrl != null) {
+        _templateServerExportUrl = edited.templateServerExportUrl;
+      }
+      if (edited.templateClientExportQuality != null) {
+        _templateClientExportQuality = edited.templateClientExportQuality;
+      }
       if (edited.sound != null) {
         _selectedSound = edited.sound;
         _soundStartOffset = edited.soundOffset;
@@ -237,6 +314,9 @@ class _AddPostScreenState extends State<AddPostScreen>
             : _pickedSoundSegmentId;
       }
       _updateType();
+      if (_templateRenderedVideo != null) {
+        _type = 'VIDEO';
+      }
     });
   }
 
@@ -503,20 +583,29 @@ class _AddPostScreenState extends State<AddPostScreen>
     if (!widget.isStory) {
       auction = _buildAuctionInput(l10n);
       if (_isAuction && auction == null) return;
-
-      if (_selectedCategory == null) {
-        PopupDialogs.showErrorDialog(
-          context,
-          l10n.fieldIsRequired(l10n.categoryLabel),
-        );
-        return;
-      }
     }
 
     if (!widget.isStory && _isAuction) {
       final allowed = await _ensureSellerCanCreateAuction();
       if (!allowed || !mounted) return;
     }
+
+    final templateId = _videoTemplateId?.trim();
+    final templateName = _videoTemplateName?.trim();
+    final postFilterName =
+        (templateId != null &&
+            templateId.isNotEmpty &&
+            templateName != null &&
+            templateName.isNotEmpty)
+        ? templateName
+        : widget.initialFilterName;
+    // Always publish the looked template render when present — never the raw still.
+    final publishFiles = _templateRenderedVideo != null
+        ? <File>[_templateRenderedVideo!]
+        : List<File>.from(_selectedFiles);
+    final slotFiles = _templateSlotFiles.isNotEmpty
+        ? _templateSlotFiles
+        : publishFiles;
 
     // Stop any leftover sound preview before upload/processing starts.
     SoundAudioPreview.stop();
@@ -530,13 +619,24 @@ class _AddPostScreenState extends State<AddPostScreen>
       didTrim: _soundDidTrim,
     );
 
+    // TikTok-style: show uploading cell on profile immediately (non-story).
+    if (!widget.isStory) {
+      final cover = _pendingCoverFile(publishFiles);
+      PendingPostUploads.instance.start(coverFile: cover);
+    }
+
     context.read<PostsBloc>().add(
       CreatePostWithMediaRequestedEvent(
-        type: _type,
+        type: (_templateRenderedVideo != null ||
+                (templateId != null &&
+                    publishFiles.length == 1 &&
+                    addPostIsVideoFile(publishFiles.first)))
+            ? 'VIDEO'
+            : MediaGalleryImportFlow.resolvePostType(publishFiles),
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
-        categoryId: widget.isStory ? null : _selectedCategory!.id,
+        categoryId: widget.isStory ? null : _selectedCategory?.id,
         privacyStatus: _privacyStatus,
         allowComments: _allowComments,
         allowDuets: widget.isStory ? false : _allowDuets,
@@ -545,20 +645,43 @@ class _AddPostScreenState extends State<AddPostScreen>
         isStory: widget.isStory,
         isAuctionable: widget.isStory ? false : _isAuction,
         auction: widget.isStory ? null : auction,
-        files: _selectedFiles,
+        files: publishFiles,
         sound: sound,
         // Exactly one of soundSegmentId | soundId | newSound (see post-sounds.md).
         soundId: attach.soundId,
         soundSegmentId: attach.soundSegmentId,
         startMs: attach.startMs,
         endMs: attach.endMs,
-        filterName: widget.initialFilterName,
+        filterName: postFilterName,
         filterCategory: widget.initialFilterCategory,
         effectSlug: widget.initialEffectSlug,
         beautyEnabled: widget.initialBeautyEnabled ? true : null,
         location: _buildLocationInput(),
+        videoTemplateId: templateId,
+        templateProjectId: _templateProjectId,
+        templateRenderedVideo: _templateRenderedVideo ??
+            (templateId != null &&
+                    publishFiles.length == 1 &&
+                    addPostIsVideoFile(publishFiles.first)
+                ? publishFiles.first
+                : null),
+        templateSlotFiles: slotFiles,
+        templateServerExportUrl: _templateServerExportUrl,
+        templateClientExportQuality: _templateClientExportQuality,
       ),
     );
+
+    if (!widget.isStory && mounted) {
+      context.goNamed('home', queryParameters: {'tab': 'profile'});
+    }
+  }
+
+  File? _pendingCoverFile(List<File> publishFiles) {
+    for (final f in _selectedFiles) {
+      if (!addPostIsVideoFile(f)) return f;
+    }
+    if (publishFiles.isNotEmpty) return publishFiles.first;
+    return _selectedFiles.isNotEmpty ? _selectedFiles.first : null;
   }
 
   Future<void> _showSoundPicker() async {
@@ -662,6 +785,7 @@ class _AddPostScreenState extends State<AddPostScreen>
       categories: _categories,
       selectedCategory: _selectedCategory,
       onSelected: (category) => setState(() => _selectedCategory = category),
+      onCleared: () => setState(() => _selectedCategory = null),
     );
   }
 
@@ -740,25 +864,38 @@ class _AddPostScreenState extends State<AddPostScreen>
     if (widget.isStory) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AddPostTagButton(
-            icon: LucideIcons.hash,
-            label: l10n.hashtagsLabel,
-            onTap: () => HashtagPickerSheet.show(
-              context,
-              controller: _descriptionController,
-            ),
+          Row(
+            children: [
+              AddPostTagButton(
+                icon: LucideIcons.hash,
+                label: l10n.hashtagsLabel,
+                onTap: () => HashtagPickerSheet.show(
+                  context,
+                  controller: _descriptionController,
+                ),
+              ),
+              const SizedBox(width: 10),
+              AddPostTagButton(
+                icon: LucideIcons.atSign,
+                label: l10n.mentionsLabel,
+                onTap: () => MentionPickerSheet.show(
+                  context,
+                  controller: _descriptionController,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          AddPostTagButton(
-            icon: LucideIcons.atSign,
-            label: l10n.mentionsLabel,
-            onTap: () => MentionPickerSheet.show(
-              context,
-              controller: _descriptionController,
+          if (_videoTemplateId != null &&
+              (_videoTemplateName?.trim().isNotEmpty ?? false)) ...[
+            const SizedBox(height: 10),
+            _TemplateAttachedChip(
+              name: _videoTemplateName!,
+              slotCount: _videoTemplateSlotCount,
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -939,13 +1076,15 @@ class _AddPostScreenState extends State<AddPostScreen>
       body: BlocConsumer<PostsBloc, PostsState>(
         listener: (context, state) {
           if (state is PostsFailure) {
-            PopupDialogs.showErrorDialog(context, state.message);
+            if (widget.isStory) {
+              PopupDialogs.showErrorDialog(context, state.message);
+            }
+            // Non-story: profile shows the error and clears the uploading tile.
           } else if (state is CreatePostSuccess) {
             if (widget.isStory) {
               context.goNamed('home');
-            } else {
-              context.goNamed('home', queryParameters: {'tab': 'profile'});
             }
+            // Non-story: already navigated to profile with uploading tile.
           }
         },
         builder: (context, state) {
@@ -1024,6 +1163,57 @@ class _AddPostScreenState extends State<AddPostScreen>
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _TemplateAttachedChip extends StatelessWidget {
+  const _TemplateAttachedChip({
+    required this.name,
+    this.slotCount,
+  });
+
+  final String name;
+  final int? slotCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fill = theme.brightness == Brightness.dark
+        ? const Color(0xFF2A2A2D)
+        : const Color(0xFFF1F1F2);
+    final slots = slotCount;
+    return Material(
+      color: fill,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              LucideIcons.layoutTemplate,
+              size: 16,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                slots != null && slots > 0
+                    ? 'Template · $name · $slots clips'
+                    : 'Template · $name',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

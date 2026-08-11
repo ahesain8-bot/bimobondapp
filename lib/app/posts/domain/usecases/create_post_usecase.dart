@@ -48,6 +48,8 @@ class CreatePostUseCase implements UseCase<PostEntity, CreatePostParams> {
       filterCategory: params.filterCategory,
       effectSlug: params.effectSlug,
       beautyEnabled: params.beautyEnabled,
+      videoTemplateId: params.videoTemplateId,
+      templateProjectId: params.templateProjectId,
     );
   }
 }
@@ -86,6 +88,8 @@ class CreatePostParams extends Equatable {
   final String? filterCategory;
   final String? effectSlug;
   final bool? beautyEnabled;
+  final String? videoTemplateId;
+  final String? templateProjectId;
 
   const CreatePostParams({
     this.type,
@@ -121,6 +125,8 @@ class CreatePostParams extends Equatable {
     this.filterCategory,
     this.effectSlug,
     this.beautyEnabled,
+    this.videoTemplateId,
+    this.templateProjectId,
   });
 
   @override
@@ -158,5 +164,7 @@ class CreatePostParams extends Equatable {
     filterCategory,
     effectSlug,
     beautyEnabled,
+    videoTemplateId,
+    templateProjectId,
   ];
 }

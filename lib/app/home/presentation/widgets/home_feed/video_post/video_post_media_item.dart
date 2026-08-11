@@ -64,13 +64,9 @@ class VideoPostMediaItem extends StatelessWidget {
         ? _feedVideoFallbackUrl(post, primaryUrl: playbackUrl)
         : null;
     final hasAttachedSound = post.sound?.resolvedAudioUrl?.isNotEmpty ?? false;
-    final sound = post.sound;
-    final hasSegmentWindow = sound?.hasSegmentWindow ?? false;
-    final segmentMaxPosition =
-        segmentPlaybackMax ??
-        (hasSegmentWindow
-            ? Duration(milliseconds: sound!.endMs! - sound.startMs!)
-            : null);
+    // Prefer the post-level window (already capped to video duration when known).
+    // Do not fall back to the raw sound length — that freezes short clips.
+    final segmentMaxPosition = segmentPlaybackMax;
 
     Widget child = isVideo
         ? CustomVideoPlayer(
@@ -80,7 +76,9 @@ class VideoPostMediaItem extends StatelessWidget {
             isActive: isActiveSlide,
             respectFeedPlaybackGate: respectFeedPlaybackGate,
             muteAudio: hasAttachedSound,
-            loopVideo: !hasSegmentWindow,
+            // Keep native looping on so short sound posts recover at EOF even
+            // before the capped segment window is known.
+            loopVideo: true,
             segmentMaxPosition: hasAttachedSound ? segmentMaxPosition : null,
             controller: videoController,
             onLongPress: onLongPress,

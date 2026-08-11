@@ -1,0 +1,61 @@
+{
+  "version": "seed-1",
+  "effects": [
+    {
+      "id": "glasses",
+      "name": "Glasses",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "glasses",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    },
+    {
+      "id": "dog_ears",
+      "name": "Dog ears",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "dog_ears",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    },
+    {
+      "id": "cat_ears",
+      "name": "Cat ears",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "cat_ears",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    },
+    {
+      "id": "hat",
+      "name": "Hat",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "hat",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    },
+    {
+      "id": "nose",
+      "name": "Clown nose",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "nose",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    },
+    {
+      "id": "mask",
+      "name": "Mask",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "mask",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    },
+    {
+      "id": "sticker",
+      "name": "Face sticker",
+      "type": "face_sticker",
+      "version": 1,
+      "nativePresetId": "sticker",
+      "parameters": { "scale": 1.0, "opacity": 1.0 }
+    }
+  ]
+}

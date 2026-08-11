@@ -1403,6 +1403,696 @@ abstract class AppLocalizations {
   /// **'Live'**
   String get feedLive;
 
+  /// No description provided for @feedShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get feedShop;
+
+  /// No description provided for @shopTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get shopTitle;
+
+  /// No description provided for @shopFeatured.
+  ///
+  /// In en, this message translates to:
+  /// **'Featured'**
+  String get shopFeatured;
+
+  /// No description provided for @shopFlashDeals.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash Deals'**
+  String get shopFlashDeals;
+
+  /// No description provided for @shopForYou.
+  ///
+  /// In en, this message translates to:
+  /// **'For You'**
+  String get shopForYou;
+
+  /// No description provided for @shopCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Cart'**
+  String get shopCart;
+
+  /// No description provided for @shopCheckout.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout'**
+  String get shopCheckout;
+
+  /// No description provided for @shopOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get shopOrders;
+
+  /// No description provided for @shopBuyNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy Now'**
+  String get shopBuyNow;
+
+  /// No description provided for @shopAddToCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Cart'**
+  String get shopAddToCart;
+
+  /// No description provided for @shopEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No products found'**
+  String get shopEmpty;
+
+  /// No description provided for @shopRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get shopRetry;
+
+  /// No description provided for @shopAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get shopAllCategories;
+
+  /// No description provided for @shopProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get shopProducts;
+
+  /// No description provided for @shopNoProductsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No products yet'**
+  String get shopNoProductsYet;
+
+  /// No description provided for @shopEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a different category or search term.'**
+  String get shopEmptyHint;
+
+  /// No description provided for @shopSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get shopSeeAll;
+
+  /// No description provided for @shopSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search products...'**
+  String get shopSearchHint;
+
+  /// No description provided for @shopSearchForProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for products'**
+  String get shopSearchForProducts;
+
+  /// No description provided for @shopRecentSearches.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get shopRecentSearches;
+
+  /// No description provided for @shopNoResultsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \"{query}\"'**
+  String shopNoResultsFor(String query);
+
+  /// No description provided for @shopSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get shopSort;
+
+  /// No description provided for @shopSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get shopSortNewest;
+
+  /// No description provided for @shopSortOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest'**
+  String get shopSortOldest;
+
+  /// No description provided for @shopSortPriceLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Price: Low'**
+  String get shopSortPriceLow;
+
+  /// No description provided for @shopSortPriceHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Price: High'**
+  String get shopSortPriceHigh;
+
+  /// No description provided for @shopSortTitleAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title A-Z'**
+  String get shopSortTitleAsc;
+
+  /// No description provided for @shopSortTitleDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Title Z-A'**
+  String get shopSortTitleDesc;
+
+  /// No description provided for @shopCartEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your cart is empty'**
+  String get shopCartEmpty;
+
+  /// No description provided for @shopSubtotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtotal'**
+  String get shopSubtotal;
+
+  /// No description provided for @shopCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission'**
+  String get shopCommission;
+
+  /// No description provided for @shopCheckoutAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout'**
+  String get shopCheckoutAction;
+
+  /// No description provided for @shopShippingDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipping Details'**
+  String get shopShippingDetails;
+
+  /// No description provided for @shopPayWithCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay with coins'**
+  String get shopPayWithCoins;
+
+  /// No description provided for @shopFirstName.
+  ///
+  /// In en, this message translates to:
+  /// **'First name'**
+  String get shopFirstName;
+
+  /// No description provided for @shopFirstNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your first name'**
+  String get shopFirstNameHint;
+
+  /// No description provided for @shopLastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Last name'**
+  String get shopLastName;
+
+  /// No description provided for @shopLastNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your last name'**
+  String get shopLastNameHint;
+
+  /// No description provided for @shopStreet.
+  ///
+  /// In en, this message translates to:
+  /// **'Street'**
+  String get shopStreet;
+
+  /// No description provided for @shopStreetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your street'**
+  String get shopStreetHint;
+
+  /// No description provided for @shopStreetNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Street no.'**
+  String get shopStreetNo;
+
+  /// No description provided for @shopStreetNoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No.'**
+  String get shopStreetNoHint;
+
+  /// No description provided for @shopApartmentNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Apartment no.'**
+  String get shopApartmentNo;
+
+  /// No description provided for @shopApartmentNoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Apt.'**
+  String get shopApartmentNoHint;
+
+  /// No description provided for @shopCity.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get shopCity;
+
+  /// No description provided for @shopCityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your city'**
+  String get shopCityHint;
+
+  /// No description provided for @shopPostcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Postcode'**
+  String get shopPostcode;
+
+  /// No description provided for @shopPostcodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your postcode'**
+  String get shopPostcodeHint;
+
+  /// No description provided for @shopCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get shopCountry;
+
+  /// No description provided for @shopCountryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your country'**
+  String get shopCountryHint;
+
+  /// No description provided for @shopPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get shopPhone;
+
+  /// No description provided for @shopPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your phone'**
+  String get shopPhoneHint;
+
+  /// No description provided for @shopFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get shopFieldRequired;
+
+  /// No description provided for @shopYourBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Your balance'**
+  String get shopYourBalance;
+
+  /// No description provided for @shopDueNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Due now'**
+  String get shopDueNow;
+
+  /// No description provided for @shopBuyCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy coins'**
+  String get shopBuyCoins;
+
+  /// No description provided for @shopPayCoinsAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {count} coins'**
+  String shopPayCoinsAmount(int count);
+
+  /// No description provided for @shopNeedMoreCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'You need {count} more coins.'**
+  String shopNeedMoreCoins(int count);
+
+  /// No description provided for @shopNotEnoughCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough coins. Buy more to continue.'**
+  String get shopNotEnoughCoins;
+
+  /// No description provided for @shopCoinsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} coins'**
+  String shopCoinsLabel(int count);
+
+  /// No description provided for @shopProductNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Product not found'**
+  String get shopProductNotFound;
+
+  /// No description provided for @shopAddFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Add favorite'**
+  String get shopAddFavorite;
+
+  /// No description provided for @shopRemoveFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove favorite'**
+  String get shopRemoveFavorite;
+
+  /// No description provided for @shopShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shopShare;
+
+  /// No description provided for @shopReadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Read more'**
+  String get shopReadMore;
+
+  /// No description provided for @shopShowLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get shopShowLess;
+
+  /// No description provided for @shopVariants.
+  ///
+  /// In en, this message translates to:
+  /// **'Variants'**
+  String get shopVariants;
+
+  /// No description provided for @shopQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get shopQuantity;
+
+  /// No description provided for @shopOutOfStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of stock'**
+  String get shopOutOfStock;
+
+  /// No description provided for @shopSelectVariantFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a variant first'**
+  String get shopSelectVariantFirst;
+
+  /// No description provided for @shopAddedToCart.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to cart'**
+  String get shopAddedToCart;
+
+  /// No description provided for @shopLiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get shopLiveBadge;
+
+  /// No description provided for @shopBestPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Best price'**
+  String get shopBestPrice;
+
+  /// No description provided for @shopPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get shopPurchases;
+
+  /// No description provided for @shopSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get shopSales;
+
+  /// No description provided for @shopNoPurchasesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No purchases yet'**
+  String get shopNoPurchasesYet;
+
+  /// No description provided for @shopNoSalesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No sales yet'**
+  String get shopNoSalesYet;
+
+  /// No description provided for @shopStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get shopStatusPending;
+
+  /// No description provided for @shopStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get shopStatusPaid;
+
+  /// No description provided for @shopStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get shopStatusCancelled;
+
+  /// No description provided for @shopStatusRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get shopStatusRefunded;
+
+  /// No description provided for @shopStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get shopStatusUnknown;
+
+  /// No description provided for @shopFulfillmentNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get shopFulfillmentNone;
+
+  /// No description provided for @shopFulfillmentAwaitingShipment.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting shipment'**
+  String get shopFulfillmentAwaitingShipment;
+
+  /// No description provided for @shopFulfillmentShipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipped'**
+  String get shopFulfillmentShipped;
+
+  /// No description provided for @shopFulfillmentDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get shopFulfillmentDelivered;
+
+  /// No description provided for @shopFulfillmentAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get shopFulfillmentAccepted;
+
+  /// No description provided for @shopFulfillmentDisputed.
+  ///
+  /// In en, this message translates to:
+  /// **'Disputed'**
+  String get shopFulfillmentDisputed;
+
+  /// No description provided for @shopStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get shopStatus;
+
+  /// No description provided for @shopFulfillment.
+  ///
+  /// In en, this message translates to:
+  /// **'Fulfillment'**
+  String get shopFulfillment;
+
+  /// No description provided for @shopTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking'**
+  String get shopTracking;
+
+  /// No description provided for @shopItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get shopItems;
+
+  /// No description provided for @shopQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty: {count}'**
+  String shopQty(int count);
+
+  /// No description provided for @shopTotalPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Total paid'**
+  String get shopTotalPaid;
+
+  /// No description provided for @shopShipping.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipping'**
+  String get shopShipping;
+
+  /// No description provided for @shopShip.
+  ///
+  /// In en, this message translates to:
+  /// **'Ship'**
+  String get shopShip;
+
+  /// No description provided for @shopShipOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Ship order'**
+  String get shopShipOrder;
+
+  /// No description provided for @shopTrackingNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking number'**
+  String get shopTrackingNumber;
+
+  /// No description provided for @shopShippingNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipping note'**
+  String get shopShippingNote;
+
+  /// No description provided for @shopReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive'**
+  String get shopReceive;
+
+  /// No description provided for @shopAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get shopAccept;
+
+  /// No description provided for @shopDispute.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute'**
+  String get shopDispute;
+
+  /// No description provided for @shopDisputeOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute order'**
+  String get shopDisputeOrder;
+
+  /// No description provided for @shopNoteOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get shopNoteOptional;
+
+  /// No description provided for @shopCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get shopCancel;
+
+  /// No description provided for @shopLiveAddProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Add product'**
+  String get shopLiveAddProduct;
+
+  /// No description provided for @shopLiveNoProductsToAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'No products available to add'**
+  String get shopLiveNoProductsToAdd;
+
+  /// No description provided for @shopLiveEmptyHost.
+  ///
+  /// In en, this message translates to:
+  /// **'No products yet — tap Add product'**
+  String get shopLiveEmptyHost;
+
+  /// No description provided for @shopLiveEmptyViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'No products in this live yet'**
+  String get shopLiveEmptyViewer;
+
+  /// No description provided for @shopPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get shopPinned;
+
+  /// No description provided for @shopPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get shopPin;
+
+  /// No description provided for @shopUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get shopUnpin;
+
+  /// No description provided for @shopRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get shopRemove;
+
+  /// No description provided for @shopBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get shopBuy;
+
+  /// No description provided for @shopItemsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String shopItemsCount(int count);
+
   /// No description provided for @noPostsFound.
   ///
   /// In en, this message translates to:
@@ -4493,10 +5183,16 @@ abstract class AppLocalizations {
   /// **'See you tomorrow 👋'**
   String get chatLastMessage5;
 
+  /// No description provided for @mediaStudioAutoCut.
+  ///
+  /// In en, this message translates to:
+  /// **'AutoCut'**
+  String get mediaStudioAutoCut;
+
   /// No description provided for @addPostAsAuction.
   ///
   /// In en, this message translates to:
-  /// **'List as auction'**
+  /// **'Show on live'**
   String get addPostAsAuction;
 
   /// No description provided for @auctionItemName.
@@ -7301,6 +7997,108 @@ abstract class AppLocalizations {
   /// **'Interests'**
   String get settingsInterests;
 
+  /// No description provided for @settingsMyProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'My Products'**
+  String get settingsMyProducts;
+
+  /// No description provided for @shopGoToMyProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to My Products'**
+  String get shopGoToMyProducts;
+
+  /// No description provided for @shopMakeAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on live'**
+  String get shopMakeAuction;
+
+  /// No description provided for @shopMyProductsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search my products...'**
+  String get shopMyProductsSearchHint;
+
+  /// No description provided for @shopFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get shopFilterAll;
+
+  /// No description provided for @shopNoMatchingProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching products'**
+  String get shopNoMatchingProducts;
+
+  /// No description provided for @shopSortQuantityHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty: High'**
+  String get shopSortQuantityHigh;
+
+  /// No description provided for @shopSortQuantityLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty: Low'**
+  String get shopSortQuantityLow;
+
+  /// No description provided for @shopFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get shopFilters;
+
+  /// No description provided for @shopMediaType.
+  ///
+  /// In en, this message translates to:
+  /// **'Media'**
+  String get shopMediaType;
+
+  /// No description provided for @shopMediaImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get shopMediaImage;
+
+  /// No description provided for @shopMediaVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get shopMediaVideo;
+
+  /// No description provided for @shopMediaCarousel.
+  ///
+  /// In en, this message translates to:
+  /// **'Carousel'**
+  String get shopMediaCarousel;
+
+  /// No description provided for @shopMinPriceCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Min coins'**
+  String get shopMinPriceCoins;
+
+  /// No description provided for @shopMaxPriceCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Max coins'**
+  String get shopMaxPriceCoins;
+
+  /// No description provided for @shopApplyFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get shopApplyFilters;
+
+  /// No description provided for @shopClearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get shopClearFilters;
+
   /// No description provided for @retry.
   ///
   /// In en, this message translates to:
@@ -7342,6 +8140,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Effects'**
   String get effectsSubtitle;
+
+  /// No description provided for @templateExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing…'**
+  String get templateExportPreparing;
+
+  /// No description provided for @templateExportUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading…'**
+  String get templateExportUploading;
+
+  /// No description provided for @templateExportUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded'**
+  String get templateExportUploaded;
+
+  /// No description provided for @templateExportPreparingSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing slots…'**
+  String get templateExportPreparingSlots;
+
+  /// No description provided for @templateExportRendering.
+  ///
+  /// In en, this message translates to:
+  /// **'Rendering…'**
+  String get templateExportRendering;
+
+  /// No description provided for @templateExportAlmostDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost done…'**
+  String get templateExportAlmostDone;
+
+  /// No description provided for @templateExportDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get templateExportDownloading;
+
+  /// No description provided for @templateExportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get templateExportDone;
+
+  /// No description provided for @templateExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Template export failed — try again'**
+  String get templateExportFailed;
+
+  /// No description provided for @templateCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load template'**
+  String get templateCouldNotLoad;
+
+  /// No description provided for @templatePreviewFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Template preview failed'**
+  String get templatePreviewFailed;
+
+  /// No description provided for @templateHandoffFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not hand off template video'**
+  String get templateHandoffFailed;
+
+  /// No description provided for @templateApplying.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying template…'**
+  String get templateApplying;
+
+  /// No description provided for @templateAddMediaToPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Add media to preview'**
+  String get templateAddMediaToPreview;
+
+  /// No description provided for @templateNeedMediaFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Take or add a photo/video first'**
+  String get templateNeedMediaFirst;
+
+  /// No description provided for @mediaStudioTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get mediaStudioTemplates;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

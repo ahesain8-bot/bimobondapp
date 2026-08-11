@@ -29,6 +29,9 @@ class AuctionSocketEvent {
   /// Server emits camelCase `auctionGiftCombo` (see EventsGateway logs).
   static const auctionGiftCombo = 'auctionGiftCombo';
   static const liveAuction = 'liveAuction';
+
+  /// Live shopping bag updates (pin/add/remove/reorder).
+  static const liveProduct = 'liveProduct';
 }
 
 class AuctionUpdatedPayload {
@@ -222,6 +225,8 @@ class AuctionSocketService {
   final _giftComboController = StreamController<GiftComboPayload>.broadcast();
   final _liveAuctionController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _liveProductController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<AuctionUpdatedPayload> get onAuctionUpdated =>
       _auctionUpdatedController.stream;
@@ -230,6 +235,8 @@ class AuctionSocketService {
   Stream<GiftComboPayload> get onGiftCombo => _giftComboController.stream;
   Stream<Map<String, dynamic>> get onLiveAuction =>
       _liveAuctionController.stream;
+  Stream<Map<String, dynamic>> get onLiveProduct =>
+      _liveProductController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -299,7 +306,8 @@ class AuctionSocketService {
         // Listen to ONE live animation event only (avoid double play).
         ..on(AuctionSocketEvent.giftCombo, _handleGiftCombo)
         ..on(AuctionSocketEvent.auctionGiftCombo, _handleGiftCombo)
-        ..on(AuctionSocketEvent.liveAuction, _handleLiveAuction);
+        ..on(AuctionSocketEvent.liveAuction, _handleLiveAuction)
+        ..on(AuctionSocketEvent.liveProduct, _handleLiveProduct);
 
       _socket!.connect();
 
@@ -543,6 +551,12 @@ class AuctionSocketService {
     _liveAuctionController.add(map);
   }
 
+  void _handleLiveProduct(dynamic data) {
+    final map = _unwrapPayload(data);
+    if (map == null || _liveProductController.isClosed) return;
+    _liveProductController.add(map);
+  }
+
   CommentModel? _parseCommentPayload(dynamic data) {
     final map = _unwrapPayload(data);
     if (map == null) return null;
@@ -712,5 +726,6 @@ class AuctionSocketService {
     _connectionController.close();
     _giftComboController.close();
     _liveAuctionController.close();
+    _liveProductController.close();
   }
 }

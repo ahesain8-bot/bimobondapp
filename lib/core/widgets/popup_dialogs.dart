@@ -71,6 +71,7 @@ class PopupDialogs {
     showDialog(
       context: context,
       barrierDismissible: false,
+      useRootNavigator: true,
       builder: (context) => PopScope(
         canPop: false,
         child: CustomLoadingWidget(isFullScreen: true, message: message),
@@ -79,8 +80,9 @@ class PopupDialogs {
   }
 
   static void hideLoadingDialog(BuildContext context) {
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    final nav = Navigator.of(context, rootNavigator: true);
+    if (nav.canPop()) {
+      nav.pop();
     }
   }
 

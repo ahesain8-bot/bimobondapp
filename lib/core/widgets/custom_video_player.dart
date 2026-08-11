@@ -538,6 +538,19 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
     if (oldWidget.muteAudio != widget.muteAudio) {
       unawaited(_setMuted(widget.muteAudio));
     }
+    if (oldWidget.segmentMaxPosition != widget.segmentMaxPosition ||
+        oldWidget.loopVideo != widget.loopVideo) {
+      _segmentEndHandled = false;
+      final controller = _controller;
+      if (controller != null && _isControllerReady(controller)) {
+        if (oldWidget.loopVideo != widget.loopVideo) {
+          unawaited(controller.setLooping(widget.loopVideo));
+        }
+        // Short clips with a longer sound window may already be stuck at EOF
+        // when the capped max finally arrives — kick the loop check now.
+        _maybeLoopSegmentPlayback(controller);
+      }
+    }
     if (oldWidget.url != widget.url ||
         oldWidget.fallbackUrl != widget.fallbackUrl) {
       _generatedPosterBytes = null;
@@ -992,21 +1005,43 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
   }
 
   void _maybeLoopSegmentPlayback(VideoPlayerController controller) {
-    final maxPos = widget.segmentMaxPosition;
+    final duration = controller.value.duration;
+    var maxPos = widget.segmentMaxPosition;
+
+    // Sound windows are often longer than short posts. Never wait past EOF or
+    // the clip will freeze instead of replaying.
+    if (maxPos != null &&
+        duration.inMilliseconds > 0 &&
+        maxPos > duration) {
+      maxPos = duration;
+    }
 
     if (maxPos != null) {
-      if (controller.value.position <
-          maxPos - const Duration(milliseconds: 120)) {
-        _segmentEndHandled = false;
+      final epsilonMs =
+          (maxPos.inMilliseconds / 5).round().clamp(40, 120);
+      final threshold = maxPos - Duration(milliseconds: epsilonMs);
+      final position = controller.value.position;
+      final nearEnd = controller.value.isCompleted ||
+          position >= threshold ||
+          (duration.inMilliseconds > 0 &&
+              position >=
+                  duration - Duration(milliseconds: epsilonMs));
+      if (!nearEnd) {
+        if (position < threshold) {
+          _segmentEndHandled = false;
+        }
         return;
       }
     } else if (widget.loopVideo) {
       // Native loop is enabled — only intervene if platform stalled at natural end.
-      final duration = controller.value.duration;
+      final epsilonMs =
+          duration.inMilliseconds > 0
+              ? (duration.inMilliseconds / 5).round().clamp(40, 120)
+              : 120;
       final nearNaturalEnd =
           duration.inMilliseconds > 0 &&
           controller.value.position >=
-              duration - const Duration(milliseconds: 120);
+              duration - Duration(milliseconds: epsilonMs);
       if (!controller.value.isCompleted && !nearNaturalEnd) {
         if (controller.value.position < const Duration(milliseconds: 300)) {
           _segmentEndHandled = false;
@@ -1033,6 +1068,16 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
         );
         if (!ok && _isControllerReady(controller)) {
           await controller.play();
+        }
+        // Wait until playback is actually running near 0 before notifying
+        // soundtrack sync — avoids music restarting while video is still loading.
+        for (var i = 0; i < 30; i++) {
+          if (!mounted || !_isControllerReady(controller)) break;
+          final v = controller.value;
+          if (v.isPlaying && v.position < const Duration(milliseconds: 500)) {
+            break;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 40));
         }
       }
     } catch (_) {}

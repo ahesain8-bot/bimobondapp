@@ -18,6 +18,7 @@ class CameraMediaPickResult {
     this.soundWindow = const Duration(seconds: 15),
     this.soundDidTrim = false,
     this.soundSegmentId,
+    this.videoTemplateId,
   });
 
   final List<File> files;
@@ -28,6 +29,7 @@ class CameraMediaPickResult {
   final Duration soundWindow;
   final bool soundDidTrim;
   final String? soundSegmentId;
+  final String? videoTemplateId;
 }
 
 /// Runs gallery items through the media studio editor, then opens add post.
@@ -49,6 +51,19 @@ class MediaGalleryImportFlow {
     return hasVideo ? 'VIDEO' : 'IMAGE';
   }
 
+  /// Files shown in Add Post / published as the post body.
+  /// Prefers client-rendered template VIDEO over slot stills.
+  static List<File> composerFiles(MediaStudioExportResult edited) {
+    final rendered = edited.templateRenderedVideo;
+    if (rendered != null) return <File>[rendered];
+    return edited.files;
+  }
+
+  static String composerType(MediaStudioExportResult edited) {
+    if (edited.templateRenderedVideo != null) return 'VIDEO';
+    return resolvePostType(edited.files);
+  }
+
   static Future<MediaStudioExportResult?> openBatchEditor(
     BuildContext context, {
     required List<GalleryMediaItem> items,
@@ -58,6 +73,10 @@ class MediaGalleryImportFlow {
     bool initialMuteOriginal = false,
     int initialIndex = 0,
     MediaEditorSeed? initialEdit,
+    String? videoTemplateId,
+    String? videoTemplateName,
+    int? videoTemplateSlotCount,
+    String? templateProjectId,
   }) {
     if (items.isEmpty) return Future.value(null);
 
@@ -72,6 +91,11 @@ class MediaGalleryImportFlow {
         'initialMuteOriginal': initialMuteOriginal,
         'popOnDone': true,
         if (initialEdit != null) 'initialEdit': initialEdit.toExtra(),
+        if (videoTemplateId != null) 'videoTemplateId': videoTemplateId,
+        if (videoTemplateName != null) 'videoTemplateName': videoTemplateName,
+        if (videoTemplateSlotCount != null)
+          'videoTemplateSlotCount': videoTemplateSlotCount,
+        if (templateProjectId != null) 'templateProjectId': templateProjectId,
       },
     );
   }
@@ -95,9 +119,10 @@ class MediaGalleryImportFlow {
     );
     if (edited == null || edited.files.isEmpty || !context.mounted) return;
 
+    final postFiles = composerFiles(edited);
     final extra = {
-      'files': edited.files,
-      'type': resolvePostType(edited.files),
+      'files': postFiles,
+      'type': composerType(edited),
       'isStory': isStory,
       'initialSound': edited.sound ?? initialSound,
       'initialSoundOffset': edited.soundOffset,
@@ -108,6 +133,23 @@ class MediaGalleryImportFlow {
       'filterCategory': edited.filterCategory.name,
       if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
       'beautyEnabled': edited.beautyEnabled,
+      if (edited.videoTemplateId != null)
+        'videoTemplateId': edited.videoTemplateId,
+      if (edited.videoTemplateName != null)
+        'videoTemplateName': edited.videoTemplateName,
+      if (edited.videoTemplateSlotCount != null)
+        'videoTemplateSlotCount': edited.videoTemplateSlotCount,
+      if (edited.templateProjectId != null)
+        'templateProjectId': edited.templateProjectId,
+      if (edited.templateRenderedVideo != null)
+        'templateRenderedVideo': edited.templateRenderedVideo,
+      if (edited.templateSlotFiles != null &&
+          edited.templateSlotFiles!.isNotEmpty)
+        'templateSlotFiles': edited.templateSlotFiles,
+      if (edited.templateServerExportUrl != null)
+        'templateServerExportUrl': edited.templateServerExportUrl,
+      if (edited.templateClientExportQuality != null)
+        'templateClientExportQuality': edited.templateClientExportQuality,
     };
 
     if (replaceRoute) {

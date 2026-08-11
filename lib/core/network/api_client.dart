@@ -2,11 +2,17 @@ import 'package:dio/dio.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   late final Dio _dio;
   final SharedPreferences sharedPreferences;
+
+  static const _authTokenKey = 'AUTH_TOKEN';
+  static const _deviceTokenKey = 'DEVICE_TOKEN';
+  static const _retriedExtraKey = 'firebase_auth_retried';
 
   ApiClient({required this.sharedPreferences}) {
     _dio = Dio(
@@ -32,28 +38,55 @@ class ApiClient {
       ),
     );
 
-    // Custom interceptor for Auth Tokens or extra headers
+    // Queued so concurrent requests wait for a single token refresh.
     _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          final authToken = sharedPreferences.getString('AUTH_TOKEN');
-          final deviceToken = sharedPreferences.getString('DEVICE_TOKEN');
-
-          if (authToken != null && authToken.isNotEmpty) {
-            // Only add the token if it's not already provided in the request options
-            if (!options.headers.containsKey('Authorization')) {
-              options.headers['Authorization'] = 'Bearer $authToken';
+      QueuedInterceptorsWrapper(
+        onRequest: (options, handler) async {
+          try {
+            final token = await _resolveFirebaseIdToken(forceRefresh: false);
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            } else {
+              final cached = sharedPreferences.getString(_authTokenKey);
+              if (cached != null &&
+                  cached.isNotEmpty &&
+                  !options.headers.containsKey('Authorization')) {
+                options.headers['Authorization'] = 'Bearer $cached';
+              }
+            }
+          } catch (e, st) {
+            debugPrint('ApiClient auth header: $e\n$st');
+            final cached = sharedPreferences.getString(_authTokenKey);
+            if (cached != null &&
+                cached.isNotEmpty &&
+                !options.headers.containsKey('Authorization')) {
+              options.headers['Authorization'] = 'Bearer $cached';
             }
           }
+
+          final deviceToken = sharedPreferences.getString(_deviceTokenKey);
           if (deviceToken != null && deviceToken.isNotEmpty) {
             options.headers['device-token'] = deviceToken;
           }
           return handler.next(options);
         },
-        onResponse: (response, handler) {
-          return handler.next(response);
-        },
-        onError: (DioException error, handler) {
+        onResponse: (response, handler) => handler.next(response),
+        onError: (error, handler) async {
+          if (_shouldRefreshAndRetry(error)) {
+            try {
+              final token = await _resolveFirebaseIdToken(forceRefresh: true);
+              if (token != null && token.isNotEmpty) {
+                final req = error.requestOptions;
+                req.headers['Authorization'] = 'Bearer $token';
+                req.extra[_retriedExtraKey] = true;
+                final response = await _dio.fetch(req);
+                return handler.resolve(response);
+              }
+            } catch (e, st) {
+              debugPrint('ApiClient 401 retry failed: $e\n$st');
+            }
+          }
+
           final exception = DioHandler.handle(error);
           if (exception is AppException) {
             return handler.reject(
@@ -70,6 +103,28 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  bool _shouldRefreshAndRetry(DioException error) {
+    if (error.response?.statusCode != 401) return false;
+    if (error.requestOptions.extra[_retriedExtraKey] == true) return false;
+    final message = '${error.response?.data ?? error.message}'.toLowerCase();
+    return message.contains('expired') ||
+        message.contains('unauthorized') ||
+        message.contains('id token') ||
+        message.contains('firebase');
+  }
+
+  /// Fresh Firebase ID token. [getIdToken] refreshes when expired;
+  /// [forceRefresh] forces a new token after a 401.
+  Future<String?> _resolveFirebaseIdToken({required bool forceRefresh}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    final token = await user.getIdToken(forceRefresh);
+    if (token != null && token.isNotEmpty) {
+      await sharedPreferences.setString(_authTokenKey, token);
+    }
+    return token;
   }
 
   Dio get dio => _dio;

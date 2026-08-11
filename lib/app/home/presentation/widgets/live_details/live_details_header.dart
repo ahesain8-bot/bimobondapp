@@ -24,6 +24,8 @@ class LiveDetailsHeader extends StatelessWidget {
     this.showCloseButton = true,
     this.showAuctionGifts = false,
     this.onAuctionGifts,
+    this.showShopProducts = false,
+    this.onShopProducts,
     this.showOwnerMenu = false,
     this.onOwnerMenu,
     this.showFollowButton = true,
@@ -49,6 +51,8 @@ class LiveDetailsHeader extends StatelessWidget {
   final bool showCloseButton;
   final bool showAuctionGifts;
   final VoidCallback? onAuctionGifts;
+  final bool showShopProducts;
+  final VoidCallback? onShopProducts;
   final bool showOwnerMenu;
   final VoidCallback? onOwnerMenu;
   final bool showFollowButton;
@@ -194,6 +198,16 @@ class LiveDetailsHeader extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (showShopProducts && onShopProducts != null)
+                      IconButton(
+                        onPressed: onShopProducts,
+                        tooltip: 'Shop',
+                        icon: const Icon(
+                          LucideIcons.shoppingBag,
+                          color: Colors.white,
+                          size: LiveDetailsLayoutConstants.closeIconSize,
+                        ),
+                      ),
                     if (showAuctionGifts && onAuctionGifts != null)
                       IconButton(
                         onPressed: onAuctionGifts,

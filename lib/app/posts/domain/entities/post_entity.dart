@@ -43,6 +43,8 @@ class PostEntity extends Equatable {
   final String? filterName;
   final String? filterCategory;
   final PostFilterEntity? filter;
+  /// Product ids tagged on this post (social commerce). Empty until API sends them.
+  final List<String> taggedProductIds;
 
   const PostEntity({
     required this.id,
@@ -80,6 +82,7 @@ class PostEntity extends Equatable {
     this.filterName,
     this.filterCategory,
     this.filter,
+    this.taggedProductIds = const [],
   });
 
   /// Filter id from nested [filter] or legacy [filterName].
@@ -95,6 +98,9 @@ class PostEntity extends Equatable {
   String? get effectiveFilterLabel {
     final nested = filter?.name.trim();
     if (nested != null && nested.isNotEmpty) return nested;
+    // Legacy posts store the display name in [filterName] (e.g. template title).
+    final legacy = filterName?.trim();
+    if (legacy != null && legacy.isNotEmpty) return legacy;
     return null;
   }
 
@@ -154,11 +160,14 @@ class PostEntity extends Equatable {
       filterName: filterName,
       filterCategory: filterCategory,
       filter: filter,
+      taggedProductIds: taggedProductIds,
     );
   }
 
   /// Public videos and auctions (non-stories) can be promoted by their owner.
   bool get canBePromoted => !isStory && privacyStatus == 'PUBLIC';
+
+  bool get hasTaggedProducts => taggedProductIds.isNotEmpty;
 
   @override
   List<Object?> get props => [
@@ -197,6 +206,7 @@ class PostEntity extends Equatable {
     filterName,
     filterCategory,
     filter,
+    taggedProductIds,
   ];
 }
 

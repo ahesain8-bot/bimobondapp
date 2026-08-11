@@ -144,6 +144,16 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
   final String? effectSlug;
   final bool? beautyEnabled;
   final PostInlineLocationInput? location;
+  final String? videoTemplateId;
+  final String? templateProjectId;
+  /// Downloaded server export for thumbnail / composer (optional).
+  final File? templateRenderedVideo;
+  /// Original stills for IMAGE UserProjectSlots (when [files] is the VIDEO).
+  final List<File>? templateSlotFiles;
+  /// Server export path from studio Next — skip mobile render on publish.
+  final String? templateServerExportUrl;
+  /// `draft` | `standard` for [templateRenderedVideo].
+  final String? templateClientExportQuality;
 
   const CreatePostWithMediaRequestedEvent({
     this.type,
@@ -169,6 +179,12 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     this.effectSlug,
     this.beautyEnabled,
     this.location,
+    this.videoTemplateId,
+    this.templateProjectId,
+    this.templateRenderedVideo,
+    this.templateSlotFiles,
+    this.templateServerExportUrl,
+    this.templateClientExportQuality,
   });
 
   @override
@@ -195,6 +211,12 @@ class CreatePostWithMediaRequestedEvent extends PostsEvent {
     effectSlug,
     beautyEnabled,
     location,
+    videoTemplateId,
+    templateProjectId,
+    templateRenderedVideo,
+    templateSlotFiles,
+    templateServerExportUrl,
+    templateClientExportQuality,
   ];
 }
 

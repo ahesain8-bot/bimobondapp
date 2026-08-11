@@ -18,6 +18,8 @@ class FeedTopTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final feedOverlay = FeedOverlayTheme.of(context);
+    final widthScale = HomeLayoutConstants.widthScale(context, minScale: 0.85, maxScale: 1.15);
+    final dividerMargin = (8.0 * widthScale).clamp(4.0, 10.0);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -31,7 +33,7 @@ class FeedTopTabs extends StatelessWidget {
         Container(
           width: HomeLayoutConstants.tabPillDividerWidth,
           height: HomeLayoutConstants.tabPillDividerHeight,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
+          margin: EdgeInsets.symmetric(horizontal: dividerMargin),
           color: feedOverlay.overlayForeground.withValues(alpha: 0.35),
         ),
         _FeedTopTabLabel(
@@ -60,6 +62,10 @@ class _FeedTopTabLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final widthScale = HomeLayoutConstants.widthScale(context, minScale: 0.85, maxScale: 1.15);
+    final selectedFontSize = (HomeLayoutConstants.tabSelectedFontSize * widthScale).clamp(14.0, 18.0);
+    final unselectedFontSize = (HomeLayoutConstants.tabUnselectedFontSize * widthScale).clamp(13.0, 17.0);
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -75,9 +81,7 @@ class _FeedTopTabLabel extends StatelessWidget {
             color: isSelected
                 ? feedOverlay.overlayForeground
                 : feedOverlay.overlayForeground.withValues(alpha: 0.55),
-            fontSize: isSelected
-                ? HomeLayoutConstants.tabSelectedFontSize
-                : HomeLayoutConstants.tabUnselectedFontSize,
+            fontSize: isSelected ? selectedFontSize : unselectedFontSize,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             height: 1.2,
             shadows: [

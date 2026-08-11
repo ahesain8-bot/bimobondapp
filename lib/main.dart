@@ -19,6 +19,9 @@ import 'package:bimobondapp/app/wallets/presentation/di/wallets_injector.dart'
     as wallets_di;
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
+import 'package:bimobondapp/app/shop/presentation/cubit/shop_cart_cubit.dart';
+import 'package:bimobondapp/app/shop/presentation/di/shop_injector.dart'
+    as shop_di;
 import 'package:bimobondapp/app/seller_verification/presentation/di/seller_verification_injector.dart'
     as seller_verification_di;
 import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart'
@@ -43,6 +46,8 @@ import 'package:bimobondapp/app/notifications/presentation/di/notifications_inje
     as notifications_di;
 import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
     as camera_studio_di;
+import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_injector.dart'
+    as video_templates_di;
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
@@ -68,9 +73,11 @@ void main() async {
   await wallets_di.initWallets();
   await gifts_di.initGifts();
   await auctions_di.initAuctions();
+  await shop_di.initShop();
   await seller_verification_di.initSellerVerification();
   await stories_di.initStories();
   await camera_studio_di.initCameraStudio();
+  await video_templates_di.initVideoTemplates();
   // Use the bundled filter/effect catalog at launch (local, no network). The
   // add-post camera refreshes it from the API when it actually opens, so the
   // two catalog requests no longer run on every cold start.
@@ -93,6 +100,9 @@ class MyApp extends StatelessWidget {
         BlocProvider<LocaleCubit>(create: (_) => LocaleCubit(auth_di.sl())),
         BlocProvider<ChatWallpaperCubit>(
           create: (_) => ChatWallpaperCubit(auth_di.sl()),
+        ),
+        BlocProvider<ShopCartCubit>(
+          create: (_) => shop_di.sl<ShopCartCubit>(),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(

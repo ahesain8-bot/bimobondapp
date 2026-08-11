@@ -36,6 +36,8 @@ import 'package:bimobondapp/app/home/presentation/widgets/add_post/camera/media_
 import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/sounds/presentation/widgets/sound_picker_sheet.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/video_template_slot_filler.dart';
+import 'package:bimobondapp/app/video_templates/presentation/widgets/video_templates_picker_sheet.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -212,6 +214,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _soundDidTrim = false;
   String? _pickedSoundSegmentId;
   bool _muteOriginalAudio = false;
+  String? _videoTemplateId;
+  String? _videoTemplateName;
+  int? _videoTemplateSlotCount;
+  String? _templateProjectId;
   File? _storyCapturedFile;
   String? _storyCapturedType;
   late final CameraFaceDetectorService _faceDetectorService;
@@ -384,27 +390,78 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     // still-running native camera view.
     unawaited(ArCameraBridge.suspendPreview());
     try {
+      final editorItems = items;
+      if (!mounted) return;
       if (widget.returnMediaOnDone) {
         final edited = await MediaGalleryImportFlow.openBatchEditor(
           context,
-          items: items,
+          items: editorItems,
           isStory: widget.isStory,
           initialSound: _selectedSound,
           initialSoundOffset: _soundStartOffset,
           initialMuteOriginal: _muteOriginalAudio,
+          videoTemplateId: _videoTemplateId,
+          videoTemplateName: _videoTemplateName,
+          videoTemplateSlotCount: _videoTemplateSlotCount,
+          templateProjectId: _templateProjectId,
         );
         if (edited != null && mounted) {
           _returnPickedMedia(edited);
         }
         return;
       }
-      await MediaGalleryImportFlow.editAndOpenComposer(
+      final edited = await MediaGalleryImportFlow.openBatchEditor(
         context,
-        items: items,
+        items: editorItems,
         isStory: widget.isStory,
         initialSound: _selectedSound,
         initialSoundOffset: _soundStartOffset,
         initialMuteOriginal: _muteOriginalAudio,
+        videoTemplateId: _videoTemplateId,
+        videoTemplateName: _videoTemplateName,
+        videoTemplateSlotCount: _videoTemplateSlotCount,
+        templateProjectId: _templateProjectId,
+      );
+      if (!mounted || edited == null || edited.files.isEmpty) return;
+      final postFiles = MediaGalleryImportFlow.composerFiles(edited);
+      context.pushReplacementNamed(
+        'add_post',
+        extra: {
+          'files': postFiles,
+          'type': MediaGalleryImportFlow.composerType(edited),
+          'isStory': false,
+          'initialSound': edited.sound ?? _selectedSound,
+          'initialSoundOffset': edited.soundOffset,
+          'initialSoundWindow': edited.soundWindow,
+          'initialSoundDidTrim': edited.soundDidTrim || _soundDidTrim,
+          'initialSoundSegmentId':
+              edited.soundSegmentId ?? _pickedSoundSegmentId,
+          if (edited.filterName != null) 'filterName': edited.filterName,
+          'filterCategory': edited.filterCategory.name,
+          if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
+          'beautyEnabled': edited.beautyEnabled,
+          if ((edited.videoTemplateId ?? _videoTemplateId) != null)
+            'videoTemplateId': edited.videoTemplateId ?? _videoTemplateId,
+          if ((edited.videoTemplateName ?? _videoTemplateName) != null)
+            'videoTemplateName':
+                edited.videoTemplateName ?? _videoTemplateName,
+          if ((edited.videoTemplateSlotCount ?? _videoTemplateSlotCount) !=
+              null)
+            'videoTemplateSlotCount':
+                edited.videoTemplateSlotCount ?? _videoTemplateSlotCount,
+          if ((edited.templateProjectId ?? _templateProjectId) != null)
+            'templateProjectId':
+                edited.templateProjectId ?? _templateProjectId,
+          if (edited.templateRenderedVideo != null)
+            'templateRenderedVideo': edited.templateRenderedVideo,
+          if (edited.templateSlotFiles != null &&
+              edited.templateSlotFiles!.isNotEmpty)
+            'templateSlotFiles': edited.templateSlotFiles,
+          if (edited.templateServerExportUrl != null)
+            'templateServerExportUrl': edited.templateServerExportUrl,
+          if (edited.templateClientExportQuality != null)
+            'templateClientExportQuality': edited.templateClientExportQuality,
+        },
       );
     } finally {
       unawaited(ArCameraBridge.resumePreview());
@@ -414,16 +471,18 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   void _returnPickedMedia(MediaStudioExportResult result) {
     if (result.files.isEmpty) return;
+    final postFiles = MediaGalleryImportFlow.composerFiles(result);
     context.pop(
       CameraMediaPickResult(
-        files: result.files,
-        type: MediaGalleryImportFlow.resolvePostType(result.files),
+        files: postFiles,
+        type: MediaGalleryImportFlow.composerType(result),
         filterName: result.filterName ?? _activeFilterName,
         sound: result.sound ?? _selectedSound,
         soundOffset: result.soundOffset,
         soundWindow: result.soundWindow,
         soundDidTrim: result.soundDidTrim || _soundDidTrim,
         soundSegmentId: result.soundSegmentId ?? _pickedSoundSegmentId,
+        videoTemplateId: result.videoTemplateId ?? _videoTemplateId,
       ),
     );
   }
@@ -722,14 +781,20 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(ArCameraBridge.suspendPreview());
     final MediaStudioExportResult? edited;
     try {
+      final items = [GalleryMediaItem(file: file, type: type)];
+      if (!mounted) return;
       edited = await MediaGalleryImportFlow.openBatchEditor(
         context,
-        items: [GalleryMediaItem(file: file, type: type)],
+        items: items,
         isStory: widget.isStory,
         initialSound: _selectedSound,
         initialSoundOffset: _soundStartOffset,
         initialMuteOriginal: _muteOriginalAudio,
         initialEdit: _captureEditSeed,
+        videoTemplateId: _videoTemplateId,
+        videoTemplateName: _videoTemplateName,
+        videoTemplateSlotCount: _videoTemplateSlotCount,
+        templateProjectId: _templateProjectId,
       );
     } finally {
       // Back on the camera (or about to leave it entirely) — either way the
@@ -743,11 +808,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       return;
     }
 
+    final postFiles = MediaGalleryImportFlow.composerFiles(edited);
     context.pushReplacementNamed(
       'add_post',
       extra: {
-        'files': edited.files,
-        'type': MediaGalleryImportFlow.resolvePostType(edited.files),
+        'files': postFiles,
+        'type': MediaGalleryImportFlow.composerType(edited),
         'isStory': false,
         'initialSound': edited.sound ?? _selectedSound,
         'initialSoundOffset': edited.soundOffset,
@@ -758,6 +824,26 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         'filterCategory': edited.filterCategory.name,
         if (edited.effectSlug != null) 'effectSlug': edited.effectSlug,
         'beautyEnabled': edited.beautyEnabled,
+        if ((edited.videoTemplateId ?? _videoTemplateId) != null)
+          'videoTemplateId': edited.videoTemplateId ?? _videoTemplateId,
+        if ((edited.videoTemplateName ?? _videoTemplateName) != null)
+          'videoTemplateName':
+              edited.videoTemplateName ?? _videoTemplateName,
+        if ((edited.videoTemplateSlotCount ?? _videoTemplateSlotCount) != null)
+          'videoTemplateSlotCount':
+              edited.videoTemplateSlotCount ?? _videoTemplateSlotCount,
+        if ((edited.templateProjectId ?? _templateProjectId) != null)
+          'templateProjectId':
+              edited.templateProjectId ?? _templateProjectId,
+        if (edited.templateRenderedVideo != null)
+          'templateRenderedVideo': edited.templateRenderedVideo,
+        if (edited.templateSlotFiles != null &&
+            edited.templateSlotFiles!.isNotEmpty)
+          'templateSlotFiles': edited.templateSlotFiles,
+        if (edited.templateServerExportUrl != null)
+          'templateServerExportUrl': edited.templateServerExportUrl,
+        if (edited.templateClientExportQuality != null)
+          'templateClientExportQuality': edited.templateClientExportQuality,
       },
     );
   }
@@ -2222,13 +2308,52 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void _onWorkspaceTabSelected(int index) {
     setState(() => _workspaceTabIndex = index);
     if (index == 1) {
-      CameraStudioSheets.showEffectsPicker(
-        context,
-        l10n: AppLocalizations.of(context)!,
-        selectedEffectSlug: _selectedEffectSlug,
-        onSelected: (slug) => _selectEffect(slug),
-      );
+      if (_studioMode == CameraStudioMode.photo) {
+        unawaited(_openPhotoTemplates());
+      } else {
+        CameraStudioSheets.showEffectsPicker(
+          context,
+          l10n: AppLocalizations.of(context)!,
+          selectedEffectSlug: _selectedEffectSlug,
+          onSelected: (slug) => _selectEffect(slug),
+        );
+      }
     }
+  }
+
+  Future<void> _openPhotoTemplates() async {
+    final picked = await VideoTemplatesPickerSheet.showPhotoTemplates(
+      context,
+      selectedTemplateId: _videoTemplateId,
+    );
+    if (!mounted || picked == null) return;
+    setState(() {
+      _videoTemplateId = picked.templateId;
+      _videoTemplateName = picked.name;
+      _videoTemplateSlotCount = VideoTemplateSlotFiller.slotsForSelection(
+        slotCount: picked.slotCount,
+        recipeApplySlotCount: picked.recipe?.applySlotCount,
+      );
+      _templateProjectId = picked.projectId;
+      if (picked.sound != null) {
+        _selectedSound = picked.sound;
+        _pickedSoundSegmentId = picked.soundSegmentId;
+        _soundDidTrim = picked.soundSegmentId != null;
+        _soundStartOffset = Duration.zero;
+        _soundWindow = const Duration(seconds: 15);
+      } else if (picked.soundSegmentId != null) {
+        _pickedSoundSegmentId = picked.soundSegmentId;
+      }
+    });
+    final need = _videoTemplateSlotCount ?? VideoTemplateSlotFiller.minPhotoDumpSlots;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${picked.name} applied — your photo keeps one slide'
+          '${need > 1 ? '; $need slots fill on publish' : ''}',
+        ),
+      ),
+    );
   }
 
   void _onStudioModeSelected(CameraStudioMode mode) {

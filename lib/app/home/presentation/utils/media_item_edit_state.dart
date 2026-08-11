@@ -233,6 +233,14 @@ class MediaStudioExportResult {
     this.soundWindow = const Duration(seconds: 15),
     this.soundDidTrim = false,
     this.soundSegmentId,
+    this.videoTemplateId,
+    this.videoTemplateName,
+    this.videoTemplateSlotCount,
+    this.templateProjectId,
+    this.templateRenderedVideo,
+    this.templateSlotFiles,
+    this.templateServerExportUrl,
+    this.templateClientExportQuality,
   });
 
   final List<File> files;
@@ -247,6 +255,18 @@ class MediaStudioExportResult {
   final Duration soundWindow;
   final bool soundDidTrim;
   final String? soundSegmentId;
+  final String? videoTemplateId;
+  final String? videoTemplateName;
+  final int? videoTemplateSlotCount;
+  final String? templateProjectId;
+  /// Downloaded server export for composer preview (optional).
+  final File? templateRenderedVideo;
+  /// Original stills for slot fill when [templateRenderedVideo] is set.
+  final List<File>? templateSlotFiles;
+  /// `/uploads/...` from `POST .../export` — publish uses this (no mobile bake).
+  final String? templateServerExportUrl;
+  /// `draft` | `standard` for [templateRenderedVideo] (null = server export).
+  final String? templateClientExportQuality;
 }
 
 /// Initial filter/effect choices when opening the editor from the camera.

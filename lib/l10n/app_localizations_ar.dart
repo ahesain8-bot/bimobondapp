@@ -685,6 +685,369 @@ class AppLocalizationsAr extends AppLocalizations {
   String get feedLive => 'مباشر';
 
   @override
+  String get feedShop => 'المتجر';
+
+  @override
+  String get shopTitle => 'المتجر';
+
+  @override
+  String get shopFeatured => 'مميز';
+
+  @override
+  String get shopFlashDeals => 'عروض سريعة';
+
+  @override
+  String get shopForYou => 'لك';
+
+  @override
+  String get shopCart => 'السلة';
+
+  @override
+  String get shopCheckout => 'الدفع';
+
+  @override
+  String get shopOrders => 'الطلبات';
+
+  @override
+  String get shopBuyNow => 'اشتري الآن';
+
+  @override
+  String get shopAddToCart => 'أضف للسلة';
+
+  @override
+  String get shopEmpty => 'لا توجد منتجات';
+
+  @override
+  String get shopRetry => 'إعادة المحاولة';
+
+  @override
+  String get shopAllCategories => 'الكل';
+
+  @override
+  String get shopProducts => 'المنتجات';
+
+  @override
+  String get shopNoProductsYet => 'لا توجد منتجات بعد';
+
+  @override
+  String get shopEmptyHint => 'جرّب فئة أو كلمة بحث مختلفة.';
+
+  @override
+  String get shopSeeAll => 'عرض الكل';
+
+  @override
+  String get shopSearchHint => 'ابحث عن منتجات...';
+
+  @override
+  String get shopSearchForProducts => 'ابحث عن منتجات';
+
+  @override
+  String get shopRecentSearches => 'الأخيرة';
+
+  @override
+  String shopNoResultsFor(String query) {
+    return 'لا نتائج لـ \"$query\"';
+  }
+
+  @override
+  String get shopSort => 'الترتيب';
+
+  @override
+  String get shopSortNewest => 'الأحدث';
+
+  @override
+  String get shopSortOldest => 'الأقدم';
+
+  @override
+  String get shopSortPriceLow => 'السعر: من الأقل';
+
+  @override
+  String get shopSortPriceHigh => 'السعر: من الأعلى';
+
+  @override
+  String get shopSortTitleAsc => 'العنوان أ-ي';
+
+  @override
+  String get shopSortTitleDesc => 'العنوان ي-أ';
+
+  @override
+  String get shopCartEmpty => 'سلتك فارغة';
+
+  @override
+  String get shopSubtotal => 'المجموع الفرعي';
+
+  @override
+  String get shopCommission => 'العمولة';
+
+  @override
+  String get shopCheckoutAction => 'إتمام الشراء';
+
+  @override
+  String get shopShippingDetails => 'تفاصيل الشحن';
+
+  @override
+  String get shopPayWithCoins => 'الدفع بالعملات';
+
+  @override
+  String get shopFirstName => 'الاسم الأول';
+
+  @override
+  String get shopFirstNameHint => 'أدخل اسمك الأول';
+
+  @override
+  String get shopLastName => 'اسم العائلة';
+
+  @override
+  String get shopLastNameHint => 'أدخل اسم العائلة';
+
+  @override
+  String get shopStreet => 'الشارع';
+
+  @override
+  String get shopStreetHint => 'أدخل اسم الشارع';
+
+  @override
+  String get shopStreetNo => 'رقم الشارع';
+
+  @override
+  String get shopStreetNoHint => 'الرقم';
+
+  @override
+  String get shopApartmentNo => 'رقم الشقة';
+
+  @override
+  String get shopApartmentNoHint => 'الشقة';
+
+  @override
+  String get shopCity => 'المدينة';
+
+  @override
+  String get shopCityHint => 'أدخل مدينتك';
+
+  @override
+  String get shopPostcode => 'الرمز البريدي';
+
+  @override
+  String get shopPostcodeHint => 'أدخل الرمز البريدي';
+
+  @override
+  String get shopCountry => 'الدولة';
+
+  @override
+  String get shopCountryHint => 'أدخل دولتك';
+
+  @override
+  String get shopPhone => 'الهاتف';
+
+  @override
+  String get shopPhoneHint => 'أدخل رقم هاتفك';
+
+  @override
+  String get shopFieldRequired => 'مطلوب';
+
+  @override
+  String get shopYourBalance => 'رصيدك';
+
+  @override
+  String get shopDueNow => 'المستحق الآن';
+
+  @override
+  String get shopBuyCoins => 'شراء عملات';
+
+  @override
+  String shopPayCoinsAmount(int count) {
+    return 'ادفع $count عملة';
+  }
+
+  @override
+  String shopNeedMoreCoins(int count) {
+    return 'تحتاج إلى $count عملة إضافية.';
+  }
+
+  @override
+  String get shopNotEnoughCoins => 'رصيد العملات غير كافٍ. اشترِ المزيد للمتابعة.';
+
+  @override
+  String shopCoinsLabel(int count) {
+    return '$count عملة';
+  }
+
+  @override
+  String get shopProductNotFound => 'المنتج غير موجود';
+
+  @override
+  String get shopAddFavorite => 'إضافة إلى المفضلة';
+
+  @override
+  String get shopRemoveFavorite => 'إزالة من المفضلة';
+
+  @override
+  String get shopShare => 'مشاركة';
+
+  @override
+  String get shopReadMore => 'اقرأ المزيد';
+
+  @override
+  String get shopShowLess => 'عرض أقل';
+
+  @override
+  String get shopVariants => 'الخيارات';
+
+  @override
+  String get shopQuantity => 'الكمية';
+
+  @override
+  String get shopOutOfStock => 'غير متوفر';
+
+  @override
+  String get shopSelectVariantFirst => 'اختر خيارًا أولاً';
+
+  @override
+  String get shopAddedToCart => 'تمت الإضافة إلى السلة';
+
+  @override
+  String get shopLiveBadge => 'مباشر';
+
+  @override
+  String get shopBestPrice => 'أفضل سعر';
+
+  @override
+  String get shopPurchases => 'مشترياتي';
+
+  @override
+  String get shopSales => 'المبيعات';
+
+  @override
+  String get shopNoPurchasesYet => 'لا توجد مشتريات بعد';
+
+  @override
+  String get shopNoSalesYet => 'لا توجد مبيعات بعد';
+
+  @override
+  String get shopStatusPending => 'قيد الانتظار';
+
+  @override
+  String get shopStatusPaid => 'مدفوع';
+
+  @override
+  String get shopStatusCancelled => 'ملغى';
+
+  @override
+  String get shopStatusRefunded => 'مسترد';
+
+  @override
+  String get shopStatusUnknown => 'غير معروف';
+
+  @override
+  String get shopFulfillmentNone => 'لم يبدأ';
+
+  @override
+  String get shopFulfillmentAwaitingShipment => 'بانتظار الشحن';
+
+  @override
+  String get shopFulfillmentShipped => 'تم الشحن';
+
+  @override
+  String get shopFulfillmentDelivered => 'تم التسليم';
+
+  @override
+  String get shopFulfillmentAccepted => 'مقبول';
+
+  @override
+  String get shopFulfillmentDisputed => 'نزاع';
+
+  @override
+  String get shopStatus => 'الحالة';
+
+  @override
+  String get shopFulfillment => 'التنفيذ';
+
+  @override
+  String get shopTracking => 'التتبع';
+
+  @override
+  String get shopItems => 'العناصر';
+
+  @override
+  String shopQty(int count) {
+    return 'الكمية: $count';
+  }
+
+  @override
+  String get shopTotalPaid => 'الإجمالي المدفوع';
+
+  @override
+  String get shopShipping => 'الشحن';
+
+  @override
+  String get shopShip => 'شحن';
+
+  @override
+  String get shopShipOrder => 'شحن الطلب';
+
+  @override
+  String get shopTrackingNumber => 'رقم التتبع';
+
+  @override
+  String get shopShippingNote => 'ملاحظة الشحن';
+
+  @override
+  String get shopReceive => 'استلام';
+
+  @override
+  String get shopAccept => 'قبول';
+
+  @override
+  String get shopDispute => 'نزاع';
+
+  @override
+  String get shopDisputeOrder => 'فتح نزاع';
+
+  @override
+  String get shopNoteOptional => 'ملاحظة (اختياري)';
+
+  @override
+  String get shopCancel => 'إلغاء';
+
+  @override
+  String get shopLiveAddProduct => 'إضافة منتج';
+
+  @override
+  String get shopLiveNoProductsToAdd => 'لا توجد منتجات لإضافتها';
+
+  @override
+  String get shopLiveEmptyHost => 'لا منتجات بعد — اضغط إضافة منتج';
+
+  @override
+  String get shopLiveEmptyViewer => 'لا توجد منتجات في هذا البث بعد';
+
+  @override
+  String get shopPinned => 'مثبّت';
+
+  @override
+  String get shopPin => 'تثبيت';
+
+  @override
+  String get shopUnpin => 'إلغاء التثبيت';
+
+  @override
+  String get shopRemove => 'إزالة';
+
+  @override
+  String get shopBuy => 'شراء';
+
+  @override
+  String shopItemsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عناصر',
+      one: 'عنصر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get noPostsFound => 'لا توجد منشورات';
 
   @override
@@ -2313,7 +2676,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatLastMessage5 => 'أراك غداً 👋';
 
   @override
-  String get addPostAsAuction => 'عرض كمزاد';
+  String get mediaStudioAutoCut => 'AutoCut';
+
+  @override
+  String get addPostAsAuction => 'عرض في البث المباشر';
 
   @override
   String get auctionItemName => 'اسم المنتج';
@@ -3812,6 +4178,57 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsInterests => 'الاهتمامات';
 
   @override
+  String get settingsMyProducts => 'منتجاتي';
+
+  @override
+  String get shopGoToMyProducts => 'الذهاب إلى منتجاتي';
+
+  @override
+  String get shopMakeAuction => 'عرض في البث المباشر';
+
+  @override
+  String get shopMyProductsSearchHint => 'ابحث في منتجاتي...';
+
+  @override
+  String get shopFilterAll => 'الكل';
+
+  @override
+  String get shopNoMatchingProducts => 'لا توجد منتجات مطابقة';
+
+  @override
+  String get shopSortQuantityHigh => 'الكمية: الأعلى';
+
+  @override
+  String get shopSortQuantityLow => 'الكمية: الأقل';
+
+  @override
+  String get shopFilters => 'فلاتر';
+
+  @override
+  String get shopMediaType => 'الوسائط';
+
+  @override
+  String get shopMediaImage => 'صورة';
+
+  @override
+  String get shopMediaVideo => 'فيديو';
+
+  @override
+  String get shopMediaCarousel => 'ألبوم';
+
+  @override
+  String get shopMinPriceCoins => 'أقل عملات';
+
+  @override
+  String get shopMaxPriceCoins => 'أكثر عملات';
+
+  @override
+  String get shopApplyFilters => 'تطبيق';
+
+  @override
+  String get shopClearFilters => 'مسح';
+
+  @override
   String get retry => 'حاول مرة أخرى';
 
   @override
@@ -3831,4 +4248,52 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get effectsSubtitle => 'المؤثرات';
+
+  @override
+  String get templateExportPreparing => 'جارٍ التحضير…';
+
+  @override
+  String get templateExportUploading => 'جارٍ الرفع…';
+
+  @override
+  String get templateExportUploaded => 'تم الرفع';
+
+  @override
+  String get templateExportPreparingSlots => 'جارٍ تجهيز الخانات…';
+
+  @override
+  String get templateExportRendering => 'جارٍ تجهيز الفيديو…';
+
+  @override
+  String get templateExportAlmostDone => 'أوشك على الانتهاء…';
+
+  @override
+  String get templateExportDownloading => 'جارٍ التنزيل…';
+
+  @override
+  String get templateExportDone => 'تم';
+
+  @override
+  String get templateExportFailed => 'فشل تصدير القالب — حاول مرة أخرى';
+
+  @override
+  String get templateCouldNotLoad => 'تعذر تحميل القالب';
+
+  @override
+  String get templatePreviewFailed => 'فشل معاينة القالب';
+
+  @override
+  String get templateHandoffFailed => 'تعذر تجهيز فيديو القالب';
+
+  @override
+  String get templateApplying => 'جارٍ تطبيق القالب…';
+
+  @override
+  String get templateAddMediaToPreview => 'أضف وسائط للمعاينة';
+
+  @override
+  String get templateNeedMediaFirst => 'التقط أو أضف صورة/فيديو أولاً';
+
+  @override
+  String get mediaStudioTemplates => 'القوالب';
 }

@@ -1,0 +1,142 @@
+import 'dart:io';
+
+import 'package:bimobondapp/app/video_templates/data/datasources/video_template_asset_loader.dart';
+import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/core/error/failures.dart';
+import 'package:dartz/dartz.dart';
+
+/// Template loading + project APIs. Metadata is cached; assets are lazy.
+///
+/// Alias: [TemplateRepository] (Phase 2 naming).
+abstract class VideoTemplatesRepository {
+  // --- Discovery ---
+
+  Future<Either<Failure, List<VideoTemplateCardEntity>>> listPhotoTemplates({
+    int limit = 40,
+    int offset = 0,
+    bool forceRefresh = false,
+  });
+
+  Future<Either<Failure, List<VideoTemplateCardEntity>>> listTemplates({
+    String? templateKind,
+    String? categoryId,
+    int limit = 40,
+    int offset = 0,
+    bool forceRefresh = false,
+  });
+
+  Future<Either<Failure, List<VideoTemplateCardEntity>>> listFeatured({
+    int limit = 40,
+    int offset = 0,
+    bool forceRefresh = false,
+  });
+
+  Future<Either<Failure, List<VideoTemplateCardEntity>>> listTrending({
+    int limit = 40,
+    int offset = 0,
+    bool forceRefresh = false,
+  });
+
+  Future<Either<Failure, List<VideoTemplateCardEntity>>> searchTemplates({
+    required String query,
+    int limit = 40,
+    int offset = 0,
+  });
+
+  Future<Either<Failure, List<VideoTemplateCardEntity>>> listBySound({
+    required String soundId,
+    int limit = 40,
+    int offset = 0,
+    bool forceRefresh = false,
+  });
+
+  Future<Either<Failure, List<TemplateCategoryEntity>>> listCategories({
+    bool forceRefresh = false,
+  });
+
+  /// Lightweight template card / detail (not the full recipe).
+  Future<Either<Failure, VideoTemplateCardEntity>> getTemplate(
+    String templateId, {
+    bool forceRefresh = false,
+  });
+
+  /// Primary editor contract. Caches JSON metadata only — no asset downloads.
+  Future<Either<Failure, VideoTemplateRecipeEntity>> getRecipe(
+    String templateId, {
+    bool includeOverlays = false,
+    bool forceRefresh = false,
+    int? expectedVersion,
+  });
+
+  Future<Either<Failure, void>> recordUse(String templateId);
+
+  // --- Lazy assets ---
+
+  /// Cover + preview video only (detail screen).
+  Future<Either<Failure, VideoTemplatePreviewAssets>> prefetchPreviewAssets(
+    VideoTemplateRecipeEntity recipe, {
+    VideoTemplateCardEntity? card,
+  });
+
+  /// Stickers / overlays / LUTs / fonts needed before the editor opens.
+  Future<Either<Failure, Map<String, File>>> prefetchEditorAssets(
+    VideoTemplateRecipeEntity recipe, {
+    bool includePlaceholders = false,
+    bool includePreview = true,
+  });
+
+  Future<Either<Failure, File?>> ensureAssetUrl(
+    String url, {
+    bool preferVideoCache = false,
+  });
+
+  void invalidateTemplateCache(String templateId, {int? newerVersion});
+
+  void clearMetadataCache();
+
+  // --- Projects / export ---
+
+  Future<Either<Failure, VideoTemplateProjectEntity>> createProject({
+    required String templateId,
+    String? title,
+  });
+
+  Future<Either<Failure, VideoTemplateProjectEntity>> getProject(
+    String projectId,
+  );
+
+  Future<Either<Failure, VideoTemplateProjectSlotEntity>> patchProjectSlot({
+    required String projectId,
+    required String slotId,
+    required String userAssetUrl,
+    double? trimStart,
+    double? trimEnd,
+    double? speed,
+    double? rotation,
+    double? scale,
+    double? volume,
+  });
+
+  Future<Either<Failure, void>> completeProject(String projectId);
+
+  Future<Either<Failure, VideoTemplateExportEntity>> queueExport({
+    required String projectId,
+    String quality = 'standard',
+  });
+
+  /// SSE export progress. Null = stream unavailable (caller should poll).
+  Future<VideoTemplateExportEntity?> listenExportStream({
+    required String projectId,
+    required String exportId,
+    void Function(VideoTemplateExportEntity snap)? onUpdate,
+    Duration timeout = const Duration(minutes: 8),
+  });
+
+  Future<Either<Failure, VideoTemplateExportEntity>> getExport({
+    required String projectId,
+    required String exportId,
+  });
+}
+
+/// Phase 2 schema-oriented alias for [VideoTemplatesRepository].
+typedef TemplateRepository = VideoTemplatesRepository;

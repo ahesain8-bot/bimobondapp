@@ -49,7 +49,29 @@ class PostModel extends PostEntity {
     super.filterName,
     super.filterCategory,
     super.filter,
+    super.taggedProductIds = const [],
   });
+
+  static List<String> _parseTaggedProductIds(Map<String, dynamic> json) {
+    final raw = json['taggedProductIds'] ??
+        json['productTags'] ??
+        json['products'];
+    if (raw is! List) {
+      final single = json['productId']?.toString().trim();
+      if (single != null && single.isNotEmpty) return [single];
+      return const [];
+    }
+    return raw
+        .map((e) {
+          if (e is String) return e.trim();
+          if (e is Map) {
+            return (e['productId'] ?? e['id'] ?? '').toString().trim();
+          }
+          return e.toString().trim();
+        })
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
 
   static List<String> _parseHashtagNames(dynamic raw) {
     if (raw is! List) return const [];
@@ -379,6 +401,7 @@ class PostModel extends PostEntity {
       filterName: _parseFilterName(json),
       filterCategory: _parseFilterCategory(json),
       filter: _parseFilter(json),
+      taggedProductIds: _parseTaggedProductIds(json),
     );
   }
 
@@ -432,6 +455,7 @@ class PostModel extends PostEntity {
       filterName: filterName,
       filterCategory: filterCategory,
       filter: filter,
+      taggedProductIds: taggedProductIds,
     );
   }
 

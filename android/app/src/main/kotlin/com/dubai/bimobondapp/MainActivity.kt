@@ -15,6 +15,8 @@ import com.dubai.bimobondapp.ar_camera.LiveBeautyState
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
+import com.dubai.bimobondapp.camera_engine.NativeCameraPlugin
+import com.dubai.bimobondapp.camera_engine.TemplateExportPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -48,6 +50,11 @@ class MainActivity : FlutterActivity() {
             AR_CAMERA_VIEW_TYPE,
             ArCameraPlatformViewFactory(this),
         )
+
+        // Phase 1: CameraX → Flutter TextureRegistry (no effects / recording).
+        NativeCameraPlugin.register(flutterEngine, this)
+        // Template timeline → Media3 Transformer / MediaCodec export.
+        TemplateExportPlugin.register(flutterEngine, this)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AR_CAMERA_CHANNEL)
             .also { arCameraChannel = it }
@@ -448,10 +455,16 @@ class MainActivity : FlutterActivity() {
         ) {
             ArCameraController.onPermissionGranted()
         }
+        if (requestCode == 101) {
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            NativeCameraPlugin.onPermissionResult(requestCode, granted)
+        }
     }
 
     override fun onDestroy() {
         ArCameraController.onRecordingAutoStopped = null
+        NativeCameraPlugin.dispose()
         CountdownTonePlayer.release()
         super.onDestroy()
     }

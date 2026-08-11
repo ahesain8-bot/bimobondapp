@@ -684,7 +684,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
       confirmLabel: l10n.deleteAction,
       destructive: true,
       onConfirm: () {
-        context.read<PostsBloc>().add(DeletePostRequestedEvent(widget.post.id));
+        unawaited(deletePostWithLoading(context, postId: widget.post.id));
       },
     );
   }
