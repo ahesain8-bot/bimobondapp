@@ -1,0 +1,159 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../../../../core/utils/app_assets.dart';
+import '../../../../../core/utils/app_colors.dart';
+import '../../../../../core/utils/app_sizes.dart';
+import '../../../../../core/utils/app_text_styles.dart';
+import '../../bloc/live_room/live_room_bloc.dart';
+import '../../bloc/live_room/live_room_event.dart';
+import '../../bloc/live_room/live_room_state.dart';
+import 'live_room_gallery_sheet.dart';
+import 'live_room_guests_sheet.dart';
+import 'live_room_pill.dart';
+import 'live_room_ranking_sheet.dart';
+
+/// Second header row: ranking + gallery (start), green invite (end).
+class LiveRoomInfoRow extends StatelessWidget {
+  const LiveRoomInfoRow({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<LiveRoomBloc, LiveRoomState>(
+      buildWhen: (previous, current) =>
+          current is LiveRoomReady &&
+          (previous is! LiveRoomReady || previous.session != current.session),
+      builder: (context, state) {
+        if (state is! LiveRoomReady) {
+          return const SizedBox.shrink();
+        }
+
+        final session = state.session;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            children: [
+              _RankingChip(
+                label: session.hourlyRankingLabel,
+                onTap: () {
+                  context
+                      .read<LiveRoomBloc>()
+                      .add(const LiveRoomRankingTapped());
+                  LiveRoomRankingSheet.show(context);
+                },
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => LiveRoomGallerySheet.show(context),
+                child: LiveRoomPill(
+                  height: AppSizes.roomChipHeight,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  color: AppColors.overlayPillSoft,
+                  child: Text(
+                    '${session.galleryCurrent}/${session.galleryTotal} المعرض',
+                    style: AppTextStyles.roomChip,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              LiveRoomPill(
+                height: AppSizes.roomChipHeight,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                color: AppColors.overlayPillSoft,
+                child: const SizedBox(width: 14),
+              ),
+              const Spacer(),
+              _InviteChip(
+                count: session.guestInviteCount,
+                onTap: () {
+                  context
+                      .read<LiveRoomBloc>()
+                      .add(const LiveRoomInviteTapped());
+                  LiveRoomGuestsSheet.show(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RankingChip extends StatelessWidget {
+  const _RankingChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: LiveRoomPill(
+        height: AppSizes.roomChipHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        color: AppColors.overlayPillSoft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              AppAssets.roomFlame,
+              width: 13,
+              height: 15,
+            ),
+            const SizedBox(width: 4),
+            Text(label, style: AppTextStyles.roomChip),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteChip extends StatelessWidget {
+  const _InviteChip({
+    required this.count,
+    required this.onTap,
+  });
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: AppSizes.roomChipHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.inviteGreen,
+          borderRadius: BorderRadius.circular(AppSizes.radiusPill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              AppAssets.roomPersonAdd,
+              width: 16,
+              height: 14,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$count',
+              style: AppTextStyles.roomChip.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

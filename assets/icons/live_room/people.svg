@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 28" fill="none">
+  <!-- Separate, block-style people; no crossing bust arcs. -->
+  <circle cx="9.1" cy="7.1" r="3.75" stroke="#B95A78" stroke-width="3"/>
+  <path d="M3.5 23v-5.25c0-3.15 2.5-5.4 5.6-5.4s5.6 2.25 5.6 5.4V23H3.5z"
+    stroke="#B95A78" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="20" cy="7.9" r="3.25" stroke="#8399B2" stroke-width="2.85"/>
+  <path d="M15.2 23v-4.7c0-2.85 2.15-4.9 4.8-4.9s4.8 2.05 4.8 4.9V23h-9.6z"
+    stroke="#8399B2" stroke-width="2.85" stroke-linejoin="round"/>
+  <!-- Small padlock badge. -->
+  <path d="M24.1 20.1v-1.4a3 3 0 0 1 6 0v1.4"
+    stroke="#FFF" stroke-width="1.8" stroke-linecap="round"/>
+  <rect x="23" y="19.6" width="8.1" height="7" rx="1.35" fill="#FFF"/>
+  <circle cx="27.05" cy="22.4" r=".75" fill="#252527"/>
+  <path d="M27.05 23v1.25" stroke="#252527" stroke-width=".85" stroke-linecap="round"/>
+</svg>

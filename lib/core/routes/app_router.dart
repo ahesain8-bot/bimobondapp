@@ -50,7 +50,8 @@ import 'package:bimobondapp/app/wallets/presentation/pages/balance_transactions_
 import 'package:bimobondapp/app/wallets/presentation/pages/balance_transaction_detail_screen.dart';
 import 'package:bimobondapp/app/wallets/presentation/pages/add_payout_method_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
-import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/screens/live_feed_screen.dart';
+import 'package:bimobondapp/features/live/presentation/pages/live_room_page.dart' as host_live;
 import 'package:bimobondapp/app/shop/domain/entities/checkout_entity.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/cart_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/checkout_screen.dart';
@@ -337,7 +338,12 @@ class AppRouter {
       GoRoute(
         path: '/lives',
         name: 'lives',
-        builder: (context, state) => const LivesScreen(),
+        builder: (context, state) => const LiveFeedScreen(),
+      ),
+      GoRoute(
+        path: '/create-live',
+        name: 'create_live',
+        builder: (context, state) => const host_live.LiveRoomPage(),
       ),
       GoRoute(
         path: '/shop',

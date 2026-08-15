@@ -55,6 +55,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bimobondapp/firebase_options.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await configureGoogleMaps();
@@ -84,7 +86,7 @@ void main() async {
   CameraStudioCatalogLoader.applyBundledCatalog();
   await chats_di.initChats();
   await notifications_di.initNotifications();
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

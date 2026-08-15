@@ -78,19 +78,6 @@ class CameraModeDurationBar extends StatelessWidget {
         selected: studioMode == CameraStudioMode.photo,
         onTap: onPhotoSelected,
       ),
-      if (showText)
-        _ModeDurationItem(
-          label: textLabel,
-          selected: false,
-          onTap: onTextSelected,
-        ),
-      if (showLive)
-        _ModeDurationItem(
-          label: liveLabel,
-          selected: studioMode == CameraStudioMode.live,
-          isLive: true,
-          onTap: onLiveSelected,
-        ),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -115,13 +102,11 @@ class _ModeDurationItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.isLive = false,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final bool isLive;
 
   @override
   Widget build(BuildContext context) {
@@ -139,14 +124,9 @@ class _ModeDurationItem extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected
-                ? (isLive
-                      ? LiveDetailsLayoutConstants.liveBadgeColor
-                      : Colors.black)
-                : Colors.white,
+            color: selected ? Colors.black : Colors.white,
             fontSize: selected ? 14 : 13,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
-            letterSpacing: isLive && selected ? 0.5 : 0,
             shadows: selected
                 ? null
                 : const [
