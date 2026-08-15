@@ -70,7 +70,6 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.isActive) return;
       ref.read(activeLiveProvider.notifier).activate(widget.live);
-      _maybeShowFirstGift();
     });
   }
 
