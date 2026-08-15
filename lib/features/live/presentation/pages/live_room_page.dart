@@ -35,6 +35,7 @@ import '../widgets/room/live_room_effects_panel.dart';
 import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
 import '../widgets/vignette_layer.dart';
+import '../utils/live_screen_wakelock.dart';
 
 /// Host live-room screen: full-screen camera with TikTok-style Arabic overlays.
 class LiveRoomPage extends StatefulWidget {
@@ -66,6 +67,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     _cameraRepository = CameraRepositoryImpl();
     _faceTracker = LiveFaceTracker();
     _preRequestPermissions();
+    LiveScreenWakelock.enable();
   }
 
   Future<void> _preRequestPermissions() async {
@@ -121,6 +123,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     if (state == AppLifecycleState.inactive) {
       bloc.add(const LiveRoomAppPaused());
     } else if (state == AppLifecycleState.resumed) {
+      LiveScreenWakelock.enable();
       bloc.add(const LiveRoomAppResumed());
     }
   }
@@ -130,6 +133,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     WidgetsBinding.instance.removeObserver(this);
     _faceTracker.dispose();
     _bloc?.close();
+    LiveScreenWakelock.disable();
     super.dispose();
   }
 

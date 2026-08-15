@@ -11,6 +11,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../providers/live_feed_provider.dart';
 import '../providers/live_session_provider.dart';
 import '../widgets/live_room_page.dart';
+import '../../../live/presentation/utils/live_screen_wakelock.dart';
 
 /// TikTok LIVE home: full-screen vertical swipe between running lives.
 class LiveFeedScreen extends ConsumerStatefulWidget {
@@ -20,23 +21,35 @@ class LiveFeedScreen extends ConsumerStatefulWidget {
   ConsumerState<LiveFeedScreen> createState() => _LiveFeedScreenState();
 }
 
-class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen> {
+class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
+    with WidgetsBindingObserver {
   late final PageController _pageController;
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pageController = PageController();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    LiveScreenWakelock.enable();
     Future.microtask(() async {
       await ref.read(liveFeedProvider.notifier).loadFeed();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      LiveScreenWakelock.enable();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
+    LiveScreenWakelock.disable();
     super.dispose();
   }
 

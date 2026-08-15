@@ -24,6 +24,7 @@ import '../widgets/start_live/settings_panel.dart';
 import '../widgets/start_live/status_bar_area.dart';
 import '../widgets/start_live/tools_row.dart';
 import '../widgets/vignette_layer.dart';
+import '../utils/live_screen_wakelock.dart';
 
 /// The live start screen: full-screen camera feed with live setup UI.
 class LiveStartPage extends StatefulWidget {
@@ -54,6 +55,7 @@ class _LiveStartPageState extends State<LiveStartPage>
     );
     _preRequestPermissions();
     _liveBloc.add(const LiveInitializeRequested());
+    LiveScreenWakelock.enable();
   }
 
   /// Request CAMERA + MICROPHONE together up-front so starting the live later
@@ -72,6 +74,7 @@ class _LiveStartPageState extends State<LiveStartPage>
     if (state == AppLifecycleState.inactive) {
       _liveBloc.add(const LiveAppPaused());
     } else if (state == AppLifecycleState.resumed) {
+      LiveScreenWakelock.enable();
       _liveBloc.add(const LiveAppResumed());
     }
   }
@@ -81,6 +84,7 @@ class _LiveStartPageState extends State<LiveStartPage>
     WidgetsBinding.instance.removeObserver(this);
     _liveBloc.close();
     _titleController.dispose();
+    LiveScreenWakelock.disable();
     super.dispose();
   }
 

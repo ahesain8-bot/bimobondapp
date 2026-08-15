@@ -7,6 +7,7 @@ import '../../../../../core/utils/app_text_styles.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import 'live_room_people_sheet.dart';
 import 'live_room_pill.dart';
 import 'live_room_profile_pill.dart';
 
@@ -44,24 +45,31 @@ class LiveRoomHeader extends StatelessWidget {
                 child: LiveRoomLikesPill(likeCount: session.likeCount),
               ),
               const Spacer(),
-              // End (left): viewers then power → visual [power][viewers]
-              LiveRoomPill(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SvgPicture.asset(
-                      AppAssets.roomPerson,
-                      width: 14,
-                      height: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      session.viewerCount.toString().padLeft(2, '0'),
-                      style: AppTextStyles.roomCounter.copyWith(fontSize: 12),
-                    ),
-                  ],
+              GestureDetector(
+                onTap: () {
+                  context
+                      .read<LiveRoomBloc>()
+                      .add(const LiveRoomViewersTapped());
+                  LiveRoomPeopleSheet.show(context);
+                },
+                child: LiveRoomPill(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset(
+                        AppAssets.roomPerson,
+                        width: 14,
+                        height: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        session.viewerCount.toString().padLeft(2, '0'),
+                        style: AppTextStyles.roomCounter.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 6),

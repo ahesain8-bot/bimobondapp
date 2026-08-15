@@ -7,20 +7,15 @@ import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import 'live_room_guests_sheet.dart';
 import 'live_room_options_sheet.dart';
-import 'live_room_people_sheet.dart';
 import 'live_room_share_sheet.dart';
 
-/// Bottom action bar rebuilt from the current vector reference.
+/// Host live bottom bar — TikTok LIVE order:
+/// [Say something…] [share] [effects] [more] [guests]
 class LiveRoomBottomBar extends StatelessWidget {
   const LiveRoomBottomBar({super.key});
 
   static const double _buttonSize = 42;
-  static const double _leftInset = 8;
-  static const double _rightInset = 12;
-  static const double _chatShareGap = 14;
-  static const double _shareEffectsGap = 14;
-  static const double _effectsMoreGap = 9;
-  static const double _rightGroupGap = 14;
+  static const double _actionGap = 8;
   static const Color _buttonFill = Color(0xFF202022);
 
   @override
@@ -28,73 +23,76 @@ class LiveRoomBottomBar extends StatelessWidget {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final bloc = context.read<LiveRoomBloc>();
 
-    return Container(
-      width: double.infinity,
-      color: Colors.black,
-      padding: EdgeInsets.fromLTRB(
-        _leftInset,
-        8,
-        _rightInset,
-        10 + bottomInset,
-      ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + bottomInset),
       child: Directionality(
         textDirection: TextDirection.ltr,
-        child: Row(
-          children: [
-            _CircleSvgButton(
-              asset: AppAssets.roomBarChat,
-              iconWidth: 28,
-              iconHeight: 28,
-              onTap: () => bloc.add(const LiveRoomChatTapped()),
-            ),
-            const SizedBox(width: _chatShareGap),
-            _CircleSvgButton(
-              asset: AppAssets.roomBarShare,
-              iconWidth: 27,
-              iconHeight: 27,
-              onTap: () {
-                bloc.add(const LiveRoomShareTapped());
-                LiveRoomShareSheet.show(context);
-              },
-            ),
-            const SizedBox(width: _shareEffectsGap),
-            _CircleSvgButton(
-              asset: AppAssets.roomBarEffects,
-              iconWidth: 27,
-              iconHeight: 27,
-              onTap: () => bloc.add(const LiveRoomEffectsTapped()),
-            ),
-            const SizedBox(width: _effectsMoreGap),
-            _CircleSvgButton(
-              asset: AppAssets.roomBarMore,
-              iconWidth: 23,
-              iconHeight: 23,
-              onTap: () {
-                bloc.add(const LiveRoomMoreTapped());
-                LiveRoomOptionsSheet.show(context);
-              },
-            ),
-            const Spacer(),
-            _CircleSvgButton(
-              asset: AppAssets.roomBarCollab,
-              iconWidth: 32,
-              iconHeight: 29,
-              onTap: () {
-                bloc.add(const LiveRoomCollabTapped());
-                LiveRoomGuestsSheet.show(context);
-              },
-            ),
-            const SizedBox(width: _rightGroupGap),
-            _CircleSvgButton(
-              asset: AppAssets.roomBarPeople,
-              iconWidth: 31,
-              iconHeight: 28,
-              onTap: () {
-                bloc.add(const LiveRoomViewersTapped());
-                LiveRoomPeopleSheet.show(context);
-              },
-            ),
-          ],
+        child: SizedBox(
+          height: _buttonSize,
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => bloc.add(const LiveRoomChatTapped()),
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      'اكتب تعليقاً…',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _CircleSvgButton(
+                asset: AppAssets.roomBarShare,
+                iconWidth: 27,
+                iconHeight: 27,
+                onTap: () {
+                  bloc.add(const LiveRoomShareTapped());
+                  LiveRoomShareSheet.show(context);
+                },
+              ),
+              const SizedBox(width: _actionGap),
+              _CircleSvgButton(
+                asset: AppAssets.roomBarEffects,
+                iconWidth: 27,
+                iconHeight: 27,
+                onTap: () => bloc.add(const LiveRoomEffectsTapped()),
+              ),
+              const SizedBox(width: _actionGap),
+              _CircleSvgButton(
+                asset: AppAssets.roomBarMore,
+                iconWidth: 23,
+                iconHeight: 23,
+                onTap: () {
+                  bloc.add(const LiveRoomMoreTapped());
+                  LiveRoomOptionsSheet.show(context);
+                },
+              ),
+              const SizedBox(width: _actionGap),
+              _CircleSvgButton(
+                asset: AppAssets.roomBarCollab,
+                iconWidth: 32,
+                iconHeight: 29,
+                onTap: () {
+                  bloc.add(const LiveRoomCollabTapped());
+                  LiveRoomGuestsSheet.show(context);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
