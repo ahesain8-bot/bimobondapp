@@ -41,6 +41,7 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/video_templ
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/features/live/presentation/widgets/live_countdown_overlay.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/foundation.dart';
@@ -88,11 +89,13 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _showPhotoEditor = false;
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
   MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.smooth;
+
   /// Retouch (Magic) On by default when the camera opens.
   bool _photoEditorMagicOn = true;
 
   /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
   static const double _kMagicAutoSmooth = 0.50;
+
   /// Face color sliders (label = value×100) applied on live camera even when
   /// Retouch/Magic is Off.
   /// Live color defaults (empty-frame / Retouch-Off baseline).
@@ -105,6 +108,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     MediaPhotoEditorTool.highlights: 0.08, // +8
     MediaPhotoEditorTool.shadows: 0.10, // +10
   };
+
   /// Front-camera live color defaults — must match the front-camera target
   /// values in FaceWarpRenderer.bindRetouchUniforms (the "frontTarget"
   /// argument of each fieldMix call). Kept in sync manually: previously this
@@ -443,15 +447,13 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           if ((edited.videoTemplateId ?? _videoTemplateId) != null)
             'videoTemplateId': edited.videoTemplateId ?? _videoTemplateId,
           if ((edited.videoTemplateName ?? _videoTemplateName) != null)
-            'videoTemplateName':
-                edited.videoTemplateName ?? _videoTemplateName,
+            'videoTemplateName': edited.videoTemplateName ?? _videoTemplateName,
           if ((edited.videoTemplateSlotCount ?? _videoTemplateSlotCount) !=
               null)
             'videoTemplateSlotCount':
                 edited.videoTemplateSlotCount ?? _videoTemplateSlotCount,
           if ((edited.templateProjectId ?? _templateProjectId) != null)
-            'templateProjectId':
-                edited.templateProjectId ?? _templateProjectId,
+            'templateProjectId': edited.templateProjectId ?? _templateProjectId,
           if (edited.templateRenderedVideo != null)
             'templateRenderedVideo': edited.templateRenderedVideo,
           if (edited.templateSlotFiles != null &&
@@ -827,14 +829,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         if ((edited.videoTemplateId ?? _videoTemplateId) != null)
           'videoTemplateId': edited.videoTemplateId ?? _videoTemplateId,
         if ((edited.videoTemplateName ?? _videoTemplateName) != null)
-          'videoTemplateName':
-              edited.videoTemplateName ?? _videoTemplateName,
+          'videoTemplateName': edited.videoTemplateName ?? _videoTemplateName,
         if ((edited.videoTemplateSlotCount ?? _videoTemplateSlotCount) != null)
           'videoTemplateSlotCount':
               edited.videoTemplateSlotCount ?? _videoTemplateSlotCount,
         if ((edited.templateProjectId ?? _templateProjectId) != null)
-          'templateProjectId':
-              edited.templateProjectId ?? _templateProjectId,
+          'templateProjectId': edited.templateProjectId ?? _templateProjectId,
         if (edited.templateRenderedVideo != null)
           'templateRenderedVideo': edited.templateRenderedVideo,
         if (edited.templateSlotFiles != null &&
@@ -1847,6 +1847,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(_beginVideoRecording());
   }
 
+  /// Pre-live countdown (1 → 2 → 3) shown over the camera preview, then the
+  /// live room opens and the stream starts.
+  Future<void> _handleGoLiveTap() async {
+    if (_isRecording || _isBusy || _isProcessingCapture) return;
+    await LiveCountdownOverlay.run(context);
+    if (!context.mounted) return;
+    context.push('/create-live');
+  }
+
   Future<void> _applyFilter(CameraFilterPreset preset) async {
     setState(() => _selectedFilter = preset.filter);
     _appliedFilterId = null;
@@ -2345,7 +2354,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         _pickedSoundSegmentId = picked.soundSegmentId;
       }
     });
-    final need = _videoTemplateSlotCount ?? VideoTemplateSlotFiller.minPhotoDumpSlots;
+    final need =
+        _videoTemplateSlotCount ?? VideoTemplateSlotFiller.minPhotoDumpSlots;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -2748,8 +2758,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             chooseMediaType: true,
             onPicked: _importFromGallery,
           ),
-          onGoLiveTap: () =>
-              CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+          onGoLiveTap: _handleGoLiveTap,
           onRecordTap: _onRecordTap,
           onFlip: _flipCamera,
           onFlash: _toggleFlash,
@@ -2927,8 +2936,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                   chooseMediaType: true,
                   onPicked: _importFromGallery,
                 ),
-                onGoLiveTap: () =>
-                    CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+                onGoLiveTap: _handleGoLiveTap,
                 onRecordTap: _onRecordTap,
                 onFlip: _flipCamera,
                 onFlash: _toggleFlash,

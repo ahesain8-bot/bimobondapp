@@ -11,6 +11,7 @@ import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_gallery_sheet.dart';
 import 'live_room_guests_sheet.dart';
+import 'live_room_elapsed_timer.dart';
 import 'live_room_pill.dart';
 import 'live_room_ranking_sheet.dart';
 
@@ -37,9 +38,9 @@ class LiveRoomInfoRow extends StatelessWidget {
               _RankingChip(
                 label: session.hourlyRankingLabel,
                 onTap: () {
-                  context
-                      .read<LiveRoomBloc>()
-                      .add(const LiveRoomRankingTapped());
+                  context.read<LiveRoomBloc>().add(
+                    const LiveRoomRankingTapped(),
+                  );
                   LiveRoomRankingSheet.show(context);
                 },
               ),
@@ -57,19 +58,15 @@ class LiveRoomInfoRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              LiveRoomPill(
-                height: AppSizes.roomChipHeight,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                color: AppColors.overlayPillSoft,
-                child: const SizedBox(width: 14),
-              ),
+              // Elapsed live time (counts up from 00:00 once streaming).
+              const LiveRoomElapsedTimer(),
               const Spacer(),
               _InviteChip(
                 count: session.guestInviteCount,
                 onTap: () {
-                  context
-                      .read<LiveRoomBloc>()
-                      .add(const LiveRoomInviteTapped());
+                  context.read<LiveRoomBloc>().add(
+                    const LiveRoomInviteTapped(),
+                  );
                   LiveRoomGuestsSheet.show(context);
                 },
               ),
@@ -82,10 +79,7 @@ class LiveRoomInfoRow extends StatelessWidget {
 }
 
 class _RankingChip extends StatelessWidget {
-  const _RankingChip({
-    required this.label,
-    required this.onTap,
-  });
+  const _RankingChip({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
@@ -101,11 +95,7 @@ class _RankingChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SvgPicture.asset(
-              AppAssets.roomFlame,
-              width: 13,
-              height: 15,
-            ),
+            SvgPicture.asset(AppAssets.roomFlame, width: 13, height: 15),
             const SizedBox(width: 4),
             Text(label, style: AppTextStyles.roomChip),
           ],
@@ -116,10 +106,7 @@ class _RankingChip extends StatelessWidget {
 }
 
 class _InviteChip extends StatelessWidget {
-  const _InviteChip({
-    required this.count,
-    required this.onTap,
-  });
+  const _InviteChip({required this.count, required this.onTap});
 
   final int count;
   final VoidCallback onTap;
@@ -138,11 +125,7 @@ class _InviteChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SvgPicture.asset(
-              AppAssets.roomPersonAdd,
-              width: 16,
-              height: 14,
-            ),
+            SvgPicture.asset(AppAssets.roomPersonAdd, width: 16, height: 14),
             const SizedBox(width: 4),
             Text(
               '$count',
