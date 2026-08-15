@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_constants.dart';
 import 'package:bimobondapp/app/ar_camera/ar_filter_catalog.dart';
+import 'package:bimobondapp/app/ar_camera/effect_definition.dart';
 
 class ArCameraBridge {
   ArCameraBridge._();
@@ -41,27 +42,49 @@ class ArCameraBridge {
   /// Screen overlays are looked up here rather than at the call site so the
   /// animation source always travels with the id: native no longer keeps its
   /// own hardcoded overlay list, so an id alone means nothing to it — it needs
-  /// either the remote `lottieUrl` or a bundled asset name to play.
+  /// either the remote animation URL or a bundled asset name to play.
   static void setFilter(String filter, {double intensity = 1.0}) {
     final overlay = ArFilterCatalog.overlayById(filter);
+
+    // Mobile Rendering Decision Tree: Does video object/videoId exist & is360 == true?
+    final is360Video = filter == 'static_360_test' || (overlay != null && overlay.is360);
+    final String? video360Url = is360Video
+        ? (overlay?.video?.url ??
+            (filter == 'static_360_test'
+                ? 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                : null))
+        : null;
+
     _channel.invokeMethod<void>('setFilter', {
       'filter': filter,
       'intensity': intensity,
-      'overlayUrl': overlay?.lottieUrl,
+      'overlayUrl': overlay?.animationUrl,
       'overlayAsset': overlay?.bundledAsset,
       'overlayLoop': overlay?.loop ?? true,
+      'overlayMediaType': overlay?.isVideo == true ? 'video' : 'lottie',
+      'is360': is360Video,
+      'video360Url': video360Url,
+      'projection': overlay?.video?.projection.name.toUpperCase() ?? 'EQUIRECTANGULAR',
+      'stereoMode': overlay?.video?.stereoMode.name.toUpperCase() ?? 'MONO',
     });
   }
 
-  /// Warms Lottie's on-disk cache for every published overlay so the first tap
+  /// Warms overlay caches (Lottie compositions + MP4 files) so the first tap
   /// on one doesn't pay a download. Safe to call repeatedly; native skips any
   /// composition already cached.
   static Future<void> prefetchOverlays() async {
     final overlays = ArFilterCatalog.overlayCatalog.overlays;
-    final urls = [
-      for (final overlay in overlays)
-        if ((overlay.lottieUrl ?? '').isNotEmpty) overlay.lottieUrl!,
-    ];
+    final lottieUrls = <String>[];
+    final videoUrls = <String>[];
+    for (final overlay in overlays) {
+      final url = overlay.animationUrl;
+      if (url == null || url.isEmpty) continue;
+      if (overlay.isVideo) {
+        videoUrls.add(url);
+      } else {
+        lottieUrls.add(url);
+      }
+    }
     // Bundled entries too: when the endpoint is unreachable the catalog is the
     // offline fallback, and those animations still benefit from being parsed
     // ahead of the first tap.
@@ -69,10 +92,11 @@ class ArCameraBridge {
       for (final overlay in overlays)
         if ((overlay.bundledAsset ?? '').isNotEmpty) overlay.bundledAsset!,
     ];
-    if (urls.isEmpty && assets.isEmpty) return;
+    if (lottieUrls.isEmpty && videoUrls.isEmpty && assets.isEmpty) return;
     try {
       await _channel.invokeMethod<void>('prefetchOverlays', {
-        'urls': urls,
+        'urls': lottieUrls,
+        'videoUrls': videoUrls,
         'assets': assets,
       });
     } catch (_) {
@@ -309,5 +333,47 @@ class ArCameraBridge {
       if (maxEdge != null) 'maxEdge': maxEdge,
     });
     return out;
+  }
+
+  /// Initializes native GPU EffectEngine.
+  static Future<void> initializeEffectEngine() async {
+    await _channel.invokeMethod<void>('initializeEffectEngine');
+  }
+
+  /// Configures live overlay effect definition on native EffectEngine.
+  static Future<void> setOverlayEffect(EffectDefinition effect) async {
+    await _channel.invokeMethod<void>('setOverlayEffect', effect.toMap());
+  }
+
+  /// Removes current overlay effect from native EffectEngine.
+  static Future<void> removeOverlayEffect() async {
+    await _channel.invokeMethod<void>('removeOverlayEffect');
+  }
+
+  /// Updates overlay position using normalized 0.0..1.0 coordinates.
+  static Future<void> setOverlayPosition(double x, double y) async {
+    await _channel.invokeMethod<void>('setOverlayPosition', {
+      'positionX': x.clamp(0.0, 1.0),
+      'positionY': y.clamp(0.0, 1.0),
+    });
+  }
+
+  /// Updates overlay scale factor.
+  static Future<void> setOverlayScale(double scale) async {
+    await _channel.invokeMethod<void>('setOverlayScale', {
+      'scale': scale.clamp(0.1, 5.0),
+    });
+  }
+
+  /// Updates overlay opacity (0.0..1.0).
+  static Future<void> setOverlayOpacity(double opacity) async {
+    await _channel.invokeMethod<void>('setOverlayOpacity', {
+      'opacity': opacity.clamp(0.0, 1.0),
+    });
+  }
+
+  /// Toggles overlay playback loop mode.
+  static Future<void> setOverlayLoop(bool loop) async {
+    await _channel.invokeMethod<void>('setOverlayLoop', {'loop': loop});
   }
 }

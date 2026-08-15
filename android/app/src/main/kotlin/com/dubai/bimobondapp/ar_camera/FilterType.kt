@@ -12,8 +12,8 @@ enum class FilterType {
     LONG_NOSE,
 
     /**
-     * Any full-screen Lottie overlay — not face-anchored, needs no face
-     * detection.
+     * Any full-screen overlay (Lottie JSON or MP4/WebM) — not face-anchored,
+     * needs no face detection.
      *
      * Deliberately ONE value rather than one per animation. These used to be
      * hardcoded (CONFETTI/KEYWORDS/SNOWFALL/SNOW_OFF_WHITE, each mapped to a
@@ -57,10 +57,15 @@ enum class FilterType {
     }
 }
 
+enum class ScreenOverlayMediaType {
+    LOTTIE,
+    VIDEO,
+}
+
 /**
  * Where a screen overlay's animation comes from. Exactly one of [url] /
  * [assetName] is set: [url] for anything published from the dashboard,
- * [assetName] for the four animations bundled in the APK, which the Dart
+ * [assetName] for animations bundled in the APK, which the Dart
  * catalog falls back to when the overlays endpoint is unreachable.
  */
 data class ScreenOverlaySource(
@@ -68,9 +73,42 @@ data class ScreenOverlaySource(
     val url: String? = null,
     val assetName: String? = null,
     val loop: Boolean = true,
+    val mediaType: ScreenOverlayMediaType = ScreenOverlayMediaType.LOTTIE,
 ) {
     /** Identity for "is the view already showing this animation?" checks. */
-    val cacheKey: String get() = url ?: assetName ?: id
+    val cacheKey: String get() = "${mediaType.name}:${url ?: assetName ?: id}"
 
     val isValid: Boolean get() = !url.isNullOrBlank() || !assetName.isNullOrBlank()
+
+    val isVideo: Boolean get() = mediaType == ScreenOverlayMediaType.VIDEO
+}
+
+/** Parses Dart's `overlayMediaType` or infers from the file extension. */
+fun parseOverlayMediaType(
+    raw: String?,
+    url: String?,
+    asset: String?,
+): ScreenOverlayMediaType {
+    when (raw?.trim()?.lowercase()) {
+        "video", "mp4", "webm", "mov" -> return ScreenOverlayMediaType.VIDEO
+        "lottie", "json", "dotlottie", "lottie_json" -> return ScreenOverlayMediaType.LOTTIE
+    }
+    val probe = (url ?: asset ?: "").trim().lowercase().substringBefore('?')
+    if (
+        probe.endsWith(".lottie") ||
+        probe.endsWith(".json") ||
+        probe.endsWith(".dotlottie")
+    ) {
+        return ScreenOverlayMediaType.LOTTIE
+    }
+    return if (
+        probe.endsWith(".mp4") ||
+        probe.endsWith(".webm") ||
+        probe.endsWith(".mov") ||
+        probe.endsWith(".m4v")
+    ) {
+        ScreenOverlayMediaType.VIDEO
+    } else {
+        ScreenOverlayMediaType.LOTTIE
+    }
 }

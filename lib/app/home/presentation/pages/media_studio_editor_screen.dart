@@ -1145,12 +1145,18 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     }
   }
 
+  Future<void> _silenceStudioPreviewForRender() async {
+    await SoundAudioPreview.stop();
+    unawaited(_templateGpuPreview?.pause() ?? Future<void>.value());
+    _templateLivePreview?.pause();
+  }
+
   Future<void> _finishAsPost({
     required bool asStory,
     bool continueProcessing = false,
   }) async {
     if (_isProcessing && !continueProcessing) return;
-    unawaited(SoundAudioPreview.stop());
+    await _silenceStudioPreviewForRender();
     if (!continueProcessing || !_isProcessing) {
       setState(() {
         _isProcessing = true;
@@ -1362,8 +1368,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   Future<void> _confirmTemplatePreviewAndPost({required bool asStory}) async {
     // Next → server draft export only (no on-device bake).
     if (_videoTemplateId != null) {
-      // Stop template music as soon as render starts.
-      unawaited(SoundAudioPreview.stop());
+      await _silenceStudioPreviewForRender();
       if (mounted) {
         setState(() {
           _isProcessing = true;
@@ -2709,7 +2714,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                 arFilterId: 'none',
                 arFilterIntensity: 1,
                 applyArColorPreview: false,
-                paused: _subEditorOpen,
+                paused: _subEditorOpen || _isProcessing,
                 // Soft template bed owns audio — mute every collage pane.
                 muted: muted || muteBed,
                 trimSegments: const [],
@@ -2756,7 +2761,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           arFilterId: 'none',
           arFilterIntensity: 1,
           applyArColorPreview: false,
-          paused: _subEditorOpen,
+          paused: _subEditorOpen || _isProcessing,
           muted: _isRenderedTemplatePreview
               ? false
               : _muteMediaForTemplateBed,
@@ -2779,7 +2784,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               applyArColorPreview: currentItem.isVideo
                   ? _needsColorFilterPreview
                   : false,
-              paused: _subEditorOpen,
+              paused: _subEditorOpen || _isProcessing,
               muted: _isRenderedTemplatePreview
                   ? false
                   : _muteMediaForTemplateBed,
@@ -2913,7 +2918,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                 color: Colors.white,
                               ),
                               const SizedBox(width: 6),
-                              Flexible(
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 220),
                                 child: Text(
                                   _videoTemplateName!,
                                   maxLines: 1,

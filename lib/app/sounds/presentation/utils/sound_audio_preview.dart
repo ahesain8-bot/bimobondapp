@@ -16,6 +16,8 @@ class SoundAudioPreview {
   static String? _playingId;
   static bool _sessionReady = false;
   static int _generation = 0;
+  /// Bumped only by [stop] so an in-flight [playAt] cannot restart after Next.
+  static int _stopEpoch = 0;
 
   static String? get playingId => _playingId;
 
@@ -51,6 +53,7 @@ class SoundAudioPreview {
   }) async {
     // Serialize starts so overlapping template ready signals can't leave
     // two AudioPlayers running (double music under preview).
+    final stopEpoch = _stopEpoch;
     final previous = _playLock;
     final gate = Completer<void>();
     _playLock = gate.future;
@@ -60,12 +63,14 @@ class SoundAudioPreview {
       } catch (_) {}
     }
     try {
+      if (stopEpoch != _stopEpoch) return;
       await _playAtUnlocked(
         soundId,
         audioUrl,
         startOffset: startOffset,
         window: window,
         loop: loop,
+        stopEpoch: stopEpoch,
       );
     } finally {
       if (!gate.isCompleted) gate.complete();
@@ -81,12 +86,16 @@ class SoundAudioPreview {
     Duration startOffset = Duration.zero,
     Duration window = const Duration(seconds: 15),
     bool loop = false,
+    int stopEpoch = 0,
   }) async {
     final url = audioUrl.trim();
     if (soundId.isEmpty || url.isEmpty) return;
+    if (stopEpoch != _stopEpoch) return;
 
-    await stop();
+    await _haltPlayer();
+    if (stopEpoch != _stopEpoch) return;
     await _ensureMixableSession();
+    if (stopEpoch != _stopEpoch) return;
 
     final generation = ++_generation;
     final player = AudioPlayer(
@@ -111,7 +120,9 @@ class SoundAudioPreview {
           end: end,
         ),
       );
-      if (generation != _generation || _player != player) {
+      if (stopEpoch != _stopEpoch ||
+          generation != _generation ||
+          _player != player) {
         await player.dispose();
         return;
       }
@@ -127,7 +138,9 @@ class SoundAudioPreview {
       }
 
       await player.play();
-      if (generation != _generation || _player != player) {
+      if (stopEpoch != _stopEpoch ||
+          generation != _generation ||
+          _player != player) {
         await player.dispose();
       }
     } catch (_) {
@@ -162,6 +175,11 @@ class SoundAudioPreview {
   }
 
   static Future<void> stop() async {
+    _stopEpoch++;
+    await _haltPlayer();
+  }
+
+  static Future<void> _haltPlayer() async {
     _generation++;
     final player = _player;
     final sub = _stateSub;

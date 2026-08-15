@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
 import android.graphics.RectF
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
@@ -255,11 +256,10 @@ object ArCameraController {
     private const val RECORD_FRAME_INTERVAL_MS = 33L
 
     // Screen-overlay filters capture recording frames from the OES beauty buffer
-    // (or PreviewView fallback) plus a headless Lottie composite. Throttled to
-    // ~5fps content updates so readback/composite cost stays low; the encoder
-    // still writes at full frame rate via pumpRecordFrame reusing the last
-    // composite between ticks.
-    private const val CONFETTI_RECORD_INTERVAL_MS = 200L
+    // (or PreviewView fallback) plus a headless composite. Paced to ~30fps
+    // (matching RECORD_FRAME_INTERVAL_MS) so the recorded video plays back smoothly
+    // in preview and after sending without low-frame-rate stutter.
+    private const val CONFETTI_RECORD_INTERVAL_MS = 33L
 
     private const val NO_FACE_CLEAR_THRESHOLD = 2
 
@@ -1124,28 +1124,8 @@ object ArCameraController {
         }
     }
 
-    /**
-     * Snapshots the screen-overlay Lottie view's currently-rendered frame
-     * (Confetti/Keywords/Snowfall/Snow White) as a bitmap, so it can be
-     * composited into a saved photo/video frame. Must run on the main thread
-     * (View drawing) — call this BEFORE handing off to a background executor,
-     * never from inside one.
-     */
-    private fun captureConfettiOverlayFrame(): Bitmap? {
-        if (!ArCameraBridge.currentFilter.isScreenOverlay()) return null
-        val overlay = ArCameraBridge.confettiOverlay ?: return null
-        if (overlay.visibility != View.VISIBLE) return null
-        val w = overlay.width
-        val h = overlay.height
-        if (w <= 0 || h <= 0) return null
-        return try {
-            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            overlay.draw(Canvas(bmp))
-            bmp
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private fun captureConfettiOverlayFrame(): Bitmap? =
+        ArCameraBridge.captureScreenOverlayFrame()
 
     /** Draws [confettiFrame] over [base] (scaled to fit), recycling confettiFrame. */
     private fun compositeConfettiOnto(base: Bitmap, confettiFrame: Bitmap?): Bitmap {
@@ -1771,10 +1751,8 @@ object ArCameraController {
                     filter.isDistortion() -> startGlSurfaceRecording(file, onResult)
 
                     filter.isScreenOverlay() -> {
-                        // Prefer OES beauty frames + Lottie composite so overlay
-                        // videos match Normal Mode polish. Hardware VideoCapture
-                        // + OverlayEffect only sees the raw sensor stream.
-                        if (boundToOes) {
+                        val isVideoOverlay = ArCameraBridge.currentOverlaySource?.isVideo == true
+                        if (isVideoOverlay || boundToOes) {
                             startBitmapRecording(file, onResult)
                         } else if (!ArCameraBridge.isPreviewLetterboxed()) {
                             prepareScreenOverlaySource()
@@ -1804,14 +1782,21 @@ object ArCameraController {
      * the animation on its own clock rather than following the on-screen view —
      * see ScreenOverlayCameraEffect.animationProgress for why.
      */
-    private fun prepareScreenOverlaySource() {
+    fun updateScreenOverlayComposition(composition: LottieComposition?) {
+        if (ArCameraBridge.currentOverlaySource?.isVideo == true) {
+            screenOverlayCameraEffect?.clear()
+            return
+        }
         val effect = screenOverlayCameraEffect ?: return
-        val composition = ArCameraBridge.confettiOverlay?.composition
         if (composition == null) {
             effect.clear()
             return
         }
         effect.setSource(composition)
+    }
+
+    private fun prepareScreenOverlaySource() {
+        updateScreenOverlayComposition(ArCameraBridge.confettiOverlay?.composition)
     }
 
     @Volatile
@@ -1918,7 +1903,7 @@ object ArCameraController {
             // coincidence).
             val filter = ArCameraBridge.currentFilter
             if (filter.isScreenOverlay()) {
-                // Pull beautified GL (or PreviewView fallback) + Lottie into the
+                // Pull beautified GL (or PreviewView fallback) + overlay into the
                 // bitmap recorder — see [requestConfettiFrame].
                 if (boundToOes) {
                     val gl = ArCameraBridge.warpGlView
@@ -2388,6 +2373,10 @@ object ArCameraController {
             scheduleNextConfettiTick()
             return
         }
+        if (ArCameraBridge.currentOverlaySource?.isVideo == true) {
+            requestVideoOverlayFrame()
+            return
+        }
         val overlay = ArCameraBridge.confettiOverlay
         val composition = overlay?.composition
         val viewW = overlay?.width ?: 0
@@ -2437,6 +2426,107 @@ object ArCameraController {
             previewView?.width?.takeIf { it > 0 } ?: viewW,
             previewView?.height?.takeIf { it > 0 } ?: viewH,
         )
+    }
+
+    private fun requestVideoOverlayFrame() {
+        val overlayFrame =
+            ArCameraBridge.ensureVideoHelper()?.captureFrame(RECORD_PROCESS_EDGE)
+        val viewW = ArCameraBridge.videoOverlay?.width ?: 0
+        val viewH = ArCameraBridge.videoOverlay?.height ?: 0
+        if (overlayFrame == null || viewW <= 0 || viewH <= 0) {
+            confettiPixelCopyBusy.set(false)
+            scheduleNextConfettiTick()
+            return
+        }
+        if (boundToOes) {
+            val beauty = try {
+                ArCameraBridge.warpGlView?.copyLastFilteredFrame()
+            } catch (_: Exception) {
+                null
+            }
+            if (beauty != null) {
+                finishVideoOverlayFrame(overlayFrame, beauty, viewW, viewH)
+                return
+            }
+        }
+        val previewView = ArCameraBridge.previewView
+        val raw = try {
+            previewView?.bitmap
+        } catch (_: Exception) {
+            null
+        }
+        if (raw == null) {
+            overlayFrame.recycle()
+            confettiPixelCopyBusy.set(false)
+            scheduleNextConfettiTick()
+            return
+        }
+        finishVideoOverlayFrame(
+            overlayFrame,
+            raw,
+            previewView?.width?.takeIf { it > 0 } ?: viewW,
+            previewView?.height?.takeIf { it > 0 } ?: viewH,
+        )
+    }
+
+    private fun finishVideoOverlayFrame(
+        overlayFrame: Bitmap,
+        base: Bitmap,
+        viewW: Int,
+        viewH: Int,
+    ) {
+        val executor = recordOfferExecutor
+        if (executor == null) {
+            confettiPixelCopyBusy.set(false)
+            scheduleNextConfettiTick()
+            if (!overlayFrame.isRecycled) overlayFrame.recycle()
+            if (!base.isRecycled) base.recycle()
+            return
+        }
+        executor.execute {
+            var composed: Bitmap? = null
+            try {
+                val targetH = RECORD_PROCESS_EDGE
+                val targetW = ((targetH * 9 / 16) and 1.inv()).coerceAtLeast(2)
+
+                val output = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(output)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
+                val baseW = base.width
+                val baseH = base.height
+                val baseAspect = baseW.toFloat() / baseH.toFloat()
+                val targetAspect = targetW.toFloat() / targetH.toFloat()
+                val cropW: Int
+                val cropH: Int
+                if (baseAspect > targetAspect) {
+                    cropH = baseH
+                    cropW = (baseH * targetAspect).toInt().coerceAtMost(baseW)
+                } else {
+                    cropW = baseW
+                    cropH = (baseW / targetAspect).toInt().coerceAtMost(baseH)
+                }
+                val left = ((baseW - cropW) / 2).coerceAtLeast(0)
+                val top = ((baseH - cropH) / 2).coerceAtLeast(0)
+                val srcRect = Rect(left, top, left + cropW, top + cropH)
+                val dstRect = RectF(0f, 0f, targetW.toFloat(), targetH.toFloat())
+
+                canvas.drawBitmap(base, srcRect, dstRect, paint)
+
+                val overlaySrcRect = Rect(0, 0, overlayFrame.width, overlayFrame.height)
+                canvas.drawBitmap(overlayFrame, overlaySrcRect, dstRect, paint)
+
+                composed = output
+            } catch (_: Exception) {
+                composed = base
+            } finally {
+                if (!overlayFrame.isRecycled) overlayFrame.recycle()
+                if (base !== composed && !base.isRecycled) base.recycle()
+            }
+            composed?.let { offerRecordingFrameAsync(it, recycleSourceAlways = true) }
+            confettiPixelCopyBusy.set(false)
+            scheduleNextConfettiTick()
+        }
     }
 
     /**
@@ -2682,6 +2772,9 @@ object ArCameraController {
      * the original un-scaled source frame, that must survive this call).
      */
     private fun applyCaptureSmoothing(bitmap: Bitmap, keep: Bitmap? = null): Bitmap {
+        // CPU Bilateral filter (OpenCV) takes 150ms+ per frame, which severely drops video recording frame rate.
+        // Skip CPU bilateral filter during continuous video recording; live preview shaders handle beauty on GPU.
+        if (recording) return bitmap
         val smoothed = try {
             BeautyFilterProcessor.smoothSkin(bitmap, CAPTURE_SMOOTH_STRENGTH)
         } catch (_: Throwable) {
@@ -3280,6 +3373,10 @@ object ArCameraController {
         val work = Runnable {
             try {
                 ArCameraBridge.confettiOverlay?.pauseAnimation()
+            } catch (_: Throwable) {
+            }
+            try {
+                ArCameraBridge.ensureVideoHelper()?.pause()
             } catch (_: Throwable) {
             }
             try {
@@ -4092,7 +4189,8 @@ object ArCameraController {
                         bindCombo(true, true, true, withPngEffect = false)
                     needAnalysis ->
                         bindCombo(true, false, true, withPngEffect = false)
-                    needVideo && filter.isScreenOverlay() ->
+                    needVideo && filter.isScreenOverlay() &&
+                        ArCameraBridge.currentOverlaySource?.isVideo != true ->
                         // Fall back to a plain video bind if the device can't take
                         // the effect — recording still works, the overlay just
                         // isn't baked in, same shape as the PNG-effect fallback.

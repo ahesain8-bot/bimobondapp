@@ -9,6 +9,7 @@ import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraOverlayPrefetcher
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
 import com.dubai.bimobondapp.ar_camera.ScreenOverlaySource
+import com.dubai.bimobondapp.ar_camera.parseOverlayMediaType
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
 import com.dubai.bimobondapp.ar_camera.LiveBeautyAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveBeautyState
@@ -117,6 +118,7 @@ class MainActivity : FlutterActivity() {
                         // it along, since native has no overlay list of its own.
                         val overlayUrl = call.argument<String>("overlayUrl")
                         val overlayAsset = call.argument<String>("overlayAsset")
+                        val overlayMediaType = call.argument<String>("overlayMediaType")
                         val overlay = if (!overlayUrl.isNullOrBlank() ||
                             !overlayAsset.isNullOrBlank()
                         ) {
@@ -125,22 +127,74 @@ class MainActivity : FlutterActivity() {
                                 url = overlayUrl,
                                 assetName = overlayAsset,
                                 loop = call.argument<Boolean>("overlayLoop") ?: true,
+                                mediaType = parseOverlayMediaType(
+                                    overlayMediaType,
+                                    overlayUrl,
+                                    overlayAsset,
+                                ),
                             )
                         } else {
                             null
                         }
+                        val is360 = call.argument<Boolean>("is360") ?: (filter == "static_360_test")
+                        val video360Url = call.argument<String>("video360Url")
+                        if (is360 || !video360Url.isNullOrBlank()) {
+                            val targetUrl = if (!video360Url.isNullOrBlank()) video360Url else "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                            ArCameraBridge.initialize360EffectEngine(this)
+                            ArCameraBridge.load360Effect(targetUrl, null)
+                        } else {
+                            ArCameraBridge.remove360Effect()
+                        }
+
                         ArCameraBridge.setFilter(filter, intensity, overlay)
                         result.success(null)
                     }
                     "prefetchOverlays" -> {
-                        val urls = call.argument<List<String>>("urls").orEmpty()
+                        val lottieUrls = call.argument<List<String>>("urls").orEmpty()
+                        val videoUrls = call.argument<List<String>>("videoUrls").orEmpty()
                         val assets = call.argument<List<String>>("assets").orEmpty()
-                        ArCameraOverlayPrefetcher.prefetch(this, urls, assets)
+                        ArCameraOverlayPrefetcher.prefetch(this, lottieUrls, videoUrls, assets)
                         result.success(null)
                     }
                     "setFilterIntensity" -> {
                         val intensity = call.argument<Double>("intensity")?.toFloat() ?: 1f
                         ArCameraBridge.updateFilterIntensity(intensity)
+                        result.success(null)
+                    }
+                    "initializeEffectEngine" -> {
+                        ArCameraBridge.initializeEffectEngine(this)
+                        result.success(null)
+                    }
+                    "setOverlayEffect" -> {
+                        val effect = parseEffectDefinition(call.arguments)
+                        if (effect != null) {
+                            ArCameraBridge.setOverlayEffect(effect)
+                        }
+                        result.success(null)
+                    }
+                    "removeOverlayEffect" -> {
+                        ArCameraBridge.removeOverlayEffect()
+                        result.success(null)
+                    }
+                    "setOverlayPosition" -> {
+                        val x = call.argument<Double>("positionX")?.toFloat() ?: 0.5f
+                        val y = call.argument<Double>("positionY")?.toFloat() ?: 0.5f
+                        ArCameraBridge.setOverlayPosition(x, y)
+                        result.success(null)
+                    }
+                    "setOverlayScale" -> {
+                        val scale = call.argument<Double>("scale")?.toFloat() ?: 1.0f
+                        ArCameraBridge.setOverlayScale(scale)
+                        result.success(null)
+                    }
+                    "setOverlayOpacity" -> {
+                        val opacity = call.argument<Double>("opacity")?.toFloat() ?: 1.0f
+                        ArCameraBridge.setOverlayOpacity(opacity)
+                        result.success(null)
+                    }
+                    "setOverlayLoop" -> {
+                        val loop = call.argument<Boolean>("loop") ?: true
+                        ArCameraBridge.setOverlayLoop(loop)
                         result.success(null)
                     }
                     "prepareShaderPipeline" -> {
@@ -468,6 +522,27 @@ class MainActivity : FlutterActivity() {
         CountdownTonePlayer.release()
         super.onDestroy()
     }
+}
+
+private fun parseEffectDefinition(args: Any?): com.dubai.bimobondapp.ar_camera.EffectDefinition? {
+    val map = args as? Map<*, *> ?: return null
+    val id = map["id"]?.toString() ?: return null
+    return com.dubai.bimobondapp.ar_camera.EffectDefinition(
+        id = id,
+        type = map["type"]?.toString() ?: "screen_overlay",
+        assetUrl = map["assetUrl"]?.toString(),
+        assetName = map["assetName"]?.toString(),
+        durationMs = (map["durationMs"] as? Number)?.toLong() ?: 0L,
+        loop = map["loop"] as? Boolean ?: true,
+        startTimeMs = (map["startTimeMs"] as? Number)?.toLong() ?: 0L,
+        endTimeMs = (map["endTimeMs"] as? Number)?.toLong() ?: 0L,
+        opacity = (map["opacity"] as? Number)?.toFloat() ?: 1.0f,
+        scale = (map["scale"] as? Number)?.toFloat() ?: 1.0f,
+        positionX = (map["positionX"] as? Number)?.toFloat() ?: 0.5f,
+        positionY = (map["positionY"] as? Number)?.toFloat() ?: 0.5f,
+        rotation = (map["rotation"] as? Number)?.toFloat() ?: 0.0f,
+        blendMode = map["blendMode"]?.toString() ?: "normal",
+    )
 }
 
 /// Plays the TikTok-style countdown beeps natively via [ToneGenerator] on the

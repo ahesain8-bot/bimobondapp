@@ -1001,7 +1001,8 @@ class _AddPostScreenState extends State<AddPostScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 140),
                   child: Text(
                     _selectedSound?.name ?? l10n.soundNoneSelected,
                     maxLines: 1,
@@ -1198,7 +1199,8 @@ class _TemplateAttachedChip extends StatelessWidget {
               color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 8),
-            Flexible(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
               child: Text(
                 slots != null && slots > 0
                     ? 'Template · $name · $slots clips'

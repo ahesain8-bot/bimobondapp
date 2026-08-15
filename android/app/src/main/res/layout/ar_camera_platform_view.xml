@@ -49,4 +49,15 @@
         android:scaleType="centerCrop"
         app:lottie_loop="true" />
 
+    <!-- Full-screen MP4/WebM overlay. TextureView (not SurfaceView): nested
+         SurfaceView often does not render inside Flutter AndroidView. -->
+    <TextureView
+        android:id="@+id/videoOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
 </FrameLayout>

@@ -76,7 +76,44 @@ class ArFilterCatalog {
   static ArOverlayCatalog overlayCatalog = ArOverlayBundledCatalog.catalog;
 
   static void updateOverlayCatalog(ArOverlayCatalog catalog) {
-    overlayCatalog = catalog;
+    final mergedCategories = <ArOverlayCategoryModel>[];
+    mergedCategories.addAll(catalog.categories);
+
+    final existingIds = {
+      for (final c in catalog.categories)
+        for (final o in c.overlays) o.id
+    };
+
+    final missingBundledOverlays = <ArOverlayItemModel>[];
+    for (final bundled in ArOverlayBundledCatalog.catalog.overlays) {
+      if (!existingIds.contains(bundled.id)) {
+        missingBundledOverlays.add(bundled);
+      }
+    }
+
+    if (missingBundledOverlays.isNotEmpty) {
+      if (mergedCategories.isNotEmpty) {
+        final firstCategory = mergedCategories.first;
+        mergedCategories[0] = ArOverlayCategoryModel(
+          id: firstCategory.id,
+          label: firstCategory.label,
+          sortOrder: firstCategory.sortOrder,
+          overlays: [...firstCategory.overlays, ...missingBundledOverlays],
+        );
+      } else {
+        mergedCategories.add(ArOverlayCategoryModel(
+          id: 'bundled',
+          label: 'Bundled',
+          sortOrder: 0,
+          overlays: missingBundledOverlays,
+        ));
+      }
+    }
+
+    overlayCatalog = ArOverlayCatalog(
+      version: catalog.version,
+      categories: mergedCategories,
+    );
     _overlayItemsCache = null;
   }
 
@@ -134,16 +171,16 @@ class ArFilterCatalog {
   static List<ArColorFilterCategory>? _colorCategoriesCache;
 
   static List<ArFilterItem> get colorItems => _colorItemsCache ??= [
-        for (final category in colorCatalog.categories)
-          for (final filter in category.filters)
-            ArFilterItem(
-              id: filter.id,
-              label: filter.label,
-              emoji: filter.emoji ?? '',
-              thumbnailUrl: filter.thumbnailUrl,
-              previewColorHex: filter.previewColorHex,
-            ),
-      ];
+    for (final category in colorCatalog.categories)
+      for (final filter in category.filters)
+        ArFilterItem(
+          id: filter.id,
+          label: filter.label,
+          emoji: filter.emoji ?? '',
+          thumbnailUrl: filter.thumbnailUrl,
+          previewColorHex: filter.previewColorHex,
+        ),
+  ];
 
   static List<ArColorFilterCategory> get colorCategories =>
       _colorCategoriesCache ??= [
@@ -155,10 +192,7 @@ class ArFilterCatalog {
           ),
       ];
 
-  static List<ArFilterItem> get items => [
-        ...effectItems,
-        ...colorItems,
-      ];
+  static List<ArFilterItem> get items => [...effectItems, ...colorItems];
 
   static int indexOfId(String id) {
     final index = items.indexWhere((item) => item.id == id);
@@ -166,10 +200,7 @@ class ArFilterCatalog {
   }
 
   static ArFilterItem byId(String id) {
-    return items.firstWhere(
-      (item) => item.id == id,
-      orElse: () => original,
-    );
+    return items.firstWhere((item) => item.id == id, orElse: () => original);
   }
 
   static bool isColorFilter(String id) =>
@@ -181,9 +212,7 @@ class ArFilterCatalog {
       (c) => c.id == categoryId,
       orElse: () => colorCategories.first,
     );
-    return [
-      for (final id in category.filterIds) byId(id),
-    ];
+    return [for (final id in category.filterIds) byId(id)];
   }
 
   static int effectCarouselIndex(String filterId) {
@@ -210,7 +239,10 @@ class ArFilterCatalog {
     ];
   }
 
-  static int effectCarouselIndexFor(String filterId, {required bool photoMode}) {
+  static int effectCarouselIndexFor(
+    String filterId, {
+    required bool photoMode,
+  }) {
     final list = effectItemsFor(photoMode: photoMode);
     final index = list.indexWhere((item) => item.id == filterId);
     return index < 0 ? 0 : index;

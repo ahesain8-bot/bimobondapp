@@ -814,6 +814,23 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(oesAPosition)
         GLES20.glDisableVertexAttribArray(oesATexCoord)
         probeGlError("OES draw")
+
+        render360EffectIfActive()
+    }
+
+    private fun render360EffectIfActive() {
+        val effect = ArCameraBridge.engine360Effect ?: return
+        if (effect.getState().status == com.dubai.bimobondapp.effect360.Engine360Status.IDLE) return
+        val proj = FloatArray(16)
+        val view = FloatArray(16)
+        effect.update(System.nanoTime())
+        effect.render(
+            cameraOesTextureId = oesTextureId,
+            width = if (oesViewport[2] > 0) oesViewport[2] else 1080,
+            height = if (oesViewport[3] > 0) oesViewport[3] else 1920,
+            projectionMatrixIn = proj,
+            viewMatrixIn = view
+        )
     }
 
     @Volatile

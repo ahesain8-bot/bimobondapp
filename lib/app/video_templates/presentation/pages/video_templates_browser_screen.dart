@@ -77,13 +77,10 @@ class _VideoTemplatesBrowserScreenState
       _categories = cats.fold((_) => const [], (v) => v);
       _featured = featured.fold((_) => const [], (v) => v);
       _trending = trending.fold((_) => const [], (v) => v);
-      catalog.fold(
-        (f) {
-          _error = f.message;
-          _catalog = const [];
-        },
-        (v) => _catalog = v,
-      );
+      catalog.fold((f) {
+        _error = f.message;
+        _catalog = const [];
+      }, (v) => _catalog = v);
     });
   }
 
@@ -111,9 +108,7 @@ class _VideoTemplatesBrowserScreenState
 
   Future<void> _open(VideoTemplateCardEntity card) async {
     final selection = await Navigator.of(context).push<VideoTemplateSelection>(
-      MaterialPageRoute(
-        builder: (_) => VideoTemplateDetailScreen(card: card),
-      ),
+      MaterialPageRoute(builder: (_) => VideoTemplateDetailScreen(card: card)),
     );
     if (selection != null && mounted) {
       final cb = widget.onSelected;
@@ -150,8 +145,13 @@ class _VideoTemplatesBrowserScreenState
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search templates',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-                prefixIcon: const Icon(LucideIcons.search, color: Colors.white54),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                ),
+                prefixIcon: const Icon(
+                  LucideIcons.search,
+                  color: Colors.white54,
+                ),
                 filled: true,
                 fillColor: const Color(0xFF1C1C1E),
                 border: OutlineInputBorder(
@@ -196,50 +196,50 @@ class _VideoTemplatesBrowserScreenState
                     child: CircularProgressIndicator(color: Colors.white54),
                   )
                 : _error != null && _catalog.isEmpty
-                    ? Center(
-                        child: Text(
-                          _error!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _load(forceRefresh: true),
-                        child: ListView(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          children: [
-                            if (_featured.isNotEmpty) ...[
-                              _sectionTitle('Featured'),
-                              _horizontal(cards: _featured),
-                            ],
-                            if (_trending.isNotEmpty) ...[
-                              _sectionTitle('Trending'),
-                              _horizontal(cards: _trending),
-                            ],
-                            _sectionTitle('For you'),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _catalog.length,
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                ? Center(
+                    child: Text(
+                      _error!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () => _load(forceRefresh: true),
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      children: [
+                        if (_featured.isNotEmpty) ...[
+                          _sectionTitle('Featured'),
+                          _horizontal(cards: _featured),
+                        ],
+                        if (_trending.isNotEmpty) ...[
+                          _sectionTitle('Trending'),
+                          _horizontal(cards: _trending),
+                        ],
+                        _sectionTitle('For you'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _catalog.length,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   mainAxisSpacing: 10,
                                   crossAxisSpacing: 10,
                                   childAspectRatio: 0.72,
                                 ),
-                                itemBuilder: (_, i) => _TemplateCard(
-                                  card: _catalog[i],
-                                  onTap: () => _open(_catalog[i]),
-                                ),
-                              ),
+                            itemBuilder: (_, i) => _TemplateCard(
+                              card: _catalog[i],
+                              onTap: () => _open(_catalog[i]),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
@@ -247,16 +247,16 @@ class _VideoTemplatesBrowserScreenState
   }
 
   Widget _sectionTitle(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text(
-          t,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+    child: Text(
+      t,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 
   Widget _horizontal({required List<VideoTemplateCardEntity> cards}) {
     return SizedBox(
@@ -324,10 +324,7 @@ class _TemplateCard extends StatelessWidget {
             ColoredBox(
               color: const Color(0xFF1C1C1E),
               child: card.coverUrl != null
-                  ? SafeNetworkImage(
-                      imageUrl: card.coverUrl,
-                      fit: BoxFit.cover,
-                    )
+                  ? SafeNetworkImage(imageUrl: card.coverUrl, fit: BoxFit.cover)
                   : const Icon(LucideIcons.clapperboard, color: Colors.white24),
             ),
             Positioned(
@@ -351,8 +348,10 @@ class _TemplateCard extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),

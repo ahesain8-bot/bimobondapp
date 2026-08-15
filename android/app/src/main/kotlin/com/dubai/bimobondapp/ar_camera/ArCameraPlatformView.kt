@@ -2,6 +2,7 @@ package com.dubai.bimobondapp.ar_camera
 
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.TextureView
 import android.view.View
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -25,6 +26,7 @@ class ArCameraPlatformView(
     private val warpGlView: FaceWarpGlView = root.findViewById(R.id.warpGlView)
     private val faceOverlay: FaceOverlayView = root.findViewById(R.id.faceOverlay)
     private val confettiOverlay: LottieAnimationView = root.findViewById(R.id.confettiOverlay)
+    private val videoOverlay: TextureView = root.findViewById(R.id.videoOverlay)
 
     private val lifecycleObserver = object : DefaultLifecycleObserver {
         override fun onPause(owner: LifecycleOwner) {
@@ -37,6 +39,10 @@ class ArCameraPlatformView(
             ArCameraController.onHostPause()
             try {
                 confettiOverlay.pauseAnimation()
+            } catch (_: Throwable) {
+            }
+            try {
+                ArCameraBridge.ensureVideoHelper()?.pause()
             } catch (_: Throwable) {
             }
         }
@@ -53,6 +59,12 @@ class ArCameraPlatformView(
                 if (confettiOverlay.visibility == View.VISIBLE) confettiOverlay.resumeAnimation()
             } catch (_: Throwable) {
             }
+            try {
+                if (videoOverlay.visibility == View.VISIBLE) {
+                    ArCameraBridge.ensureVideoHelper()?.resume()
+                }
+            } catch (_: Throwable) {
+            }
         }
     }
 
@@ -61,6 +73,7 @@ class ArCameraPlatformView(
         ArCameraBridge.previewView = previewView
         ArCameraBridge.warpGlView = warpGlView
         ArCameraBridge.confettiOverlay = confettiOverlay
+        ArCameraBridge.videoOverlay = videoOverlay
         ArCameraBridge.platformRoot = root
         ArCameraBridge.hostActivity = activity
         ArCameraBridge.lifecycleOwner = activity
@@ -77,6 +90,7 @@ class ArCameraPlatformView(
         warpGlView.ensureGlInitialized()
 
         confettiOverlay.visibility = View.GONE
+        videoOverlay.visibility = View.GONE
         confettiOverlay.repeatCount = LottieDrawable.INFINITE
         confettiOverlay.cancelAnimation()
         try {
@@ -107,6 +121,10 @@ class ArCameraPlatformView(
         }
         try {
             confettiOverlay.cancelAnimation()
+        } catch (_: Throwable) {
+        }
+        try {
+            ArCameraBridge.ensureVideoHelper()?.release()
         } catch (_: Throwable) {
         }
         ArCameraController.stop()

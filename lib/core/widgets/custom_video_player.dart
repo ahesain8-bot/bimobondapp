@@ -137,6 +137,8 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
   /// False while the phone is locked / app backgrounded — stops audio then.
   bool _appInForeground = true;
   Uint8List? _generatedPosterBytes;
+  /// Last loading flag scheduled for the feed progress bar (dedupe post-frame).
+  bool? _pendingFeedLoadingPublish;
   bool _posterGenerationStarted = false;
   int _feedHandoffGeneration = 0;
   bool _segmentEndHandled = false;
@@ -301,7 +303,12 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
       final ms = controller.value.duration.inMilliseconds;
       if (ms <= 0 || ms == _lastReportedDurationMs) return;
       _lastReportedDurationMs = ms;
-      widget.onVideoDurationReady!(Duration(milliseconds: ms));
+      // Parent may call setState — never invoke synchronously during build.
+      final duration = Duration(milliseconds: ms);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onVideoDurationReady?.call(duration);
+      });
     } catch (_) {}
   }
 
@@ -1423,8 +1430,17 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer>
     final progressNotifier =
         _progressNotifier ?? FeedVideoProgressScope.maybeOf(context);
     final loadingOnProgressBar = progressNotifier != null;
+    // Never notify the progress bar during build — that marks ancestors dirty
+    // mid-frame (setState / markNeedsBuild during build).
     if (loadingOnProgressBar) {
-      _publishFeedVideoLoading(showVideoLoading);
+      final show = showVideoLoading;
+      if (_pendingFeedLoadingPublish != show) {
+        _pendingFeedLoadingPublish = show;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _publishFeedVideoLoading(show);
+        });
+      }
     }
 
     return GestureDetector(

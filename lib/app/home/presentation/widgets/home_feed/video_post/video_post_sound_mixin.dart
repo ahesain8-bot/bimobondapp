@@ -109,7 +109,11 @@ mixin VideoPostSoundMixin on State<VideoPostWidget> {
     if (ms <= 0) return;
     if (_knownVideoDurationMs == ms) return;
     _knownVideoDurationMs = ms;
-    unawaited(_onVideoDurationChanged());
+    // May be reported from a player listener during build — defer setState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_onVideoDurationChanged());
+    });
   }
 
   Future<void> _onVideoDurationChanged() async {

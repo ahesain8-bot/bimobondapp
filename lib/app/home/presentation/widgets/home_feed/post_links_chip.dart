@@ -395,7 +395,8 @@ class PostLinksChip extends StatelessWidget {
                   item.chipIcon!,
                   const SizedBox(width: 6),
                 ],
-                Flexible(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 240),
                   child: Text(
                     item.chipTitle,
                     maxLines: 1,
@@ -437,7 +438,8 @@ class PostLinksChip extends StatelessWidget {
                 first.chipIcon!,
                 const SizedBox(width: 6),
               ],
-              Flexible(
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
                 child: Text(
                   first.chipTitle,
                   maxLines: 1,

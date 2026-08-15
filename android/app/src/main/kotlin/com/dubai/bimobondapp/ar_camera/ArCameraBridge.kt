@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -22,15 +23,107 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieDrawable
+import com.dubai.bimobondapp.effect360.Engine360EffectImpl
 
 object ArCameraBridge {
     var faceOverlay: FaceOverlayView? = null
     var previewView: PreviewView? = null
     var warpGlView: FaceWarpGlView? = null
     var confettiOverlay: LottieAnimationView? = null
+    var videoOverlay: TextureView? = null
 
-    /** Source currently loaded into [confettiOverlay] — see [applyRenderMode]. */
+    /** Source currently loaded into the screen overlay views — see [applyRenderMode]. */
     private var loadedOverlayKey: String? = null
+    private var screenOverlayVideoHelper: ScreenOverlayVideoHelper? = null
+
+    var engine360Effect: Engine360EffectImpl? = null
+
+    fun initialize360EffectEngine(context: android.content.Context) {
+        if (engine360Effect == null) {
+            engine360Effect = Engine360EffectImpl(context.applicationContext)
+        }
+        engine360Effect?.initialize()
+    }
+
+    fun load360Effect(videoUrl: String, alphaUrl: String? = null) {
+        engine360Effect?.load360Effect(videoUrl, alphaUrl)
+        mainHandler.post { showGlHidePreview() }
+    }
+
+    fun remove360Effect() {
+        engine360Effect?.remove360Effect()
+    }
+
+    fun onPause() {
+        engine360Effect?.remove360Effect()
+    }
+
+    fun onResume() {
+        engine360Effect?.initialize()
+    }
+
+    fun set360EffectOpacity(opacity: Float) {
+        engine360Effect?.set360EffectOpacity(opacity)
+    }
+
+    fun set360ManualOrientation(yaw: Float, pitch: Float) {
+        engine360Effect?.setManualOrientation(yaw, pitch)
+    }
+
+    fun ensureVideoHelper(): ScreenOverlayVideoHelper? {
+        val texture = videoOverlay ?: return null
+        val ctx = hostActivity ?: return null
+        return try {
+            screenOverlayVideoHelper ?: ScreenOverlayVideoHelper(texture, ctx).also {
+                screenOverlayVideoHelper = it
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Snapshots the active screen overlay (Lottie or MP4) for photo/video bake.
+     * Must run on the main thread.
+     *
+     * @param maxEdge long-edge cap for MP4 GPU readback (photos use a higher
+     *   default than recording).
+     */
+    fun captureScreenOverlayFrame(
+        maxEdge: Int = ScreenOverlayVideoHelper.PHOTO_CAPTURE_EDGE,
+    ): Bitmap? {
+        if (!currentFilter.isScreenOverlay()) return null
+        val source = currentOverlaySource ?: return null
+        return if (source.isVideo) {
+            ensureVideoHelper()?.captureFrame(maxEdge)
+        } else {
+            captureLottieOverlayFrame()
+        }
+    }
+
+    private fun captureLottieOverlayFrame(): Bitmap? {
+        val overlay = confettiOverlay ?: return null
+        if (overlay.visibility != View.VISIBLE) return null
+        val w = overlay.width
+        val h = overlay.height
+        if (w <= 0 || h <= 0) return null
+        return try {
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            overlay.draw(android.graphics.Canvas(bmp))
+            bmp
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun bringScreenOverlayToFront() {
+        if (!currentFilter.isScreenOverlay()) return
+        if (currentOverlaySource?.isVideo == true) {
+            videoOverlay?.bringToFront()
+        } else {
+            confettiOverlay?.bringToFront()
+        }
+    }
 
     /**
      * Animation the selected screen overlay should play, handed over by Dart
@@ -637,7 +730,7 @@ object ArCameraBridge {
         iv.bringToFront()
         // The screen-overlay animation sits on top of the preview and keeps
         // running through the rebind, so it must stay above the cover.
-        if (currentFilter.isScreenOverlay()) confettiOverlay?.bringToFront()
+        if (currentFilter.isScreenOverlay()) bringScreenOverlayToFront()
         if (currentFilter.isPngOverlay()) faceOverlay?.bringToFront()
         rebindCover = iv
         rebindCoverSawIdle = false
@@ -832,7 +925,12 @@ object ArCameraBridge {
             confettiOverlay?.cancelAnimation()
         } catch (_: Throwable) {
         }
+        try {
+            screenOverlayVideoHelper?.unload()
+        } catch (_: Throwable) {
+        }
         confettiOverlay?.visibility = View.GONE
+        videoOverlay?.visibility = View.GONE
         faceOverlay?.resetForNonPngFilter()
         faceOverlay?.visibility = View.GONE
         warpGlView?.setOesEnabled(false)
@@ -864,47 +962,115 @@ object ArCameraBridge {
         faceOverlay?.visibility = if (usePngUnderlay) View.VISIBLE else View.GONE
 
         val confetti = confettiOverlay
-        if (useScreenOverlay) {
-            // Every overlay shares this one Lottie view — only one is ever
-            // active at a time — so swap its animation whenever the selection
-            // actually changes.
+        val videoView = videoOverlay
+        val videoHelper = ensureVideoHelper()
+        val is360Active = engine360Effect?.getState()?.status != com.dubai.bimobondapp.effect360.Engine360Status.IDLE
+        if (useScreenOverlay && !is360Active) {
             val source = currentOverlaySource
-            if (confetti != null && source != null && source.isValid &&
-                source.cacheKey != loadedOverlayKey
-            ) {
-                try {
-                    confetti.cancelAnimation()
-                    confetti.repeatCount =
-                        if (source.loop) LottieDrawable.INFINITE else 0
-                    val url = source.url
-                    if (!url.isNullOrBlank()) {
-                        // Lottie caches downloaded compositions on disk itself,
-                        // keyed by URL, so this is a network call only the first
-                        // time a given overlay is ever used on the device — and
-                        // usually not even then, because prefetchOverlays() has
-                        // already warmed it. Async: onCompositionLoaded fires
-                        // when it's ready.
-                        confetti.setAnimationFromUrl(url)
-                    } else {
-                        confetti.setAnimation(source.assetName)
+            if (source != null && source.isValid) {
+                if (source.isVideo) {
+                    try {
+                        confetti?.pauseAnimation()
+                    } catch (_: Throwable) {
                     }
-                    loadedOverlayKey = source.cacheKey
-                } catch (t: Throwable) {
-                    android.util.Log.e(
-                        "ArCamera",
-                        "screen overlay load failed: ${source.cacheKey}",
-                        t,
-                    )
-                    loadedOverlayKey = null
+                    confetti?.visibility = View.GONE
+                    videoView?.visibility = View.VISIBLE
+                    if (source.cacheKey != loadedOverlayKey) {
+                        videoHelper?.load(source)
+                        loadedOverlayKey = source.cacheKey
+                    } else {
+                        videoHelper?.resume()
+                    }
+                    videoView?.bringToFront()
+                } else {
+                    videoHelper?.unload()
+                    videoView?.visibility = View.GONE
+                    if (confetti != null && source.cacheKey != loadedOverlayKey) {
+                        val targetCacheKey = source.cacheKey
+                        try {
+                            confetti.cancelAnimation()
+                            val url = source.url
+                            val assetName = source.assetName
+                            val appContext = hostActivity?.applicationContext ?: confetti.context.applicationContext
+                            loadedOverlayKey = targetCacheKey
+
+                            val task = if (!url.isNullOrBlank()) {
+                                LottieNetworkLoader.loadFromUrl(appContext, url, url)
+                            } else if (!assetName.isNullOrBlank()) {
+                                com.airbnb.lottie.LottieCompositionFactory.fromAsset(appContext, assetName, assetName)
+                            } else {
+                                null
+                            }
+
+                            if (task != null) {
+                                task.addListener { composition: com.airbnb.lottie.LottieComposition ->
+                                    if (currentOverlaySource?.cacheKey == targetCacheKey) {
+                                        confetti.setComposition(composition)
+                                        confetti.repeatCount =
+                                            if (source.loop) LottieDrawable.INFINITE else 0
+                                        confetti.visibility = View.VISIBLE
+                                        confetti.bringToFront()
+                                        if (!confetti.isAnimating) {
+                                            confetti.playAnimation()
+                                        }
+                                        ArCameraController.updateScreenOverlayComposition(composition)
+                                    }
+                                }
+                                task.addFailureListener { t: Throwable ->
+                                    android.util.Log.e(
+                                        "ArCamera",
+                                        "screen overlay network load failed: $targetCacheKey",
+                                        t,
+                                    )
+                                    if (!assetName.isNullOrBlank()) {
+                                        try {
+                                            com.airbnb.lottie.LottieCompositionFactory.fromAsset(appContext, assetName, assetName)
+                                                .addListener { fallbackComp: com.airbnb.lottie.LottieComposition ->
+                                                    if (currentOverlaySource?.cacheKey == targetCacheKey) {
+                                                        confetti.setComposition(fallbackComp)
+                                                        confetti.repeatCount =
+                                                            if (source.loop) LottieDrawable.INFINITE else 0
+                                                        confetti.visibility = View.VISIBLE
+                                                        confetti.bringToFront()
+                                                        if (!confetti.isAnimating) {
+                                                            confetti.playAnimation()
+                                                        }
+                                                        ArCameraController.updateScreenOverlayComposition(fallbackComp)
+                                                    }
+                                                }
+                                        } catch (_: Throwable) {
+                                        }
+                                    }
+                                    if (loadedOverlayKey == targetCacheKey) {
+                                        loadedOverlayKey = null
+                                    }
+                                }
+                            }
+                        } catch (t: Throwable) {
+                            android.util.Log.e(
+                                "ArCamera",
+                                "screen overlay setup failed: ${source.cacheKey}",
+                                t,
+                            )
+                            loadedOverlayKey = null
+                        }
+                    }
+                    confetti?.visibility = View.VISIBLE
+                    confetti?.bringToFront()
+                    try {
+                        if (confetti != null && confetti.composition != null && !confetti.isAnimating) {
+                            confetti.playAnimation()
+                        }
+                    } catch (_: Throwable) {
+                    }
                 }
             }
-            confetti?.visibility = View.VISIBLE
-            confetti?.bringToFront()
+        } else {
             try {
-                if (confetti != null && !confetti.isAnimating) confetti.playAnimation()
+                videoHelper?.unload()
             } catch (_: Throwable) {
             }
-        } else {
+            videoView?.visibility = View.GONE
             try {
                 confetti?.pauseAnimation()
             } catch (_: Throwable) {
@@ -955,12 +1121,9 @@ object ArCameraBridge {
             }
 
             useScreenOverlay -> {
-                // Same full-res OES beauty pipeline as Normal Mode. The Lottie
-                // view stays on top for live preview; recorded video composites
-                // beautified GL frames + Lottie (see ArCameraController) so
-                // overlay clips keep the same polish as Normal Mode video.
-                // Hardware VideoCapture+OverlayEffect alone only sees the raw
-                // sensor stream — beauty never reaches that path.
+                // Lottie and MP4 share the same OES beauty path as Normal Mode.
+                // Video plays in a TextureView on top (visible inside Flutter
+                // PlatformView); recording composites OES frames + overlay frames.
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 gl?.setCaptureEnabled(true)
                 if (!ArCameraController.isBoundToOes()) {
@@ -1006,7 +1169,7 @@ object ArCameraBridge {
     }
 
     private fun bringDecorOverlaysToFront() {
-        if (currentFilter.isScreenOverlay()) confettiOverlay?.bringToFront()
+        bringScreenOverlayToFront()
         if (currentFilter.isPngOverlay()) faceOverlay?.bringToFront()
     }
 
@@ -1076,10 +1239,16 @@ object ArCameraBridge {
             confettiOverlay?.cancelAnimation()
         } catch (_: Throwable) {
         }
+        try {
+            screenOverlayVideoHelper?.release()
+        } catch (_: Throwable) {
+        }
+        screenOverlayVideoHelper = null
         faceOverlay = null
         previewView = null
         warpGlView = null
         confettiOverlay = null
+        videoOverlay = null
         loadedOverlayKey = null
         currentOverlaySource = null
         platformRoot = null
@@ -1099,4 +1268,30 @@ object ArCameraBridge {
         letterboxBottomPx = 0
         BackPersonPresence.reset()
     }
+
+    fun initializeEffectEngine(context: android.content.Context) {
+        FaceLandmarkerHolder.warmup(context)
+    }
+
+    fun setOverlayEffect(effect: EffectDefinition) {
+        val overlaySource = if (!effect.assetUrl.isNullOrBlank() || !effect.assetName.isNullOrBlank()) {
+            ScreenOverlaySource(
+                id = effect.id,
+                url = effect.assetUrl,
+                assetName = effect.assetName,
+                loop = effect.loop,
+                mediaType = if (effect.isVideo) ScreenOverlayMediaType.VIDEO else ScreenOverlayMediaType.LOTTIE,
+            )
+        } else null
+        setFilter(effect.id, 1.0f, overlaySource)
+    }
+
+    fun removeOverlayEffect() {
+        setFilter("none", 1.0f, null)
+    }
+
+    fun setOverlayPosition(x: Float, y: Float) {}
+    fun setOverlayScale(scale: Float) {}
+    fun setOverlayOpacity(opacity: Float) {}
+    fun setOverlayLoop(loop: Boolean) {}
 }
