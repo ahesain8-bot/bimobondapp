@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/comment_entity.dart';
@@ -184,25 +185,9 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
 
         if (_activeLiveId != live.id) return;
 
-        await socket.connect(
-          liveId: result.liveId,
-          token: result.socketToken,
-        );
-
-        if (_activeLiveId != live.id) return;
-
-        final coins =
-            await _ref.read(giftRepositoryProvider).getCoinBalance();
-        final commentsResult = await _ref
-            .read(commentRepositoryProvider)
-            .getComments(liveId: live.id, limit: 20);
-        final comments = commentsResult.fold(
-          (_) => <CommentEntity>[],
-          (batch) => batch.comments.reversed.toList(),
-        );
-
-        _listenSocket(live.id);
-
+        // LiveKit is the critical path. Publish the connected state now so the
+        // renderer can attach on the first subscribed track; overlays load in
+        // parallel and must not delay the first video frame.
         state = state.copyWith(
           session: state.session!.copyWith(
             live: result.live.copyWith(
@@ -210,15 +195,51 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
               isFollowing: live.isFollowing,
             ),
             connectionState: LiveConnectionState.connected,
-            isSocketConnected: true,
             isLiveKitConnected: true,
             socketToken: result.socketToken,
             liveKitToken: result.liveKitToken,
-            coinBalance: coins.getOrElse(() => 1250),
+            coinBalance: 1250,
           ),
-          comments: comments,
           showJoinSuccess: true,
         );
+
+        final socketFuture = socket.connect(
+          liveId: result.liveId,
+          token: result.socketToken,
+        );
+        final coinsFuture =
+            _ref.read(giftRepositoryProvider).getCoinBalance();
+        final commentsFuture = _ref
+            .read(commentRepositoryProvider)
+            .getComments(liveId: live.id, limit: 20);
+
+        try {
+          final results = await Future.wait<dynamic>([
+            socketFuture,
+            coinsFuture,
+            commentsFuture,
+          ]);
+          if (_activeLiveId != live.id) return;
+
+          final coins = results[1];
+          final commentsResult = results[2];
+          final comments = commentsResult.fold(
+            (_) => <CommentEntity>[],
+            (batch) => batch.comments.reversed.toList(),
+          );
+          _listenSocket(live.id);
+          state = state.copyWith(
+            session: state.session!.copyWith(
+              isSocketConnected: true,
+              coinBalance: coins.getOrElse(() => 1250),
+            ),
+            comments: comments,
+          );
+        } catch (_) {
+          // A slow/failing overlay service must not take down an already
+          // connected LiveKit video. Socket reconnect handling remains active
+          // when it becomes available on the next join.
+        }
 
         Future.delayed(const Duration(milliseconds: 1200), () {
           if (_activeLiveId == live.id) {
@@ -471,7 +492,16 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
   void dispose() {
     _disposed = true;
     _socketSub?.cancel();
-    // Do not call async teardown / set state after dispose.
+    _socketSub = null;
+    // Sync tearDown: MUST happen inside dispose() so the Notifier lifecycle
+    // (auto-dispose / ProviderScope) cleanly releases ALL resources —
+    // LiveKit room, remote tracks, socket — no matter which exit path the
+    // user takes (nav pop, back button, swipe out).
+    //
+    // We do NOT await the Future from _teardown because dispose() must be
+    // synchronous; the operation is fire-and-forget to its own event loop
+    // turn and will never touch `state` after dispose (silent=true).
+    unawaited(_teardown(silent: true));
     super.dispose();
   }
 }

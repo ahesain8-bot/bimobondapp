@@ -51,6 +51,7 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
   LiveKitService? _liveKit;
   StreamSubscription<LiveKitConnectionState>? _liveKitSub;
   Room? _room;
+  RemoteVideoTrack? _track;
 
   @override
   void initState() {
@@ -92,8 +93,10 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
     } else if (state == LiveKitConnectionState.disconnected ||
         state == LiveKitConnectionState.failed) {
       _detachRoom();
+      // Sync only buffering/state fields, no unnecessary rebuild of the
+      // entire VideoTrackRenderer.
+      if (mounted && (_buffering || _initializing)) setState(() {});
     }
-    if (mounted) setState(() {});
   }
 
   void _attachRoom(Room room) {
@@ -101,16 +104,26 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
     _detachRoom();
     _room = room;
     room.addListener(_onRoomChanged);
+    _refreshTrack();
   }
 
   void _detachRoom() {
     final room = _room;
     _room = null;
     if (room != null) room.removeListener(_onRoomChanged);
+    _track = null;
   }
 
   /// Room emits on every event (participant/track subscribed, etc.).
   void _onRoomChanged() {
+    _refreshTrack();
+  }
+
+  void _refreshTrack() {
+    final room = _room;
+    final next = room == null ? null : _firstSubscribedVideoTrack(room);
+    if (identical(next, _track)) return;
+    _track = next;
     if (mounted) setState(() {});
   }
 
@@ -241,24 +254,22 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
   Widget _buildMedia() {
     // Primary path: host WebRTC video over LiveKit.
     final room = widget.isActive ? _room : null;
-    if (room != null) {
-      final track = _firstSubscribedVideoTrack(room);
-      if (track != null) {
-        return ColoredBox(
-          color: Colors.black,
-          child: VideoTrackRenderer(
-            track,
-            fit: widget.fit == BoxFit.cover
-                ? VideoViewFit.cover
-                : VideoViewFit.contain,
-            placeholderBuilder: (_) => AnimatedVideoPlaceholder(
-              seed: widget.live.id,
-              category: widget.live.category,
-              hostInitial: widget.live.hostName,
-            ),
+    final track = room == null ? null : _track;
+    if (track != null) {
+      return ColoredBox(
+        color: Colors.black,
+        child: VideoTrackRenderer(
+          track,
+          fit: widget.fit == BoxFit.cover
+              ? VideoViewFit.cover
+              : VideoViewFit.contain,
+          placeholderBuilder: (_) => AnimatedVideoPlaceholder(
+            seed: widget.live.id,
+            category: widget.live.category,
+            hostInitial: widget.live.hostName,
           ),
-        );
-      }
+        ),
+      );
     }
 
     final controller = _controller;

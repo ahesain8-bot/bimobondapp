@@ -14,9 +14,6 @@ class LivesMediaDataSource {
   /// (e.g. reconnection, disconnection, renegotiation failure).
   void Function(String tag, String message)? onRoomEvent;
 
-  /// True when the room is connected **and** at least one local track exists
-  /// (audio or video) — the preview layer only needs a valid track object
-  /// to render, so we do not require publish-confirmation here.
   bool get isConnected =>
       _room != null && (_videoTrack != null || _audioTrack != null);
 
@@ -48,14 +45,22 @@ class LivesMediaDataSource {
     //   NOT check the enabled flag.
     // • backupVideoCodec DISABLED: defense in depth — prevents backup codec
     //   from being advertised in simulcastCodecs at publish time.
+    // • adaptiveStream TRUE on the HOST (paired with viewer-side TRUE): the
+    //   SFU can pick the appropriate simulcast layer per subscriber viewport.
     // • fastPublish KEPT TRUE (default): reduces initial publish latency.
+    // • videoEncoding: explicit 720p@25fps 1.6Mbps target for mobile portrait
+    //   + VGA@20 700kbps mid layer + QVGA@15 300kbps low layer for simulcast.
     final room = Room(
       roomOptions: const RoomOptions(
-        adaptiveStream: false,
+        adaptiveStream: true,
         dynacast: false,
         defaultVideoPublishOptions: VideoPublishOptions(
           simulcast: true,
           backupVideoCodec: BackupVideoCodec(enabled: false),
+          videoEncoding: VideoEncoding(
+            maxBitrate: 1600000,
+            maxFramerate: 25,
+          ),
         ),
       ),
     );
@@ -115,7 +120,16 @@ class LivesMediaDataSource {
             'createCameraTrack attempt ${attempt + 1}/6...',
           );
           _videoTrack = await LocalVideoTrack.createCameraTrack(
-            CameraCaptureOptions(cameraPosition: cameraPosition),
+            CameraCaptureOptions(
+              cameraPosition: cameraPosition,
+              params: const VideoParameters(
+                dimensions: VideoDimensionsPresets.h720_169,
+                encoding: VideoEncoding(
+                  maxBitrate: 1600000,
+                  maxFramerate: 25,
+                ),
+              ),
+            ),
           );
           _videoPublished = false;
           lastError = null;
@@ -171,11 +185,12 @@ class LivesMediaDataSource {
     required String token,
   }) async {
     await disconnect();
-    // Same options as publisher — disable backup codec renegotiation and
-    // dynacast to prevent any renegotiation path.
+    // Aligned viewer options: adaptiveStream TRUE (so SFU can pick the right
+    // simulcast layer per viewer viewport and network), dynacast FALSE to
+    // avoid renegotiation storms, backup codec disabled (same as publisher).
     final room = Room(
       roomOptions: const RoomOptions(
-        adaptiveStream: false,
+        adaptiveStream: true,
         dynacast: false,
         defaultVideoPublishOptions: VideoPublishOptions(
           backupVideoCodec: BackupVideoCodec(enabled: false),
@@ -207,11 +222,21 @@ class LivesMediaDataSource {
 
     final position =
         useFront ? CameraPosition.front : CameraPosition.back;
+    const params = VideoParameters(
+      dimensions: VideoDimensionsPresets.h720_169,
+      encoding: VideoEncoding(
+        maxBitrate: 1600000,
+        maxFramerate: 25,
+      ),
+    );
 
     try {
       // Fast path: restart the existing published track in place.
       await old.restartTrack(
-        CameraCaptureOptions(cameraPosition: position),
+        CameraCaptureOptions(
+          cameraPosition: position,
+          params: params,
+        ),
       );
       return old;
     } catch (e, st) {
@@ -233,7 +258,10 @@ class LivesMediaDataSource {
     _videoPublished = false;
 
     final next = await LocalVideoTrack.createCameraTrack(
-      CameraCaptureOptions(cameraPosition: position),
+      CameraCaptureOptions(
+        cameraPosition: position,
+        params: params,
+      ),
     );
     await room.localParticipant?.publishVideoTrack(next);
     _videoTrack = next;
