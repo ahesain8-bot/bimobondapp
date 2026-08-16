@@ -203,6 +203,29 @@ class ArCameraBridge {
     }
   }
 
+  /// Fully stops the native camera pipeline and un-binds the camera device.
+  ///
+  /// Used before pushing a route that opens its OWN camera (the live room):
+  /// otherwise the lens is held open twice at once, which flashes the preview
+  /// and on some devices fails with a "lens busy" error.
+  static Future<void> stopCamera() async {
+    try {
+      await _channel.invokeMethod<void>('stopCamera');
+    } catch (_) {
+      // Camera view may already be disposed — nothing to stop.
+    }
+  }
+
+  /// Re-initialises the native camera pipeline after [stopCamera] (e.g. when
+  /// returning from the live room). Re-applies the last filter natively.
+  static Future<void> startCamera() async {
+    try {
+      await _channel.invokeMethod<void>('startCamera');
+    } catch (_) {
+      // Camera view may already be disposed — nothing to start.
+    }
+  }
+
   static Future<void> setPreviewLetterbox({
     required int topPx,
     required int bottomPx,

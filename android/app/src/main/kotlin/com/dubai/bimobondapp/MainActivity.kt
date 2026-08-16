@@ -353,6 +353,32 @@ class MainActivity : FlutterActivity() {
                         ArCameraController.resumePreview()
                         result.success(null)
                     }
+                    // Fully tears the native camera down (camera unbound). Used
+                    // before pushing a route that opens its own camera (live
+                    // room) so the lens is never held twice at once.
+                    "stopCamera" -> {
+                        ArCameraController.stop()
+                        result.success(null)
+                    }
+                    // Re-initialises the native camera after [stopCamera] when
+                    // the camera screen becomes visible again.
+                    "startCamera" -> {
+                        val activity = ArCameraBridge.hostActivity
+                        val lifecycleOwner = ArCameraBridge.lifecycleOwner
+                        val previewView = ArCameraBridge.previewView
+                        val faceOverlay = ArCameraBridge.faceOverlay
+                        if (activity != null && lifecycleOwner != null &&
+                            previewView != null && faceOverlay != null
+                        ) {
+                            ArCameraController.start(
+                                activity,
+                                lifecycleOwner,
+                                previewView,
+                                faceOverlay,
+                            )
+                        }
+                        result.success(null)
+                    }
                     "setPreviewLetterbox" -> {
                         val top = call.argument<Int>("topPx") ?: 0
                         val bottom = call.argument<Int>("bottomPx") ?: 0
