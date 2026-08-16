@@ -48,6 +48,10 @@ import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_inje
     as camera_studio_di;
 import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_injector.dart'
     as video_templates_di;
+import 'package:bimobondapp/app/calls/presentation/di/calls_injector.dart'
+    as calls_di;
+import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
+import 'package:bimobondapp/app/calls/presentation/widgets/global_call_listener.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
@@ -78,12 +82,10 @@ void main() async {
   await stories_di.initStories();
   await camera_studio_di.initCameraStudio();
   await video_templates_di.initVideoTemplates();
-  // Use the bundled filter/effect catalog at launch (local, no network). The
-  // add-post camera refreshes it from the API when it actually opens, so the
-  // two catalog requests no longer run on every cold start.
   CameraStudioCatalogLoader.applyBundledCatalog();
   await chats_di.initChats();
   await notifications_di.initNotifications();
+  await calls_di.initCalls();
   runApp(const MyApp());
 }
 
@@ -104,6 +106,9 @@ class MyApp extends StatelessWidget {
         BlocProvider<ShopCartCubit>(
           create: (_) => shop_di.sl<ShopCartCubit>(),
         ),
+        BlocProvider<CallBloc>(
+          create: (_) => calls_di.sl<CallBloc>(),
+        ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {
@@ -121,6 +126,11 @@ class MyApp extends StatelessWidget {
                   supportedLocales: AppLocalizations.supportedLocales,
                   locale: locale,
                   routerConfig: AppRouter.router,
+                  builder: (context, child) {
+                    return GlobalCallListener(
+                      child: child ?? const SizedBox.shrink(),
+                    );
+                  },
                 );
               },
             ),

@@ -3,12 +3,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 NotificationEntity notificationFromRemoteMessage(RemoteMessage message) {
   final data = Map<String, dynamic>.from(message.data);
-  final auctionId = data['auctionId']?.toString();
 
   return NotificationEntity(
-    id: data['notificationId']?.toString() ?? '',
+    id: data['notificationId']?.toString() ?? data['callId']?.toString() ?? '',
     userId: data['userId']?.toString() ?? '',
-    type: data['type']?.toString() ?? 'SYSTEM',
+    type: data['type']?.toString() ?? (data['screen'] == 'incoming_call' ? 'CALL_INCOMING' : 'SYSTEM'),
     isRead: false,
     createdAt: DateTime.now(),
     actorId: data['actorId']?.toString(),
@@ -16,7 +15,7 @@ NotificationEntity notificationFromRemoteMessage(RemoteMessage message) {
     body: message.notification?.body ?? data['body']?.toString(),
     postId: data['postId']?.toString(),
     commentId: data['commentId']?.toString(),
-    data: auctionId != null ? {'auctionId': auctionId} : null,
+    data: data,
   );
 }
 
