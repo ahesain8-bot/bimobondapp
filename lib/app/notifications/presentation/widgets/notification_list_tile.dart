@@ -437,7 +437,7 @@ class _ActionRichText extends StatelessWidget {
             ],
           ),
         ),
-        if (tag != null) tag,
+        ?tag,
       ],
     );
   }

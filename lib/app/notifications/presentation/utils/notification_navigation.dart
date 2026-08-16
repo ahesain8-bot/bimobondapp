@@ -4,7 +4,12 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/app/calls/domain/usecases/get_call_by_id_usecase.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
+import 'package:bimobondapp/app/calls/presentation/di/calls_injector.dart' as calls_di;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 Future<void> handleNotificationTap(
@@ -105,6 +110,40 @@ Future<void> navigateFromNotification(
             'trafficSource': TrafficSource.notification,
           },
         );
+      }
+      return;
+    case 'CALL_INCOMING':
+      final callId = notification.data?['callId']?.toString();
+      final chatId = notification.data?['chatId']?.toString();
+      if (callId != null && callId.isNotEmpty && context.mounted) {
+        try {
+          final getCallById = calls_di.sl<GetCallByIdUseCase>();
+          final result = await getCallById(callId: callId);
+          result.fold(
+            (_) {
+              if (chatId != null && chatId.isNotEmpty && context.mounted) {
+                context.pushNamed('chat', extra: {'chatId': chatId});
+              }
+            },
+            (call) {
+              if (context.mounted) {
+                context.read<CallBloc>().add(IncomingCallReceivedEvent(call: call));
+              }
+            },
+          );
+        } catch (_) {
+          if (chatId != null && chatId.isNotEmpty && context.mounted) {
+            context.pushNamed('chat', extra: {'chatId': chatId});
+          }
+        }
+      } else if (chatId != null && chatId.isNotEmpty && context.mounted) {
+        context.pushNamed('chat', extra: {'chatId': chatId});
+      }
+      return;
+    case 'CALL_MISSED':
+      final chatId = notification.data?['chatId']?.toString();
+      if (chatId != null && chatId.isNotEmpty && context.mounted) {
+        context.pushNamed('chat', extra: {'chatId': chatId});
       }
       return;
     case 'ADMIN_MESSAGE':

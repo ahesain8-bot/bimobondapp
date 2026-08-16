@@ -92,6 +92,7 @@ dependencies:
   google_fonts: ^8.2.0
   just_audio: ^0.10.6
   audio_session: ^0.2.4
+  livekit_client: ^2.11.0
 
 dev_dependencies:
   flutter_test:

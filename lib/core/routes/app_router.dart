@@ -36,6 +36,7 @@ import 'package:bimobondapp/app/home/presentation/utils/media_item_edit_state.da
 import 'package:bimobondapp/app/video_templates/presentation/pages/video_templates_browser_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
+import 'package:bimobondapp/app/calls/presentation/pages/active_call_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/new_chat_screen.dart';
@@ -459,6 +460,11 @@ class AppRouter {
         path: '/ended-auctions',
         name: 'ended_auctions',
         builder: (context, state) => const EndedAuctionsScreen(),
+      ),
+      GoRoute(
+        path: '/active-call',
+        name: 'active_call',
+        builder: (context, state) => const ActiveCallScreen(),
       ),
       GoRoute(
         path: '/chat',
