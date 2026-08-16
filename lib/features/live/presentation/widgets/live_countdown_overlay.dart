@@ -43,13 +43,22 @@ class _LiveCountdownOverlayBodyState extends State<_LiveCountdownOverlayBody> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    // Chained one-shot timers instead of a single periodic timer: a periodic
+    // timer keeps re-firing while a frame is being skipped, which can stack up
+    // callbacks. Each step schedules the next one explicitly.
+    _scheduleNext();
+  }
+
+  void _scheduleNext() {
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 1), () {
+      if (!mounted) return;
       if (_value >= 3) {
-        timer.cancel();
         _finish();
         return;
       }
       setState(() => _value++);
+      _scheduleNext();
     });
   }
 
@@ -70,13 +79,17 @@ class _LiveCountdownOverlayBodyState extends State<_LiveCountdownOverlayBody> {
       backgroundColor: Colors.transparent,
       body: Center(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 350),
-          switchInCurve: Curves.easeOutBack,
+          duration: const Duration(milliseconds: 300),
+          // NO overshooting curves (easeOutBack/elastic) here: their transformed
+          // values leave [0, 1] and CurvedAnimation throws "parametric value
+          // outside of [0, 1] range", which in release builds aborts the frame
+          // and freezes the whole app.
+          switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, animation) {
             return ScaleTransition(
-              scale: Tween<double>(begin: 2.2, end: 1.0).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              scale: Tween<double>(begin: 1.6, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
               ),
               child: FadeTransition(opacity: animation, child: child),
             );

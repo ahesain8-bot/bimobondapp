@@ -150,12 +150,19 @@ class CameraWorkspaceTabs extends StatelessWidget {
     required this.creativeLabel,
     required this.selectedIndex,
     required this.onSelected,
+    this.liveLabel,
+    this.onLiveTap,
   });
 
   final String postLabel;
   final String creativeLabel;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+
+  /// When provided, a "start live" tab is shown right next to the
+  /// creative tab, using the exact same style as the other tabs.
+  final String? liveLabel;
+  final VoidCallback? onLiveTap;
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +176,7 @@ class CameraWorkspaceTabs extends StatelessWidget {
       selected: selectedIndex == 1,
       onTap: () => onSelected(1),
     );
+    final hasLive = liveLabel != null && onLiveTap != null;
 
     // Stack + directional align so RTL doesn't flip Create under the upload
     // button (Row would reverse and collide with gallery on the start edge).
@@ -189,7 +197,20 @@ class CameraWorkspaceTabs extends StatelessWidget {
                 alignment: AlignmentDirectional.centerStart,
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 36),
-                  child: createTab,
+                  child: hasLive
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            createTab,
+                            const SizedBox(width: 6),
+                            _WorkspaceTab(
+                              label: liveLabel!,
+                              selected: false,
+                              onTap: onLiveTap!,
+                            ),
+                          ],
+                        )
+                      : createTab,
                 ),
               ),
             ),
@@ -498,11 +519,11 @@ class CameraCaptureControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The "start live" action moved to a compact pill next to the
+    // "الإبداع" workspace tab; live mode no longer shows a full-width
+    // button here.
     if (isLiveMode) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: CameraGoLiveButton(label: goLiveLabel, onTap: onGoLiveTap),
-      );
+      return const SizedBox.shrink();
     }
 
     final hasEffect = selectedEffect != null && !selectedEffect!.isNone;

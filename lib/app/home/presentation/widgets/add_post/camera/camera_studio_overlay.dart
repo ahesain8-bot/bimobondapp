@@ -413,6 +413,8 @@ class CameraStudioOverlay extends StatelessWidget {
                                         workspaceTabIndex: workspaceTabIndex,
                                         onWorkspaceTabSelected:
                                             onWorkspaceTabSelected,
+                                        liveLabel: l10n.cameraGoLive,
+                                        onLiveTap: onGoLiveTap,
                                       )
                                     : showGalleryUpload
                                     ? Align(
@@ -476,25 +478,6 @@ class CameraStudioOverlay extends StatelessWidget {
                             onNext: onFinishRecording!,
                           ),
                       ],
-                      if (isLiveMode) ...[
-                        const SizedBox(height: 10),
-                        CameraCaptureControls(
-                          isLiveMode: true,
-                          isPhotoMode: false,
-                          isRecording: false,
-                          isBusy: isBusy,
-                          recordProgress: 0,
-                          effectsLabel: l10n.cameraEffects,
-                          uploadLabel: l10n.uploadFromLibrary,
-                          goLiveLabel: l10n.cameraGoLive,
-                          onEffectsTap: onEffectsTap,
-                          onUploadTap: onUploadTap,
-                          onGoLiveTap: onGoLiveTap,
-                          onRecordTap: onRecordTap,
-                          showUpload: false,
-                          showEffectsTool: false,
-                        ),
-                      ],
                       if (!isReviewingDraft) ...[
                         const SizedBox(height: 10),
                         CameraWorkspaceTabs(
@@ -502,6 +485,8 @@ class CameraStudioOverlay extends StatelessWidget {
                           creativeLabel: l10n.cameraTabCreative,
                           selectedIndex: workspaceTabIndex,
                           onSelected: onWorkspaceTabSelected,
+                          liveLabel: l10n.cameraGoLive,
+                          onLiveTap: onGoLiveTap,
                         ),
                         SizedBox(
                           height: 10 + MediaQuery.paddingOf(context).bottom,
@@ -711,6 +696,8 @@ class _BottomWorkspaceRow extends StatelessWidget {
     required this.creativeLabel,
     required this.workspaceTabIndex,
     required this.onWorkspaceTabSelected,
+    this.liveLabel,
+    this.onLiveTap,
   });
 
   final bool showGallery;
@@ -720,6 +707,8 @@ class _BottomWorkspaceRow extends StatelessWidget {
   final String creativeLabel;
   final int workspaceTabIndex;
   final ValueChanged<int> onWorkspaceTabSelected;
+  final String? liveLabel;
+  final VoidCallback? onLiveTap;
 
   @override
   Widget build(BuildContext context) {
@@ -735,6 +724,8 @@ class _BottomWorkspaceRow extends StatelessWidget {
             creativeLabel: creativeLabel,
             selectedIndex: workspaceTabIndex,
             onSelected: onWorkspaceTabSelected,
+            liveLabel: liveLabel,
+            onLiveTap: onLiveTap,
           ),
           if (showGallery)
             Align(

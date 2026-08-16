@@ -1849,11 +1849,35 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   /// Pre-live countdown (1 → 2 → 3) shown over the camera preview, then the
   /// live room opens and the stream starts.
+  ///
+  /// The native AR camera is fully released before pushing the room (it opens
+  /// its own lens) and restarted when the user comes back — otherwise the
+  /// camera is opened twice at once, which flashes the preview and can fail
+  /// with a "lens busy" error.
   Future<void> _handleGoLiveTap() async {
     if (_isRecording || _isBusy || _isProcessingCapture) return;
     await LiveCountdownOverlay.run(context);
     if (!context.mounted) return;
-    context.push('/create-live');
+    try {
+      if (_useNativeArFilters) {
+        await ArCameraBridge.stopCamera();
+      }
+      if (!context.mounted) return;
+      await context.push('/create-live');
+    } catch (_) {
+      // Rare handoff failure — never leave a frozen preview.
+    } finally {
+      // Back from the live room (or after a failed handoff): bring the camera
+      // preview back up with its filter / beauty settings.
+      if (_useNativeArFilters && mounted) {
+        await ArCameraBridge.startCamera();
+        _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
+        if (_photoEditorMagicOn) {
+          ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+        }
+        _syncRetouchToNative();
+      }
+    }
   }
 
   Future<void> _applyFilter(CameraFilterPreset preset) async {
