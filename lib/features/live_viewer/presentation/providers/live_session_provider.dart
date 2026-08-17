@@ -145,11 +145,11 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
         topViewerAvatars: avatars,
         pkScoreLeft: isPk
             ? (live.metadata?['scoreLeft'] as int? ??
-                8000 + random.nextInt(8000))
+                  8000 + random.nextInt(8000))
             : 0,
         pkScoreRight: isPk
             ? (live.metadata?['scoreRight'] as int? ??
-                1000 + random.nextInt(3000))
+                  1000 + random.nextInt(3000))
             : 0,
         currentUserId: _currentUserId,
       );
@@ -174,162 +174,152 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
       final joinResult = await _ref.read(joinLiveUseCaseProvider)(live.id);
       if (_activeLiveId != live.id) return;
 
-      await joinResult.fold((failure) async {
-        final banned = failure.message.toLowerCase().contains('banned');
-        final ended = failure.message.toLowerCase().contains('ended');
-        state = state.copyWith(
-          session: state.session!.copyWith(
-            connectionState: banned
-                ? LiveConnectionState.banned
-                : ended
-                    ? LiveConnectionState.liveEnded
-                    : LiveConnectionState.error,
-            errorMessage: failure.message,
-          ),
-        );
-      }, (result) async {
-        final socket = _ref.read(socketServiceProvider);
+      await joinResult.fold(
+        (failure) async {
+          final banned = failure.message.toLowerCase().contains('banned');
+          final ended = failure.message.toLowerCase().contains('ended');
+          state = state.copyWith(
+            session: state.session!.copyWith(
+              connectionState: banned
+                  ? LiveConnectionState.banned
+                  : ended
+                  ? LiveConnectionState.liveEnded
+                  : LiveConnectionState.error,
+              errorMessage: failure.message,
+            ),
+          );
+        },
+        (result) async {
+          final socket = _ref.read(socketServiceProvider);
 
-        // ============================================================
-        // [DEBUG-QOS JWT] Non-cryptographic token claim check.
-        // Decodes ONLY the Base64 payload of the viewer JWT to prove
-        // the backend isn't embedding a max-quality / max-bitrate
-        // restriction that overrides our client-side simulcast
-        // settings.  NEVER prints the full token or verifies a
-        // signature — only dumps public claims.
-        // ============================================================
-        try {
-          final tok = result.liveKitToken;
-          final parts = tok.split('.');
-          if (parts.length >= 2) {
-            // JWT payload is parts[1], URL-safe base64.
-            String payload = parts[1];
-            // Add padding if missing.
-            while (payload.length % 4 != 0) {
-              payload += '=';
+          // ============================================================
+          // [DEBUG-QOS JWT] Non-cryptographic token claim check.
+          // Decodes ONLY the Base64 payload of the viewer JWT to prove
+          // the backend isn't embedding a max-quality / max-bitrate
+          // restriction that overrides our client-side simulcast
+          // settings.  NEVER prints the full token or verifies a
+          // signature — only dumps public claims.
+          // ============================================================
+          try {
+            final tok = result.liveKitToken;
+            final parts = tok.split('.');
+            if (parts.length >= 2) {
+              // JWT payload is parts[1], URL-safe base64.
+              String payload = parts[1];
+              // Add padding if missing.
+              while (payload.length % 4 != 0) {
+                payload += '=';
+              }
+              final bytes = base64Url.decode(payload);
+              final Map<String, dynamic> claims =
+                  jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+              final subClaims = Map<String, dynamic>.of(claims);
+              // Remove sensitive fields if present (never in viewer LiveKit JWT,
+              // but be defensive).
+              subClaims.remove('secret');
+              subClaims.remove('apiKey');
+              subClaims.remove('apiSecret');
+              subClaims.remove('privateKey');
             }
-            final bytes = base64Url.decode(payload);
-            final Map<String, dynamic> claims =
-                jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-            final subClaims = Map<String, dynamic>.of(claims);
-            // Remove sensitive fields if present (never in viewer LiveKit JWT,
-            // but be defensive).
-            subClaims.remove('secret');
-            subClaims.remove('apiKey');
-            subClaims.remove('apiSecret');
-            subClaims.remove('privateKey');
-            debugPrint(
-              '[DEBUG-QOS] JWT-CLAIMS (viewer token, public only):'
-              '  exp=${subClaims['exp']}'
-              '  room=${subClaims['room'] ?? subClaims['roomName']}'
-              '  identity=${subClaims['identity']}'
-              '  canPublish=${subClaims['canPublish']}'
-              '  canSubscribe=${subClaims['canSubscribe']}'
-              '  canPublishData=${subClaims['canPublishData']}'
-              '  hiddenClaims=${subClaims['hidden']}'
-              '  maxVideoBitrate=${subClaims['maxVideoBitrate']}'
-              '  maxQuality=${subClaims['maxQuality'] ?? subClaims['video_max_quality']}'
-              '  otherKeys=${subClaims.keys.where((k) => !const <String>{'exp','room','roomName','identity','canPublish','canSubscribe','canPublishData','hidden','maxVideoBitrate','maxQuality','video_max_quality','nbf','iat','iss','jti','sub'}.contains(k)).join(',')}'
-              '  allClaimKeysSorted=${(subClaims.keys.toList()..sort()).join(',')}',
+          } catch (e) {}
+
+          final liveKit = _ref.read(liveKitServiceProvider);
+          try {
+            await liveKit.connect(
+              url: result.liveKitUrl,
+              token: result.liveKitToken,
+              roomName: result.liveId,
+              mockStreamUrl: result.live.streamUrl,
             );
+          } catch (_) {
+            if (_activeLiveId != live.id) return;
+            state = state.copyWith(
+              session: state.session!.copyWith(
+                connectionState: LiveConnectionState.error,
+                errorMessage: 'Failed to connect to stream',
+              ),
+            );
+            return;
           }
-        } catch (e) {
-          debugPrint('[DEBUG-QOS] JWT-CLAIMS (decode failed): $e');
-        }
 
-        final liveKit = _ref.read(liveKitServiceProvider);
-        try {
-          await liveKit.connect(
-            url: result.liveKitUrl,
-            token: result.liveKitToken,
-            roomName: result.liveId,
-            mockStreamUrl: result.live.streamUrl,
-          );
-        } catch (_) {
-          if (_activeLiveId != live.id) return;
-          state = state.copyWith(
-            session: state.session!.copyWith(
-              connectionState: LiveConnectionState.error,
-              errorMessage: 'Failed to connect to stream',
-            ),
-          );
-          return;
-        }
-
-        if (_activeLiveId != live.id) return;
-
-        // LiveKit is the critical path. Publish the connected state now so the
-        // renderer can attach on the first subscribed track; overlays load in
-        // parallel and must not delay the first video frame.
-        state = state.copyWith(
-          session: state.session!.copyWith(
-            live: result.live.copyWith(
-              metadata: live.metadata,
-              isFollowing: live.isFollowing,
-            ),
-            connectionState: LiveConnectionState.connected,
-            isLiveKitConnected: true,
-            socketToken: result.socketToken,
-            liveKitToken: result.liveKitToken,
-            coinBalance: 1250,
-          ),
-          showJoinSuccess: true,
-        );
-
-        final socketFuture = socket.connect(
-          liveId: result.liveId,
-          token: result.socketToken,
-        );
-        final coinsFuture =
-            _ref.read(giftRepositoryProvider).getCoinBalance();
-        final commentsFuture = _ref
-            .read(commentRepositoryProvider)
-            .getComments(liveId: live.id, limit: 20);
-        final meFuture = _loadCurrentUserId();
-
-        try {
-          final results = await Future.wait<dynamic>([
-            socketFuture,
-            coinsFuture,
-            commentsFuture,
-            meFuture,
-          ]);
           if (_activeLiveId != live.id) return;
 
-          final coins = results[1];
-          final commentsResult = results[2];
-          _currentUserId = results[3] as String? ?? _currentUserId;
-          final comments = commentsResult.fold(
-            (_) => <CommentEntity>[],
-            (batch) => batch.comments.reversed.toList(),
-          ) as List<CommentEntity>;
-          CommentEntity? pinned;
-          for (final c in comments) {
-            if (c.isPinned) pinned = c;
-          }
-          pinned ??= _pinnedFromLiveMetadata(result.live);
-          _listenSocket(live.id);
+          // LiveKit is the critical path. Publish the connected state now so the
+          // renderer can attach on the first subscribed track; overlays load in
+          // parallel and must not delay the first video frame.
           state = state.copyWith(
             session: state.session!.copyWith(
-              isSocketConnected: true,
-              coinBalance: coins.getOrElse(() => 1250),
+              live: result.live.copyWith(
+                metadata: live.metadata,
+                isFollowing: live.isFollowing,
+              ),
+              connectionState: LiveConnectionState.connected,
+              isLiveKitConnected: true,
+              socketToken: result.socketToken,
+              liveKitToken: result.liveKitToken,
+              coinBalance: 1250,
             ),
-            comments: comments,
-            pinnedComment: pinned,
-            currentUserId: _currentUserId,
+            showJoinSuccess: true,
           );
-        } catch (_) {
-          // A slow/failing overlay service must not take down an already
-          // connected LiveKit video. Socket reconnect handling remains active
-          // when it becomes available on the next join.
-        }
 
-        Future.delayed(const Duration(milliseconds: 1200), () {
-          if (_activeLiveId == live.id) {
-            state = state.copyWith(showJoinSuccess: false);
+          final socketFuture = socket.connect(
+            liveId: result.liveId,
+            token: result.socketToken,
+          );
+          final coinsFuture = _ref
+              .read(giftRepositoryProvider)
+              .getCoinBalance();
+          final commentsFuture = _ref
+              .read(commentRepositoryProvider)
+              .getComments(liveId: live.id, limit: 20);
+          final meFuture = _loadCurrentUserId();
+
+          try {
+            final results = await Future.wait<dynamic>([
+              socketFuture,
+              coinsFuture,
+              commentsFuture,
+              meFuture,
+            ]);
+            if (_activeLiveId != live.id) return;
+
+            final coins = results[1];
+            final commentsResult = results[2];
+            _currentUserId = results[3] as String? ?? _currentUserId;
+            final comments =
+                commentsResult.fold(
+                      (_) => <CommentEntity>[],
+                      (batch) => batch.comments.reversed.toList(),
+                    )
+                    as List<CommentEntity>;
+            CommentEntity? pinned;
+            for (final c in comments) {
+              if (c.isPinned) pinned = c;
+            }
+            pinned ??= _pinnedFromLiveMetadata(result.live);
+            _listenSocket(live.id);
+            state = state.copyWith(
+              session: state.session!.copyWith(
+                isSocketConnected: true,
+                coinBalance: coins.getOrElse(() => 1250),
+              ),
+              comments: comments,
+              pinnedComment: pinned,
+              currentUserId: _currentUserId,
+            );
+          } catch (_) {
+            // A slow/failing overlay service must not take down an already
+            // connected LiveKit video. Socket reconnect handling remains active
+            // when it becomes available on the next join.
           }
-        });
-      });
+
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            if (_activeLiveId == live.id) {
+              state = state.copyWith(showJoinSuccess: false);
+            }
+          });
+        },
+      );
     } finally {
       _busy = false;
       final pending = _pendingActivate;
@@ -486,30 +476,32 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
       _scheduleBannerClear();
       return;
     }
-    final result = await _ref.read(commentRepositoryProvider).sendComment(
-          liveId: id,
-          content: content.trim(),
-        );
-    result.fold((failure) {
-      final muted = failure.message.toLowerCase().contains('mute');
-      state = state.copyWith(
-        chatMuted: muted || state.chatMuted,
-        moderationBanner: muted
-            ? 'Your chat is muted on this live'
-            : failure.message,
-      );
-      _scheduleBannerClear();
-    }, (comment) {
-      if (comment.userId.isNotEmpty) {
-        _currentUserId ??= comment.userId;
-      }
-      if (!state.comments.any((c) => c.id == comment.id)) {
+    final result = await _ref
+        .read(commentRepositoryProvider)
+        .sendComment(liveId: id, content: content.trim());
+    result.fold(
+      (failure) {
+        final muted = failure.message.toLowerCase().contains('mute');
         state = state.copyWith(
-          comments: [...state.comments, comment],
-          currentUserId: _currentUserId,
+          chatMuted: muted || state.chatMuted,
+          moderationBanner: muted
+              ? 'Your chat is muted on this live'
+              : failure.message,
         );
-      }
-    });
+        _scheduleBannerClear();
+      },
+      (comment) {
+        if (comment.userId.isNotEmpty) {
+          _currentUserId ??= comment.userId;
+        }
+        if (!state.comments.any((c) => c.id == comment.id)) {
+          state = state.copyWith(
+            comments: [...state.comments, comment],
+            currentUserId: _currentUserId,
+          );
+        }
+      },
+    );
   }
 
   Future<void> like({int burst = 1}) async {
@@ -621,7 +613,9 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
 
   Future<String?> _loadCurrentUserId() async {
     try {
-      final payload = await _ref.read(apiClientProvider).get(ApiEndpoints.authMe);
+      final payload = await _ref
+          .read(apiClientProvider)
+          .get(ApiEndpoints.authMe);
       final id = payload['id']?.toString();
       if (id != null && id.isNotEmpty) return id;
       final user = payload['user'];
@@ -645,12 +639,14 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
       id: map['id']?.toString() ?? 'pinned',
       liveId: live.id,
       userId: userMap?['id']?.toString() ?? map['userId']?.toString() ?? '',
-      username: userMap?['username']?.toString() ??
+      username:
+          userMap?['username']?.toString() ??
           userMap?['fullName']?.toString() ??
           'User',
       userAvatar: userMap?['avatarUrl']?.toString(),
       content: content,
-      createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+      createdAt:
+          DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       gifterLevel: userMap?['gifterLevel'] is num
           ? (userMap!['gifterLevel'] as num).toInt()
@@ -701,9 +697,7 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
     if (session == null) return;
     final next = !session.live.isFollowing;
     state = state.copyWith(
-      session: session.copyWith(
-        live: session.live.copyWith(isFollowing: next),
-      ),
+      session: session.copyWith(live: session.live.copyWith(isFollowing: next)),
     );
     if (next) {
       await _ref.read(liveRepositoryProvider).followHost(session.live.hostId);
@@ -768,5 +762,5 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
 
 final activeLiveProvider =
     StateNotifierProvider<ActiveLiveNotifier, LiveSessionUiState>((ref) {
-  return ActiveLiveNotifier(ref);
-});
+      return ActiveLiveNotifier(ref);
+    });

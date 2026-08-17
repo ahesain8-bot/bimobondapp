@@ -18,7 +18,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:bimobondapp/app/calls/services/call_ringtone_service.dart';
 import 'package:bimobondapp/app/calls/services/callkit_service.dart';
-import 'package:livekit_client/livekit_client.dart';
+import 'package:livekit_client/livekit_client.dart' as lk;
 
 class CallBloc extends Bloc<CallEvent, CallState> {
   final StartCallUseCase startCallUseCase;
@@ -123,12 +123,12 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     LiveKitRoomStateChangedEvent event,
     Emitter<CallState> emit,
   ) {
-    if (event.roomState == ConnectionState.reconnecting) {
+    if (event.roomState == lk.ConnectionState.reconnecting) {
       if (state is CallActiveState) {
         final cur = state as CallActiveState;
         emit(CallReconnectingState(call: cur.call));
       }
-    } else if (event.roomState == ConnectionState.connected) {
+    } else if (event.roomState == lk.ConnectionState.connected) {
       if (state is CallReconnectingState) {
         final cur = state as CallReconnectingState;
         emit(CallActiveState(call: cur.call, livekitService: livekitService));
