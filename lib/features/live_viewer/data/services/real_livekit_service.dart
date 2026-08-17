@@ -90,29 +90,79 @@ class RealLiveKitService implements LiveKitService {
         ..on<RoomConnectedEvent>((event) {
           debugPrint('🔌 LiveKit connected: $roomName');
           _setState(LiveKitConnectionState.connected);
+        })
+        // [DEBUG-QOS VIEWER 1/3] Remote track subscribed: print what
+        // simulcast layers the remote publication actually advertises,
+        // which codec is in use, and — critically — what VideoQuality
+        // the viewer is currently scheduled to receive BEFORE any UI
+        // touches it.  This line isolates whether adaptiveStream has
+        // already picked the wrong layer before the widget tree builds.
+        // NOTE: For 2.11.0, remote tracks do NOT expose `options.encodings`;
+        // instead we read: publication.dimensions (from server TrackInfo),
+        // publication.mimeType (direct String getter, no .codec wrapper),
+        // and publication.videoQuality getter which returns the user's
+        // explicit setVideoQuality preference (or HIGH if unset — note
+        // this is NOT the SFU's actual forwarding decision, which is why
+        // the LiveVideoPlayer renderer also probes via getReceiverStats).
+        ..on<TrackSubscribedEvent>((ev) {
+          if (ev.track is! RemoteVideoTrack) return;
+          final p = ev.publication;
+          final part = ev.participant;
+          final vtrack = ev.track as RemoteVideoTrack;
+          final pub = p; // RemoteTrackPublication
+          final dims = pub.dimensions; // server-reported published dims
+          final mime = pub.mimeType; // 2.11.0 direct getter
+          final qualityPref = pub.videoQuality.name.toUpperCase();
+          // Remote tracks don't expose encodings list; actual decoder dims
+          // are queried via getReceiverStats() in the LiveVideoPlayer renderer
+          // probe block (VIEWER-RENDERER DEBUG-QOS).
+          debugPrint(
+            '[DEBUG-QOS] VIEWER-TRACK-SUBSCRIBED:'
+            '  room=$roomName'
+            '  hostId=${part.identity}'
+            '  trackSid=${vtrack.sid}'
+            '  pubSid=${pub.sid}'
+            '  simulcasted=${pub.simulcasted}'
+            '  mime=$mime'
+            '  pubDimensions=${dims?.width}x${dims?.height}'
+            '  videoQualityGetter(preference)=$qualityPref'
+            '  (NOTE: decoder-output dims queried separately in VIEWER-RENDERER probe via getReceiverStats())',
+          );
+        })
+        // [DEBUG-QOS VIEWER 2/3] TrackStreamStateUpdatedEvent fires when the
+        // SFU pauses the track due to bandwidth limits or resumes it.
+        // (Replaces non-existent RemoteVideoTrackEvent listener that would
+        // have caused compile error on livekit_client <2.13.)
+        ..on<TrackStreamStateUpdatedEvent>((ev) {
+          try {
+            final p = ev.publication;
+            debugPrint(
+              '[DEBUG-QOS] VIEWER-TRACK-STREAM-STATE:'
+              '  streamState=${ev.streamState.name.toUpperCase()}'
+              '  pubSid=${p.sid}'
+              '  videoQuality(preference)=${p.videoQuality.name.toUpperCase()}'
+              '  simulcasted=${p.simulcasted}',
+            );
+          } catch (_) {}
         });
 
       await room.connect(url, token);
       _room = room;
 
       // Viewer: subscribe only — no local publish.
-      // Request the MEDIUM quality layer first. adaptiveStream=true (set in
-      // RoomOptions above) will allow the SFU to further adjust the quality
-      // up or down based on viewport + network.  Requesting MEDIUM avoids
-      // stuck-on-LOW while still giving the SFU headroom to step up to HIGH
-      // when supported.
-      Future<void>.delayed(const Duration(milliseconds: 400), () async {
-        try {
-          for (final participant in room.remoteParticipants.values) {
-            for (final pub in participant.videoTrackPublications) {
-              if (pub.subscribed) {
-                await pub.setVideoQuality(VideoQuality.MEDIUM);
-              }
-            }
-          }
-        } catch (_) {}
-      });
-
+      //
+      // NOTE: We intentionally do NOT call setVideoQuality() here anymore.
+      // Previously `setVideoQuality(VideoQuality.MEDIUM)` was hard-capped on
+      // every remote subscribed publication after 400 ms — this forced the
+      // SFU to serve the 360p (mid) simulcast layer even on good Wi-Fi and
+      // when the renderer is full-screen, causing heavy upscaling blur on
+      // all viewer devices.  RoomOptions.adaptiveStream = true (configured
+      // above) tells the engine to request the appropriate layer based on
+      // the actual VideoTrackRenderer viewport dimensions (full-screen →
+      // HIGH / 720p automatically) and the current available downlink.
+      // This yields the same or better quality as an explicit HIGH request,
+      // but still falls back cleanly on weak networks — no manual toggle
+      // required and no artificial cap on good links.
       _streamUrl = mockStreamUrl;
       _setState(LiveKitConnectionState.connected);
     } catch (e, st) {

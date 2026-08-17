@@ -5,6 +5,10 @@ import 'gift_entity.dart';
 /// Socket event types matching the backend contract.
 enum SocketEventType {
   liveComment,
+  liveCommentDeleted,
+  liveCommentPinned,
+  liveCommentUnpinned,
+  liveModeration,
   liveGift,
   liveLike,
   liveViewers,
@@ -42,6 +46,62 @@ class LiveCommentEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, comment];
+}
+
+class LiveCommentDeletedEvent extends SocketEvent {
+  final String commentId;
+
+  const LiveCommentDeletedEvent({
+    required super.liveId,
+    required this.commentId,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveCommentDeleted);
+
+  @override
+  List<Object?> get props => [...super.props, commentId];
+}
+
+class LiveCommentPinnedEvent extends SocketEvent {
+  final CommentEntity comment;
+
+  const LiveCommentPinnedEvent({
+    required super.liveId,
+    required this.comment,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveCommentPinned);
+
+  @override
+  List<Object?> get props => [...super.props, comment];
+}
+
+class LiveCommentUnpinnedEvent extends SocketEvent {
+  final String commentId;
+
+  const LiveCommentUnpinnedEvent({
+    required super.liveId,
+    required this.commentId,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveCommentUnpinned);
+
+  @override
+  List<Object?> get props => [...super.props, commentId];
+}
+
+class LiveModerationEvent extends SocketEvent {
+  final String moderationType;
+  final String? userId;
+  final String? reason;
+
+  const LiveModerationEvent({
+    required super.liveId,
+    required this.moderationType,
+    this.userId,
+    this.reason,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveModeration);
+
+  @override
+  List<Object?> get props => [...super.props, moderationType, userId, reason];
 }
 
 class LiveGiftEvent extends SocketEvent {

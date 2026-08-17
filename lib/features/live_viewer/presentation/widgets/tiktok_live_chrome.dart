@@ -334,15 +334,29 @@ class _BadgeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rank = live.metadata?['hourlyRank'] ?? 12;
+    final rank = live.metadata?['hourlyRank'] as int? ?? 12;
     final location = live.metadata?['location'] as String? ?? 'LIVE';
     final goalProgress = live.metadata?['goalProgress'] as String?;
+    final isPopular = live.metadata?['isPopular'] == true;
+    final popularReason = live.metadata?['popularReason'] as String?;
+    final leagueTier = live.metadata?['hostLeagueTier'] as String?;
+    final hostHearts = live.metadata?['hostHeartCount'] as int? ?? 0;
+    final host = (
+      isPopular: isPopular,
+      popularReason: popularReason,
+      leagueTier: leagueTier,
+      hostHearts: hostHearts,
+    );
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
+          if (host.isPopular) ...[
+            _PopularityBadge(reason: host.popularReason),
+            const SizedBox(width: 4),
+          ],
           GestureDetector(
             onTap: onHourlyRankTap,
             child: _Pill(
@@ -414,7 +428,110 @@ class _BadgeRow extends StatelessWidget {
               ),
             ),
           ),
+          if (host.leagueTier != null) ...[
+            const SizedBox(width: 4),
+            _LeagueTierBadge(tier: host.leagueTier!),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Popularity badge — rendered if the backend flagged this host as trending.
+/// Uses `popularReason` to pick glyph + tint:
+///  - `admin_boost`  → rocket / royal purple (staff promoted).
+///  - `hourly_rank`  (or null) → fire / gradient (organic trending).
+class _PopularityBadge extends StatelessWidget {
+  final String? reason;
+
+  const _PopularityBadge({this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    final isBoost = reason == 'admin_boost';
+    final icon = isBoost ? '🚀' : '⭐';
+    const label = 'Popular';
+    final gradient = isBoost
+        ? const LinearGradient(
+            colors: [Color(0xFF7B61FF), Color(0xFFFF6BD6)],
+          )
+        : const LinearGradient(
+            colors: [Color(0xFFFF5A3F), Color(0xFFFFC371)],
+          );
+
+    return Container(
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.18),
+          width: 0.6,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 10)),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// League tier pill — shows host's `hostLeagueTier` (e.g. B2, A1, S+)
+/// pulled from the backend `user` object.  Colored by tier letter.
+class _LeagueTierBadge extends StatelessWidget {
+  final String tier;
+
+  const _LeagueTierBadge({required this.tier});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tier.trim().toUpperCase();
+    final Color color;
+    if (t.startsWith('S')) {
+      color = const Color(0xFFFFB800);
+    } else if (t.startsWith('A')) {
+      color = const Color(0xFFFF5A8A);
+    } else if (t.startsWith('B')) {
+      color = const Color(0xFF3D7EFF);
+    } else if (t.startsWith('C')) {
+      color = const Color(0xFF27C26F);
+    } else {
+      color = const Color(0xFF9AA0A6);
+    }
+
+    return Container(
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.55), width: 0.8),
+      ),
+      child: Text(
+        t.isEmpty ? 'Tier' : 'League · $t',
+        style: TextStyle(
+          color: color,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
       ),
     );
   }
@@ -567,8 +684,8 @@ class PkBattleBar extends StatelessWidget {
   }
 }
 
-/// Bottom bar matching screenshots:
-/// [treasure?][emoji][Write...][share↓count][gift][rose][multi-guest]
+/// TikTok LIVE viewer bottom bar (LTR):
+/// [treasure?] [Write...] [emoji] [share↓count] [gift] [rose] [multi-guest]
 class TikTokLiveBottomBar extends StatelessWidget {
   final VoidCallback onTypeTap;
   final VoidCallback onGiftTap;
@@ -616,20 +733,6 @@ class TikTokLiveBottomBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              GestureDetector(
-                onTap: onEmojiTap ?? onTypeTap,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.emoji_emotions_outlined,
-                      color: Color(0xD9FFFFFF), size: 22),
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: commentField ??
                     GestureDetector(
@@ -653,6 +756,20 @@ class TikTokLiveBottomBar extends StatelessWidget {
                         ),
                       ),
                     ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onEmojiTap ?? onTypeTap,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.emoji_emotions_outlined,
+                      color: Color(0xD9FFFFFF), size: 22),
+                ),
               ),
               const SizedBox(width: 10),
               GestureDetector(

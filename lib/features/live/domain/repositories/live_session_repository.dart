@@ -71,9 +71,13 @@ class LiveHudGiftEvent extends LiveHudEvent {
   const LiveHudGiftEvent({
     this.summaryText,
     this.totalEarnedCoins,
+    this.senderName,
+    this.senderGifterLevel,
   });
   final String? summaryText;
   final int? totalEarnedCoins;
+  final String? senderName;
+  final int? senderGifterLevel;
 }
 
 class LiveHudHourlyRankEvent extends LiveHudEvent {

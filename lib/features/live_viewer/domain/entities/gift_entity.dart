@@ -125,6 +125,7 @@ class GiftSentEntity extends Equatable {
   final int totalCost;
   final DateTime sentAt;
   final GiftEntity? giftDetails;
+  final int? senderGifterLevel;
 
   const GiftSentEntity({
     required this.id,
@@ -137,6 +138,7 @@ class GiftSentEntity extends Equatable {
     required this.totalCost,
     required this.sentAt,
     this.giftDetails,
+    this.senderGifterLevel,
   });
 
   @override
@@ -151,5 +153,6 @@ class GiftSentEntity extends Equatable {
         totalCost,
         sentAt,
         giftDetails,
+        senderGifterLevel,
       ];
 }

@@ -41,7 +41,7 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/video_templ
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/features/live/presentation/widgets/live_countdown_overlay.dart';
+import 'package:bimobondapp/features/live_source/presentation/pages/live_start_page.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/foundation.dart';
@@ -1847,28 +1847,23 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(_beginVideoRecording());
   }
 
-  /// Pre-live countdown (1 → 2 → 3) shown over the camera preview, then the
-  /// live room opens and the stream starts.
-  ///
-  /// The native AR camera is fully released before pushing the room (it opens
-  /// its own lens) and restarted when the user comes back — otherwise the
-  /// camera is opened twice at once, which flashes the preview and can fail
-  /// with a "lens busy" error.
+  /// Opens the LiveStartPage from lib/features/live_source/.
   Future<void> _handleGoLiveTap() async {
     if (_isRecording || _isBusy || _isProcessingCapture) return;
-    await LiveCountdownOverlay.run(context);
-    if (!context.mounted) return;
     try {
       if (_useNativeArFilters) {
         await ArCameraBridge.stopCamera();
       }
       if (!context.mounted) return;
-      await context.push('/create-live');
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const LiveStartPage(),
+        ),
+      );
     } catch (_) {
-      // Rare handoff failure — never leave a frozen preview.
+      // Never leave a frozen preview.
     } finally {
-      // Back from the live room (or after a failed handoff): bring the camera
-      // preview back up with its filter / beauty settings.
+      // Back from the live start page: bring the camera preview back.
       if (_useNativeArFilters && mounted) {
         await ArCameraBridge.startCamera();
         _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);

@@ -99,6 +99,11 @@ class RealGiftRepository implements GiftRepository {
         totalCost: _asInt(payload['totalCost']) ?? total,
         sentAt: DateTime.now(),
         giftDetails: gift,
+        senderGifterLevel: _asInt(
+          payload['sender'] is Map
+              ? Map<String, dynamic>.from(payload['sender'] as Map)['gifterLevel']
+              : payload['gifterLevel'],
+        ),
       );
 
       _incoming[liveId]?.add(sent);

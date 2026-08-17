@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../../core/widgets/gifter_level_badge.dart';
 import '../../domain/entities/comment_entity.dart';
 import 'fallback_media.dart';
 import 'tiktok_live_tokens.dart';
@@ -184,6 +185,10 @@ class TikTokCommentBubble extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if ((comment.gifterLevel ?? 0) > 0) ...[
+                  const SizedBox(width: 4),
+                  GifterLevelBadge(level: comment.gifterLevel!, compact: true),
+                ],
                 const SizedBox(width: 4),
                 const Icon(Icons.card_giftcard, color: Colors.white, size: 14),
               ],
@@ -193,8 +198,8 @@ class TikTokCommentBubble extends StatelessWidget {
       );
     }
 
-    final level = (comment.userId.hashCode.abs() % 50) + 1;
     final isYou = comment.username == 'You';
+    final level = comment.gifterLevel ?? 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
@@ -228,13 +233,16 @@ class TikTokCommentBubble extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _LevelBadge(level: level),
-                    const SizedBox(width: 4),
-                    if (level > 30) ...[
-                      const _MiniBadge(
-                        label: 'No.1',
-                        color: TikTokLiveTokens.liveRed,
-                      ),
+                    if (level > 0) ...[
+                      GifterLevelBadge(level: level, compact: true),
+                      const SizedBox(width: 4),
+                    ],
+                    if (comment.isVerified) ...[
+                      const Icon(Icons.verified, size: 12, color: Color(0xFF20D5EC)),
+                      const SizedBox(width: 4),
+                    ],
+                    if (comment.isPinned) ...[
+                      const Icon(Icons.push_pin, size: 11, color: Colors.white70),
                       const SizedBox(width: 4),
                     ],
                     Flexible(
@@ -262,72 +270,66 @@ class TikTokCommentBubble extends StatelessWidget {
   }
 }
 
-class _LevelBadge extends StatelessWidget {
-  final int level;
+/// Floating pinned-comment bar from `liveCommentPinned` (mobile-api.md §16).
+class PinnedCommentBar extends StatelessWidget {
+  final CommentEntity comment;
+  final VoidCallback? onClose;
 
-  const _LevelBadge({required this.level});
-
-  Color get _bg {
-    if (level >= 40) return const Color(0xFFFFB020);
-    if (level >= 20) return const Color(0xFF9B6DFF);
-    return const Color(0xFF4A9EFF);
-  }
+  const PinnedCommentBar({
+    super.key,
+    required this.comment,
+    this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 15,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_bg, Color.lerp(_bg, Colors.white, 0.25)!],
-        ),
-        borderRadius: BorderRadius.circular(3.5),
+        color: TikTokLiveTokens.frost(0.62),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.diamond, size: 8, color: Colors.white),
-          const SizedBox(width: 1),
-          Text(
-            '$level',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              height: 1,
+          const Icon(Icons.push_pin, color: Colors.white, size: 14),
+          const SizedBox(width: 6),
+          if ((comment.gifterLevel ?? 0) > 0) ...[
+            GifterLevelBadge(level: comment.gifterLevel!, compact: true),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '${comment.username}: ',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  TextSpan(
+                    text: comment.content,
+                    style: const TextStyle(
+                      color: Color(0xE6FFFFFF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (onClose != null)
+            GestureDetector(
+              onTap: onClose,
+              child: const Icon(Icons.close, color: Colors.white54, size: 16),
+            ),
         ],
-      ),
-    );
-  }
-}
-
-class _MiniBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _MiniBadge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 15,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(3.5),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          height: 1,
-        ),
       ),
     );
   }

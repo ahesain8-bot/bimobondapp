@@ -48,19 +48,50 @@ class LivesMediaDataSource {
     // • adaptiveStream TRUE on the HOST (paired with viewer-side TRUE): the
     //   SFU can pick the appropriate simulcast layer per subscriber viewport.
     // • fastPublish KEPT TRUE (default): reduces initial publish latency.
-    // • videoEncoding: explicit 720p@25fps 1.6Mbps target for mobile portrait
-    //   + VGA@20 700kbps mid layer + QVGA@15 300kbps low layer for simulcast.
+    // • videoEncoding: 720p@30fps 2.5Mbps base layer (TikTok LIVE quality
+    //   target).  Previously capped at 25fps/1.6Mbps which caused visible
+    //   block-compression blur on fast motion and stuttering cadence.
+    // • videoSimulcastLayers: explicit 3-layer ladder for portrait streaming:
+    //     HIGH  = 1280×720  @30fps  2500 kbps  (base, capture dimensions)
+    //     MID   =  640×360  @30fps   900 kbps  (stable mid, not 20fps)
+    //     LOW   =  320×180  @15fps   400 kbps  (fallback, audio-only safety)
+    //   Explicit sizing prevents LiveKit SDK auto-defaults from picking
+    //   overly conservative mid/low bitrates on some Android build targets,
+    //   and bumps mid to 30fps so mid-layer downgrades don't drop smoothness.
     final room = Room(
-      roomOptions: const RoomOptions(
+      roomOptions: RoomOptions(
         adaptiveStream: true,
         dynacast: false,
         defaultVideoPublishOptions: VideoPublishOptions(
           simulcast: true,
-          backupVideoCodec: BackupVideoCodec(enabled: false),
-          videoEncoding: VideoEncoding(
-            maxBitrate: 1600000,
-            maxFramerate: 25,
+          backupVideoCodec: const BackupVideoCodec(enabled: false),
+          videoEncoding: const VideoEncoding(
+            maxBitrate: 2500000,
+            maxFramerate: 30,
           ),
+          videoSimulcastLayers: const [
+            VideoParameters(
+              dimensions: VideoDimensions(1280, 720),
+              encoding: VideoEncoding(
+                maxBitrate: 2500000,
+                maxFramerate: 30,
+              ),
+            ),
+            VideoParameters(
+              dimensions: VideoDimensions(640, 360),
+              encoding: VideoEncoding(
+                maxBitrate: 900000,
+                maxFramerate: 30,
+              ),
+            ),
+            VideoParameters(
+              dimensions: VideoDimensions(320, 180),
+              encoding: VideoEncoding(
+                maxBitrate: 400000,
+                maxFramerate: 15,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -125,8 +156,8 @@ class LivesMediaDataSource {
               params: const VideoParameters(
                 dimensions: VideoDimensionsPresets.h720_169,
                 encoding: VideoEncoding(
-                  maxBitrate: 1600000,
-                  maxFramerate: 25,
+                  maxBitrate: 2500000,
+                  maxFramerate: 30,
                 ),
               ),
             ),
@@ -137,6 +168,38 @@ class LivesMediaDataSource {
             '🔍 [Host] connectAndPublish: '
             'camera track created on attempt ${attempt + 1}',
           );
+
+          // ============================================================
+          // [DEBUG-QOS HOST 1/4] Actual CAPTURE runtime diagnostics.
+          // Do NOT trust the params we passed: inspect the values the
+          // camera hardware + LiveKit engine actually accepted.
+          // Reads correct 2.11.0 getters only (LocalVideoTrack.currentOptions
+          // → VideoCaptureOptions.params → VideoParameters.dimensions/encoding).
+          // ============================================================
+          try {
+            final t = _videoTrack!;
+            final opts = t.currentOptions; // VideoCaptureOptions (2.11.0 correct name, not .options)
+            final params = opts.params;     // VideoParameters (dimensions + encoding)
+            final dims = params.dimensions;
+            final enc = params.encoding;
+            final capW = dims.width;
+            final capH = dims.height;
+            final capFps = enc?.maxFramerate ?? opts.maxFrameRate ?? 30;
+            final capBr = enc?.maxBitrate ?? 2500000;
+            debugPrint(
+              '[DEBUG-QOS] HOST-CAPTURE:'
+              '  position=${cameraPosition.name}'
+              '  dimensions(WxH)=${capW}x$capH'
+              '  requestedFps=$capFps'
+              '  requestedBitrate=${(capBr / 1000).toStringAsFixed(0)}kbps'
+              '  track.sid=${t.sid}'
+              '  captureMaxFrameRate_opt=${opts.maxFrameRate}'
+              '  (W>H => landscape; H>W => portrait).',
+            );
+          } catch (e) {
+            debugPrint('[DEBUG-QOS] HOST-CAPTURE (read failed): $e');
+          }
+
           break;
         } catch (e, st) {
           lastError = e;
@@ -153,9 +216,104 @@ class LivesMediaDataSource {
         throw StateError('LiveKit camera open failed: $lastError');
       }
       debugPrint('🔍 [Host] connectAndPublish: publishing video track...');
-      await room.localParticipant?.publishVideoTrack(_videoTrack!);
+      // Pass EXPLICIT VideoPublishOptions — L284 of SDK 2.11.0 local_participant:
+      //   publishOptions ??= track.lastPublishOptions ?? room.roomOptions.defaults.
+      // By passing explicitly we guarantee the HIGH=720p layer is declared at
+      // publish time regardless of any future room-default override path.
+      // Smallest-same-values as roomOptions (no knob change, per user order).
+      await room.localParticipant?.publishVideoTrack(
+        _videoTrack!,
+        publishOptions: VideoPublishOptions(
+          simulcast: true,
+          backupVideoCodec: const BackupVideoCodec(enabled: false),
+          videoEncoding: const VideoEncoding(
+            maxBitrate: 2500000,
+            maxFramerate: 30,
+          ),
+          videoSimulcastLayers: const [
+            VideoParameters(
+              dimensions: VideoDimensions(1280, 720),
+              encoding: VideoEncoding(
+                maxBitrate: 2500000,
+                maxFramerate: 30,
+              ),
+            ),
+            VideoParameters(
+              dimensions: VideoDimensions(640, 360),
+              encoding: VideoEncoding(
+                maxBitrate: 900000,
+                maxFramerate: 30,
+              ),
+            ),
+            VideoParameters(
+              dimensions: VideoDimensions(320, 180),
+              encoding: VideoEncoding(
+                maxBitrate: 400000,
+                maxFramerate: 15,
+              ),
+            ),
+          ],
+        ),
+      );
       _videoPublished = true;
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
+
+      // ============================================================
+      // [DEBUG-QOS HOST 2/4] Actual PUBLISHED simulcast layers.
+      // Prove what the SFU sees — if HIGH layer is missing here,
+      // the viewer CAN NEVER RECEIVE 720p no matter what viewer does.
+      // Uses correct 2.11.0 API only:
+      //   TrackPublication.mimeType (direct String getter, no .codec wrapper)
+      //   LocalVideoTrack.lastPublishOptions.videoSimulcastLayers
+      //   LocalVideoTrack.simulcastCodecs.entries (RIDs + encodings)
+      //   TrackPublication.dimensions (server reported W×H from TrackInfo)
+      // ============================================================
+      try {
+        final pubs = room.localParticipant?.videoTrackPublications ?? [];
+        for (final p in pubs) {
+          final lvTrack = p.track as LocalVideoTrack?;
+          final sim = p.simulcasted;
+          final mime = p.mimeType; // 2.11.0 direct getter (no .codec wrapper)
+          final trackCodec = lvTrack?.codec; // LocalTrack.codec String
+          final pubDim = p.dimensions; // server-reported dimensions
+
+          // Published layer definitions (what we declared + SDK accepted):
+          final simLayers = lvTrack?.lastPublishOptions?.videoSimulcastLayers;
+
+          // Actual active RIDs:
+          final scEntries = lvTrack?.simulcastCodecs.entries.toList() ?? [];
+
+          debugPrint(
+            '[DEBUG-QOS] HOST-PUBLISH:'
+            '  sid=${p.sid}'
+            '  trackId=${p.track?.mediaStreamTrack.id}'
+            '  simulcasted=$sim'
+            '  mime=$mime'
+            '  trackCodec=$trackCodec'
+            '  pubDimensions=${pubDim?.width}x${pubDim?.height}'
+            '  declaredSimLayers=${simLayers == null ? "null" : simLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}fps/${l.encoding == null ? "?" : "${(l.encoding!.maxBitrate~/1000)}kbps"}").toList()}'
+            '  scCount=${scEntries.length}'
+            '  scRIDs=${scEntries.map((e) => "${e.key}(${e.value.codec})").toList()}'
+            '  encodings_per_rid=${scEntries.map((e) => "rid:${e.key} enc=${e.value.encodings?.map((en) => "rid:${en.rid ?? "f"} on:${en.active} scale:${en.scaleResolutionDownBy ?? 1.0} fps:${en.maxFramerate ?? "?"} br:${en.maxBitrate ?? "?"}").toList()}").toList()}',
+          );
+
+          if (simLayers == null || simLayers.isEmpty) {
+            // Fallback: SDK stored no explicit layers (or not yet set).
+            final roomOpts = room.roomOptions.defaultVideoPublishOptions;
+            debugPrint(
+              '[DEBUG-QOS] HOST-PUBLISH (fallback-room-publish-opts):'
+              '  videoCodec=${roomOpts.videoCodec}'
+              '  simulcast=${roomOpts.simulcast}'
+              '  br=${roomOpts.videoEncoding?.maxBitrate}'
+              '  fps=${roomOpts.videoEncoding?.maxFramerate}'
+              '  simlayers.count=${roomOpts.videoSimulcastLayers.length}'
+              '  layers=${roomOpts.videoSimulcastLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}").toList()}',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[DEBUG-QOS] HOST-PUBLISH (err): $e');
+      }
     } catch (e, st) {
       videoError = e;
       debugPrint('🔴 [Host] LiveKit video publish failed: $e\n$st');
@@ -225,8 +383,8 @@ class LivesMediaDataSource {
     const params = VideoParameters(
       dimensions: VideoDimensionsPresets.h720_169,
       encoding: VideoEncoding(
-        maxBitrate: 1600000,
-        maxFramerate: 25,
+        maxBitrate: 2500000,
+        maxFramerate: 30,
       ),
     );
 

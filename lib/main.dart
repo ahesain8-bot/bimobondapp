@@ -88,11 +88,7 @@ void main() async {
   await chats_di.initChats();
   await notifications_di.initNotifications();
   await calls_di.initCalls();
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -109,12 +105,8 @@ class MyApp extends StatelessWidget {
         BlocProvider<ChatWallpaperCubit>(
           create: (_) => ChatWallpaperCubit(auth_di.sl()),
         ),
-        BlocProvider<ShopCartCubit>(
-          create: (_) => shop_di.sl<ShopCartCubit>(),
-        ),
-        BlocProvider<CallBloc>(
-          create: (_) => calls_di.sl<CallBloc>(),
-        ),
+        BlocProvider<ShopCartCubit>(create: (_) => shop_di.sl<ShopCartCubit>()),
+        BlocProvider<CallBloc>(create: (_) => calls_di.sl<CallBloc>()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {

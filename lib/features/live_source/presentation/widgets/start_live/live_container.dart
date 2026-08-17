@@ -1,52 +1,38 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
+import '../../../../../features/live/presentation/widgets/live_countdown_overlay.dart';
+import '../../../../../features/live/presentation/pages/live_room_page.dart';
 
 /// Live setup card: title input + image picker + LIVE start button.
-class LiveContainer extends StatelessWidget {
+class LiveContainer extends StatefulWidget {
   const LiveContainer({super.key, required this.titleController});
 
   final TextEditingController titleController;
 
+  @override
+  State<LiveContainer> createState() => _LiveContainerState();
+}
+
+class _LiveContainerState extends State<LiveContainer> {
+  /// Shows countdown (3 → 2 → 1), then navigates to the live room.
   Future<void> _openLiveRoom(BuildContext context) async {
-    // Pre-live countdown (3 → 2 → 1) shown over the camera preview.
     await LiveCountdownOverlay.run(context);
     if (!context.mounted) return;
 
-    final title = titleController.text.trim();
-    final liveBloc = context.read<LiveBloc>();
-
-    // REUSE the camera that is already running on the start screen: hand the
-    // SAME controller to the room (no close/reopen -> no black flicker).
-    final ready = liveBloc.state is LiveReady
-        ? liveBloc.state as LiveReady
-        : null;
-    final CameraController? runningCamera =
-        (ready != null && ready.isCameraInitialized)
-            ? ready.controller
-            : null;
-
-    if (runningCamera != null) {
-      liveBloc.add(const LiveCameraHandedOff());
-    } else {
-      liveBloc.add(const LiveAppPaused());
-    }
-    if (!context.mounted) return;
-
-    await Navigator.of(context).push(
+    final title = widget.titleController.text.trim();
+    await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => LiveRoomPage(
           title: title.isEmpty ? null : title,
-          initialCamera: runningCamera,
         ),
       ),
     );
-
-    if (!context.mounted) return;
-    liveBloc.add(const LiveAppResumed());
   }
 
   @override
@@ -71,7 +57,7 @@ class LiveContainer extends StatelessWidget {
             children: [
               Expanded(
                 child: TextField(
-                  controller: titleController,
+                  controller: widget.titleController,
                   decoration: InputDecoration(
                     hintText: 'اضافة عنوان',
                     hintStyle: AppTextStyles.titleHint.copyWith(fontSize: 13),
@@ -126,7 +112,7 @@ class LiveContainer extends StatelessWidget {
                   ),
                   SizedBox(width: AppSpacing.xs),
                   Text(
-                    'إنشاء',
+                    'بدء',
                     style: AppTextStyles.liveStart.copyWith(fontSize: 15),
                   ),
                 ],

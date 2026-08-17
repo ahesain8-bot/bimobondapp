@@ -58,6 +58,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomInviteTapped>(_onUiAction);
     on<LiveRoomRankingTapped>(_onRankingTapped);
     on<LiveRoomLikeTapped>(_onLikeTapped);
+    on<LiveRoomHeartBurstConsumed>(_onHeartBurstConsumed);
     on<LiveRoomTitleSubmitted>(_onTitleSubmitted);
     on<LiveRoomEffectsPanelModeChanged>(_onEffectsPanelModeChanged);
     on<LiveRoomEffectSelected>(_onEffectSelected);
@@ -762,12 +763,37 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       emit(
         ready.copyWith(
           session: ready.session.copyWith(likeCount: likeCount),
+          floatingHeartBurst: ready.floatingHeartBurst + 1,
         ),
       );
     } on ApiException catch (e) {
       emit(current.copyWith(actionMessage: e.message));
     } catch (e) {
       emit(current.copyWith(actionMessage: e.toString()));
+    }
+  }
+
+  void _onHeartBurstConsumed(
+    LiveRoomHeartBurstConsumed event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null || current.floatingHeartBurst == 0) return;
+    emit(current.copyWith(floatingHeartBurst: 0));
+  }
+
+  String _moderationMessage(String type) {
+    switch (type) {
+      case 'chat_muted':
+        return 'تم كتم دردشة مشاهد';
+      case 'chat_unmuted':
+        return 'تم إلغاء كتم دردشة مشاهد';
+      case 'viewer_banned':
+        return 'تم حظر مشاهد من البث';
+      case 'viewer_unbanned':
+        return 'تم إلغاء حظر مشاهد';
+      default:
+        return 'تحديث إشراف: $type';
     }
   }
 
@@ -989,34 +1015,50 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           ),
         );
       case LiveHudModerationEvent(:final type):
-        emit(current.copyWith(actionMessage: 'تعديل مشرف: $type'));
+        emit(current.copyWith(actionMessage: _moderationMessage(type)));
       case LiveHudViewersEvent(:final viewers):
         emit(
           current.copyWith(
             session: current.session.copyWith(viewerCount: viewers),
           ),
         );
-      case LiveHudLikeEvent(:final likeCount):
+      case LiveHudLikeEvent(:final likeCount, :final userId):
+        final isHostTap = userId != null && userId == current.session.host.id;
         emit(
           current.copyWith(
             session: current.session.copyWith(likeCount: likeCount),
+            floatingHeartBurst: isHostTap
+                ? current.floatingHeartBurst
+                : current.floatingHeartBurst + 1,
           ),
         );
       case LiveHudEndedEvent():
         add(const LiveRoomRemoteEnded());
-      case LiveHudGiftEvent(:final summaryText, :final totalEarnedCoins):
+      case LiveHudGiftEvent(
+          :final summaryText,
+          :final totalEarnedCoins,
+          :final senderName,
+          :final senderGifterLevel,
+        ):
         var session = current.session;
         if (totalEarnedCoins != null) {
           session = session.copyWith(totalEarnedCoins: totalEarnedCoins);
         }
-        final messages = summaryText == null || summaryText.isEmpty
+        final giftText = (summaryText != null && summaryText.isNotEmpty)
+            ? summaryText
+            : (senderName == null || senderName.isEmpty)
+                ? null
+                : '$senderName أرسل هدية';
+        final messages = giftText == null
             ? session.messages
             : [
                 ...session.messages,
                 LiveChatMessage(
                   id: 'gift-${DateTime.now().millisecondsSinceEpoch}',
-                  text: summaryText,
-                  showBadge: true,
+                  text: giftText,
+                  showBadge: (senderGifterLevel ?? 0) > 0,
+                  username: senderName,
+                  gifterLevel: senderGifterLevel,
                 ),
               ];
         emit(current.copyWith(session: session.copyWith(messages: messages)));

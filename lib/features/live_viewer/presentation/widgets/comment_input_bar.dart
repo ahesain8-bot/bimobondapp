@@ -6,12 +6,14 @@ class CommentInputBar extends StatefulWidget {
   final ValueChanged<String> onSend;
   final VoidCallback? onEmojiTap;
   final bool enabled;
+  final String hintText;
 
   const CommentInputBar({
     super.key,
     required this.onSend,
     this.onEmojiTap,
     this.enabled = true,
+    this.hintText = 'Write...',
   });
 
   @override
@@ -123,11 +125,11 @@ class _CommentInputBarState extends State<CommentInputBar> {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _submit(),
                   onTap: () => setState(() {}),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    hintText: 'Write...',
-                    hintStyle: TextStyle(
+                    hintText: widget.enabled ? widget.hintText : 'Chat muted',
+                    hintStyle: const TextStyle(
                       color: Color(0x8CFFFFFF),
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
