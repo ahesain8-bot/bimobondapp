@@ -1858,19 +1858,25 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     if (_isRecording || _isBusy || _isProcessingCapture) return;
     await LiveCountdownOverlay.run(context);
     if (!context.mounted) return;
-    if (_useNativeArFilters) {
-      await ArCameraBridge.stopCamera();
-    }
-    if (!context.mounted) return;
-    await context.push('/create-live');
-    // Back from the live room: bring the camera preview back up.
-    if (_useNativeArFilters && mounted) {
-      await ArCameraBridge.startCamera();
-      _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
-      if (_photoEditorMagicOn) {
-        ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+    try {
+      if (_useNativeArFilters) {
+        await ArCameraBridge.stopCamera();
       }
-      _syncRetouchToNative();
+      if (!context.mounted) return;
+      await context.push('/create-live');
+    } catch (_) {
+      // Rare handoff failure — never leave a frozen preview.
+    } finally {
+      // Back from the live room (or after a failed handoff): bring the camera
+      // preview back up with its filter / beauty settings.
+      if (_useNativeArFilters && mounted) {
+        await ArCameraBridge.startCamera();
+        _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
+        if (_photoEditorMagicOn) {
+          ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+        }
+        _syncRetouchToNative();
+      }
     }
   }
 

@@ -119,6 +119,12 @@ class PushNotificationService {
         'PushNotificationService: foreground message ${message.messageId}',
       );
     }
+    final type = message.data['type']?.toString();
+    final screen = message.data['screen']?.toString();
+    if (type == 'CALL_INCOMING' || screen == 'incoming_call') {
+      _handleNotificationOpen(message);
+      return;
+    }
     await showRemoteMessage(message);
   }
 
@@ -176,17 +182,15 @@ class PushNotificationService {
       final data = Map<String, dynamic>.from(raw);
       _navigateToNotification(
         NotificationEntity(
-          id: data['notificationId']?.toString() ?? '',
+          id: data['notificationId']?.toString() ?? data['callId']?.toString() ?? '',
           userId: data['userId']?.toString() ?? '',
-          type: data['type']?.toString() ?? 'SYSTEM',
+          type: data['type']?.toString() ?? (data['screen'] == 'incoming_call' ? 'CALL_INCOMING' : 'SYSTEM'),
           isRead: false,
           createdAt: DateTime.now(),
           actorId: data['actorId']?.toString(),
           postId: data['postId']?.toString(),
           commentId: data['commentId']?.toString(),
-          data: data['auctionId'] != null
-              ? {'auctionId': data['auctionId'].toString()}
-              : null,
+          data: data,
         ),
       );
     } catch (_) {

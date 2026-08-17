@@ -63,6 +63,33 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
       _scheduleActivate();
+    } else if (!widget.isActive && oldWidget.isActive) {
+      _deactivateIfThis();
+    }
+  }
+
+  @override
+  void dispose() {
+    _deactivateIfThis();
+    super.dispose();
+  }
+
+  void _deactivateIfThis() {
+    // Only teardown the session if the currently active live id matches this
+    // page (vertical swipe offscreen / page pop).
+    final notifier =
+        _safeProviderContainer?.read(activeLiveProvider.notifier);
+    if (notifier != null &&
+        notifier.activeLiveId == widget.live.id) {
+      notifier.deactivate();
+    }
+  }
+
+  ProviderContainer? get _safeProviderContainer {
+    try {
+      return ProviderScope.containerOf(context, listen: false);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -223,32 +250,40 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ui = ref.watch(activeLiveProvider);
-    final isThisRoom = ui.live?.id == widget.live.id;
-    final live = isThisRoom ? (ui.live ?? widget.live) : widget.live;
+    // ── Granular Riverpod selectors to prevent full rebuild storms ──────────────
+    // Every socket event (comment/like/gift) MUST NOT rebuild the video widget or
+    // the full page.  The root build only watches connectionState + active live id
+    // — it does NOT depend on comments, likes, gifts, pk scores, floating hearts.
+    // Each of those is wrapped in Consumer(s) further down, rebuilding in isolation.
+    final connectionState = ref.watch(activeLiveProvider.select((s) => s.connectionState));
+    final activeLiveId = ref.watch(activeLiveProvider.select((s) => s.live?.id));
+    final isThisRoom = activeLiveId == widget.live.id;
+    // To read the *full* `live` entity (contains host metadata never rebuilt on
+    // socket events), use a third selector that returns the LiveEntity itself —
+    // compared by identity so a newly-created copyWith() on the same live still
+    // triggers when needed but does not fire on comments/likes/gifts.
+    final liveForActive = ref.watch(
+      activeLiveProvider.select((s) => s.live),
+    );
+    final live = isThisRoom ? (liveForActive ?? widget.live) : widget.live;
     final connected = isThisRoom &&
-        (ui.connectionState == LiveConnectionState.connected ||
-            ui.connectionState == LiveConnectionState.reconnecting);
+        (connectionState == LiveConnectionState.connected ||
+            connectionState == LiveConnectionState.reconnecting);
     final isPk = live.metadata?['isPk'] == true;
     final isMultiGrid = live.metadata?['isMultiGrid'] == true;
     final isMultiGuest = live.metadata?['isMultiGuest'] == true;
     final showFanClub =
         !isPk && !isMultiGrid && live.metadata?['showFanClub'] != false;
-    // Multi-grid reference always shows the gift-goal card above the bar.
     final showGiftGoal = !isPk &&
         !_giftGoalDismissed &&
         (isMultiGrid || live.metadata?['showGiftGoal'] == true);
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     final guests = _guestsFrom(live);
     final shareCount = live.metadata?['shareCount'] as int? ?? 111;
-
-    // Bottom chrome — raised SafeArea(min 16) + padding 8 + row 42.
     final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
     final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
     final screenW = MediaQuery.sizeOf(context).width;
-    // PK: keep letterboxed aspect; center vertically with comments below.
     final pkVideoH = screenW / TikTokLiveTokens.pkVideoAspect;
-    // Top chrome height + black gap before media (matches reference marks).
     final chromeGap = isMultiGrid
         ? TikTokLiveTokens.multiGridChromeGap
         : TikTokLiveTokens.badgeGapBelow;
@@ -296,9 +331,16 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                             top: 0,
                             left: 0,
                             right: 0,
-                            child: PkBattleBar(
-                              scoreLeft: ui.pkScoreLeft,
-                              scoreRight: ui.pkScoreRight,
+                            child: Consumer(
+                              builder: (context, ref, _) {
+                                final (left, right) = ref.watch(
+                                  activeLiveProvider.select((s) => (s.pkScoreLeft, s.pkScoreRight)),
+                                );
+                                return PkBattleBar(
+                                  scoreLeft: left,
+                                  scoreRight: right,
+                                );
+                              },
                             ),
                           ),
                       ],
@@ -335,12 +377,19 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(10, 4, 54, 0),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return CommentsSection(
-                              comments: ui.comments,
-                              height: constraints.maxHeight,
-                              alignTop: false,
+                        child: Consumer(
+                          builder: (context, ref, _) {
+                            final comments = ref.watch(
+                              activeLiveProvider.select((s) => s.comments),
+                            );
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                return CommentsSection(
+                                  comments: comments,
+                                  height: constraints.maxHeight,
+                                  alignTop: false,
+                                );
+                              },
                             );
                           },
                         ),
@@ -370,12 +419,19 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(10, 2, 16, 0),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return CommentsSection(
-                              comments: ui.comments,
-                              height: constraints.maxHeight,
-                              alignTop: false,
+                        child: Consumer(
+                          builder: (context, ref, _) {
+                            final comments = ref.watch(
+                              activeLiveProvider.select((s) => s.comments),
+                            );
+                            return LayoutBuilder(
+                              builder: (context, constraints) {
+                                return CommentsSection(
+                                  comments: comments,
+                                  height: constraints.maxHeight,
+                                  alignTop: false,
+                                );
+                              },
                             );
                           },
                         ),
@@ -444,33 +500,38 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
             top: 0,
             left: 0,
             right: 0,
-            child: TikTokLiveTopBar(
-              live: live,
-              topViewerAvatars: isThisRoom
-                  ? ui.topViewerAvatars
-                  : const [
-                      'https://i.pravatar.cc/150?u=a',
-                      'https://i.pravatar.cc/150?u=b',
-                      'https://i.pravatar.cc/150?u=c',
-                    ],
-              onFollow: () {
-                if (widget.isActive) {
-                  ref.read(activeLiveProvider.notifier).toggleFollow();
-                }
+            child: Consumer(
+              builder: (context, ref, _) {
+                final avatars = isThisRoom
+                    ? ref.watch(activeLiveProvider.select((s) => s.topViewerAvatars))
+                    : const <String>[
+                        'https://i.pravatar.cc/150?u=a',
+                        'https://i.pravatar.cc/150?u=b',
+                        'https://i.pravatar.cc/150?u=c',
+                      ];
+                return TikTokLiveTopBar(
+                  live: live,
+                  topViewerAvatars: avatars,
+                  onFollow: () {
+                    if (widget.isActive) {
+                      ref.read(activeLiveProvider.notifier).toggleFollow();
+                    }
+                  },
+                  onClose: () {
+                    if (widget.onClose != null) {
+                      widget.onClose!();
+                    }
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
+                  onHourlyRankTap:
+                      widget.isActive ? () => _openRanking(live) : null,
+                  onLeagueTap: widget.isActive ? () => _openLeague(live) : null,
+                );
               },
-              onClose: () {
-                if (widget.onClose != null) {
-                  widget.onClose!();
-                }
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/');
-                }
-              },
-              onHourlyRankTap:
-                  widget.isActive ? () => _openRanking(live) : null,
-              onLeagueTap: widget.isActive ? () => _openLeague(live) : null,
             ),
           ),
 
@@ -543,9 +604,16 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
               left: TikTokLiveTokens.commentLeft,
               right: isMultiGuest ? 68 : 56,
               bottom: barTotalH + 8 + giftGoalH,
-              child: CommentsSection(
-                comments: ui.comments,
-                height: TikTokLiveTokens.commentFeedH,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final comments = ref.watch(
+                    activeLiveProvider.select((s) => s.comments),
+                  );
+                  return CommentsSection(
+                    comments: comments,
+                    height: TikTokLiveTokens.commentFeedH,
+                  );
+                },
               ),
             ),
 
@@ -571,16 +639,33 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
 
           // Floating gifts / hearts
           if (widget.isActive && isThisRoom) ...[
-            FloatingGiftsLayer(
-              recentGifts: ui.recentGifts,
-              activeGift: ui.activeGiftAnimation,
-              onAnimationComplete: () =>
-                  ref.read(activeLiveProvider.notifier).clearGiftAnimation(),
+            Consumer(
+              builder: (context, ref, _) {
+                final recent = ref.watch(
+                  activeLiveProvider.select((s) => s.recentGifts),
+                );
+                final active = ref.watch(
+                  activeLiveProvider.select((s) => s.activeGiftAnimation),
+                );
+                return FloatingGiftsLayer(
+                  recentGifts: recent,
+                  activeGift: active,
+                  onAnimationComplete: () =>
+                      ref.read(activeLiveProvider.notifier).clearGiftAnimation(),
+                );
+              },
             ),
-            FloatingHeartsOverlay(
-              burst: ui.floatingHeartBurst,
-              onConsumed: () =>
-                  ref.read(activeLiveProvider.notifier).consumeHeartBurst(),
+            Consumer(
+              builder: (context, ref, _) {
+                final burst = ref.watch(
+                  activeLiveProvider.select((s) => s.floatingHeartBurst),
+                );
+                return FloatingHeartsOverlay(
+                  burst: burst,
+                  onConsumed: () =>
+                      ref.read(activeLiveProvider.notifier).consumeHeartBurst(),
+                );
+              },
             ),
             ..._tapHearts,
           ],
@@ -590,53 +675,71 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: TikTokLiveBottomBar(
-              onTypeTap: () => setState(() => _showComposer = true),
-              onGiftTap: () => _openGifts(ui.session?.coinBalance ?? 1250),
-              onShareTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Share @${live.hostName}'),
-                    backgroundColor: AppColors.surface,
-                    behavior: SnackBarBehavior.floating,
-                  ),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final coinBalance = ref.watch(
+                  activeLiveProvider.select((s) => s.session?.coinBalance),
+                );
+                return TikTokLiveBottomBar(
+                  onTypeTap: () => setState(() => _showComposer = true),
+                  onGiftTap: () => _openGifts(coinBalance ?? 1250),
+                  onShareTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Share @${live.hostName}'),
+                        backgroundColor: AppColors.surface,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  onTreasureTap: (isPk || isMultiGrid)
+                      ? null
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Treasure chest'),
+                              backgroundColor: AppColors.surface,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                  onRoseTap: widget.isActive ? _sendRose : null,
+                  onMultiGuestTap: widget.isActive
+                      ? () => _openGuestRequest(live)
+                      : null,
+                  shareCount: shareCount,
+                  commentField: _showComposer
+                      ? CommentInputBar(
+                          enabled: connected,
+                          onSend: (text) {
+                            ref.read(activeLiveProvider.notifier).sendComment(text);
+                            setState(() => _showComposer = false);
+                          },
+                        )
+                      : null,
                 );
               },
-              onTreasureTap: (isPk || isMultiGrid)
-                  ? null
-                  : () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Treasure chest'),
-                          backgroundColor: AppColors.surface,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-              onRoseTap: widget.isActive ? _sendRose : null,
-              onMultiGuestTap: widget.isActive
-                  ? () => _openGuestRequest(live)
-                  : null,
-              shareCount: shareCount,
-              commentField: _showComposer
-                  ? CommentInputBar(
-                      enabled: connected,
-                      onSend: (text) {
-                        ref.read(activeLiveProvider.notifier).sendComment(text);
-                        setState(() => _showComposer = false);
-                      },
-                    )
-                  : null,
             ),
           ),
 
           if (widget.isActive && isThisRoom)
-            LiveStateOverlay(
-              state: ui.connectionState,
-              message: ui.session?.errorMessage,
-              reconnectAttempt: ui.session?.reconnectAttempt ?? 0,
-              onRetry: () => ref.read(activeLiveProvider.notifier).retry(),
-              onLeave: widget.onClose,
+            Consumer(
+              builder: (context, ref, _) {
+                final conn = ref.watch(
+                  activeLiveProvider.select((s) => s.connectionState),
+                );
+                final sess = ref.watch(
+                  activeLiveProvider.select((s) => s.session),
+                );
+                return LiveStateOverlay(
+                  state: conn,
+                  message: sess?.errorMessage,
+                  reconnectAttempt: sess?.reconnectAttempt ?? 0,
+                  onRetry: () =>
+                      ref.read(activeLiveProvider.notifier).retry(),
+                  onLeave: widget.onClose,
+                );
+              },
             ),
         ],
       ),

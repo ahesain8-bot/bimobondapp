@@ -17,6 +17,11 @@ import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/app/calls/domain/entities/call_entity.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_state.dart';
+import 'package:bimobondapp/app/calls/presentation/widgets/active_call_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -63,6 +68,11 @@ class _ChatViewState extends State<ChatView> {
   void initState() {
     super.initState();
     _messageController.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CallBloc>().socketService.joinChat(widget.chatId);
+      context.read<CallBloc>().add(CheckActiveCallEvent(chatId: widget.chatId));
+    });
     if (widget.openCamera) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _didRequestCamera) return;
@@ -74,6 +84,7 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   void dispose() {
+    context.read<CallBloc>().socketService.leaveChat(widget.chatId);
     ChatVoicePlayback.instance.stop();
     _voiceRecorder.dispose();
     _messageController.dispose();
@@ -454,6 +465,14 @@ class _ChatViewState extends State<ChatView> {
                   : 'User');
         final currentUserImageUrl = currentUser?.avatarUrl?.trim() ?? '';
 
+        final callState = context.watch<CallBloc>().state;
+        CallEntity? activeCall;
+        if (callState is CallActiveState && callState.call.chatId == widget.chatId) {
+          activeCall = callState.call;
+        } else if (callState is CallOutgoingRingingState && callState.call.chatId == widget.chatId) {
+          activeCall = callState.call;
+        }
+
         return Scaffold(
           backgroundColor: chatTheme.chatBackgroundColor,
           appBar: ChatAppBar(
@@ -464,6 +483,30 @@ class _ChatViewState extends State<ChatView> {
             lastSeenAt: widget.lastSeenAt,
             lastSeenText: widget.lastSeenText,
             onProfileTap: _onPeerHeaderTap,
+            onAudioCallTap: () {
+              final invitees = widget.peerUserId != null && widget.peerUserId!.isNotEmpty
+                  ? [widget.peerUserId!]
+                  : null;
+              context.read<CallBloc>().add(
+                    StartCallEvent(
+                      chatId: widget.chatId,
+                      type: 'AUDIO',
+                      inviteeIds: invitees,
+                    ),
+                  );
+            },
+            onVideoCallTap: () {
+              final invitees = widget.peerUserId != null && widget.peerUserId!.isNotEmpty
+                  ? [widget.peerUserId!]
+                  : null;
+              context.read<CallBloc>().add(
+                    StartCallEvent(
+                      chatId: widget.chatId,
+                      type: 'VIDEO',
+                      inviteeIds: invitees,
+                    ),
+                  );
+            },
           ),
 
           body: Stack(
@@ -472,6 +515,8 @@ class _ChatViewState extends State<ChatView> {
                 backgroundColor: chatTheme.chatBackgroundColor,
                 child: Column(
                   children: [
+                    if (activeCall != null)
+                      ActiveCallBanner(call: activeCall),
                     Expanded(
                       child: isLoading && messages.isEmpty
                           ? const ChatMessageListSkeleton()

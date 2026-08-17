@@ -64,7 +64,10 @@ class RealLiveKitService implements LiveKitService {
     try {
       final room = Room(
         roomOptions: const RoomOptions(
-          adaptiveStream: false,
+          // Let LiveKit select the highest layer that the current viewport and
+          // network can sustain. Disabling this left viewers on the publisher's
+          // initial/default layer and made quality unnecessarily low or unstable.
+          adaptiveStream: true,
           dynacast: false,
           defaultVideoPublishOptions: VideoPublishOptions(
             backupVideoCodec: BackupVideoCodec(enabled: false),
@@ -93,6 +96,23 @@ class RealLiveKitService implements LiveKitService {
       _room = room;
 
       // Viewer: subscribe only — no local publish.
+      // Request the MEDIUM quality layer first. adaptiveStream=true (set in
+      // RoomOptions above) will allow the SFU to further adjust the quality
+      // up or down based on viewport + network.  Requesting MEDIUM avoids
+      // stuck-on-LOW while still giving the SFU headroom to step up to HIGH
+      // when supported.
+      Future<void>.delayed(const Duration(milliseconds: 400), () async {
+        try {
+          for (final participant in room.remoteParticipants.values) {
+            for (final pub in participant.videoTrackPublications) {
+              if (pub.subscribed) {
+                await pub.setVideoQuality(VideoQuality.MEDIUM);
+              }
+            }
+          }
+        } catch (_) {}
+      });
+
       _streamUrl = mockStreamUrl;
       _setState(LiveKitConnectionState.connected);
     } catch (e, st) {

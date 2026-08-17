@@ -42,12 +42,22 @@ class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       LiveScreenWakelock.enable();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      // App sent to background: ALWAYS tear down the active live session so
+      // audio/video/socket/LiveKit never keep running when the user isn't
+      // viewing.
+      ref.read(activeLiveProvider.notifier).deactivate();
+      LiveScreenWakelock.disable();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Deactivate current live BEFORE disposing the controller so we don't
+    // leave a dangling LiveKit connection + socket on viewer exit.
+    ref.read(activeLiveProvider.notifier).deactivate();
     _pageController.dispose();
     LiveScreenWakelock.disable();
     super.dispose();
@@ -64,7 +74,16 @@ class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
         ref.read(liveFeedProvider.notifier).loadMore();
       }
       if (index < lives.length) {
-        ref.read(activeLiveProvider.notifier).activate(lives[index]);
+        // Swapping to a different live in vertical feed: tear down the
+        // PREVIOUS active live FIRST so only one peer connection + socket
+        // + renderer exists at a time (prevents audio + video leaks).
+        final notifier = ref.read(activeLiveProvider.notifier);
+        final current = lives[index];
+        if (notifier.activeLiveId != null &&
+            notifier.activeLiveId != current.id) {
+          notifier.deactivate();
+        }
+        notifier.activate(current);
       }
     });
   }
@@ -87,15 +106,17 @@ class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       body: _buildBody(feed),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/create-live'),
-        backgroundColor: const Color(0xFFEF4B5B),
-        icon: const Icon(Icons.videocam, color: Colors.white),
-        label: const Text(
-          'إنشاء بث',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
+      // TEMPORARILY DISABLED — Create Live FAB (إنشاء بث)
+      // Restore by uncommenting the block below:
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: () => context.push('/create-live'),
+      //   backgroundColor: const Color(0xFFEF4B5B),
+      //   icon: const Icon(Icons.videocam, color: Colors.white),
+      //   label: const Text(
+      //     'إنشاء بث',
+      //     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      //   ),
+      // ),
     );
   }
 

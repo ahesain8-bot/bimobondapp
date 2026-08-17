@@ -15,6 +15,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.username,
     required this.imageUrl,
     required this.onProfileTap,
+    this.onAudioCallTap,
+    this.onVideoCallTap,
     this.userId,
     this.isPeerActive = false,
     this.lastSeenAt,
@@ -25,6 +27,8 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String username;
   final String imageUrl;
   final VoidCallback onProfileTap;
+  final VoidCallback? onAudioCallTap;
+  final VoidCallback? onVideoCallTap;
   final String? userId;
   final bool isPeerActive;
   final String? lastSeenAt;
@@ -168,6 +172,22 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
 
+                    IconButton(
+                      icon: Icon(
+                        LucideIcons.phone,
+                        color: onSurface,
+                        size: ChatLayoutConstants.appBarActionIconSize,
+                      ),
+                      onPressed: onAudioCallTap,
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        LucideIcons.video,
+                        color: onSurface,
+                        size: ChatLayoutConstants.appBarActionIconSize,
+                      ),
+                      onPressed: onVideoCallTap,
+                    ),
                     IconButton(
                       icon: Icon(
                         LucideIcons.flag,
