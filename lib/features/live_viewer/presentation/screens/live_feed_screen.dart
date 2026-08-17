@@ -78,25 +78,21 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
   void _onPageChanged(int index) {
     setState(() => _currentIndex = index);
 
-    // Defer provider writes until after this frame finishes building.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final lives = ref.read(liveFeedProvider).lives;
-      if (index >= lives.length - 2) {
+      final feed = ref.read(liveFeedProvider);
+      final lives = feed.lives;
+      if (index >= lives.length - 2 && feed.hasMore) {
         ref.read(liveFeedProvider.notifier).loadMore();
       }
-      if (index < lives.length) {
-        // Swapping to a different live in vertical feed: tear down the
-        // PREVIOUS active live FIRST so only one peer connection + socket
-        // + renderer exists at a time (prevents audio + video leaks).
-        final notifier = ref.read(activeLiveProvider.notifier);
-        final current = lives[index];
-        if (notifier.activeLiveId != null &&
-            notifier.activeLiveId != current.id) {
-          notifier.deactivate();
-        }
-        notifier.activate(current);
+      if (index >= lives.length) return;
+      final notifier = ref.read(activeLiveProvider.notifier);
+      final current = lives[index];
+      if (notifier.activeLiveId != null &&
+          notifier.activeLiveId != current.id) {
+        notifier.deactivate();
       }
+      notifier.activate(current);
     });
   }
 
@@ -147,34 +143,41 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
 
     return Stack(
       children: [
-        PageView.builder(
-          controller: _pageController,
-          scrollDirection: Axis.vertical,
-          allowImplicitScrolling: false,
-          physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
-          itemCount: feed.lives.length + (feed.hasMore ? 1 : 0),
-          onPageChanged: _onPageChanged,
-          itemBuilder: (context, index) {
-            if (index >= feed.lives.length) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
+        RefreshIndicator(
+          color: AppColors.primary,
+          backgroundColor: Colors.black,
+          onRefresh: _refresh,
+          displacement: 60,
+          strokeWidth: 2.5,
+          child: PageView.builder(
+            controller: _pageController,
+            scrollDirection: Axis.vertical,
+            allowImplicitScrolling: false,
+            physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
+            itemCount: feed.lives.length + (feed.hasMore ? 1 : 0),
+            onPageChanged: _onPageChanged,
+            itemBuilder: (context, index) {
+              if (index >= feed.lives.length) {
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                );
+              }
+              final live = feed.lives[index];
+              return LiveRoomPage(
+                key: ValueKey(live.id),
+                live: live,
+                isActive: index == _currentIndex,
+                onClose: () {
+                  if (_currentIndex + 1 < feed.lives.length) {
+                    _pageController.nextPage(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                },
               );
-            }
-            final live = feed.lives[index];
-            return LiveRoomPage(
-              key: ValueKey(live.id),
-              live: live,
-              isActive: index == _currentIndex,
-              onClose: () {
-                if (_currentIndex + 1 < feed.lives.length) {
-                  _pageController.nextPage(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                  );
-                }
-              },
-            );
-          },
+            },
+          ),
         ),
         if (_currentIndex == 0)
           Positioned(
@@ -223,15 +226,29 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAuth = error is AuthorizationFailure || error is AuthenticationFailure;
+    final isNetwork = error is NetworkFailure;
+    final icon = isNetwork
+        ? Icons.wifi_off_outlined
+        : isAuth
+            ? Icons.lock_outline
+            : Icons.error_outline;
+    final title = isNetwork
+        ? 'Can\u2019t connect'
+        : isAuth
+            ? 'Please sign in'
+            : 'Couldn\u2019t load LIVE';
+    final cta = isAuth ? 'Sign in' : 'Retry';
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 56),
+            Icon(icon, color: AppColors.error, size: 56),
             const SizedBox(height: 12),
-            Text('Couldn\'t load LIVE', style: AppTextStyles.titleMedium),
+            Text(title, style: AppTextStyles.titleMedium),
             const SizedBox(height: 8),
             Text(
               error.message,
@@ -241,7 +258,7 @@ class _ErrorView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            ElevatedButton(onPressed: onRetry, child: Text(cta)),
           ],
         ),
       ),

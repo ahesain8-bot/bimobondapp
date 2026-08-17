@@ -251,21 +251,63 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
   @override
   Widget build(BuildContext context) {
     // ── Granular Riverpod selectors to prevent full rebuild storms ──────────────
-    // Every socket event (comment/like/gift) MUST NOT rebuild the video widget or
-    // the full page.  The root build only watches connectionState + active live id
-    // — it does NOT depend on comments, likes, gifts, pk scores, floating hearts.
-    // Each of those is wrapped in Consumer(s) further down, rebuilding in isolation.
+    // Every socket event (comment/like/gift/viewerCount) MUST NOT rebuild the
+    // video widget or the full page.  The root build watches ONLY stable fields
+    // that NEVER change after a room is joined (identity, host info, title,
+    // metadata).  Frequently-updated numeric counters (viewerCount, likeCount,
+    // coinBalance) are watched only inside their dedicated Consumer(s).
     final connectionState = ref.watch(activeLiveProvider.select((s) => s.connectionState));
     final activeLiveId = ref.watch(activeLiveProvider.select((s) => s.live?.id));
     final isThisRoom = activeLiveId == widget.live.id;
-    // To read the *full* `live` entity (contains host metadata never rebuilt on
-    // socket events), use a third selector that returns the LiveEntity itself —
-    // compared by identity so a newly-created copyWith() on the same live still
-    // triggers when needed but does not fire on comments/likes/gifts.
-    final liveForActive = ref.watch(
-      activeLiveProvider.select((s) => s.live),
-    );
-    final live = isThisRoom ? (liveForActive ?? widget.live) : widget.live;
+    // Tuple of LIVE-STABLE fields only (no viewer/like counters that change on
+    // every socket broadcast).  Because tuple uses identical()/== and these
+    // fields are immutable for the room lifetime, the root build() only fires
+    // once per live, regardless of viewer/like/comment socket traffic.
+    final stableInfo = ref.watch(activeLiveProvider.select((s) {
+      final l = s.live;
+      if (l == null) return null;
+      return (
+        l.id,
+        l.hostId,
+        l.hostName,
+        l.hostAvatar,
+        l.title,
+        l.description,
+        l.thumbnailUrl,
+        l.streamUrl,
+        l.category,
+        l.status,
+        l.startTime,
+        l.endTime,
+        l.isLive,
+        l.isFollowing,
+        l.metadata,
+      );
+    }));
+    LiveEntity live;
+    if (isThisRoom && stableInfo != null) {
+      live = LiveEntity(
+        id: stableInfo.$1,
+        hostId: stableInfo.$2,
+        hostName: stableInfo.$3,
+        hostAvatar: stableInfo.$4,
+        title: stableInfo.$5,
+        description: stableInfo.$6,
+        thumbnailUrl: stableInfo.$7,
+        streamUrl: stableInfo.$8,
+        category: stableInfo.$9,
+        status: stableInfo.$10,
+        startTime: stableInfo.$11,
+        endTime: stableInfo.$12,
+        isLive: stableInfo.$13,
+        isFollowing: stableInfo.$14,
+        metadata: stableInfo.$15,
+        viewerCount: 0, // never used at root; overridden in consumers below
+        likeCount: 0, // never used at root; overridden in consumers below
+      );
+    } else {
+      live = widget.live;
+    }
     final connected = isThisRoom &&
         (connectionState == LiveConnectionState.connected ||
             connectionState == LiveConnectionState.reconnecting);
@@ -279,7 +321,6 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
         (isMultiGrid || live.metadata?['showGiftGoal'] == true);
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     final guests = _guestsFrom(live);
-    final shareCount = live.metadata?['shareCount'] as int? ?? 111;
     final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
     final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
     final screenW = MediaQuery.sizeOf(context).width;
@@ -523,7 +564,9 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
             ),
           ),
 
-          // Top chrome
+          // Top chrome — pulls viewerCount + likeCount via its OWN selectors
+          // so numeric-counter socket broadcasts rebuild ONLY this widget,
+          // never the LiveVideoPlayer or the page scaffold.
           Positioned(
             top: 0,
             left: 0,
@@ -537,8 +580,23 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                         'https://i.pravatar.cc/150?u=b',
                         'https://i.pravatar.cc/150?u=c',
                       ];
+                final counts = isThisRoom
+                    ? ref.watch(activeLiveProvider.select((s) {
+                        final l = s.live;
+                        return (viewer: l?.viewerCount ?? 0, like: l?.likeCount ?? 0, following: l?.isFollowing ?? false);
+                      }))
+                    : (
+                        viewer: widget.live.viewerCount,
+                        like: widget.live.likeCount,
+                        following: widget.live.isFollowing,
+                      );
+                final liveForTop = live.copyWith(
+                  viewerCount: counts.viewer,
+                  likeCount: counts.like,
+                  isFollowing: counts.following,
+                );
                 return TikTokLiveTopBar(
-                  live: live,
+                  live: liveForTop,
                   topViewerAvatars: avatars,
                   onFollow: () {
                     if (widget.isActive) {
@@ -680,17 +738,33 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
               left: 10,
               right: 10,
               bottom: barTotalH + 6,
-              child: GiftGoalCard(
-                title: 'Help ${live.hostName} reach the gift goal!',
-                current: live.metadata?['giftGoalCurrent'] as int? ?? 7,
-                target: live.metadata?['giftGoalTarget'] as int? ?? 8,
-                onSend: () {
-                  final rose = MockGiftCatalog.byId('gift_rose');
-                  if (rose != null) {
-                    ref.read(activeLiveProvider.notifier).sendGift(rose);
-                  }
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final goal = isThisRoom
+                      ? ref.watch(activeLiveProvider.select((s) {
+                          final m = s.live?.metadata;
+                          return (
+                            current: m?['giftGoalCurrent'] as int? ?? 0,
+                            target: m?['giftGoalTarget'] as int? ?? 0,
+                          );
+                        }))
+                      : (
+                          current: live.metadata?['giftGoalCurrent'] as int? ?? 7,
+                          target: live.metadata?['giftGoalTarget'] as int? ?? 8,
+                        );
+                  return GiftGoalCard(
+                    title: 'Help ${live.hostName} reach the gift goal!',
+                    current: goal.current,
+                    target: goal.target,
+                    onSend: () {
+                      final rose = MockGiftCatalog.byId('gift_rose');
+                      if (rose != null) {
+                        ref.read(activeLiveProvider.notifier).sendGift(rose);
+                      }
+                    },
+                    onClose: () => setState(() => _giftGoalDismissed = true),
+                  );
                 },
-                onClose: () => setState(() => _giftGoalDismissed = true),
               ),
             ),
 
@@ -762,19 +836,31 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
               },
             ),
 
-          // Bottom action bar — raised to match reference
+          // Bottom action bar — raised to match reference.
+          // Coin balance + shareCount pulled here through their OWN selectors
+          // so they never cause a video renderer rebuild.
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: Consumer(
               builder: (context, ref, _) {
-                final coinBalance = ref.watch(
-                  activeLiveProvider.select((s) => s.session?.coinBalance),
-                );
-                final chatMuted = ref.watch(
-                  activeLiveProvider.select((s) => s.chatMuted),
-                );
+                final coinBalance = isThisRoom
+                    ? ref.watch(
+                        activeLiveProvider.select((s) => s.session?.coinBalance),
+                      )
+                    : null;
+                final chatMuted = isThisRoom
+                    ? ref.watch(
+                        activeLiveProvider.select((s) => s.chatMuted),
+                      )
+                    : false;
+                final shareCount = isThisRoom
+                    ? ref.watch(activeLiveProvider.select((s) {
+                        final m = s.live?.metadata;
+                        return m?['shareCount'] as int? ?? 111;
+                      }))
+                    : (live.metadata?['shareCount'] as int? ?? 111);
                 return TikTokLiveBottomBar(
                   onTypeTap: () {
                     if (chatMuted) {
