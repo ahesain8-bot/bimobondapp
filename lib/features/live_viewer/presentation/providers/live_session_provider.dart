@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -163,6 +164,53 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
         );
       }, (result) async {
         final socket = _ref.read(socketServiceProvider);
+
+        // ============================================================
+        // [DEBUG-QOS JWT] Non-cryptographic token claim check.
+        // Decodes ONLY the Base64 payload of the viewer JWT to prove
+        // the backend isn't embedding a max-quality / max-bitrate
+        // restriction that overrides our client-side simulcast
+        // settings.  NEVER prints the full token or verifies a
+        // signature — only dumps public claims.
+        // ============================================================
+        try {
+          final tok = result.liveKitToken;
+          final parts = tok.split('.');
+          if (parts.length >= 2) {
+            // JWT payload is parts[1], URL-safe base64.
+            String payload = parts[1];
+            // Add padding if missing.
+            while (payload.length % 4 != 0) {
+              payload += '=';
+            }
+            final bytes = base64Url.decode(payload);
+            final Map<String, dynamic> claims =
+                jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+            final subClaims = Map<String, dynamic>.of(claims);
+            // Remove sensitive fields if present (never in viewer LiveKit JWT,
+            // but be defensive).
+            subClaims.remove('secret');
+            subClaims.remove('apiKey');
+            subClaims.remove('apiSecret');
+            subClaims.remove('privateKey');
+            debugPrint(
+              '[DEBUG-QOS] JWT-CLAIMS (viewer token, public only):'
+              '  exp=${subClaims['exp']}'
+              '  room=${subClaims['room'] ?? subClaims['roomName']}'
+              '  identity=${subClaims['identity']}'
+              '  canPublish=${subClaims['canPublish']}'
+              '  canSubscribe=${subClaims['canSubscribe']}'
+              '  canPublishData=${subClaims['canPublishData']}'
+              '  hiddenClaims=${subClaims['hidden']}'
+              '  maxVideoBitrate=${subClaims['maxVideoBitrate']}'
+              '  maxQuality=${subClaims['maxQuality'] ?? subClaims['video_max_quality']}'
+              '  otherKeys=${subClaims.keys.where((k) => !const <String>{'exp','room','roomName','identity','canPublish','canSubscribe','canPublishData','hidden','maxVideoBitrate','maxQuality','video_max_quality','nbf','iat','iss','jti','sub'}.contains(k)).join(',')}'
+              '  allClaimKeysSorted=${(subClaims.keys.toList()..sort()).join(',')}',
+            );
+          }
+        } catch (e) {
+          debugPrint('[DEBUG-QOS] JWT-CLAIMS (decode failed): $e');
+        }
 
         final liveKit = _ref.read(liveKitServiceProvider);
         try {
