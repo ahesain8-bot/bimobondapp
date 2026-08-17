@@ -135,11 +135,16 @@ class LivesSocketDataSource {
 
     socket.on('liveGift', (data) {
       final map = _asMap(data);
+      final sender = _asMap(map?['sender']) ?? _asMap(map?['user']);
       _controller.add(
         LiveHudGiftEvent(
           summaryText: map?['message']?.toString() ??
               map?['summary']?.toString(),
           totalEarnedCoins: _asInt(map?['totalEarnedCoins']),
+          senderName: sender?['username']?.toString() ??
+              sender?['fullName']?.toString() ??
+              map?['senderName']?.toString(),
+          senderGifterLevel: _asInt(sender?['gifterLevel']),
         ),
       );
     });

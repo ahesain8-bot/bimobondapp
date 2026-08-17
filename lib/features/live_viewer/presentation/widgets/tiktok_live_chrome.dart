@@ -567,8 +567,8 @@ class PkBattleBar extends StatelessWidget {
   }
 }
 
-/// Bottom bar matching screenshots:
-/// [treasure?][emoji][Write...][share↓count][gift][rose][multi-guest]
+/// TikTok LIVE viewer bottom bar (LTR):
+/// [treasure?] [Write...] [emoji] [share↓count] [gift] [rose] [multi-guest]
 class TikTokLiveBottomBar extends StatelessWidget {
   final VoidCallback onTypeTap;
   final VoidCallback onGiftTap;
@@ -616,20 +616,6 @@ class TikTokLiveBottomBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              GestureDetector(
-                onTap: onEmojiTap ?? onTypeTap,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.emoji_emotions_outlined,
-                      color: Color(0xD9FFFFFF), size: 22),
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: commentField ??
                     GestureDetector(
@@ -653,6 +639,20 @@ class TikTokLiveBottomBar extends StatelessWidget {
                         ),
                       ),
                     ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onEmojiTap ?? onTypeTap,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.emoji_emotions_outlined,
+                      color: Color(0xD9FFFFFF), size: 22),
+                ),
               ),
               const SizedBox(width: 10),
               GestureDetector(

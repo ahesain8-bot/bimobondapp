@@ -12,6 +12,9 @@ class CommentEntity extends Equatable {
   final String? replyToUsername;
   final List<String>? mentions;
   final Map<String, dynamic>? metadata;
+  final int? gifterLevel;
+  final bool isVerified;
+  final bool isPinned;
 
   const CommentEntity({
     required this.id,
@@ -25,6 +28,9 @@ class CommentEntity extends Equatable {
     this.replyToUsername,
     this.mentions,
     this.metadata,
+    this.gifterLevel,
+    this.isVerified = false,
+    this.isPinned = false,
   });
 
   CommentEntity copyWith({
@@ -39,6 +45,9 @@ class CommentEntity extends Equatable {
     String? replyToUsername,
     List<String>? mentions,
     Map<String, dynamic>? metadata,
+    int? gifterLevel,
+    bool? isVerified,
+    bool? isPinned,
   }) {
     return CommentEntity(
       id: id ?? this.id,
@@ -52,6 +61,9 @@ class CommentEntity extends Equatable {
       replyToUsername: replyToUsername ?? this.replyToUsername,
       mentions: mentions ?? this.mentions,
       metadata: metadata ?? this.metadata,
+      gifterLevel: gifterLevel ?? this.gifterLevel,
+      isVerified: isVerified ?? this.isVerified,
+      isPinned: isPinned ?? this.isPinned,
     );
   }
 
@@ -68,6 +80,9 @@ class CommentEntity extends Equatable {
         replyToUsername,
         mentions,
         metadata,
+        gifterLevel,
+        isVerified,
+        isPinned,
       ];
 }
 

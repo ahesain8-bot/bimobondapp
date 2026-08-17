@@ -18,8 +18,9 @@ import 'fake_socket_service.dart' show SocketService;
 ///                    extraHeaders: { Authorization: Bearer <token> } })
 /// ```
 /// Client → server: `joinLive { liveId }` / `leaveLive { liveId }`.
-/// Server → client (`live_{id}`): liveComment, liveGift, liveLike,
-/// liveViewers, liveEnded, userJoined + reconnect lifecycle events.
+/// Server → client (`live_{id}`): liveComment, liveCommentDeleted,
+/// liveCommentPinned, liveCommentUnpinned, liveModeration, liveGift,
+/// liveLike, liveViewers, liveEnded, userJoined + reconnect lifecycle.
 class RealSocketService implements SocketService {
   RealSocketService({Future<String?> Function()? idTokenProvider})
       : _idTokenProvider = idTokenProvider ?? _defaultTokenProvider;
@@ -124,6 +125,26 @@ class RealSocketService implements SocketService {
 
     socket.on('liveComment', (data) {
       final event = SocketMapper.commentEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    socket.on('liveCommentDeleted', (data) {
+      final event = SocketMapper.commentDeletedEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    socket.on('liveCommentPinned', (data) {
+      final event = SocketMapper.commentPinnedEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    socket.on('liveCommentUnpinned', (data) {
+      final event = SocketMapper.commentUnpinnedEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    socket.on('liveModeration', (data) {
+      final event = SocketMapper.moderationEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 

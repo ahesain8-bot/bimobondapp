@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/api_endpoints.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/live_entity.dart';
@@ -23,6 +24,10 @@ class LiveSessionUiState {
   final List<String> topViewerAvatars;
   final int pkScoreLeft;
   final int pkScoreRight;
+  final CommentEntity? pinnedComment;
+  final bool chatMuted;
+  final String? moderationBanner;
+  final String? currentUserId;
 
   const LiveSessionUiState({
     this.session,
@@ -35,6 +40,10 @@ class LiveSessionUiState {
     this.topViewerAvatars = const [],
     this.pkScoreLeft = 0,
     this.pkScoreRight = 0,
+    this.pinnedComment,
+    this.chatMuted = false,
+    this.moderationBanner,
+    this.currentUserId,
   });
 
   LiveConnectionState get connectionState =>
@@ -56,6 +65,12 @@ class LiveSessionUiState {
     List<String>? topViewerAvatars,
     int? pkScoreLeft,
     int? pkScoreRight,
+    CommentEntity? pinnedComment,
+    bool clearPinnedComment = false,
+    bool? chatMuted,
+    String? moderationBanner,
+    bool clearModerationBanner = false,
+    String? currentUserId,
   }) {
     return LiveSessionUiState(
       session: session ?? this.session,
@@ -70,6 +85,14 @@ class LiveSessionUiState {
       topViewerAvatars: topViewerAvatars ?? this.topViewerAvatars,
       pkScoreLeft: pkScoreLeft ?? this.pkScoreLeft,
       pkScoreRight: pkScoreRight ?? this.pkScoreRight,
+      pinnedComment: clearPinnedComment
+          ? null
+          : (pinnedComment ?? this.pinnedComment),
+      chatMuted: chatMuted ?? this.chatMuted,
+      moderationBanner: clearModerationBanner
+          ? null
+          : (moderationBanner ?? this.moderationBanner),
+      currentUserId: currentUserId ?? this.currentUserId,
     );
   }
 }
@@ -82,6 +105,7 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
   bool _busy = false;
   bool _disposed = false;
   LiveEntity? _pendingActivate;
+  String? _currentUserId;
 
   ActiveLiveNotifier(this._ref) : super(const LiveSessionUiState());
 
@@ -126,6 +150,7 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
             ? (live.metadata?['scoreRight'] as int? ??
                 1000 + random.nextInt(3000))
             : 0,
+        currentUserId: _currentUserId,
       );
 
       if (live.status == LiveStatus.ended) {
@@ -212,21 +237,29 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
         final commentsFuture = _ref
             .read(commentRepositoryProvider)
             .getComments(liveId: live.id, limit: 20);
+        final meFuture = _loadCurrentUserId();
 
         try {
           final results = await Future.wait<dynamic>([
             socketFuture,
             coinsFuture,
             commentsFuture,
+            meFuture,
           ]);
           if (_activeLiveId != live.id) return;
 
           final coins = results[1];
           final commentsResult = results[2];
+          _currentUserId = results[3] as String? ?? _currentUserId;
           final comments = commentsResult.fold(
             (_) => <CommentEntity>[],
             (batch) => batch.comments.reversed.toList(),
-          );
+          ) as List<CommentEntity>;
+          CommentEntity? pinned;
+          for (final c in comments) {
+            if (c.isPinned) pinned = c;
+          }
+          pinned ??= _pinnedFromLiveMetadata(result.live);
           _listenSocket(live.id);
           state = state.copyWith(
             session: state.session!.copyWith(
@@ -234,6 +267,8 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
               coinBalance: coins.getOrElse(() => 1250),
             ),
             comments: comments,
+            pinnedComment: pinned,
+            currentUserId: _currentUserId,
           );
         } catch (_) {
           // A slow/failing overlay service must not take down an already
@@ -273,7 +308,34 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
       final next = [...state.comments, event.comment];
       state = state.copyWith(
         comments: next.length > 80 ? next.sublist(next.length - 80) : next,
+        pinnedComment: event.comment.isPinned
+            ? event.comment
+            : state.pinnedComment,
       );
+    } else if (event is LiveCommentDeletedEvent) {
+      state = state.copyWith(
+        comments: state.comments.where((c) => c.id != event.commentId).toList(),
+        clearPinnedComment: state.pinnedComment?.id == event.commentId,
+      );
+    } else if (event is LiveCommentPinnedEvent) {
+      final pinned = event.comment.copyWith(isPinned: true);
+      state = state.copyWith(
+        comments: [
+          for (final c in state.comments)
+            c.id == pinned.id ? pinned : c.copyWith(isPinned: false),
+        ],
+        pinnedComment: pinned,
+      );
+    } else if (event is LiveCommentUnpinnedEvent) {
+      state = state.copyWith(
+        comments: [
+          for (final c in state.comments)
+            c.id == event.commentId ? c.copyWith(isPinned: false) : c,
+        ],
+        clearPinnedComment: true,
+      );
+    } else if (event is LiveModerationEvent) {
+      _onModeration(event);
     } else if (event is UserJoinedEvent) {
       final joinNotice = CommentEntity(
         id: 'join_${event.timestamp.microsecondsSinceEpoch}',
@@ -287,7 +349,7 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
       );
       state = state.copyWith(comments: [...state.comments, joinNotice]);
     } else if (event is LiveLikeEvent) {
-      final isSelf = event.userId == 'current_user';
+      final isSelf = _isMe(event.userId);
       state = state.copyWith(
         session: session.copyWith(
           live: session.live.copyWith(likeCount: event.likeCount),
@@ -320,6 +382,7 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
         userAvatar: event.gift.senderAvatar,
         content: event.gift.giftDetails?.name ?? 'a gift',
         createdAt: event.gift.sentAt,
+        gifterLevel: event.gift.senderGifterLevel,
         metadata: const {'type': 'gift'},
       );
       final nextComments = [...state.comments, giftNotice];
@@ -368,13 +431,35 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
   Future<void> sendComment(String content) async {
     final id = _activeLiveId;
     if (id == null || content.trim().isEmpty) return;
+    if (state.chatMuted) {
+      state = state.copyWith(
+        moderationBanner: 'Your chat is muted on this live',
+      );
+      _scheduleBannerClear();
+      return;
+    }
     final result = await _ref.read(commentRepositoryProvider).sendComment(
           liveId: id,
           content: content.trim(),
         );
-    result.fold((_) {}, (comment) {
+    result.fold((failure) {
+      final muted = failure.message.toLowerCase().contains('mute');
+      state = state.copyWith(
+        chatMuted: muted || state.chatMuted,
+        moderationBanner: muted
+            ? 'Your chat is muted on this live'
+            : failure.message,
+      );
+      _scheduleBannerClear();
+    }, (comment) {
+      if (comment.userId.isNotEmpty) {
+        _currentUserId ??= comment.userId;
+      }
       if (!state.comments.any((c) => c.id == comment.id)) {
-        state = state.copyWith(comments: [...state.comments, comment]);
+        state = state.copyWith(
+          comments: [...state.comments, comment],
+          currentUserId: _currentUserId,
+        );
       }
     });
   }
@@ -398,6 +483,133 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
     if (state.floatingHeartBurst > 0) {
       state = state.copyWith(floatingHeartBurst: 0);
     }
+  }
+
+  void consumeModerationBanner() {
+    if (state.moderationBanner != null) {
+      state = state.copyWith(clearModerationBanner: true);
+    }
+  }
+
+  void _scheduleBannerClear() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!_disposed) consumeModerationBanner();
+    });
+  }
+
+  bool _isMe(String? userId) {
+    if (userId == null || userId.isEmpty) return false;
+    if (_currentUserId != null && userId == _currentUserId) return true;
+    final firebaseUid = fb.FirebaseAuth.instance.currentUser?.uid;
+    return firebaseUid != null && userId == firebaseUid;
+  }
+
+  void _onModeration(LiveModerationEvent event) {
+    final isMe = _isMe(event.userId);
+    switch (event.moderationType) {
+      case 'chat_muted':
+        if (!isMe) return;
+        state = state.copyWith(
+          chatMuted: true,
+          moderationBanner: event.reason?.isNotEmpty == true
+              ? 'Chat muted: ${event.reason}'
+              : 'Your chat was muted',
+        );
+        _scheduleBannerClear();
+      case 'chat_unmuted':
+        if (!isMe) return;
+        state = state.copyWith(
+          chatMuted: false,
+          moderationBanner: 'Your chat was unmuted',
+        );
+        _scheduleBannerClear();
+      case 'viewer_banned':
+        if (!isMe) return;
+        unawaited(_kickBanned(event.reason));
+      case 'viewer_unbanned':
+        if (!isMe) return;
+        state = state.copyWith(
+          chatMuted: false,
+          moderationBanner: 'You were unbanned from this live',
+        );
+        _scheduleBannerClear();
+      default:
+        if (isMe) {
+          state = state.copyWith(
+            moderationBanner: 'Moderation update: ${event.moderationType}',
+          );
+          _scheduleBannerClear();
+        }
+    }
+  }
+
+  Future<void> _kickBanned(String? reason) async {
+    final session = state.session;
+    try {
+      await _ref.read(socketServiceProvider).disconnect();
+    } catch (_) {}
+    try {
+      await _ref.read(liveKitServiceProvider).disconnect();
+    } catch (_) {}
+    final id = _activeLiveId;
+    if (id != null) {
+      try {
+        await _ref.read(leaveLiveUseCaseProvider)(id);
+      } catch (_) {}
+    }
+    if (_disposed || session == null) return;
+    state = state.copyWith(
+      session: session.copyWith(
+        connectionState: LiveConnectionState.banned,
+        isSocketConnected: false,
+        isLiveKitConnected: false,
+        errorMessage: reason?.isNotEmpty == true
+            ? reason
+            : 'You are banned from this live',
+      ),
+      chatMuted: true,
+    );
+  }
+
+  Future<String?> _loadCurrentUserId() async {
+    try {
+      final payload = await _ref.read(apiClientProvider).get(ApiEndpoints.authMe);
+      final id = payload['id']?.toString();
+      if (id != null && id.isNotEmpty) return id;
+      final user = payload['user'];
+      if (user is Map) {
+        final nested = user['id']?.toString();
+        if (nested != null && nested.isNotEmpty) return nested;
+      }
+    } catch (_) {}
+    return fb.FirebaseAuth.instance.currentUser?.uid;
+  }
+
+  CommentEntity? _pinnedFromLiveMetadata(LiveEntity live) {
+    final raw = live.metadata?['pinnedComment'];
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final user = map['user'];
+    final userMap = user is Map ? Map<String, dynamic>.from(user) : null;
+    final content = map['content']?.toString() ?? map['text']?.toString() ?? '';
+    if (content.isEmpty && map['id'] == null) return null;
+    return CommentEntity(
+      id: map['id']?.toString() ?? 'pinned',
+      liveId: live.id,
+      userId: userMap?['id']?.toString() ?? map['userId']?.toString() ?? '',
+      username: userMap?['username']?.toString() ??
+          userMap?['fullName']?.toString() ??
+          'User',
+      userAvatar: userMap?['avatarUrl']?.toString(),
+      content: content,
+      createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      gifterLevel: userMap?['gifterLevel'] is num
+          ? (userMap!['gifterLevel'] as num).toInt()
+          : int.tryParse(userMap?['gifterLevel']?.toString() ?? ''),
+      isVerified: userMap?['isVerified'] == true,
+      isPinned: true,
+    );
   }
 
   Future<void> sendGift(GiftEntity gift, {int quantity = 1}) async {

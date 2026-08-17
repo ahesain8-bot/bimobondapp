@@ -382,12 +382,26 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                             final comments = ref.watch(
                               activeLiveProvider.select((s) => s.comments),
                             );
+                            final pinned = ref.watch(
+                              activeLiveProvider.select((s) => s.pinnedComment),
+                            );
                             return LayoutBuilder(
                               builder: (context, constraints) {
-                                return CommentsSection(
-                                  comments: comments,
-                                  height: constraints.maxHeight,
-                                  alignTop: false,
+                                final pinH = pinned == null ? 0.0 : 50.0;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (pinned != null) ...[
+                                      PinnedCommentBar(comment: pinned),
+                                      const SizedBox(height: 6),
+                                    ],
+                                    CommentsSection(
+                                      comments: comments,
+                                      height: (constraints.maxHeight - pinH)
+                                          .clamp(40.0, constraints.maxHeight),
+                                      alignTop: false,
+                                    ),
+                                  ],
                                 );
                               },
                             );
@@ -424,12 +438,26 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                             final comments = ref.watch(
                               activeLiveProvider.select((s) => s.comments),
                             );
+                            final pinned = ref.watch(
+                              activeLiveProvider.select((s) => s.pinnedComment),
+                            );
                             return LayoutBuilder(
                               builder: (context, constraints) {
-                                return CommentsSection(
-                                  comments: comments,
-                                  height: constraints.maxHeight,
-                                  alignTop: false,
+                                final pinH = pinned == null ? 0.0 : 50.0;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (pinned != null) ...[
+                                      PinnedCommentBar(comment: pinned),
+                                      const SizedBox(height: 6),
+                                    ],
+                                    CommentsSection(
+                                      comments: comments,
+                                      height: (constraints.maxHeight - pinH)
+                                          .clamp(40.0, constraints.maxHeight),
+                                      alignTop: false,
+                                    ),
+                                  ],
                                 );
                               },
                             );
@@ -598,6 +626,22 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
               ),
             ),
 
+          // Right-side heart tap (M3: burst hearts on like).
+          if (widget.isActive && isThisRoom && !isPk)
+            Positioned(
+              right: 0,
+              top: headerBottom,
+              bottom: barTotalH + 48,
+              width: 64,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {
+                  _spawnHearts(2);
+                  ref.read(activeLiveProvider.notifier).like(burst: 1);
+                },
+              ),
+            ),
+
           // Comments (solo / sidebar — PK & multi-grid comments are in columns above)
           if (widget.isActive && isThisRoom && !isMultiGrid && !isPk)
             Positioned(
@@ -609,9 +653,22 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                   final comments = ref.watch(
                     activeLiveProvider.select((s) => s.comments),
                   );
-                  return CommentsSection(
-                    comments: comments,
-                    height: TikTokLiveTokens.commentFeedH,
+                  final pinned = ref.watch(
+                    activeLiveProvider.select((s) => s.pinnedComment),
+                  );
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (pinned != null) ...[
+                        PinnedCommentBar(comment: pinned),
+                        const SizedBox(height: 8),
+                      ],
+                      CommentsSection(
+                        comments: comments,
+                        height: TikTokLiveTokens.commentFeedH,
+                      ),
+                    ],
                   );
                 },
               ),
@@ -670,6 +727,41 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
             ..._tapHearts,
           ],
 
+          if (widget.isActive && isThisRoom)
+            Consumer(
+              builder: (context, ref, _) {
+                final banner = ref.watch(
+                  activeLiveProvider.select((s) => s.moderationBanner),
+                );
+                if (banner == null || banner.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                return Positioned(
+                  left: 12,
+                  right: 12,
+                  top: headerBottom + 8,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        banner,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
           // Bottom action bar — raised to match reference
           Positioned(
             left: 0,
@@ -680,8 +772,23 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                 final coinBalance = ref.watch(
                   activeLiveProvider.select((s) => s.session?.coinBalance),
                 );
+                final chatMuted = ref.watch(
+                  activeLiveProvider.select((s) => s.chatMuted),
+                );
                 return TikTokLiveBottomBar(
-                  onTypeTap: () => setState(() => _showComposer = true),
+                  onTypeTap: () {
+                    if (chatMuted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Your chat is muted on this live'),
+                          backgroundColor: AppColors.surface,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
+                    setState(() => _showComposer = true);
+                  },
                   onGiftTap: () => _openGifts(coinBalance ?? 1250),
                   onShareTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -710,7 +817,8 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                   shareCount: shareCount,
                   commentField: _showComposer
                       ? CommentInputBar(
-                          enabled: connected,
+                          enabled: connected && !chatMuted,
+                          hintText: chatMuted ? 'Chat muted' : 'Write...',
                           onSend: (text) {
                             ref.read(activeLiveProvider.notifier).sendComment(text);
                             setState(() => _showComposer = false);

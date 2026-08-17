@@ -77,6 +77,7 @@ class LiveRoomReady extends LiveRoomState {
     this.isSendingChat = false,
     this.isEnding = false,
     this.actionMessage,
+    this.floatingHeartBurst = 0,
   });
 
   final LiveSession session;
@@ -111,6 +112,9 @@ class LiveRoomReady extends LiveRoomState {
   /// Transient user-facing message (missing API / errors).
   final String? actionMessage;
 
+  /// Increment to spawn floating hearts (TikTok-style like burst).
+  final int floatingHeartBurst;
+
   LiveRoomReady copyWith({
     LiveSession? session,
     Object? controller = _unset,
@@ -134,6 +138,7 @@ class LiveRoomReady extends LiveRoomState {
     bool? isEnding,
     String? actionMessage,
     bool clearActionMessage = false,
+    int? floatingHeartBurst,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -165,6 +170,7 @@ class LiveRoomReady extends LiveRoomState {
       isEnding: isEnding ?? this.isEnding,
       actionMessage:
           clearActionMessage ? null : (actionMessage ?? this.actionMessage),
+      floatingHeartBurst: floatingHeartBurst ?? this.floatingHeartBurst,
     );
   }
 }

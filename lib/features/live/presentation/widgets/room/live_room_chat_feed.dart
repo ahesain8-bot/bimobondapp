@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
+import '../../../../../core/widgets/gifter_level_badge.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
@@ -26,6 +27,13 @@ class LiveRoomChatFeed extends StatelessWidget {
         }
 
         final messages = state.session.messages;
+        LiveChatMessage? pinned;
+        for (final message in messages) {
+          if (message.isPinned) {
+            pinned = message;
+            break;
+          }
+        }
         final maxWidth =
             MediaQuery.sizeOf(context).width * AppSizes.roomChatMaxWidthFactor;
 
@@ -33,16 +41,26 @@ class LiveRoomChatFeed extends StatelessWidget {
           alignment: AlignmentDirectional.bottomEnd,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: messages.length,
-              separatorBuilder: (_, _) =>
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (pinned != null) ...[
+                  _PinnedCommentBar(message: pinned),
                   const SizedBox(height: AppSpacing.roomChatGap),
-              itemBuilder: (context, index) {
-                return _ChatMessageTile(message: messages[index]);
-              },
+                ],
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: messages.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.roomChatGap),
+                  itemBuilder: (context, index) {
+                    return _ChatMessageTile(message: messages[index]);
+                  },
+                ),
+              ],
             ),
           ),
         );
@@ -157,7 +175,10 @@ class _ChatMessageTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (message.showBadge) ...[
+          if ((message.gifterLevel ?? 0) > 0) ...[
+            GifterLevelBadge(level: message.gifterLevel!, compact: true),
+            const SizedBox(width: AppSpacing.xs),
+          ] else if (message.showBadge) ...[
             const _SystemBadge(),
             const SizedBox(width: AppSpacing.xs),
           ],
@@ -191,6 +212,43 @@ class _SystemBadge extends StatelessWidget {
         Icons.music_note,
         size: 10,
         color: Colors.white,
+      ),
+    );
+  }
+}
+
+class _PinnedCommentBar extends StatelessWidget {
+  const _PinnedCommentBar({required this.message});
+
+  final LiveChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.push_pin, color: Colors.white, size: 14),
+          const SizedBox(width: 6),
+          if ((message.gifterLevel ?? 0) > 0) ...[
+            GifterLevelBadge(level: message.gifterLevel!, compact: true),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Text(
+              message.text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.roomChat,
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -59,9 +59,10 @@ class RealCommentRepository implements CommentRepository {
       final pinned = payload['pinnedComment'];
       if (pinned is Map<String, dynamic>) {
         final p = _commentFromJson(pinned, liveId);
-        if (p != null) comments.insert(0, p.copyWith(
-          metadata: {...?p.metadata, 'pinned': true},
-        ));
+        if (p != null) {
+          comments.removeWhere((c) => c.id == p.id);
+          comments.insert(0, p.copyWith(isPinned: true));
+        }
       }
 
       _ensureRoom(liveId);
@@ -164,6 +165,12 @@ class RealCommentRepository implements CommentRepository {
         if (event.liveId != liveId) return;
         if (event is LiveCommentEvent) {
           _append(liveId, event.comment, fromSocket: true);
+        } else if (event is LiveCommentDeletedEvent) {
+          _remove(liveId, event.commentId);
+        } else if (event is LiveCommentPinnedEvent) {
+          _setPinned(liveId, event.comment);
+        } else if (event is LiveCommentUnpinnedEvent) {
+          _clearPinned(liveId, event.commentId);
         } else if (event is UserJoinedEvent) {
           final joinComment = CommentEntity(
             id: 'join_${event.userId}_${event.timestamp.microsecondsSinceEpoch}',
@@ -191,6 +198,37 @@ class RealCommentRepository implements CommentRepository {
     list.add(comment);
     if (list.length > 120) {
       list.removeRange(0, list.length - 120);
+    }
+    _controllers[liveId]?.add(List.unmodifiable(list));
+  }
+
+  void _remove(String liveId, String commentId) {
+    final list = _cache[liveId];
+    if (list == null) return;
+    list.removeWhere((c) => c.id == commentId);
+    _controllers[liveId]?.add(List.unmodifiable(list));
+  }
+
+  void _setPinned(String liveId, CommentEntity comment) {
+    final list = _cache.putIfAbsent(liveId, () => []);
+    final pinned = comment.copyWith(isPinned: true);
+    list.removeWhere((c) => c.id == pinned.id);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].isPinned) {
+        list[i] = list[i].copyWith(isPinned: false);
+      }
+    }
+    list.insert(0, pinned);
+    _controllers[liveId]?.add(List.unmodifiable(list));
+  }
+
+  void _clearPinned(String liveId, String commentId) {
+    final list = _cache[liveId];
+    if (list == null) return;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id == commentId || list[i].isPinned) {
+        list[i] = list[i].copyWith(isPinned: false);
+      }
     }
     _controllers[liveId]?.add(List.unmodifiable(list));
   }
@@ -225,10 +263,20 @@ class RealCommentRepository implements CommentRepository {
           DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
               DateTime.now(),
       replyToUserId: json['replyToUserId']?.toString(),
+      gifterLevel: _asInt(userMap?['gifterLevel']),
+      isVerified: userMap?['isVerified'] == true,
+      isPinned: json['isPinned'] == true || json['pinned'] == true,
       metadata: json['isPinned'] == true || json['pinned'] == true
           ? const {'pinned': true}
           : null,
     );
+  }
+
+  int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   void dispose() {

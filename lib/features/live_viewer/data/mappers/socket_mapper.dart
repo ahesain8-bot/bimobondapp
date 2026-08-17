@@ -36,6 +36,9 @@ class SocketMapper {
       createdAt:
           _parseDate(nested['createdAt']) ?? DateTime.now(),
       replyToUserId: nested['replyToUserId']?.toString(),
+      gifterLevel: _asInt(user?['gifterLevel']),
+      isVerified: user?['isVerified'] == true,
+      isPinned: nested['isPinned'] == true || nested['pinned'] == true,
       metadata: nested['isPinned'] == true || nested['pinned'] == true
           ? const {'pinned': true}
           : null,
@@ -75,6 +78,7 @@ class SocketMapper {
           _asInt(gift?['coinCost']) ??
           0,
       sentAt: _parseDate(map['sentAt']) ?? DateTime.now(),
+      senderGifterLevel: _asInt(sender?['gifterLevel']),
       giftDetails: gift == null
           ? null
           : GiftEntity(
@@ -129,6 +133,66 @@ class SocketMapper {
     return LiveEndedEvent(
       liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
       reason: map['reason']?.toString() ?? 'Host ended the live',
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveCommentDeletedEvent? commentDeletedEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final id = map['commentId']?.toString() ?? map['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return LiveCommentDeletedEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      commentId: id,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveCommentPinnedEvent? commentPinnedEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final commentEvent = SocketMapper.commentEvent(data, fallbackLiveId);
+    if (commentEvent == null) return null;
+    return LiveCommentPinnedEvent(
+      liveId: commentEvent.liveId,
+      comment: commentEvent.comment.copyWith(isPinned: true),
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveCommentUnpinnedEvent? commentUnpinnedEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final id = map['commentId']?.toString() ?? map['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return LiveCommentUnpinnedEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      commentId: id,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveModerationEvent? moderationEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final type = map['type']?.toString();
+    if (type == null || type.isEmpty) return null;
+    return LiveModerationEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      moderationType: type,
+      userId: map['userId']?.toString(),
+      reason: map['reason']?.toString(),
       timestamp: DateTime.now(),
     );
   }

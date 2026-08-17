@@ -189,6 +189,11 @@ class LiveMapper {
       meta['guests'] = guests;
     }
 
+    final pinned = _asMap(json['pinnedComment']);
+    if (pinned != null) {
+      meta['pinnedComment'] = pinned;
+    }
+
     // PK battle snapshot.
     final battle = _asMap(json['battle']);
     if (battle != null) {

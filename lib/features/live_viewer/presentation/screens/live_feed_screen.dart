@@ -14,14 +14,26 @@ import '../widgets/live_room_page.dart';
 import '../../../live/presentation/utils/live_screen_wakelock.dart';
 
 /// TikTok LIVE home: full-screen vertical swipe between running lives.
-class LiveFeedScreen extends ConsumerStatefulWidget {
+///
+/// Wraps its own [ProviderScope] so the screen works even if the app root
+/// was started without one (hot reload cannot re-run [runApp]).
+class LiveFeedScreen extends StatelessWidget {
   const LiveFeedScreen({super.key});
 
   @override
-  ConsumerState<LiveFeedScreen> createState() => _LiveFeedScreenState();
+  Widget build(BuildContext context) {
+    return const ProviderScope(child: _LiveFeedView());
+  }
 }
 
-class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
+class _LiveFeedView extends ConsumerStatefulWidget {
+  const _LiveFeedView();
+
+  @override
+  ConsumerState<_LiveFeedView> createState() => _LiveFeedViewState();
+}
+
+class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
     with WidgetsBindingObserver {
   late final PageController _pageController;
   int _currentIndex = 0;

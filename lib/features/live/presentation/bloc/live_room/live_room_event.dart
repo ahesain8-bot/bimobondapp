@@ -62,6 +62,10 @@ class LiveRoomLikeTapped extends LiveRoomEvent {
   const LiveRoomLikeTapped();
 }
 
+class LiveRoomHeartBurstConsumed extends LiveRoomEvent {
+  const LiveRoomHeartBurstConsumed();
+}
+
 class LiveRoomTitleSubmitted extends LiveRoomEvent {
   const LiveRoomTitleSubmitted(this.title);
 

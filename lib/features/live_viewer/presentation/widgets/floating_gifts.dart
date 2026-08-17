@@ -10,6 +10,7 @@ import '../../domain/entities/gift_entity.dart';
 import 'fallback_media.dart';
 import 'gift_icon.dart';
 import 'tiktok_live_tokens.dart';
+import '../../../../core/widgets/gifter_level_badge.dart';
 
 /// Combo gift toast (left) + center burst — TikTok LIVE timing/layout.
 class FloatingGiftsLayer extends StatelessWidget {
@@ -108,16 +109,29 @@ class _GiftToast extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      gift.senderName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        height: 1.1,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            gift.senderName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                        if ((gift.senderGifterLevel ?? 0) > 0) ...[
+                          const SizedBox(width: 4),
+                          GifterLevelBadge(
+                            level: gift.senderGifterLevel!,
+                            compact: true,
+                          ),
+                        ],
+                      ],
                     ),
                     Text(
                       'sent ${details?.name ?? 'Gift'}',
