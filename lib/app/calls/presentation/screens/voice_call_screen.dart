@@ -96,7 +96,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         : caller.username;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
@@ -113,8 +113,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                             const Color(0xFF0F172A),
                           ]
                         : [
-                            const Color(0x256366F1),
-                            const Color(0xFFF1F5F9),
+                            const Color(0x186366F1),
+                            Colors.white,
                           ],
                   ),
                 ),
@@ -149,15 +149,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                           ),
                         ),
                       ),
-
-                      // Status Badge Indicator
-                      CallStatusBadge(
-                        status: widget.statusState,
-                        timerText: widget.timerText,
-                        isDark: isDark,
-                      ),
-
-                      const SizedBox(width: 44), // Alignment spacer
                     ],
                   ),
                 ),
@@ -226,6 +217,26 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                               : Colors.black54,
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Timer Text directly under User Name
+                      Text(
+                        widget.statusState == CallUiStatusState.connected
+                            ? widget.timerText
+                            : (widget.statusState == CallUiStatusState.calling
+                                ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الاتصال...' : 'Calling...')
+                                : (widget.statusState == CallUiStatusState.ringing
+                                    ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الرنين...' : 'Ringing...')
+                                    : widget.timerText)),
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF818CF8)
+                              : const Color(0xFF4F46E5),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],

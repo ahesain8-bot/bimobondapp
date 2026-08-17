@@ -162,3 +162,12 @@ class ToggleSpeakerEvent extends CallEvent {
 class ClearCallStateEvent extends CallEvent {
   const ClearCallStateEvent();
 }
+
+class LiveKitRoomStateChangedEvent extends CallEvent {
+  final dynamic roomState;
+
+  const LiveKitRoomStateChangedEvent({required this.roomState});
+
+  @override
+  List<Object?> get props => [roomState];
+}

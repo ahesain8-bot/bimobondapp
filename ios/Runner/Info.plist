@@ -79,5 +79,12 @@
 	<string>This app needs photo library access to send images and videos in chat.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to record posts, stories, and chat media.</string>
+
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>voip</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

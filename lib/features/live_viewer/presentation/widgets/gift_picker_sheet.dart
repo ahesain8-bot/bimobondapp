@@ -48,12 +48,22 @@ class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Container(
       height: MediaQuery.of(context).size.height * 0.55 + bottom * 0.2,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
       ),
       child: Column(
         children: [

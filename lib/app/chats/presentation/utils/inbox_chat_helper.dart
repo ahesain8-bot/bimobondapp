@@ -90,6 +90,21 @@ String inboxLastMessagePreview(
             ? contentPreview
             : l10n.messagesInboxLastPoll;
         break;
+      case ChatMessageType.call:
+        final callType =
+            last.payload?['callType']?.toString().toUpperCase() ?? 'AUDIO';
+        final isVideo = callType == 'VIDEO';
+        final status =
+            last.payload?['status']?.toString().toUpperCase() ?? '';
+        final isAr = l10n.localeName == 'ar';
+        if (status == 'MISSED' || status == 'REJECTED') {
+          body = isAr ? '📞 مكالمة فائتة' : '📞 Missed call';
+        } else if (isVideo) {
+          body = isAr ? '📹 مكالمة فيديو' : '📹 Video call';
+        } else {
+          body = isAr ? '📞 مكالمة صوتية' : '📞 Voice call';
+        }
+        break;
       case ChatMessageType.text:
       case ChatMessageType.unknown:
         body = contentPreview;

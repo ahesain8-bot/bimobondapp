@@ -1,6 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:bimobondapp/app/calls/data/models/call_model.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_state.dart';
+import 'package:bimobondapp/app/calls/services/callkit_service.dart';
 import 'package:bimobondapp/app/notifications/domain/entities/notification_entity.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_navigation.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/push_payload_parser.dart';
@@ -8,6 +13,7 @@ import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -50,18 +56,29 @@ class PushNotificationService {
     );
 
     if (Platform.isAndroid) {
-      await _localNotifications
+      final androidPlugin = _localNotifications
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.createNotificationChannel(
-            const AndroidNotificationChannel(
-              channelId,
-              channelName,
-              description: channelDescription,
-              importance: Importance.high,
-            ),
-          );
+          >();
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          channelId,
+          channelName,
+          description: channelDescription,
+          importance: Importance.max,
+        ),
+      );
+      await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'incoming_calls_channel',
+          'Incoming Calls',
+          description: 'Incoming Audio & Video Calls',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+          showBadge: true,
+        ),
+      );
     }
 
     _initialized = true;
@@ -119,10 +136,30 @@ class PushNotificationService {
         'PushNotificationService: foreground message ${message.messageId}',
       );
     }
-    final type = message.data['type']?.toString();
-    final screen = message.data['screen']?.toString();
-    if (type == 'CALL_INCOMING' || screen == 'incoming_call') {
-      _handleNotificationOpen(message);
+    final data = message.data;
+    final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? '')
+        .toString()
+        .toUpperCase();
+
+    if (_isIncomingCallData(data)) {
+      final rootCtx = AppRouter.rootNavigatorKey.currentContext;
+      if (rootCtx != null && rootCtx.mounted) {
+        final callBloc = rootCtx.read<CallBloc>();
+        if (callBloc.state is! CallIncomingState && callBloc.state is! CallActiveState) {
+          final callEntity = CallModel.fromJson(data);
+          callBloc.add(IncomingCallReceivedEvent(call: callEntity));
+        }
+      }
+      return;
+    } else if (typeUpper == 'CALL_CANCELLED' ||
+        typeUpper == 'CALL_ENDED' ||
+        typeUpper == 'CALL_REJECTED') {
+      final callId = data['callId']?.toString();
+      if (callId != null && callId.isNotEmpty) {
+        await CallkitService.instance.endCall(callId);
+      } else {
+        await CallkitService.instance.endAllCalls();
+      }
       return;
     }
     await showRemoteMessage(message);
@@ -210,9 +247,96 @@ void _onBackgroundNotificationTap(NotificationResponse response) {
   // Navigation is handled when the app resumes; payload is stored by the OS.
 }
 
+bool _isIncomingCallData(Map<String, dynamic> data) {
+  final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? '')
+      .toString()
+      .toUpperCase();
+  final screenUpper = (data['screen'] ?? '').toString().toUpperCase();
+
+  if (typeUpper == 'CALL_INCOMING' ||
+      typeUpper == 'INCOMING_CALL' ||
+      typeUpper.contains('INCOMING') ||
+      screenUpper == 'INCOMING_CALL') {
+    return true;
+  }
+
+  final callId = data['callId']?.toString() ?? data['id']?.toString();
+  if (callId != null &&
+      callId.isNotEmpty &&
+      typeUpper != 'CALL_CANCELLED' &&
+      typeUpper != 'CALL_ENDED' &&
+      typeUpper != 'CALL_REJECTED') {
+    return true;
+  }
+
+  return false;
+}
+
+Map<String, dynamic> _extractFullMessageData(RemoteMessage message) {
+  final data = Map<String, dynamic>.from(message.data);
+  if (message.notification != null) {
+    if (message.notification!.title != null &&
+        message.notification!.title!.isNotEmpty) {
+      data.putIfAbsent('notificationTitle', () => message.notification!.title);
+      data.putIfAbsent('title', () => message.notification!.title);
+      data.putIfAbsent('callerName', () => message.notification!.title);
+      data.putIfAbsent('name', () => message.notification!.title);
+      data.putIfAbsent('username', () => message.notification!.title);
+    }
+    if (message.notification!.body != null &&
+        message.notification!.body!.isNotEmpty) {
+      data.putIfAbsent('notificationBody', () => message.notification!.body);
+      data.putIfAbsent('body', () => message.notification!.body);
+    }
+  }
+
+  for (final key in ['user', 'caller', 'actor', 'sender', 'initiator', 'data', 'payload', 'call']) {
+    final val = data[key];
+    if (val is String && val.trim().startsWith('{') && val.trim().endsWith('}')) {
+      try {
+        final decoded = jsonDecode(val);
+        if (decoded is Map) {
+          final decodedMap = Map<String, dynamic>.from(decoded);
+          decodedMap.forEach((k, v) {
+            data.putIfAbsent(k, () => v);
+          });
+        }
+      } catch (_) {}
+    } else if (val is Map) {
+      final mapVal = Map<String, dynamic>.from(val);
+      mapVal.forEach((k, v) {
+        data.putIfAbsent(k, () => v);
+      });
+    }
+  }
+
+  return data;
+}
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   await PushNotificationService.instance.initializeEarly();
+
+  final data = _extractFullMessageData(message);
+  final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? '')
+      .toString()
+      .toUpperCase();
+
+  if (_isIncomingCallData(data)) {
+    await CallkitService.instance.showIncomingCall(data);
+    return;
+  } else if (typeUpper == 'CALL_CANCELLED' ||
+      typeUpper == 'CALL_ENDED' ||
+      typeUpper == 'CALL_REJECTED') {
+    final callId = data['callId']?.toString();
+    if (callId != null && callId.isNotEmpty) {
+      await CallkitService.instance.endCall(callId);
+    } else {
+      await CallkitService.instance.endAllCalls();
+    }
+    return;
+  }
+
   await PushNotificationService.instance.showRemoteMessage(message);
 }

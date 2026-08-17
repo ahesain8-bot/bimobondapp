@@ -48,6 +48,8 @@ class ChatMessageModel extends ChatMessageEntity {
         return ChatMessageType.share;
       case 'POLL':
         return ChatMessageType.poll;
+      case 'CALL':
+        return ChatMessageType.call;
       default:
         return ChatMessageType.unknown;
     }

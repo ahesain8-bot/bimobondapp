@@ -37,6 +37,7 @@ import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'dart:async';
 
+import 'package:bimobondapp/app/calls/presentation/pages/call_history_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -416,6 +417,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                         builder: (context, _) {
                           final badge = notifications_di
                               .sl<NotificationUnreadBadge>();
+                          final isAr = Localizations.localeOf(context).languageCode == 'ar';
                           return Column(
                             children: [
                               MessagesInboxActionTile(
@@ -447,6 +449,16 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                                   context.pushNamed('activity').then(
                                     (_) => badge.refresh(),
                                   );
+                                },
+                              ),
+                              MessagesInboxActionTile(
+                                icon: LucideIcons.phoneCall,
+                                iconBackground: const Color(0xFF6366F1),
+                                title: isAr ? 'المكالمات' : 'Calls',
+                                subtitle: isAr ? 'سجل المكالمات الصوتية والفيديو' : 'Recent audio & video calls',
+                                showChevron: true,
+                                onTap: () {
+                                  context.pushNamed('call_history');
                                 },
                               ),
                             ],

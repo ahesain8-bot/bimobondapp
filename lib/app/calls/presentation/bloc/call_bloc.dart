@@ -17,6 +17,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:bimobondapp/app/calls/services/call_ringtone_service.dart';
+import 'package:bimobondapp/app/calls/services/callkit_service.dart';
+import 'package:livekit_client/livekit_client.dart';
 
 class CallBloc extends Bloc<CallEvent, CallState> {
   final StartCallUseCase startCallUseCase;
@@ -71,7 +73,10 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     on<SwitchCameraEvent>(_onSwitchCamera);
     on<ToggleSpeakerEvent>(_onToggleSpeaker);
     on<ClearCallStateEvent>(_onClearCallState);
+    on<LiveKitRoomStateChangedEvent>(_onLiveKitRoomStateChanged);
   }
+
+  StreamSubscription? _livekitStateSub;
 
   void _initSocketListeners() {
     _incomingSub = socketService.onCallIncoming.listen((payload) {
@@ -108,12 +113,51 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     _endedSub = socketService.onCallEnded.listen((call) {
       add(CallEndedReceivedEvent(call: call));
     });
+
+    _livekitStateSub = livekitService.onRoomStateChanged.listen((roomState) {
+      add(LiveKitRoomStateChangedEvent(roomState: roomState));
+    });
+  }
+
+  void _onLiveKitRoomStateChanged(
+    LiveKitRoomStateChangedEvent event,
+    Emitter<CallState> emit,
+  ) {
+    if (event.roomState == ConnectionState.reconnecting) {
+      if (state is CallActiveState) {
+        final cur = state as CallActiveState;
+        emit(CallReconnectingState(call: cur.call));
+      }
+    } else if (event.roomState == ConnectionState.connected) {
+      if (state is CallReconnectingState) {
+        final cur = state as CallReconnectingState;
+        emit(CallActiveState(call: cur.call, livekitService: livekitService));
+      }
+    }
+  }
+
+  Timer? _outgoingTimeoutTimer;
+
+  void _startOutgoingTimeout(String callId) {
+    _outgoingTimeoutTimer?.cancel();
+    _outgoingTimeoutTimer = Timer(const Duration(seconds: 35), () {
+      if (state is CallOutgoingRingingState) {
+        final currentCall = (state as CallOutgoingRingingState).call;
+        add(EndCallEvent(callId: currentCall.id));
+      }
+    });
+  }
+
+  void _cancelOutgoingTimeout() {
+    _outgoingTimeoutTimer?.cancel();
+    _outgoingTimeoutTimer = null;
   }
 
   Future<void> _onStartCall(
     StartCallEvent event,
     Emitter<CallState> emit,
   ) async {
+    _cancelOutgoingTimeout();
     emit(const CallInitialState());
     final result = await startCallUseCase(
       chatId: event.chatId,
@@ -127,6 +171,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
       },
       (session) async {
         emit(CallOutgoingRingingState(call: session.call, session: session));
+        _startOutgoingTimeout(session.call.id);
         unawaited(ringtoneService.playOutgoingRingtone());
         // Caller immediately joins LiveKit
         try {
@@ -146,7 +191,9 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     AcceptCallEvent event,
     Emitter<CallState> emit,
   ) async {
+    _cancelOutgoingTimeout();
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     final result = await acceptCallUseCase(callId: event.callId);
 
     await result.fold(
@@ -183,7 +230,9 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     RejectCallEvent event,
     Emitter<CallState> emit,
   ) async {
+    _cancelOutgoingTimeout();
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     final result = await rejectCallUseCase(callId: event.callId);
 
     result.fold(
@@ -200,7 +249,9 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     EndCallEvent event,
     Emitter<CallState> emit,
   ) async {
+    _cancelOutgoingTimeout();
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     await livekitService.disconnect();
     final result = await endCallUseCase(callId: event.callId);
 
@@ -218,7 +269,9 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     LeaveCallEvent event,
     Emitter<CallState> emit,
   ) async {
+    _cancelOutgoingTimeout();
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     await livekitService.disconnect();
     final result = await leaveCallUseCase(callId: event.callId);
 
@@ -282,6 +335,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     if (state is! CallActiveState && state is! CallOutgoingRingingState) {
       emit(CallIncomingState(call: event.call));
       unawaited(ringtoneService.playIncomingRingtone());
+      unawaited(CallkitService.instance.showIncomingCall(event.call.toCallkitData()));
     }
   }
 
@@ -313,6 +367,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     Emitter<CallState> emit,
   ) {
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     if (event.call.isEnded || event.call.status == 'REJECTED') {
       livekitService.disconnect();
       emit(CallEndedState(reason: 'Call rejected', call: event.call));
@@ -326,6 +381,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     Emitter<CallState> emit,
   ) {
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     livekitService.disconnect();
     emit(CallEndedState(reason: 'Call cancelled', call: event.call));
   }
@@ -353,6 +409,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     Emitter<CallState> emit,
   ) {
     unawaited(ringtoneService.stop());
+    unawaited(CallkitService.instance.endAllCalls());
     livekitService.disconnect();
     emit(CallEndedState(reason: 'Call ended', call: event.call));
   }
@@ -407,12 +464,14 @@ class CallBloc extends Bloc<CallEvent, CallState> {
 
   @override
   Future<void> close() {
+    _outgoingTimeoutTimer?.cancel();
     _incomingSub?.cancel();
     _acceptedSub?.cancel();
     _rejectedSub?.cancel();
     _cancelledSub?.cancel();
     _participantUpdateSub?.cancel();
     _endedSub?.cancel();
+    _livekitStateSub?.cancel();
     ringtoneService.stop();
     livekitService.disconnect();
     return super.close();

@@ -115,4 +115,24 @@ class CallsRepositoryImpl implements CallsRepository {
       return Left(FailureMapper.from(e));
     }
   }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getCallHistory({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? type,
+  }) async {
+    try {
+      final result = await remoteDataSource.getCallHistory(
+        page: page,
+        limit: limit,
+        status: status,
+        type: type,
+      );
+      return Right(result);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
 }

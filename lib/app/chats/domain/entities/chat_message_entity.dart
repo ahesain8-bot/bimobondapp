@@ -13,6 +13,7 @@ enum ChatMessageType {
   gift,
   share,
   poll,
+  call,
   unknown,
 }
 

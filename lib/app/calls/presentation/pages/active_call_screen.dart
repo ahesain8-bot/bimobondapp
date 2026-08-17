@@ -32,8 +32,12 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   }
 
   void _startTimer() {
+    _durationTimer?.cancel();
+    _secondsElapsed = 0;
     _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
+      if (!mounted) return;
+      final callState = context.read<CallBloc>().state;
+      if (callState is CallActiveState) {
         setState(() {
           _secondsElapsed++;
         });
@@ -63,14 +67,21 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<CallBloc, CallState>(
-      listener: (context, state) {
-        if (state is CallEndedState) {
-          if (context.mounted && Navigator.of(context).canPop()) {
-            context.pop();
-          }
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _onMinimize();
         }
       },
+      child: BlocConsumer<CallBloc, CallState>(
+        listener: (context, state) {
+          if (state is CallEndedState) {
+            if (context.mounted && Navigator.of(context).canPop()) {
+              context.pop();
+            }
+          }
+        },
       builder: (context, state) {
         if (state is! CallActiveState && state is! CallOutgoingRingingState) {
           return const Scaffold(
@@ -85,11 +96,12 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
         bool isOutgoingRinging = false;
         bool isMuted = false;
         bool isCameraOff = false;
-        bool isSpeakerOn = true;
+        bool isSpeakerOn = false;
 
         if (state is CallOutgoingRingingState) {
           call = state.call;
           isOutgoingRinging = true;
+          isSpeakerOn = call.isVideo;
         } else {
           final activeState = state as CallActiveState;
           call = activeState.call;
@@ -199,6 +211,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
           );
         }
       },
+    ),
     );
   }
 }

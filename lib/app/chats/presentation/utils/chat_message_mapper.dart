@@ -63,6 +63,8 @@ String _typeToUi(ChatMessageType type) {
       return 'gift';
     case ChatMessageType.poll:
       return 'poll';
+    case ChatMessageType.call:
+      return 'call';
     case ChatMessageType.share:
       return 'share';
     case ChatMessageType.unknown:
@@ -180,6 +182,15 @@ Map<String, dynamic> chatMessageToUiMap(
           'votes': <Map<String, dynamic>>[],
           'hasEnded': false,
         },
+    },
+    if (message.type == ChatMessageType.call && !message.isDeleted) ...{
+      'callId': message.payload?['callId'],
+      'callType': message.payload?['callType'] ?? 'AUDIO',
+      'callStatus': message.payload?['status'] ?? 'ENDED',
+      'durationSeconds': message.payload?['durationSeconds'],
+      'startedAt': message.payload?['startedAt'],
+      'endedAt': message.payload?['endedAt'],
+      'initiatorId': message.payload?['initiatorId'],
     },
     'isMe': isMe,
     'time': formatChatMessageTime(message.createdAt),

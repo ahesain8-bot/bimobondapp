@@ -37,6 +37,7 @@ import 'package:bimobondapp/app/video_templates/presentation/pages/video_templat
 import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/calls/presentation/pages/active_call_screen.dart';
+import 'package:bimobondapp/app/calls/presentation/pages/call_history_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/new_chat_screen.dart';
@@ -471,6 +472,11 @@ class AppRouter {
         path: '/active-call',
         name: 'active_call',
         builder: (context, state) => const ActiveCallScreen(),
+      ),
+      GoRoute(
+        path: '/call-history',
+        name: 'call_history',
+        builder: (context, state) => const CallHistoryScreen(),
       ),
       GoRoute(
         path: '/chat',

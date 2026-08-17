@@ -45,7 +45,7 @@ class RemoteVideoView extends StatelessWidget {
       children: [
         Positioned.fill(
           child: showVideo
-              ? VideoTrackRenderer(track as VideoTrack)
+              ? VideoTrackRenderer(track)
               : _buildFallbackAvatar(context, name),
         ),
 
@@ -242,7 +242,7 @@ class _LocalVideoViewState extends State<LocalVideoView> {
               if (showVideo)
                 Positioned.fill(
                   child: VideoTrackRenderer(
-                    track as VideoTrack,
+                    track,
                     fit: VideoViewFit.cover,
                   ),
                 )

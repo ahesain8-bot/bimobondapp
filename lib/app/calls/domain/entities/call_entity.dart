@@ -114,6 +114,20 @@ class CallEntity extends Equatable {
       status.toUpperCase() == 'REJECTED' ||
       status.toUpperCase() == 'CANCELLED';
 
+  Map<String, dynamic> toCallkitData() {
+    final callerName = (initiatedBy.fullName != null && initiatedBy.fullName!.isNotEmpty)
+        ? initiatedBy.fullName!
+        : initiatedBy.username;
+    return {
+      'callId': id,
+      'chatId': chatId,
+      'type': type,
+      'isVideo': isVideo,
+      'callerName': callerName,
+      'callerAvatar': initiatedBy.avatarUrl,
+    };
+  }
+
   CallEntity copyWith({
     String? id,
     String? chatId,

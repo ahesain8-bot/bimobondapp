@@ -178,10 +178,33 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                               ),
                             ),
                           ),
-                          CallStatusBadge(
-                            status: widget.statusState,
-                            timerText: widget.timerText,
-                            isDark: true,
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.statusState == CallUiStatusState.connected
+                                    ? widget.timerText
+                                    : (widget.statusState == CallUiStatusState.calling
+                                        ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الاتصال...' : 'Calling...')
+                                        : (widget.statusState == CallUiStatusState.ringing
+                                            ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الرنين...' : 'Ringing...')
+                                            : widget.timerText)),
+                                style: const TextStyle(
+                                  color: Color(0xFFA5B4FC),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(width: 44),
                         ],

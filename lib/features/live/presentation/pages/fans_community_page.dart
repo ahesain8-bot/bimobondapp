@@ -170,11 +170,12 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bloc = _bloc;
     if (bloc == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF3F3F3),
-        body: Center(child: CircularProgressIndicator(color: Colors.black)),
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+        body: const Center(child: CircularProgressIndicator(color: Colors.black)),
       );
     }
 
@@ -191,7 +192,7 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
           final ready = state is FanClubReady ? state : null;
 
           return Scaffold(
-            backgroundColor: const Color(0xFFF3F3F3),
+            backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
             body: SafeArea(
               child: Directionality(
                 textDirection: TextDirection.rtl,

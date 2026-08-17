@@ -138,8 +138,9 @@ class _DiscordPageState extends State<DiscordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F3F3),
+      backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
       body: SafeArea(
         child: Directionality(
           textDirection: TextDirection.rtl,

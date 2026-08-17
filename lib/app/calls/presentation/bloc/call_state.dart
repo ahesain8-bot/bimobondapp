@@ -104,3 +104,29 @@ class CallErrorState extends CallState {
   @override
   List<Object?> get props => [message];
 }
+
+class CallReconnectingState extends CallState {
+  final CallEntity call;
+  final String message;
+
+  const CallReconnectingState({
+    required this.call,
+    this.message = 'Reconnecting...',
+  });
+
+  @override
+  List<Object?> get props => [call, message];
+}
+
+class CallTimedOutState extends CallState {
+  final CallEntity? call;
+  final String reason;
+
+  const CallTimedOutState({
+    this.call,
+    this.reason = 'No answer',
+  });
+
+  @override
+  List<Object?> get props => [call, reason];
+}

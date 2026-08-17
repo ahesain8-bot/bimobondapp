@@ -88,7 +88,11 @@ void main() async {
   await chats_di.initChats();
   await notifications_di.initNotifications();
   await calls_di.initCalls();
-  runApp(const MyApp());
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

@@ -7,8 +7,12 @@ import 'package:bimobondapp/app/home/presentation/widgets/stories/story_shared_p
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
+import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ChatMessageItem extends StatelessWidget {
   const ChatMessageItem({
@@ -566,6 +570,8 @@ class ChatMessageContent extends StatelessWidget {
           duration: msg['duration']?.toString() ?? '0:00',
           audioUrl: msg['audioUrl']?.toString() ?? msg['mediaUrl']?.toString(),
         );
+      case 'call':
+        return ChatCallMessageWidget(msg: msg, isMe: isMe);
       default:
         return const SizedBox.shrink();
     }
@@ -682,6 +688,180 @@ class ChatReactionBadge extends StatelessWidget {
       child: Text(
         emoji,
         style: const TextStyle(fontSize: ChatLayoutConstants.reactionBadgeSize),
+      ),
+    );
+  }
+}
+
+class ChatCallMessageWidget extends StatelessWidget {
+  const ChatCallMessageWidget({
+    super.key,
+    required this.msg,
+    required this.isMe,
+  });
+
+  final Map<String, dynamic> msg;
+  final bool isMe;
+
+  String _formatDuration(int? seconds) {
+    if (seconds == null || seconds <= 0) return '';
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final chatTheme = ChatTheme.of(context);
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final isDark = theme.brightness == Brightness.dark;
+
+    final payload = msg['payload'] is Map
+        ? Map<String, dynamic>.from(msg['payload'] as Map)
+        : <String, dynamic>{};
+
+    final callType = (msg['callType'] ?? payload['callType'] ?? 'AUDIO')
+        .toString()
+        .toUpperCase();
+    final status = (msg['callStatus'] ?? payload['status'] ?? 'ENDED')
+        .toString()
+        .toUpperCase();
+    final isVideo = callType == 'VIDEO';
+
+    final rawDuration = msg['durationSeconds'] ?? payload['durationSeconds'];
+    int? durationSecs;
+    if (rawDuration is num) {
+      durationSecs = rawDuration.toInt();
+    } else if (rawDuration != null) {
+      durationSecs = int.tryParse(rawDuration.toString());
+    }
+
+    final isMissed = status == 'MISSED' || status == 'REJECTED';
+    final isCancelled = status == 'CANCELLED';
+
+    IconData iconData;
+    Color iconColor;
+    String statusLabel;
+
+    if (isMissed) {
+      iconData = LucideIcons.phoneMissed;
+      iconColor = colorScheme.error;
+      statusLabel = isAr ? 'مكالمة فائتة' : 'Missed call';
+    } else if (isCancelled) {
+      iconData = isVideo ? LucideIcons.videoOff : LucideIcons.phoneOff;
+      iconColor = colorScheme.secondary;
+      statusLabel = isAr ? 'مكالمة ملغاة' : 'Cancelled call';
+    } else {
+      iconData = isVideo ? LucideIcons.video : LucideIcons.phone;
+      iconColor = colorScheme.primary;
+      final dur = _formatDuration(durationSecs);
+      final title = isVideo
+          ? (isAr ? 'مكالمة فيديو' : 'Video call')
+          : (isAr ? 'مكالمة صوتية' : 'Voice call');
+      statusLabel = dur.isNotEmpty ? '$title ($dur)' : title;
+    }
+
+    final peerUserId =
+        (msg['peerUserId'] ?? msg['senderId'] ?? payload['initiatorId'] ?? '')
+            .toString();
+    final chatId = (msg['chatId'] ?? payload['chatId'] ?? '').toString();
+
+    final cardBgColor = isMe
+        ? (isDark
+            ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+            : colorScheme.primary.withValues(alpha: 0.10))
+        : (isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+            : colorScheme.surfaceContainerHigh);
+
+    final titleTextColor = isMe
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurface;
+
+    final subTextColor = isMe
+        ? colorScheme.onPrimaryContainer.withValues(alpha: 0.75)
+        : colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cardBgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMe
+              ? colorScheme.primary.withValues(alpha: 0.25)
+              : colorScheme.outline.withValues(alpha: 0.15),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(iconData, size: 20, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  statusLabel,
+                  style: TextStyle(
+                    color: titleTextColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isAr ? 'انقر لإعادة الاتصال' : 'Tap to call back',
+                  style: TextStyle(
+                    color: subTextColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            onPressed: () {
+              context.read<CallBloc>().add(
+                    StartCallEvent(
+                      chatId: chatId,
+                      type: isVideo ? 'VIDEO' : 'AUDIO',
+                      inviteeIds: peerUserId.isNotEmpty ? [peerUserId] : null,
+                    ),
+                  );
+            },
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primary.withValues(alpha: 0.15),
+              ),
+              child: Icon(
+                isVideo ? LucideIcons.video : LucideIcons.phone,
+                size: 16,
+                color: colorScheme.primary,
+              ),
+            ),
+            constraints: const BoxConstraints(),
+            padding: EdgeInsets.zero,
+          ),
+        ],
       ),
     );
   }

@@ -101,22 +101,12 @@ class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final feed = ref.watch(liveFeedProvider);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? Colors.black : Colors.white,
       body: _buildBody(feed),
-      // TEMPORARILY DISABLED — Create Live FAB (إنشاء بث)
-      // Restore by uncommenting the block below:
-      // floatingActionButton: FloatingActionButton.extended(
-      //   onPressed: () => context.push('/create-live'),
-      //   backgroundColor: const Color(0xFFEF4B5B),
-      //   icon: const Icon(Icons.videocam, color: Colors.white),
-      //   label: const Text(
-      //     'إنشاء بث',
-      //     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      //   ),
-      // ),
     );
   }
 
@@ -195,10 +185,11 @@ class _LiveFeedScreenState extends ConsumerState<LiveFeedScreen>
 class _LoadingSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: const Color(0xFF1A1A1A),
-      highlightColor: const Color(0xFF2A2A2A),
-      child: Container(color: Colors.white),
+      baseColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE2E8F0),
+      highlightColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF1F5F9),
+      child: Container(color: isDark ? Colors.black : Colors.white),
     );
   }
 }
@@ -244,6 +235,7 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -251,12 +243,14 @@ class _EmptyView extends StatelessWidget {
           Icon(
             Icons.live_tv_outlined,
             size: 72,
-            color: Colors.white.withValues(alpha: 0.35),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.35)
+                : Colors.black.withValues(alpha: 0.35),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No live streams right now',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
           ),
           const SizedBox(height: 16),
           TextButton(onPressed: onRefresh, child: const Text('Refresh')),
