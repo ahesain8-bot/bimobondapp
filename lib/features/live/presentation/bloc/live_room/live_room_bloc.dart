@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../../core/network/api_exceptions.dart';
+import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../../domain/entities/live_host.dart';
@@ -609,6 +610,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     _hudSub = null;
 
     if (isClosed) return;
+    // Tell the LIVE feed screen this live ended so it disappears immediately.
+    LiveFeedRefreshBus.instance.notifyLiveEnded(current.session.id);
     emit(const LiveRoomEnded());
 
     if (endFailure != null) {
@@ -642,6 +645,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     _hudSub = null;
     _sessionTeardownDone = true;
     if (isClosed) return;
+    // Tell the LIVE feed screen this live ended so it disappears immediately.
+    LiveFeedRefreshBus.instance.notifyLiveEnded(current.session.id);
     emit(const LiveRoomEnded());
   }
 

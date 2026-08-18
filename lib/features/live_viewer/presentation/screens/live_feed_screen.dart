@@ -1,13 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shimmer/shimmer.dart';
 
-import 'package:go_router/go_router.dart';
-
 import '../../core/errors/failures.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../../../core/services/live_feed_refresh_bus.dart';
 import '../providers/live_feed_provider.dart';
 import '../providers/live_session_provider.dart';
 import '../widgets/live_room_page.dart';
@@ -37,6 +38,7 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
     with WidgetsBindingObserver {
   late final PageController _pageController;
   int _currentIndex = 0;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -48,6 +50,39 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
     Future.microtask(() async {
       await ref.read(liveFeedProvider.notifier).loadFeed();
     });
+
+    // When the host ends a live, remove it from the feed immediately.
+    LiveFeedRefreshBus.instance.addListener(_onLiveEndedSignal);
+
+    // Background merge: new lives are appended to the feed automatically so
+    // they show up when the user swipes down — no pull-to-refresh needed.
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => _silentRefresh(),
+    );
+  }
+
+  Future<void> _silentRefresh() async {
+    if (!mounted) return;
+    await ref.read(liveFeedProvider.notifier).silentRefresh();
+    if (!mounted) return;
+    // Clamp the current page if the list shrank below it.
+    final lives = ref.read(liveFeedProvider).lives;
+    if (lives.isEmpty) return;
+    if (_currentIndex >= lives.length) {
+      final target = lives.length - 1;
+      _pageController.jumpToPage(target);
+      setState(() => _currentIndex = target);
+    }
+  }
+
+  void _onLiveEndedSignal() {
+    if (!mounted) return;
+    final endedId = LiveFeedRefreshBus.instance.lastEndedLiveId;
+    if (endedId == null) return;
+    // Removing the live triggers the ref.listen in build() which clamps the
+    // page and re-activates the live now at the current position.
+    ref.read(liveFeedProvider.notifier).removeLive(endedId);
   }
 
   @override
@@ -67,6 +102,8 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    LiveFeedRefreshBus.instance.removeListener(_onLiveEndedSignal);
     // Deactivate current live BEFORE disposing the controller so we don't
     // leave a dangling LiveKit connection + socket on viewer exit.
     ref.read(activeLiveProvider.notifier).deactivate();
@@ -78,14 +115,43 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
   void _onPageChanged(int index) {
     setState(() => _currentIndex = index);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final feed = ref.read(liveFeedProvider);
       final lives = feed.lives;
+
+      // Reached the loading/refresh page at the end of the feed.
+      // Swiping down here asks the server for new lives:
+      //  - if a new live appeared, it shows and the user stays on it;
+      //  - if nothing new, bounce back to the current live.
+      if (index >= lives.length) {
+        final before = lives.length;
+        await ref.read(liveFeedProvider.notifier).silentRefresh();
+        if (!mounted) return;
+        final after = ref.read(liveFeedProvider).lives.length;
+        if (after == before) {
+          // No new lives: return to the last real live.
+          final target = after - 1;
+          if (target >= 0) {
+            _pageController.jumpToPage(target);
+            setState(() => _currentIndex = target);
+            final currentLives = ref.read(liveFeedProvider).lives;
+            ref.read(activeLiveProvider.notifier).activate(currentLives[target]);
+          }
+        } else {
+          // New lives appeared: activate the live now at this index.
+          final newLives = ref.read(liveFeedProvider).lives;
+          if (index < newLives.length) {
+            ref.read(activeLiveProvider.notifier).activate(newLives[index]);
+          }
+        }
+        return;
+      }
+
       if (index >= lives.length - 2 && feed.hasMore) {
         ref.read(liveFeedProvider.notifier).loadMore();
       }
-      if (index >= lives.length) return;
+
       final notifier = ref.read(activeLiveProvider.notifier);
       final current = lives[index];
       if (notifier.activeLiveId != null &&
@@ -111,6 +177,36 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final feed = ref.watch(liveFeedProvider);
+
+    // When a live is removed from the feed (host ended it / socket liveEnded),
+    // the live at the current index changes. Re-activate it so video/audio
+    // keeps playing instead of showing only the "live" badge.
+    ref.listen<LiveFeedState>(liveFeedProvider, (previous, next) {
+      if (previous == null) return;
+      final prevLives = previous.lives;
+      final nextLives = next.lives;
+      if (nextLives.isEmpty) return;
+
+      final idx = _currentIndex.clamp(0, nextLives.length - 1);
+      final prevId = idx < prevLives.length ? prevLives[idx].id : null;
+      final nextId = nextLives[idx].id;
+
+      if (prevId != nextId) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final lives = ref.read(liveFeedProvider).lives;
+          if (lives.isEmpty) return;
+          final target = _currentIndex.clamp(0, lives.length - 1);
+          if (_currentIndex != target) {
+            _pageController.jumpToPage(target);
+            setState(() => _currentIndex = target);
+          }
+          // Re-activate the live now at the current position so its
+          // video/audio actually plays.
+          ref.read(activeLiveProvider.notifier).activate(lives[target]);
+        });
+      }
+    });
 
     return Scaffold(
       backgroundColor: isDark ? Colors.black : Colors.white,
@@ -144,7 +240,9 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
             scrollDirection: Axis.vertical,
             allowImplicitScrolling: false,
             physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
-            itemCount: feed.lives.length + (feed.hasMore ? 1 : 0),
+            // Always keep a trailing loading/refresh page so swiping down at
+            // the end of the feed triggers a check for new lives.
+            itemCount: feed.lives.length + 1,
             onPageChanged: _onPageChanged,
             itemBuilder: (context, index) {
               if (index >= feed.lives.length) {
