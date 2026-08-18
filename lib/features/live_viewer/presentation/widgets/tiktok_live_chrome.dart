@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/utils/extensions.dart';
 import '../../domain/entities/live_entity.dart';
+import 'animated_counter.dart';
 import 'fallback_media.dart';
 import 'tiktok_live_tokens.dart';
 
@@ -230,10 +231,9 @@ class _ViewerCountPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              viewerCount > 999
-                  ? viewerCount.formatNumber
-                  : '$viewerCount',
+            AnimatedCounter(
+              value: viewerCount,
+              compact: viewerCount > 999,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 12.5,

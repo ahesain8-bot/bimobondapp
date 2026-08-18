@@ -82,6 +82,9 @@ class CallkitService {
               return;
             }
             _handledActionKeys.add(key);
+            unawaited(FlutterCallkitIncoming.endCall(callId));
+          } else {
+            unawaited(FlutterCallkitIncoming.endAllCalls());
           }
           debugPrint('CallkitService: Call Declined/Timed out for callId=$callId');
           if (_onDeclineHandler != null) {
@@ -208,16 +211,28 @@ class CallkitService {
     String? callerName;
     for (final candidate in nameCandidates) {
       if (candidate != null && candidate is String && candidate.trim().isNotEmpty && candidate.trim() != 'null') {
-        callerName = candidate.trim();
-        break;
+        final lower = candidate.trim().toLowerCase();
+        if (lower != 'incoming call' &&
+            lower != 'incoming audio call' &&
+            lower != 'incoming video call' &&
+            lower != 'bimo bond' &&
+            lower != 'مكالمة واردة' &&
+            lower != 'مكالمة') {
+          callerName = candidate.trim();
+          break;
+        }
       }
     }
 
-    if (callerName == null || callerName == 'Incoming Call') {
+    if (callerName == null || callerName.isEmpty || callerName == 'Incoming Call') {
       final bodyStr = (data['body'] ?? data['notificationBody'] ?? data['message'] ?? '').toString();
       if (bodyStr.isNotEmpty) {
         if (bodyStr.contains(' is calling')) {
           callerName = bodyStr.split(' is calling').first.trim();
+        } else if (bodyStr.contains('calling you')) {
+          callerName = bodyStr.split('calling you').first.replaceAll('is', '').trim();
+        } else if (bodyStr.toLowerCase().contains('call from ')) {
+          callerName = bodyStr.substring(bodyStr.toLowerCase().indexOf('from ') + 5).trim();
         } else if (bodyStr.contains('يقوم بالاتصال')) {
           callerName = bodyStr.split('يقوم بالاتصال').first.trim();
         } else if (bodyStr.contains('مكالمة من ')) {
@@ -285,6 +300,10 @@ class CallkitService {
   }
 
   Future<void> showIncomingCall(Map<String, dynamic> data) async {
+    try {
+      await FlutterCallkitIncoming.endAllCalls();
+    } catch (_) {}
+
     final callId = data['callId']?.toString() ?? data['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
     final details = _extractCallerDetails(data);
     final callerName = details['name'] ?? 'Incoming Call';

@@ -116,12 +116,18 @@ class SocketMapper {
     final map = _asMap(data);
     if (map == null) return null;
 
-    final viewers = _asInt(map['viewers'] ?? map['count']);
+    final rawViewers = map['viewers'] ?? map['count'];
+    final avatars = avatarUrlsFrom(
+      map['topViewers'] ?? map['users'] ?? map['viewersList'] ?? rawViewers,
+    );
+    final viewers = _asInt(rawViewers) ??
+        (rawViewers is List ? rawViewers.length : null);
     if (viewers == null) return null;
 
     return LiveViewersEvent(
       liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
       viewerCount: viewers,
+      topViewerAvatars: avatars,
       timestamp: DateTime.now(),
     );
   }
@@ -215,9 +221,28 @@ class SocketMapper {
       username: user['username']?.toString() ??
           user['fullName']?.toString() ??
           'User',
-      avatarUrl: user['avatarUrl']?.toString(),
+      avatarUrl: user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
+      viewerCount: _asInt(map['viewers'] ?? map['count']),
       timestamp: DateTime.now(),
     );
+  }
+
+  /// Avatar URLs from `topViewers` / `users` / a viewers list, if present.
+  static List<String> avatarUrlsFrom(dynamic raw) {
+    if (raw is! List) return const [];
+    final urls = <String>[];
+    for (final item in raw) {
+      if (item is String && item.trim().isNotEmpty) {
+        urls.add(item.trim());
+        continue;
+      }
+      final map = _asMap(item);
+      if (map == null) continue;
+      final user = _asMap(map['user']) ?? map;
+      final url = user['avatarUrl']?.toString() ?? user['avatar']?.toString();
+      if (url != null && url.trim().isNotEmpty) urls.add(url.trim());
+    }
+    return urls.take(3).toList();
   }
 
   // ── Helpers ───────────────────────────────────────────

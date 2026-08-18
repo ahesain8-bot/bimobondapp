@@ -181,10 +181,26 @@ class PushNotificationService {
     _openFromPayload(payload);
   }
 
+  Future<void> cancelNotification(int id) async {
+    try {
+      await _localNotifications.cancel(id: id);
+    } catch (_) {}
+  }
+
+  Future<void> cancelAllNotifications() async {
+    try {
+      await _localNotifications.cancelAll();
+    } catch (_) {}
+  }
+
   Future<void> showRemoteMessage(RemoteMessage message) async {
     final title = pushTitle(message);
     final body = pushBody(message);
     final payload = jsonEncode(message.data);
+
+    final callId = message.data['callId']?.toString() ?? message.data['id']?.toString();
+    final chatId = message.data['chatId']?.toString();
+    final notifId = callId != null ? callId.hashCode : (chatId != null ? chatId.hashCode : message.hashCode);
 
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -201,7 +217,7 @@ class PushNotificationService {
     );
 
     await _localNotifications.show(
-      id: message.hashCode,
+      id: notifId,
       title: title,
       body: body,
       notificationDetails: NotificationDetails(
@@ -423,12 +439,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     return;
   } else if (typeUpper == 'CALL_CANCELLED' ||
       typeUpper == 'CALL_ENDED' ||
-      typeUpper == 'CALL_REJECTED') {
-    final callId = data['callId']?.toString();
+      typeUpper == 'CALL_REJECTED' ||
+      typeUpper == 'CALL_MISSED' ||
+      typeUpper == 'MISSED_CALL' ||
+      typeUpper == 'MISSED') {
+    final callId = data['callId']?.toString() ?? data['id']?.toString();
     if (callId != null && callId.isNotEmpty) {
       await CallkitService.instance.endCall(callId);
+      await PushNotificationService.instance.cancelNotification(callId.hashCode);
     } else {
       await CallkitService.instance.endAllCalls();
+      await PushNotificationService.instance.cancelAllNotifications();
     }
     return;
   }

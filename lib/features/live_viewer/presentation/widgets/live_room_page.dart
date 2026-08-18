@@ -575,11 +575,12 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
               builder: (context, ref, _) {
                 final avatars = isThisRoom
                     ? ref.watch(activeLiveProvider.select((s) => s.topViewerAvatars))
-                    : const <String>[
-                        'https://i.pravatar.cc/150?u=a',
-                        'https://i.pravatar.cc/150?u=b',
-                        'https://i.pravatar.cc/150?u=c',
-                      ];
+                    : (widget.live.metadata?['topViewerAvatars'] as List?)
+                            ?.map((e) => e.toString())
+                            .where((url) => url.isNotEmpty)
+                            .take(3)
+                            .toList() ??
+                        const <String>[];
                 final counts = isThisRoom
                     ? ref.watch(activeLiveProvider.select((s) {
                         final l = s.live;

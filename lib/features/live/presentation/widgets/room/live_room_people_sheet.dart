@@ -94,45 +94,56 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
           ? const LiveRoomSheetStatus.loading()
           : _error != null
               ? LiveRoomSheetStatus.error(message: _error!)
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  children: [
-                    _statCard(
-                      title: 'عدد المشاهدين الآن',
-                      value: '${widget.session.viewerCount}',
-                      subtitle:
-                          'يأتي العدد من حقل viewers والـ Socket (liveViewers). '
-                          'لا يوجد API لقائمة أسماء المشاهدين في مستندات lives.',
-                    ),
-                    const SizedBox(height: 12),
-                    _statCard(
-                      title: 'ضيوف على المسرح',
-                      value: '$_activeGuests',
-                      subtitle: 'من GET /lives/:id/guests (ACTIVE)',
-                    ),
-                    const SizedBox(height: 12),
-                    _statCard(
-                      title: 'طلبات معلقة',
-                      value: '$_pendingGuests',
-                      subtitle: 'REQUESTED + INVITED',
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      icon: const Icon(Icons.groups_outlined),
-                      label: const Text('إدارة الضيوف'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () {
-                        context
-                            .read<LiveRoomBloc>()
-                            .add(const LiveRoomGuestsChanged());
-                        Navigator.of(context).maybePop(false);
-                      },
-                      child: const Text('إغلاق'),
-                    ),
-                  ],
+              : BlocBuilder<LiveRoomBloc, LiveRoomState>(
+                  buildWhen: (previous, current) =>
+                      current is LiveRoomReady &&
+                      (previous is! LiveRoomReady ||
+                          previous.session.viewerCount !=
+                              current.session.viewerCount),
+                  builder: (context, state) {
+                    final viewers = state is LiveRoomReady
+                        ? state.session.viewerCount
+                        : widget.session.viewerCount;
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                      children: [
+                        _statCard(
+                          title: 'عدد المشاهدين الآن',
+                          value: '$viewers',
+                          subtitle:
+                              'يتحدث مباشرة عند دخول أو خروج مشاهد (liveViewers).',
+                        ),
+                        const SizedBox(height: 12),
+                        _statCard(
+                          title: 'ضيوف على المسرح',
+                          value: '$_activeGuests',
+                          subtitle: 'من GET /lives/:id/guests (ACTIVE)',
+                        ),
+                        const SizedBox(height: 12),
+                        _statCard(
+                          title: 'طلبات معلقة',
+                          value: '$_pendingGuests',
+                          subtitle: 'REQUESTED + INVITED',
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          icon: const Icon(Icons.groups_outlined),
+                          label: const Text('إدارة الضيوف'),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () {
+                            context
+                                .read<LiveRoomBloc>()
+                                .add(const LiveRoomGuestsChanged());
+                            Navigator.of(context).maybePop(false);
+                          },
+                          child: const Text('إغلاق'),
+                        ),
+                      ],
+                    );
+                  },
                 ),
     );
   }
