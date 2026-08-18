@@ -215,7 +215,7 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
               }
             } else if (state is CallActiveState || state is CallOutgoingRingingState) {
               _maximizeCall();
-            } else if (state is CallEndedState) {
+            } else if (state is CallEndedState || state is CallInitialState) {
               _isIncomingCallScreenOpen = false;
               _isActiveCallScreenOpen = false;
               nav.popUntil(
@@ -224,14 +224,18 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
                     route.settings.name != '/active-call',
               );
 
-              final rootCtx = AppRouter.rootNavigatorKey.currentContext;
-              if (rootCtx != null && rootCtx.mounted) {
-                ScaffoldMessenger.of(rootCtx).showSnackBar(
-                  SnackBar(
-                    content: Text(state.reason ?? 'Call ended'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+              if (state is CallEndedState &&
+                  state.reason != null &&
+                  state.reason!.trim().isNotEmpty) {
+                final rootCtx = AppRouter.rootNavigatorKey.currentContext;
+                if (rootCtx != null && rootCtx.mounted) {
+                  ScaffoldMessenger.of(rootCtx).showSnackBar(
+                    SnackBar(
+                      content: Text(state.reason!),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
               }
             }
           },

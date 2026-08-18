@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/calls/domain/entities/call_entity.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/call_controls.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/call_status.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -90,7 +91,11 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final caller = widget.call.initiatedBy;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final caller = widget.call.getDisplayUser(
+      currentUserId,
+      isOutgoing: widget.isOutgoingRinging,
+    );
     final displayName = caller.fullName?.isNotEmpty == true
         ? caller.fullName!
         : caller.username;
@@ -149,6 +154,54 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                           ),
                         ),
                       ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                width: 16,
+                                height: 16,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                  'assets/images/app_icon.png',
+                                  width: 16,
+                                  height: 16,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Bimo-Bond Call',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 44),
                     ],
                   ),
                 ),
@@ -228,7 +281,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                             : (widget.statusState == CallUiStatusState.calling
                                 ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الاتصال...' : 'Calling...')
                                 : (widget.statusState == CallUiStatusState.ringing
-                                    ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الرنين...' : 'Ringing...')
+                                    ? (Localizations.localeOf(context).languageCode == 'ar' ? 'يرن...' : 'Ringing...')
                                     : widget.timerText)),
                         style: TextStyle(
                           color: isDark

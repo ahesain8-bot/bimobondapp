@@ -13,6 +13,7 @@ import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -136,17 +137,22 @@ class PushNotificationService {
         'PushNotificationService: foreground message ${message.messageId}',
       );
     }
-    final data = message.data;
-    final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? '')
+    final fullData = _extractFullMessageData(message);
+    final typeUpper = (fullData['type'] ?? fullData['event'] ?? fullData['action'] ?? '')
         .toString()
         .toUpperCase();
 
-    if (_isIncomingCallData(data)) {
+    if (_isIncomingCallData(fullData)) {
+      final isAppResumed =
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+      if (!isAppResumed) {
+        await CallkitService.instance.showIncomingCall(fullData);
+      }
       final rootCtx = AppRouter.rootNavigatorKey.currentContext;
       if (rootCtx != null && rootCtx.mounted) {
         final callBloc = rootCtx.read<CallBloc>();
         if (callBloc.state is! CallIncomingState && callBloc.state is! CallActiveState) {
-          final callEntity = CallModel.fromJson(data);
+          final callEntity = CallModel.fromJson(fullData);
           callBloc.add(IncomingCallReceivedEvent(call: callEntity));
         }
       }
@@ -154,7 +160,7 @@ class PushNotificationService {
     } else if (typeUpper == 'CALL_CANCELLED' ||
         typeUpper == 'CALL_ENDED' ||
         typeUpper == 'CALL_REJECTED') {
-      final callId = data['callId']?.toString();
+      final callId = fullData['callId']?.toString() ?? fullData['id']?.toString();
       if (callId != null && callId.isNotEmpty) {
         await CallkitService.instance.endCall(callId);
       } else {
@@ -248,24 +254,50 @@ void _onBackgroundNotificationTap(NotificationResponse response) {
 }
 
 bool _isIncomingCallData(Map<String, dynamic> data) {
-  final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? '')
+  final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? data['eventType'] ?? data['callType'] ?? '')
       .toString()
       .toUpperCase();
   final screenUpper = (data['screen'] ?? '').toString().toUpperCase();
 
   if (typeUpper == 'CALL_INCOMING' ||
       typeUpper == 'INCOMING_CALL' ||
+      typeUpper == 'CALL' ||
       typeUpper.contains('INCOMING') ||
-      screenUpper == 'INCOMING_CALL') {
-    return true;
+      screenUpper == 'INCOMING_CALL' ||
+      screenUpper == 'CALL') {
+    if (typeUpper != 'CALL_CANCELLED' &&
+        typeUpper != 'CALL_ENDED' &&
+        typeUpper != 'CALL_REJECTED' &&
+        typeUpper != 'CALL_MISSED') {
+      return true;
+    }
   }
 
-  final callId = data['callId']?.toString() ?? data['id']?.toString();
+  final callId = data['callId']?.toString() ??
+      data['call_id']?.toString() ??
+      data['id']?.toString() ??
+      data['channel']?.toString();
+
   if (callId != null &&
       callId.isNotEmpty &&
       typeUpper != 'CALL_CANCELLED' &&
       typeUpper != 'CALL_ENDED' &&
-      typeUpper != 'CALL_REJECTED') {
+      typeUpper != 'CALL_REJECTED' &&
+      typeUpper != 'CALL_MISSED') {
+    return true;
+  }
+
+  final body = (data['body'] ?? data['notificationBody'] ?? '').toString().toLowerCase();
+  final title = (data['title'] ?? data['notificationTitle'] ?? '').toString().toLowerCase();
+  if ((body.contains('calling') ||
+          body.contains('مكالمة') ||
+          body.contains('is calling') ||
+          title.contains('calling') ||
+          title.contains('مكالمة')) &&
+      typeUpper != 'CALL_CANCELLED' &&
+      typeUpper != 'CALL_ENDED' &&
+      typeUpper != 'CALL_REJECTED' &&
+      typeUpper != 'CALL_MISSED') {
     return true;
   }
 
@@ -274,19 +306,62 @@ bool _isIncomingCallData(Map<String, dynamic> data) {
 
 Map<String, dynamic> _extractFullMessageData(RemoteMessage message) {
   final data = Map<String, dynamic>.from(message.data);
+
   if (message.notification != null) {
-    if (message.notification!.title != null &&
-        message.notification!.title!.isNotEmpty) {
-      data.putIfAbsent('notificationTitle', () => message.notification!.title);
-      data.putIfAbsent('title', () => message.notification!.title);
-      data.putIfAbsent('callerName', () => message.notification!.title);
-      data.putIfAbsent('name', () => message.notification!.title);
-      data.putIfAbsent('username', () => message.notification!.title);
+    final notifTitle = message.notification!.title;
+    final notifBody = message.notification!.body;
+
+    if (notifTitle != null && notifTitle.isNotEmpty) {
+      data.putIfAbsent('notificationTitle', () => notifTitle);
+      data.putIfAbsent('title', () => notifTitle);
+      final lowerTitle = notifTitle.toLowerCase();
+      if (lowerTitle != 'incoming call' &&
+          lowerTitle != 'incoming voice call' &&
+          lowerTitle != 'incoming video call' &&
+          lowerTitle != 'bimo bond' &&
+          lowerTitle != 'مكالمة واردة' &&
+          lowerTitle != 'مكالمة') {
+        data.putIfAbsent('callerName', () => notifTitle);
+        data.putIfAbsent('name', () => notifTitle);
+        data.putIfAbsent('username', () => notifTitle);
+      }
     }
-    if (message.notification!.body != null &&
-        message.notification!.body!.isNotEmpty) {
-      data.putIfAbsent('notificationBody', () => message.notification!.body);
-      data.putIfAbsent('body', () => message.notification!.body);
+
+    if (notifBody != null && notifBody.isNotEmpty) {
+      data.putIfAbsent('notificationBody', () => notifBody);
+      data.putIfAbsent('body', () => notifBody);
+
+      final trimmedBody = notifBody.trim();
+      if (trimmedBody.startsWith('{') && trimmedBody.endsWith('}')) {
+        try {
+          final decoded = jsonDecode(trimmedBody);
+          if (decoded is Map) {
+            final bodyMap = Map<String, dynamic>.from(decoded);
+            bodyMap.forEach((k, v) {
+              data.putIfAbsent(k, () => v);
+            });
+          }
+        } catch (_) {}
+      }
+
+      String? extractedName;
+      if (notifBody.contains(' is calling')) {
+        extractedName = notifBody.split(' is calling').first.trim();
+      } else if (notifBody.contains('يقوم بالاتصال')) {
+        extractedName = notifBody.split('يقوم بالاتصال').first.trim();
+      } else if (notifBody.contains('مكالمة من ')) {
+        extractedName = notifBody.split('مكالمة من ').last.trim();
+      }
+
+      if (extractedName != null &&
+          extractedName.isNotEmpty &&
+          extractedName.toLowerCase() != 'incoming call' &&
+          extractedName.toLowerCase() != 'مكالمة واردة') {
+        data['callerName'] = extractedName;
+        data['name'] = extractedName;
+        data['username'] = extractedName;
+        data['fullName'] = extractedName;
+      }
     }
   }
 
@@ -300,6 +375,9 @@ Map<String, dynamic> _extractFullMessageData(RemoteMessage message) {
           decodedMap.forEach((k, v) {
             data.putIfAbsent(k, () => v);
           });
+          if (key == 'user' || key == 'caller' || key == 'initiator' || key == 'actor') {
+            data.putIfAbsent('initiatedBy', () => decodedMap);
+          }
         }
       } catch (_) {}
     } else if (val is Map) {
@@ -307,6 +385,23 @@ Map<String, dynamic> _extractFullMessageData(RemoteMessage message) {
       mapVal.forEach((k, v) {
         data.putIfAbsent(k, () => v);
       });
+      if (key == 'user' || key == 'caller' || key == 'initiator' || key == 'actor') {
+        data.putIfAbsent('initiatedBy', () => mapVal);
+      }
+    }
+  }
+
+  if (data['initiatedBy'] == null) {
+    final callerName = data['callerName'] ?? data['fullName'] ?? data['username'] ?? data['name'];
+    final callerAvatar = data['callerAvatar'] ?? data['avatarUrl'] ?? data['avatar'] ?? data['imageUrl'];
+    final callerId = data['callerId'] ?? data['initiatorId'] ?? data['userId'] ?? '';
+    if (callerName != null) {
+      data['initiatedBy'] = {
+        'id': callerId.toString(),
+        'username': callerName.toString(),
+        'fullName': callerName.toString(),
+        'avatarUrl': callerAvatar?.toString(),
+      };
     }
   }
 

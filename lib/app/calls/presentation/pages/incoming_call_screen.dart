@@ -20,6 +20,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _acceptWithCameraOff = false;
+  bool _isProcessingAction = false;
+  bool _isAccepting = false;
+  bool _isDeclining = false;
+
 
   @override
   void initState() {
@@ -128,6 +132,23 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.asset(
+                                  'assets/images/logo.png',
+                                  width: 18,
+                                  height: 18,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Image.asset(
+                                    'assets/images/app_icon.png',
+                                    width: 18,
+                                    height: 18,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Icon(
                                 isVideo
                                     ? LucideIcons.video
@@ -137,9 +158,14 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                Localizations.localeOf(context).languageCode == 'ar'
-                                    ? (isVideo ? 'مكالمة فيديو واردة' : 'مكالمة صوتية واردة')
-                                    : (isVideo ? 'Incoming Video Call' : 'Incoming Voice Call'),
+                                Localizations.localeOf(context).languageCode ==
+                                        'ar'
+                                    ? (isVideo
+                                        ? 'Bimo-Bond مكالمة فيديو'
+                                        : 'Bimo-Bond مكالمة صوتية')
+                                    : (isVideo
+                                        ? 'Bimo-Bond Video Call'
+                                        : 'Bimo-Bond Audio Call'),
                                 style: TextStyle(
                                   color: isDark ? Colors.white : Colors.black87,
                                   fontSize: 13,
@@ -290,31 +316,49 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          context.read<CallBloc>().add(
-                                RejectCallEvent(callId: widget.call.id),
-                              );
-                        },
+                        onTap: _isProcessingAction
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isProcessingAction = true;
+                                  _isDeclining = true;
+                                });
+                                context.read<CallBloc>().add(
+                                      RejectCallEvent(callId: widget.call.id),
+                                    );
+                              },
                         child: Container(
                           width: 68,
                           height: 68,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFFEF4444),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFEF4444)
-                                    .withValues(alpha: 0.45),
-                                blurRadius: 20,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                            color: _isProcessingAction
+                                ? const Color(0xFFEF4444).withValues(alpha: 0.5)
+                                : const Color(0xFFEF4444),
+                            boxShadow: _isProcessingAction
+                                ? []
+                                : [
+                                    BoxShadow(
+                                      color: const Color(0xFFEF4444)
+                                          .withValues(alpha: 0.45),
+                                      blurRadius: 20,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
                           ),
-                          child: const Icon(
-                            LucideIcons.phone,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                          child: _isDeclining
+                              ? const Padding(
+                                  padding: EdgeInsets.all(18),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Icon(
+                                  LucideIcons.phone,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -334,40 +378,58 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          if (_acceptWithCameraOff) {
-                            context.read<CallBloc>().add(
-                                  const ToggleCameraEvent(),
-                                );
-                          }
-                          context.read<CallBloc>().add(
-                                AcceptCallEvent(callId: widget.call.id),
-                              );
-                        },
+                        onTap: _isProcessingAction
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isProcessingAction = true;
+                                  _isAccepting = true;
+                                });
+                                if (_acceptWithCameraOff) {
+                                  context.read<CallBloc>().add(
+                                        const ToggleCameraEvent(),
+                                      );
+                                }
+                                context.read<CallBloc>().add(
+                                      AcceptCallEvent(callId: widget.call.id),
+                                    );
+                              },
                         child: Container(
                           width: 68,
                           height: 68,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFF10B981),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.45),
-                                blurRadius: 20,
-                                spreadRadius: 2,
-                              ),
-                            ],
+                            color: _isProcessingAction
+                                ? const Color(0xFF10B981).withValues(alpha: 0.5)
+                                : const Color(0xFF10B981),
+                            boxShadow: _isProcessingAction
+                                ? []
+                                : [
+                                    BoxShadow(
+                                      color: const Color(0xFF10B981)
+                                          .withValues(alpha: 0.45),
+                                      blurRadius: 20,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
                           ),
-                          child: Icon(
-                            isVideo
-                                ? (_acceptWithCameraOff
-                                    ? LucideIcons.videoOff
-                                    : LucideIcons.video)
-                                : LucideIcons.phoneCall,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                          child: _isAccepting
+                              ? const Padding(
+                                  padding: EdgeInsets.all(18),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Icon(
+                                  isVideo
+                                      ? (_acceptWithCameraOff
+                                          ? LucideIcons.videoOff
+                                          : LucideIcons.video)
+                                      : LucideIcons.phoneCall,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
                         ),
                       ),
                       const SizedBox(height: 10),

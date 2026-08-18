@@ -3,6 +3,7 @@ import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
 import 'package:bimobondapp/app/calls/services/livekit_call_service.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -36,7 +37,8 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final caller = widget.call.initiatedBy;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final caller = widget.call.getDisplayUser(currentUserId);
     final displayName = caller.fullName?.isNotEmpty == true
         ? caller.fullName!
         : caller.username;
@@ -132,13 +134,35 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          displayName,
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                width: 14,
+                                height: 14,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                  'assets/images/app_icon.png',
+                                  width: 14,
+                                  height: 14,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              displayName,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Row(
@@ -153,7 +177,7 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              widget.timerText,
+                              '${widget.timerText} • Bimo-Bond',
                               style: TextStyle(
                                 color: isDark ? Colors.white70 : Colors.black54,
                                 fontSize: 11,

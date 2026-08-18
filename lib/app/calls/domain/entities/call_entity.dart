@@ -114,6 +114,48 @@ class CallEntity extends Equatable {
       status.toUpperCase() == 'REJECTED' ||
       status.toUpperCase() == 'CANCELLED';
 
+  CallUserEntity getDisplayUser(String currentUserId, {bool isOutgoing = false}) {
+    if (isOutgoing || (currentUserId.isNotEmpty && initiatedBy.id == currentUserId)) {
+      for (final p in participants) {
+        if (p.role.toUpperCase() == 'CALLEE' && p.user != null) {
+          return p.user!;
+        }
+      }
+      for (final p in participants) {
+        if (p.userId != currentUserId && p.userId != initiatedBy.id && p.user != null) {
+          return p.user!;
+        }
+      }
+      for (final p in participants) {
+        if (p.userId != currentUserId && p.user != null) {
+          return p.user!;
+        }
+      }
+      for (final p in participants) {
+        if (p.role.toUpperCase() == 'CALLEE' && p.userId.isNotEmpty) {
+          return CallUserEntity(id: p.userId, username: 'User');
+        }
+      }
+      for (final p in participants) {
+        if (p.userId != currentUserId && p.userId.isNotEmpty) {
+          return CallUserEntity(id: p.userId, username: 'User');
+        }
+      }
+    }
+
+    if (initiatedBy.id.isNotEmpty && initiatedBy.id != currentUserId) {
+      return initiatedBy;
+    }
+
+    for (final p in participants) {
+      if (p.userId != currentUserId && p.user != null) {
+        return p.user!;
+      }
+    }
+
+    return initiatedBy;
+  }
+
   Map<String, dynamic> toCallkitData() {
     final callerName = (initiatedBy.fullName != null && initiatedBy.fullName!.isNotEmpty)
         ? initiatedBy.fullName!

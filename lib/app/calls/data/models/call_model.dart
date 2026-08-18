@@ -142,13 +142,109 @@ class CallModel extends CallEntity {
       }
     }
 
-    final callerName = json['callerName']?.toString() ??
-        json['actorName']?.toString() ??
-        json['title']?.toString() ??
-        json['senderName']?.toString() ??
-        'User';
-    final callerAvatar = json['callerAvatar']?.toString() ?? json['avatar']?.toString();
-    final callerId = json['callerId']?.toString() ?? json['initiatorId']?.toString() ?? json['userId']?.toString() ?? '';
+    CallUserModel? extraCalleeUser;
+    for (final key in ['callee', 'recipient', 'targetUser', 'otherUser', 'invitee', 'user', 'receiver', 'toUser']) {
+      final val = json[key];
+      if (val is Map) {
+        extraCalleeUser = CallUserModel.fromJson(Map<String, dynamic>.from(val));
+        break;
+      }
+    }
+
+    if (extraCalleeUser != null && extraCalleeUser.id.isNotEmpty) {
+      final calleeId = extraCalleeUser.id;
+      final existingIdx = participantsList.indexWhere(
+        (p) => p.userId == calleeId || p.role.toUpperCase() == 'CALLEE',
+      );
+      if (existingIdx >= 0) {
+        final existing = participantsList[existingIdx];
+        if (existing.user == null) {
+          participantsList[existingIdx] = CallParticipantModel(
+            id: existing.id,
+            userId: existing.userId,
+            role: existing.role,
+            status: existing.status,
+            joinedAt: existing.joinedAt,
+            leftAt: existing.leftAt,
+            user: extraCalleeUser,
+          );
+        }
+      } else {
+        participantsList.add(
+          CallParticipantModel(
+            id: 'callee_$calleeId',
+            userId: calleeId,
+            role: 'CALLEE',
+            status: 'RINGING',
+            user: extraCalleeUser,
+          ),
+        );
+      }
+    }
+
+    final nameCandidates = [
+      json['callerName'],
+      json['caller_name'],
+      json['fullName'],
+      json['full_name'],
+      json['actorName'],
+      json['actor_name'],
+      json['senderName'],
+      json['sender_name'],
+      json['displayName'],
+      json['display_name'],
+      json['userName'],
+      json['user_name'],
+      json['username'],
+      json['name'],
+      json['title'],
+    ];
+
+    String? callerName;
+    for (final candidate in nameCandidates) {
+      if (candidate != null && candidate is String && candidate.trim().isNotEmpty && candidate.trim() != 'null') {
+        final lower = candidate.trim().toLowerCase();
+        if (lower != 'incoming call' &&
+            lower != 'incoming voice call' &&
+            lower != 'incoming video call' &&
+            lower != 'bimo bond' &&
+            lower != 'مكالمة واردة' &&
+            lower != 'مكالمة') {
+          callerName = candidate.trim();
+          break;
+        }
+      }
+    }
+    callerName ??= json['callerName']?.toString() ?? json['username']?.toString() ?? json['title']?.toString() ?? 'User';
+
+    final avatarCandidates = [
+      json['callerAvatar'],
+      json['caller_avatar'],
+      json['avatarUrl'],
+      json['avatar_url'],
+      json['avatar'],
+      json['userAvatar'],
+      json['user_avatar'],
+      json['imageUrl'],
+      json['image_url'],
+      json['image'],
+      json['icon'],
+      json['picture'],
+      json['profile_pic'],
+    ];
+
+    String? callerAvatar;
+    for (final candidate in avatarCandidates) {
+      if (candidate != null && candidate is String && candidate.trim().isNotEmpty && candidate.trim() != 'null') {
+        callerAvatar = candidate.trim();
+        break;
+      }
+    }
+
+    final callerId = json['callerId']?.toString() ??
+        json['initiatorId']?.toString() ??
+        json['userId']?.toString() ??
+        '';
 
     final rawInitiatedBy = json['initiatedBy'];
     CallUserModel initiatedByModel;
@@ -266,9 +362,17 @@ class CallSessionModel extends CallSessionEntity {
 
   factory CallSessionModel.fromJson(Map<String, dynamic> json) {
     final rawCall = json['call'];
-    final callEntity = rawCall is Map
-        ? CallModel.fromJson(Map<String, dynamic>.from(rawCall))
-        : CallModel.fromJson(json);
+    final Map<String, dynamic> callData = rawCall is Map
+        ? Map<String, dynamic>.from(rawCall)
+        : Map<String, dynamic>.from(json);
+
+    for (final key in ['callee', 'recipient', 'targetUser', 'otherUser', 'invitee', 'user', 'receiver', 'toUser']) {
+      if (json[key] != null && callData[key] == null) {
+        callData[key] = json[key];
+      }
+    }
+
+    final callEntity = CallModel.fromJson(callData);
 
     return CallSessionModel(
       call: callEntity,

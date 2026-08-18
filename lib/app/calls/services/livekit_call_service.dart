@@ -125,7 +125,7 @@ class LiveKitCallService {
       }
 
       try {
-        await Hardware.instance.setSpeakerphoneOn(_isSpeakerPhoneOn);
+        await AudioManager.instance.setSpeakerOutputPreferred(_isSpeakerPhoneOn);
       } catch (e) {
         debugPrint('LiveKitCallService initial speakerphone set error: $e');
       }
@@ -228,7 +228,7 @@ class LiveKitCallService {
   Future<void> toggleSpeaker() async {
     _isSpeakerPhoneOn = !_isSpeakerPhoneOn;
     try {
-      await Hardware.instance.setSpeakerphoneOn(_isSpeakerPhoneOn);
+      await AudioManager.instance.setSpeakerOutputPreferred(_isSpeakerPhoneOn);
     } catch (e) {
       debugPrint('LiveKitCallService toggleSpeaker error: $e');
     }

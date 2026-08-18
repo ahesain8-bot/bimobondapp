@@ -13,6 +13,7 @@ class CallkitService {
   Function(Map<String, dynamic> extra)? _onDeclineHandler;
   Map<String, dynamic>? _pendingAcceptExtra;
   Map<String, dynamic>? _pendingDeclineExtra;
+  final Set<String> _handledActionKeys = {};
 
   void initialize({
     Function(Map<String, dynamic> extra)? onAccept,
@@ -52,10 +53,20 @@ class CallkitService {
         }
       }
 
+      final callId = extra['callId']?.toString() ?? extra['id']?.toString() ?? body['id']?.toString();
+
       switch (event.event) {
         case Event.actionCallAccept:
         case Event.actionCallCallback:
-          debugPrint('CallkitService: Call Accepted/Tapped for callId=${extra['callId']}');
+          if (callId != null && callId.isNotEmpty) {
+            final key = 'accept_$callId';
+            if (_handledActionKeys.contains(key)) {
+              debugPrint('CallkitService: Duplicate accept event ignored for $callId');
+              return;
+            }
+            _handledActionKeys.add(key);
+          }
+          debugPrint('CallkitService: Call Accepted/Tapped for callId=$callId');
           if (_onAcceptHandler != null) {
             _onAcceptHandler?.call(extra);
           } else {
@@ -64,7 +75,15 @@ class CallkitService {
           break;
         case Event.actionCallDecline:
         case Event.actionCallTimeout:
-          debugPrint('CallkitService: Call Declined/Timed out for callId=${extra['callId']}');
+          if (callId != null && callId.isNotEmpty) {
+            final key = 'decline_$callId';
+            if (_handledActionKeys.contains(key)) {
+              debugPrint('CallkitService: Duplicate decline event ignored for $callId');
+              return;
+            }
+            _handledActionKeys.add(key);
+          }
+          debugPrint('CallkitService: Call Declined/Timed out for callId=$callId');
           if (_onDeclineHandler != null) {
             _onDeclineHandler?.call(extra);
           } else {
@@ -72,6 +91,10 @@ class CallkitService {
           }
           break;
         case Event.actionCallEnded:
+          if (callId != null) {
+            _handledActionKeys.remove('accept_$callId');
+            _handledActionKeys.remove('decline_$callId');
+          }
           break;
         default:
           break;
@@ -271,13 +294,16 @@ class CallkitService {
     final typeStr = data['type']?.toString().toUpperCase() ?? '';
     final callType = data['callType']?.toString().toUpperCase() ?? '';
     final isVideo = typeStr == 'VIDEO' || callType == 'VIDEO' || data['isVideo'] == true || data['isVideo'] == 'true';
+    final callKindText = isVideo ? 'Bimo-Bond Video Call' : 'Bimo-Bond Audio Call';
 
     final params = CallKitParams(
       id: callId,
       nameCaller: callerName,
-      appName: 'Bimo Bond',
+      appName: callKindText,
       avatar: callerAvatar,
-      handle: callerHandle,
+      handle: (callerHandle != 'Voice Call' && callerHandle != 'Video Call' && callerHandle.isNotEmpty)
+          ? '$callerHandle • $callKindText'
+          : callKindText,
       type: isVideo ? 1 : 0,
       duration: 30000,
       textAccept: 'Accept',
@@ -286,11 +312,13 @@ class CallkitService {
       headers: <String, dynamic>{'apiKey': 'bimobond'},
       android: const AndroidParams(
         isCustomNotification: false,
-        isShowLogo: false,
+        isShowLogo: true,
+        logoUrl: 'logo',
+        isShowFullLockedScreen: true,
         ringtonePath: 'system_ringtone_default',
-        backgroundColor: '#FFFFFF',
-        actionColor: '#4CAF50',
-        textColor: '#1E293B',
+        backgroundColor: '#090D16',
+        actionColor: '#10B981',
+        textColor: '#FFFFFF',
         incomingCallNotificationChannelName: 'Incoming Calls',
         missedCallNotificationChannelName: 'Missed Calls',
         isShowCallID: true,

@@ -44,24 +44,20 @@ class CallControls extends StatelessWidget {
     final labelFlip = isArabic ? 'قلب' : 'Flip';
     final labelSpeaker = isArabic ? 'مكبر الصوت' : 'Speaker';
     final labelNormalSound = isArabic ? 'صوت عادي' : 'Normal';
-    final labelCloseSound = isArabic ? 'إغلاق الصوت' : 'Sound Off';
-    final labelToAudio = isArabic ? 'صوتي' : 'To Audio';
-    final labelToVideo = isArabic ? 'فيديو' : 'To Video';
-    final labelAdd = isArabic ? 'إضافة' : 'Add';
     final labelEnd = isArabic ? 'إنهاء' : 'End';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isDarkTheme
-            ? const Color(0xFF1E293B).withValues(alpha: 0.85)
+            ? const Color(0xFF1E293B).withValues(alpha: 0.88)
             : Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: isDarkTheme
               ? Colors.white.withValues(alpha: 0.12)
               : Colors.black.withValues(alpha: 0.06),
-          width: 1.5,
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
@@ -74,10 +70,10 @@ class CallControls extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Mic Mute / Unmute
+            // 1. Mic Mute / Unmute
             _AnimatedControlButton(
               icon: isMuted ? LucideIcons.micOff : LucideIcons.mic,
               label: isMuted ? labelUnmute : labelMute,
@@ -86,9 +82,20 @@ class CallControls extends StatelessWidget {
               isDarkTheme: isDarkTheme,
               onTap: onToggleMute,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
 
-            // Camera On / Off (Only for Video Calls)
+            // 2. Speaker / Sound Output Toggle
+            _AnimatedControlButton(
+              icon: isSpeakerOn ? LucideIcons.volume2 : LucideIcons.volumeX,
+              label: isSpeakerOn ? labelSpeaker : labelNormalSound,
+              isActive: isSpeakerOn,
+              activeBgColor: const Color(0xFF6366F1),
+              isDarkTheme: isDarkTheme,
+              onTap: onToggleSpeaker,
+            ),
+            const SizedBox(width: 8),
+
+            // 3. Camera Open / Off (Only for Video Calls)
             if (isVideoCall) ...[
               _AnimatedControlButton(
                 icon: isCameraOff ? LucideIcons.videoOff : LucideIcons.video,
@@ -98,62 +105,23 @@ class CallControls extends StatelessWidget {
                 isDarkTheme: isDarkTheme,
                 onTap: onToggleCamera,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
             ],
 
-            // Switch Camera (Front/Back)
-            if (isVideoCall && !isCameraOff && onSwitchCamera != null) ...[
+            // 4. Switch Camera (Front/Back) (Only for Video Calls)
+            if (isVideoCall && onSwitchCamera != null) ...[
               _AnimatedControlButton(
                 icon: LucideIcons.switchCamera,
                 label: labelFlip,
                 isDarkTheme: isDarkTheme,
                 onTap: onSwitchCamera!,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
             ],
 
-            // Speakerphone / Sound Toggle
+            // 5. Red End Call Button (Allows both Caller and Receiver to end call)
             _AnimatedControlButton(
-              icon: isSpeakerOn
-                  ? LucideIcons.volume2
-                  : (isVideoCall ? LucideIcons.volumeX : LucideIcons.volume1),
-              label: isSpeakerOn
-                  ? labelSpeaker
-                  : (isVideoCall ? labelCloseSound : labelNormalSound),
-              isActive: isVideoCall ? !isSpeakerOn : isSpeakerOn,
-              activeBgColor: isVideoCall
-                  ? const Color(0xFFEF4444)
-                  : const Color(0xFF6366F1),
-              isDarkTheme: isDarkTheme,
-              onTap: onToggleSpeaker,
-            ),
-            const SizedBox(width: 12),
-
-            // Switch between Voice / Video (Only for Video Calls)
-            if (isVideoCall && onToggleCallType != null) ...[
-              _AnimatedControlButton(
-                icon: isVideoCall ? LucideIcons.phone : LucideIcons.video,
-                label: isVideoCall ? labelToAudio : labelToVideo,
-                isDarkTheme: isDarkTheme,
-                onTap: onToggleCallType!,
-              ),
-              const SizedBox(width: 12),
-            ],
-
-            // Add Participant
-            if (onAddParticipant != null) ...[
-              _AnimatedControlButton(
-                icon: LucideIcons.userPlus,
-                label: labelAdd,
-                isDarkTheme: isDarkTheme,
-                onTap: onAddParticipant!,
-              ),
-              const SizedBox(width: 12),
-            ],
-
-            // Visually Prominent End Call Button
-            _AnimatedControlButton(
-              icon: LucideIcons.phone,
+              icon: LucideIcons.phoneOff,
               label: labelEnd,
               isEndCall: true,
               isDarkTheme: isDarkTheme,
