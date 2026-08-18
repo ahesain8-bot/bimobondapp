@@ -45,8 +45,8 @@ class LiveDto {
           json['thumbnail_url'] as String? ?? json['thumbnailUrl'] as String?,
       streamUrl: json['stream_url'] as String? ?? json['streamUrl'] as String?,
       category: json['category'] as String? ?? 'Other',
-      viewerCount: json['viewer_count'] as int? ?? json['viewerCount'] as int? ?? 0,
-      likeCount: json['like_count'] as int? ?? json['likeCount'] as int? ?? 0,
+      viewerCount: (json['viewer_count'] as num?)?.toInt() ?? (json['viewerCount'] as num?)?.toInt() ?? 0,
+      likeCount: (json['like_count'] as num?)?.toInt() ?? (json['likeCount'] as num?)?.toInt() ?? 0,
       startTime: DateTime.tryParse(
             json['start_time'] as String? ?? json['startTime'] as String? ?? '',
           ) ??

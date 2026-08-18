@@ -135,35 +135,7 @@ flutter:
     - assets/animations/
     - assets/camera_engine/
     - assets/icons/live_room/
-    - assets/icons/live_room/chat.svg
-    - assets/icons/live_room/collab.svg
-    - assets/icons/live_room/effects.svg
-    - assets/icons/live_room/flame.svg
-    - assets/icons/live_room/heart.svg
-    - assets/icons/live_room/more.svg
-    - assets/icons/live_room/people.svg
-    - assets/icons/live_room/person.svg
-    - assets/icons/live_room/person_add.svg
-    - assets/icons/live_room/power.svg
-    - assets/icons/live_room/share.svg
     - assets/images/create_live/
-    - assets/images/create_live/content_copy.png
-    - assets/images/create_live/discord.png
-    - assets/images/create_live/edit.png
-    - assets/images/create_live/follow_hosts.png
-    - assets/images/create_live/go.png
-    - assets/images/create_live/guests.png
-    - assets/images/create_live/heart.png
-    - assets/images/create_live/home.png
-    - assets/images/create_live/interaction.png
-    - assets/images/create_live/money.png
-    - assets/images/create_live/service.png
-    - assets/images/create_live/service_plus.png
-    - assets/images/create_live/settings.png
-    - assets/images/create_live/share.png
-    - assets/images/create_live/shield.png
-    - assets/images/create_live/tools_collapsed.png
-    - assets/images/create_live/tools_expanded.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

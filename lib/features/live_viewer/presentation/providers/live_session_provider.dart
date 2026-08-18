@@ -146,12 +146,12 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
                 (i) => 'https://i.pravatar.cc/150?u=${live.id}_v$i',
               ),
         pkScoreLeft: isPk
-            ? (live.metadata?['scoreLeft'] as int? ??
-                  8000 + random.nextInt(8000))
+            ? ((live.metadata?['scoreLeft'] as num?)?.toInt() ??
+                  (8000 + Random().nextInt(8000)))
             : 0,
         pkScoreRight: isPk
-            ? (live.metadata?['scoreRight'] as int? ??
-                  1000 + random.nextInt(3000))
+            ? ((live.metadata?['scoreRight'] as num?)?.toInt() ??
+                  (1000 + Random().nextInt(3000)))
             : 0,
         currentUserId: _currentUserId,
       );
