@@ -12,6 +12,7 @@ import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import 'live_dependencies.dart';
+import 'live_feed_provider.dart';
 
 /// UI state for the currently active live room only.
 class LiveSessionUiState {
@@ -440,6 +441,9 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
           errorMessage: event.reason,
         ),
       );
+      // Remove the ended live from the feed immediately so it disappears
+      // without waiting for the next silent refresh.
+      _ref.read(liveFeedProvider.notifier).removeLive(event.liveId);
     } else if (event is NetworkLostEvent) {
       state = state.copyWith(
         session: session.copyWith(
