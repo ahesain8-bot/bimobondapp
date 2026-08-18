@@ -51,13 +51,19 @@ class LivesMediaDataSource {
     // • videoEncoding: 720p@30fps 2.5Mbps base layer (TikTok LIVE quality
     //   target).  Previously capped at 25fps/1.6Mbps which caused visible
     //   block-compression blur on fast motion and stuttering cadence.
-    // • videoSimulcastLayers: explicit 3-layer ladder for portrait streaming:
+    // • videoSimulcastLayers: EXPLICIT 2-layer ladder (480p MINIMUM PER M2
+    //   PRODUCT REQUIREMENT — never publish below 854×480):
     //     HIGH  = 1280×720  @30fps  2500 kbps  (base, capture dimensions)
-    //     MID   =  640×360  @30fps   900 kbps  (stable mid, not 20fps)
-    //     LOW   =  320×180  @15fps   400 kbps  (fallback, audio-only safety)
+    //     LOW   =  854×480  @30fps  1200 kbps  (minimum, NO 360p/180p allowed)
+    //   Rid ordering in LiveKit 2.11.0 utils.dart:
+    //     presets.sorted() by area ascending → [ LOW(480p area=409k),
+    //     HIGH(720p area=921k) ] → indexes 0,1 → videoRids[0]='q'=LOW,
+    //     videoRids[1]='h'=MEDIUM (since 2 layers only — LiveKit quality enum
+    //     maps 'q' to LOW and 'h' to MEDIUM/HIGH fallback as appropriate).
+    //     computeSimulcastPresets L354 for size=1280: [low, original=HIGH] → 2 layers.
+    //     This guarantees: NEVER 360x640 or 180x320 anywhere in pipeline.
     //   Explicit sizing prevents LiveKit SDK auto-defaults from picking
-    //   overly conservative mid/low bitrates on some Android build targets,
-    //   and bumps mid to 30fps so mid-layer downgrades don't drop smoothness.
+    //   overly conservative mid/low bitrates on some Android build targets.
     final room = Room(
       roomOptions: RoomOptions(
         adaptiveStream: true,
@@ -78,17 +84,10 @@ class LivesMediaDataSource {
               ),
             ),
             VideoParameters(
-              dimensions: VideoDimensions(640, 360),
+              dimensions: VideoDimensions(854, 480),
               encoding: VideoEncoding(
-                maxBitrate: 900000,
+                maxBitrate: 1200000,
                 maxFramerate: 30,
-              ),
-            ),
-            VideoParameters(
-              dimensions: VideoDimensions(320, 180),
-              encoding: VideoEncoding(
-                maxBitrate: 400000,
-                maxFramerate: 15,
               ),
             ),
           ],
@@ -215,12 +214,12 @@ class LivesMediaDataSource {
       if (_videoTrack == null) {
         throw StateError('LiveKit camera open failed: $lastError');
       }
-      debugPrint('🔍 [Host] connectAndPublish: publishing video track...');
       // Pass EXPLICIT VideoPublishOptions — L284 of SDK 2.11.0 local_participant:
       //   publishOptions ??= track.lastPublishOptions ?? room.roomOptions.defaults.
-      // By passing explicitly we guarantee the HIGH=720p layer is declared at
-      // publish time regardless of any future room-default override path.
-      // Smallest-same-values as roomOptions (no knob change, per user order).
+      // By passing explicitly we guarantee the HIGH=720p + MIN-LOW=480p layers are
+      // declared at publish time regardless of any future room-default override path.
+      // 2-layer ladder only (M2 requirement): NEVER below 854×480 (480p minimum).
+      // Values identical to roomOptions above for consistency.
       await room.localParticipant?.publishVideoTrack(
         _videoTrack!,
         publishOptions: VideoPublishOptions(
@@ -239,17 +238,10 @@ class LivesMediaDataSource {
               ),
             ),
             VideoParameters(
-              dimensions: VideoDimensions(640, 360),
+              dimensions: VideoDimensions(854, 480),
               encoding: VideoEncoding(
-                maxBitrate: 900000,
+                maxBitrate: 1200000,
                 maxFramerate: 30,
-              ),
-            ),
-            VideoParameters(
-              dimensions: VideoDimensions(320, 180),
-              encoding: VideoEncoding(
-                maxBitrate: 400000,
-                maxFramerate: 15,
               ),
             ),
           ],

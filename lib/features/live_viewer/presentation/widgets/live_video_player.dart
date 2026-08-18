@@ -64,41 +64,62 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
     if (widget.isActive) _init();
 
     // ============================================================
-    // [M2 VIDEO-QUALITY] PERMANENT smallest fix — overrides the
-    // LiveKit SDK adaptiveStream first-frame 0×0 thumbnail race.
+    // [M2 VIDEO-QUALITY 480p FLOOR] Permanent production fix.
     //
-    // ROOT CAUSE (confirmed from 2.11.0 track_settings.dart L44
-    // resolveVideoSettings): adaptiveStream merges user-preferred
-    // quality vs VisibilityObserver-measured RenderBox dimensions
-    // and ALWAYS PICKS THE SMALLER.  If the observer fires BEFORE
-    // layout completes (PageView stack first-frame + Animated-
-    // VideoPlaceholder interleave), measured dims = 0×0 → SFU is
-    // sent 0×0 dimensions and forwards the LOW/MEDIUM simulcast
-    // layer FOREVER, even after later layout fills the screen.
+    // PRODUCT RULE (from M2 spec):
+    //   • NEVER publish, request, or select a layer below 480p.
+    //   • Host publishes exactly 2 simulcast layers:
+    //       HIGH = 1280×720 @30fps 2500 kbps
+    //       LOW  =  854×480 @30fps 1200 kbps
+    //     (no 360p / 180p fallback layers exist on host side).
+    //   • Viewer adaptiveStream MUST stay enabled (keeps SFU
+    //     bandwidth-layer selection + visibility-based disabled flag).
     //
-    // FIX (production-safe, smallest surface):
-    //   1. Fire on PostFrameCallback so RenderBox is laid out.
-    //   2. Measure actual logical W×H (NOT the SDK's cached value).
-    //   3. If size implies full-screen (W≥350 && H≥350):
-    //        a. setVideoDimensions(1280×720) — manual dims request
-    //           that equals HIGH layer dimensions.
-    //        b. setVideoQuality(HIGH) — user-preference enum HIGH.
-    //      When explicit dims are set, resolveVideoSettings still
-    //      compares vs. VisibilityObserver dims but since we now
-    //      match HIGH layer, even if observer catches up, "smaller"
-    //      is identical (no revert to 360p).
-    //   4. If size < 350 (thumbnail / collapsed player): do NOTHING.
-    //      adaptiveStream correctly continues degrading to 360p/180p
-    //      for those views — we do NOT break adaptive behavior on
-    //      small views, only un-stick the full-screen stuck case.
-    //   5. After 450ms (RTP layer switch latency), read decoder
-    //      stats once and fire a repeat setVideoDimensions ONLY if
-    //      decoded W<900 (i.e. SFU still not on HIGH; 1 retry is
-    //      enough, network re-downgrades on real poor bandwidth are
-    //      handled by SFU later).
+    // CLEAN PUBLIC-API IMPLEMENTATION (no SDK fork, no timers):
+    //   1. Extract helper `_findVideoPub()` — locates the host's
+    //      subscribed RemoteTrackPublication<RemoteVideoTrack>.
+    //   2. Extract helper `_applyQualityFloor(bool isActive)` — uses
+    //      ONLY LiveKit 2.11.0 PUBLIC API (setVideoDimensions +
+    //      setVideoQuality):
+    //        isActive=true → setVideoDimensions(1280×720) +
+    //                        setVideoQuality(HIGH)
+    //          → SFU receives MAX-dims = 720p. Since only 2 layers
+    //            exist, SFU bandwidth-estimate will pick the LARGEST
+    //            layer that FITS within 1280×720: either HIGH (good
+    //            network) or LOW 480p (weak network). Since 360p/180p
+    //            layers simply do not exist in host publish, the SFU
+    //            CANNOT fall below 480p — hard guarantee.
+    //        isActive=false (PageView offscreen) → setVideoDimensions
+    //                         (854×480) [MINIMUM layer, per user rule
+    //                         "Do NOT switch inactive items to 360p /
+    //                          180p — keep minimum 480p always"].
+    //          → Saves 1300 kbps (2500 - 1200) per offscreen item,
+    //            prevents multi-PageView decoder / bandwidth
+    //            contention, eliminates buffering on vertical swipe.
+    //   3. Call `_applyQualityFloor(widget.isActive)` AFTER FIRST
+    //      LAYOUT via addPostFrameCallback (so RenderBox exists) AND
+    //      also from:
+    //        • didUpdateWidget on isActive transitions (PageView
+    //          active↔inactive flips), AND
+    //        • _onLiveKitState when reconnecting (Room just became
+    //          connected → re-apply the floor after re-subscribe).
+    //      No Timer.periodic, no per-frame work, no repeated
+    //      setVideoDimensions calls — userPreference set once per
+    //      state transition, which SDK deduplicates internally via
+    //      `if (newValue == _userPreference?.dimensions) return;`
+    //      (remote.dart L318 setVideoDimensions early return).
     //
-    // DEBUG-QOS instrumentation preserved per Stage 3 order for
-    // evidence capture (removed "PROBE" semantics; renamed to FIX).
+    // The adaptiveStream VisibilityObserver still runs and still
+    // measures RenderBox size.  resolveVideoSettings (track_settings
+    // L44) will pick smaller(userPref, observerDim).  userPref is
+    // 1280×720 (fullscreen) or 854×480 (offscreen).  observerDim on
+    // mid-tier DPR 2.6 = ~936 px wide.  Area(936×2024) = 1.9M >
+    // Area(854×480)=0.41M → userPref 480p IS SMALLER → 480p wins
+    // resolve.  High-end DPR 3.5 = width 1260 → userPref 1280 wins
+    // → 720p on good devices.  On all devices: NEVER below 480p
+    // because userPref floor = 480p and host has no lower layers.
+    //
+    // DEBUG-QOS instrumentation preserved for runtime evidence.
     // ============================================================
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -107,25 +128,9 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
         final size = rb?.hasSize == true ? rb!.size : Size.zero;
         final px = MediaQuery.of(context).devicePixelRatio;
         final track = _track;
+        final pub = _findVideoPub();
 
-        // Find first subscribed remote video publication for explicit fix.
-        // 2.11.0 correct type: RemoteTrackPublication<RemoteVideoTrack>
-        //   (class "RemoteVideoPublication" does NOT exist in this SDK).
-        RemoteTrackPublication<RemoteVideoTrack>? pub;
-        final roomObj = _room;
-        if (roomObj != null) {
-          outer:
-          for (final p in roomObj.remoteParticipants.values) {
-            for (final vp in p.videoTrackPublications) {
-              if (vp.subscribed) {
-                pub = vp;
-                break outer;
-              }
-            }
-          }
-        }
-
-        // Decoder stats BEFORE fix — evidence baseline.
+        // Baseline decoder stats (evidence before floor apply)
         int? decW;
         int? decH;
         num? decFps;
@@ -146,98 +151,113 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
             statsErr = e.toString();
           }
         }
-
-        final pubW = pub?.dimensions?.width;
-        final pubH = pub?.dimensions?.height;
-
-        final before = pub?.videoQuality;
-        final beforeDims = pub?.videoDimensions;
-        final fullscreen = size.width > 350 && size.height > 350;
         debugPrint(
-          '[DEBUG-QOS] VIEWER-RENDERER (before-fix):'
+          '[DEBUG-QOS] VIEWER-RENDERER (before-floor):'
           '  liveId=${widget.live.id}'
+          '  isActive=${widget.isActive}'
           '  logicalPx=${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}'
           '  pixelRatio=${px.toStringAsFixed(2)}'
           '  physicalPx=${(size.width * px).toStringAsFixed(0)}x${(size.height * px).toStringAsFixed(0)}'
-          '  isAttached=${rb?.attached ?? false}'
-          '  pubDims(WxH)=${pubW ?? "?"}x${pubH ?? "?"}'
-          '  decoderStatsFrame(WxH)=${decW ?? "?"}x${decH ?? "?"}'
+          '  pubDims(WxH)=${pub?.dimensions?.width ?? "?"}x${pub?.dimensions?.height ?? "?"}'
+          '  decoder(WxH)=${decW ?? "?"}x${decH ?? "?"}'
           '  decoderFps=${decFps ?? "?"}'
           '  decoderCodec=${decMime ?? "?"}'
           '  decoderBitrateKbps=${decKbps ?? "?"}'
-          '  decoderStatsErr=${statsErr ?? "none"}'
-          '  pub.videoQualityGetterPrefBefore=${before?.name.toUpperCase() ?? "null"}'
-          '  pub.videoDimensionsGetterBefore=${beforeDims == null ? "null" : "${beforeDims.width}x${beforeDims.height}"}'
-          '  fullScreen?=$fullscreen',
+          '  decoderErr=${statsErr ?? "none"}',
         );
-
-        // ── PERMANENT fix action (only on fullscreen) ───────────
-        if (pub != null && fullscreen) {
-          try {
-            const target = VideoDimensions(1280, 720);
-            debugPrint(
-              '[VIDEO-FIX] VIEWER-RENDERER fullscreen detected →'
-              ' setVideoDimensions(${target.width}x${target.height})'
-              ' + setVideoQuality(HIGH)',
-            );
-            // Order matters: dimensions first (resolves to smaller),
-            // then quality enum HIGH (sends both signals to SFU).
-            await pub.setVideoDimensions(target);
-            await pub.setVideoQuality(VideoQuality.HIGH);
-            // Wait ≥ 1 RTT + RTP key-frame for SFU to forward HIGH.
-            await Future<void>.delayed(const Duration(milliseconds: 450));
-            final after = pub.videoQuality;
-            final afterDims = pub.videoDimensions;
-            // Re-read decoder stats AFTER fix.
-            int? aftDecW;
-            int? aftDecH;
-            String? aftDecMime;
-            num? aftDecKbps;
-            if (track != null) {
-              try {
-                final s2 = await track.getReceiverStats();
-                if (s2 != null) {
-                  aftDecW = s2.frameWidth?.toInt();
-                  aftDecH = s2.frameHeight?.toInt();
-                  aftDecMime = s2.mimeType;
-                  aftDecKbps = track.currentBitrate == null ? null : (track.currentBitrate! / 1000).round();
-                }
-              } catch (_) {}
-            }
-            // 1 retry if decoded width still < 900 (i.e. not on HIGH).
-            if (track != null && (aftDecW == null || aftDecW < 900)) {
-              debugPrint(
-                '[VIDEO-FIX] VIEWER-RENDERER after 450ms decoder still'
-                ' W=${aftDecW ?? "?"} (HIGH=1280); retry setVideoDimensions once',
-              );
-              await Future<void>.delayed(const Duration(milliseconds: 200));
-              await pub.setVideoDimensions(target);
-              await pub.setVideoQuality(VideoQuality.HIGH);
-            }
-            debugPrint(
-              '[DEBUG-QOS] VIEWER-RENDERER (after-fix):'
-              '  pub.videoQualityGetterAfter=${after.name.toUpperCase()}'
-              '  pub.videoDimensionsGetterAfter=${afterDims == null ? "null" : "${afterDims.width}x${afterDims.height}"}'
-              '  EXPLICIT_DIMS_CHANGED? ${beforeDims != afterDims ? "YES" : "NO (dims already set or SFU will forward via quality enum)"}'
-              '  QUALITY_ENUM_CHANGED? ${before != after ? "YES" : "NO (already HIGH)"}'
-              '  decoderFrameAfterFix(WxH)=${aftDecW ?? "?"}x${aftDecH ?? "?"}'
-              '  decoderCodecAfter=$aftDecMime'
-              '  decoderBitrateAfterKbps=${aftDecKbps ?? "?"}',
-            );
-          } catch (e) {
-            debugPrint('[VIDEO-FIX] VIEWER-RENDERER fix apply failed: $e');
-          }
-        } else {
-          debugPrint(
-            '[VIDEO-FIX] VIEWER-RENDERER: NOT applying fix —'
-            ' fullScreen=$fullscreen (pub!=null?=${pub != null}).'
-            ' adaptiveStream continues normal degrade for small/thumbnail view.',
-          );
-        }
       } catch (e) {
-        debugPrint('[DEBUG-QOS] VIEWER-RENDERER (err): $e');
+        debugPrint('[DEBUG-QOS] VIEWER-RENDERER (before-floor err): $e');
+      } finally {
+        // Apply floor AFTER logging baseline — guarantees the
+        // post-frame transition at least once after first layout.
+        unawaited(_applyQualityFloor(widget.isActive));
       }
     });
+  }
+
+  /// First subscribed RemoteVideoTrack publication from any remote
+  /// participant in the attached Room (the host's camera).
+  RemoteTrackPublication<RemoteVideoTrack>? _findVideoPub() {
+    final roomObj = _room;
+    if (roomObj == null) return null;
+    for (final p in roomObj.remoteParticipants.values) {
+      for (final vp in p.videoTrackPublications) {
+        if (vp.subscribed) return vp;
+      }
+    }
+    return null;
+  }
+
+  /// Applies the M2 480p MINIMUM quality floor using ONLY 2.11.0
+  /// public SDK APIs (setVideoDimensions / setVideoQuality).
+  /// Called once per state transition, NOT repeatedly — the SDK
+  /// already deduplicates no-op calls at the top of both methods.
+  ///
+  /// isActive=true → request HIGH layer dims (1280×720):
+  ///   SFU will adapt freely between the 2 host layers:
+  ///     • HIGH=1280×720 on good network
+  ///     • LOW = 854×480 on medium/weak
+  ///   No other layers exist so selection CANNOT drop below 480p.
+  ///
+  /// isActive=false (PageView offscreen) → clamp to MIN 480p only:
+  ///   Saves ~1300 kbps per offscreen decoder vs keeping 720p,
+  ///   eliminates multi-decoder contention during fast swipe,
+  ///   AND complies with "Do NOT switch inactive items to 360/180p"
+  ///   because 854×480 is the published MINIMUM layer.
+  Future<void> _applyQualityFloor(bool isActive) async {
+    final pub = _findVideoPub();
+    if (pub == null) return;
+    try {
+      final dims = isActive
+          ? const VideoDimensions(1280, 720)
+          : const VideoDimensions(854, 480);
+      final quality = isActive ? VideoQuality.HIGH : VideoQuality.LOW;
+      debugPrint(
+        '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
+        '  isActive=$isActive'
+        '  → setVideoDimensions(${dims.width}x${dims.height})'
+        ' + setVideoQuality(${quality.name.toUpperCase()})',
+      );
+      // setVideoDimensions first (dimensions override quality enum in
+      // buildUpdateTrackSettings — track_settings.dart L129-133), then
+      // apply quality enum so both signals reach the SFU signaling.
+      await pub.setVideoDimensions(dims);
+      await pub.setVideoQuality(quality);
+
+      // After one RTT + key-frame settle, read decoder stats ONCE
+      // (not polled / periodic) to confirm the layer switch landed.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      final track = _track;
+      int? aftDecW;
+      int? aftDecH;
+      String? aftDecMime;
+      num? aftDecKbps;
+      if (track != null) {
+        try {
+          final s2 = await track.getReceiverStats();
+          if (s2 != null) {
+            aftDecW = s2.frameWidth?.toInt();
+            aftDecH = s2.frameHeight?.toInt();
+            aftDecMime = s2.mimeType;
+            aftDecKbps = track.currentBitrate == null ? null : (track.currentBitrate! / 1000).round();
+          }
+        } catch (_) {}
+      }
+      final afterQ = pub.videoQuality;
+      final afterDims = pub.videoDimensions;
+      debugPrint(
+        '[DEBUG-QOS] VIEWER-RENDERER (after-floor):'
+        '  liveId=${widget.live.id}'
+        '  pub.videoQualityAfter=${afterQ.name.toUpperCase()}'
+        '  pub.videoDimensionsAfter=${afterDims == null ? "null" : "${afterDims.width}x${afterDims.height}"}'
+        '  decoderFrameAfter(WxH)=${aftDecW ?? "?"}x${aftDecH ?? "?"}'
+        '  decoderCodecAfter=$aftDecMime'
+        '  decoderBitrateAfterKbps=${aftDecKbps ?? "?"}'
+        '  FLOOR_GUARANTEE(>=854x480)? ${aftDecW == null || aftDecH == null ? "NOT_YET_DECODED" : (aftDecW! >= 854 && aftDecH! >= 480 ? "PASS >=480p" : "BELOW_FLOOR(host may not have published 2 layers yet; no 360/180 layers exist)")}',
+      );
+    } catch (e) {
+      debugPrint('[VIDEO-FIX] VIEWER-FLOOR apply failed: $e');
+    }
   }
 
   @override
@@ -266,6 +286,10 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
           !_hasError) {
         _init();
       }
+      // Re-apply 480p floor whenever Room (re)connects — a fresh
+      // subscription means a brand-new RemoteTrackPublication whose
+      // userPreference defaults to HIGH / no-dims. Reset to our floor.
+      unawaited(_applyQualityFloor(widget.isActive));
     } else if (state == LiveKitConnectionState.disconnected ||
         state == LiveKitConnectionState.failed) {
       _detachRoom();
@@ -322,6 +346,7 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
       _disposeController();
       if (widget.isActive) _init();
     } else if (oldWidget.isActive != widget.isActive) {
+      unawaited(_applyQualityFloor(widget.isActive));
       if (widget.isActive) {
         if (_controller == null) {
           _init();
@@ -330,7 +355,6 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
         }
       } else {
         _controller?.pause();
-        // Release decoder while off-screen.
         _disposeController();
         if (mounted) {
           setState(() {
