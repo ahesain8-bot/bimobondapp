@@ -131,19 +131,20 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
       if (_disposed) return;
       _activeLiveId = live.id;
 
-      final random = Random(live.id.hashCode);
-      final avatars = List.generate(
-        3,
-        (i) => 'https://i.pravatar.cc/150?u=${live.id}_v$i',
-      );
       final isPk = live.metadata?['isPk'] == true;
+      final initialAvatars = _avatarsFromLive(live);
 
       state = LiveSessionUiState(
         session: LiveSessionEntity(
           live: live,
           connectionState: LiveConnectionState.connecting,
         ),
-        topViewerAvatars: avatars,
+        topViewerAvatars: initialAvatars.isNotEmpty
+            ? initialAvatars
+            : List.generate(
+                3,
+                (i) => 'https://i.pravatar.cc/150?u=${live.id}_v$i',
+              ),
         pkScoreLeft: isPk
             ? (live.metadata?['scoreLeft'] as int? ??
                   8000 + random.nextInt(8000))
@@ -248,6 +249,7 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
           // LiveKit is the critical path. Publish the connected state now so the
           // renderer can attach on the first subscribed track; overlays load in
           // parallel and must not delay the first video frame.
+          final joinedAvatars = _avatarsFromLive(result.live);
           state = state.copyWith(
             session: state.session!.copyWith(
               live: result.live.copyWith(
@@ -261,6 +263,9 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
               coinBalance: 1250,
             ),
             showJoinSuccess: true,
+            topViewerAvatars: joinedAvatars.isNotEmpty
+                ? joinedAvatars
+                : state.topViewerAvatars,
           );
 
           final socketFuture = socket.connect(
@@ -376,17 +381,36 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
     } else if (event is LiveModerationEvent) {
       _onModeration(event);
     } else if (event is UserJoinedEvent) {
+      if (_isMe(event.userId)) {
+        if (event.viewerCount != null) {
+          state = state.copyWith(
+            session: session.copyWith(
+              live: session.live.copyWith(viewerCount: event.viewerCount!),
+            ),
+          );
+        }
+        return;
+      }
       final joinNotice = CommentEntity(
         id: 'join_${event.timestamp.microsecondsSinceEpoch}',
         liveId: event.liveId,
         userId: event.userId,
         username: event.username,
         userAvatar: event.avatarUrl,
-        content: 'joined',
+        content: '${event.username} joined the live',
         createdAt: event.timestamp,
         metadata: const {'type': 'join'},
       );
-      state = state.copyWith(comments: [...state.comments, joinNotice]);
+      final next = [...state.comments, joinNotice];
+      state = state.copyWith(
+        comments: next.length > 80 ? next.sublist(next.length - 80) : next,
+        topViewerAvatars: _pushAvatar(state.topViewerAvatars, event.avatarUrl),
+        session: event.viewerCount != null
+            ? session.copyWith(
+                live: session.live.copyWith(viewerCount: event.viewerCount!),
+              )
+            : session,
+      );
     } else if (event is LiveLikeEvent) {
       final isSelf = _isMe(event.userId);
       state = state.copyWith(
@@ -402,6 +426,9 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
         session: session.copyWith(
           live: session.live.copyWith(viewerCount: event.viewerCount),
         ),
+        topViewerAvatars: event.topViewerAvatars.isNotEmpty
+            ? event.topViewerAvatars
+            : state.topViewerAvatars,
       );
     } else if (event is LiveGiftEvent) {
       var left = state.pkScoreLeft;
@@ -546,6 +573,21 @@ class ActiveLiveNotifier extends StateNotifier<LiveSessionUiState> {
     if (_currentUserId != null && userId == _currentUserId) return true;
     final firebaseUid = fb.FirebaseAuth.instance.currentUser?.uid;
     return firebaseUid != null && userId == firebaseUid;
+  }
+
+  List<String> _avatarsFromLive(LiveEntity live) {
+    final raw = live.metadata?['topViewerAvatars'];
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString())
+        .where((url) => url.isNotEmpty)
+        .take(3)
+        .toList();
+  }
+
+  List<String> _pushAvatar(List<String> current, String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) return current;
+    return [avatarUrl, ...current.where((url) => url != avatarUrl)].take(3).toList();
   }
 
   void _onModeration(LiveModerationEvent event) {

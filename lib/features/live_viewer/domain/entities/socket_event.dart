@@ -136,15 +136,17 @@ class LiveLikeEvent extends SocketEvent {
 
 class LiveViewersEvent extends SocketEvent {
   final int viewerCount;
+  final List<String> topViewerAvatars;
 
   const LiveViewersEvent({
     required super.liveId,
     required this.viewerCount,
+    this.topViewerAvatars = const [],
     required super.timestamp,
   }) : super(type: SocketEventType.liveViewers);
 
   @override
-  List<Object?> get props => [...super.props, viewerCount];
+  List<Object?> get props => [...super.props, viewerCount, topViewerAvatars];
 }
 
 class LiveEndedEvent extends SocketEvent {
@@ -164,17 +166,20 @@ class UserJoinedEvent extends SocketEvent {
   final String userId;
   final String username;
   final String? avatarUrl;
+  final int? viewerCount;
 
   const UserJoinedEvent({
     required super.liveId,
     required this.userId,
     required this.username,
     this.avatarUrl,
+    this.viewerCount,
     required super.timestamp,
   }) : super(type: SocketEventType.userJoined);
 
   @override
-  List<Object?> get props => [...super.props, userId, username, avatarUrl];
+  List<Object?> get props =>
+      [...super.props, userId, username, avatarUrl, viewerCount];
 }
 
 class NetworkLostEvent extends SocketEvent {

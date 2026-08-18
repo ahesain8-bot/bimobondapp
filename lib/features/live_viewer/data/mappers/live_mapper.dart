@@ -189,6 +189,13 @@ class LiveMapper {
       meta['guests'] = guests;
     }
 
+    final topAvatars = _avatarUrlsFrom(
+      json['topViewers'] ?? json['viewersList'] ?? json['recentViewers'],
+    );
+    if (topAvatars.isNotEmpty) {
+      meta['topViewerAvatars'] = topAvatars;
+    }
+
     final pinned = _asMap(json['pinnedComment']);
     if (pinned != null) {
       meta['pinnedComment'] = pinned;
@@ -204,5 +211,22 @@ class LiveMapper {
     }
 
     return meta.isEmpty ? null : meta;
+  }
+
+  static List<String> _avatarUrlsFrom(dynamic raw) {
+    if (raw is! List) return const [];
+    final urls = <String>[];
+    for (final item in raw) {
+      if (item is String && item.trim().isNotEmpty) {
+        urls.add(item.trim());
+        continue;
+      }
+      final map = _asMap(item);
+      if (map == null) continue;
+      final user = _asMap(map['user']) ?? map;
+      final url = user['avatarUrl']?.toString() ?? user['avatar']?.toString();
+      if (url != null && url.trim().isNotEmpty) urls.add(url.trim());
+    }
+    return urls.take(3).toList();
   }
 }

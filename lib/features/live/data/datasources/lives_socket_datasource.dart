@@ -103,10 +103,31 @@ class LivesSocketDataSource {
 
     socket.on('liveViewers', (data) {
       final map = _asMap(data);
-      final viewers = _asInt(map?['viewers']);
+      final rawViewers = map?['viewers'] ?? map?['count'];
+      final viewers = _asInt(rawViewers) ??
+          (rawViewers is List ? rawViewers.length : null);
       if (viewers != null) {
         _controller.add(LiveHudViewersEvent(viewers));
       }
+    });
+
+    socket.on('userJoined', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      final user = _asMap(map['user']) ?? map;
+      final userId = user['id']?.toString() ?? map['userId']?.toString();
+      if (userId == null || userId.isEmpty) return;
+      _controller.add(
+        LiveHudUserJoinedEvent(
+          userId: userId,
+          username: user['username']?.toString() ??
+              user['fullName']?.toString() ??
+              'مشاهد',
+          avatarUrl:
+              user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
+          viewers: _asInt(map['viewers'] ?? map['count']),
+        ),
+      );
     });
 
     socket.on('liveLike', (data) {

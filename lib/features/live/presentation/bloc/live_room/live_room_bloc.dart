@@ -1027,6 +1027,41 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             session: current.session.copyWith(viewerCount: viewers),
           ),
         );
+      case LiveHudUserJoinedEvent(
+          :final userId,
+          :final username,
+          :final viewers,
+        ):
+        if (userId == current.session.host.id) {
+          if (viewers != null) {
+            emit(
+              current.copyWith(
+                session: current.session.copyWith(viewerCount: viewers),
+              ),
+            );
+          }
+          return;
+        }
+        final joinText = '$username انضم 👋';
+        final messages = [
+          ...current.session.messages,
+          LiveChatMessage(
+            id: 'join-$userId-${DateTime.now().microsecondsSinceEpoch}',
+            text: joinText,
+            userId: userId,
+            username: username,
+          ),
+        ];
+        emit(
+          current.copyWith(
+            session: current.session.copyWith(
+              viewerCount: viewers ?? current.session.viewerCount,
+              messages: messages.length > 80
+                  ? messages.sublist(messages.length - 80)
+                  : messages,
+            ),
+          ),
+        );
       case LiveHudLikeEvent(:final likeCount, :final userId):
         final isHostTap = userId != null && userId == current.session.host.id;
         emit(

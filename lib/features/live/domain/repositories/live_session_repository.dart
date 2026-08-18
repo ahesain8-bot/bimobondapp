@@ -24,6 +24,19 @@ class LiveHudViewersEvent extends LiveHudEvent {
   final int viewers;
 }
 
+class LiveHudUserJoinedEvent extends LiveHudEvent {
+  const LiveHudUserJoinedEvent({
+    required this.userId,
+    required this.username,
+    this.avatarUrl,
+    this.viewers,
+  });
+  final String userId;
+  final String username;
+  final String? avatarUrl;
+  final int? viewers;
+}
+
 class LiveHudLikeEvent extends LiveHudEvent {
   const LiveHudLikeEvent({
     required this.likeCount,
