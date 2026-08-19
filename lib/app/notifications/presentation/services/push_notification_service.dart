@@ -428,6 +428,7 @@ Map<String, dynamic> _extractFullMessageData(RemoteMessage message) {
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   await PushNotificationService.instance.initializeEarly();
+  CallkitService.instance.listenToEvents();
 
   final data = _extractFullMessageData(message);
   final typeUpper = (data['type'] ?? data['event'] ?? data['action'] ?? '')

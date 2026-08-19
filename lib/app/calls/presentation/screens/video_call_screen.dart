@@ -96,9 +96,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       isOutgoing: widget.statusState == CallUiStatusState.calling ||
           widget.statusState == CallUiStatusState.ringing,
     );
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final displayName = caller.displayName;
 
     return StreamBuilder<List<Participant>>(
       stream: widget.livekitService.onParticipantsChanged,

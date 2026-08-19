@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         const val AR_CAMERA_CHANNEL = "com.dubai.bimobondapp/ar_camera"
         const val AR_CAMERA_VIEW_TYPE = "ar-camera-preview"
+        const val KEYGUARD_CHANNEL = "com.dubai.bimobondapp/keyguard"
     }
 
     private var arCameraChannel: MethodChannel? = null
@@ -56,6 +57,44 @@ class MainActivity : FlutterActivity() {
         NativeCameraPlugin.register(flutterEngine, this)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KEYGUARD_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setShowWhenLocked" -> {
+                        val show = call.argument<Boolean>("show") ?: false
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                            setShowWhenLocked(show)
+                            setTurnScreenOn(show)
+                        } else {
+                            if (show) {
+                                window.addFlags(
+                                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                                    android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                                )
+                            } else {
+                                window.clearFlags(
+                                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                                    android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                                )
+                            }
+                        }
+                        result.success(null)
+                    }
+                    "requestDismissKeyguard" -> {
+                        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            km.requestDismissKeyguard(this, null)
+                        }
+                        result.success(null)
+                    }
+                    "isKeyguardLocked" -> {
+                        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+                        result.success(km.isKeyguardLocked)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AR_CAMERA_CHANNEL)
             .also { arCameraChannel = it }

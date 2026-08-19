@@ -24,15 +24,24 @@ class CallIncomingState extends CallState {
 
 class CallOutgoingRingingState extends CallState {
   final CallEntity call;
-  final CallSessionEntity session;
+  final CallSessionEntity? session;
 
   const CallOutgoingRingingState({
     required this.call,
-    required this.session,
+    this.session,
   });
 
   @override
   List<Object?> get props => [call, session];
+}
+
+class CallConnectingState extends CallState {
+  final CallEntity call;
+
+  const CallConnectingState({required this.call});
+
+  @override
+  List<Object?> get props => [call];
 }
 
 class CallActiveState extends CallState {

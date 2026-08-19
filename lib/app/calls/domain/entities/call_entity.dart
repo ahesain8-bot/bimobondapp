@@ -13,6 +13,16 @@ class CallUserEntity extends Equatable {
     this.avatarUrl,
   });
 
+  String get displayName {
+    if (fullName != null && fullName!.trim().isNotEmpty && fullName != 'null') {
+      return fullName!.trim();
+    }
+    if (username.trim().isNotEmpty && username != 'null') {
+      return username.trim();
+    }
+    return 'User';
+  }
+
   @override
   List<Object?> get props => [id, username, fullName, avatarUrl];
 }
@@ -157,16 +167,15 @@ class CallEntity extends Equatable {
   }
 
   Map<String, dynamic> toCallkitData() {
-    final callerName = (initiatedBy.fullName != null && initiatedBy.fullName!.isNotEmpty)
-        ? initiatedBy.fullName!
-        : initiatedBy.username;
+    final displayUser = getDisplayUser('');
+    final callerName = displayUser.displayName;
     return {
       'callId': id,
       'chatId': chatId,
       'type': type,
       'isVideo': isVideo,
       'callerName': callerName,
-      'callerAvatar': initiatedBy.avatarUrl,
+      'callerAvatar': displayUser.avatarUrl ?? initiatedBy.avatarUrl,
     };
   }
 

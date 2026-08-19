@@ -9,11 +9,76 @@ class CallUserModel extends CallUserEntity {
   });
 
   factory CallUserModel.fromJson(Map<String, dynamic> json) {
+    final nameCandidates = [
+      json['fullName'],
+      json['full_name'],
+      json['displayName'],
+      json['display_name'],
+      json['name'],
+      json['callerName'],
+      json['caller_name'],
+      json['actorName'],
+      json['actor_name'],
+      json['title'],
+    ];
+    String? fullName;
+    for (final candidate in nameCandidates) {
+      if (candidate != null &&
+          candidate is String &&
+          candidate.trim().isNotEmpty &&
+          candidate.trim() != 'null') {
+        fullName = candidate.trim();
+        break;
+      }
+    }
+
+    final usernameCandidates = [
+      json['username'],
+      json['user_name'],
+      json['userName'],
+      json['handle'],
+    ];
+    String? username;
+    for (final candidate in usernameCandidates) {
+      if (candidate != null &&
+          candidate is String &&
+          candidate.trim().isNotEmpty &&
+          candidate.trim() != 'null') {
+        username = candidate.trim();
+        break;
+      }
+    }
+
+    final avatarCandidates = [
+      json['avatarUrl'],
+      json['avatar_url'],
+      json['avatar'],
+      json['userAvatar'],
+      json['user_avatar'],
+      json['imageUrl'],
+      json['image_url'],
+      json['picture'],
+      json['profile_pic'],
+    ];
+    String? avatarUrl;
+    for (final candidate in avatarCandidates) {
+      if (candidate != null &&
+          candidate is String &&
+          candidate.trim().isNotEmpty &&
+          candidate.trim() != 'null') {
+        avatarUrl = candidate.trim();
+        break;
+      }
+    }
+
     return CallUserModel(
-      id: json['id']?.toString() ?? '',
-      username: json['username']?.toString() ?? '',
-      fullName: json['fullName']?.toString(),
-      avatarUrl: json['avatarUrl']?.toString(),
+      id: json['id']?.toString() ??
+          json['userId']?.toString() ??
+          json['_id']?.toString() ??
+          '',
+      username: username ?? fullName ?? 'User',
+      fullName: fullName ?? username,
+      avatarUrl: avatarUrl,
     );
   }
 
@@ -143,7 +208,16 @@ class CallModel extends CallEntity {
     }
 
     CallUserModel? extraCalleeUser;
-    for (final key in ['callee', 'recipient', 'targetUser', 'otherUser', 'invitee', 'user', 'receiver', 'toUser']) {
+    for (final key in [
+      'callee',
+      'recipient',
+      'targetUser',
+      'otherUser',
+      'invitee',
+      'user',
+      'receiver',
+      'toUser'
+    ]) {
       final val = json[key];
       if (val is Map) {
         extraCalleeUser = CallUserModel.fromJson(Map<String, dynamic>.from(val));
@@ -202,7 +276,10 @@ class CallModel extends CallEntity {
 
     String? callerName;
     for (final candidate in nameCandidates) {
-      if (candidate != null && candidate is String && candidate.trim().isNotEmpty && candidate.trim() != 'null') {
+      if (candidate != null &&
+          candidate is String &&
+          candidate.trim().isNotEmpty &&
+          candidate.trim() != 'null') {
         final lower = candidate.trim().toLowerCase();
         if (lower != 'incoming call' &&
             lower != 'incoming voice call' &&
@@ -215,7 +292,10 @@ class CallModel extends CallEntity {
         }
       }
     }
-    callerName ??= json['callerName']?.toString() ?? json['username']?.toString() ?? json['title']?.toString() ?? 'User';
+    callerName ??= json['callerName']?.toString() ??
+        json['username']?.toString() ??
+        json['title']?.toString() ??
+        'User';
 
     final avatarCandidates = [
       json['callerAvatar'],
@@ -235,7 +315,10 @@ class CallModel extends CallEntity {
 
     String? callerAvatar;
     for (final candidate in avatarCandidates) {
-      if (candidate != null && candidate is String && candidate.trim().isNotEmpty && candidate.trim() != 'null') {
+      if (candidate != null &&
+          candidate is String &&
+          candidate.trim().isNotEmpty &&
+          candidate.trim() != 'null') {
         callerAvatar = candidate.trim();
         break;
       }
@@ -258,8 +341,25 @@ class CallModel extends CallEntity {
         avatarUrl: rawInitiatedBy.avatarUrl,
       );
     } else if (rawInitiatedBy is Map) {
-      initiatedByModel =
+      final parsed =
           CallUserModel.fromJson(Map<String, dynamic>.from(rawInitiatedBy));
+      final resolvedName = (parsed.fullName?.trim().isNotEmpty == true)
+          ? parsed.fullName
+          : (parsed.username.trim().isNotEmpty == true &&
+                  parsed.username != 'User')
+              ? parsed.username
+              : callerName;
+      final resolvedAvatar = (parsed.avatarUrl?.trim().isNotEmpty == true)
+          ? parsed.avatarUrl
+          : callerAvatar;
+      initiatedByModel = CallUserModel(
+        id: parsed.id.isNotEmpty ? parsed.id : callerId,
+        username: (parsed.username.trim().isNotEmpty && parsed.username != 'User')
+            ? parsed.username
+            : (resolvedName ?? 'User'),
+        fullName: resolvedName,
+        avatarUrl: resolvedAvatar,
+      );
     } else {
       initiatedByModel = CallUserModel(
         id: callerId,
@@ -318,36 +418,30 @@ class CallModel extends CallEntity {
       if (startedAt != null) 'startedAt': startedAt!.toIso8601String(),
       if (endedAt != null) 'endedAt': endedAt!.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
-      'initiatedBy': {
-        'id': initiatedBy.id,
-        'username': initiatedBy.username,
-        if (initiatedBy.fullName != null) 'fullName': initiatedBy.fullName,
-        if (initiatedBy.avatarUrl != null) 'avatarUrl': initiatedBy.avatarUrl,
-      },
-      'participants': participants.map((p) {
-        if (p is CallParticipantModel) return p.toJson();
-        return {
-          'id': p.id,
-          'userId': p.userId,
-          'role': p.role,
-          'status': p.status,
-          if (p.joinedAt != null) 'joinedAt': p.joinedAt!.toIso8601String(),
-          if (p.leftAt != null) 'leftAt': p.leftAt!.toIso8601String(),
-          if (p.user != null)
-            'user': {
-              'id': p.user!.id,
-              'username': p.user!.username,
-              if (p.user!.fullName != null) 'fullName': p.user!.fullName,
-              if (p.user!.avatarUrl != null) 'avatarUrl': p.user!.avatarUrl,
+      'initiatedBy': (initiatedBy is CallUserModel)
+          ? (initiatedBy as CallUserModel).toJson()
+          : {
+              'id': initiatedBy.id,
+              'username': initiatedBy.username,
+              if (initiatedBy.fullName != null)
+                'fullName': initiatedBy.fullName,
+              if (initiatedBy.avatarUrl != null)
+                'avatarUrl': initiatedBy.avatarUrl,
             },
-        };
-      }).toList(),
+      'participants': participants
+          .map((p) => (p is CallParticipantModel)
+              ? p.toJson()
+              : {
+                  'id': p.id,
+                  'userId': p.userId,
+                  'role': p.role,
+                  'status': p.status,
+                })
+          .toList(),
       if (chat != null)
-        'chat': {
-          'id': chat!.id,
-          'isGroup': chat!.isGroup,
-          if (chat!.name != null) 'name': chat!.name,
-        },
+        'chat': (chat is CallChatModel)
+            ? (chat as CallChatModel).toJson()
+            : {'id': chat!.id, 'isGroup': chat!.isGroup, 'name': chat!.name},
     };
   }
 }
@@ -362,48 +456,25 @@ class CallSessionModel extends CallSessionEntity {
 
   factory CallSessionModel.fromJson(Map<String, dynamic> json) {
     final rawCall = json['call'];
-    final Map<String, dynamic> callData = rawCall is Map
-        ? Map<String, dynamic>.from(rawCall)
-        : Map<String, dynamic>.from(json);
-
-    for (final key in ['callee', 'recipient', 'targetUser', 'otherUser', 'invitee', 'user', 'receiver', 'toUser']) {
-      if (json[key] != null && callData[key] == null) {
-        callData[key] = json[key];
-      }
+    final CallModel callModel;
+    if (rawCall is CallModel) {
+      callModel = rawCall;
+    } else if (rawCall is Map) {
+      callModel = CallModel.fromJson(Map<String, dynamic>.from(rawCall));
+    } else {
+      callModel = CallModel.fromJson(json);
     }
-
-    final callEntity = CallModel.fromJson(callData);
 
     return CallSessionModel(
-      call: callEntity,
-      livekitUrl: json['livekitUrl']?.toString() ?? '',
-      token: json['token']?.toString() ?? '',
-      roomName: json['roomName']?.toString() ?? '',
+      call: callModel,
+      livekitUrl: json['livekitUrl']?.toString() ??
+          json['url']?.toString() ??
+          json['wsUrl']?.toString() ??
+          '',
+      token: json['token']?.toString() ?? json['accessToken']?.toString() ?? '',
+      roomName: json['roomName']?.toString() ??
+          json['room']?.toString() ??
+          callModel.roomName,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    Map<String, dynamic> callMap;
-    if (call is CallModel) {
-      callMap = (call as CallModel).toJson();
-    } else {
-      callMap = {
-        'id': call.id,
-        'chatId': call.chatId,
-        'type': call.type,
-        'status': call.status,
-        'roomName': call.roomName,
-        'maxParticipants': call.maxParticipants,
-        if (call.startedAt != null) 'startedAt': call.startedAt!.toIso8601String(),
-        if (call.endedAt != null) 'endedAt': call.endedAt!.toIso8601String(),
-        'createdAt': call.createdAt.toIso8601String(),
-      };
-    }
-    return {
-      'call': callMap,
-      'livekitUrl': livekitUrl,
-      'token': token,
-      'roomName': roomName,
-    };
   }
 }

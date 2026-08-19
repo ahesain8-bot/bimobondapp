@@ -96,9 +96,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
       currentUserId,
       isOutgoing: widget.isOutgoingRinging,
     );
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final displayName = caller.displayName;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,

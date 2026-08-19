@@ -2,6 +2,11 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/calls/data/datasources/call_socket_service.dart';
 import 'package:bimobondapp/app/calls/domain/entities/call_entity.dart';
+import 'package:bimobondapp/app/calls/domain/session/call_controller.dart';
+import 'package:bimobondapp/app/calls/domain/session/call_session.dart';
+import 'package:bimobondapp/app/calls/domain/session/call_session_event.dart';
+import 'package:bimobondapp/app/calls/domain/session/call_session_manager.dart';
+import 'package:bimobondapp/app/calls/domain/session/call_session_state.dart';
 import 'package:bimobondapp/app/calls/domain/usecases/accept_call_usecase.dart';
 import 'package:bimobondapp/app/calls/domain/usecases/end_call_usecase.dart';
 import 'package:bimobondapp/app/calls/domain/usecases/get_active_call_usecase.dart';
@@ -12,13 +17,9 @@ import 'package:bimobondapp/app/calls/domain/usecases/reject_call_usecase.dart';
 import 'package:bimobondapp/app/calls/domain/usecases/start_call_usecase.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_state.dart';
-import 'package:bimobondapp/app/calls/services/livekit_call_service.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-
 import 'package:bimobondapp/app/calls/services/call_ringtone_service.dart';
-import 'package:bimobondapp/app/calls/services/callkit_service.dart';
-import 'package:livekit_client/livekit_client.dart' as lk;
+import 'package:bimobondapp/app/calls/services/livekit_call_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class CallBloc extends Bloc<CallEvent, CallState> {
   final StartCallUseCase startCallUseCase;
@@ -32,13 +33,11 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   final CallSocketService socketService;
   final LiveKitCallService livekitService;
   final CallRingtoneService ringtoneService;
+  final CallController callController;
+  final CallSessionManager sessionManager;
 
-  StreamSubscription? _incomingSub;
-  StreamSubscription? _acceptedSub;
-  StreamSubscription? _rejectedSub;
-  StreamSubscription? _cancelledSub;
-  StreamSubscription? _participantUpdateSub;
-  StreamSubscription? _endedSub;
+  StreamSubscription? _sessionManagerSub;
+  StreamSubscription? _sessionStateSub;
 
   CallBloc({
     required this.startCallUseCase,
@@ -52,8 +51,11 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     required this.socketService,
     required this.livekitService,
     required this.ringtoneService,
+    required this.callController,
+    required this.sessionManager,
   }) : super(const CallInitialState()) {
-    _initSocketListeners();
+    callController.initialize();
+    _subscribeToSessionManager();
 
     on<StartCallEvent>(_onStartCall);
     on<AcceptCallEvent>(_onAcceptCall);
@@ -74,281 +76,115 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     on<ToggleSpeakerEvent>(_onToggleSpeaker);
     on<ClearCallStateEvent>(_onClearCallState);
     on<LiveKitRoomStateChangedEvent>(_onLiveKitRoomStateChanged);
+    on<SessionStateUpdatedEvent>(_onSessionStateUpdated);
   }
 
-  StreamSubscription? _livekitStateSub;
-
-  void _initSocketListeners() {
-    _incomingSub = socketService.onCallIncoming.listen((payload) {
-      add(IncomingCallReceivedEvent(call: payload.call));
-    });
-
-    _acceptedSub = socketService.onCallAccepted.listen((call) {
-      add(CallAcceptedReceivedEvent(call: call));
-    });
-
-    _rejectedSub = socketService.onCallRejected.listen((payload) {
-      add(
-        CallRejectedReceivedEvent(
-          call: payload.call,
-          rejectedByUserId: payload.rejectedByUserId,
-        ),
-      );
-    });
-
-    _cancelledSub = socketService.onCallCancelled.listen((call) {
-      add(CallCancelledReceivedEvent(call: call));
-    });
-
-    _participantUpdateSub = socketService.onCallParticipantUpdate.listen((
-      payload,
-    ) {
-      add(
-        CallParticipantUpdatedEvent(
-          callId: payload.callId,
-          participant: payload.participant,
-        ),
-      );
-    });
-
-    _endedSub = socketService.onCallEnded.listen((call) {
-      add(CallEndedReceivedEvent(call: call));
-    });
-
-    _livekitStateSub = livekitService.onRoomStateChanged.listen((roomState) {
-      add(LiveKitRoomStateChangedEvent(roomState: roomState));
+  void _subscribeToSessionManager() {
+    _sessionManagerSub = sessionManager.onActiveSessionChanged.listen((session) {
+      if (session == null) {
+        if (state is! CallEndedState && state is! CallInitialState) {
+          add(const ClearCallStateEvent());
+        }
+        return;
+      }
+      _listenToSession(session);
     });
   }
 
-  void _onLiveKitRoomStateChanged(
-    LiveKitRoomStateChangedEvent event,
+  void _listenToSession(CallSession session) {
+    _sessionStateSub?.cancel();
+    _sessionStateSub = session.onStateChanged.listen((fsmState) {
+      add(SessionStateUpdatedEvent(session: session, fsmState: fsmState));
+    });
+    add(SessionStateUpdatedEvent(session: session, fsmState: session.state));
+  }
+
+  void _onSessionStateUpdated(
+    SessionStateUpdatedEvent event,
     Emitter<CallState> emit,
   ) {
-    if (event.roomState == lk.ConnectionState.reconnecting) {
-      if (state is CallActiveState) {
-        final cur = state as CallActiveState;
-        emit(CallReconnectingState(call: cur.call));
-      }
-    } else if (event.roomState == lk.ConnectionState.connected) {
-      if (state is CallReconnectingState) {
-        final cur = state as CallReconnectingState;
-        emit(CallActiveState(call: cur.call, livekitService: livekitService));
-      }
+    final session = event.session as CallSession;
+    final fsmState = event.fsmState as CallSessionState;
+
+    switch (fsmState.status) {
+      case CallSessionStatus.idle:
+        emit(const CallInitialState());
+        break;
+      case CallSessionStatus.outgoingCalling:
+      case CallSessionStatus.outgoingRinging:
+        emit(CallOutgoingRingingState(call: session.call));
+        break;
+      case CallSessionStatus.incomingRinging:
+        emit(CallIncomingState(call: session.call));
+        break;
+      case CallSessionStatus.connecting:
+        emit(CallConnectingState(call: session.call));
+        break;
+      case CallSessionStatus.connected:
+        emit(CallActiveState(
+          call: session.call,
+          livekitService: livekitService,
+          isMuted: fsmState.isMuted,
+          isCameraOff: fsmState.isCameraOff,
+          isSpeakerPhoneOn: fsmState.audioRoute == CallAudioRoute.speaker,
+        ));
+        break;
+      case CallSessionStatus.reconnecting:
+        emit(CallReconnectingState(call: session.call));
+        break;
+      case CallSessionStatus.ended:
+        emit(CallEndedState(reason: 'Call ended', call: session.call));
+        break;
+      case CallSessionStatus.rejected:
+        emit(CallEndedState(reason: 'Rejected', call: session.call));
+        break;
+      case CallSessionStatus.busy:
+        emit(CallEndedState(reason: 'Busy', call: session.call));
+        break;
+      case CallSessionStatus.failed:
+        emit(CallErrorState(message: fsmState.errorMessage ?? 'Call failed'));
+        break;
     }
-  }
-
-  Timer? _outgoingTimeoutTimer;
-
-  void _startOutgoingTimeout(String callId) {
-    _outgoingTimeoutTimer?.cancel();
-    _outgoingTimeoutTimer = Timer(const Duration(seconds: 35), () {
-      if (state is CallOutgoingRingingState) {
-        final currentCall = (state as CallOutgoingRingingState).call;
-        add(EndCallEvent(callId: currentCall.id));
-      }
-    });
-  }
-
-  void _cancelOutgoingTimeout() {
-    _outgoingTimeoutTimer?.cancel();
-    _outgoingTimeoutTimer = null;
   }
 
   Future<void> _onStartCall(
     StartCallEvent event,
     Emitter<CallState> emit,
   ) async {
-    _cancelOutgoingTimeout();
     emit(const CallInitialState());
-    final result = await startCallUseCase(
+    final session = await callController.startCall(
       chatId: event.chatId,
       type: event.type,
       inviteeIds: event.inviteeIds,
     );
-
-    await result.fold(
-      (failure) async {
-        emit(CallErrorState(message: failure.message));
-      },
-      (session) async {
-        emit(CallOutgoingRingingState(call: session.call, session: session));
-        _startOutgoingTimeout(session.call.id);
-        unawaited(ringtoneService.playOutgoingRingtone());
-        // Caller immediately joins LiveKit
-        try {
-          await livekitService.connect(
-            url: session.livekitUrl,
-            token: session.token,
-            isVideo: session.call.isVideo,
-          );
-        } catch (e) {
-          debugPrint('Failed to connect to LiveKit: $e');
-        }
-      },
-    );
-  }
-
-  final Set<String> _pendingAcceptRejectCallIds = {};
-
-  bool _isCallNoLongerRingingError(String? message) {
-    if (message == null || message.trim().isEmpty) return false;
-    final msg = message.toLowerCase();
-    return msg.contains('no longer ringing') ||
-        msg.contains('not ringing') ||
-        msg.contains('already ended') ||
-        msg.contains('already answered') ||
-        msg.contains('already rejected') ||
-        msg.contains('call ended') ||
-        msg.contains('call not found') ||
-        msg.contains('400');
+    if (session == null) {
+      emit(const CallErrorState(message: 'Failed to start call'));
+    }
   }
 
   Future<void> _onAcceptCall(
     AcceptCallEvent event,
     Emitter<CallState> emit,
   ) async {
-    if (_pendingAcceptRejectCallIds.contains(event.callId)) {
-      debugPrint(
-        'CallBloc: Ignoring duplicate AcceptCallEvent for callId ${event.callId}',
-      );
-      return;
-    }
-    if (state is CallActiveState &&
-        (state as CallActiveState).call.id == event.callId) {
-      debugPrint('CallBloc: Call ${event.callId} is already active');
-      return;
-    }
-
-    _pendingAcceptRejectCallIds.add(event.callId);
-    _cancelOutgoingTimeout();
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-
-    try {
-      final result = await acceptCallUseCase(callId: event.callId);
-
-      await result.fold(
-        (failure) async {
-          if (_isCallNoLongerRingingError(failure.message)) {
-            debugPrint(
-              'CallBloc: 400 Call is no longer ringing on accept. Silently closing UI.',
-            );
-            unawaited(ringtoneService.stop());
-            unawaited(CallkitService.instance.endAllCalls());
-            emit(const CallInitialState());
-          } else {
-            emit(CallErrorState(message: failure.message));
-          }
-        },
-        (session) async {
-          emit(
-            CallActiveState(
-              call: session.call,
-              session: session,
-              livekitService: livekitService,
-              isMuted: livekitService.isMuted,
-              isCameraOff: livekitService.isCameraOff,
-              isSpeakerPhoneOn: livekitService.isSpeakerPhoneOn,
-            ),
-          );
-
-          // Callee joins LiveKit upon accept
-          try {
-            await livekitService.connect(
-              url: session.livekitUrl,
-              token: session.token,
-              isVideo: session.call.isVideo,
-            );
-          } catch (e) {
-            debugPrint('Failed to connect LiveKit on accept: $e');
-          }
-        },
-      );
-    } finally {
-      _pendingAcceptRejectCallIds.remove(event.callId);
-    }
+    await callController.acceptCall(event.callId);
   }
 
   Future<void> _onRejectCall(
     RejectCallEvent event,
     Emitter<CallState> emit,
   ) async {
-    if (_pendingAcceptRejectCallIds.contains(event.callId)) {
-      debugPrint(
-        'CallBloc: Ignoring duplicate RejectCallEvent for callId ${event.callId}',
-      );
-      return;
-    }
-    if (state is CallEndedState || state is CallInitialState) {
-      debugPrint('CallBloc: Call ${event.callId} already ended/cleared');
-      return;
-    }
-
-    _pendingAcceptRejectCallIds.add(event.callId);
-    _cancelOutgoingTimeout();
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-
-    try {
-      final result = await rejectCallUseCase(callId: event.callId);
-
-      result.fold(
-        (failure) {
-          if (_isCallNoLongerRingingError(failure.message)) {
-            debugPrint(
-              'CallBloc: 400 Call is no longer ringing on reject. Silently closing UI.',
-            );
-            unawaited(ringtoneService.stop());
-            unawaited(CallkitService.instance.endAllCalls());
-            emit(const CallInitialState());
-          } else {
-            emit(CallErrorState(message: failure.message));
-          }
-        },
-        (call) {
-          emit(CallEndedState(reason: 'Rejected', call: call));
-        },
-      );
-    } finally {
-      _pendingAcceptRejectCallIds.remove(event.callId);
-    }
+    await callController.rejectCall(event.callId);
   }
 
   Future<void> _onEndCall(EndCallEvent event, Emitter<CallState> emit) async {
-    _cancelOutgoingTimeout();
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-    await livekitService.disconnect();
-    final result = await endCallUseCase(callId: event.callId);
-
-    result.fold(
-      (failure) {
-        emit(CallEndedState(reason: failure.message));
-      },
-      (call) {
-        emit(CallEndedState(reason: 'Call ended', call: call));
-      },
-    );
+    await callController.endCall(event.callId);
   }
 
   Future<void> _onLeaveCall(
     LeaveCallEvent event,
     Emitter<CallState> emit,
   ) async {
-    _cancelOutgoingTimeout();
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-    await livekitService.disconnect();
-    final result = await leaveCallUseCase(callId: event.callId);
-
-    result.fold(
-      (failure) {
-        emit(CallEndedState(reason: failure.message));
-      },
-      (call) {
-        emit(CallEndedState(reason: 'Left call', call: call));
-      },
-    );
+    await callController.endCall(event.callId);
   }
 
   Future<void> _onInviteToCall(
@@ -363,9 +199,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     result.fold(
       (failure) {
         if (state is CallActiveState) {
-          emit(
-            (state as CallActiveState).copyWith(errorMessage: failure.message),
-          );
+          emit((state as CallActiveState).copyWith(errorMessage: failure.message));
         }
       },
       (updatedCall) {
@@ -391,66 +225,22 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   void _onIncomingCallReceived(
     IncomingCallReceivedEvent event,
     Emitter<CallState> emit,
-  ) {
-    if (state is! CallActiveState && state is! CallOutgoingRingingState) {
-      emit(CallIncomingState(call: event.call));
-      unawaited(ringtoneService.playIncomingRingtone());
-      final isAppResumed =
-          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
-      if (!isAppResumed) {
-        unawaited(
-          CallkitService.instance.showIncomingCall(event.call.toCallkitData()),
-        );
-      }
-    }
-  }
+  ) {}
 
   void _onCallAcceptedReceived(
     CallAcceptedReceivedEvent event,
     Emitter<CallState> emit,
-  ) {
-    unawaited(ringtoneService.stop());
-    if (state is CallOutgoingRingingState) {
-      final s = (state as CallOutgoingRingingState).session;
-      emit(
-        CallActiveState(
-          call: event.call,
-          session: s,
-          livekitService: livekitService,
-          isMuted: livekitService.isMuted,
-          isCameraOff: livekitService.isCameraOff,
-          isSpeakerPhoneOn: livekitService.isSpeakerPhoneOn,
-        ),
-      );
-    } else if (state is CallActiveState) {
-      final cur = state as CallActiveState;
-      emit(cur.copyWith(call: event.call));
-    }
-  }
+  ) {}
 
   void _onCallRejectedReceived(
     CallRejectedReceivedEvent event,
     Emitter<CallState> emit,
-  ) {
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-    if (event.call.isEnded || event.call.status == 'REJECTED') {
-      livekitService.disconnect();
-      emit(CallEndedState(reason: 'Call rejected', call: event.call));
-    } else if (state is CallActiveState) {
-      emit((state as CallActiveState).copyWith(call: event.call));
-    }
-  }
+  ) {}
 
   void _onCallCancelledReceived(
     CallCancelledReceivedEvent event,
     Emitter<CallState> emit,
-  ) {
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-    livekitService.disconnect();
-    emit(CallEndedState(reason: 'Call cancelled', call: event.call));
-  }
+  ) {}
 
   void _onCallParticipantUpdated(
     CallParticipantUpdatedEvent event,
@@ -479,22 +269,21 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   void _onCallEndedReceived(
     CallEndedReceivedEvent event,
     Emitter<CallState> emit,
-  ) {
-    unawaited(ringtoneService.stop());
-    unawaited(CallkitService.instance.endAllCalls());
-    livekitService.disconnect();
-    emit(CallEndedState(reason: 'Call ended', call: event.call));
-  }
+  ) {}
+
+  void _onLiveKitRoomStateChanged(
+    LiveKitRoomStateChangedEvent event,
+    Emitter<CallState> emit,
+  ) {}
 
   Future<void> _onToggleMute(
     ToggleMuteEvent event,
     Emitter<CallState> emit,
   ) async {
     await livekitService.toggleMute();
-    if (state is CallActiveState) {
-      final cur = state as CallActiveState;
-      emit(cur.copyWith(isMuted: livekitService.isMuted));
-    }
+    sessionManager.activeSession?.dispatch(
+      ToggleMuteSessionEvent(isMuted: livekitService.isMuted),
+    );
   }
 
   Future<void> _onToggleCamera(
@@ -502,10 +291,9 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     Emitter<CallState> emit,
   ) async {
     await livekitService.toggleCamera();
-    if (state is CallActiveState) {
-      final cur = state as CallActiveState;
-      emit(cur.copyWith(isCameraOff: livekitService.isCameraOff));
-    }
+    sessionManager.activeSession?.dispatch(
+      ToggleCameraSessionEvent(isCameraOff: livekitService.isCameraOff),
+    );
   }
 
   Future<void> _onSwitchCamera(
@@ -519,30 +307,18 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     ToggleSpeakerEvent event,
     Emitter<CallState> emit,
   ) async {
-    await livekitService.toggleSpeaker();
-    if (state is CallActiveState) {
-      final cur = state as CallActiveState;
-      emit(cur.copyWith(isSpeakerPhoneOn: livekitService.isSpeakerPhoneOn));
-    }
+    final nextSpeaker = !livekitService.isSpeakerPhoneOn;
+    await callController.audioRouteManager.setSpeakerphone(nextSpeaker);
   }
 
   void _onClearCallState(ClearCallStateEvent event, Emitter<CallState> emit) {
-    unawaited(ringtoneService.stop());
     emit(const CallInitialState());
   }
 
   @override
   Future<void> close() {
-    _outgoingTimeoutTimer?.cancel();
-    _incomingSub?.cancel();
-    _acceptedSub?.cancel();
-    _rejectedSub?.cancel();
-    _cancelledSub?.cancel();
-    _participantUpdateSub?.cancel();
-    _endedSub?.cancel();
-    _livekitStateSub?.cancel();
-    ringtoneService.stop();
-    livekitService.disconnect();
+    _sessionManagerSub?.cancel();
+    _sessionStateSub?.cancel();
     return super.close();
   }
 }

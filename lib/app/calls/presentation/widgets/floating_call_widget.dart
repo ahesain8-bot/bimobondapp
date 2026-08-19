@@ -39,9 +39,7 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
 
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
     final caller = widget.call.getDisplayUser(currentUserId);
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final displayName = caller.displayName;
     final isVideo = widget.call.isVideo;
 
     return Positioned(

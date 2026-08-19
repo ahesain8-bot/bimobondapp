@@ -476,6 +476,7 @@ class _ChatViewState extends State<ChatView> {
         return Scaffold(
           backgroundColor: chatTheme.chatBackgroundColor,
           appBar: ChatAppBar(
+            chatId: widget.chatId,
             username: widget.username,
             imageUrl: widget.imageUrl,
             userId: widget.peerUserId,

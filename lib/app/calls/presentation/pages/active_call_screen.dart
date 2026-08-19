@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:bimobondapp/app/calls/services/keyguard_service.dart';
+
 class ActiveCallScreen extends StatefulWidget {
   const ActiveCallScreen({super.key});
 
@@ -28,6 +30,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
   @override
   void initState() {
     super.initState();
+    KeyguardService.instance.setShowWhenLocked(true);
     _startTimer();
   }
 
@@ -47,6 +50,8 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
   @override
   void dispose() {
+    KeyguardService.instance.setShowWhenLocked(false);
+    KeyguardService.instance.requestDismissKeyguard();
     _durationTimer?.cancel();
     super.dispose();
   }
@@ -83,7 +88,9 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
           }
         },
       builder: (context, state) {
-        if (state is! CallActiveState && state is! CallOutgoingRingingState) {
+        if (state is! CallActiveState &&
+            state is! CallOutgoingRingingState &&
+            state is! CallConnectingState) {
           return const Scaffold(
             backgroundColor: Color(0xFF0F172A),
             body: Center(
@@ -101,6 +108,10 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
         if (state is CallOutgoingRingingState) {
           call = state.call;
           isOutgoingRinging = true;
+          isSpeakerOn = call.isVideo;
+        } else if (state is CallConnectingState) {
+          call = state.call;
+          isOutgoingRinging = false;
           isSpeakerOn = call.isVideo;
         } else {
           final activeState = state as CallActiveState;

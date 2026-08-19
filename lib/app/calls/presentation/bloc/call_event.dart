@@ -171,3 +171,13 @@ class LiveKitRoomStateChangedEvent extends CallEvent {
   @override
   List<Object?> get props => [roomState];
 }
+
+class SessionStateUpdatedEvent extends CallEvent {
+  final dynamic session;
+  final dynamic fsmState;
+
+  const SessionStateUpdatedEvent({required this.session, required this.fsmState});
+
+  @override
+  List<Object?> get props => [session, fsmState];
+}

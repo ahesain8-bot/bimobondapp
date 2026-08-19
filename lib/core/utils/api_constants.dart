@@ -165,6 +165,10 @@ class ApiConstants {
   // Chats
   static const String chats = '/chats';
   static String chatById(String chatId) => '/chats/$chatId';
+  static String chatSettings(String chatId) => '/chats/$chatId/settings';
+  static String chatWallpaper(String chatId) => '/chats/$chatId/wallpaper';
+  static String chatRead(String chatId) => '/chats/$chatId/read';
+  static const String chatWallpapersCatalog = '/chats/wallpapers';
   static String chatMessages(String chatId) => '/chats/$chatId/messages';
   static String markMessageRead(String messageId) =>
       '/chats/messages/$messageId/read';

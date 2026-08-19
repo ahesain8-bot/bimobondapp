@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/home/presentation/pages/tiktok_chat_settings_screen.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -12,6 +13,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   const ChatAppBar({
+    required this.chatId,
     required this.username,
     required this.imageUrl,
     required this.onProfileTap,
@@ -24,6 +26,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
   });
 
+  final String chatId;
   final String username;
   final String imageUrl;
   final VoidCallback onProfileTap;
@@ -202,9 +205,19 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
                         color: onSurface,
                         size: ChatLayoutConstants.appBarActionIconSize,
                       ),
-                      tooltip: l10n.settingsChatWallpaper,
-                      onPressed: () =>
-                          context.pushNamed('chat_wallpaper_settings'),
+                      tooltip: 'Details',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => TikTokChatSettingsScreen(
+                              chatId: chatId,
+                              username: username,
+                              imageUrl: imageUrl,
+                              peerUserId: userId,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

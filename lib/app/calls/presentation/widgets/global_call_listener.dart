@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
-import 'package:bimobondapp/app/calls/domain/entities/call_entity.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
-import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_state.dart';
 import 'package:bimobondapp/app/calls/presentation/pages/active_call_screen.dart';
 import 'package:bimobondapp/app/calls/presentation/pages/incoming_call_screen.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/floating_call_widget.dart';
 import 'package:bimobondapp/app/calls/services/callkit_service.dart';
+import 'package:bimobondapp/app/calls/services/keyguard_service.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -39,7 +38,6 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _connectSocketIfAuth();
-      _initCallkitListeners();
     });
   }
 
@@ -47,35 +45,28 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       CallkitService.instance.checkActiveCalls();
-      CallkitService.instance.endAllCalls();
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _ensureActiveCallScreenVisibleOnResume();
+    } else if (state == AppLifecycleState.paused) {
       if (!mounted) return;
       final callState = context.read<CallBloc>().state;
-      if (callState is CallIncomingState) {
+      final activeSession = context.read<CallBloc>().sessionManager.activeSession;
+      if (callState is CallIncomingState &&
+          activeSession != null &&
+          activeSession.state.isIncomingRinging) {
         CallkitService.instance.showIncomingCall(callState.call.toCallkitData());
       }
     }
   }
 
-  void _initCallkitListeners() {
-    CallkitService.instance.initialize(
-      onAccept: (extra) {
-        final callId = extra['callId']?.toString() ?? extra['id']?.toString();
-        if (callId != null && callId.isNotEmpty && mounted) {
-          final currentState = context.read<CallBloc>().state;
-          if (currentState is CallActiveState && currentState.call.id == callId) {
-            return;
-          }
-          context.read<CallBloc>().add(AcceptCallEvent(callId: callId));
-        }
-      },
-      onDecline: (extra) {
-        final callId = extra['callId']?.toString() ?? extra['id']?.toString();
-        if (callId != null && callId.isNotEmpty && mounted) {
-          context.read<CallBloc>().add(RejectCallEvent(callId: callId));
-        }
-      },
-    );
+  void _ensureActiveCallScreenVisibleOnResume() {
+    if (!mounted) return;
+    final callState = context.read<CallBloc>().state;
+    if (callState is CallActiveState ||
+        callState is CallConnectingState ||
+        callState is CallOutgoingRingingState) {
+      _isActiveCallScreenOpen = false;
+      _maximizeCall();
+    }
   }
 
   void _startTimer() {
@@ -128,12 +119,18 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
     final nav = AppRouter.rootNavigatorKey.currentState;
     if (nav == null) return;
 
+    nav.popUntil((route) =>
+        route.settings.name != '/incoming-call' &&
+        route.settings.name != '/active-call');
+
     if (mounted) {
       setState(() {
         _isActiveCallScreenOpen = true;
+        _isIncomingCallScreenOpen = false;
       });
     } else {
       _isActiveCallScreenOpen = true;
+      _isIncomingCallScreenOpen = false;
     }
 
     nav
@@ -166,7 +163,6 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
           listener: (context, state) {
             if (state is AuthSuccess) {
               context.read<CallBloc>().socketService.connect(state.user.id);
-              CallkitService.instance.checkActiveCalls();
             } else if (state is AuthInitial) {
               context.read<CallBloc>().socketService.disconnect();
             }
@@ -190,8 +186,18 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
             if (nav == null) return;
 
             if (state is CallIncomingState) {
+              if (_isActiveCallScreenOpen) {
+                nav.popUntil((route) => route.settings.name != '/active-call');
+                _isActiveCallScreenOpen = false;
+              }
               if (!_isIncomingCallScreenOpen) {
-                _isIncomingCallScreenOpen = true;
+                if (mounted) {
+                  setState(() {
+                    _isIncomingCallScreenOpen = true;
+                  });
+                } else {
+                  _isIncomingCallScreenOpen = true;
+                }
                 nav
                     .push(
                       MaterialPageRoute(
@@ -199,7 +205,9 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
                         fullscreenDialog: true,
                         builder: (routeContext) => BlocProvider.value(
                           value: context.read<CallBloc>(),
-                          child: IncomingCallScreen(call: state.call),
+                          child: IncomingCallScreen(
+                            call: state.call,
+                          ),
                         ),
                       ),
                     )
@@ -213,29 +221,61 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
                       }
                     });
               }
-            } else if (state is CallActiveState || state is CallOutgoingRingingState) {
-              _maximizeCall();
-            } else if (state is CallEndedState || state is CallInitialState) {
-              _isIncomingCallScreenOpen = false;
-              _isActiveCallScreenOpen = false;
-              nav.popUntil(
-                (route) =>
+            } else if (state is CallOutgoingRingingState ||
+                state is CallConnectingState ||
+                state is CallActiveState) {
+              if (!_isActiveCallScreenOpen) {
+                nav.popUntil((route) =>
                     route.settings.name != '/incoming-call' &&
-                    route.settings.name != '/active-call',
-              );
+                    route.settings.name != '/active-call');
 
-              if (state is CallEndedState &&
-                  state.reason != null &&
-                  state.reason!.trim().isNotEmpty) {
-                final rootCtx = AppRouter.rootNavigatorKey.currentContext;
-                if (rootCtx != null && rootCtx.mounted) {
-                  ScaffoldMessenger.of(rootCtx).showSnackBar(
-                    SnackBar(
-                      content: Text(state.reason!),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                if (mounted) {
+                  setState(() {
+                    _isActiveCallScreenOpen = true;
+                    _isIncomingCallScreenOpen = false;
+                  });
+                } else {
+                  _isActiveCallScreenOpen = true;
+                  _isIncomingCallScreenOpen = false;
                 }
+
+                nav
+                    .push(
+                      MaterialPageRoute(
+                        settings: const RouteSettings(name: '/active-call'),
+                        fullscreenDialog: true,
+                        builder: (routeContext) => BlocProvider.value(
+                          value: context.read<CallBloc>(),
+                          child: const ActiveCallScreen(),
+                        ),
+                      ),
+                    )
+                    .then((_) {
+                      if (mounted) {
+                        setState(() {
+                          _isActiveCallScreenOpen = false;
+                        });
+                      } else {
+                        _isActiveCallScreenOpen = false;
+                      }
+                    });
+              }
+            } else if (state is CallEndedState || state is CallInitialState) {
+              KeyguardService.instance.setShowWhenLocked(false);
+              KeyguardService.instance.requestDismissKeyguard();
+
+              nav.popUntil((route) =>
+                  route.settings.name != '/incoming-call' &&
+                  route.settings.name != '/active-call');
+
+              if (mounted) {
+                setState(() {
+                  _isIncomingCallScreenOpen = false;
+                  _isActiveCallScreenOpen = false;
+                });
+              } else {
+                _isIncomingCallScreenOpen = false;
+                _isActiveCallScreenOpen = false;
               }
             }
           },
@@ -244,45 +284,50 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
       child: Stack(
         children: [
           widget.child,
-
-          // Minimized Floating Call Overlay (Only when ActiveCallScreen is minimized/closed)
           BlocBuilder<CallBloc, CallState>(
             builder: (context, state) {
-              if (_isActiveCallScreenOpen ||
-                  (state is! CallActiveState &&
-                      state is! CallOutgoingRingingState &&
-                      state is! CallReconnectingState)) {
-                return const SizedBox.shrink();
+              final activeSession =
+                  context.read<CallBloc>().sessionManager.activeSession;
+              final hasActiveSession = activeSession != null &&
+                  (activeSession.state.isConnected ||
+                      activeSession.state.isConnecting ||
+                      activeSession.state.isOutgoing);
+
+              final isCallRunning = state is CallActiveState ||
+                  state is CallConnectingState ||
+                  state is CallOutgoingRingingState ||
+                  hasActiveSession;
+
+              if (isCallRunning &&
+                  !_isActiveCallScreenOpen &&
+                  !_isIncomingCallScreenOpen) {
+                final call = (state is CallActiveState)
+                    ? state.call
+                    : (state is CallConnectingState)
+                        ? state.call
+                        : (state is CallOutgoingRingingState)
+                            ? state.call
+                            : activeSession?.call;
+
+                if (call != null) {
+                  final livekitService = (state is CallActiveState)
+                      ? state.livekitService
+                      : context.read<CallBloc>().livekitService;
+
+                  final isMuted = (state is CallActiveState)
+                      ? state.isMuted
+                      : false;
+
+                  return FloatingCallWidget(
+                    call: call,
+                    livekitService: livekitService,
+                    timerText: _formatDuration(_secondsElapsed),
+                    isMuted: isMuted,
+                    onMaximize: _maximizeCall,
+                  );
+                }
               }
-
-              final CallEntity call;
-              bool isMuted = false;
-              String timerDisplay = _formatDuration(_secondsElapsed);
-
-              if (state is CallOutgoingRingingState) {
-                call = state.call;
-              } else if (state is CallReconnectingState) {
-                call = state.call;
-                final isAr = Localizations.localeOf(context).languageCode == 'ar';
-                timerDisplay = isAr ? 'جاري إعادة الاتصال...' : 'Reconnecting...';
-              } else {
-                final activeState = state as CallActiveState;
-                call = activeState.call;
-                isMuted = activeState.isMuted;
-              }
-
-              final livekitService = context.read<CallBloc>().livekitService;
-
-              return Directionality(
-                textDirection: Directionality.maybeOf(context) ?? TextDirection.ltr,
-                child: FloatingCallWidget(
-                  call: call,
-                  livekitService: livekitService,
-                  timerText: timerDisplay,
-                  isMuted: isMuted,
-                  onMaximize: _maximizeCall,
-                ),
-              );
+              return const SizedBox.shrink();
             },
           ),
         ],

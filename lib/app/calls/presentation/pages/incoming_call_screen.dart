@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:bimobondapp/app/calls/services/keyguard_service.dart';
+
 class IncomingCallScreen extends StatefulWidget {
   final CallEntity call;
 
@@ -28,6 +30,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   @override
   void initState() {
     super.initState();
+    KeyguardService.instance.setShowWhenLocked(true);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
@@ -40,6 +43,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
 
   @override
   void dispose() {
+    KeyguardService.instance.setShowWhenLocked(false);
+    KeyguardService.instance.requestDismissKeyguard();
     _pulseController.dispose();
     super.dispose();
   }
@@ -49,10 +54,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final caller = widget.call.initiatedBy;
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final displayUser = widget.call.getDisplayUser('');
+    final displayName = displayUser.displayName;
     final isVideo = widget.call.isVideo;
 
     return Scaffold(
@@ -208,7 +211,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                             ),
                             child: ClipOval(
                               child: SafeNetworkAvatar(
-                                imageUrl: caller.avatarUrl,
+                                imageUrl: displayUser.avatarUrl,
                                 radius: 60,
                                 fallbackText: displayName,
                               ),
@@ -227,7 +230,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '@${caller.username}',
+                          '@${displayUser.username}',
                           style: TextStyle(
                             color: isDark
                                 ? Colors.white.withValues(alpha: 0.6)
