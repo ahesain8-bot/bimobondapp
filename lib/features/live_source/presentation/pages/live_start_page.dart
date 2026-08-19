@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/constants/app_spacing.dart';
+import '../../../live/data/repositories/camera_repository_impl.dart';
+import '../../../live/domain/repositories/camera_repository.dart';
+import '../../../live/domain/usecases/dispose_camera.dart';
+import '../../../live/domain/usecases/initialize_camera.dart';
+import '../../../live/presentation/utils/live_screen_wakelock.dart';
 import '../bloc/start_live/live_bloc.dart';
 import '../bloc/start_live/live_event.dart';
 import 'service_plus_page.dart';
@@ -26,24 +32,57 @@ class LiveStartPage extends StatefulWidget {
   State<LiveStartPage> createState() => _LiveStartPageState();
 }
 
-class _LiveStartPageState extends State<LiveStartPage> {
+class _LiveStartPageState extends State<LiveStartPage>
+    with WidgetsBindingObserver {
   final TextEditingController _titleController = TextEditingController();
   bool _isBeautifyPanelVisible = false;
   bool _isEffectsPanelVisible = false;
   bool _isSettingsPanelVisible = false;
+  late final CameraRepository _cameraRepository;
   late final LiveBloc _liveBloc;
 
   @override
   void initState() {
     super.initState();
-    _liveBloc = LiveBloc();
+    WidgetsBinding.instance.addObserver(this);
+
+    _cameraRepository = CameraRepositoryImpl();
+    _liveBloc = LiveBloc(
+      initializeCamera: InitializeCamera(_cameraRepository),
+      disposeCamera: DisposeCamera(_cameraRepository),
+    );
+    _preRequestPermissions();
     _liveBloc.add(const LiveInitializeRequested());
+    LiveScreenWakelock.enable();
+  }
+
+  /// Request CAMERA + MICROPHONE together up-front so starting the live later
+  /// never triggers a second permission dialog (the camera plugin only asks
+  /// for CAMERA; LiveKit asks for RECORD_AUDIO when it creates the mic track).
+  Future<void> _preRequestPermissions() async {
+    try {
+      await [Permission.camera, Permission.microphone].request();
+    } catch (_) {
+      // Camera init below surfaces any hard failure; ignore request errors.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive) {
+      _liveBloc.add(const LiveAppPaused());
+    } else if (state == AppLifecycleState.resumed) {
+      LiveScreenWakelock.enable();
+      _liveBloc.add(const LiveAppResumed());
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _liveBloc.close();
     _titleController.dispose();
+    LiveScreenWakelock.disable();
     super.dispose();
   }
 
