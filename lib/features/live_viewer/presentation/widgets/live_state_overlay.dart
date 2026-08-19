@@ -142,11 +142,7 @@ class _Scrim extends StatelessWidget {
   final Widget child;
   final bool blur;
 
-  const _Scrim({
-    super.key,
-    required this.child,
-    this.blur = false,
-  });
+  const _Scrim({super.key, required this.child, this.blur = false});
 
   @override
   Widget build(BuildContext context) {
@@ -205,12 +201,18 @@ class _Banner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(title,
-                        style: AppTextStyles.labelLarge
-                            .copyWith(color: Colors.white)),
-                    Text(subtitle,
-                        style: AppTextStyles.labelSmall
-                            .copyWith(color: Colors.white70)),
+                    Text(
+                      title,
+                      style: AppTextStyles.labelLarge.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: Colors.white70,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -263,11 +265,17 @@ class _StatusBody extends StatelessWidget {
             child: Icon(icon, color: iconColor ?? Colors.white, size: 34),
           ),
           const SizedBox(height: 18),
-          Text(title, style: AppTextStyles.titleLarge, textAlign: TextAlign.center),
+          Text(
+            title,
+            style: AppTextStyles.titleLarge,
+            textAlign: TextAlign.center,
+          ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
             textAlign: TextAlign.center,
           ),
           if (showSpinner) ...[

@@ -19,8 +19,8 @@ class RealCommentRepository implements CommentRepository {
   RealCommentRepository({
     required LiveApiClient apiClient,
     required SocketService socket,
-  })  : _api = apiClient,
-        _socket = socket;
+  }) : _api = apiClient,
+       _socket = socket;
 
   final LiveApiClient _api;
   final SocketService _socket;
@@ -39,10 +39,7 @@ class RealCommentRepository implements CommentRepository {
       final page = int.tryParse(cursor ?? '') ?? 1;
       final payload = await _api.get(
         ApiEndpoints.liveComments(liveId),
-        query: {
-          'page': '$page',
-          'limit': '$limit',
-        },
+        query: {'page': '$page', 'limit': '$limit'},
       );
 
       final data = payload['data'];
@@ -73,11 +70,13 @@ class RealCommentRepository implements CommentRepository {
           ? (meta['hasMore'] == true || meta['totalPages'] is int)
           : comments.length >= limit;
 
-      return Right(CommentBatch(
-        comments: comments,
-        hasMore: hasMore,
-        nextCursor: hasMore ? '${page + 1}' : null,
-      ));
+      return Right(
+        CommentBatch(
+          comments: comments,
+          hasMore: hasMore,
+          nextCursor: hasMore ? '${page + 1}' : null,
+        ),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to fetch comments: $e'));
     }
@@ -96,7 +95,8 @@ class RealCommentRepository implements CommentRepository {
       );
 
       // Backend returns the comment directly or wrapped.
-      final comment = _commentFromJson(payload, liveId) ??
+      final comment =
+          _commentFromJson(payload, liveId) ??
           CommentEntity(
             id: 'c_${DateTime.now().microsecondsSinceEpoch}',
             liveId: liveId,
@@ -121,9 +121,7 @@ class RealCommentRepository implements CommentRepository {
       // Live id is not known here — fall back to local cache lookup.
       for (final entry in _cache.entries) {
         if (entry.value.any((c) => c.id == commentId)) {
-          await _api.delete(
-            ApiEndpoints.liveCommentById(entry.key, commentId),
-          );
+          await _api.delete(ApiEndpoints.liveCommentById(entry.key, commentId));
           return const Right(null);
         }
       }
@@ -233,35 +231,31 @@ class RealCommentRepository implements CommentRepository {
     _controllers[liveId]?.add(List.unmodifiable(list));
   }
 
-  CommentEntity? _commentFromJson(
-    Map<String, dynamic> json,
-    String liveId,
-  ) {
+  CommentEntity? _commentFromJson(Map<String, dynamic> json, String liveId) {
     final user = json['user'];
     final userMap = user is Map<String, dynamic>
         ? user
         : (user is Map ? Map<String, dynamic>.from(user) : null);
 
-    final content = json['content']?.toString() ??
-        json['text']?.toString() ??
-        '';
+    final content =
+        json['content']?.toString() ?? json['text']?.toString() ?? '';
     if (content.isEmpty && json['id'] == null) return null;
 
     return CommentEntity(
-      id: json['id']?.toString() ??
+      id:
+          json['id']?.toString() ??
           'c_${DateTime.now().microsecondsSinceEpoch}',
       liveId: json['liveId']?.toString() ?? liveId,
-      userId: userMap?['id']?.toString() ??
-          json['userId']?.toString() ??
-          '',
-      username: userMap?['username']?.toString() ??
+      userId: userMap?['id']?.toString() ?? json['userId']?.toString() ?? '',
+      username:
+          userMap?['username']?.toString() ??
           userMap?['fullName']?.toString() ??
           'User',
       userAvatar: userMap?['avatarUrl']?.toString(),
       content: content,
       createdAt:
           DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
-              DateTime.now(),
+          DateTime.now(),
       replyToUserId: json['replyToUserId']?.toString(),
       gifterLevel: _asInt(userMap?['gifterLevel']),
       isVerified: userMap?['isVerified'] == true,

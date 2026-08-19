@@ -25,8 +25,9 @@ class FakeGiftRepository implements GiftRepository {
   Future<Either<Failure, List<GiftEntity>>> getGiftsByRarity(
     GiftRarity rarity,
   ) async {
-    final gifts =
-        MockGiftCatalog.gifts.where((g) => g.rarity == rarity).toList();
+    final gifts = MockGiftCatalog.gifts
+        .where((g) => g.rarity == rarity)
+        .toList();
     return Right(gifts);
   }
 

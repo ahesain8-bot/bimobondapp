@@ -92,8 +92,10 @@ class _CommentInputBarState extends State<CommentInputBar> {
                       color: TikTokLiveTokens.frost(0.40),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Text(_quickEmojis[i],
-                        style: const TextStyle(fontSize: 16)),
+                    child: Text(
+                      _quickEmojis[i],
+                      style: const TextStyle(fontSize: 16),
+                    ),
                   ),
                 );
               },
@@ -145,9 +147,7 @@ class _CommentInputBarState extends State<CommentInputBar> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: _hasText
-                        ? TikTokLiveTokens.liveRed
-                        : Colors.white24,
+                    color: _hasText ? TikTokLiveTokens.liveRed : Colors.white24,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(

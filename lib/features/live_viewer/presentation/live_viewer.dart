@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'screens/live_feed_screen.dart';
 
@@ -42,8 +41,6 @@ class _LiveViewerEntryState extends State<LiveViewerEntry> {
 
   @override
   Widget build(BuildContext context) {
-    return const ProviderScope(
-      child: LiveFeedScreen(),
-    );
+    return const LiveFeedScreen();
   }
 }

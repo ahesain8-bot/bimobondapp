@@ -11,6 +11,7 @@ import 'tiktok_live_tokens.dart';
 class CommentsSection extends StatefulWidget {
   final List<CommentEntity> comments;
   final double height;
+
   /// When true, comments sit at the top of the feed (multi-grid under tiles).
   final bool alignTop;
 
@@ -57,11 +58,11 @@ class _CommentsSectionState extends State<CommentsSection> {
         ? widget.comments.sublist(widget.comments.length - 30)
         : widget.comments;
     final maxW =
-        MediaQuery.sizeOf(context).width * TikTokLiveTokens.commentMaxWidthFactor;
+        MediaQuery.sizeOf(context).width *
+        TikTokLiveTokens.commentMaxWidthFactor;
 
     return Align(
-      alignment:
-          widget.alignTop ? Alignment.topLeft : Alignment.bottomLeft,
+      alignment: widget.alignTop ? Alignment.topLeft : Alignment.bottomLeft,
       child: SizedBox(
         width: maxW,
         height: widget.height,
@@ -70,16 +71,8 @@ class _CommentsSectionState extends State<CommentsSection> {
             return LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: const [
-                Colors.transparent,
-                Colors.black,
-                Colors.black,
-              ],
-              stops: [
-                0.0,
-                TikTokLiveTokens.commentFade / widget.height,
-                1.0,
-              ],
+              colors: const [Colors.transparent, Colors.black, Colors.black],
+              stops: [0.0, TikTokLiveTokens.commentFade / widget.height, 1.0],
             ).createShader(rect);
           },
           blendMode: BlendMode.dstIn,
@@ -117,7 +110,10 @@ class TikTokCommentBubble extends StatelessWidget {
         child: RichText(
           text: TextSpan(
             children: [
-              TextSpan(text: comment.username, style: TikTokLiveTokens.joinUser),
+              TextSpan(
+                text: comment.username,
+                style: TikTokLiveTokens.joinUser,
+              ),
               TextSpan(
                 text: ' joined',
                 style: TikTokLiveTokens.commentBody.copyWith(
@@ -238,11 +234,19 @@ class TikTokCommentBubble extends StatelessWidget {
                       const SizedBox(width: 4),
                     ],
                     if (comment.isVerified) ...[
-                      const Icon(Icons.verified, size: 12, color: Color(0xFF20D5EC)),
+                      const Icon(
+                        Icons.verified,
+                        size: 12,
+                        color: Color(0xFF20D5EC),
+                      ),
                       const SizedBox(width: 4),
                     ],
                     if (comment.isPinned) ...[
-                      const Icon(Icons.push_pin, size: 11, color: Colors.white70),
+                      const Icon(
+                        Icons.push_pin,
+                        size: 11,
+                        color: Colors.white70,
+                      ),
                       const SizedBox(width: 4),
                     ],
                     Flexible(
@@ -275,11 +279,7 @@ class PinnedCommentBar extends StatelessWidget {
   final CommentEntity comment;
   final VoidCallback? onClose;
 
-  const PinnedCommentBar({
-    super.key,
-    required this.comment,
-    this.onClose,
-  });
+  const PinnedCommentBar({super.key, required this.comment, this.onClose});
 
   @override
   Widget build(BuildContext context) {

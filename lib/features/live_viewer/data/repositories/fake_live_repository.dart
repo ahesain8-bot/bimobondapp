@@ -32,44 +32,56 @@ class FakeLiveRepository implements LiveRepository {
           .toList();
       return Right(activeLives);
     } on SocketException catch (e) {
-      return Left(NetworkFailure(
-        'No internet connection. Please check your network and try again.',
-        details: e.message,
-      ));
+      return Left(
+        NetworkFailure(
+          'No internet connection. Please check your network and try again.',
+          details: e.message,
+        ),
+      );
     } on TimeoutException {
-      return const Left(NetworkFailure(
-        'Connection timed out. Please try again.',
-      ));
+      return const Left(
+        NetworkFailure('Connection timed out. Please try again.'),
+      );
     } on UnauthorizedException catch (e) {
-      return Left(AuthorizationFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } on NotFoundException catch (e) {
-      return Left(NotFoundFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        NotFoundFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } on ServiceUnavailableException catch (e) {
-      return Left(ServerFailure(
-        'Live service is temporarily unavailable. Please try again later.',
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        ServerFailure(
+          'Live service is temporarily unavailable. Please try again later.',
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } on BadRequestException catch (e) {
-      return Left(ValidationFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        ValidationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } on ApiException catch (e) {
-      return Left(ServerFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        ServerFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to fetch live feed: $e'));
     }
@@ -120,45 +132,54 @@ class FakeLiveRepository implements LiveRepository {
       final result = await _remote.joinLive(liveId);
       return Right(result);
     } on SocketException catch (e) {
-      return Left(NetworkFailure(
-        'No internet connection. Please check your network and try again.',
-        details: e.message,
-      ));
+      return Left(
+        NetworkFailure(
+          'No internet connection. Please check your network and try again.',
+          details: e.message,
+        ),
+      );
     } on TimeoutException {
-      return const Left(NetworkFailure(
-        'Connection timed out. Please try again.',
-      ));
+      return const Left(
+        NetworkFailure('Connection timed out. Please try again.'),
+      );
     } on UnauthorizedException catch (e) {
-      return Left(AuthorizationFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } on NotFoundException catch (e) {
-      return Left(NotFoundFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        NotFoundFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('BANNED')) {
-        return const Left(AuthorizationFailure(
-          'You are banned from this live stream.',
-          code: 'USER_BANNED',
-        ));
+        return const Left(
+          AuthorizationFailure(
+            'You are banned from this live stream.',
+            code: 'USER_BANNED',
+          ),
+        );
       }
       if (msg.contains('ENDED')) {
-        return const Left(NotFoundFailure(
-          'This live stream has ended.',
-          code: 'LIVE_ENDED',
-        ));
+        return const Left(
+          NotFoundFailure('This live stream has ended.', code: 'LIVE_ENDED'),
+        );
       }
       if (msg.contains('INVALID_JOIN_RESPONSE')) {
-        return const Left(ServerFailure(
-          'Failed to start stream. Please try again.',
-          code: 'INVALID_JOIN_RESPONSE',
-        ));
+        return const Left(
+          ServerFailure(
+            'Failed to start stream. Please try again.',
+            code: 'INVALID_JOIN_RESPONSE',
+          ),
+        );
       }
       return Left(ServerFailure('Failed to join live: $e'));
     }
@@ -170,16 +191,17 @@ class FakeLiveRepository implements LiveRepository {
       await _remote.leaveLive(liveId);
       return const Right(null);
     } on SocketException catch (e) {
-      return Left(NetworkFailure(
-        'No internet connection.',
-        details: e.message,
-      ));
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
     } on UnauthorizedException catch (e) {
-      return Left(AuthorizationFailure(
-        e.message,
-        code: e.statusCode?.toString(),
-        details: e.details,
-      ));
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to leave live: $e'));
     }

@@ -44,12 +44,14 @@ class LiveMapper {
       description: json['description']?.toString(),
       thumbnailUrl: json['coverUrl']?.toString(),
       streamUrl: json['streamUrl']?.toString(),
-      category: json['categoryName']?.toString() ??
+      category:
+          json['categoryName']?.toString() ??
           json['category']?.toString() ??
           'General',
       viewerCount: viewerCount,
       likeCount: likeCount,
-      startTime: _parseDate(json['startedAt']) ??
+      startTime:
+          _parseDate(json['startedAt']) ??
           _parseDate(json['createdAt']) ??
           DateTime.now(),
       endTime: _parseDate(json['endedAt']),
@@ -154,7 +156,8 @@ class LiveMapper {
     meta['location'] = json['location']?.toString() ?? 'Live';
     meta['hourlyRank'] = hourlyRank ?? _asInt(json['hourlyRank']);
     meta['shareCount'] = _asInt(json['shareCount']) ?? 0;
-    meta['showFanClub'] = json['fanClub'] != null || json['showFanClub'] == true;
+    meta['showFanClub'] =
+        json['fanClub'] != null || json['showFanClub'] == true;
 
     final fanClub = _asMap(json['fanClub']);
     if (fanClub != null) {
@@ -167,7 +170,8 @@ class LiveMapper {
     // Popular badge (TikTok parity §20).
     if (json['isPopular'] == true || hourlyRank != null) {
       meta['isPopular'] = true;
-      meta['popularReason'] = json['popularReason']?.toString() ?? 'hourly_rank';
+      meta['popularReason'] =
+          json['popularReason']?.toString() ?? 'hourly_rank';
     }
 
     // Host league tier from the user object.

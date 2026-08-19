@@ -15,27 +15,18 @@ abstract class Failure extends Equatable {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const ServerFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const NetworkFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const CacheFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class ValidationFailure extends Failure {
@@ -53,49 +44,31 @@ class ValidationFailure extends Failure {
 }
 
 class AuthenticationFailure extends Failure {
-  const AuthenticationFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const AuthenticationFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class AuthorizationFailure extends Failure {
-  const AuthorizationFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const AuthorizationFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class NotFoundFailure extends Failure {
-  const NotFoundFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const NotFoundFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class TimeoutFailure extends Failure {
-  const TimeoutFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const TimeoutFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class UnknownFailure extends Failure {
-  const UnknownFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const UnknownFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class WebsocketFailure extends Failure {
-  const WebsocketFailure(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const WebsocketFailure(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }

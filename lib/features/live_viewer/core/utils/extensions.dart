@@ -85,7 +85,9 @@ extension DateTimeExtensions on DateTime {
 
   bool get isYesterday {
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return year == yesterday.year && month == yesterday.month && day == yesterday.day;
+    return year == yesterday.year &&
+        month == yesterday.month &&
+        day == yesterday.day;
   }
 }
 
@@ -95,72 +97,61 @@ extension WidgetExtensions on Widget {
   Widget get expanded => Expanded(child: this);
   Widget get flexible => Flexible(child: this);
 
-  Widget padding(EdgeInsetsGeometry padding) => Padding(padding: padding, child: this);
-  Widget paddingAll(double value) => Padding(padding: EdgeInsets.all(value), child: this);
-  Widget paddingHorizontal(double value) => Padding(padding: EdgeInsets.symmetric(horizontal: value), child: this);
-  Widget paddingVertical(double value) => Padding(padding: EdgeInsets.symmetric(vertical: value), child: this);
+  Widget padding(EdgeInsetsGeometry padding) =>
+      Padding(padding: padding, child: this);
+  Widget paddingAll(double value) =>
+      Padding(padding: EdgeInsets.all(value), child: this);
+  Widget paddingHorizontal(double value) => Padding(
+    padding: EdgeInsets.symmetric(horizontal: value),
+    child: this,
+  );
+  Widget paddingVertical(double value) => Padding(
+    padding: EdgeInsets.symmetric(vertical: value),
+    child: this,
+  );
 
-  Widget margin(EdgeInsetsGeometry margin) => Container(margin: margin, child: this);
-  Widget marginAll(double value) => Container(margin: EdgeInsets.all(value), child: this);
+  Widget margin(EdgeInsetsGeometry margin) =>
+      Container(margin: margin, child: this);
+  Widget marginAll(double value) =>
+      Container(margin: EdgeInsets.all(value), child: this);
 
-  Widget align([AlignmentGeometry alignment = Alignment.center]) => Align(alignment: alignment, child: this);
+  Widget align([AlignmentGeometry alignment = Alignment.center]) =>
+      Align(alignment: alignment, child: this);
 
   Widget hero(String tag) => Hero(tag: tag, child: this);
 
-  Widget materialize([Color? color]) => Material(
-    type: MaterialType.transparency,
-    color: color,
-    child: this,
-  );
+  Widget materialize([Color? color]) =>
+      Material(type: MaterialType.transparency, color: color, child: this);
 
-  Widget ignorePointer({bool ignoring = true}) => IgnorePointer(ignoring: ignoring, child: this);
-  Widget absorbPointer({bool absorbing = true}) => AbsorbPointer(absorbing: absorbing, child: this);
+  Widget ignorePointer({bool ignoring = true}) =>
+      IgnorePointer(ignoring: ignoring, child: this);
+  Widget absorbPointer({bool absorbing = true}) =>
+      AbsorbPointer(absorbing: absorbing, child: this);
 
-  Widget withConstraints(BoxConstraints constraints) => ConstrainedBox(
-    constraints: constraints,
-    child: this,
-  );
+  Widget withConstraints(BoxConstraints constraints) =>
+      ConstrainedBox(constraints: constraints, child: this);
 
-  Widget withSize({double? width, double? height}) => SizedBox(
-    width: width,
-    height: height,
-    child: this,
-  );
+  Widget withSize({double? width, double? height}) =>
+      SizedBox(width: width, height: height, child: this);
 
-  Widget withOpacity(double opacity) => Opacity(
-    opacity: opacity,
-    child: this,
-  );
+  Widget withOpacity(double opacity) => Opacity(opacity: opacity, child: this);
 
-  Widget withRotation(double turns) => RotatedBox(
-    quarterTurns: (turns * 4).round(),
-    child: this,
-  );
+  Widget withRotation(double turns) =>
+      RotatedBox(quarterTurns: (turns * 4).round(), child: this);
 
-  Widget withScale(double scale) => Transform.scale(
-    scale: scale,
-    child: this,
-  );
+  Widget withScale(double scale) => Transform.scale(scale: scale, child: this);
 
-  Widget withTranslate(Offset offset) => Transform.translate(
-    offset: offset,
-    child: this,
-  );
+  Widget withTranslate(Offset offset) =>
+      Transform.translate(offset: offset, child: this);
 
-  Widget onTap(VoidCallback onTap) => GestureDetector(
-    onTap: onTap,
-    child: this,
-  );
+  Widget onTap(VoidCallback onTap) =>
+      GestureDetector(onTap: onTap, child: this);
 
-  Widget onLongPress(VoidCallback onLongPress) => GestureDetector(
-    onLongPress: onLongPress,
-    child: this,
-  );
+  Widget onLongPress(VoidCallback onLongPress) =>
+      GestureDetector(onLongPress: onLongPress, child: this);
 
-  Widget withBorderRadius(BorderRadius borderRadius) => ClipRRect(
-    borderRadius: borderRadius,
-    child: this,
-  );
+  Widget withBorderRadius(BorderRadius borderRadius) =>
+      ClipRRect(borderRadius: borderRadius, child: this);
 
   Widget circleClip() => ClipOval(child: this);
 
@@ -202,7 +193,11 @@ extension BuildContextExtensions on BuildContext {
   void pop<T>([T? result]) => Navigator.of(this).pop(result);
   void unfocus() => FocusScope.of(this).unfocus();
 
-  void showSnackBar(String message, {SnackBarAction? action, Duration? duration}) {
+  void showSnackBar(
+    String message, {
+    SnackBarAction? action,
+    Duration? duration,
+  }) {
     ScaffoldMessenger.of(this).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -212,18 +207,18 @@ extension BuildContextExtensions on BuildContext {
     );
   }
 
-  Future<T?> navigateTo<T>(Widget page) => Navigator.of(this).push<T>(
-    MaterialPageRoute(builder: (_) => page),
-  );
+  Future<T?> navigateTo<T>(Widget page) =>
+      Navigator.of(this).push<T>(MaterialPageRoute(builder: (_) => page));
 
-  Future<T?> replaceWith<T>(Widget page) => Navigator.of(this).pushReplacement<T, dynamic>(
-    MaterialPageRoute(builder: (_) => page),
-  );
+  Future<T?> replaceWith<T>(Widget page) => Navigator.of(
+    this,
+  ).pushReplacement<T, dynamic>(MaterialPageRoute(builder: (_) => page));
 
-  Future<T?> navigateAndRemoveUntil<T>(Widget page) => Navigator.of(this).pushAndRemoveUntil<T>(
-    MaterialPageRoute(builder: (_) => page),
-    (_) => false,
-  );
+  Future<T?> navigateAndRemoveUntil<T>(Widget page) =>
+      Navigator.of(this).pushAndRemoveUntil<T>(
+        MaterialPageRoute(builder: (_) => page),
+        (_) => false,
+      );
 }
 
 // List Extensions
@@ -253,7 +248,8 @@ extension ListExtensions<T> on List<T> {
 
 // Nullable Extensions
 extension NullableExtensions<T> on T? {
-  R? map<R>(R Function(T) transform) => this != null ? transform(this as T) : null;
+  R? map<R>(R Function(T) transform) =>
+      this != null ? transform(this as T) : null;
   T orElse(T defaultValue) => this ?? defaultValue;
   T? orElseNullable(T? defaultValue) => this ?? defaultValue;
   bool get isNull => this == null;

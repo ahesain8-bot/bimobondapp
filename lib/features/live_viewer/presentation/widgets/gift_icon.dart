@@ -7,11 +7,7 @@ class GiftIcon extends StatelessWidget {
   final GiftEntity gift;
   final double size;
 
-  const GiftIcon({
-    super.key,
-    required this.gift,
-    this.size = 32,
-  });
+  const GiftIcon({super.key, required this.gift, this.size = 32});
 
   static IconData iconFor(String key) {
     switch (key) {
@@ -83,10 +79,7 @@ class GiftIcon extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          colors: [
-            colorFor(gift).withOpacity(0.35),
-            Colors.transparent,
-          ],
+          colors: [colorFor(gift).withOpacity(0.35), Colors.transparent],
         ),
       ),
       child: Icon(

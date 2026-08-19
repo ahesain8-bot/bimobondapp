@@ -11,8 +11,7 @@ import 'fake_livekit_service.dart' show LiveKitConnectionState, LiveKitService;
 /// `url` + `token` must come from `POST /lives/:id/join` (mobile-api.md §15).
 /// Token TTL ≈ 6h — reconnect means re-joining to refresh the token.
 class RealLiveKitService implements LiveKitService {
-  final _stateController =
-      StreamController<LiveKitConnectionState>.broadcast();
+  final _stateController = StreamController<LiveKitConnectionState>.broadcast();
 
   LiveKitConnectionState _state = LiveKitConnectionState.disconnected;
   String? _roomName;

@@ -18,7 +18,7 @@ import 'live_remote_datasource.dart';
 /// - `DELETE /creators/:id/fan-club/subscribe` (unfollow)
 class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   HttpLiveRemoteDataSource({LiveApiClient? apiClient})
-      : _api = apiClient ?? _defaultApiClient();
+    : _api = apiClient ?? _defaultApiClient();
 
   final LiveApiClient _api;
 
@@ -44,8 +44,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
       query: {
         'page': '$page',
         'limit': '$limit',
-        if (category != null && category.isNotEmpty)
-          'categoryId': category,
+        if (category != null && category.isNotEmpty) 'categoryId': category,
       },
     );
     return LiveMapper.listFromPayload(payload);
@@ -71,9 +70,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     final payload = await _api.post(ApiEndpoints.liveJoin(liveId));
 
     final nestedLive = payload['live'];
-    final liveJson = nestedLive is Map<String, dynamic>
-        ? nestedLive
-        : payload;
+    final liveJson = nestedLive is Map<String, dynamic> ? nestedLive : payload;
 
     final live = LiveMapper.fromJson(liveJson);
     final liveKitUrl = payload['url']?.toString() ?? '';
@@ -91,7 +88,8 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
 
     // The socket handshake uses the Firebase ID token itself — no separate
     // socket token from the backend. Keep a placeholder for contract parity.
-    final socketToken = await _api.idTokenProvider?.call() ??
+    final socketToken =
+        await _api.idTokenProvider?.call() ??
         'socket_${liveId}_${DateTime.now().millisecondsSinceEpoch}';
 
     return JoinLiveResult(

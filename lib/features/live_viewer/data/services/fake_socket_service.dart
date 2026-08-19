@@ -12,10 +12,7 @@ abstract class SocketService {
   bool get isConnected;
   String? get currentLiveId;
 
-  Future<void> connect({
-    required String liveId,
-    required String token,
-  });
+  Future<void> connect({required String liveId, required String token});
 
   Future<void> disconnect();
 
@@ -48,10 +45,36 @@ class FakeSocketService implements SocketService {
   int _reconnectAttempt = 0;
 
   static const _usernames = [
-    'Alex', 'Blake', 'Casey', 'Drew', 'Emery', 'Finley', 'Gray', 'Harper',
-    'Indigo', 'Jordan', 'Kai', 'Logan', 'Morgan', 'Nova', 'Oakley', 'Parker',
-    'Quinn', 'Riley', 'Sage', 'Taylor', 'Uma', 'Val', 'Winter', 'Xen',
-    'Yuki', 'Zara', 'StarGazer', 'NightOwl', 'Dreamer', 'Luna',
+    'Alex',
+    'Blake',
+    'Casey',
+    'Drew',
+    'Emery',
+    'Finley',
+    'Gray',
+    'Harper',
+    'Indigo',
+    'Jordan',
+    'Kai',
+    'Logan',
+    'Morgan',
+    'Nova',
+    'Oakley',
+    'Parker',
+    'Quinn',
+    'Riley',
+    'Sage',
+    'Taylor',
+    'Uma',
+    'Val',
+    'Winter',
+    'Xen',
+    'Yuki',
+    'Zara',
+    'StarGazer',
+    'NightOwl',
+    'Dreamer',
+    'Luna',
   ];
 
   static const _comments = [
@@ -90,10 +113,7 @@ class FakeSocketService implements SocketService {
   }
 
   @override
-  Future<void> connect({
-    required String liveId,
-    required String token,
-  }) async {
+  Future<void> connect({required String liveId, required String token}) async {
     await Future.delayed(const Duration(milliseconds: 400));
     _liveId = liveId;
     _connected = true;
@@ -102,18 +122,14 @@ class FakeSocketService implements SocketService {
 
     // Rarely end the live after a long session (~3% chance after 90–180s).
     _endTimer?.cancel();
-    _endTimer = Timer(
-      Duration(seconds: 90 + _random.nextInt(90)),
-      () {
-        if (!_connected || _liveId == null) return;
-        if (_random.nextDouble() > 0.03) return;
-        _controller.add(LiveEndedEvent(
-          liveId: _liveId!,
-          timestamp: DateTime.now(),
-        ));
-        disconnect();
-      },
-    );
+    _endTimer = Timer(Duration(seconds: 90 + _random.nextInt(90)), () {
+      if (!_connected || _liveId == null) return;
+      if (_random.nextDouble() > 0.03) return;
+      _controller.add(
+        LiveEndedEvent(liveId: _liveId!, timestamp: DateTime.now()),
+      );
+      disconnect();
+    });
 
     // Occasional network blip for reconnect UX (disabled by default density).
     _networkChaosTimer?.cancel();
@@ -136,34 +152,36 @@ class FakeSocketService implements SocketService {
   @override
   Future<void> emitComment(CommentEntity comment) async {
     if (!_connected || _liveId == null) return;
-    _controller.add(LiveCommentEvent(
-      liveId: _liveId!,
-      comment: comment,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveCommentEvent(
+        liveId: _liveId!,
+        comment: comment,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   @override
   Future<void> emitLike({required int likeCount, int delta = 1}) async {
     if (!_connected || _liveId == null) return;
     _likeCount = likeCount;
-    _controller.add(LiveLikeEvent(
-      liveId: _liveId!,
-      likeCount: likeCount,
-      delta: delta,
-      userId: 'current_user',
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveLikeEvent(
+        liveId: _liveId!,
+        likeCount: likeCount,
+        delta: delta,
+        userId: 'current_user',
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   @override
   Future<void> emitGift(GiftSentEntity gift) async {
     if (!_connected || _liveId == null) return;
-    _controller.add(LiveGiftEvent(
-      liveId: _liveId!,
-      gift: gift,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveGiftEvent(liveId: _liveId!, gift: gift, timestamp: DateTime.now()),
+    );
   }
 
   @override
@@ -172,30 +190,30 @@ class FakeSocketService implements SocketService {
     final liveId = _liveId!;
     _stopEmitters();
     _connected = false;
-    _controller.add(NetworkLostEvent(
-      liveId: liveId,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      NetworkLostEvent(liveId: liveId, timestamp: DateTime.now()),
+    );
     _attemptReconnect(liveId);
   }
 
   void _attemptReconnect(String liveId) {
     _reconnectAttempt++;
-    _controller.add(ReconnectingEvent(
-      liveId: liveId,
-      attempt: _reconnectAttempt,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      ReconnectingEvent(
+        liveId: liveId,
+        attempt: _reconnectAttempt,
+        timestamp: DateTime.now(),
+      ),
+    );
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 2), () async {
       if (_liveId != null && _liveId != liveId) return;
       _liveId = liveId;
       _connected = true;
-      _controller.add(ReconnectedEvent(
-        liveId: liveId,
-        timestamp: DateTime.now(),
-      ));
+      _controller.add(
+        ReconnectedEvent(liveId: liveId, timestamp: DateTime.now()),
+      );
       _startEmitters();
     });
   }
@@ -254,34 +272,40 @@ class FakeSocketService implements SocketService {
       content: _comments[_random.nextInt(_comments.length)],
       createdAt: DateTime.now(),
     );
-    _controller.add(LiveCommentEvent(
-      liveId: _liveId!,
-      comment: comment,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveCommentEvent(
+        liveId: _liveId!,
+        comment: comment,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   void _emitFakeLikes() {
     if (!_connected || _liveId == null) return;
     final delta = 1 + _random.nextInt(12);
     _likeCount += delta;
-    _controller.add(LiveLikeEvent(
-      liveId: _liveId!,
-      likeCount: _likeCount,
-      delta: delta,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveLikeEvent(
+        liveId: _liveId!,
+        likeCount: _likeCount,
+        delta: delta,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   void _emitViewerUpdate() {
     if (!_connected || _liveId == null) return;
     final delta = _random.nextInt(21) - 8;
     _viewerCount = (_viewerCount + delta).clamp(1, 999999);
-    _controller.add(LiveViewersEvent(
-      liveId: _liveId!,
-      viewerCount: _viewerCount,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveViewersEvent(
+        liveId: _liveId!,
+        viewerCount: _viewerCount,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   void _emitFakeGift() {
@@ -301,29 +325,31 @@ class FakeSocketService implements SocketService {
       sentAt: DateTime.now(),
       giftDetails: gift,
     );
-    _controller.add(LiveGiftEvent(
-      liveId: _liveId!,
-      gift: sent,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      LiveGiftEvent(liveId: _liveId!, gift: sent, timestamp: DateTime.now()),
+    );
   }
 
   void _emitUserJoined() {
     if (!_connected || _liveId == null) return;
     final username = _usernames[_random.nextInt(_usernames.length)];
     _viewerCount += 1;
-    _controller.add(UserJoinedEvent(
-      liveId: _liveId!,
-      userId: 'user_${_random.nextInt(99999)}',
-      username: username,
-      avatarUrl: 'https://i.pravatar.cc/150?u=$username',
-      timestamp: DateTime.now(),
-    ));
-    _controller.add(LiveViewersEvent(
-      liveId: _liveId!,
-      viewerCount: _viewerCount,
-      timestamp: DateTime.now(),
-    ));
+    _controller.add(
+      UserJoinedEvent(
+        liveId: _liveId!,
+        userId: 'user_${_random.nextInt(99999)}',
+        username: username,
+        avatarUrl: 'https://i.pravatar.cc/150?u=$username',
+        timestamp: DateTime.now(),
+      ),
+    );
+    _controller.add(
+      LiveViewersEvent(
+        liveId: _liveId!,
+        viewerCount: _viewerCount,
+        timestamp: DateTime.now(),
+      ),
+    );
   }
 
   void dispose() {

@@ -30,20 +30,19 @@ class FakeCommentRepository implements CommentRepository {
       _ensureRoom(liveId);
       final all = _comments[liveId]!;
       if (all.isEmpty) {
-        final seed = List.generate(
-          8,
-          (_) => _seedComment(liveId),
-        );
+        final seed = List.generate(8, (_) => _seedComment(liveId));
         all.addAll(seed);
       }
       final slice = all.length > limit
           ? all.sublist(all.length - limit)
           : List<CommentEntity>.from(all);
-      return Right(CommentBatch(
-        comments: slice.reversed.toList(),
-        hasMore: all.length > limit,
-        nextCursor: all.length > limit ? 'cursor_${all.length}' : null,
-      ));
+      return Right(
+        CommentBatch(
+          comments: slice.reversed.toList(),
+          hasMore: all.length > limit,
+          nextCursor: all.length > limit ? 'cursor_${all.length}' : null,
+        ),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to fetch comments: $e'));
     }
@@ -164,7 +163,9 @@ class FakeCommentRepository implements CommentRepository {
       username: username,
       userAvatar: 'https://i.pravatar.cc/150?u=$username',
       content: msgs[_random.nextInt(msgs.length)],
-      createdAt: DateTime.now().subtract(Duration(seconds: _random.nextInt(90))),
+      createdAt: DateTime.now().subtract(
+        Duration(seconds: _random.nextInt(90)),
+      ),
     );
   }
 

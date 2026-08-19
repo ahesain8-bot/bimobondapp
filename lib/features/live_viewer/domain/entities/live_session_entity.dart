@@ -68,8 +68,13 @@ class JoinLiveResult extends Equatable {
   });
 
   @override
-  List<Object?> get props =>
-      [liveId, socketToken, liveKitToken, liveKitUrl, live];
+  List<Object?> get props => [
+    liveId,
+    socketToken,
+    liveKitToken,
+    liveKitUrl,
+    live,
+  ];
 }
 
 /// Active watch session snapshot.
@@ -126,15 +131,15 @@ class LiveSessionEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        live,
-        connectionState,
-        socketToken,
-        liveKitToken,
-        isSocketConnected,
-        isLiveKitConnected,
-        reconnectAttempt,
-        errorMessage,
-        coinBalance,
-        hasLiked,
-      ];
+    live,
+    connectionState,
+    socketToken,
+    liveKitToken,
+    isSocketConnected,
+    isLiveKitConnected,
+    reconnectAttempt,
+    errorMessage,
+    coinBalance,
+    hasLiked,
+  ];
 }

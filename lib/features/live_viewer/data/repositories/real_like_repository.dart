@@ -19,8 +19,8 @@ class RealLikeRepository implements LikeRepository {
   RealLikeRepository({
     required LiveApiClient apiClient,
     required SocketService socket,
-  })  : _api = apiClient,
-        _socket = socket;
+  }) : _api = apiClient,
+       _socket = socket;
 
   final LiveApiClient _api;
   final SocketService _socket;
@@ -64,10 +64,7 @@ class RealLikeRepository implements LikeRepository {
   }
 
   @override
-  Future<Either<Failure, void>> sendBurstLikes(
-    String liveId,
-    int count,
-  ) async {
+  Future<Either<Failure, void>> sendBurstLikes(String liveId, int count) async {
     // Soft limit: max 15 taps/sec/user/live.
     final safe = count.clamp(1, 15);
     try {

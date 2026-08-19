@@ -47,10 +47,7 @@ class FakeLikeRepository implements LikeRepository {
   }
 
   @override
-  Future<Either<Failure, void>> sendBurstLikes(
-    String liveId,
-    int count,
-  ) async {
+  Future<Either<Failure, void>> sendBurstLikes(String liveId, int count) async {
     await Future.delayed(const Duration(milliseconds: 80));
     try {
       _likedLives.add(liveId);

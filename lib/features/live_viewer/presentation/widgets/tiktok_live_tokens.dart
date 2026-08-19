@@ -31,8 +31,10 @@ abstract final class TikTokLiveTokens {
   static const double viewerOverlap = 8; // center pitch = 16
   static const double viewerBorder = 1.5;
   static const double closeIcon = 24;
+
   /// Black gap between badge row and PK score bar (reference green marks).
   static const double badgeGapBelow = 12;
+
   /// Black gap between badge row and multi-guest grid (reference — wider).
   static const double multiGridChromeGap = 20;
   static const double badgeH = 20; // matches _Pill height in chrome
@@ -86,17 +88,22 @@ abstract final class TikTokLiveTokens {
   // —— Scrims ——
   static const double topScrimH = 112;
   static const double topScrimAlpha = 0.45;
+
   /// Bottom comment-zone scrim (reference: soft fade over video).
   static const double bottomScrimH = 280;
   static const double bottomScrimAlpha = 0.92;
+
   /// PK: comment overlay height; video extends under it with gradient.
   static const double pkCommentBandH = 168;
   static const double pkContributorOverlap = 52;
+
   /// PK video top offset below status bar (under badge row; reference match).
   static const double pkVideoTopBelowSafe = 84;
+
   /// Combined PK split aspect (width / height). Higher = shorter letterboxed band.
   /// Tuned to TikTok LIVE PK middle-band framing (~middle third of screen).
   static const double pkVideoAspect = 1.35;
+
   /// Extra black gap below PK video before comment band.
   static const double pkVideoBottomGap = 8;
 

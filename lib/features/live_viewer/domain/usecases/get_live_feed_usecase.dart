@@ -13,10 +13,6 @@ class GetLiveFeedUseCase {
     int limit = 10,
     String? category,
   }) {
-    return repository.getLiveFeed(
-      page: page,
-      limit: limit,
-      category: category,
-    );
+    return repository.getLiveFeed(page: page, limit: limit, category: category);
   }
 }
