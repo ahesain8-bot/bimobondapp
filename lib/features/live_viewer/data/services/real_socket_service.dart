@@ -34,6 +34,7 @@ class RealSocketService implements SocketService {
   io.Socket? _socket;
   String? _liveId;
   bool _connected = false;
+  bool _disposed = false;
   final _controller = StreamController<SocketEvent>.broadcast();
 
   @override
@@ -44,6 +45,11 @@ class RealSocketService implements SocketService {
 
   @override
   String? get currentLiveId => _liveId;
+
+  void _emit(SocketEvent event) {
+    if (_disposed || _controller.isClosed) return;
+    _controller.add(event);
+  }
 
   @override
   Future<void> connect({
@@ -87,7 +93,7 @@ class RealSocketService implements SocketService {
       final wasConnected = _connected;
       _connected = false;
       if (wasConnected && _liveId != null) {
-        _controller.add(NetworkLostEvent(
+        _emit(NetworkLostEvent(
           liveId: _liveId!,
           timestamp: DateTime.now(),
         ));
@@ -105,7 +111,7 @@ class RealSocketService implements SocketService {
 
     socket.onReconnectAttempt((attempt) {
       if (_liveId == null) return;
-      _controller.add(ReconnectingEvent(
+      _emit(ReconnectingEvent(
         liveId: _liveId!,
         attempt: attempt,
         timestamp: DateTime.now(),
@@ -116,7 +122,7 @@ class RealSocketService implements SocketService {
       _connected = true;
       if (_liveId != null) {
         socket.emit('joinLive', {'liveId': _liveId});
-        _controller.add(ReconnectedEvent(
+        _emit(ReconnectedEvent(
           liveId: _liveId!,
           timestamp: DateTime.now(),
         ));
@@ -125,52 +131,52 @@ class RealSocketService implements SocketService {
 
     socket.on('liveComment', (data) {
       final event = SocketMapper.commentEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveCommentDeleted', (data) {
       final event = SocketMapper.commentDeletedEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveCommentPinned', (data) {
       final event = SocketMapper.commentPinnedEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveCommentUnpinned', (data) {
       final event = SocketMapper.commentUnpinnedEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveModeration', (data) {
       final event = SocketMapper.moderationEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveGift', (data) {
       final event = SocketMapper.giftEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveLike', (data) {
       final event = SocketMapper.likeEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveViewers', (data) {
       final event = SocketMapper.viewersEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('liveEnded', (data) {
       final event = SocketMapper.endedEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.on('userJoined', (data) {
       final event = SocketMapper.userJoinedEvent(data, _liveId);
-      if (event != null) _controller.add(event);
+      if (event != null) _emit(event);
     });
 
     socket.connect();
@@ -214,7 +220,9 @@ class RealSocketService implements SocketService {
     // Not supported for the real socket — UI triggers a manual reconnect.
   }
 
+  @override
   Future<void> dispose() async {
+    _disposed = true;
     await disconnect();
     await _controller.close();
   }

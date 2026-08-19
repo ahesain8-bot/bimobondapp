@@ -20,6 +20,7 @@ class RealLiveKitService implements LiveKitService {
   String? _url;
   String? _token;
   Room? _room;
+  bool _disposed = false;
 
   @override
   LiveKitConnectionState get state => _state;
@@ -35,9 +36,11 @@ class RealLiveKitService implements LiveKitService {
 
   /// The underlying LiveKit room — exposed for future `LiveKitVideoView`
   /// rendering of subscribed remote tracks.
+  @override
   Room? get room => _room;
 
   void _setState(LiveKitConnectionState next) {
+    if (_disposed || _stateController.isClosed) return;
     _state = next;
     _stateController.add(next);
   }
@@ -215,7 +218,9 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
+  @override
   void dispose() {
+    _disposed = true;
     _stateController.close();
   }
 }

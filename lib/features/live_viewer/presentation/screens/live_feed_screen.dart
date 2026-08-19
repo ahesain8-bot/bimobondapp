@@ -11,6 +11,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../../../core/services/live_feed_refresh_bus.dart';
 import '../providers/live_feed_provider.dart';
 import '../providers/live_session_provider.dart';
+import '../../domain/entities/live_session_entity.dart';
 import '../widgets/live_room_page.dart';
 import '../../../live/presentation/utils/live_screen_wakelock.dart';
 
@@ -94,7 +95,7 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
       // App sent to background: ALWAYS tear down the active live session so
       // audio/video/socket/LiveKit never keep running when the user isn't
       // viewing.
-      ref.read(activeLiveProvider.notifier).deactivate();
+      ref.read(activeLiveProvider.notifier).deactivateAll();
       LiveScreenWakelock.disable();
     }
   }
@@ -106,13 +107,14 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
     LiveFeedRefreshBus.instance.removeListener(_onLiveEndedSignal);
     // Deactivate current live BEFORE disposing the controller so we don't
     // leave a dangling LiveKit connection + socket on viewer exit.
-    ref.read(activeLiveProvider.notifier).deactivate();
+    ref.read(activeLiveProvider.notifier).deactivateAll();
     _pageController.dispose();
     LiveScreenWakelock.disable();
     super.dispose();
   }
 
   void _onPageChanged(int index) {
+    final sw = Stopwatch()..start();
     setState(() => _currentIndex = index);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -120,19 +122,27 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
       final feed = ref.read(liveFeedProvider);
       final lives = feed.lives;
 
+      if (lives.isEmpty) return;
+
+      // Clamp index to valid range
+      final safeIndex = index.clamp(0, lives.length - 1);
+      debugPrint('⏱️ [FEED] _onPageChanged START: index=$index, safeIndex=$safeIndex, liveId=${lives[safeIndex].id} (${sw.elapsedMilliseconds}ms)');
       // Reached the loading/refresh page at the end of the feed.
       // Swiping down here asks the server for new lives:
       //  - if a new live appeared, it shows and the user stays on it;
       //  - if nothing new, bounce back to the current live.
       if (index >= lives.length) {
+        debugPrint('⏱️ [FEED] Swipe to load-more page: index=$index, lives.length=${lives.length} (${sw.elapsedMilliseconds}ms)');
         final before = lives.length;
         await ref.read(liveFeedProvider.notifier).silentRefresh();
         if (!mounted) return;
         final after = ref.read(liveFeedProvider).lives.length;
+        debugPrint('⏱️ [FEED] After silentRefresh: before=$before, after=$after (${sw.elapsedMilliseconds}ms)');
         if (after == before) {
           // No new lives: return to the last real live.
           final target = after - 1;
           if (target >= 0) {
+            debugPrint('⏱️ [FEED] No new lives, bounce back to target=$target (${sw.elapsedMilliseconds}ms)');
             _pageController.jumpToPage(target);
             setState(() => _currentIndex = target);
             final currentLives = ref.read(liveFeedProvider).lives;
@@ -142,23 +152,29 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
           // New lives appeared: activate the live now at this index.
           final newLives = ref.read(liveFeedProvider).lives;
           if (index < newLives.length) {
+            debugPrint('⏱️ [FEED] New lives appeared, activate index=$index (${sw.elapsedMilliseconds}ms)');
             ref.read(activeLiveProvider.notifier).activate(newLives[index]);
           }
         }
+        debugPrint('⏱️ [FEED] _onPageChanged COMPLETE (load-more): ${sw.elapsedMilliseconds}ms');
         return;
       }
 
       if (index >= lives.length - 2 && feed.hasMore) {
+        debugPrint('⏱️ [FEED] Load more triggered: index=$index, hasMore=${feed.hasMore} (${sw.elapsedMilliseconds}ms)');
         ref.read(liveFeedProvider.notifier).loadMore();
       }
 
       final notifier = ref.read(activeLiveProvider.notifier);
-      final current = lives[index];
-      if (notifier.activeLiveId != null &&
-          notifier.activeLiveId != current.id) {
-        notifier.deactivate();
-      }
-      notifier.activate(current);
+      final current = lives[safeIndex];
+      debugPrint('⏱️ [FEED] Page changed: index=$index, safeIndex=$safeIndex, liveId=${current.id}, activeLiveId=${notifier.activeLiveId} (${sw.elapsedMilliseconds}ms)');
+      // NOTE: Do NOT call deactivate() here — activate() handles
+      // tearing down the old active session via _adoptPreloaded/_teardown.
+      // Calling deactivate() in parallel destroys the preloaded session
+      // before it can be adopted.
+      debugPrint('⏱️ [FEED] Activating live: ${current.id} (${sw.elapsedMilliseconds}ms)');
+      await notifier.activate(current);
+      debugPrint('⏱️ [FEED] _onPageChanged COMPLETE: ${sw.elapsedMilliseconds}ms');
     });
   }
 
@@ -178,15 +194,60 @@ class _LiveFeedViewState extends ConsumerState<_LiveFeedView>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final feed = ref.watch(liveFeedProvider);
 
-    // When a live is removed from the feed (host ended it / socket liveEnded),
-    // the live at the current index changes. Re-activate it so video/audio
-    // keeps playing instead of showing only the "live" badge.
+    // Preload the next live IMMEDIATELY — as soon as we know which live is
+    // active and there's a live below it. We don't wait for "connected";
+    // the background session starts connecting right away so by the time
+    // the user swipes down the video is already rolling.
+    ref.listen<(String?, LiveConnectionState)?>(
+      activeLiveProvider.select(
+        (s) => s.live != null
+            ? (s.live!.id, s.connectionState)
+            : (null, LiveConnectionState.idle),
+      ),
+      (previous, next) {
+        if (next == null) return;
+        final (liveId, connectionState) = next;
+        debugPrint('🔄 [FEED] Active live state changed: liveId=$liveId, state=$connectionState');
+        if (liveId == null) return;
+        // Trigger preload on ANY state change of the active live — the
+        // sooner we start the background connection, the more likely the
+        // next live is ready before the user swipes.
+        final lives = ref.read(liveFeedProvider).lives;
+        final index = lives.indexWhere((l) => l.id == liveId);
+        final nextIndex = index + 1;
+        debugPrint('🔄 [FEED] Preload check: index=$index, nextIndex=$nextIndex, lives.length=${lives.length}');
+        if (nextIndex >= 0 && nextIndex < lives.length) {
+          debugPrint('🔄 [FEED] Starting preload for next live: ${lives[nextIndex].id}');
+          ref.read(activeLiveProvider.notifier).preload(lives[nextIndex]);
+        }
+      },
+    );
+
+    // Also preload when the feed itself changes (e.g. initial load or
+    // refresh brings new lives). If there's an active live and a live
+    // below it, start preloading immediately. Also handles the case
+    // where a live is removed from the feed (host ended it / liveEnded):
+    // the live at the current index changes, so we re-activate it.
     ref.listen<LiveFeedState>(liveFeedProvider, (previous, next) {
+      final lives = next.lives;
+      if (lives.isEmpty) return;
+
+      // 1) Preload the next live below the active one.
+      final activeId = ref.read(activeLiveProvider.notifier).activeLiveId;
+      if (activeId != null) {
+        final index = lives.indexWhere((l) => l.id == activeId);
+        final nextIndex = index + 1;
+        if (nextIndex >= 0 && nextIndex < lives.length) {
+          debugPrint('🔄 [FEED] Feed changed, preloading next live: ${lives[nextIndex].id}');
+          ref.read(activeLiveProvider.notifier).preload(lives[nextIndex]);
+        }
+      }
+
+      // 2) If a live was removed and the live at the current index changed,
+      //    re-activate it so video/audio keeps playing.
       if (previous == null) return;
       final prevLives = previous.lives;
       final nextLives = next.lives;
-      if (nextLives.isEmpty) return;
-
       final idx = _currentIndex.clamp(0, nextLives.length - 1);
       final prevId = idx < prevLives.length ? prevLives[idx].id : null;
       final nextId = nextLives[idx].id;

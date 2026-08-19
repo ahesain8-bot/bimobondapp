@@ -49,17 +49,33 @@ final liveRemoteDataSourceProvider = Provider<LiveRemoteDataSource>((ref) {
   return HttpLiveRemoteDataSource(apiClient: ref.watch(apiClientProvider));
 });
 
+/// Shared socket proxy that [ActiveLiveNotifier] points at the current
+/// active (or preloaded) delegate. Repositories and widgets stay subscribed
+/// to this single provider while the backing socket changes per live.
 final socketServiceProvider = Provider<SocketService>((ref) {
-  final service = RealSocketService(idTokenProvider: _firebaseIdToken);
-  ref.onDispose(service.dispose);
-  return service;
+  final proxy = SocketServiceProxy();
+  ref.onDispose(proxy.dispose);
+  return proxy;
 });
 
+/// Shared LiveKit proxy that [ActiveLiveNotifier] points at the current
+/// active (or preloaded) delegate. [LiveVideoPlayer] subscribes to this
+/// provider once and follows whichever room is currently active.
 final liveKitServiceProvider = Provider<LiveKitService>((ref) {
-  final service = RealLiveKitService();
-  ref.onDispose(service.dispose);
-  return service;
+  final proxy = LiveKitServiceProxy();
+  ref.onDispose(proxy.dispose);
+  return proxy;
 });
+
+/// Factory for creating a fresh [SocketService] per live (active or preload).
+final socketServiceFactoryProvider = Provider<SocketService Function()>(
+  (ref) => () => RealSocketService(idTokenProvider: _firebaseIdToken),
+);
+
+/// Factory for creating a fresh [LiveKitService] per live (active or preload).
+final liveKitServiceFactoryProvider = Provider<LiveKitService Function()>(
+  (ref) => () => RealLiveKitService(),
+);
 
 final liveRepositoryProvider = Provider<LiveRepository>((ref) {
   return FakeLiveRepository(ref.watch(liveRemoteDataSourceProvider));

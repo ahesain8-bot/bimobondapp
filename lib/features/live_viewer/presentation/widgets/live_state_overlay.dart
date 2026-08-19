@@ -24,8 +24,12 @@ class LiveStateOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Connecting and loading are invisible — the video player area simply
+    // stays blank until the track arrives. No "Connecting" UI is shown.
     if (state == LiveConnectionState.connected ||
-        state == LiveConnectionState.idle) {
+        state == LiveConnectionState.idle ||
+        state == LiveConnectionState.connecting ||
+        state == LiveConnectionState.loading) {
       return const SizedBox.shrink();
     }
 

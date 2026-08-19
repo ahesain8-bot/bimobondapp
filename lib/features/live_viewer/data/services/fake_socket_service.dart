@@ -25,6 +25,7 @@ abstract class SocketService {
 
   /// Force a simulated network drop (for testing reconnect UI).
   void simulateNetworkLoss();
+  void dispose();
 }
 
 /// Periodically emits TikTok-like live events so the room feels alive.
@@ -326,9 +327,83 @@ class FakeSocketService implements SocketService {
     ));
   }
 
+  @override
   void dispose() {
     _stopEmitters();
     _controller.close();
+  }
+}
+
+/// A proxy that switches listeners between multiple underlying [SocketService]
+/// instances while keeping the same public stream and provider reference.
+///
+/// This lets the feed maintain a preloaded socket for the next live and swap
+/// it to active instantly when the user swipes.
+class SocketServiceProxy implements SocketService {
+  SocketService? _delegate;
+  final _eventsController = StreamController<SocketEvent>.broadcast();
+  StreamSubscription<SocketEvent>? _sub;
+
+  @override
+  Stream<SocketEvent> get events => _eventsController.stream;
+
+  @override
+  bool get isConnected => _delegate?.isConnected ?? false;
+
+  @override
+  String? get currentLiveId => _delegate?.currentLiveId;
+
+  @override
+  Future<void> connect({
+    required String liveId,
+    required String token,
+  }) {
+    if (_delegate == null) {
+      throw StateError('No socket delegate set');
+    }
+    return _delegate!.connect(liveId: liveId, token: token);
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _delegate?.disconnect();
+  }
+
+  @override
+  Future<void> emitComment(CommentEntity comment) async {
+    await _delegate?.emitComment(comment);
+  }
+
+  @override
+  Future<void> emitLike({required int likeCount, int delta = 1}) async {
+    await _delegate?.emitLike(likeCount: likeCount, delta: delta);
+  }
+
+  @override
+  Future<void> emitGift(GiftSentEntity gift) async {
+    await _delegate?.emitGift(gift);
+  }
+
+  @override
+  void simulateNetworkLoss() {
+    _delegate?.simulateNetworkLoss();
+  }
+
+  /// Swaps the backing socket and forwards its event stream.
+  void setDelegate(SocketService? delegate) {
+    if (_delegate == delegate) return;
+    _sub?.cancel();
+    _sub = null;
+    _delegate = delegate;
+    if (delegate != null) {
+      _sub = delegate.events.listen(_eventsController.add);
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _eventsController.close();
   }
 }
 

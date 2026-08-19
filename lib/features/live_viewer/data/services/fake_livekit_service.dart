@@ -31,6 +31,7 @@ abstract class LiveKitService {
 
   Future<void> disconnect();
   Future<void> reconnect();
+  void dispose();
 }
 
 /// Simulates LiveKit join / leave / reconnect with realistic delays.
@@ -112,7 +113,86 @@ class FakeLiveKitService implements LiveKitService {
     _setState(LiveKitConnectionState.connected);
   }
 
+  @override
   void dispose() {
+    _stateController.close();
+  }
+}
+
+/// A proxy that switches the UI between multiple underlying [LiveKitService]
+/// instances without recreating the provider.
+///
+/// The feed keeps one "active" room and may keep one preloaded room; this
+/// proxy lets [LiveVideoPlayer] and [ActiveLiveNotifier] share the same
+/// provider reference while the actual delegate changes under the hood.
+class LiveKitServiceProxy implements LiveKitService {
+  LiveKitService? _delegate;
+  final _stateController = StreamController<LiveKitConnectionState>.broadcast();
+  StreamSubscription<LiveKitConnectionState>? _sub;
+
+  @override
+  LiveKitConnectionState get state =>
+      _delegate?.state ?? LiveKitConnectionState.disconnected;
+
+  @override
+  Stream<LiveKitConnectionState> get stateStream => _stateController.stream;
+
+  @override
+  Room? get room => _delegate?.room;
+
+  @override
+  String? get roomName => _delegate?.roomName;
+
+  @override
+  String? get streamUrl => _delegate?.streamUrl;
+
+  @override
+  Future<void> connect({
+    required String url,
+    required String token,
+    required String roomName,
+    String? mockStreamUrl,
+  }) {
+    if (_delegate == null) {
+      throw StateError('No LiveKit delegate set');
+    }
+    return _delegate!.connect(
+      url: url,
+      token: token,
+      roomName: roomName,
+      mockStreamUrl: mockStreamUrl,
+    );
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _delegate?.disconnect();
+  }
+
+  @override
+  Future<void> reconnect() => _delegate?.reconnect() ?? Future.value();
+
+  /// Swaps the backing service and re-broadcasts its state stream.
+  void setDelegate(LiveKitService? delegate) {
+    if (_delegate == delegate) return;
+    _sub?.cancel();
+    _sub = null;
+    _delegate = delegate;
+    if (delegate != null) {
+      _sub = delegate.stateStream.listen(_emit);
+      _emit(delegate.state);
+    } else {
+      _emit(LiveKitConnectionState.disconnected);
+    }
+  }
+
+  void _emit(LiveKitConnectionState next) {
+    _stateController.add(next);
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
     _stateController.close();
   }
 }

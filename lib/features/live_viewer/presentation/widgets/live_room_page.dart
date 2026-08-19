@@ -12,7 +12,6 @@ import 'comment_input_bar.dart';
 import 'comments_section.dart';
 import 'fallback_media.dart';
 import 'fan_club_widgets.dart';
-import 'first_gift_modal.dart';
 import 'floating_gifts.dart';
 import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
@@ -46,12 +45,13 @@ class LiveRoomPage extends ConsumerStatefulWidget {
 class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
-  bool _firstGiftPrompted = false;
+  bool _activateScheduled = false;
   final List<FloatingHeart> _tapHearts = [];
 
   @override
   void initState() {
     super.initState();
+    debugPrint('🔄 [ROOM] initState: liveId=${widget.live.id}, isActive=${widget.isActive}');
     // Never modify providers synchronously in lifecycle methods.
     if (widget.isActive) {
       _scheduleActivate();
@@ -61,60 +61,42 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
   @override
   void didUpdateWidget(covariant LiveRoomPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    debugPrint('🔄 [ROOM] didUpdateWidget: liveId=${widget.live.id}, isActive=${widget.isActive}, oldIsActive=${oldWidget.isActive}');
+    // Reset activation flag if the live changed
+    if (oldWidget.live.id != widget.live.id) {
+      _activateScheduled = false;
+    }
     if (widget.isActive && !oldWidget.isActive) {
       _scheduleActivate();
-    } else if (!widget.isActive && oldWidget.isActive) {
-      _deactivateIfThis();
     }
+    // We intentionally do NOT deactivate the session here when the page goes
+    // offscreen. [LiveFeedScreen._onPageChanged] is the single source of truth
+    // for activation/teardown; deactivating here can tear down the active live
+    // while the feed is bouncing back from the "load more" page, causing the
+    // "only live badge, no video" bug.
   }
 
   @override
   void dispose() {
-    _deactivateIfThis();
+    // Teardown is handled by [LiveFeedScreen.dispose] / [_onPageChanged].
     super.dispose();
   }
 
-  void _deactivateIfThis() {
-    // Only teardown the session if the currently active live id matches this
-    // page (vertical swipe offscreen / page pop).
-    final notifier =
-        _safeProviderContainer?.read(activeLiveProvider.notifier);
-    if (notifier != null &&
-        notifier.activeLiveId == widget.live.id) {
-      notifier.deactivate();
-    }
-  }
-
-  ProviderContainer? get _safeProviderContainer {
-    try {
-      return ProviderScope.containerOf(context, listen: false);
-    } catch (_) {
-      return null;
-    }
-  }
-
   void _scheduleActivate() {
+    if (_activateScheduled) {
+      debugPrint('🔄 [ROOM] _scheduleActivate skipped: already scheduled for ${widget.live.id}');
+      return;
+    }
+    _activateScheduled = true;
+    debugPrint('🔄 [ROOM] _scheduleActivate: liveId=${widget.live.id}');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !widget.isActive) return;
-      ref.read(activeLiveProvider.notifier).activate(widget.live);
-    });
-  }
-
-  void _maybeShowFirstGift() {
-    if (_firstGiftPrompted || !widget.isActive) return;
-    _firstGiftPrompted = true;
-    Future.delayed(const Duration(milliseconds: 1600), () async {
-      if (!mounted || !widget.isActive) return;
-      final sent = await showFirstGiftModal(
-        context,
-        hostName: widget.live.hostName,
-      );
-      if (sent == true && mounted) {
-        final rose = MockGiftCatalog.byId('gift_rose');
-        if (rose != null) {
-          ref.read(activeLiveProvider.notifier).sendGift(rose);
-        }
+      if (!mounted || !widget.isActive) {
+        debugPrint('🔄 [ROOM] _scheduleActivate skipped: mounted=$mounted, isActive=${widget.isActive}');
+        _activateScheduled = false;
+        return;
       }
+      debugPrint('🔄 [ROOM] _scheduleActivate calling activate: ${widget.live.id}');
+      ref.read(activeLiveProvider.notifier).activate(widget.live);
     });
   }
 
@@ -365,7 +347,7 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                       children: [
                         _PkVideoLayout(
                           live: live,
-                          isActive: widget.isActive && connected,
+                          isActive: widget.isActive,
                         ),
                         if (isThisRoom)
                           Positioned(
@@ -466,7 +448,7 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
                 children: [
                   MultiGuestGrid(
                     live: live,
-                    isActive: widget.isActive && connected,
+                    isActive: widget.isActive,
                     guests: guests,
                     onRequestTap: () => _openGuestRequest(live),
                   ),
@@ -514,7 +496,7 @@ class _LiveRoomPageState extends ConsumerState<LiveRoomPage> {
           else
             LiveVideoPlayer(
               live: live,
-              isActive: widget.isActive && connected,
+              isActive: widget.isActive,
             ),
 
           // Soft bottom gradient only (no solid black void under grid)

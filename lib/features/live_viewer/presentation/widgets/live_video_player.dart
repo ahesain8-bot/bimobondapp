@@ -59,8 +59,12 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
     final liveKit = ref.read(liveKitServiceProvider);
     _liveKit = liveKit;
     _liveKitSub = liveKit.stateStream.listen(_onLiveKitState);
-    final room = liveKit.room;
-    if (room != null) _attachRoom(room);
+    // Do NOT _attachRoom here — initState for neighbor pages in PageView
+    // runs while the proxy still points at the currently-active session's
+    // room. Attaching here would render the wrong live's last frame when
+    // this page becomes active. Instead, rely on _onLiveKitState (fired
+    // by _setProxyDelegates when activate() switches the proxy) to attach
+    // the correct room at the right time.
     if (widget.isActive) _init();
 
     // ============================================================
@@ -123,55 +127,9 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
     // ============================================================
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      try {
-        final rb = context.findRenderObject() as RenderBox?;
-        final size = rb?.hasSize == true ? rb!.size : Size.zero;
-        final px = MediaQuery.of(context).devicePixelRatio;
-        final track = _track;
-        final pub = _findVideoPub();
-
-        // Baseline decoder stats (evidence before floor apply)
-        int? decW;
-        int? decH;
-        num? decFps;
-        String? decMime;
-        num? decKbps;
-        String? statsErr;
-        if (track != null) {
-          try {
-            final s = await track.getReceiverStats();
-            if (s != null) {
-              decW = s.frameWidth?.toInt();
-              decH = s.frameHeight?.toInt();
-              decFps = s.framesPerSecond;
-              decMime = s.mimeType;
-              decKbps = track.currentBitrate == null ? null : (track.currentBitrate! / 1000).round();
-            }
-          } catch (e) {
-            statsErr = e.toString();
-          }
-        }
-        debugPrint(
-          '[DEBUG-QOS] VIEWER-RENDERER (before-floor):'
-          '  liveId=${widget.live.id}'
-          '  isActive=${widget.isActive}'
-          '  logicalPx=${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}'
-          '  pixelRatio=${px.toStringAsFixed(2)}'
-          '  physicalPx=${(size.width * px).toStringAsFixed(0)}x${(size.height * px).toStringAsFixed(0)}'
-          '  pubDims(WxH)=${pub?.dimensions?.width ?? "?"}x${pub?.dimensions?.height ?? "?"}'
-          '  decoder(WxH)=${decW ?? "?"}x${decH ?? "?"}'
-          '  decoderFps=${decFps ?? "?"}'
-          '  decoderCodec=${decMime ?? "?"}'
-          '  decoderBitrateKbps=${decKbps ?? "?"}'
-          '  decoderErr=${statsErr ?? "none"}',
-        );
-      } catch (e) {
-        debugPrint('[DEBUG-QOS] VIEWER-RENDERER (before-floor err): $e');
-      } finally {
-        // Apply floor AFTER logging baseline — guarantees the
-        // post-frame transition at least once after first layout.
-        unawaited(_applyQualityFloor(widget.isActive));
-      }
+      // Apply floor after first layout — guarantees the
+      // post-frame transition at least once after first layout.
+      unawaited(_applyQualityFloor(widget.isActive));
     });
   }
 
@@ -212,51 +170,14 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
           ? const VideoDimensions(1280, 720)
           : const VideoDimensions(854, 480);
       final quality = isActive ? VideoQuality.HIGH : VideoQuality.LOW;
-      debugPrint(
-        '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
-        '  isActive=$isActive'
-        '  → setVideoDimensions(${dims.width}x${dims.height})'
-        ' + setVideoQuality(${quality.name.toUpperCase()})',
-      );
+      debugPrint('[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}  isActive=$isActive  → setVideoDimensions(${dims.width}x${dims.height}) + setVideoQuality(${quality.name.toUpperCase()})');
       // setVideoDimensions first (dimensions override quality enum in
       // buildUpdateTrackSettings — track_settings.dart L129-133), then
       // apply quality enum so both signals reach the SFU signaling.
       await pub.setVideoDimensions(dims);
       await pub.setVideoQuality(quality);
-
-      // After one RTT + key-frame settle, read decoder stats ONCE
-      // (not polled / periodic) to confirm the layer switch landed.
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      final track = _track;
-      int? aftDecW;
-      int? aftDecH;
-      String? aftDecMime;
-      num? aftDecKbps;
-      if (track != null) {
-        try {
-          final s2 = await track.getReceiverStats();
-          if (s2 != null) {
-            aftDecW = s2.frameWidth?.toInt();
-            aftDecH = s2.frameHeight?.toInt();
-            aftDecMime = s2.mimeType;
-            aftDecKbps = track.currentBitrate == null ? null : (track.currentBitrate! / 1000).round();
-          }
-        } catch (_) {}
-      }
-      final afterQ = pub.videoQuality;
-      final afterDims = pub.videoDimensions;
-      debugPrint(
-        '[DEBUG-QOS] VIEWER-RENDERER (after-floor):'
-        '  liveId=${widget.live.id}'
-        '  pub.videoQualityAfter=${afterQ.name.toUpperCase()}'
-        '  pub.videoDimensionsAfter=${afterDims == null ? "null" : "${afterDims.width}x${afterDims.height}"}'
-        '  decoderFrameAfter(WxH)=${aftDecW ?? "?"}x${aftDecH ?? "?"}'
-        '  decoderCodecAfter=$aftDecMime'
-        '  decoderBitrateAfterKbps=${aftDecKbps ?? "?"}'
-        '  FLOOR_GUARANTEE(>=854x480)? ${aftDecW == null || aftDecH == null ? "NOT_YET_DECODED" : (aftDecW! >= 854 && aftDecH! >= 480 ? "PASS >=480p" : "BELOW_FLOOR(host may not have published 2 layers yet; no 360/180 layers exist)")}',
-      );
-    } catch (e) {
-      debugPrint('[VIDEO-FIX] VIEWER-FLOOR apply failed: $e');
+    } catch (_) {
+      // quality floor application is best-effort
     }
   }
 
@@ -272,14 +193,25 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
   /// LiveKit room appeared / reconnected → start rendering its remote video.
   /// Also triggers the secondary `video_player` fallback path when the
   /// LiveKit service supplies an HTTP(S) mock `streamUrl`.
+  ///
+  /// The proxy is shared and always points at the active session's room.
+  /// Only the active widget (isActive=true) will _init() and render video;
+  /// offscreen widgets attach the room but don't render.
   void _onLiveKitState(LiveKitConnectionState state) {
     if (!mounted) return;
     final liveKit = _liveKit;
     if (liveKit == null) return;
 
     if (state == LiveKitConnectionState.connected) {
+      // ALWAYS re-attach to the proxy's current room — the proxy
+      // delegate may have been switched by activate()/_adoptPreloaded().
+      // Even offscreen widgets attach so that when they become active
+      // the video is already rendering (no black flash).
       final room = liveKit.room;
       if (room != null && room != _room) _attachRoom(room);
+      // Only the active widget initializes the video_player fallback
+      // path (for http mock streams). LiveKit video rendering happens
+      // via VideoTrackRenderer which is always alive once attached.
       if (widget.isActive &&
           _controller == null &&
           !_initializing &&
@@ -348,6 +280,14 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
     } else if (oldWidget.isActive != widget.isActive) {
       unawaited(_applyQualityFloor(widget.isActive));
       if (widget.isActive) {
+        // Do NOT _attachRoom here — didUpdateWidget runs during the
+        // build phase, BEFORE _onPageChanged → activate() switches the
+        // proxy delegate. Reading _liveKit?.room here would return the
+        // OLD room, causing the widget to render the previous live's
+        // last frame for a few ms before _onLiveKitState fires with the
+        // new room. Instead, rely on _onLiveKitState (triggered by
+        // _setProxyDelegates → proxy emits 'connected') to attach the
+        // correct room.
         if (_controller == null) {
           _init();
         } else {
@@ -453,22 +393,38 @@ class _LiveVideoPlayerState extends ConsumerState<LiveVideoPlayer> {
 
   Widget _buildMedia() {
     // Primary path: host WebRTC video over LiveKit.
-    final room = widget.isActive ? _room : null;
+    // Use _room directly (not widget.isActive ? _room : null) so that
+    // when the proxy switches rooms, the video appears instantly for
+    // the active widget. Offscreen widgets have isActive=false which
+    // is handled by the caller (LiveRoomPage) not rendering this widget
+    // at all when not active.
+    final room = _room;
     final track = room == null ? null : _track;
     if (track != null) {
-      return ColoredBox(
-        color: Colors.black,
-        child: VideoTrackRenderer(
-          track,
-          fit: widget.fit == BoxFit.cover
-              ? VideoViewFit.cover
-              : VideoViewFit.contain,
-          placeholderBuilder: (_) => AnimatedVideoPlaceholder(
+      // Stack: placeholder in background, VideoTrackRenderer on top.
+      // This prevents the black flash that occurs during the transition
+      // from AnimatedVideoPlaceholder to VideoTrackRenderer — the
+      // placeholder stays visible behind the renderer until the first
+      // video frame is drawn, then the renderer covers it completely.
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background placeholder — stays visible until video covers it
+          AnimatedVideoPlaceholder(
             seed: widget.live.id,
             category: widget.live.category,
             hostInitial: widget.live.hostName,
           ),
-        ),
+          // Video renderer on top
+          VideoTrackRenderer(
+            track,
+            fit: widget.fit == BoxFit.cover
+                ? VideoViewFit.cover
+                : VideoViewFit.contain,
+            // No placeholder needed — the background Stack handles it
+            placeholderBuilder: (_) => const SizedBox.shrink(),
+          ),
+        ],
       );
     }
 
