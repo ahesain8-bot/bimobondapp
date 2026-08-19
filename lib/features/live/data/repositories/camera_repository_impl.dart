@@ -5,12 +5,15 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/services/live_video_quality_preference.dart';
+import '../../domain/entities/live_capture_profile.dart';
 import '../../domain/repositories/camera_repository.dart';
 
 /// Concrete camera implementation backed by the `camera` plugin.
 ///
-/// Optimized for live-host UX: caches device list, prefers a faster preset,
-/// and serializes init/dispose so start-screen ↔ room handoff cannot race.
+/// Optimized for live-host UX: caches device list, opens at the best 16:9
+/// profile the handset actually accepts, and serializes init/dispose so the
+/// start-screen ↔ room handoff cannot race.
 class CameraRepositoryImpl implements CameraRepository {
   static List<CameraDescription>? _cachedCameras;
   static Future<List<CameraDescription>>? _camerasFuture;
@@ -64,12 +67,10 @@ class CameraRepositoryImpl implements CameraRepository {
           ? ImageFormatGroup.nv21
           : ImageFormatGroup.bgra8888;
 
-      // `medium` opens much faster than `high` on mid-range Android devices;
-      // still enough for host preview + face effects.
       return _openController(
         selectedCamera,
         preferredFormat,
-        ResolutionPreset.medium,
+        LiveVideoQualityPreference.instance.profile,
       );
     } catch (e) {
       debugPrint('Camera init error: $e');
@@ -77,7 +78,25 @@ class CameraRepositoryImpl implements CameraRepository {
     }
   }
 
+  /// Opens [camera] at the best profile it accepts, walking down from
+  /// [profile]. A handset that cannot bind 1080p lands on 720p instead of
+  /// dropping straight to the old 240p last resort, so the preview stays
+  /// sharp everywhere the hardware allows it.
   Future<CameraController?> _openController(
+    CameraDescription camera,
+    ImageFormatGroup format,
+    LiveCaptureProfile profile,
+  ) async {
+    for (final candidate in profile.fallbacks) {
+      final controller = await _tryOpen(camera, format, candidate.preset);
+      if (controller != null) return controller;
+    }
+    // Last resort for hardware that refuses every 16:9 profile — a low
+    // preview still beats a black screen on the go-live sheet.
+    return _tryOpen(camera, format, ResolutionPreset.low);
+  }
+
+  Future<CameraController?> _tryOpen(
     CameraDescription camera,
     ImageFormatGroup format,
     ResolutionPreset preset,
@@ -96,9 +115,6 @@ class CameraRepositoryImpl implements CameraRepository {
     } catch (e) {
       debugPrint('Camera init with $preset/$format failed: $e');
       await _safeDispose(controller);
-      if (preset != ResolutionPreset.low) {
-        return _openController(camera, format, ResolutionPreset.low);
-      }
       return null;
     }
   }
