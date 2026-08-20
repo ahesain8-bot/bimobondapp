@@ -4,6 +4,7 @@ class LiveChatMessage {
     required this.id,
     required this.text,
     this.body,
+    this.avatarUrl,
     this.showBadge = false,
     this.userId,
     this.username,
@@ -19,6 +20,9 @@ class LiveChatMessage {
   /// whole sentences and leave it null so they keep rendering as one run.
   final String? body;
 
+  /// Commenter's picture, shown beside their line the way TikTok does.
+  final String? avatarUrl;
+
   /// Whether to show the circular system / level badge beside the message.
   final bool showBadge;
 
@@ -31,6 +35,7 @@ class LiveChatMessage {
     String? id,
     String? text,
     String? body,
+    String? avatarUrl,
     bool? showBadge,
     String? userId,
     String? username,
@@ -41,6 +46,7 @@ class LiveChatMessage {
       id: id ?? this.id,
       text: text ?? this.text,
       body: body ?? this.body,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       showBadge: showBadge ?? this.showBadge,
       userId: userId ?? this.userId,
       username: username ?? this.username,

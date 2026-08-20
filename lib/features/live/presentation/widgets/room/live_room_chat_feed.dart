@@ -195,22 +195,91 @@ class _ChatMessageTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Badge sits on the visual left of the message (end side in RTL).
+    // A viewer comment stacks a dim handle over the bright line they wrote,
+    // behind their picture. Joins and gifts stay one line with the round badge.
+    final isComment = message.body != null &&
+        message.username != null &&
+        message.username!.isNotEmpty;
+
     return GestureDetector(
       onLongPress: () => _showModeration(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if ((message.gifterLevel ?? 0) > 0) ...[
+          if (isComment) ...[
+            _CommenterAvatar(url: message.avatarUrl),
+            const SizedBox(width: AppSpacing.xs),
+          ] else if ((message.gifterLevel ?? 0) > 0) ...[
             GifterLevelBadge(level: message.gifterLevel!, compact: true),
             const SizedBox(width: AppSpacing.xs),
           ] else if (message.showBadge) ...[
             const _SystemBadge(),
             const SizedBox(width: AppSpacing.xs),
           ],
-          Expanded(child: _MessageText(message: message)),
+          Expanded(
+            child: isComment
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          if ((message.gifterLevel ?? 0) > 0) ...[
+                            GifterLevelBadge(
+                              level: message.gifterLevel!,
+                              compact: true,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Flexible(
+                            child: Text(
+                              message.isPinned
+                                  ? '📌 ${message.username}'
+                                  : message.username!,
+                              style: AppTextStyles.roomChatAuthor,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        message.body!,
+                        style: AppTextStyles.roomChatBody,
+                      ),
+                    ],
+                  )
+                : _MessageText(message: message),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Round picture beside a comment. Falls back to a neutral disc when the
+/// server sends no avatar, so the run keeps its left edge either way.
+class _CommenterAvatar extends StatelessWidget {
+  const _CommenterAvatar({required this.url});
+
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: AppSizes.roomChatAvatar,
+      height: AppSizes.roomChatAvatar,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+        image: url != null && url!.isNotEmpty
+            ? DecorationImage(image: NetworkImage(url!), fit: BoxFit.cover)
+            : null,
+      ),
+      child: url != null && url!.isNotEmpty
+          ? null
+          : const Icon(Icons.person, size: 13, color: Colors.white70),
     );
   }
 }
