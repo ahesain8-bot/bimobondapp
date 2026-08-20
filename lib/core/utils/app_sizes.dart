@@ -149,6 +149,11 @@ class AppSizes {
   /// Chat feed max width fraction of screen.
   static const double roomChatMaxWidthFactor = 0.78;
 
+  /// Chat feed max height fraction of screen. The bloc keeps up to 80
+  /// messages, which is far taller than the screen, so the feed is clamped
+  /// and shows the newest run at the bottom instead of overflowing.
+  static const double roomChatMaxHeightFactor = 0.34;
+
   /// System message leading badge size.
   static const double roomChatBadge = 16;
 

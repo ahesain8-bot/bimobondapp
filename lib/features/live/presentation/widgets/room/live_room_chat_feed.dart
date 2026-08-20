@@ -49,16 +49,27 @@ class LiveRoomChatFeed extends StatelessWidget {
                   _PinnedCommentBar(message: pinned),
                   const SizedBox(height: AppSpacing.roomChatGap),
                 ],
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  itemCount: messages.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: AppSpacing.roomChatGap),
-                  itemBuilder: (context, index) {
-                    return _ChatMessageTile(message: messages[index]);
-                  },
+                // Laid out bottom-up so the newest line sits just above the
+                // composer and anything older is clipped off the top, instead
+                // of the whole 80-message backlog pushing the column over.
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height *
+                        AppSizes.roomChatMaxHeightFactor,
+                  ),
+                  child: ListView.separated(
+                    reverse: true,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: messages.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: AppSpacing.roomChatGap),
+                    itemBuilder: (context, index) {
+                      final message = messages[messages.length - 1 - index];
+                      return _ChatMessageTile(message: message);
+                    },
+                  ),
                 ),
               ],
             ),
@@ -182,15 +193,54 @@ class _ChatMessageTile extends StatelessWidget {
             const _SystemBadge(),
             const SizedBox(width: AppSpacing.xs),
           ],
-          Expanded(
-            child: Text(
-              message.isPinned ? '📌 ${message.text}' : message.text,
-              style: AppTextStyles.roomChat,
-              textAlign: TextAlign.right,
-            ),
-          ),
+          Expanded(child: _MessageText(message: message)),
         ],
       ),
+    );
+  }
+}
+
+/// Renders a viewer comment as a dimmed name followed by what they said, and
+/// anything else (joins, gifts) as the single sentence the producer built.
+class _MessageText extends StatelessWidget {
+  const _MessageText({
+    required this.message,
+    this.maxLines,
+    this.showPinMarker = true,
+  });
+
+  final LiveChatMessage message;
+  final int? maxLines;
+
+  /// The pinned bar draws its own pin icon, so it suppresses the inline one.
+  final bool showPinMarker;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = message.username;
+    final body = message.body;
+    final pin = message.isPinned && showPinMarker ? '📌 ' : '';
+
+    if (name == null || name.isEmpty || body == null) {
+      return Text(
+        '$pin${message.text}',
+        style: AppTextStyles.roomChat,
+        textAlign: TextAlign.right,
+        maxLines: maxLines,
+        overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      );
+    }
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '$pin$name  ', style: AppTextStyles.roomChatAuthor),
+          TextSpan(text: body, style: AppTextStyles.roomChat),
+        ],
+      ),
+      textAlign: TextAlign.right,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
     );
   }
 }
@@ -240,12 +290,10 @@ class _PinnedCommentBar extends StatelessWidget {
             const SizedBox(width: 4),
           ],
           Expanded(
-            child: Text(
-              message.text,
+            child: _MessageText(
+              message: message,
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.roomChat,
-              textAlign: TextAlign.right,
+              showPinMarker: false,
             ),
           ),
         ],
