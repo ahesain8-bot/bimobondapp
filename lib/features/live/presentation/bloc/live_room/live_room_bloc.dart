@@ -140,6 +140,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
 
     late final LiveSession session;
+    var startedOnServer = true;
     try {
       session = await sessionFuture;
     } catch (e) {
@@ -161,6 +162,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         return;
       }
       // Fallback to local session if backend server is offline so camera preview remains active.
+      startedOnServer = false;
       session = LiveSession(
         id: 'local_live_${DateTime.now().millisecondsSinceEpoch}',
         host: const LiveHost(
@@ -188,6 +190,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       emit: emit,
       session: session,
       controller: controller,
+      startedOnServer: startedOnServer,
     );
   }
 
@@ -325,6 +328,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required Emitter<LiveRoomState> emit,
     required LiveSession session,
     required CameraController? controller,
+    bool startedOnServer = true,
   }) async {
     await _hudSub?.cancel();
     _hudSub = _sessionRepository.hudEvents.listen((hudEvent) {
@@ -343,6 +347,25 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         isMediaConnected: false,
       ),
     );
+
+    // The offline fallback invents a `local_live_…` id, so there is no room on
+    // the server to join: viewers, comments and likes would all stay empty with
+    // nothing on screen explaining why. Tell the host instead of pretending.
+    if (!startedOnServer) {
+      final ready = _readyOrNull;
+      if (ready != null && !isClosed) {
+        emit(
+          ready.copyWith(
+            actionMessage:
+                'لم يبدأ البث على الخادم. المعاينة تعمل محلياً فقط، ولن يظهر '
+                'المشاهدون ولا التعليقات ولا الإعجابات. أعد المحاولة.',
+          ),
+        );
+      }
+      // Nothing to enrich or publish either: every one of those calls keys off
+      // the live id the server never issued.
+      return;
+    }
 
     // Socket HUD (does not block preview).
     if (session.id.isNotEmpty) {

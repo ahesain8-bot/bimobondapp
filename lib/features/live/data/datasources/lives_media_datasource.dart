@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../../core/services/live_video_quality_preference.dart';
+import '../../domain/entities/live_capture_profile.dart';
+
 /// Publishes / subscribes LiveKit A/V using **server-issued** `url` + `token` only.
 ///
 /// Never mints JWTs or stores `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`.
@@ -9,6 +12,11 @@ class LivesMediaDataSource {
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
+
+  /// The profile the camera actually opened at — not the one we asked for.
+  /// Publish options and camera flips both read this so the declared layers
+  /// can never claim a resolution the sensor refused.
+  var _activeProfile = LiveVideoQualityPreference.instance.profile;
 
   /// Callback invoked when the Room fires an event the host should know about
   /// (e.g. reconnection, disconnection, renegotiation failure).
@@ -23,6 +31,53 @@ class LivesMediaDataSource {
 
   /// Local camera track for [VideoTrackRenderer] preview (host/guest).
   LocalVideoTrack? get localVideoTrack => _videoTrack;
+
+  /// Capture request for [profile] on the given lens.
+  CameraCaptureOptions _captureOptionsFor(
+    LiveCaptureProfile profile,
+    CameraPosition position,
+  ) {
+    return CameraCaptureOptions(
+      cameraPosition: position,
+      params: VideoParameters(
+        dimensions: VideoDimensions(profile.width, profile.height),
+        encoding: VideoEncoding(
+          maxBitrate: profile.maxBitrate,
+          maxFramerate: profile.maxFps,
+        ),
+      ),
+    );
+  }
+
+  /// Simulcast ladder for [profile], highest layer first.
+  ///
+  /// Every tier at or below the capture profile is declared so the SFU always
+  /// has a lower layer to hand a viewer on a weak connection, and the walk
+  /// stops at 480p — nothing below that is ever published.
+  List<VideoParameters> _simulcastLayersFor(LiveCaptureProfile profile) {
+    return [
+      for (final tier in profile.fallbacks)
+        VideoParameters(
+          dimensions: VideoDimensions(tier.width, tier.height),
+          encoding: VideoEncoding(
+            maxBitrate: tier.maxBitrate,
+            maxFramerate: tier.maxFps,
+          ),
+        ),
+    ];
+  }
+
+  VideoPublishOptions _publishOptionsFor(LiveCaptureProfile profile) {
+    return VideoPublishOptions(
+      simulcast: true,
+      backupVideoCodec: const BackupVideoCodec(enabled: false),
+      videoEncoding: VideoEncoding(
+        maxBitrate: profile.maxBitrate,
+        maxFramerate: profile.maxFps,
+      ),
+      videoSimulcastLayers: _simulcastLayersFor(profile),
+    );
+  }
 
   /// Host/guest: connect then publish camera + mic (production.md §3.4).
   Future<void> connectAndPublish({
@@ -48,49 +103,26 @@ class LivesMediaDataSource {
     // • adaptiveStream TRUE on the HOST (paired with viewer-side TRUE): the
     //   SFU can pick the appropriate simulcast layer per subscriber viewport.
     // • fastPublish KEPT TRUE (default): reduces initial publish latency.
-    // • videoEncoding: 720p@30fps 2.5Mbps base layer (TikTok LIVE quality
-    //   target).  Previously capped at 25fps/1.6Mbps which caused visible
-    //   block-compression blur on fast motion and stuttering cadence.
-    // • videoSimulcastLayers: EXPLICIT 2-layer ladder (480p MINIMUM PER M2
-    //   PRODUCT REQUIREMENT — never publish below 854×480):
-    //     HIGH  = 1280×720  @30fps  2500 kbps  (base, capture dimensions)
-    //     LOW   =  854×480  @30fps  1200 kbps  (minimum, NO 360p/180p allowed)
-    //   Rid ordering in LiveKit 2.11.0 utils.dart:
-    //     presets.sorted() by area ascending → [ LOW(480p area=409k),
-    //     HIGH(720p area=921k) ] → indexes 0,1 → videoRids[0]='q'=LOW,
-    //     videoRids[1]='h'=MEDIUM (since 2 layers only — LiveKit quality enum
-    //     maps 'q' to LOW and 'h' to MEDIUM/HIGH fallback as appropriate).
-    //     computeSimulcastPresets L354 for size=1280: [low, original=HIGH] → 2 layers.
-    //     This guarantees: NEVER 360x640 or 180x320 anywhere in pipeline.
+    // • videoEncoding / videoSimulcastLayers: built from
+    //   LiveCaptureProfile.ladder so the base layer is 1080p@30fps 4.5Mbps —
+    //   the tier TikTok LIVE publishes from a capable handset. The previous
+    //   720p cap was the single biggest reason our streams read as softer
+    //   than theirs on a modern phone. Layers descend 1080p → 720p → 480p and
+    //   stop there (480p MINIMUM PER M2 PRODUCT REQUIREMENT — never publish
+    //   below 854×480, so no 360p/180p can appear anywhere in the pipeline).
+    //   Rid ordering in LiveKit 2.11.0 utils.dart sorts presets by area
+    //   ascending, so declaring them highest-first here is safe: the SDK
+    //   re-sorts before assigning 'q'/'h'/'f'.
     //   Explicit sizing prevents LiveKit SDK auto-defaults from picking
     //   overly conservative mid/low bitrates on some Android build targets.
+    //   These are room DEFAULTS only; publishVideoTrack below passes the
+    //   profile the camera actually accepted.
     final room = Room(
       roomOptions: RoomOptions(
         adaptiveStream: true,
         dynacast: false,
-        defaultVideoPublishOptions: VideoPublishOptions(
-          simulcast: true,
-          backupVideoCodec: const BackupVideoCodec(enabled: false),
-          videoEncoding: const VideoEncoding(
-            maxBitrate: 2500000,
-            maxFramerate: 30,
-          ),
-          videoSimulcastLayers: const [
-            VideoParameters(
-              dimensions: VideoDimensions(1280, 720),
-              encoding: VideoEncoding(
-                maxBitrate: 2500000,
-                maxFramerate: 30,
-              ),
-            ),
-            VideoParameters(
-              dimensions: VideoDimensions(854, 480),
-              encoding: VideoEncoding(
-                maxBitrate: 1200000,
-                maxFramerate: 30,
-              ),
-            ),
-          ],
+        defaultVideoPublishOptions: _publishOptionsFor(
+          LiveVideoQualityPreference.instance.profile,
         ),
       ),
     );
@@ -143,29 +175,28 @@ class LivesMediaDataSource {
 
     try {
       Object? lastError;
+      final ladder = LiveVideoQualityPreference.instance.profile.fallbacks;
       for (var attempt = 0; attempt < 6; attempt++) {
+        // Two passes per profile: the retry budget the Xiaomi camera2
+        // pipeline needed is kept, but a sensor that refuses the host's
+        // ceiling now steps down a tier instead of being asked the same
+        // resolution six times.
+        final profile = ladder[(attempt ~/ 2).clamp(0, ladder.length - 1)];
         try {
           debugPrint(
             '🔍 [Host] connectAndPublish: '
-            'createCameraTrack attempt ${attempt + 1}/6...',
+            'createCameraTrack attempt ${attempt + 1}/6 at ${profile.label}...',
           );
           _videoTrack = await LocalVideoTrack.createCameraTrack(
-            CameraCaptureOptions(
-              cameraPosition: cameraPosition,
-              params: const VideoParameters(
-                dimensions: VideoDimensionsPresets.h720_169,
-                encoding: VideoEncoding(
-                  maxBitrate: 2500000,
-                  maxFramerate: 30,
-                ),
-              ),
-            ),
+            _captureOptionsFor(profile, cameraPosition),
           );
+          _activeProfile = profile;
           _videoPublished = false;
           lastError = null;
           debugPrint(
             '🔍 [Host] connectAndPublish: '
-            'camera track created on attempt ${attempt + 1}',
+            'camera track created on attempt ${attempt + 1} '
+            'at ${profile.label}',
           );
 
           // ============================================================
@@ -216,36 +247,14 @@ class LivesMediaDataSource {
       }
       // Pass EXPLICIT VideoPublishOptions — L284 of SDK 2.11.0 local_participant:
       //   publishOptions ??= track.lastPublishOptions ?? room.roomOptions.defaults.
-      // By passing explicitly we guarantee the HIGH=720p + MIN-LOW=480p layers are
-      // declared at publish time regardless of any future room-default override path.
-      // 2-layer ladder only (M2 requirement): NEVER below 854×480 (480p minimum).
-      // Values identical to roomOptions above for consistency.
+      // By passing explicitly we guarantee the layers are declared at publish
+      // time regardless of any future room-default override path. The ladder
+      // is derived from the profile the camera actually opened at, so we never
+      // advertise a layer the sensor refused, and it always bottoms out at
+      // 854×480 (M2 requirement: never publish below 480p).
       await room.localParticipant?.publishVideoTrack(
         _videoTrack!,
-        publishOptions: VideoPublishOptions(
-          simulcast: true,
-          backupVideoCodec: const BackupVideoCodec(enabled: false),
-          videoEncoding: const VideoEncoding(
-            maxBitrate: 2500000,
-            maxFramerate: 30,
-          ),
-          videoSimulcastLayers: const [
-            VideoParameters(
-              dimensions: VideoDimensions(1280, 720),
-              encoding: VideoEncoding(
-                maxBitrate: 2500000,
-                maxFramerate: 30,
-              ),
-            ),
-            VideoParameters(
-              dimensions: VideoDimensions(854, 480),
-              encoding: VideoEncoding(
-                maxBitrate: 1200000,
-                maxFramerate: 30,
-              ),
-            ),
-          ],
-        ),
+        publishOptions: _publishOptionsFor(_activeProfile),
       );
       _videoPublished = true;
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
@@ -372,22 +381,13 @@ class LivesMediaDataSource {
 
     final position =
         useFront ? CameraPosition.front : CameraPosition.back;
-    const params = VideoParameters(
-      dimensions: VideoDimensionsPresets.h720_169,
-      encoding: VideoEncoding(
-        maxBitrate: 2500000,
-        maxFramerate: 30,
-      ),
-    );
+    // Flip at whatever the session is already running — dropping back to a
+    // fixed 720p here would silently downgrade a 1080p stream mid-broadcast.
+    final options = _captureOptionsFor(_activeProfile, position);
 
     try {
       // Fast path: restart the existing published track in place.
-      await old.restartTrack(
-        CameraCaptureOptions(
-          cameraPosition: position,
-          params: params,
-        ),
-      );
+      await old.restartTrack(options);
       return old;
     } catch (e, st) {
       debugPrint('LiveKit restartTrack flip failed, republishing: $e\n$st');
@@ -407,13 +407,11 @@ class LivesMediaDataSource {
     _videoTrack = null;
     _videoPublished = false;
 
-    final next = await LocalVideoTrack.createCameraTrack(
-      CameraCaptureOptions(
-        cameraPosition: position,
-        params: params,
-      ),
+    final next = await LocalVideoTrack.createCameraTrack(options);
+    await room.localParticipant?.publishVideoTrack(
+      next,
+      publishOptions: _publishOptionsFor(_activeProfile),
     );
-    await room.localParticipant?.publishVideoTrack(next);
     _videoTrack = next;
     _videoPublished = true;
     return next;

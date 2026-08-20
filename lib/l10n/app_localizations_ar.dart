@@ -436,6 +436,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get savePost => 'حفظ المنشور';
 
   @override
+  String get postSavedToFavorites => 'تم الحفظ في المفضلة';
+
+  @override
   String get unsavePost => 'إزالة من المحفوظات';
 
   @override

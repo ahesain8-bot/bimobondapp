@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
@@ -8,6 +10,9 @@ import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
 import '../../../../../features/live/presentation/widgets/live_countdown_overlay.dart';
 import '../../../../../features/live/presentation/pages/live_room_page.dart';
+import '../../bloc/start_live/live_bloc.dart';
+import '../../bloc/start_live/live_event.dart';
+import '../../bloc/start_live/live_state.dart';
 
 /// Live setup card: title input + image picker + LIVE start button.
 class LiveContainer extends StatefulWidget {
@@ -26,10 +31,32 @@ class _LiveContainerState extends State<LiveContainer> {
     if (!context.mounted) return;
 
     final title = widget.titleController.text.trim();
+    final liveBloc = context.read<LiveBloc>();
+
+    // REUSE the camera that is already running on the start screen: hand the
+    // SAME controller to the room (no close/reopen -> no black flicker). This
+    // screen is replaced by the room, so without the handoff the controller
+    // would outlive its bloc while the room opened a second session.
+    final ready = liveBloc.state is LiveReady
+        ? liveBloc.state as LiveReady
+        : null;
+    final CameraController? runningCamera =
+        (ready != null && ready.isCameraInitialized)
+            ? ready.controller
+            : null;
+
+    if (runningCamera != null) {
+      liveBloc.add(const LiveCameraHandedOff());
+    } else {
+      liveBloc.add(const LiveAppPaused());
+    }
+    if (!context.mounted) return;
+
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => LiveRoomPage(
           title: title.isEmpty ? null : title,
+          initialCamera: runningCamera,
         ),
       ),
     );

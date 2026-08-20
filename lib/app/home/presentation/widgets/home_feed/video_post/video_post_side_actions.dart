@@ -24,6 +24,7 @@ class VideoPostSideActions extends StatelessWidget {
     required this.commentLabel,
     required this.isSaved,
     required this.saveLabel,
+    required this.shareLabel,
     required this.commentActionKey,
     required this.shareActionKey,
     required this.onAvatarTap,
@@ -55,6 +56,7 @@ class VideoPostSideActions extends StatelessWidget {
   final String commentLabel;
   final bool isSaved;
   final String saveLabel;
+  final String shareLabel;
   final GlobalKey commentActionKey;
   final GlobalKey shareActionKey;
   final VoidCallback onAvatarTap;
@@ -148,6 +150,7 @@ class VideoPostSideActions extends StatelessWidget {
           key: shareActionKey,
           child: VideoPostActionButton(
             icon: LucideIcons.forward400,
+            label: shareLabel,
             color: Colors.white,
             onTap: onShare,
             onLongPress: onShareLongPress,

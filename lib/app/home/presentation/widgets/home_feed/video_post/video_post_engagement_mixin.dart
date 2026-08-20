@@ -7,11 +7,14 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
   late int commentCount;
   late bool isSaved;
   late int saveCount;
+  late int shareCount;
   late bool isReposted;
   late int repostCount;
   late List<RepostUserEntity> recentReposters;
   String? repostQuote;
   bool pendingRepostToggle = false;
+  bool pendingLikeToggle = false;
+  bool pendingSaveToggle = false;
   bool isFollowing = false;
   bool isFollowLoading = false;
   bool followStatusResolved = false;
@@ -27,6 +30,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     commentCount = widget.post.commentCount;
     isSaved = widget.post.isSaved;
     saveCount = widget.post.saveCount;
+    shareCount = widget.post.shareCount;
     isReposted = widget.post.isReposted;
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
@@ -40,6 +44,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     commentCount = widget.post.commentCount;
     isSaved = widget.post.isSaved;
     saveCount = widget.post.saveCount;
+    shareCount = widget.post.shareCount;
     isReposted = widget.post.isReposted;
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
@@ -324,6 +329,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     setState(() {
       isLiked = nextLiked;
       likeCount = nextCount;
+      pendingLikeToggle = true;
     });
     widget.onFeedPostPatch?.call(
       widget.post.id,
@@ -342,12 +348,40 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     setState(() {
       isSaved = nextSaved;
       saveCount = nextCount;
+      pendingSaveToggle = true;
     });
     widget.onFeedPostPatch?.call(
       widget.post.id,
       (post) => post.copyWith(isSaved: nextSaved, saveCount: nextCount),
     );
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
+
+    // TikTok confirms a save with a floating bar; unsaving stays silent there.
+    if (!nextSaved) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.black.withValues(alpha: 0.88),
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+        ),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 18),
+            const SizedBox(width: AppSizes.p8),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context)!.postSavedToFavorites,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void showQuickShare() {
@@ -449,6 +483,40 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     );
     context.read<PostsBloc>().add(
       ToggleRepostPostRequestedEvent(widget.post.id, quote: quote),
+    );
+  }
+
+  /// The server refused the like (private account, rate limit, offline). Put
+  /// the heart back where it was so the feed stops claiming something the
+  /// server never recorded.
+  void rollbackLikeToggle() {
+    if (!pendingLikeToggle) return;
+    final revertedLiked = !isLiked;
+    final revertedCount = revertedLiked ? likeCount + 1 : likeCount - 1;
+    setState(() {
+      isLiked = revertedLiked;
+      likeCount = revertedCount;
+      pendingLikeToggle = false;
+    });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(isLiked: revertedLiked, likeCount: revertedCount),
+    );
+  }
+
+  /// Same for the bookmark.
+  void rollbackSaveToggle() {
+    if (!pendingSaveToggle) return;
+    final revertedSaved = !isSaved;
+    final revertedCount = revertedSaved ? saveCount + 1 : saveCount - 1;
+    setState(() {
+      isSaved = revertedSaved;
+      saveCount = revertedCount;
+      pendingSaveToggle = false;
+    });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(isSaved: revertedSaved, saveCount: revertedCount),
     );
   }
 

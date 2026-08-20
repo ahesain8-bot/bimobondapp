@@ -85,6 +85,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   final GlobalKey _arPreviewKey = GlobalKey(debugLabel: 'ar-camera-preview');
   bool _pendingVideoStart = false;
   bool _returnToPhotoAfterVideo = false;
+
+  /// True while the go-live screen owns the camera. The CamerAwesome branch
+  /// unmounts for the duration — the live page runs its own capture session
+  /// and iOS will not hand the same device to both at once. The native AR
+  /// branch does not need this; it releases through ArCameraBridge instead.
+  bool _liveHandoffActive = false;
   bool _showFilters = false;
   bool _showPhotoEditor = false;
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
@@ -1853,6 +1859,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     try {
       if (_useNativeArFilters) {
         await ArCameraBridge.stopCamera();
+      } else {
+        setState(() => _liveHandoffActive = true);
+        // Let the unmount reach the platform before the live page asks for
+        // the camera, otherwise iOS still reports the device as in use.
+        await Future<void>.delayed(const Duration(milliseconds: 120));
       }
       if (!context.mounted) return;
       await Navigator.of(context).push(
@@ -1863,6 +1874,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     } catch (_) {
       // Never leave a frozen preview.
     } finally {
+      if (!_useNativeArFilters && mounted) {
+        setState(() => _liveHandoffActive = false);
+      }
       // Back from the live start page: bring the camera preview back.
       if (_useNativeArFilters && mounted) {
         await ArCameraBridge.startCamera();
@@ -2593,6 +2607,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           children: [
             if (_useNativeArFilters)
               _buildNativeArCameraBody(l10n, filters)
+            else if (_liveHandoffActive)
+              const ColoredBox(color: Colors.black)
             else
               _buildCamerAwesomeBody(l10n, filters),
             if (_showShutterFlash)

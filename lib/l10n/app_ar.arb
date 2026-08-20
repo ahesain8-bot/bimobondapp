@@ -154,6 +154,7 @@
   "repostAction": "إعادة النشر",
   "repostUndo": "تراجع عن إعادة النشر",
   "savePost": "حفظ المنشور",
+  "postSavedToFavorites": "تم الحفظ في المفضلة",
   "unsavePost": "إزالة من المحفوظات",
   "repostQuoteHint": "أضف تعليقاً (اختياري)",
   "repostComposeTitle": "أضف إلى إعادة النشر",

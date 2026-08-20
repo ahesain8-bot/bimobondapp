@@ -105,6 +105,8 @@ class LiveSessionMapper {
       id: source['id']?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       text: displayText,
+      body: content,
+      avatarUrl: user?['avatarUrl']?.toString() ?? user?['avatar']?.toString(),
       showBadge: (gifterLevel ?? 0) > 0,
       userId: user?['id']?.toString(),
       username: username,
