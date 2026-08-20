@@ -537,12 +537,22 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     // LiveKit publish is UP. DROP the Flutter camera from the widget tree
     // FIRST (state update), THEN release the underlying controller.
+    //
+    // Only swap when there is genuinely something to swap TO. isMediaConnected
+    // is true as soon as the room holds an audio OR a video track, so a run
+    // where the mic came up but the lens did not would otherwise clear the
+    // controller with no LiveKit frame behind it and leave the host on a
+    // permanently black room.
+    final liveTrack = _sessionRepository.localPreviewTrack as VideoTrack?;
+    final mediaUp = _sessionRepository.isMediaConnected;
+    final swapToLiveKit = liveTrack != null && mediaUp;
     emit(
       ready.copyWith(
-        controller: null,
-        isCameraInitialized: false,
-        isMediaConnected: _sessionRepository.isMediaConnected,
-        localVideoTrack: _sessionRepository.localPreviewTrack as VideoTrack?,
+        controller: swapToLiveKit ? null : ready.controller,
+        isCameraInitialized:
+            swapToLiveKit ? false : ready.isCameraInitialized,
+        isMediaConnected: mediaUp,
+        localVideoTrack: liveTrack,
         isFrontCamera: useFront,
         clearActionMessage: true,
       ),
@@ -553,7 +563,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       'localVideoTrack=${_sessionRepository.localPreviewTrack != null ? "SET" : "NULL"}',
     );
 
-    if (!releasedEarly && local != null) {
+    if (swapToLiveKit && !releasedEarly && local != null) {
       debugPrint('🔍 [BLoC] Disposing Flutter camera (not released early)...');
       await _disposeCamera(local);
       debugPrint('🔍 [BLoC] Flutter camera disposed ✅');
