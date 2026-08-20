@@ -32,6 +32,7 @@ import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/services/post_share_refresh_bus.dart';
 import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
@@ -173,6 +174,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
+    PostShareRefreshBus.instance.addListener(_onPostShared);
     initEngagementState();
 
     _likeAnimController = AnimationController(
@@ -218,6 +220,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     flushPostViewWithWatchDuration();
     unawaited(pausePostSound());
     unawaited(SoundAudioPreview.stop());
+  }
+
+  /// This post was just shared from the options sheet: move the counter.
+  /// Falls back to a local bump when the server did not report a total.
+  void _onPostShared() {
+    final bus = PostShareRefreshBus.instance;
+    if (bus.lastSharedPostId != widget.post.id || !mounted) return;
+    setState(() => shareCount = bus.lastShareCount ?? shareCount + 1);
   }
 
   void _onFeedPlaybackGateChanged() {
@@ -334,6 +344,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     flushPostViewWithWatchDuration();
     WidgetsBinding.instance.removeObserver(this);
     FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
+    PostShareRefreshBus.instance.removeListener(_onPostShared);
     _detachRouteListener();
     unawaited(stopPostSound());
     _chromeEntranceController?.dispose();
@@ -546,6 +557,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           commentLabel: formatCompactCount(commentCount),
           isSaved: isSaved,
           saveLabel: formatCompactCount(saveCount),
+          shareLabel: formatCompactCount(shareCount),
           commentActionKey: _commentActionKey,
           shareActionKey: _shareActionKey,
           onAvatarTap: openAuthorProfile,

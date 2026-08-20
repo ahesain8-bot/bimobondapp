@@ -7,6 +7,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
   late int commentCount;
   late bool isSaved;
   late int saveCount;
+  late int shareCount;
   late bool isReposted;
   late int repostCount;
   late List<RepostUserEntity> recentReposters;
@@ -27,6 +28,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     commentCount = widget.post.commentCount;
     isSaved = widget.post.isSaved;
     saveCount = widget.post.saveCount;
+    shareCount = widget.post.shareCount;
     isReposted = widget.post.isReposted;
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
@@ -40,6 +42,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     commentCount = widget.post.commentCount;
     isSaved = widget.post.isSaved;
     saveCount = widget.post.saveCount;
+    shareCount = widget.post.shareCount;
     isReposted = widget.post.isReposted;
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
