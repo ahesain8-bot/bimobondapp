@@ -1066,6 +1066,62 @@
   "chatWallpaperPlus": "علامات زائد",
   "chatWallpaperSquares": "مربعات",
   "chatWallpaperMaze": "متاهة",
+  "chatWallpaperChooseFromPhotos": "اختر من الصور",
+  "chatWallpaperUploadDeviceSubtitle": "رفع صورة شخصية من الجهاز",
+  "chatWallpaperDefault": "الافتراضي (بدون خلفية)",
+  "chatWallpaperCatalog": "كتالوج الخلفيات",
+  "chatWallpaperUpdated": "تم تحديث الخلفية الشخصية",
+  "chatSettingsTitle": "التفاصيل",
+  "chatSettingsProfile": "الملف الشخصي",
+  "chatSettingsMute": "كتم",
+  "chatSettingsMuted": "مكتوم",
+  "chatSettingsReport": "إبلاغ",
+  "chatSettingsMuteNotifications": "كتم الإشعارات",
+  "chatSettingsPinToTop": "تثبيت في الأعلى",
+  "chatSettingsWallpaperSubtitle": "خلفية نمط مخصصة",
+  "chatSettingsSearch": "بحث في المحادثة",
+  "chatSettingsBlock": "حظر @{username}",
+  "@chatSettingsBlock": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsBlocked": "محظور",
+  "unblock": "إلغاء الحظر",
+  "chatYouBlockedUser": "لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر لتتمكن من مراسلته.",
+  "userNotFound": "المستخدم غير موجود",
+  "chatSettingsDeleteHistory": "مسح سجل المحادثة",
+  "chatSettingsSearchHint": "اكتب كلمة للبحث...",
+  "chatSettingsSearching": "جاري البحث عن \"{query}\"...",
+  "@chatSettingsSearching": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "chatSettingsReportTitle": "الإبلاغ عن @{username}",
+  "@chatSettingsReportTitle": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsReportSpam": "احتيال أو إزعاج",
+  "chatSettingsReportHarassment": "مضايقة أو تنمر",
+  "chatSettingsReportInappropriate": "محتوى غير لائق",
+  "chatSettingsReportSubmitted": "تم إرسال البلاغ: {reason}",
+  "@chatSettingsReportSubmitted": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "chatSettingsBlockTitle": "حظر @{username}؟",
+  "@chatSettingsBlockTitle": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsBlockMessage": "لن يتمكن من مراسلتك أو رؤية ملفك الشخصي.",
+  "chatSettingsDeleteTitle": "مسح سجل المحادثة؟",
+  "chatSettingsDeleteMessage": "سيؤدي هذا إلى إزالة سجل المحادثة بالنسبة لك. لا يمكن التراجع عن هذا الإجراء.",
   "messagesTitle": "الرسائل",
   "messagesInboxTitle": "البريد الوارد",
   "messagesNewChatTitle": "محادثة جديدة",

@@ -23,6 +23,7 @@ class InboxLoadSuccess extends InboxState {
     this.suggestions = const [],
     this.loadGeneration = 0,
     this.suggestionsLoaded = false,
+    this.typingChatIds = const {},
   });
 
   final List<ChatEntity> chats;
@@ -31,6 +32,23 @@ class InboxLoadSuccess extends InboxState {
   /// Bumped after each inbox fetch so pull-to-refresh can detect completion.
   final int loadGeneration;
   final bool suggestionsLoaded;
+  final Map<String, bool> typingChatIds;
+
+  InboxLoadSuccess copyWith({
+    List<ChatEntity>? chats,
+    List<UserSuggestionEntity>? suggestions,
+    int? loadGeneration,
+    bool? suggestionsLoaded,
+    Map<String, bool>? typingChatIds,
+  }) {
+    return InboxLoadSuccess(
+      chats: chats ?? this.chats,
+      suggestions: suggestions ?? this.suggestions,
+      loadGeneration: loadGeneration ?? this.loadGeneration,
+      suggestionsLoaded: suggestionsLoaded ?? this.suggestionsLoaded,
+      typingChatIds: typingChatIds ?? this.typingChatIds,
+    );
+  }
 
   @override
   List<Object?> get props => [
@@ -38,6 +56,7 @@ class InboxLoadSuccess extends InboxState {
         suggestions,
         loadGeneration,
         suggestionsLoaded,
+        typingChatIds,
       ];
 }
 

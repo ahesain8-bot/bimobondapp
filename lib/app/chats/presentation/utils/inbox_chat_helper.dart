@@ -13,6 +13,11 @@ class InboxChatItem {
     required this.unread,
     this.peerUserId,
     this.active = false,
+    this.isPinned = false,
+    this.isMuted = false,
+    this.isTyping = false,
+    this.isLastFromMe = false,
+    this.isLastReadByPeer = false,
   });
 
   final String chatId;
@@ -23,6 +28,11 @@ class InboxChatItem {
   final bool unread;
   final String? peerUserId;
   final bool active;
+  final bool isPinned;
+  final bool isMuted;
+  final bool isTyping;
+  final bool isLastFromMe;
+  final bool isLastReadByPeer;
 }
 
 String inboxLastMessagePreview(
@@ -130,11 +140,43 @@ String inboxLastMessagePreview(
 InboxChatItem inboxChatItemFromEntity(
   ChatEntity chat,
   String currentUserId,
-  AppLocalizations l10n,
-) {
+  AppLocalizations l10n, {
+  bool isTyping = false,
+}) {
   final other = chat.otherParticipant(currentUserId);
   final last = chat.lastMessage;
-  final preview = inboxLastMessagePreview(chat, currentUserId, l10n);
+  final isAr = l10n.localeName == 'ar';
+  final preview = isTyping
+      ? (isAr ? 'يكتب الآن...' : 'Typing...')
+      : inboxLastMessagePreview(chat, currentUserId, l10n);
+
+  final isLastFromMe = last != null &&
+      last.senderId.isNotEmpty &&
+      last.senderId == currentUserId;
+
+  final isReadByMe = (last != null && last.isReadBy(currentUserId)) ||
+      (last?.payload != null && last?.payload!['isRead'] == true);
+
+  final isUnread = !isLastFromMe && !isReadByMe && (chat.unreadCount > 0);
+
+  bool isPeerActive = other?.isActive == true || other?.isOnline == true;
+  if (!isPeerActive &&
+      other?.lastSeenAt != null &&
+      other!.lastSeenAt!.trim().isNotEmpty) {
+    try {
+      final dt = DateTime.parse(other.lastSeenAt!).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 5) {
+        isPeerActive = true;
+      }
+    } catch (_) {}
+  }
+
+  final isLastReadByPeer = last != null &&
+      (last.readByUserIds.any((id) => id.isNotEmpty && id != currentUserId) ||
+          last.payload?['isRead'] == true ||
+          last.payload?['read'] == true ||
+          last.payload?['is_read'] == true);
 
   return InboxChatItem(
     chatId: chat.id,
@@ -144,9 +186,14 @@ InboxChatItem inboxChatItemFromEntity(
     imageUrl: other?.avatarUrl,
     preview: preview,
     time: formatInboxTime(last?.createdAt ?? chat.updatedAt, l10n),
-    unread: chat.unreadCount > 0,
+    unread: isUnread,
     peerUserId: chat.isGroup ? null : other?.id,
-    active: other?.isActive == true || other?.isOnline == true,
+    active: isPeerActive,
+    isPinned: chat.isPinned,
+    isMuted: chat.isMuted,
+    isTyping: isTyping,
+    isLastFromMe: isLastFromMe,
+    isLastReadByPeer: isLastReadByPeer,
   );
 }
 
@@ -158,20 +205,37 @@ int _chatActivityMillis(ChatEntity chat) {
 
 List<ChatEntity> sortChatsByRecentActivity(List<ChatEntity> chats) {
   final sorted = List<ChatEntity>.from(chats);
-  sorted.sort(
-    (a, b) => _chatActivityMillis(b).compareTo(_chatActivityMillis(a)),
-  );
+  sorted.sort((a, b) {
+    if (a.isPinned != b.isPinned) {
+      return a.isPinned ? -1 : 1; // Pinned chats come FIRST!
+    }
+    return _chatActivityMillis(b).compareTo(_chatActivityMillis(a));
+  });
+  return sorted;
+}
+
+List<InboxChatItem> sortInboxItems(List<InboxChatItem> items) {
+  final sorted = List<InboxChatItem>.from(items);
+  sorted.sort((a, b) {
+    if (a.isPinned != b.isPinned) {
+      return a.isPinned ? -1 : 1; // Pinned items come FIRST!
+    }
+    return 0;
+  });
   return sorted;
 }
 
 List<InboxChatItem> filterInboxChats(List<InboxChatItem> items, String query) {
-  if (query.isEmpty) return items;
-  final q = query.toLowerCase();
-  return items
-      .where(
-        (c) =>
-            c.name.toLowerCase().contains(q) ||
-            c.preview.toLowerCase().contains(q),
-      )
-      .toList();
+  List<InboxChatItem> result = items;
+  if (query.isNotEmpty) {
+    final q = query.toLowerCase();
+    result = items
+        .where(
+          (c) =>
+              c.name.toLowerCase().contains(q) ||
+              c.preview.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+  return sortInboxItems(result);
 }

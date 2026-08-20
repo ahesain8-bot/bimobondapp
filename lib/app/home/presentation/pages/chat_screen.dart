@@ -15,6 +15,8 @@ class ChatScreen extends StatelessWidget {
     required this.imageUrl,
     this.peerUserId,
     this.openCamera = false,
+    this.isPinned = false,
+    this.isMuted = false,
   });
 
   final String chatId;
@@ -22,6 +24,8 @@ class ChatScreen extends StatelessWidget {
   final String imageUrl;
   final String? peerUserId;
   final bool openCamera;
+  final bool isPinned;
+  final bool isMuted;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +43,8 @@ class ChatScreen extends StatelessWidget {
         currentUserId: currentUserId,
         peerUserId: peerUserId,
         openCamera: openCamera,
+        initialIsPinned: isPinned,
+        initialIsMuted: isMuted,
       ),
     );
   }

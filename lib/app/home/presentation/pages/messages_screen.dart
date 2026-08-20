@@ -37,7 +37,6 @@ import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'dart:async';
 
-import 'package:bimobondapp/app/calls/presentation/pages/call_history_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -58,9 +57,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   void initState() {
     super.initState();
     _inboxBloc = chats_di.sl<InboxBloc>();
-    if (widget.isTabActive) {
-      _loadTabData();
-    }
+    _loadTabData();
   }
 
   @override
@@ -117,11 +114,9 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     _viewedStoriesStore = auth_di.sl<ViewedStoriesStore>();
     _viewedStoriesStore.addListener(_onViewedStoriesChanged);
     _bindViewedStoriesUser();
-    if (widget.isTabActive) {
-      _loadRecentMentions();
-      _loadLastFollower();
-      _loadStories();
-    }
+    _loadRecentMentions();
+    _loadLastFollower();
+    _loadStories();
   }
 
   void _onViewedStoriesChanged() {
@@ -366,7 +361,12 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                 if (state is InboxLoadSuccess) {
                   setState(() {
                     _cachedInboxItems = state.chats
-                        .map((c) => inboxChatItemFromEntity(c, userId, l10n))
+                        .map((c) => inboxChatItemFromEntity(
+                              c,
+                              userId,
+                              l10n,
+                              isTyping: state.typingChatIds[c.id] == true,
+                            ))
                         .toList();
                   });
                 }
@@ -375,10 +375,25 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
           ],
           child: BlocBuilder<InboxBloc, InboxState>(
             builder: (context, state) {
-              final inboxItems = _cachedInboxItems;
+              final List<InboxChatItem> inboxItems;
+              if (state is InboxLoadSuccess) {
+                inboxItems = state.chats
+                    .map((c) => inboxChatItemFromEntity(
+                          c,
+                          userId,
+                          l10n,
+                          isTyping: state.typingChatIds[c.id] == true,
+                        ))
+                    .toList();
+              } else {
+                inboxItems = _cachedInboxItems;
+              }
+
               final isInitialLoading =
                   (state is InboxLoading || state is InboxInitial) &&
-                  !_inboxLoadFinished;
+                  !_inboxLoadFinished &&
+                  _cachedInboxItems.isEmpty &&
+                  (state is! InboxLoadSuccess);
               final showInboxSkeleton = isInitialLoading || _isRefreshing;
               return RefreshIndicator(
                 onRefresh: _onRefresh,

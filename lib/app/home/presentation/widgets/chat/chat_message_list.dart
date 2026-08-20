@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_message_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_message_text.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_profile_header.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_typing_indicator.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -20,6 +21,11 @@ class ChatMessageList extends StatelessWidget {
     required this.onReactionPicker,
     required this.onReplyTo,
     this.onPollVote,
+    this.followersCount,
+    this.postsCount,
+    this.statsText,
+    this.mutualText,
+    this.onProfileTap,
     super.key,
   });
 
@@ -36,10 +42,18 @@ class ChatMessageList extends StatelessWidget {
   final void Function(Map<String, dynamic> msg) onReactionPicker;
   final void Function(Map<String, dynamic> msg) onReplyTo;
   final void Function(String messageId, int optionIndex)? onPollVote;
+  final int? followersCount;
+  final int? postsCount;
+  final String? statsText;
+  final String? mutualText;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+
+    final totalHeaderItems = 1; // Profile Header at top
+    final totalCount = totalHeaderItems + messages.length + (isTyping ? 1 : 0);
 
     return ListView.builder(
       controller: scrollController,
@@ -49,9 +63,24 @@ class ChatMessageList extends StatelessWidget {
         ChatLayoutConstants.messageListHorizontalPadding,
         ChatLayoutConstants.messageListBottomPadding,
       ),
-      itemCount: messages.length + (isTyping ? 1 : 0),
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        if (isTyping && index == messages.length) {
+        if (index == 0) {
+          return ChatProfileHeader(
+            username: username,
+            imageUrl: peerImageUrl,
+            userId: peerUserId,
+            followersCount: followersCount,
+            postsCount: postsCount,
+            statsText: statsText,
+            mutualText: mutualText,
+            onTap: onProfileTap,
+          );
+        }
+
+        final msgIndex = index - totalHeaderItems;
+
+        if (isTyping && msgIndex == messages.length) {
           return ChatTypingIndicator(
             peerImageUrl: peerImageUrl,
             username: username,
@@ -59,8 +88,8 @@ class ChatMessageList extends StatelessWidget {
           );
         }
 
-        final msg = messages[index];
-        final prevMsg = index > 0 ? messages[index - 1] : null;
+        final msg = messages[msgIndex];
+        final prevMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
         final isFirstInGroup =
             prevMsg == null || prevMsg['isMe'] != msg['isMe'];
 
@@ -73,7 +102,7 @@ class ChatMessageList extends StatelessWidget {
           currentUserImageUrl: currentUserImageUrl,
           currentUserId: currentUserId,
           isFirstInGroup: isFirstInGroup,
-          isFirstInList: index == 0,
+          isFirstInList: msgIndex == 0,
           messageText: chatMessageText(msg, l10n),
           replyText: msg['replyTo'] != null
               ? chatMessageText(msg['replyTo'] as Map<String, dynamic>, l10n)

@@ -2265,6 +2265,109 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatWallpaperMaze => 'Maze';
 
   @override
+  String get chatWallpaperChooseFromPhotos => 'Choose from Photos';
+
+  @override
+  String get chatWallpaperUploadDeviceSubtitle => 'Upload personal photo from device';
+
+  @override
+  String get chatWallpaperDefault => 'Default (No Wallpaper)';
+
+  @override
+  String get chatWallpaperCatalog => 'Wallpapers Catalog';
+
+  @override
+  String get chatWallpaperUpdated => 'Personal background updated';
+
+  @override
+  String get chatSettingsTitle => 'Details';
+
+  @override
+  String get chatSettingsProfile => 'Profile';
+
+  @override
+  String get chatSettingsMute => 'Mute';
+
+  @override
+  String get chatSettingsMuted => 'Muted';
+
+  @override
+  String get chatSettingsReport => 'Report';
+
+  @override
+  String get chatSettingsMuteNotifications => 'Mute notifications';
+
+  @override
+  String get chatSettingsPinToTop => 'Pin to top';
+
+  @override
+  String get chatSettingsWallpaperSubtitle => 'Custom theme background';
+
+  @override
+  String get chatSettingsSearch => 'Search in conversation';
+
+  @override
+  String chatSettingsBlock(String username) {
+    return 'Block @$username';
+  }
+
+  @override
+  String get chatSettingsBlocked => 'Blocked';
+
+  @override
+  String get unblock => 'Unblock';
+
+  @override
+  String get chatYouBlockedUser => 'You blocked this user. Unblock to send a message.';
+
+  @override
+  String get userNotFound => 'User not found';
+
+  @override
+  String get chatSettingsDeleteHistory => 'Delete chat history';
+
+  @override
+  String get chatSettingsSearchHint => 'Type keyword...';
+
+  @override
+  String chatSettingsSearching(String query) {
+    return 'Searching for \"$query\"...';
+  }
+
+  @override
+  String chatSettingsReportTitle(String username) {
+    return 'Report @$username';
+  }
+
+  @override
+  String get chatSettingsReportSpam => 'Spam or Scam';
+
+  @override
+  String get chatSettingsReportHarassment => 'Harassment or Bullying';
+
+  @override
+  String get chatSettingsReportInappropriate => 'Inappropriate Content';
+
+  @override
+  String chatSettingsReportSubmitted(String reason) {
+    return 'Report submitted: $reason';
+  }
+
+  @override
+  String chatSettingsBlockTitle(String username) {
+    return 'Block @$username?';
+  }
+
+  @override
+  String get chatSettingsBlockMessage => 'They won\'t be able to message you or view your profile.';
+
+  @override
+  String get chatSettingsDeleteTitle => 'Delete chat history?';
+
+  @override
+  String get chatSettingsDeleteMessage => 'This will remove the chat history for you. This action cannot be undone.';
+
+  @override
   String get messagesTitle => 'Messages';
 
   @override

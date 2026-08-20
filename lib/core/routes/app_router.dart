@@ -489,6 +489,8 @@ class AppRouter {
             imageUrl: extra?['imageUrl'] as String? ?? '',
             peerUserId: extra?['peerUserId'] as String?,
             openCamera: extra?['openCamera'] as bool? ?? false,
+            isPinned: extra?['isPinned'] as bool? ?? false,
+            isMuted: extra?['isMuted'] as bool? ?? false,
           );
         },
       ),

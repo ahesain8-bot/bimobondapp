@@ -1,5 +1,4 @@
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
-import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 /// Semantic colors for the chat screen (bubbles, input, overlays, sheets).
@@ -71,16 +70,19 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
     final isDark = brightness == Brightness.dark;
 
     return ChatTheme(
-      activeStatus: AppTheme.successAccent,
-      readReceipt: Colors.green,
-      replyAccent: scheme.primary,
-      onSentBubble: scheme.onSurface,
-      onSentBubbleMuted: scheme.onSurface.withValues(alpha: 0.6),
-      receivedBubbleColor: scheme.primary,
-      onReceivedBubble: Colors.white,
-      onReceivedBubbleMuted: Colors.white.withValues(alpha: 0.7),
-      sentBubbleColor: isDark ? scheme.surface : Colors.white,
-      inputFill: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      activeStatus: scheme.secondary,
+      readReceipt: scheme.secondary,
+      replyAccent: scheme.secondary,
+      onSentBubble: isDark ? Colors.white : const Color(0xFF0F172A),
+      onSentBubbleMuted:
+          isDark ? Colors.white70 : const Color(0xFF64748B),
+      receivedBubbleColor:
+          isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      onReceivedBubble: isDark ? Colors.white : const Color(0xFF1E293B),
+      onReceivedBubbleMuted: isDark ? Colors.white70 : const Color(0xFF64748B),
+      sentBubbleColor:
+          isDark ? scheme.primary.withValues(alpha: 0.65) : scheme.primary.withValues(alpha: 0.45),
+      inputFill: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       recordingScrim: Colors.black.withValues(
         alpha: ChatLayoutConstants.recordingOverlayAlpha,
       ),
@@ -88,21 +90,19 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
       recordingForegroundMuted: Colors.white.withValues(alpha: 0.7),
       waveformOnOverlay: Colors.white.withValues(alpha: 0.8),
       bubbleShadow: Colors.black.withValues(
-        alpha: ChatLayoutConstants.bubbleShadowAlpha,
+        alpha: isDark ? 0.2 : 0.04,
       ),
       pendingReceipt: scheme.onSurface.withValues(alpha: 0.5),
       backgroundGradientEnd: isDark
           ? scheme.surface.withValues(alpha: 0.35)
-          : scheme.primary.withValues(
+          : scheme.secondary.withValues(
               alpha: ChatLayoutConstants.patternOpacityLight,
             ),
-      chatBackgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
-      sentBubbleGradientStart: scheme.primary.withValues(
-        alpha: ChatLayoutConstants.sentBubbleOpacity,
-      ),
-      sentBubbleGradientEnd: scheme.primary.withValues(
-        alpha: ChatLayoutConstants.sentBubbleOpacity,
-      ),
+      chatBackgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
+      sentBubbleGradientStart:
+          isDark ? scheme.primary.withValues(alpha: 0.65) : scheme.primary.withValues(alpha: 0.45),
+      sentBubbleGradientEnd:
+          isDark ? scheme.secondary.withValues(alpha: 0.65) : scheme.secondary.withValues(alpha: 0.45),
       moreMenuIconColors: const [
         Color(0xFF2196F3),
         Color(0xFFFF9800),
@@ -118,9 +118,7 @@ class ChatTheme extends ThemeExtension<ChatTheme> {
           : const Color(0xFFF1F1F2),
       inboxSecondaryText: scheme.onSurface.withValues(alpha: 0.45),
       inboxChevron: scheme.onSurface.withValues(alpha: 0.28),
-      sendIdleFill: isDark
-          ? scheme.onSurface.withValues(alpha: 0.2)
-          : const Color(0xFFE8E8E8),
+      sendIdleFill: const Color(0xFF5B7CFA),
     );
   }
 

@@ -9,6 +9,8 @@ class ChatModel extends ChatEntity {
     required super.participants,
     super.name,
     super.isGroup,
+    super.isPinned,
+    super.isMuted,
     super.lastMessage,
     super.unreadCount,
     super.updatedAt,
@@ -36,11 +38,25 @@ class ChatModel extends ChatEntity {
     final chatId = (json['id'] ?? '').toString();
     final lastMessage = _parseLastMessage(json, chatId);
 
+    final settingsMap = json['settings'] is Map ? json['settings'] as Map : null;
+    final isPinned = json['isPinned'] == true ||
+        json['is_pinned'] == true ||
+        json['pinned'] == true ||
+        settingsMap?['isPinned'] == true ||
+        settingsMap?['is_pinned'] == true;
+    final isMuted = json['isMuted'] == true ||
+        json['is_muted'] == true ||
+        json['muted'] == true ||
+        settingsMap?['isMuted'] == true ||
+        settingsMap?['is_muted'] == true;
+
     return ChatModel(
       id: chatId,
       participants: participants,
       name: json['name']?.toString(),
       isGroup: json['isGroup'] == true || json['is_group'] == true,
+      isPinned: isPinned,
+      isMuted: isMuted,
       lastMessage: lastMessage,
       unreadCount:
           ((json['unreadCount'] ?? json['unread_count']) as num?)?.toInt() ?? 0,

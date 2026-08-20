@@ -2265,6 +2265,109 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatWallpaperMaze => 'متاهة';
 
   @override
+  String get chatWallpaperChooseFromPhotos => 'اختر من الصور';
+
+  @override
+  String get chatWallpaperUploadDeviceSubtitle => 'رفع صورة شخصية من الجهاز';
+
+  @override
+  String get chatWallpaperDefault => 'الافتراضي (بدون خلفية)';
+
+  @override
+  String get chatWallpaperCatalog => 'كتالوج الخلفيات';
+
+  @override
+  String get chatWallpaperUpdated => 'تم تحديث الخلفية الشخصية';
+
+  @override
+  String get chatSettingsTitle => 'التفاصيل';
+
+  @override
+  String get chatSettingsProfile => 'الملف الشخصي';
+
+  @override
+  String get chatSettingsMute => 'كتم';
+
+  @override
+  String get chatSettingsMuted => 'مكتوم';
+
+  @override
+  String get chatSettingsReport => 'إبلاغ';
+
+  @override
+  String get chatSettingsMuteNotifications => 'كتم الإشعارات';
+
+  @override
+  String get chatSettingsPinToTop => 'تثبيت في الأعلى';
+
+  @override
+  String get chatSettingsWallpaperSubtitle => 'خلفية نمط مخصصة';
+
+  @override
+  String get chatSettingsSearch => 'بحث في المحادثة';
+
+  @override
+  String chatSettingsBlock(String username) {
+    return 'حظر @$username';
+  }
+
+  @override
+  String get chatSettingsBlocked => 'محظور';
+
+  @override
+  String get unblock => 'إلغاء الحظر';
+
+  @override
+  String get chatYouBlockedUser => 'لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر لتتمكن من مراسلته.';
+
+  @override
+  String get userNotFound => 'المستخدم غير موجود';
+
+  @override
+  String get chatSettingsDeleteHistory => 'مسح سجل المحادثة';
+
+  @override
+  String get chatSettingsSearchHint => 'اكتب كلمة للبحث...';
+
+  @override
+  String chatSettingsSearching(String query) {
+    return 'جاري البحث عن \"$query\"...';
+  }
+
+  @override
+  String chatSettingsReportTitle(String username) {
+    return 'الإبلاغ عن @$username';
+  }
+
+  @override
+  String get chatSettingsReportSpam => 'احتيال أو إزعاج';
+
+  @override
+  String get chatSettingsReportHarassment => 'مضايقة أو تنمر';
+
+  @override
+  String get chatSettingsReportInappropriate => 'محتوى غير لائق';
+
+  @override
+  String chatSettingsReportSubmitted(String reason) {
+    return 'تم إرسال البلاغ: $reason';
+  }
+
+  @override
+  String chatSettingsBlockTitle(String username) {
+    return 'حظر @$username؟';
+  }
+
+  @override
+  String get chatSettingsBlockMessage => 'لن يتمكن من مراسلتك أو رؤية ملفك الشخصي.';
+
+  @override
+  String get chatSettingsDeleteTitle => 'مسح سجل المحادثة؟';
+
+  @override
+  String get chatSettingsDeleteMessage => 'سيؤدي هذا إلى إزالة سجل المحادثة بالنسبة لك. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
   String get messagesTitle => 'الرسائل';
 
   @override
