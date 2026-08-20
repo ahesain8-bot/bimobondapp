@@ -351,6 +351,33 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
       (post) => post.copyWith(isSaved: nextSaved, saveCount: nextCount),
     );
     context.read<PostsBloc>().add(ToggleSavePostRequestedEvent(widget.post.id));
+
+    // TikTok confirms a save with a floating bar; unsaving stays silent there.
+    if (!nextSaved) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.black.withValues(alpha: 0.88),
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+        ),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 18),
+            const SizedBox(width: AppSizes.p8),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context)!.postSavedToFavorites,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void showQuickShare() {
