@@ -487,7 +487,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         if (current is RepostPostSuccess && current.postId == post.id) {
           return true;
         }
-        if (current is PostsFailure && pendingRepostToggle) {
+        if (current is PostsFailure &&
+            (pendingRepostToggle || pendingLikeToggle || pendingSaveToggle)) {
+          return true;
+        }
+        if (current is LikePostSuccess && current.postId == post.id) {
+          return true;
+        }
+        if (current is SavePostSuccess && current.postId == post.id) {
           return true;
         }
         return false;
@@ -517,8 +524,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           return;
         }
 
-        if (state is PostsFailure && pendingRepostToggle) {
-          rollbackRepostToggle();
+        // The server accepted it, so the optimistic value stands.
+        if (state is LikePostSuccess && state.postId == post.id) {
+          pendingLikeToggle = false;
+          return;
+        }
+        if (state is SavePostSuccess && state.postId == post.id) {
+          pendingSaveToggle = false;
+          return;
+        }
+
+        if (state is PostsFailure) {
+          // A refusal used to leave the heart or bookmark filled while the
+          // server had recorded nothing, so the post never turned up in the
+          // liked or saved grid. Put it back and say why.
+          if (pendingRepostToggle) rollbackRepostToggle();
+          if (pendingLikeToggle) rollbackLikeToggle();
+          if (pendingSaveToggle) rollbackSaveToggle();
           PopupDialogs.showErrorDialog(context, state.message);
         }
       },
