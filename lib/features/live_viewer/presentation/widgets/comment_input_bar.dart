@@ -6,6 +6,7 @@ class CommentInputBar extends StatefulWidget {
   final ValueChanged<String> onSend;
   final VoidCallback? onEmojiTap;
   final bool enabled;
+  final bool isSending;
   final String hintText;
 
   const CommentInputBar({
@@ -13,6 +14,7 @@ class CommentInputBar extends StatefulWidget {
     required this.onSend,
     this.onEmojiTap,
     this.enabled = true,
+    this.isSending = false,
     this.hintText = 'Write...',
   });
 
@@ -51,10 +53,9 @@ class _CommentInputBarState extends State<CommentInputBar> {
 
   void _submit() {
     final text = _controller.text.trim();
-    if (text.isEmpty || !widget.enabled) return;
+    if (text.isEmpty || !widget.enabled || widget.isSending) return;
     widget.onSend(text);
     _controller.clear();
-    _focusNode.unfocus();
   }
 
   void _insertEmoji(String emoji) {
@@ -115,7 +116,7 @@ class _CommentInputBarState extends State<CommentInputBar> {
                 child: TextField(
                   controller: _controller,
                   focusNode: _focusNode,
-                  enabled: widget.enabled,
+                  enabled: widget.enabled && !widget.isSending,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -130,7 +131,11 @@ class _CommentInputBarState extends State<CommentInputBar> {
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    hintText: widget.enabled ? widget.hintText : 'Chat muted',
+                    hintText: widget.isSending
+                        ? 'Sending...'
+                        : widget.enabled
+                        ? widget.hintText
+                        : 'Chat muted',
                     hintStyle: const TextStyle(
                       color: Color(0x8CFFFFFF),
                       fontSize: 14,
@@ -140,22 +145,45 @@ class _CommentInputBarState extends State<CommentInputBar> {
                   ),
                 ),
               ),
-              GestureDetector(
-                onTap: _hasText ? _submit : null,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: _hasText ? TikTokLiveTokens.liveRed : Colors.white24,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_upward_rounded,
-                    color: _hasText ? Colors.white : Colors.white54,
-                    size: 16,
-                  ),
-                ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 140),
+                child: widget.isSending
+                    ? const SizedBox(
+                        key: ValueKey('loading'),
+                        width: 28,
+                        height: 28,
+                        child: Padding(
+                          padding: EdgeInsets.all(6),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        key: const ValueKey('send'),
+                        onTap: _hasText && widget.enabled ? _submit : null,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _hasText && widget.enabled
+                                ? TikTokLiveTokens.liveRed
+                                : Colors.white24,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.arrow_upward_rounded,
+                            color: _hasText && widget.enabled
+                                ? Colors.white
+                                : Colors.white54,
+                            size: 16,
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),

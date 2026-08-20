@@ -54,15 +54,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.isActive) {
-      _scheduleActivate();
-    }
+    _scheduleActivate();
   }
 
   @override
   void didUpdateWidget(covariant LiveRoomPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isActive && !oldWidget.isActive) {
+    if (oldWidget.live.id != widget.live.id) {
+      _deactivateIfThis();
+      _scheduleActivate();
+    } else if (widget.isActive && !oldWidget.isActive) {
       _scheduleActivate();
     } else if (!widget.isActive && oldWidget.isActive) {
       _deactivateIfThis();
@@ -84,9 +85,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _scheduleActivate() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !widget.isActive) return;
+      if (!mounted) return;
       context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
-      if (!_firstGiftPrompted) {
+      if (widget.isActive && !_firstGiftPrompted) {
         _firstGiftPrompted = true;
         Future.delayed(const Duration(milliseconds: 1600), () async {
           if (!mounted || !widget.isActive) return;
@@ -233,6 +234,67 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         isMuted: m['muted'] == true,
       );
     }).toList();
+  }
+
+  List<String> _moderatorIdsFrom(LiveEntity live) {
+    final raw = live.metadata?['moderators'];
+    if (raw is! List) return const [];
+    return raw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+  }
+
+  Widget _buildCommentsSection({
+    required BuildContext context,
+    required LiveViewerState state,
+    required LiveEntity live,
+    required double height,
+    bool alignTop = false,
+  }) {
+    final moderators = _moderatorIdsFrom(live);
+    final bloc = context.read<LiveViewerBloc>();
+    return CommentsSection(
+      comments: state.comments,
+      height: height,
+      alignTop: alignTop,
+      currentUserId: state.currentUserId,
+      hostId: live.hostId,
+      moderatorIds: moderators,
+      mutedUserIds: state.mutedUserIds,
+      bannedUserIds: state.bannedUserIds,
+      onDeleteComment: (commentId, targetUserId) {
+        bloc.add(
+          LiveViewerCommentDeletedRequested(
+            commentId,
+            targetUserId: targetUserId,
+          ),
+        );
+      },
+      onMuteUser: (userId, username, reason) {
+        bloc.add(
+          LiveViewerViewerChatMuteRequested(
+            userId,
+            username: username,
+            reason: reason,
+          ),
+        );
+      },
+      onUnmuteUser: (userId, username) {
+        bloc.add(
+          LiveViewerViewerChatUnmuteRequested(userId, username: username),
+        );
+      },
+      onBanUser: (userId, username, reason) {
+        bloc.add(
+          LiveViewerViewerBannedRequested(
+            userId,
+            username: username,
+            reason: reason,
+          ),
+        );
+      },
+      onUnbanUser: (userId, username) {
+        bloc.add(LiveViewerViewerUnbannedRequested(userId, username: username));
+      },
+    );
   }
 
   @override
@@ -436,7 +498,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                   prev.comments != curr.comments ||
                                   prev.pinnedComment != curr.pinnedComment,
                               builder: (context, state) {
-                                final comments = state.comments;
                                 final pinned = state.pinnedComment;
                                 return LayoutBuilder(
                                   builder: (context, constraints) {
@@ -449,8 +510,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                           PinnedCommentBar(comment: pinned),
                                           const SizedBox(height: 6),
                                         ],
-                                        CommentsSection(
-                                          comments: comments,
+                                        _buildCommentsSection(
+                                          context: context,
+                                          state: state,
+                                          live: live,
                                           height: (constraints.maxHeight - pinH)
                                               .clamp(
                                                 40.0,
@@ -494,7 +557,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                   prev.comments != curr.comments ||
                                   prev.pinnedComment != curr.pinnedComment,
                               builder: (context, state) {
-                                final comments = state.comments;
                                 final pinned = state.pinnedComment;
                                 return LayoutBuilder(
                                   builder: (context, constraints) {
@@ -507,8 +569,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                           PinnedCommentBar(comment: pinned),
                                           const SizedBox(height: 6),
                                         ],
-                                        CommentsSection(
-                                          comments: comments,
+                                        _buildCommentsSection(
+                                          context: context,
+                                          state: state,
+                                          live: live,
                                           height: (constraints.maxHeight - pinH)
                                               .clamp(
                                                 40.0,
@@ -738,7 +802,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         prev.comments != curr.comments ||
                         prev.pinnedComment != curr.pinnedComment,
                     builder: (context, state) {
-                      final comments = state.comments;
                       final pinned = state.pinnedComment;
                       return Column(
                         mainAxisSize: MainAxisSize.min,
@@ -748,8 +811,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                             PinnedCommentBar(comment: pinned),
                             const SizedBox(height: 8),
                           ],
-                          CommentsSection(
-                            comments: comments,
+                          _buildCommentsSection(
+                            context: context,
+                            state: state,
+                            live: live,
                             height: TikTokLiveTokens.commentFeedH,
                           ),
                         ],
@@ -889,6 +954,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     return prev.session?.coinBalance !=
                             curr.session?.coinBalance ||
                         prev.chatMuted != curr.chatMuted ||
+                        prev.isCommentSending != curr.isCommentSending ||
                         pShare != cShare;
                   },
                   builder: (context, state) {
@@ -896,6 +962,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         ? state.session?.coinBalance
                         : null;
                     final chatMuted = isThisRoom ? state.chatMuted : false;
+                    final isCommentSending = isThisRoom
+                        ? state.isCommentSending
+                        : false;
                     final shareCount = isThisRoom
                         ? (state.live?.metadata?['shareCount'] as int? ?? 111)
                         : (live.metadata?['shareCount'] as int? ?? 111);
@@ -942,12 +1011,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       commentField: _showComposer
                           ? CommentInputBar(
                               enabled: connected && !chatMuted,
+                              isSending: isCommentSending,
                               hintText: chatMuted ? 'Chat muted' : 'Write...',
                               onSend: (text) {
+                                if (isCommentSending) return;
                                 context.read<LiveViewerBloc>().add(
                                   LiveViewerCommentSent(text),
                                 );
-                                setState(() => _showComposer = false);
                               },
                             )
                           : null,

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/repositories/like_repository.dart';
 import '../services/fake_socket_service.dart';
 

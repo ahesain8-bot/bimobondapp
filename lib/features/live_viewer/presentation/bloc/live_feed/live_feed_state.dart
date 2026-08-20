@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../../domain/entities/live_entity.dart';
 
 abstract class LiveFeedState extends Equatable {
@@ -28,13 +28,58 @@ abstract class LiveFeedState extends Equatable {
     int? currentPage,
     bool clearError = false,
   }) {
+    final resolvedLives = lives ?? this.lives;
+    final resolvedIsLoading = isLoading ?? this.isLoading;
+    final resolvedIsLoadingMore = isLoadingMore ?? this.isLoadingMore;
+    final resolvedHasMore = hasMore ?? this.hasMore;
+    final resolvedError =
+        clearError ? null : (error ?? this.error);
+    final resolvedCurrentPage = currentPage ?? this.currentPage;
+
+    final bool hadError = this.error != null;
+    final bool keepAsFailure = hadError && resolvedError != null;
+    final bool wantError = resolvedError != null;
+
+    if (resolvedIsLoading) {
+      return LiveFeedLoadInProgress(
+        lives: resolvedLives,
+        isLoading: true,
+        isLoadingMore: resolvedIsLoadingMore,
+        hasMore: resolvedHasMore,
+        error: resolvedError,
+        currentPage: resolvedCurrentPage,
+      );
+    }
+
+    if (wantError) {
+      return LiveFeedLoadFailure(
+        failure: resolvedError!,
+        lives: resolvedLives,
+        isLoading: false,
+        isLoadingMore: resolvedIsLoadingMore,
+        hasMore: resolvedHasMore,
+        currentPage: resolvedCurrentPage,
+      );
+    }
+
+    // isLoading == false && error == null
+    if (this is LiveFeedInitial && !keepAsFailure) {
+      // Initial with no error + no loading stays Initial only if no real data
+      // accumulated.  Once lives set (from any path) → become Success so that
+      // UI branches on state is LiveFeedInitial correctly detect "first load
+      // pending".
+      if (resolvedLives.isEmpty) {
+        return const LiveFeedInitial();
+      }
+    }
+
     return LiveFeedLoadSuccess(
-      lives: lives ?? this.lives,
-      isLoading: isLoading ?? this.isLoading,
-      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-      hasMore: hasMore ?? this.hasMore,
-      error: clearError ? null : (error ?? this.error),
-      currentPage: currentPage ?? this.currentPage,
+      lives: resolvedLives,
+      isLoading: false,
+      isLoadingMore: resolvedIsLoadingMore,
+      hasMore: resolvedHasMore,
+      error: null,
+      currentPage: resolvedCurrentPage,
     );
   }
 

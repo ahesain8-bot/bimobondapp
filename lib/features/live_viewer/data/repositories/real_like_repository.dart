@@ -4,7 +4,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/like_repository.dart';
 import '../services/fake_socket_service.dart' show SocketService;

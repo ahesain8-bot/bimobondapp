@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_exceptions.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/live_repository.dart';
@@ -263,5 +263,111 @@ class FakeLiveRepository implements LiveRepository {
     int limit = 10,
   }) {
     return getLiveFeed(limit: limit);
+  }
+
+  @override
+  Future<Either<Failure, void>> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    try {
+      await _remote.banViewer(liveId: liveId, userId: userId, reason: reason);
+      return const Right(null);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to ban viewer: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unbanViewer({
+    required String liveId,
+    required String userId,
+  }) async {
+    try {
+      await _remote.unbanViewer(liveId: liveId, userId: userId);
+      return const Right(null);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to unban viewer: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    try {
+      await _remote.muteViewerChat(
+        liveId: liveId,
+        userId: userId,
+        reason: reason,
+      );
+      return const Right(null);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to mute viewer chat: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  }) async {
+    try {
+      await _remote.unmuteViewerChat(liveId: liveId, userId: userId);
+      return const Right(null);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to unmute viewer chat: $e'));
+    }
   }
 }

@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:get_it/get_it.dart';
-
 import '../../../../core/network/live_api_client.dart';
 import '../../data/datasources/http_live_remote_datasource.dart';
 import '../../data/datasources/live_remote_datasource.dart';
@@ -16,21 +15,26 @@ import '../../domain/repositories/comment_repository.dart';
 import '../../domain/repositories/gift_repository.dart';
 import '../../domain/repositories/like_repository.dart';
 import '../../domain/repositories/live_repository.dart';
+import '../../domain/usecases/ban_viewer_usecase.dart';
+import '../../domain/usecases/delete_comment_usecase.dart';
 import '../../domain/usecases/get_live_feed_usecase.dart';
 import '../../domain/usecases/join_live_usecase.dart';
 import '../../domain/usecases/leave_live_usecase.dart';
 import '../../domain/usecases/like_live_usecase.dart';
+import '../../domain/usecases/mute_viewer_chat_usecase.dart';
 import '../../domain/usecases/send_gift_usecase.dart';
+import '../../domain/usecases/unban_viewer_usecase.dart';
+import '../../domain/usecases/unmute_viewer_chat_usecase.dart';
 import '../bloc/live_feed/live_feed_bloc.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
 
 final sl = GetIt.instance;
 
 Future<String?> _firebaseIdToken() async {
+  final user = fb.FirebaseAuth.instance.currentUser;
+  if (user == null) return null;
   try {
-    final user = fb.FirebaseAuth.instance.currentUser;
-    if (user == null) return null;
-    return user.getIdToken();
+    return await user.getIdToken();
   } catch (_) {
     return null;
   }
@@ -72,6 +76,11 @@ Future<void> initLiveViewer() async {
   sl.registerLazySingleton(() => LeaveLiveUseCase(sl()));
   sl.registerLazySingleton(() => LikeLiveUseCase(sl()));
   sl.registerLazySingleton(() => SendGiftUseCase(sl()));
+  sl.registerLazySingleton(() => BanViewerUseCase(sl()));
+  sl.registerLazySingleton(() => UnbanViewerUseCase(sl()));
+  sl.registerLazySingleton(() => MuteViewerChatUseCase(sl()));
+  sl.registerLazySingleton(() => UnmuteViewerChatUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteCommentUseCase(sl()));
 
   sl.registerFactory(() => LiveFeedBloc(getLiveFeedUseCase: sl()));
 
@@ -81,6 +90,11 @@ Future<void> initLiveViewer() async {
       leaveLiveUseCase: sl(),
       likeLiveUseCase: sl(),
       sendGiftUseCase: sl(),
+      banViewerUseCase: sl(),
+      unbanViewerUseCase: sl(),
+      muteViewerChatUseCase: sl(),
+      unmuteViewerChatUseCase: sl(),
+      deleteCommentUseCase: sl(),
       liveRepository: sl(),
       commentRepository: sl(),
       giftRepository: sl(),

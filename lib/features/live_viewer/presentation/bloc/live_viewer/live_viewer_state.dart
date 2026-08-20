@@ -19,6 +19,9 @@ class LiveViewerState extends Equatable {
   final bool chatMuted;
   final String? moderationBanner;
   final String? currentUserId;
+  final Set<String> bannedUserIds;
+  final Set<String> mutedUserIds;
+  final bool isCommentSending;
 
   const LiveViewerState({
     this.session,
@@ -35,6 +38,9 @@ class LiveViewerState extends Equatable {
     this.chatMuted = false,
     this.moderationBanner,
     this.currentUserId,
+    this.bannedUserIds = const {},
+    this.mutedUserIds = const {},
+    this.isCommentSending = false,
   });
 
   LiveConnectionState get connectionState =>
@@ -62,6 +68,9 @@ class LiveViewerState extends Equatable {
     String? moderationBanner,
     bool clearModerationBanner = false,
     String? currentUserId,
+    Set<String>? bannedUserIds,
+    Set<String>? mutedUserIds,
+    bool? isCommentSending,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -84,6 +93,9 @@ class LiveViewerState extends Equatable {
           ? null
           : (moderationBanner ?? this.moderationBanner),
       currentUserId: currentUserId ?? this.currentUserId,
+      bannedUserIds: bannedUserIds ?? this.bannedUserIds,
+      mutedUserIds: mutedUserIds ?? this.mutedUserIds,
+      isCommentSending: isCommentSending ?? this.isCommentSending,
     );
   }
 
@@ -103,5 +115,8 @@ class LiveViewerState extends Equatable {
     chatMuted,
     moderationBanner,
     currentUserId,
+    bannedUserIds,
+    mutedUserIds,
+    isCommentSending,
   ];
 }

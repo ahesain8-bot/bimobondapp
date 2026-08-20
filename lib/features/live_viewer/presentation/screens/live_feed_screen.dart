@@ -16,7 +16,7 @@ import '../bloc/live_viewer/live_viewer_event.dart';
 import '../bloc/live_viewer/live_viewer_state.dart';
 import '../di/live_viewer_injector.dart' as di;
 import '../widgets/live_room_page.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../domain/entities/live_entity.dart';

@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/comment_repository.dart';
@@ -76,8 +76,18 @@ class FakeCommentRepository implements CommentRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteComment(String commentId) async {
+  Future<Either<Failure, void>> deleteComment(
+    String commentId, {
+    String? liveId,
+  }) async {
     await Future.delayed(const Duration(milliseconds: 200));
+    if (liveId != null) {
+      final list = _comments[liveId];
+      if (list != null) {
+        list.removeWhere((c) => c.id == commentId);
+        _controllers[liveId]?.add(List.unmodifiable(list));
+      }
+    }
     return const Right(null);
   }
 

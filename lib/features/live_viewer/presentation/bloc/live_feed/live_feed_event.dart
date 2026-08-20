@@ -1,6 +1,4 @@
 import 'package:equatable/equatable.dart';
-import '../../../core/errors/failures.dart';
-import '../../../domain/entities/live_entity.dart';
 
 abstract class LiveFeedEvent extends Equatable {
   const LiveFeedEvent();

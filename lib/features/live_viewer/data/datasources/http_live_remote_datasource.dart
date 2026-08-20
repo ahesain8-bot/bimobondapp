@@ -144,4 +144,45 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   Future<void> unfollowHost(String hostId) async {
     await _api.delete(ApiEndpoints.creatorsFanClubSubscribe(hostId));
   }
+
+  @override
+  Future<void> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    final body = <String, dynamic>{};
+    if (reason != null && reason.isNotEmpty) body['reason'] = reason;
+    await _api.post(ApiEndpoints.liveViewerBan(liveId, userId), body: body);
+  }
+
+  @override
+  Future<void> unbanViewer({
+    required String liveId,
+    required String userId,
+  }) async {
+    await _api.post(ApiEndpoints.liveViewerUnban(liveId, userId));
+  }
+
+  @override
+  Future<void> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    final body = <String, dynamic>{};
+    if (reason != null && reason.isNotEmpty) body['reason'] = reason;
+    await _api.post(
+      ApiEndpoints.liveViewerMuteChat(liveId, userId),
+      body: body,
+    );
+  }
+
+  @override
+  Future<void> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  }) async {
+    await _api.post(ApiEndpoints.liveViewerUnmuteChat(liveId, userId));
+  }
 }

@@ -1,5 +1,5 @@
 import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../entities/comment_entity.dart';
 
 abstract class CommentRepository {
@@ -17,8 +17,12 @@ abstract class CommentRepository {
     String? replyToUserId,
   });
 
-  /// Delete a comment (if authorized)
-  Future<Either<Failure, void>> deleteComment(String commentId);
+  /// Delete a comment (if authorized).
+  /// If liveId is provided, performs the call directly without cache lookup.
+  Future<Either<Failure, void>> deleteComment(
+    String commentId, {
+    String? liveId,
+  });
 
   /// Report a comment
   Future<Either<Failure, void>> reportComment({

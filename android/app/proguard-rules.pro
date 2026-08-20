@@ -91,3 +91,57 @@
 # Video/media Flutter plugins that drive the above.
 -keep class ch.waio.pro_video_editor.** { *; }
 -dontwarn ch.waio.pro_video_editor.**
+
+# LiveKit / Flutter WebRTC (JNI + reflection + native libwebrtc bridge)
+-keep class com.cloudwebrtc.webrtc.** { *; }
+-dontwarn com.cloudwebrtc.webrtc.**
+-keep class org.webrtc.** { *; }
+-dontwarn org.webrtc.**
+-keep class io.livekit.android.** { *; }
+-dontwarn io.livekit.android.**
+
+# Socket.IO / Engine.IO Java client (okhttp3 + okio)
+-keep class io.socket.** { *; }
+-dontwarn io.socket.**
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-keep class okio.** { *; }
+-dontwarn okio.**
+
+# Just Audio (media session + ExoPlayer bridge)
+-keep class com.ryanheise.** { *; }
+-dontwarn com.ryanheise.**
+
+# Record Android plugin (microphone / NDK audio)
+-keep class com.llfbandit.record.** { *; }
+-dontwarn com.llfbandit.record.**
+
+# Location plugin (GMS FusedLocation + GMS common)
+-keep class com.lyokone.location.** { *; }
+-dontwarn com.lyokone.location.**
+
+# flutter_local_notifications (schedules alarms via AndroidX core)
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
+-dontwarn com.dexterous.flutterlocalnotifications.**
+
+# flutter_callkit_incoming (telecom / VoIP service + reflection)
+-keep class co.huntie.flutter_callkit_incoming.** { *; }
+-dontwarn co.huntie.flutter_callkit_incoming.**
+-keep class com.timwoj.flutter_callkit_incoming.** { *; }
+-dontwarn com.timwoj.flutter_callkit_incoming.**
+
+# Permission Handler + Wakelock Plus (Activity binding + reflection)
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.permissionhandler.**
+-keep class creativemaybeno.wakelock_plus.** { *; }
+-dontwarn creativemaybeno.wakelock_plus.**
+
+# AndroidX / Guava / WorkManager classes that are referenced only
+# behind compile-time guards (library declares them @RequiresApi, or
+# Flavio classes shadow across versions). R8 treats missing refs as errors
+# unless explicitly silenced.
+-dontwarn androidx.window.**
+-dontwarn androidx.concurrent.**
+-dontwarn androidx.work.**
+-dontwarn com.google.common.util.concurrent.**
+-dontwarn com.squareup.moshi.**

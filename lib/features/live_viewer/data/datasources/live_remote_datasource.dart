@@ -25,6 +25,25 @@ abstract class LiveRemoteDataSource {
   Future<void> followHost(String hostId);
 
   Future<void> unfollowHost(String hostId);
+
+  Future<void> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  });
+
+  Future<void> unbanViewer({required String liveId, required String userId});
+
+  Future<void> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  });
+
+  Future<void> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  });
 }
 
 class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
@@ -145,6 +164,40 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
   @override
   Future<void> unfollowHost(String hostId) async {
     await Future.delayed(const Duration(milliseconds: 280));
+  }
+
+  @override
+  Future<void> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 320));
+  }
+
+  @override
+  Future<void> unbanViewer({
+    required String liveId,
+    required String userId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  @override
+  Future<void> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  @override
+  Future<void> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
   /// Endpoint path helpers for documentation / future Dio mapping.

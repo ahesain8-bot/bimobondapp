@@ -1,9 +1,6 @@
 import 'package:equatable/equatable.dart';
-import '../../../core/errors/failures.dart';
-import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/gift_entity.dart';
 import '../../../domain/entities/live_entity.dart';
-import '../../../domain/entities/live_session_entity.dart';
 
 abstract class LiveViewerEvent extends Equatable {
   const LiveViewerEvent();
@@ -80,4 +77,73 @@ class LiveViewerSocketEventReceived extends LiveViewerEvent {
 
   @override
   List<Object?> get props => [identityHashCode(event)];
+}
+
+class LiveViewerCommentDeletedRequested extends LiveViewerEvent {
+  final String commentId;
+  final String? targetUserId;
+
+  const LiveViewerCommentDeletedRequested(this.commentId, {this.targetUserId});
+
+  @override
+  List<Object?> get props => [commentId, targetUserId];
+}
+
+class LiveViewerViewerChatMuteRequested extends LiveViewerEvent {
+  final String userId;
+  final String? username;
+  final String? reason;
+
+  const LiveViewerViewerChatMuteRequested(
+    this.userId, {
+    this.username,
+    this.reason,
+  });
+
+  @override
+  List<Object?> get props => [userId, username, reason];
+}
+
+class LiveViewerViewerChatUnmuteRequested extends LiveViewerEvent {
+  final String userId;
+  final String? username;
+
+  const LiveViewerViewerChatUnmuteRequested(this.userId, {this.username});
+
+  @override
+  List<Object?> get props => [userId, username];
+}
+
+class LiveViewerViewerBannedRequested extends LiveViewerEvent {
+  final String userId;
+  final String? username;
+  final String? reason;
+
+  const LiveViewerViewerBannedRequested(
+    this.userId, {
+    this.username,
+    this.reason,
+  });
+
+  @override
+  List<Object?> get props => [userId, username, reason];
+}
+
+class LiveViewerViewerUnbannedRequested extends LiveViewerEvent {
+  final String userId;
+  final String? username;
+
+  const LiveViewerViewerUnbannedRequested(this.userId, {this.username});
+
+  @override
+  List<Object?> get props => [userId, username];
+}
+
+class LiveViewerSendStateChanged extends LiveViewerEvent {
+  final bool isSending;
+
+  const LiveViewerSendStateChanged(this.isSending);
+
+  @override
+  List<Object?> get props => [isSending];
 }
