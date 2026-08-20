@@ -154,6 +154,9 @@ class AppSizes {
   /// and shows the newest run at the bottom instead of overflowing.
   static const double roomChatMaxHeightFactor = 0.34;
 
+  /// Where the chat feed reaches full opacity, as a fraction of its height.
+  static const double roomChatFadeStop = 0.28;
+
   /// System message leading badge size.
   static const double roomChatBadge = 16;
 

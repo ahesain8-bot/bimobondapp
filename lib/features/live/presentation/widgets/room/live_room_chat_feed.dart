@@ -57,18 +57,22 @@ class LiveRoomChatFeed extends StatelessWidget {
                     maxHeight: MediaQuery.sizeOf(context).height *
                         AppSizes.roomChatMaxHeightFactor,
                   ),
-                  child: ListView.separated(
-                    reverse: true,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.zero,
-                    itemCount: messages.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.roomChatGap),
-                    itemBuilder: (context, index) {
-                      final message = messages[messages.length - 1 - index];
-                      return _ChatMessageTile(message: message);
-                    },
+                  child: ShaderMask(
+                    shaderCallback: _fadeOlderLines,
+                    blendMode: BlendMode.dstIn,
+                    child: ListView.separated(
+                      reverse: true,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      itemCount: messages.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: AppSpacing.roomChatGap),
+                      itemBuilder: (context, index) {
+                        final message = messages[messages.length - 1 - index];
+                        return _ChatMessageTile(message: message);
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -78,6 +82,17 @@ class LiveRoomChatFeed extends StatelessWidget {
       },
     );
   }
+}
+
+/// Older lines dissolve as they climb out of the feed, the way they do on
+/// TikTok, so the run never ends on a hard cut against the video.
+Shader _fadeOlderLines(Rect bounds) {
+  return const LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Colors.transparent, Colors.white],
+    stops: [0.0, AppSizes.roomChatFadeStop],
+  ).createShader(bounds);
 }
 
 class _ChatMessageTile extends StatelessWidget {
