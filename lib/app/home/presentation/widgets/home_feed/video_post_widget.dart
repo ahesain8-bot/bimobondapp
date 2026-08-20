@@ -228,7 +228,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
   void _onPostShared() {
     final bus = PostShareRefreshBus.instance;
     if (bus.lastSharedPostId != widget.post.id || !mounted) return;
-    setState(() => shareCount = bus.lastShareCount ?? shareCount + 1);
+    final next = bus.lastShareCount ?? shareCount + 1;
+    setState(() => shareCount = next);
+    // Same as like and save: push it into the feed's copy too, otherwise the
+    // next syncEngagementFromPost reads the stale total straight back over it.
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(shareCount: next),
+    );
   }
 
   void _onFeedPlaybackGateChanged() {
