@@ -4,6 +4,7 @@ import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../room/live_room_option_tile.dart';
+import '../room/live_video_quality_sheet.dart';
 
 /// Settings sheet using the same surface, cards and rows as the room menu.
 class SettingsPanel extends StatefulWidget {
@@ -186,6 +187,7 @@ class _SettingsCards extends StatelessWidget {
               icon: Icons.high_quality_outlined,
               title: 'جودة الفيديو',
               trailing: LiveRoomOptionTrailing.chevron,
+              onTap: () => LiveVideoQualitySheet.show(context),
             ),
             LiveRoomOptionTile(
               icon: Icons.rocket_launch_outlined,

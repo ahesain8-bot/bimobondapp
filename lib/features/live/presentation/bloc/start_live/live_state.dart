@@ -1,5 +1,7 @@
 import 'package:camera/camera.dart';
 
+const Object _unset = Object();
+
 /// States emitted by [LiveBloc].
 sealed class LiveState {
   const LiveState();
@@ -45,7 +47,7 @@ class LiveReady extends LiveState {
   final int selectedIndex;
 
   LiveReady copyWith({
-    CameraController? controller,
+    Object? controller = _unset,
     bool? isCameraInitialized,
     bool? isFrontCamera,
     bool? isToolsExpanded,
@@ -53,7 +55,9 @@ class LiveReady extends LiveState {
     int? selectedIndex,
   }) {
     return LiveReady(
-      controller: controller ?? this.controller,
+      controller: identical(controller, _unset)
+          ? this.controller
+          : controller as CameraController?,
       isCameraInitialized: isCameraInitialized ?? this.isCameraInitialized,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
       isToolsExpanded: isToolsExpanded ?? this.isToolsExpanded,

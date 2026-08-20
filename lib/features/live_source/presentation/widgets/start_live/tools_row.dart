@@ -93,7 +93,12 @@ class ToolsRow extends StatelessWidget {
                   label: 'تجميل',
                   onTap: onBeautifyTap,
                 ),
-                ToolButton(asset: AppAssets.heart,label: 'قلب',onTap: () => liveBloc.add(const LiveToolsToggleRequested()),),
+                ToolButton(
+                  asset: AppAssets.heart,
+                  label: 'قلب',
+                  onTap: () =>
+                      liveBloc.add(const LiveCameraSwitchRequested()),
+                ),
               ],
             ),
             // Secondary tools are visible only while the tools panel is expanded.

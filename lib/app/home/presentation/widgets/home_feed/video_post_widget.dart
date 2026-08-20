@@ -32,6 +32,8 @@ import 'package:bimobondapp/core/navigation/feed_navigation.dart';
 import 'package:bimobondapp/core/navigation/sound_navigation.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
+import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/services/post_share_refresh_bus.dart';
 import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/format_count.dart';
@@ -173,6 +175,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     FeedPlaybackGate.instance.addListener(_onFeedPlaybackGateChanged);
+    PostShareRefreshBus.instance.addListener(_onPostShared);
     initEngagementState();
 
     _likeAnimController = AnimationController(
@@ -218,6 +221,21 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     flushPostViewWithWatchDuration();
     unawaited(pausePostSound());
     unawaited(SoundAudioPreview.stop());
+  }
+
+  /// This post was just shared from the options sheet: move the counter.
+  /// Falls back to a local bump when the server did not report a total.
+  void _onPostShared() {
+    final bus = PostShareRefreshBus.instance;
+    if (bus.lastSharedPostId != widget.post.id || !mounted) return;
+    final next = bus.lastShareCount ?? shareCount + 1;
+    setState(() => shareCount = next);
+    // Same as like and save: push it into the feed's copy too, otherwise the
+    // next syncEngagementFromPost reads the stale total straight back over it.
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(shareCount: next),
+    );
   }
 
   void _onFeedPlaybackGateChanged() {
@@ -334,6 +352,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
     flushPostViewWithWatchDuration();
     WidgetsBinding.instance.removeObserver(this);
     FeedPlaybackGate.instance.removeListener(_onFeedPlaybackGateChanged);
+    PostShareRefreshBus.instance.removeListener(_onPostShared);
     _detachRouteListener();
     unawaited(stopPostSound());
     _chromeEntranceController?.dispose();
@@ -468,7 +487,14 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
         if (current is RepostPostSuccess && current.postId == post.id) {
           return true;
         }
-        if (current is PostsFailure && pendingRepostToggle) {
+        if (current is PostsFailure &&
+            (pendingRepostToggle || pendingLikeToggle || pendingSaveToggle)) {
+          return true;
+        }
+        if (current is LikePostSuccess && current.postId == post.id) {
+          return true;
+        }
+        if (current is SavePostSuccess && current.postId == post.id) {
           return true;
         }
         return false;
@@ -498,8 +524,23 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           return;
         }
 
-        if (state is PostsFailure && pendingRepostToggle) {
-          rollbackRepostToggle();
+        // The server accepted it, so the optimistic value stands.
+        if (state is LikePostSuccess && state.postId == post.id) {
+          pendingLikeToggle = false;
+          return;
+        }
+        if (state is SavePostSuccess && state.postId == post.id) {
+          pendingSaveToggle = false;
+          return;
+        }
+
+        if (state is PostsFailure) {
+          // A refusal used to leave the heart or bookmark filled while the
+          // server had recorded nothing, so the post never turned up in the
+          // liked or saved grid. Put it back and say why.
+          if (pendingRepostToggle) rollbackRepostToggle();
+          if (pendingLikeToggle) rollbackLikeToggle();
+          if (pendingSaveToggle) rollbackSaveToggle();
           PopupDialogs.showErrorDialog(context, state.message);
         }
       },
@@ -546,6 +587,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget>
           commentLabel: formatCompactCount(commentCount),
           isSaved: isSaved,
           saveLabel: formatCompactCount(saveCount),
+          shareLabel: formatCompactCount(shareCount),
           commentActionKey: _commentActionKey,
           shareActionKey: _shareActionKey,
           onAvatarTap: openAuthorProfile,

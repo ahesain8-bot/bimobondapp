@@ -114,6 +114,38 @@ class AppTextStyles {
     height: 1.1,
   );
 
+  /// The comment itself: heavier than the name above it, matching how
+  /// TikTok stacks a dim handle over a bright line of text.
+  static const TextStyle roomChatBody = TextStyle(
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    height: 1.25,
+    shadows: [
+      Shadow(
+        color: Color(0x99000000),
+        blurRadius: 4,
+        offset: Offset(0, 1),
+      ),
+    ],
+  );
+
+  /// Commenter name inside the chat feed. Dimmed against the comment itself
+  /// so the eye lands on what was said, the way TikTok weights the two.
+  static const TextStyle roomChatAuthor = TextStyle(
+    color: Color(0xB3FFFFFF),
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.35,
+    shadows: [
+      Shadow(
+        color: Color(0x99000000),
+        blurRadius: 4,
+        offset: Offset(0, 1),
+      ),
+    ],
+  );
+
   /// Live-room system / chat feed text.
   static const TextStyle roomChat = TextStyle(
     color: Colors.white,
