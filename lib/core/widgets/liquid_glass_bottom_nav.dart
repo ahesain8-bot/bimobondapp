@@ -102,20 +102,12 @@ class LiquidGlassBottomNav extends StatelessWidget {
   final Widget? center;
   final int centerInsertAfter;
 
-  /// TikTok's compose button: a white body with a cyan edge peeking out one
-  /// side and a red one the other. Same footprint as before so the row keeps
-  /// its spacing.
-  static const Color _composeCyan = Color(0xFF25F4EE);
-  static const Color _composeRed = Color(0xFFFE2C55);
-
+  /// Gradient add button used in the logged-in nav center slot.
   static Widget addButton({
     required BuildContext context,
     required VoidCallback onTap,
   }) {
-    const double edge = 4;
-    const radius = BorderRadius.all(
-      Radius.circular(HomeLayoutConstants.addButtonRadius),
-    );
+    final theme = Theme.of(context);
 
     return GestureDetector(
       onTap: onTap,
@@ -123,53 +115,33 @@ class LiquidGlassBottomNav extends StatelessWidget {
         padding: const EdgeInsets.only(
           bottom: HomeLayoutConstants.navItemBottomPadding,
         ),
-        child: SizedBox(
+        child: Container(
           width: HomeLayoutConstants.addButtonWidth,
           height: HomeLayoutConstants.addButtonHeight,
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: HomeLayoutConstants.addButtonWidth - edge,
-                child: const DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _composeCyan,
-                    borderRadius: radius,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: HomeLayoutConstants.addButtonWidth - edge,
-                child: const DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _composeRed,
-                    borderRadius: radius,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: edge,
-                right: edge,
-                top: 0,
-                bottom: 0,
-                child: const DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: radius,
-                  ),
-                  child: Icon(
-                    Icons.add,
-                    color: Colors.black,
-                    size: HomeLayoutConstants.addButtonIconSize,
-                  ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(
+              HomeLayoutConstants.addButtonRadius,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                blurRadius: HomeLayoutConstants.addButtonShadowBlur,
+                offset: const Offset(
+                  0,
+                  HomeLayoutConstants.addButtonShadowOffsetY,
                 ),
               ),
             ],
+          ),
+          child: Icon(
+            Icons.add,
+            color: theme.colorScheme.onPrimary,
+            size: HomeLayoutConstants.addButtonIconSize,
           ),
         ),
       ),
@@ -180,12 +152,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final feedOverlay = FeedOverlayTheme.of(context);
-    // TikTok marks the active tab by weight and full-strength foreground, not
-    // by a brand colour, so the row reads as one family and the centre button
-    // stays the only coloured thing down here.
-    final selectedColor = glassStyle
-        ? feedOverlay.overlayForeground
-        : theme.colorScheme.onSurface;
+    final selectedColor = theme.colorScheme.primary;
     final unselectedColor = glassStyle
         ? feedOverlay.overlayForegroundMuted
         : theme.colorScheme.onSurface.withValues(alpha: 0.45);

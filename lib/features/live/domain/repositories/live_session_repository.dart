@@ -102,6 +102,15 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   final String? label;
 }
 
+/// The HUD socket came up, or refused to. Comments, the viewer counter and
+/// likes all arrive over that socket, so a silent failure looks to the host
+/// like three separate features being broken.
+class LiveHudConnectionEvent extends LiveHudEvent {
+  const LiveHudConnectionEvent({required this.connected, this.reason});
+  final bool connected;
+  final String? reason;
+}
+
 /// Contract for loading and updating an active live session.
 abstract class LiveSessionRepository {
   /// Creates and starts a host live (`POST /lives` with `startNow: true`).

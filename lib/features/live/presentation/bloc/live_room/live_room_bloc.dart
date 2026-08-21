@@ -1005,6 +1005,23 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final hud = event.event;
 
     switch (hud) {
+      case LiveHudConnectionEvent(:final connected, :final reason):
+        // Comments, viewers and likes all ride this socket. Losing it used to
+        // be printed to the console and nowhere else, so the host just saw
+        // three features quietly stop working.
+        if (connected) {
+          if (current.actionMessage != null) {
+            emit(current.copyWith(clearActionMessage: true));
+          }
+          return;
+        }
+        emit(
+          current.copyWith(
+            actionMessage:
+                'انقطع الاتصال المباشر بالغرفة، فلن تصل تعليقات المشاهدين '
+                'ولا عدد المشاهدين ولا الإعجابات${reason == null ? '' : ' ($reason)'}.',
+          ),
+        );
       case LiveHudCommentEvent(:final message):
         if (current.session.messages.any((m) => m.id == message.id)) {
           return;
