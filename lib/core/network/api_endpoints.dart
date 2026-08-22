@@ -38,6 +38,7 @@ class ApiEndpoints {
   static String liveLeave(String id) => '/lives/$id/leave';
   static String liveLike(String id) => '/lives/$id/like';
   static String liveComments(String id) => '/lives/$id/comments';
+  static String liveViewers(String id) => '/lives/$id/viewers';
   static String liveCommentById(String liveId, String commentId) =>
       '/lives/$liveId/comments/$commentId';
   static String liveCommentPin(String liveId, String commentId) =>
