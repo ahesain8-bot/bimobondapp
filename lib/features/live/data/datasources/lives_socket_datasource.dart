@@ -48,11 +48,27 @@ class LivesSocketDataSource {
       debugPrint('Socket.IO connected');
       socket.emit('joinLive', {'liveId': liveId});
       socket.emit('joinUser', {});
+      _controller.add(const LiveHudConnectionEvent(connected: true));
     });
 
-    socket.onDisconnect((_) => debugPrint('Socket.IO disconnected'));
-    socket.onConnectError((e) => debugPrint('Socket.IO connect error: $e'));
-    socket.onError((e) => debugPrint('Socket.IO error: $e'));
+    socket.onDisconnect((_) {
+      debugPrint('Socket.IO disconnected');
+      _controller.add(
+        const LiveHudConnectionEvent(connected: false, reason: 'disconnected'),
+      );
+    });
+    socket.onConnectError((e) {
+      debugPrint('Socket.IO connect error: $e');
+      _controller.add(
+        LiveHudConnectionEvent(connected: false, reason: e.toString()),
+      );
+    });
+    socket.onError((e) {
+      debugPrint('Socket.IO error: $e');
+      _controller.add(
+        LiveHudConnectionEvent(connected: false, reason: e.toString()),
+      );
+    });
 
     socket.on('liveComment', (data) {
       final map = _asMap(data);

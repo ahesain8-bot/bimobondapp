@@ -2,6 +2,7 @@ import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
 import '../../domain/entities/live_host.dart';
 import '../../domain/entities/live_leaderboard_entry.dart';
+import '../../domain/entities/live_viewer.dart';
 
 /// Maps guest / leaderboard / gallery JSON from lives/mobile-api.md.
 class LiveHostExtrasMapper {
@@ -71,6 +72,23 @@ class LiveHostExtrasMapper {
       status: json['status']?.toString(),
       targetPrice: _asNum(json['targetPrice']),
       currentPrice: _asNum(json['currentPrice'] ?? json['startingPrice']),
+    );
+  }
+
+  static LiveViewer viewerFromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>?;
+    final fullName = user?['fullName']?.toString();
+    final handle = user?['username']?.toString();
+    return LiveViewer(
+      userId: user?['id']?.toString() ?? json['userId']?.toString() ?? '',
+      displayName: (fullName != null && fullName.trim().isNotEmpty)
+          ? fullName.trim()
+          : (handle ?? 'مشاهد'),
+      username: handle,
+      avatarUrl: user?['avatarUrl']?.toString(),
+      isVerified: user?['isVerified'] == true,
+      gifterLevel: _asInt(user?['gifterLevel']),
+      isActive: json['leftAt'] == null,
     );
   }
 

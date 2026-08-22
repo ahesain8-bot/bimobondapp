@@ -301,6 +301,22 @@ class LivesRemoteDataSource {
     );
   }
 
+  Future<Map<String, dynamic>> viewers(
+    String liveId, {
+    int page = 1,
+    int limit = 50,
+    bool activeOnly = true,
+  }) {
+    return _api.get(
+      ApiEndpoints.liveViewers(liveId),
+      query: {
+        'page': '$page',
+        'limit': '$limit',
+        'activeOnly': '$activeOnly',
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> giftersLeaderboard(
     String liveId, {
     String window = 'hour',

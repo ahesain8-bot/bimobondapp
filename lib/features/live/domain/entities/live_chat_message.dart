@@ -6,6 +6,7 @@ class LiveChatMessage {
     this.body,
     this.avatarUrl,
     this.showBadge = false,
+    this.isJoinEvent = false,
     this.userId,
     this.username,
     this.gifterLevel,
@@ -26,6 +27,10 @@ class LiveChatMessage {
   /// Whether to show the circular system / level badge beside the message.
   final bool showBadge;
 
+  /// Someone walked into the room. Carries its own badge, the way TikTok
+  /// marks arrivals apart from what people actually say.
+  final bool isJoinEvent;
+
   final String? userId;
   final String? username;
   final int? gifterLevel;
@@ -37,6 +42,7 @@ class LiveChatMessage {
     String? body,
     String? avatarUrl,
     bool? showBadge,
+    bool? isJoinEvent,
     String? userId,
     String? username,
     int? gifterLevel,
@@ -48,6 +54,7 @@ class LiveChatMessage {
       body: body ?? this.body,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       showBadge: showBadge ?? this.showBadge,
+      isJoinEvent: isJoinEvent ?? this.isJoinEvent,
       userId: userId ?? this.userId,
       username: username ?? this.username,
       gifterLevel: gifterLevel ?? this.gifterLevel,

@@ -436,9 +436,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get savePost => 'Save post';
 
   @override
-  String get postSavedToFavorites => 'Saved to favorites';
-
-  @override
   String get unsavePost => 'Remove from saved';
 
   @override

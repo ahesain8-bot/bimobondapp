@@ -3,6 +3,7 @@ import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
 import '../entities/live_leaderboard_entry.dart';
 import '../entities/live_session.dart';
+import '../entities/live_viewer.dart';
 
 /// Real-time HUD events from Socket.IO (`live_{id}` room).
 sealed class LiveHudEvent {
@@ -100,6 +101,15 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   });
   final int? hourlyRank;
   final String? label;
+}
+
+/// The HUD socket came up, or refused to. Comments, the viewer counter and
+/// likes all arrive over that socket, so a silent failure looks to the host
+/// like three separate features being broken.
+class LiveHudConnectionEvent extends LiveHudEvent {
+  const LiveHudConnectionEvent({required this.connected, this.reason});
+  final bool connected;
+  final String? reason;
 }
 
 /// Contract for loading and updating an active live session.
@@ -211,6 +221,9 @@ abstract class LiveSessionRepository {
 
   /// Full guest list (`GET /lives/:id/guests`).
   Future<List<LiveGuest>> loadGuests(String liveId);
+
+  /// Who is watching right now (`GET /lives/:id/viewers`).
+  Future<List<LiveViewer>> loadViewers(String liveId);
 
   Future<void> inviteGuest({
     required String liveId,
