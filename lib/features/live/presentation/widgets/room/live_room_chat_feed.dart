@@ -10,7 +10,8 @@ import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 
-/// Activity feed anchored to the start side (right in RTL), matching the reference.
+/// Activity feed pinned to the bottom-left, the way TikTok anchors it, and
+/// held there in Arabic too rather than following the RTL start edge.
 class LiveRoomChatFeed extends StatelessWidget {
   const LiveRoomChatFeed({super.key});
 
@@ -37,45 +38,51 @@ class LiveRoomChatFeed extends StatelessWidget {
         final maxWidth =
             MediaQuery.sizeOf(context).width * AppSizes.roomChatMaxWidthFactor;
 
-        return Align(
-          alignment: AlignmentDirectional.bottomEnd,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (pinned != null) ...[
-                  _PinnedCommentBar(message: pinned),
-                  const SizedBox(height: AppSpacing.roomChatGap),
-                ],
-                // Laid out bottom-up so the newest line sits just above the
-                // composer and anything older is clipped off the top, instead
-                // of the whole 80-message backlog pushing the column over.
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(context).height *
-                        AppSizes.roomChatMaxHeightFactor,
-                  ),
-                  child: ShaderMask(
-                    shaderCallback: _fadeOlderLines,
-                    blendMode: BlendMode.dstIn,
-                    child: ListView.separated(
-                      reverse: true,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: EdgeInsets.zero,
-                      itemCount: messages.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSpacing.roomChatGap),
-                      itemBuilder: (context, index) {
-                        final message = messages[messages.length - 1 - index];
-                        return _ChatMessageTile(message: message);
-                      },
+        return Directionality(
+          // Local override only: Arabic still shapes right-to-left inside each
+          // line, but the run itself hugs the left edge like the reference.
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (pinned != null) ...[
+                    _PinnedCommentBar(message: pinned),
+                    const SizedBox(height: AppSpacing.roomChatGap),
+                  ],
+                  // Laid out bottom-up so the newest line sits just above the
+                  // composer and anything older is clipped off the top, instead
+                  // of the whole 80-message backlog pushing the column over.
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight:
+                          MediaQuery.sizeOf(context).height *
+                          AppSizes.roomChatMaxHeightFactor,
+                    ),
+                    child: ShaderMask(
+                      shaderCallback: _fadeOlderLines,
+                      blendMode: BlendMode.dstIn,
+                      child: ListView.separated(
+                        reverse: true,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: messages.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.roomChatGap),
+                        itemBuilder: (context, index) {
+                          final message = messages[messages.length - 1 - index];
+                          return _ChatMessageTile(message: message);
+                        },
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -113,9 +120,7 @@ class _ChatMessageTile extends StatelessWidget {
               children: [
                 ListTile(
                   leading: Icon(
-                    message.isPinned
-                        ? Icons.push_pin_outlined
-                        : Icons.push_pin,
+                    message.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
                     color: Colors.white70,
                   ),
                   title: Text(
@@ -130,7 +135,10 @@ class _ChatMessageTile extends StatelessWidget {
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.white70),
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.white70,
+                  ),
                   title: const Text(
                     'حذف التعليق',
                     style: TextStyle(color: Colors.white),
@@ -142,7 +150,10 @@ class _ChatMessageTile extends StatelessWidget {
                 ),
                 if (message.userId != null && message.userId!.isNotEmpty) ...[
                   ListTile(
-                    leading: const Icon(Icons.volume_off_outlined, color: Colors.white70),
+                    leading: const Icon(
+                      Icons.volume_off_outlined,
+                      color: Colors.white70,
+                    ),
                     title: const Text(
                       'كتم دردشة المشاهد',
                       style: TextStyle(color: Colors.white),
@@ -153,7 +164,10 @@ class _ChatMessageTile extends StatelessWidget {
                     ),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.volume_up_outlined, color: Colors.white70),
+                    leading: const Icon(
+                      Icons.volume_up_outlined,
+                      color: Colors.white70,
+                    ),
                     title: const Text(
                       'إلغاء كتم الدردشة',
                       style: TextStyle(color: Colors.white),
@@ -185,19 +199,20 @@ class _ChatMessageTile extends StatelessWidget {
 
     if (action == null || !context.mounted) return;
     context.read<LiveRoomBloc>().add(
-          LiveRoomModerationRequested(
-            action: action,
-            commentId: message.id,
-            userId: message.userId,
-          ),
-        );
+      LiveRoomModerationRequested(
+        action: action,
+        commentId: message.id,
+        userId: message.userId,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     // A viewer comment stacks a dim handle over the bright line they wrote,
     // behind their picture. Joins and gifts stay one line with the round badge.
-    final isComment = message.body != null &&
+    final isComment =
+        message.body != null &&
         message.username != null &&
         message.username!.isNotEmpty;
 
@@ -243,10 +258,7 @@ class _ChatMessageTile extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Text(
-                        message.body!,
-                        style: AppTextStyles.roomChatBody,
-                      ),
+                      Text(message.body!, style: AppTextStyles.roomChatBody),
                     ],
                   )
                 : _MessageText(message: message),
@@ -309,7 +321,7 @@ class _MessageText extends StatelessWidget {
       return Text(
         '$pin${message.text}',
         style: AppTextStyles.roomChat,
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.left,
         maxLines: maxLines,
         overflow: maxLines == null ? null : TextOverflow.ellipsis,
       );
@@ -322,7 +334,7 @@ class _MessageText extends StatelessWidget {
           TextSpan(text: body, style: AppTextStyles.roomChat),
         ],
       ),
-      textAlign: TextAlign.right,
+      textAlign: TextAlign.left,
       maxLines: maxLines,
       overflow: maxLines == null ? null : TextOverflow.ellipsis,
     );
@@ -342,11 +354,7 @@ class _SystemBadge extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
       ),
-      child: const Icon(
-        Icons.music_note,
-        size: 10,
-        color: Colors.white,
-      ),
+      child: const Icon(Icons.music_note, size: 10, color: Colors.white),
     );
   }
 }
