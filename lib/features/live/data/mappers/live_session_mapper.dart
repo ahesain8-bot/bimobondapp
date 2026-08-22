@@ -52,7 +52,14 @@ class LiveSessionMapper {
         live['user'] as Map<String, dynamic>?,
         userId: live['userId']?.toString(),
       ),
-      viewerCount: _asInt(live['viewers']) ?? 0,
+      viewerCount:
+          _asInt(
+            live['viewers'] ??
+                live['viewerCount'] ??
+                live['viewer_count'] ??
+                live['count'],
+          ) ??
+          0,
       likeCount: _asInt(live['likeCount']) ?? 0,
       galleryCurrent: galleryCurrent ?? 0,
       galleryTotal: galleryTotal ?? 0,

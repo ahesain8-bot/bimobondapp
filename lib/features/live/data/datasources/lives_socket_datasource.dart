@@ -43,11 +43,13 @@ class LivesSocketDataSource {
     );
 
     _socket = socket;
+    final connected = Completer<void>();
 
     socket.onConnect((_) {
       debugPrint('Socket.IO connected');
       socket.emit('joinLive', {'liveId': liveId});
       socket.emit('joinUser', {});
+      if (!connected.isCompleted) connected.complete();
       _controller.add(const LiveHudConnectionEvent(connected: true));
     });
 
@@ -59,6 +61,9 @@ class LivesSocketDataSource {
     });
     socket.onConnectError((e) {
       debugPrint('Socket.IO connect error: $e');
+      if (!connected.isCompleted) {
+        connected.completeError(StateError('Socket.IO connect error: $e'));
+      }
       _controller.add(
         LiveHudConnectionEvent(connected: false, reason: e.toString()),
       );
@@ -68,6 +73,13 @@ class LivesSocketDataSource {
       _controller.add(
         LiveHudConnectionEvent(connected: false, reason: e.toString()),
       );
+    });
+
+    socket.onReconnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
+      debugPrint('Socket.IO reconnected; rejoining live room');
+      socket.emit('joinLive', {'liveId': liveId});
+      socket.emit('joinUser', {});
     });
 
     socket.on('liveComment', (data) {
@@ -119,7 +131,11 @@ class LivesSocketDataSource {
 
     socket.on('liveViewers', (data) {
       final map = _asMap(data);
-      final rawViewers = map?['viewers'] ?? map?['count'];
+      final rawViewers =
+          map?['viewers'] ??
+          map?['viewerCount'] ??
+          map?['viewer_count'] ??
+          map?['count'];
       final viewers = _asInt(rawViewers) ??
           (rawViewers is List ? rawViewers.length : null);
       if (viewers != null) {
@@ -141,7 +157,12 @@ class LivesSocketDataSource {
               'مشاهد',
           avatarUrl:
               user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
-          viewers: _asInt(map['viewers'] ?? map['count']),
+          viewers: _asInt(
+            map['viewers'] ??
+                map['viewerCount'] ??
+                map['viewer_count'] ??
+                map['count'],
+          ),
         ),
       );
     });
@@ -198,6 +219,7 @@ class LivesSocketDataSource {
     });
 
     socket.connect();
+    await connected.future.timeout(const Duration(seconds: 10));
   }
 
   Future<void> disconnect() async {

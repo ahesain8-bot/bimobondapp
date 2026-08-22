@@ -337,6 +337,18 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       }
     });
 
+    // Skipped for the offline fallback below: a `local_live_<ts>` id means
+    // POST /lives never succeeded, so there is no room on the server and the
+    // join would subscribe to nothing.
+    String? socketError;
+    if (startedOnServer && session.id.isNotEmpty) {
+      try {
+        await _sessionRepository.connectRealtime(session.id);
+      } catch (e) {
+        socketError = 'Socket connection failed: $e';
+      }
+    }
+
     // Preview is already on screen (Opening → Ready keeps same controller).
     emit(
       LiveRoomReady(
@@ -345,6 +357,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         isCameraInitialized: controller != null,
         isFrontCamera: true,
         isMediaConnected: false,
+        actionMessage: socketError,
       ),
     );
 
@@ -365,18 +378,6 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       // Nothing to enrich or publish either: every one of those calls keys off
       // the live id the server never issued.
       return;
-    }
-
-    // Socket HUD (does not block preview).
-    if (session.id.isNotEmpty) {
-      try {
-        await _sessionRepository.connectRealtime(session.id);
-      } catch (e) {
-        final ready = _readyOrNull;
-        if (ready != null && !isClosed) {
-          emit(ready.copyWith(actionMessage: 'تعذر الاتصال بالبث المباشر: $e'));
-        }
-      }
     }
 
     // Enrichment off the critical path.
