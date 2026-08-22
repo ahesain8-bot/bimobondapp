@@ -3,6 +3,7 @@ import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
 import '../entities/live_leaderboard_entry.dart';
 import '../entities/live_session.dart';
+import '../entities/live_viewer.dart';
 
 /// Real-time HUD events from Socket.IO (`live_{id}` room).
 sealed class LiveHudEvent {
@@ -86,11 +87,24 @@ class LiveHudGiftEvent extends LiveHudEvent {
     this.totalEarnedCoins,
     this.senderName,
     this.senderGifterLevel,
+    this.senderAvatarUrl,
+    this.giftName,
+    this.giftIcon,
+    this.giftImageUrl,
+    this.quantity,
   });
   final String? summaryText;
   final int? totalEarnedCoins;
   final String? senderName;
   final int? senderGifterLevel;
+
+  /// Everything below is what the banner draws. All optional: the payload
+  /// varies by gift and older events carry only the summary line.
+  final String? senderAvatarUrl;
+  final String? giftName;
+  final String? giftIcon;
+  final String? giftImageUrl;
+  final int? quantity;
 }
 
 class LiveHudHourlyRankEvent extends LiveHudEvent {
@@ -100,6 +114,28 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   });
   final int? hourlyRank;
   final String? label;
+}
+
+/// Someone invited you onto their stage. Arrives on the personal `user_*`
+/// room rather than the live room, so it can land while you are anywhere.
+class LiveHudGuestInviteEvent extends LiveHudEvent {
+  const LiveHudGuestInviteEvent({
+    this.liveId,
+    this.hostName,
+    this.role,
+  });
+  final String? liveId;
+  final String? hostName;
+  final String? role;
+}
+
+/// The HUD socket came up, or refused to. Comments, the viewer counter and
+/// likes all arrive over that socket, so a silent failure looks to the host
+/// like three separate features being broken.
+class LiveHudConnectionEvent extends LiveHudEvent {
+  const LiveHudConnectionEvent({required this.connected, this.reason});
+  final bool connected;
+  final String? reason;
 }
 
 /// Contract for loading and updating an active live session.
@@ -211,6 +247,9 @@ abstract class LiveSessionRepository {
 
   /// Full guest list (`GET /lives/:id/guests`).
   Future<List<LiveGuest>> loadGuests(String liveId);
+
+  /// Who is watching right now (`GET /lives/:id/viewers`).
+  Future<List<LiveViewer>> loadViewers(String liveId);
 
   Future<void> inviteGuest({
     required String liveId,

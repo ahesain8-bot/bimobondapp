@@ -117,7 +117,7 @@ class SocketMapper {
     final map = _asMap(data);
     if (map == null) return null;
 
-    final rawViewers = map['viewers'] ?? map['count'];
+    final rawViewers = _rawViewerValue(map);
     final avatars = avatarUrlsFrom(
       map['topViewers'] ?? map['users'] ?? map['viewersList'] ?? rawViewers,
     );
@@ -223,7 +223,7 @@ class SocketMapper {
           user['fullName']?.toString() ??
           'User',
       avatarUrl: user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
-      viewerCount: _asInt(map['viewers'] ?? map['count']),
+      viewerCount: _viewerCount(map),
       timestamp: DateTime.now(),
     );
   }
@@ -244,6 +244,18 @@ class SocketMapper {
       if (url != null && url.trim().isNotEmpty) urls.add(url.trim());
     }
     return urls.take(3).toList();
+  }
+
+  static int? _viewerCount(Map<String, dynamic> map) {
+    final raw = _rawViewerValue(map);
+    return _asInt(raw) ?? (raw is List ? raw.length : null);
+  }
+
+  static dynamic _rawViewerValue(Map<String, dynamic> map) {
+    return map['viewers'] ??
+        map['viewerCount'] ??
+        map['viewer_count'] ??
+        map['count'];
   }
 
   // ── Helpers ───────────────────────────────────────────

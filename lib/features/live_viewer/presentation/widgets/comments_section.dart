@@ -62,7 +62,9 @@ class _CommentsSectionState extends State<CommentsSection> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients) return;
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          widget.alignTop
+              ? _scrollController.position.maxScrollExtent
+              : _scrollController.position.minScrollExtent,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
         );
@@ -102,10 +104,13 @@ class _CommentsSectionState extends State<CommentsSection> {
           blendMode: BlendMode.dstIn,
           child: ListView.builder(
             controller: _scrollController,
+            reverse: !widget.alignTop,
             padding: EdgeInsets.zero,
             itemCount: visible.length,
             itemBuilder: (context, index) {
-              final comment = visible[index];
+              final comment = widget.alignTop
+                  ? visible[index]
+                  : visible[visible.length - 1 - index];
               final isHostOrMod =
                   (widget.currentUserId != null &&
                       widget.currentUserId == widget.hostId) ||

@@ -13,6 +13,7 @@ import '../datasources/lives_remote_datasource.dart';
 import '../datasources/lives_socket_datasource.dart';
 import '../mappers/live_host_extras_mapper.dart';
 import '../mappers/live_session_mapper.dart';
+import '../../domain/entities/live_viewer.dart';
 
 /// Remote live-session repository backed by Nest `/lives` + Socket.IO + LiveKit.
 class LiveSessionRepositoryImpl implements LiveSessionRepository {
@@ -494,6 +495,21 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
             fallbackRank: i,
           );
         })
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<LiveViewer>> loadViewers(String liveId) async {
+    final json = await _remote.viewers(liveId);
+    final raw = json['data'] ?? json['items'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map(
+          (e) => LiveHostExtrasMapper.viewerFromJson(
+            Map<String, dynamic>.from(e),
+          ),
+        )
         .toList(growable: false);
   }
 

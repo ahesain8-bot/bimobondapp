@@ -188,19 +188,20 @@ class LiquidGlassBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final feedOverlay = FeedOverlayTheme.of(context);
-    // TikTok marks the active tab by weight and full-strength foreground, not
-    // by a brand colour, so the row reads as one family and the centre button
-    // stays the only coloured thing down here.
-    final selectedColor = glassStyle
-        ? feedOverlay.overlayForeground
-        : theme.colorScheme.onSurface;
+    final selectedColor = theme.colorScheme.primary;
     final unselectedColor = glassStyle
         ? feedOverlay.overlayForegroundMuted
         : theme.colorScheme.onSurface.withValues(alpha: 0.45);
 
-    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.85, maxScale: 1.15);
-    final topPadding = (HomeLayoutConstants.bottomNavTopPadding * heightScale).clamp(4.0, 12.0);
-    final safeExtra = (HomeLayoutConstants.bottomNavSafeExtra * heightScale).clamp(4.0, 12.0);
+    final heightScale = HomeLayoutConstants.heightScale(
+      context,
+      minScale: 0.85,
+      maxScale: 1.15,
+    );
+    final topPadding = (HomeLayoutConstants.bottomNavTopPadding * heightScale)
+        .clamp(4.0, 12.0);
+    final safeExtra = (HomeLayoutConstants.bottomNavSafeExtra * heightScale)
+        .clamp(4.0, 12.0);
 
     Widget navBar = Container(
       decoration: BoxDecoration(
@@ -214,9 +215,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
               ),
       ),
       padding: EdgeInsets.only(
-        bottom:
-            MediaQuery.viewPaddingOf(context).bottom +
-            safeExtra,
+        bottom: MediaQuery.viewPaddingOf(context).bottom + safeExtra,
         top: topPadding,
       ),
       child: Row(
@@ -298,10 +297,21 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected ? selectedColor : unselectedColor;
 
-    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.85, maxScale: 1.15);
-    final size = (HomeLayoutConstants.navIconSize * heightScale).clamp(22.0, 32.0);
-    final fontSize = (HomeLayoutConstants.navLabelFontSize * heightScale).clamp(8.0, 11.0);
-    final iconLabelGap = (HomeLayoutConstants.navIconLabelGap * heightScale).clamp(1.0, 4.0);
+    final heightScale = HomeLayoutConstants.heightScale(
+      context,
+      minScale: 0.85,
+      maxScale: 1.15,
+    );
+    final size = (HomeLayoutConstants.navIconSize * heightScale).clamp(
+      22.0,
+      32.0,
+    );
+    final fontSize = (HomeLayoutConstants.navLabelFontSize * heightScale).clamp(
+      8.0,
+      11.0,
+    );
+    final iconLabelGap = (HomeLayoutConstants.navIconLabelGap * heightScale)
+        .clamp(1.0, 4.0);
 
     final resolvedAsset = isSelected
         ? (selectedAssetPath ?? assetPath)

@@ -162,7 +162,6 @@ class ProfileHeaderSection extends StatelessWidget {
                   onTap: onFollowingTap,
                 ),
               ),
-              const _StatDivider(),
               Expanded(
                 child: ProfileStatItem(
                   number: formatProfileCount(user.followerCount ?? 0),
@@ -170,7 +169,6 @@ class ProfileHeaderSection extends StatelessWidget {
                   onTap: onFollowersTap,
                 ),
               ),
-              const _StatDivider(),
               Expanded(
                 child: ProfileStatItem(
                   number: formatProfileCount(user.totalLikes ?? 0),
@@ -412,20 +410,6 @@ class ProfileHeaderSection extends StatelessWidget {
           const SizedBox(height: AppSizes.p8),
         ],
       ),
-    );
-  }
-}
-
-/// Hairline between the three counters, as TikTok separates them.
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: AppSizes.p24,
-      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.14),
     );
   }
 }

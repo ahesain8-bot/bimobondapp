@@ -14,7 +14,6 @@ import 'comment_input_bar.dart';
 import 'comments_section.dart';
 import 'fallback_media.dart';
 import 'fan_club_widgets.dart';
-import 'first_gift_modal.dart';
 import 'floating_gifts.dart';
 import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
@@ -48,7 +47,6 @@ class LiveRoomPage extends StatefulWidget {
 class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
-  bool _firstGiftPrompted = false;
   final List<FloatingHeart> _tapHearts = [];
 
   @override
@@ -87,22 +85,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
-      if (widget.isActive && !_firstGiftPrompted) {
-        _firstGiftPrompted = true;
-        Future.delayed(const Duration(milliseconds: 1600), () async {
-          if (!mounted || !widget.isActive) return;
-          final sent = await showFirstGiftModal(
-            context,
-            hostName: widget.live.hostName,
-          );
-          if (sent == true && mounted) {
-            final rose = MockGiftCatalog.byId('gift_rose');
-            if (rose != null) {
-              context.read<LiveViewerBloc>().add(LiveViewerGiftSent(rose));
-            }
-          }
-        });
-      }
     });
   }
 
@@ -404,7 +386,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
         return GestureDetector(
           onDoubleTap: () {
-            if (!widget.isActive) return;
             _spawnHearts(5);
             context.read<LiveViewerBloc>().add(const LiveViewerLiked(burst: 5));
           },
@@ -753,7 +734,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     onRequestTap: () => _openGuestRequest(live),
                   ),
                 ),
-              if (isPk && widget.isActive)
+              if (isPk && isThisRoom)
                 Positioned(
                   right: 10,
                   bottom: barTotalH + 72,
@@ -776,7 +757,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     ],
                   ),
                 ),
-              if (widget.isActive && isThisRoom && !isPk)
+              if (isThisRoom && !isPk)
                 Positioned(
                   right: 0,
                   top: headerBottom,
@@ -878,7 +859,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     },
                   ),
                 ),
-              if (widget.isActive && isThisRoom) ...[
+              if (widget.isActive && isThisRoom)
                 BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) =>
                       prev.recentGifts != curr.recentGifts ||
@@ -893,6 +874,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     );
                   },
                 ),
+              if (isThisRoom) ...[
                 BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) =>
                       prev.floatingHeartBurst != curr.floatingHeartBurst,

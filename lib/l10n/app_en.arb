@@ -154,7 +154,6 @@
   "repostAction": "Repost",
   "repostUndo": "Undo repost",
   "savePost": "Save post",
-  "postSavedToFavorites": "Saved to favorites",
   "unsavePost": "Remove from saved",
   "repostQuoteHint": "Add a comment (optional)",
   "repostComposeTitle": "Add to your repost",

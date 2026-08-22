@@ -941,12 +941,6 @@ abstract class AppLocalizations {
   /// **'Save post'**
   String get savePost;
 
-  /// No description provided for @postSavedToFavorites.
-  ///
-  /// In en, this message translates to:
-  /// **'Saved to favorites'**
-  String get postSavedToFavorites;
-
   /// No description provided for @unsavePost.
   ///
   /// In en, this message translates to:

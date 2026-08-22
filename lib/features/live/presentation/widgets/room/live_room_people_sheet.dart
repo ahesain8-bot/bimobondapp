@@ -8,10 +8,12 @@ import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_host_sheet_chrome.dart';
 import 'live_room_guests_sheet.dart';
+import '../../../domain/entities/live_viewer.dart';
+import '../../../../../core/widgets/gifter_level_badge.dart';
 
 /// People / viewers sheet.
 ///
-/// There is no documented `GET /lives/:id/viewers` roster — shows live viewer
+/// Shows the roster from `GET /lives/:id/viewers` plus the live viewer
 /// count from the session + guests from `GET /lives/:id/guests`.
 class LiveRoomPeopleSheet {
   const LiveRoomPeopleSheet._();
@@ -54,6 +56,7 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
   String? _error;
   var _activeGuests = 0;
   var _pendingGuests = 0;
+  var _viewers = const <LiveViewer>[];
 
   @override
   LiveSessionRepository get repository => context.read<LiveSessionRepository>();
@@ -71,10 +74,19 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
     });
     try {
       final guests = await repository.loadGuests(widget.session.id);
+      // The roster is a bonus on top of the counters: if it fails the sheet
+      // still shows what it always showed rather than going to an error page.
+      var roster = const <LiveViewer>[];
+      try {
+        roster = await repository.loadViewers(widget.session.id);
+      } catch (_) {
+        roster = const <LiveViewer>[];
+      }
       if (!mounted) return;
       setState(() {
         _activeGuests = guests.where((g) => g.isActive).length;
         _pendingGuests = guests.where((g) => g.isPending).length;
+        _viewers = roster;
         _loading = false;
       });
     } catch (e) {
@@ -125,6 +137,20 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
                           value: '$_pendingGuests',
                           subtitle: 'REQUESTED + INVITED',
                         ),
+                        if (_viewers.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          const Text(
+                            'من يشاهد الآن',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          for (final viewer in _viewers)
+                            _ViewerRow(viewer: viewer),
+                        ],
                         const SizedBox(height: 20),
                         FilledButton.icon(
                           onPressed: () => Navigator.of(context).pop(true),
@@ -178,6 +204,61 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
             subtitle,
             style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.35),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One person in the roster: picture, name, and their gifter level when the
+/// server sends one.
+class _ViewerRow extends StatelessWidget {
+  const _ViewerRow({required this.viewer});
+
+  final LiveViewer viewer;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = viewer.avatarUrl;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.18),
+              image: avatar != null && avatar.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(avatar),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: avatar != null && avatar.isNotEmpty
+                ? null
+                : const Icon(Icons.person, size: 17, color: Colors.white70),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              viewer.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ),
+          if (viewer.isVerified)
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(Icons.verified, size: 15, color: Colors.lightBlue),
+            ),
+          if ((viewer.gifterLevel ?? 0) > 0) ...[
+            const SizedBox(width: 6),
+            GifterLevelBadge(level: viewer.gifterLevel!, compact: true),
+          ],
         ],
       ),
     );

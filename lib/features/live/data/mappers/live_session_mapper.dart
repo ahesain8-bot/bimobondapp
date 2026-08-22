@@ -52,7 +52,14 @@ class LiveSessionMapper {
         live['user'] as Map<String, dynamic>?,
         userId: live['userId']?.toString(),
       ),
-      viewerCount: _asInt(live['viewers']) ?? 0,
+      viewerCount:
+          _asInt(
+            live['viewers'] ??
+                live['viewerCount'] ??
+                live['viewer_count'] ??
+                live['count'],
+          ) ??
+          0,
       likeCount: _asInt(live['likeCount']) ?? 0,
       galleryCurrent: galleryCurrent ?? 0,
       galleryTotal: galleryTotal ?? 0,
@@ -95,8 +102,14 @@ class LiveSessionMapper {
     final content = source['content']?.toString() ??
         source['text']?.toString() ??
         '';
-    final username = user?['username']?.toString() ??
-        user?['fullName']?.toString();
+    // Same order the host branch above uses: the real name first, the
+    // generated handle only as a fallback. Reversed, every comment showed
+    // `user_e309173c` instead of the person's name.
+    final fullName = user?['fullName']?.toString();
+    final handle = user?['username']?.toString();
+    final username = (fullName != null && fullName.trim().isNotEmpty)
+        ? fullName.trim()
+        : handle;
     final displayText = username == null || username.isEmpty
         ? content
         : '$username: $content';
