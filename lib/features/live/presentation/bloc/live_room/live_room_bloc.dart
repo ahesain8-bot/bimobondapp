@@ -1092,7 +1092,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           }
           return;
         }
-        final joinText = '$username انضم 👋';
+        final joinText = '$username انضم';
         final messages = [
           ...current.session.messages,
           LiveChatMessage(
@@ -1100,6 +1100,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             text: joinText,
             userId: userId,
             username: username,
+            isJoinEvent: true,
           ),
         ];
         emit(

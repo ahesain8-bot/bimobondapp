@@ -221,7 +221,10 @@ class _ChatMessageTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isComment) ...[
+          if (message.isJoinEvent) ...[
+            const _JoinBadge(),
+            const SizedBox(width: AppSpacing.xs),
+          ] else if (isComment) ...[
             _CommenterAvatar(url: message.avatarUrl),
             const SizedBox(width: AppSpacing.xs),
           ] else if ((message.gifterLevel ?? 0) > 0) ...[
@@ -337,6 +340,26 @@ class _MessageText extends StatelessWidget {
       textAlign: TextAlign.left,
       maxLines: maxLines,
       overflow: maxLines == null ? null : TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// Arrival marker: the wave TikTok puts in front of a "joined" line.
+class _JoinBadge extends StatelessWidget {
+  const _JoinBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: AppSizes.roomChatBadge,
+      height: AppSizes.roomChatBadge,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+      ),
+      child: const Text('👋', style: TextStyle(fontSize: 9)),
     );
   }
 }
