@@ -116,6 +116,19 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   final String? label;
 }
 
+/// Someone invited you onto their stage. Arrives on the personal `user_*`
+/// room rather than the live room, so it can land while you are anywhere.
+class LiveHudGuestInviteEvent extends LiveHudEvent {
+  const LiveHudGuestInviteEvent({
+    this.liveId,
+    this.hostName,
+    this.role,
+  });
+  final String? liveId;
+  final String? hostName;
+  final String? role;
+}
+
 /// The HUD socket came up, or refused to. Comments, the viewer counter and
 /// likes all arrive over that socket, so a silent failure looks to the host
 /// like three separate features being broken.

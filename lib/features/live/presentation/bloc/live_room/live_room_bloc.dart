@@ -1017,6 +1017,18 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final hud = event.event;
 
     switch (hud) {
+      case LiveHudGuestInviteEvent(:final hostName, :final role):
+        // Arrives on the personal room, so it can reach a host who is already
+        // broadcasting. Surfaced, not acted on: accepting is a deliberate tap.
+        final who = (hostName == null || hostName.isEmpty) ? 'المضيف' : hostName;
+        final asCoHost = role != null && role.toUpperCase() == 'CO_HOST';
+        emit(
+          current.copyWith(
+            actionMessage: asCoHost
+                ? 'دعاك $who للانضمام كمضيف مشارك.'
+                : 'دعاك $who للانضمام إلى المسرح.',
+          ),
+        );
       case LiveHudConnectionEvent(:final connected, :final reason):
         // Comments, viewers and likes all ride this socket. Losing it used to
         // be printed to the console and nowhere else, so the host just saw

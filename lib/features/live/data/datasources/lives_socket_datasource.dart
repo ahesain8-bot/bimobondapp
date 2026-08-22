@@ -224,6 +224,24 @@ class LivesSocketDataSource {
       );
     });
 
+    // Personal room `user_*`, not the live room: an invite can land while the
+    // user is watching something else entirely (mobile-api.md, Personal room).
+    socket.on('liveGuestInvite', (data) {
+      final map = _asMap(data);
+      final host = _asMap(map?['host']) ?? _asMap(map?['user']);
+      final fullName = host?['fullName']?.toString();
+      _controller.add(
+        LiveHudGuestInviteEvent(
+          liveId: map?['liveId']?.toString(),
+          hostName: (fullName != null && fullName.trim().isNotEmpty)
+              ? fullName.trim()
+              : (host?['username']?.toString() ??
+                  map?['hostName']?.toString()),
+          role: (map?['role'] ?? map?['guestRole'])?.toString(),
+        ),
+      );
+    });
+
     socket.on('liveHourlyRankUpdated', (data) {
       final map = _asMap(data);
       final rank = _asInt(map?['hourlyRank'] ?? map?['rank']);
