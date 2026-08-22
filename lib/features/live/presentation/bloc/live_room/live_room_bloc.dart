@@ -21,6 +21,7 @@ import '../../../domain/usecases/start_live_session.dart';
 import '../../../domain/usecases/update_live_title.dart';
 import 'live_room_event.dart';
 import 'live_room_state.dart';
+import '../../../domain/entities/live_gift_banner.dart';
 
 /// Orchestrates the live-room host screen: backend session + HUD + camera.
 class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
@@ -60,6 +61,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomRankingTapped>(_onRankingTapped);
     on<LiveRoomLikeTapped>(_onLikeTapped);
     on<LiveRoomHeartBurstConsumed>(_onHeartBurstConsumed);
+    on<LiveRoomGiftBannerConsumed>(_onGiftBannerConsumed);
     on<LiveRoomTitleSubmitted>(_onTitleSubmitted);
     on<LiveRoomEffectsPanelModeChanged>(_onEffectsPanelModeChanged);
     on<LiveRoomEffectSelected>(_onEffectSelected);
@@ -812,6 +814,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
   }
 
+  void _onGiftBannerConsumed(
+    LiveRoomGiftBannerConsumed event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null || current.giftBanner == null) return;
+    emit(current.copyWith(giftBanner: null));
+  }
+
   void _onHeartBurstConsumed(
     LiveRoomHeartBurstConsumed event,
     Emitter<LiveRoomState> emit,
@@ -1131,6 +1142,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           :final totalEarnedCoins,
           :final senderName,
           :final senderGifterLevel,
+          :final senderAvatarUrl,
+          :final giftName,
+          :final giftIcon,
+          :final giftImageUrl,
+          :final quantity,
         ):
         var session = current.session;
         if (totalEarnedCoins != null) {
@@ -1153,7 +1169,26 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                   gifterLevel: senderGifterLevel,
                 ),
               ];
-        emit(current.copyWith(session: session.copyWith(messages: messages)));
+        // The chat line stays as the permanent record; the banner is the
+        // celebration on top of the video, the way TikTok plays one.
+        final banner = (senderName == null || senderName.isEmpty)
+            ? current.giftBanner
+            : LiveGiftBanner(
+                id: 'gift-${DateTime.now().microsecondsSinceEpoch}',
+                senderName: senderName,
+                senderAvatarUrl: senderAvatarUrl,
+                giftName: giftName,
+                giftIcon: giftIcon,
+                giftImageUrl: giftImageUrl,
+                quantity: quantity,
+                gifterLevel: senderGifterLevel,
+              );
+        emit(
+          current.copyWith(
+            session: session.copyWith(messages: messages),
+            giftBanner: banner,
+          ),
+        );
       case LiveHudHourlyRankEvent(:final hourlyRank, :final label):
         emit(
           current.copyWith(

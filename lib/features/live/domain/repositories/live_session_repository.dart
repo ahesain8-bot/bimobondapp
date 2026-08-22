@@ -87,11 +87,24 @@ class LiveHudGiftEvent extends LiveHudEvent {
     this.totalEarnedCoins,
     this.senderName,
     this.senderGifterLevel,
+    this.senderAvatarUrl,
+    this.giftName,
+    this.giftIcon,
+    this.giftImageUrl,
+    this.quantity,
   });
   final String? summaryText;
   final int? totalEarnedCoins;
   final String? senderName;
   final int? senderGifterLevel;
+
+  /// Everything below is what the banner draws. All optional: the payload
+  /// varies by gift and older events carry only the summary line.
+  final String? senderAvatarUrl;
+  final String? giftName;
+  final String? giftIcon;
+  final String? giftImageUrl;
+  final int? quantity;
 }
 
 class LiveHudHourlyRankEvent extends LiveHudEvent {

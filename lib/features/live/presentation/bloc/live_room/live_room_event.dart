@@ -66,6 +66,11 @@ class LiveRoomHeartBurstConsumed extends LiveRoomEvent {
   const LiveRoomHeartBurstConsumed();
 }
 
+/// The gift banner finished playing; clear it so the next gift can show.
+class LiveRoomGiftBannerConsumed extends LiveRoomEvent {
+  const LiveRoomGiftBannerConsumed();
+}
+
 class LiveRoomTitleSubmitted extends LiveRoomEvent {
   const LiveRoomTitleSubmitted(this.title);
 

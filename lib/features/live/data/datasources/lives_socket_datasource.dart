@@ -194,15 +194,32 @@ class LivesSocketDataSource {
     socket.on('liveGift', (data) {
       final map = _asMap(data);
       final sender = _asMap(map?['sender']) ?? _asMap(map?['user']);
+      final gift = _asMap(map?['gift']) ?? map;
+      // Same key fallbacks GiftModel uses: the catalog is not consistent
+      // about name/title or icon/emoji, and neither is this payload.
+      final senderFullName = sender?['fullName']?.toString();
       _controller.add(
         LiveHudGiftEvent(
           summaryText: map?['message']?.toString() ??
               map?['summary']?.toString(),
           totalEarnedCoins: _asInt(map?['totalEarnedCoins']),
-          senderName: sender?['username']?.toString() ??
-              sender?['fullName']?.toString() ??
-              map?['senderName']?.toString(),
+          senderName:
+              (senderFullName != null && senderFullName.trim().isNotEmpty)
+                  ? senderFullName.trim()
+                  : (sender?['username']?.toString() ??
+                      map?['senderName']?.toString()),
           senderGifterLevel: _asInt(sender?['gifterLevel']),
+          senderAvatarUrl: sender?['avatarUrl']?.toString() ??
+              sender?['avatar']?.toString(),
+          giftName: (gift?['name'] ?? gift?['title'] ?? gift?['label'])
+              ?.toString(),
+          giftIcon: (gift?['icon'] ?? gift?['emoji'] ?? gift?['symbol'])
+              ?.toString(),
+          giftImageUrl: (gift?['imageUrl'] ?? gift?['image'] ?? gift?['iconUrl'])
+              ?.toString(),
+          quantity: _asInt(
+            map?['quantity'] ?? map?['count'] ?? gift?['quantity'],
+          ),
         ),
       );
     });
