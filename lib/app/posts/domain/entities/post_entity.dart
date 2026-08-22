@@ -43,6 +43,7 @@ class PostEntity extends Equatable {
   final String? filterName;
   final String? filterCategory;
   final PostFilterEntity? filter;
+  final bool isPinned;
   /// Product ids tagged on this post (social commerce). Empty until API sends them.
   final List<String> taggedProductIds;
 
@@ -82,6 +83,7 @@ class PostEntity extends Equatable {
     this.filterName,
     this.filterCategory,
     this.filter,
+    this.isPinned = false,
     this.taggedProductIds = const [],
   });
 
@@ -124,6 +126,7 @@ class PostEntity extends Equatable {
     String? description,
     String? privacyStatus,
     PostSoundEntity? sound,
+    bool? isPinned,
   }) {
     return PostEntity(
       id: id,
@@ -161,6 +164,7 @@ class PostEntity extends Equatable {
       filterName: filterName,
       filterCategory: filterCategory,
       filter: filter,
+      isPinned: isPinned ?? this.isPinned,
       taggedProductIds: taggedProductIds,
     );
   }
@@ -198,6 +202,7 @@ class PostEntity extends Equatable {
     mentions,
     isAuctionable,
     isStory,
+    isPinned,
     auction,
     isPromoted,
     isAd,

@@ -32,25 +32,21 @@ class ProfileBioText extends StatelessWidget {
         : trimmed;
     final secondary = theme.colorScheme.onSurface.withValues(alpha: 0.55);
 
-    return SizedBox(
-      height: fixedHeight,
-      width: double.infinity,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Text(
-            display,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: hasBio ? theme.colorScheme.onSurface : secondary,
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-              height: 1.35,
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          display,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: hasBio ? theme.colorScheme.onSurface : secondary,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            height: 1.25,
           ),
         ),
       ),

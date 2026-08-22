@@ -12,6 +12,8 @@ class ApiConstants {
   static const String forgotPassword = '/auth/forgot-password';
   static const String resetPassword = '/auth/reset-password';
   static const String updateProfile = '/users/me';
+  static String deleteCloseFriend(String memberId) => '/users/me/close-friends/$memberId';
+  static String userProfileLinks(String userId) => '/users/$userId/profile-links';
   static const String updateUserLocation = '/users/me/location';
   static const String userLocationHistory = '/users/me/locations/history';
   static const String userLocationMovements = '/users/me/locations/movements';
@@ -340,5 +342,6 @@ class ApiConstants {
       '/creators/$creatorId/fan-club/subscribe';
   static String creatorsFanClubMembers(String creatorId) =>
       '/creators/$creatorId/fan-club/members';
-  static const String usersMeFanClubs = '/users/me/fan-clubs';
+  // Story Archive & Highlights
+  static const String myStories = '/stories/me';
 }

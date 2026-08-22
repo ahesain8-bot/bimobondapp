@@ -27,6 +27,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
+import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/create_highlight_sheet.dart';
+
 class ProfileScreen extends StatefulWidget {
   final bool isTabActive;
 
@@ -43,6 +47,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   int _profileLoadKey = 0;
   Completer<void>? _pullRefreshCompleter;
   final ScrollController _scrollController = ScrollController();
+  List<HighlightEntity> _highlights = [];
+  final ProfileRemoteDataSource _profileRemoteDS = ProfileRemoteDataSourceImpl();
   final List<ProfileTabPostsState> _tabPosts = List.generate(
     ProfileLayoutConstants.tabCount,
     (_) => ProfileTabPostsState(),
@@ -95,12 +101,24 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Future<void> _loadHighlights() async {
+    try {
+      final highlights = await _profileRemoteDS.getHighlights('me', isMe: true);
+      if (mounted) {
+        setState(() => _highlights = highlights);
+      }
+    } catch (e) {
+      debugPrint('[ProfileScreen] getHighlights error: $e');
+    }
+  }
+
   void _loadProfile() {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthSuccess) return;
 
     context.read<AuthBloc>().add(const FetchProfileEvent());
     _fetchUserPosts(refresh: true);
+    _loadHighlights();
   }
 
   Future<void> _refreshProfileAfterNavigation(
@@ -521,6 +539,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                               },
                             ),
                           ),
+                          highlights: _highlights,
+                          onAddHighlight: () {
+                            CreateHighlightSheet.show(
+                              context,
+                              onCreated: (newHighlight) {
+                                if (mounted) {
+                                  setState(() {
+                                    _highlights.removeWhere((h) => h.id == newHighlight.id);
+                                    _highlights.insert(0, newHighlight);
+                                  });
+                                }
+                              },
+                              onSaved: _loadHighlights,
+                            );
+                          },
                         ),
                       ),
                       SliverToBoxAdapter(

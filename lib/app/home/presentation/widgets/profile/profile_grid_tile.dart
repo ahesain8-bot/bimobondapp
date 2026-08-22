@@ -139,6 +139,52 @@ class ProfileGridTile extends StatelessWidget {
                 left: AppSizes.p6,
                 child: ProfileAuctionBadge(status: auctionStatus),
               ),
+            if (post.isPinned && !isAuction)
+              Positioned(
+                top: AppSizes.p6,
+                left: AppSizes.p6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        LucideIcons.pin,
+                        size: 10,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 3.5),
+                      Text(
+                        Localizations.localeOf(context).languageCode == 'ar' ? 'مثبّت' : 'Pinned',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             if (_hasMultipleMedia)
               const Positioned(
                 top: AppSizes.p6,

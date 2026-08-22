@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_tab_posts_state.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_load_more.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
@@ -58,17 +59,33 @@ class ProfilePostsGridSliver extends StatelessWidget {
       );
     }
 
+    final displayPosts = <PostEntity>[];
+    if (tabIndex == ProfileLayoutConstants.postsTabIndex) {
+      final pinned = <PostEntity>[];
+      final unpinned = <PostEntity>[];
+      for (final p in tab.posts) {
+        if (p.isPinned) {
+          pinned.add(p);
+        } else {
+          unpinned.add(p);
+        }
+      }
+      displayPosts.addAll([...pinned, ...unpinned]);
+    } else {
+      displayPosts.addAll(tab.posts);
+    }
+
     final grid = SliverGrid(
       gridDelegate: _gridDelegate,
       delegate: SliverChildBuilderDelegate((context, index) {
-        final post = tab.posts[index];
+        final post = displayPosts[index];
         return ProfileGridTile(
           post: post,
           tabIndex: tabIndex,
           theme: theme,
           onTap: () => openProfilePosts(
             context,
-            posts: tab.posts,
+            posts: displayPosts,
             initialIndex: index,
             source: profilePostsSourceForTab(tabIndex),
             page: tab.page,
@@ -76,7 +93,7 @@ class ProfilePostsGridSliver extends StatelessWidget {
             userId: userId,
           ),
         );
-      }, childCount: tab.posts.length),
+      }, childCount: displayPosts.length),
     );
 
     if (!_showLoadMoreFooter) return grid;

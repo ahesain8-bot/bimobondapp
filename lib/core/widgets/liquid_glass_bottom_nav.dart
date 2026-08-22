@@ -102,20 +102,17 @@ class LiquidGlassBottomNav extends StatelessWidget {
   final Widget? center;
   final int centerInsertAfter;
 
-  /// TikTok's compose button: a white body with a cyan edge peeking out one
-  /// side and a red one the other. Same footprint as before so the row keeps
-  /// its spacing.
-  static const Color _composeCyan = Color(0xFF25F4EE);
-  static const Color _composeRed = Color(0xFFFE2C55);
-
   static Widget addButton({
     required BuildContext context,
     required VoidCallback onTap,
   }) {
-    const double edge = 4;
+    const double edge = 3.5;
     const radius = BorderRadius.all(
       Radius.circular(HomeLayoutConstants.addButtonRadius),
     );
+    final cs = Theme.of(context).colorScheme;
+    final primaryColor = cs.primary;
+    final secondaryColor = cs.secondary;
 
     return GestureDetector(
       onTap: onTap,
@@ -133,9 +130,9 @@ class LiquidGlassBottomNav extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 width: HomeLayoutConstants.addButtonWidth - edge,
-                child: const DecoratedBox(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: _composeCyan,
+                    color: primaryColor,
                     borderRadius: radius,
                   ),
                 ),
@@ -145,9 +142,9 @@ class LiquidGlassBottomNav extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 width: HomeLayoutConstants.addButtonWidth - edge,
-                child: const DecoratedBox(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: _composeRed,
+                    color: secondaryColor,
                     borderRadius: radius,
                   ),
                 ),
@@ -157,14 +154,25 @@ class LiquidGlassBottomNav extends StatelessWidget {
                 right: edge,
                 top: 0,
                 bottom: 0,
-                child: const DecoratedBox(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    gradient: LinearGradient(
+                      colors: [primaryColor, secondaryColor],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: radius,
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.35),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.add,
-                    color: Colors.black,
+                    color: Colors.white,
                     size: HomeLayoutConstants.addButtonIconSize,
                   ),
                 ),

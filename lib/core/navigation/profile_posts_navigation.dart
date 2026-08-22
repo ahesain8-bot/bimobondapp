@@ -74,7 +74,7 @@ ProfilePostsOpenArgs? profilePostsOpenArgsFromExtra(Object? extra) {
   return extra is ProfilePostsOpenArgs ? extra : null;
 }
 
-void openProfilePosts(
+Future<T?> openProfilePosts<T>(
   BuildContext context, {
   required List<PostEntity> posts,
   required int initialIndex,
@@ -84,10 +84,10 @@ void openProfilePosts(
   String? userId,
 }) {
   if (posts.isEmpty || initialIndex < 0 || initialIndex >= posts.length) {
-    return;
+    return Future.value(null);
   }
 
-  context.pushNamed(
+  return context.pushNamed<T>(
     'profile_posts_viewer',
     extra: ProfilePostsOpenArgs(
       posts: posts,

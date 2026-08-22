@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
+import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_load_more.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_uploading_grid_tile.dart';
@@ -94,8 +95,24 @@ class ProfilePostsGridSliver extends StatelessWidget {
       );
     }
 
+    final displayPosts = <PostEntity>[];
+    if (tabIndex == ProfileLayoutConstants.postsTabIndex) {
+      final pinned = <PostEntity>[];
+      final unpinned = <PostEntity>[];
+      for (final p in tab.posts) {
+        if (p.isPinned) {
+          pinned.add(p);
+        } else {
+          unpinned.add(p);
+        }
+      }
+      displayPosts.addAll([...pinned, ...unpinned]);
+    } else {
+      displayPosts.addAll(tab.posts);
+    }
+
     final pendingCount = uploads.length;
-    final total = pendingCount + tab.posts.length;
+    final total = pendingCount + displayPosts.length;
 
     final grid = SliverGrid(
       gridDelegate: _gridDelegate,
@@ -104,14 +121,14 @@ class ProfilePostsGridSliver extends StatelessWidget {
           return ProfileUploadingGridTile(upload: uploads[index]);
         }
         final postIndex = index - pendingCount;
-        final post = tab.posts[postIndex];
+        final post = displayPosts[postIndex];
         return ProfileGridTile(
           post: post,
           tabIndex: tabIndex,
           theme: theme,
           onTap: () => openProfilePosts(
             context,
-            posts: tab.posts,
+            posts: displayPosts,
             initialIndex: postIndex,
             source: profilePostsSourceForTab(tabIndex),
             page: tab.page,

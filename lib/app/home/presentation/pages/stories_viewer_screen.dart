@@ -27,6 +27,11 @@ import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
+import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
+import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -54,11 +59,15 @@ class StoriesViewerScreen extends StatefulWidget {
   const StoriesViewerScreen({
     required this.stories,
     this.initialIndex = 0,
+    this.highlightId,
+    this.highlightTitle,
     super.key,
   });
 
   final List<PostEntity> stories;
   final int initialIndex;
+  final String? highlightId;
+  final String? highlightTitle;
 
   @override
   State<StoriesViewerScreen> createState() => _StoriesViewerScreenState();
@@ -88,7 +97,9 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
           viewCount: s.viewCount,
         ),
     };
-    _currentIndex = widget.initialIndex.clamp(0, _stories.length - 1);
+    _currentIndex = _stories.isEmpty
+        ? 0
+        : widget.initialIndex.clamp(0, _stories.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -376,25 +387,231 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
   void _showStoryOptions(PostEntity post) {
     _pauseProgress();
     final l10n = AppLocalizations.of(context)!;
-    var openedConfirm = false;
+    var openedModal = false;
 
     GlassBottomSheet.showActions<void>(
       context,
       children: [
-        GlassBottomSheetListTile(
-          label: l10n.deletePost,
-          destructive: true,
-          icon: LucideIcons.trash2,
-          onTap: () {
-            openedConfirm = true;
-            Navigator.pop(context);
-            _confirmDelete(post);
-          },
-        ),
+        if (_isOwner(post)) ...[
+          if (widget.highlightId != null) ...[
+            GlassBottomSheetListTile(
+              label: l10n.removeFromHighlight,
+              destructive: true,
+              icon: LucideIcons.starOff,
+              onTap: () {
+                openedModal = true;
+                Navigator.pop(context);
+                _removeFromHighlight(post);
+              },
+            ),
+          ],
+          GlassBottomSheetListTile(
+            label: l10n.addToHighlights,
+            icon: LucideIcons.star,
+            onTap: () {
+              openedModal = true;
+              Navigator.pop(context);
+              _showAddToHighlightPicker(post);
+            },
+          ),
+          GlassBottomSheetListTile(
+            label: l10n.deletePost,
+            destructive: true,
+            icon: LucideIcons.trash2,
+            onTap: () {
+              openedModal = true;
+              Navigator.pop(context);
+              _confirmDelete(post);
+            },
+          ),
+        ],
       ],
     ).whenComplete(() {
-      if (mounted && !openedConfirm) _resumeProgress();
+      if (mounted && !openedModal) _resumeProgress();
     });
+  }
+
+  Future<void> _removeFromHighlight(PostEntity post) async {
+    if (widget.highlightId == null) return;
+    _pauseProgress();
+    PopupDialogs.showLoadingDialog(context);
+    try {
+      final ds = ProfileRemoteDataSourceImpl();
+      await ds.removeStoryFromHighlight(widget.highlightId!, post.id);
+      if (mounted) {
+        PopupDialogs.hideLoadingDialog(context);
+        PopupDialogs.showSuccessDialog(context, 'Removed from highlight');
+        _removeStoryAt(_currentIndex);
+      }
+    } catch (e) {
+      if (mounted) {
+        PopupDialogs.hideLoadingDialog(context);
+        PopupDialogs.showErrorDialog(
+          context,
+          'Failed to remove from highlight: $e',
+        );
+        _resumeProgress();
+      }
+    }
+  }
+
+  Future<void> _showAddToHighlightPicker(PostEntity post) async {
+    _pauseProgress();
+    final ds = ProfileRemoteDataSourceImpl();
+    List<HighlightEntity> highlights = [];
+    try {
+      highlights = await ds.getHighlights('me', isMe: true);
+    } catch (e) {
+      debugPrint('[StoriesViewerScreen] Error fetching highlights: $e');
+    }
+
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Add to Highlight',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.blueAccent,
+                    child: Icon(Icons.add, color: Colors.white),
+                  ),
+                  title: const Text('New Highlight', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _createNewHighlightAndAdd(post);
+                  },
+                ),
+                if (highlights.isNotEmpty) const Divider(),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: highlights.length,
+                    itemBuilder: (context, idx) {
+                      final h = highlights[idx];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: h.coverUrl != null && h.coverUrl!.isNotEmpty
+                              ? NetworkImage(h.coverUrl!)
+                              : null,
+                          child: h.coverUrl == null || h.coverUrl!.isEmpty
+                              ? const Icon(Icons.star_rounded, color: Colors.amber)
+                              : null,
+                        ),
+                        title: Text(h.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text('${h.stories.length} stories'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await _addStoryToHighlight(h.id, post.id, h.title);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (mounted) _resumeProgress();
+  }
+
+  Future<void> _createNewHighlightAndAdd(PostEntity post) async {
+    final titleCtrl = TextEditingController();
+    final storyCover = post.thumbnailUrl ?? (post.media.isNotEmpty ? post.media.first.url : null);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Highlight'),
+        content: TextField(
+          controller: titleCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Highlight Name',
+            hintText: 'e.g. Travel, Memories',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final title = titleCtrl.text.trim();
+              if (title.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                final ds = ProfileRemoteDataSourceImpl();
+                final highlight = await ds.createHighlight(title, storyCover, 0);
+                await _addStoryToHighlight(highlight.id, post.id, title);
+              } catch (e) {
+                if (mounted) {
+                  PopupDialogs.showErrorDialog(context, 'Failed to create highlight: $e');
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addStoryToHighlight(String highlightId, String storyId, String highlightTitle) async {
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    try {
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConstants.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ApiConstants.apiKey,
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      await dio.post(
+        '/stories/highlights/$highlightId/stories',
+        data: {'storyId': storyId, 'sortOrder': 0},
+      );
+      if (mounted) {
+        PopupDialogs.showSuccessDialog(context, 'Added to $highlightTitle!');
+      }
+    } catch (e) {
+      debugPrint('[StoriesViewerScreen] addStoryToHighlight error: $e');
+      if (mounted) {
+        PopupDialogs.showErrorDialog(context, 'Failed to add story to highlight');
+      }
+    }
   }
 
   void _confirmDelete(PostEntity post) {

@@ -1256,7 +1256,7 @@ abstract class AppLocalizations {
   /// No description provided for @takePhoto.
   ///
   /// In en, this message translates to:
-  /// **'Take a photo'**
+  /// **'Take Photo'**
   String get takePhoto;
 
   /// No description provided for @importFromLibrary.
@@ -8428,6 +8428,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Templates'**
   String get mediaStudioTemplates;
+
+  /// No description provided for @pinToTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to top'**
+  String get pinToTop;
+
+  /// No description provided for @unpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpin;
+
+  /// No description provided for @pinnedToTopSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned to top of profile'**
+  String get pinnedToTopSuccess;
+
+  /// No description provided for @unpinnedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned from profile'**
+  String get unpinnedSuccess;
+
+  /// No description provided for @closeFriendsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Friends'**
+  String get closeFriendsTab;
+
+  /// No description provided for @addCloseFriendsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Close Friends'**
+  String get addCloseFriendsTitle;
+
+  /// No description provided for @addCloseFriendsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose friends to add to your close friends list'**
+  String get addCloseFriendsSubtitle;
+
+  /// No description provided for @searchCloseFriendsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search close friends...'**
+  String get searchCloseFriendsHint;
+
+  /// No description provided for @noCloseFriendsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No close friends added yet.'**
+  String get noCloseFriendsYet;
+
+  /// No description provided for @profileLinksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Links'**
+  String get profileLinksTitle;
+
+  /// No description provided for @noLinksAddedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No links added yet.'**
+  String get noLinksAddedYet;
+
+  /// No description provided for @accountTypePersonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal'**
+  String get accountTypePersonal;
+
+  /// No description provided for @accountTypeCreator.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator'**
+  String get accountTypeCreator;
+
+  /// No description provided for @accountTypeBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Business'**
+  String get accountTypeBusiness;
+
+  /// No description provided for @badgeOfficial.
+  ///
+  /// In en, this message translates to:
+  /// **'Official'**
+  String get badgeOfficial;
+
+  /// No description provided for @badgeCreator.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator'**
+  String get badgeCreator;
+
+  /// No description provided for @addToHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to highlights'**
+  String get addToHighlights;
+
+  /// No description provided for @newHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'New highlight'**
+  String get newHighlight;
+
+  /// No description provided for @editCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit cover'**
+  String get editCover;
+
+  /// No description provided for @highlightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get highlightsTitle;
+
+  /// No description provided for @noStoriesInArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'No stories found in archive'**
+  String get noStoriesInArchive;
+
+  /// No description provided for @removeFromHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Highlight'**
+  String get removeFromHighlight;
+
+  /// No description provided for @highlightCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight created'**
+  String get highlightCreated;
+
+  /// No description provided for @highlightUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight updated'**
+  String get highlightUpdated;
+
+  /// No description provided for @chooseFromGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from Gallery'**
+  String get chooseFromGallery;
+
+  /// No description provided for @pasteImageUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste Image URL'**
+  String get pasteImageUrl;
+
+  /// No description provided for @newHighlightButton.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get newHighlightButton;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

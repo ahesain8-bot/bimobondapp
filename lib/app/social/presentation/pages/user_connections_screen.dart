@@ -16,12 +16,14 @@ import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/profile/close_friends_sheet.dart';
 import 'package:dartz/dartz.dart' hide State;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-enum UserConnectionType { following, followers, friends }
+enum UserConnectionType { following, followers, friends, closeFriends }
 
 class UserConnectionsScreen extends StatefulWidget {
   const UserConnectionsScreen({
@@ -88,7 +90,11 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
       UserConnectionType.followers,
     ];
     if (_isOwnProfile) {
-      return [...baseTabs, UserConnectionType.friends];
+      return [
+        ...baseTabs,
+        UserConnectionType.friends,
+        UserConnectionType.closeFriends,
+      ];
     }
     return baseTabs;
   }
@@ -138,6 +144,7 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
       case UserConnectionType.following:
         return user.copyWith(isFollowing: true);
       case UserConnectionType.friends:
+      case UserConnectionType.closeFriends:
         return user.copyWith(isFollowing: true, isFollowedBy: true);
     }
   }
@@ -315,6 +322,33 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
         return social_di.sl<GetMyFriendsUseCase>()(
           SocialListQuery(page: page, limit: _pageSize),
         );
+      case UserConnectionType.closeFriends:
+        try {
+          final list = await ProfileRemoteDataSourceImpl().getCloseFriends();
+          final users = <SocialUserEntity>[];
+          for (final item in list) {
+            final userMap = item['user'] is Map
+                ? Map<String, dynamic>.from(item['user'] as Map)
+                : item;
+            users.add(SocialUserEntity(
+              id: (item['memberId'] ?? item['id'] ?? item['userId'] ?? userMap['id'])?.toString() ?? '',
+              username: (userMap['username'] ?? '').toString(),
+              fullName: userMap['fullName']?.toString() ?? userMap['name']?.toString(),
+              avatarUrl: userMap['avatarUrl']?.toString(),
+              isFollowing: true,
+              isFollowedBy: true,
+              isCloseFriend: true,
+            ));
+          }
+          return Right(SocialUserPageEntity(
+            users: users,
+            page: 1,
+            lastPage: 1,
+            total: users.length,
+          ));
+        } catch (e) {
+          return Left(ServerFailure(e.toString()));
+        }
     }
   }
 
@@ -326,6 +360,8 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
         return l10n.followers;
       case UserConnectionType.friends:
         return l10n.friendsLabel;
+      case UserConnectionType.closeFriends:
+        return l10n.closeFriendsTab;
     }
   }
 
@@ -337,6 +373,8 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
         return l10n.connectionsEmptyFollowing;
       case UserConnectionType.friends:
         return l10n.connectionsEmptyFriends;
+      case UserConnectionType.closeFriends:
+        return l10n.noCloseFriendsYet;
     }
   }
 
@@ -356,6 +394,9 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
             color: theme.scaffoldBackgroundColor,
             child: TabBar(
               controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 16),
               labelColor: theme.colorScheme.primary,
               unselectedLabelColor: theme.colorScheme.onSurface.withValues(
                 alpha: 0.55,
@@ -399,11 +440,51 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
       );
     }
 
+    Widget? addCloseFriendsHeader;
+    if (_selectedType == UserConnectionType.closeFriends) {
+      addCloseFriendsHeader = Container(
+        margin: const EdgeInsets.symmetric(horizontal: AppSizes.p16, vertical: AppSizes.p8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+        ),
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF10B981),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.star_rounded, size: 20, color: Colors.white),
+          ),
+          title: Text(
+            l10n.addCloseFriendsTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          subtitle: Text(
+            l10n.addCloseFriendsSubtitle,
+            style: const TextStyle(fontSize: 12),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () async {
+            CloseFriendsSheet.show(context);
+            _loadUsers(refresh: true);
+          },
+        ),
+      );
+    }
+
+    final itemCount =
+        tab.users.length + (tab.isLoadingMore && !tab.hasReachedMax ? 1 : 0);
+
     if (tab.users.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(AppSizes.p24),
         children: [
+          if (addCloseFriendsHeader != null) addCloseFriendsHeader,
+          const SizedBox(height: 16),
           CustomText(
             _emptyMessage(l10n),
             textAlign: TextAlign.center,
@@ -413,56 +494,60 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
       );
     }
 
-    final itemCount =
-        tab.users.length + (tab.isLoadingMore && !tab.hasReachedMax ? 1 : 0);
-
-    return ListView.separated(
-      key: ValueKey(_selectedType),
-      controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
-      itemCount: itemCount,
-      separatorBuilder: (context, index) {
-        if (index >= tab.users.length - 1) {
-          return const SizedBox.shrink();
-        }
-        return Divider(
-          height: 1,
-          indent: 72,
-          color: theme.dividerColor.withValues(alpha: 0.08),
-        );
-      },
-      itemBuilder: (context, index) {
-        if (tab.isLoadingMore &&
-            !tab.hasReachedMax &&
-            index == tab.users.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSizes.p16),
-            child: Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-
-        final user = tab.users[index];
-        return SocialUserListTile(
-          user: user,
-          isSelf: _isSelfUser(user),
-          isFollowLoading: _followLoadingIds.contains(user.id),
-          onFollowTap: () => _toggleFollow(index),
-          onProfileFollowStateChanged: (isFollowing) {
-            setState(() {
-              tab.users[index] = tab.users[index].copyWith(
-                isFollowing: isFollowing,
+    return Column(
+      children: [
+        if (addCloseFriendsHeader != null) addCloseFriendsHeader,
+        Expanded(
+          child: ListView.separated(
+            key: ValueKey(_selectedType),
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(vertical: AppSizes.p8),
+            itemCount: itemCount,
+            separatorBuilder: (context, index) {
+              if (index >= tab.users.length - 1) {
+                return const SizedBox.shrink();
+              }
+              return Divider(
+                height: 1,
+                indent: 72,
+                color: theme.dividerColor.withValues(alpha: 0.08),
               );
-            });
-          },
-        );
-      },
+            },
+            itemBuilder: (context, index) {
+              if (tab.isLoadingMore &&
+                  !tab.hasReachedMax &&
+                  index == tab.users.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSizes.p16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+
+              final user = tab.users[index];
+              return SocialUserListTile(
+                user: user,
+                isSelf: _isSelfUser(user),
+                isFollowLoading: _followLoadingIds.contains(user.id),
+                onFollowTap: () => _toggleFollow(index),
+                onProfileFollowStateChanged: (isFollowing) {
+                  setState(() {
+                    tab.users[index] = tab.users[index].copyWith(
+                      isFollowing: isFollowing,
+                    );
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

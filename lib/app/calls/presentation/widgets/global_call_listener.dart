@@ -119,9 +119,12 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
     final nav = AppRouter.rootNavigatorKey.currentState;
     if (nav == null) return;
 
-    nav.popUntil((route) =>
-        route.settings.name != '/incoming-call' &&
-        route.settings.name != '/active-call');
+    try {
+      nav.popUntil((route) =>
+          route.isFirst ||
+          (route.settings.name != '/incoming-call' &&
+           route.settings.name != '/active-call'));
+    } catch (_) {}
 
     if (mounted) {
       setState(() {
@@ -185,98 +188,112 @@ class _GlobalCallListenerState extends State<GlobalCallListener>
             final nav = AppRouter.rootNavigatorKey.currentState;
             if (nav == null) return;
 
-            if (state is CallIncomingState) {
-              if (_isActiveCallScreenOpen) {
-                nav.popUntil((route) => route.settings.name != '/active-call');
-                _isActiveCallScreenOpen = false;
-              }
-              if (!_isIncomingCallScreenOpen) {
-                if (mounted) {
-                  setState(() {
-                    _isIncomingCallScreenOpen = true;
-                  });
-                } else {
-                  _isIncomingCallScreenOpen = true;
+            try {
+              if (state is CallIncomingState) {
+                if (_isActiveCallScreenOpen) {
+                  try {
+                    nav.popUntil((route) =>
+                        route.isFirst ||
+                        route.settings.name != '/active-call');
+                  } catch (_) {}
+                  _isActiveCallScreenOpen = false;
                 }
-                nav
-                    .push(
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: '/incoming-call'),
-                        fullscreenDialog: true,
-                        builder: (routeContext) => BlocProvider.value(
-                          value: context.read<CallBloc>(),
-                          child: IncomingCallScreen(
-                            call: state.call,
+                if (!_isIncomingCallScreenOpen) {
+                  if (mounted) {
+                    setState(() {
+                      _isIncomingCallScreenOpen = true;
+                    });
+                  } else {
+                    _isIncomingCallScreenOpen = true;
+                  }
+                  nav
+                      .push(
+                        MaterialPageRoute(
+                          settings: const RouteSettings(name: '/incoming-call'),
+                          fullscreenDialog: true,
+                          builder: (routeContext) => BlocProvider.value(
+                            value: context.read<CallBloc>(),
+                            child: IncomingCallScreen(
+                              call: state.call,
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                    .then((_) {
-                      if (mounted) {
-                        setState(() {
+                      )
+                      .then((_) {
+                        if (mounted) {
+                          setState(() {
+                            _isIncomingCallScreenOpen = false;
+                          });
+                        } else {
                           _isIncomingCallScreenOpen = false;
-                        });
-                      } else {
-                        _isIncomingCallScreenOpen = false;
-                      }
+                        }
+                      });
+                }
+              } else if (state is CallOutgoingRingingState ||
+                  state is CallConnectingState ||
+                  state is CallActiveState) {
+                if (!_isActiveCallScreenOpen) {
+                  try {
+                    nav.popUntil((route) =>
+                        route.isFirst ||
+                        (route.settings.name != '/incoming-call' &&
+                         route.settings.name != '/active-call'));
+                  } catch (_) {}
+
+                  if (mounted) {
+                    setState(() {
+                      _isActiveCallScreenOpen = true;
+                      _isIncomingCallScreenOpen = false;
                     });
-              }
-            } else if (state is CallOutgoingRingingState ||
-                state is CallConnectingState ||
-                state is CallActiveState) {
-              if (!_isActiveCallScreenOpen) {
-                nav.popUntil((route) =>
-                    route.settings.name != '/incoming-call' &&
-                    route.settings.name != '/active-call');
+                  } else {
+                    _isActiveCallScreenOpen = true;
+                    _isIncomingCallScreenOpen = false;
+                  }
+
+                  nav
+                      .push(
+                        MaterialPageRoute(
+                          settings: const RouteSettings(name: '/active-call'),
+                          fullscreenDialog: true,
+                          builder: (routeContext) => BlocProvider.value(
+                            value: context.read<CallBloc>(),
+                            child: const ActiveCallScreen(),
+                          ),
+                        ),
+                      )
+                      .then((_) {
+                        if (mounted) {
+                          setState(() {
+                            _isActiveCallScreenOpen = false;
+                          });
+                        } else {
+                          _isActiveCallScreenOpen = false;
+                        }
+                      });
+                }
+              } else if (state is CallEndedState || state is CallInitialState) {
+                KeyguardService.instance.setShowWhenLocked(false);
+                KeyguardService.instance.requestDismissKeyguard();
+
+                try {
+                  nav.popUntil((route) =>
+                      route.isFirst ||
+                      (route.settings.name != '/incoming-call' &&
+                       route.settings.name != '/active-call'));
+                } catch (_) {}
 
                 if (mounted) {
                   setState(() {
-                    _isActiveCallScreenOpen = true;
                     _isIncomingCallScreenOpen = false;
+                    _isActiveCallScreenOpen = false;
                   });
                 } else {
-                  _isActiveCallScreenOpen = true;
-                  _isIncomingCallScreenOpen = false;
-                }
-
-                nav
-                    .push(
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: '/active-call'),
-                        fullscreenDialog: true,
-                        builder: (routeContext) => BlocProvider.value(
-                          value: context.read<CallBloc>(),
-                          child: const ActiveCallScreen(),
-                        ),
-                      ),
-                    )
-                    .then((_) {
-                      if (mounted) {
-                        setState(() {
-                          _isActiveCallScreenOpen = false;
-                        });
-                      } else {
-                        _isActiveCallScreenOpen = false;
-                      }
-                    });
-              }
-            } else if (state is CallEndedState || state is CallInitialState) {
-              KeyguardService.instance.setShowWhenLocked(false);
-              KeyguardService.instance.requestDismissKeyguard();
-
-              nav.popUntil((route) =>
-                  route.settings.name != '/incoming-call' &&
-                  route.settings.name != '/active-call');
-
-              if (mounted) {
-                setState(() {
                   _isIncomingCallScreenOpen = false;
                   _isActiveCallScreenOpen = false;
-                });
-              } else {
-                _isIncomingCallScreenOpen = false;
-                _isActiveCallScreenOpen = false;
+                }
               }
+            } catch (e) {
+              debugPrint('[GlobalCallListener] Safe navigation popUntil caught: $e');
             }
           },
         ),

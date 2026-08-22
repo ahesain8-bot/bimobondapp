@@ -608,7 +608,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeProfilePhoto => 'Change profile photo';
 
   @override
-  String get takePhoto => 'Take a photo';
+  String get takePhoto => 'Take Photo';
 
   @override
   String get importFromLibrary => 'Import';
@@ -4402,4 +4402,85 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaStudioTemplates => 'Templates';
+
+  @override
+  String get pinToTop => 'Pin to top';
+
+  @override
+  String get unpin => 'Unpin';
+
+  @override
+  String get pinnedToTopSuccess => 'Pinned to top of profile';
+
+  @override
+  String get unpinnedSuccess => 'Unpinned from profile';
+
+  @override
+  String get closeFriendsTab => 'Close Friends';
+
+  @override
+  String get addCloseFriendsTitle => 'Add Close Friends';
+
+  @override
+  String get addCloseFriendsSubtitle => 'Choose friends to add to your close friends list';
+
+  @override
+  String get searchCloseFriendsHint => 'Search close friends...';
+
+  @override
+  String get noCloseFriendsYet => 'No close friends added yet.';
+
+  @override
+  String get profileLinksTitle => 'Links';
+
+  @override
+  String get noLinksAddedYet => 'No links added yet.';
+
+  @override
+  String get accountTypePersonal => 'Personal';
+
+  @override
+  String get accountTypeCreator => 'Creator';
+
+  @override
+  String get accountTypeBusiness => 'Business';
+
+  @override
+  String get badgeOfficial => 'Official';
+
+  @override
+  String get badgeCreator => 'Creator';
+
+  @override
+  String get addToHighlights => 'Add to highlights';
+
+  @override
+  String get newHighlight => 'New highlight';
+
+  @override
+  String get editCover => 'Edit cover';
+
+  @override
+  String get highlightsTitle => 'Highlights';
+
+  @override
+  String get noStoriesInArchive => 'No stories found in archive';
+
+  @override
+  String get removeFromHighlight => 'Remove from Highlight';
+
+  @override
+  String get highlightCreated => 'Highlight created';
+
+  @override
+  String get highlightUpdated => 'Highlight updated';
+
+  @override
+  String get chooseFromGallery => 'Choose from Gallery';
+
+  @override
+  String get pasteImageUrl => 'Paste Image URL';
+
+  @override
+  String get newHighlightButton => 'New';
 }

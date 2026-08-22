@@ -732,6 +732,12 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
           : null,
       onDelete: isPostOwner() ? confirmDeletePost : null,
       onRepost: isPostOwner() ? null : handleRepostTap,
+      onPinToggle: () {
+        widget.onFeedPostPatch?.call(
+          widget.post.id,
+          (p) => p.copyWith(isPinned: !p.isPinned),
+        );
+      },
       isReposted: isReposted,
     );
   }

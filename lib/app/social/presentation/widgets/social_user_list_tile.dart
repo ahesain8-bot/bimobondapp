@@ -147,15 +147,33 @@ class SocialUserListTile extends StatelessWidget {
         isOnline: user.isActive == true,
       ),
 
-      title: Text(
-        _titleText(showUsernameSubtitle),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          fontSize: compact ? CommentLayout.likesNameFontSize : null,
-          height: compact ? 1.15 : null,
-        ),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              _titleText(showUsernameSubtitle),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontSize: compact ? CommentLayout.likesNameFontSize : null,
+                height: compact ? 1.15 : null,
+              ),
+            ),
+          ),
+          if (user.isCloseFriend) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.star_rounded, size: 10, color: Colors.white),
+            ),
+          ],
+        ],
       ),
       subtitle: _buildSubtitle(handle, subtitleOverride),
       trailing: trailingOverride ??

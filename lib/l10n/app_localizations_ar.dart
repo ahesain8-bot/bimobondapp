@@ -4402,4 +4402,85 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mediaStudioTemplates => 'القوالب';
+
+  @override
+  String get pinToTop => 'تثبيت في الأعلى';
+
+  @override
+  String get unpin => 'إلغاء التثبيت';
+
+  @override
+  String get pinnedToTopSuccess => 'تم التثبيت في أعلى الملف الشخصي';
+
+  @override
+  String get unpinnedSuccess => 'تم إلغاء التثبيت من الملف الشخصي';
+
+  @override
+  String get closeFriendsTab => 'الأصدقاء المقربون';
+
+  @override
+  String get addCloseFriendsTitle => 'إضافة أصدقاء مقربين';
+
+  @override
+  String get addCloseFriendsSubtitle => 'اختر أصدقاء لإضافتهم إلى قائمة الأصدقاء المقربين';
+
+  @override
+  String get searchCloseFriendsHint => 'البحث عن أصدقاء مقربين...';
+
+  @override
+  String get noCloseFriendsYet => 'لم يتم إضافة أصدقاء مقربين بعد.';
+
+  @override
+  String get profileLinksTitle => 'الروابط';
+
+  @override
+  String get noLinksAddedYet => 'لم يتم إضافة روابط بعد.';
+
+  @override
+  String get accountTypePersonal => 'شخصي';
+
+  @override
+  String get accountTypeCreator => 'منشئ محتوى';
+
+  @override
+  String get accountTypeBusiness => 'أعمال';
+
+  @override
+  String get badgeOfficial => 'رسمي';
+
+  @override
+  String get badgeCreator => 'منشئ محتوى';
+
+  @override
+  String get addToHighlights => 'إضافة إلى الأبرز';
+
+  @override
+  String get newHighlight => 'هايلايت جديد';
+
+  @override
+  String get editCover => 'تعديل الغلاف';
+
+  @override
+  String get highlightsTitle => 'الأبرز';
+
+  @override
+  String get noStoriesInArchive => 'لا توجد قصص في الأرشيف';
+
+  @override
+  String get removeFromHighlight => 'إزالة من الأبرز';
+
+  @override
+  String get highlightCreated => 'تم إنشاء الهايلايت';
+
+  @override
+  String get highlightUpdated => 'تم تحديث الهايلايت';
+
+  @override
+  String get chooseFromGallery => 'اختيار من المعرض';
+
+  @override
+  String get pasteImageUrl => 'لصق رابط الصورة';
+
+  @override
+  String get newHighlightButton => 'جديد';
 }

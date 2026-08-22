@@ -49,6 +49,7 @@ class PostModel extends PostEntity {
     super.filterName,
     super.filterCategory,
     super.filter,
+    super.isPinned = false,
     super.taggedProductIds = const [],
   });
 
@@ -401,6 +402,7 @@ class PostModel extends PostEntity {
       filterName: _parseFilterName(json),
       filterCategory: _parseFilterCategory(json),
       filter: _parseFilter(json),
+      isPinned: PostModel._parseBoolField(json['isPinned'] ?? json['pinned']),
       taggedProductIds: _parseTaggedProductIds(json),
     );
   }
@@ -419,6 +421,7 @@ class PostModel extends PostEntity {
     String? description,
     String? privacyStatus,
     PostSoundEntity? sound,
+    bool? isPinned,
   }) {
     return PostModel(
       id: id,
@@ -442,7 +445,7 @@ class PostModel extends PostEntity {
       recentReposters: recentReposters ?? this.recentReposters,
       createdAt: createdAt,
       user: user as PostUserModel?,
-      media: media.cast<PostMediaModel>(),
+      media: media as List<PostMediaModel>,
       hashtags: hashtags,
       mentions: mentions,
       isAuctionable: isAuctionable,
@@ -456,6 +459,7 @@ class PostModel extends PostEntity {
       filterName: filterName,
       filterCategory: filterCategory,
       filter: filter,
+      isPinned: isPinned ?? this.isPinned,
       taggedProductIds: taggedProductIds,
     );
   }
