@@ -30,7 +30,14 @@ class LiveMapper {
     final user = _asMap(json['user']);
     final id = json['id']?.toString() ?? '';
 
-    final viewerCount = _asInt(json['viewers']) ?? 0;
+    final viewerCount =
+        _asInt(
+          json['viewers'] ??
+              json['viewerCount'] ??
+              json['viewer_count'] ??
+              json['count'],
+        ) ??
+        0;
     final likeCount = _asInt(json['likeCount']) ?? 0;
     final status = _parseStatus(json['status']?.toString());
     final hourlyRank = _asInt(json['hourlyRank']);

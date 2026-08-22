@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-
 import 'package:dartz/dartz.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
 import '../../../data/services/fake_livekit_service.dart';
@@ -68,7 +66,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerViewerUnbannedRequested>(_onViewerUnbannedRequested);
     on<LiveViewerSendStateChanged>(_onSendStateChanged);
   }
-
   final JoinLiveUseCase joinLiveUseCase;
   final LeaveLiveUseCase leaveLiveUseCase;
   final LikeLiveUseCase likeLiveUseCase;
@@ -703,6 +700,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (event is LiveCommentEvent) {
       // Silently drop comments from viewers who have been banned.
       if (state.bannedUserIds.contains(event.comment.userId)) return;
+      if (state.comments.any((comment) => comment.id == event.comment.id)) {
+        return;
+      }
       final next = [...state.comments, event.comment];
       emit(
         state.copyWith(

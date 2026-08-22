@@ -333,6 +333,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       }
     });
 
+    String? socketError;
+    if (session.id.isNotEmpty) {
+      try {
+        await _sessionRepository.connectRealtime(session.id);
+      } catch (e) {
+        socketError = 'Socket connection failed: $e';
+      }
+    }
+
     // Preview is already on screen (Opening → Ready keeps same controller).
     emit(
       LiveRoomReady(
@@ -341,20 +350,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         isCameraInitialized: controller != null,
         isFrontCamera: true,
         isMediaConnected: false,
+        actionMessage: socketError,
       ),
     );
-
-    // Socket HUD (does not block preview).
-    if (session.id.isNotEmpty) {
-      try {
-        await _sessionRepository.connectRealtime(session.id);
-      } catch (e) {
-        final ready = _readyOrNull;
-        if (ready != null && !isClosed) {
-          emit(ready.copyWith(actionMessage: 'تعذر الاتصال بالبث المباشر: $e'));
-        }
-      }
-    }
 
     // Enrichment off the critical path.
     await _enrichSession(emit);

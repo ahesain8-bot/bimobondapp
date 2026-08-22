@@ -164,7 +164,8 @@ class _CommentInputBarState extends State<CommentInputBar> {
                       )
                     : GestureDetector(
                         key: const ValueKey('send'),
-                        onTap: _hasText && widget.enabled ? _submit : null,
+                        behavior: HitTestBehavior.opaque,
+                        onTapDown: (_) => _submit(),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 140),
                           width: 28,
