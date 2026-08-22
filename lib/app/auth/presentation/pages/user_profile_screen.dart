@@ -37,6 +37,9 @@ import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -148,6 +151,41 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _isLoadingUser = true;
         _errorMessage = null;
       });
+    }
+
+    if (!_isSelf) {
+      try {
+        final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+        final dio = Dio(
+          BaseOptions(
+            baseUrl: ApiConstants.baseUrl,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': ApiConstants.apiKey,
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+          ),
+        );
+        final relRes = await dio.get(
+          ApiConstants.userRelationship(widget.userId),
+        );
+        if (relRes.statusCode == 200 && relRes.data is Map) {
+          final rData = Map<String, dynamic>.from(relRes.data as Map);
+          final isBlocked = rData['isBlocked'] == true ||
+              rData['isBlockedByYou'] == true ||
+              rData['isBlockedByThem'] == true;
+          if (isBlocked && mounted) {
+            setState(() {
+              _user = null;
+              _isLoadingUser = false;
+              _errorMessage = 'user_not_found';
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('UserProfileScreen: Error checking relationship: $e');
+      }
     }
 
     final result = _isSelf
@@ -447,14 +485,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             onBackPressed: () => context.pop(_isFollowing),
             hideBottomDivider: true,
           ),
-          body: _errorMessage != null && user == null && !_isLoadingUser
+          body: (_errorMessage != null || user == null) && !_isLoadingUser
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(AppSizes.p24),
-                    child: CustomText(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      variant: TextVariant.secondary,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.account_circle_outlined,
+                          size: 64,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.3),
+                        ),
+                        const SizedBox(height: 12),
+                        CustomText(
+                          l10n.userNotFound,
+                          textAlign: TextAlign.center,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          variant: TextVariant.secondary,
+                        ),
+                      ],
                     ),
                   ),
                 )

@@ -4403,6 +4403,192 @@ abstract class AppLocalizations {
   /// **'Maze'**
   String get chatWallpaperMaze;
 
+  /// No description provided for @chatWallpaperChooseFromPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from Photos'**
+  String get chatWallpaperChooseFromPhotos;
+
+  /// No description provided for @chatWallpaperUploadDeviceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload personal photo from device'**
+  String get chatWallpaperUploadDeviceSubtitle;
+
+  /// No description provided for @chatWallpaperDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default (No Wallpaper)'**
+  String get chatWallpaperDefault;
+
+  /// No description provided for @chatWallpaperCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallpapers Catalog'**
+  String get chatWallpaperCatalog;
+
+  /// No description provided for @chatWallpaperUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal background updated'**
+  String get chatWallpaperUpdated;
+
+  /// No description provided for @chatSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get chatSettingsTitle;
+
+  /// No description provided for @chatSettingsProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get chatSettingsProfile;
+
+  /// No description provided for @chatSettingsMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get chatSettingsMute;
+
+  /// No description provided for @chatSettingsMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted'**
+  String get chatSettingsMuted;
+
+  /// No description provided for @chatSettingsReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get chatSettingsReport;
+
+  /// No description provided for @chatSettingsMuteNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute notifications'**
+  String get chatSettingsMuteNotifications;
+
+  /// No description provided for @chatSettingsPinToTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to top'**
+  String get chatSettingsPinToTop;
+
+  /// No description provided for @chatSettingsWallpaperSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom theme background'**
+  String get chatSettingsWallpaperSubtitle;
+
+  /// No description provided for @chatSettingsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in conversation'**
+  String get chatSettingsSearch;
+
+  /// No description provided for @chatSettingsBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block @{username}'**
+  String chatSettingsBlock(String username);
+
+  /// No description provided for @chatSettingsBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get chatSettingsBlocked;
+
+  /// No description provided for @unblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get unblock;
+
+  /// No description provided for @chatYouBlockedUser.
+  ///
+  /// In en, this message translates to:
+  /// **'You blocked this user. Unblock to send a message.'**
+  String get chatYouBlockedUser;
+
+  /// No description provided for @userNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found'**
+  String get userNotFound;
+
+  /// No description provided for @chatSettingsDeleteHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat history'**
+  String get chatSettingsDeleteHistory;
+
+  /// No description provided for @chatSettingsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type keyword...'**
+  String get chatSettingsSearchHint;
+
+  /// No description provided for @chatSettingsSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for \"{query}\"...'**
+  String chatSettingsSearching(String query);
+
+  /// No description provided for @chatSettingsReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report @{username}'**
+  String chatSettingsReportTitle(String username);
+
+  /// No description provided for @chatSettingsReportSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam or Scam'**
+  String get chatSettingsReportSpam;
+
+  /// No description provided for @chatSettingsReportHarassment.
+  ///
+  /// In en, this message translates to:
+  /// **'Harassment or Bullying'**
+  String get chatSettingsReportHarassment;
+
+  /// No description provided for @chatSettingsReportInappropriate.
+  ///
+  /// In en, this message translates to:
+  /// **'Inappropriate Content'**
+  String get chatSettingsReportInappropriate;
+
+  /// No description provided for @chatSettingsReportSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Report submitted: {reason}'**
+  String chatSettingsReportSubmitted(String reason);
+
+  /// No description provided for @chatSettingsBlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Block @{username}?'**
+  String chatSettingsBlockTitle(String username);
+
+  /// No description provided for @chatSettingsBlockMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'They won\'t be able to message you or view your profile.'**
+  String get chatSettingsBlockMessage;
+
+  /// No description provided for @chatSettingsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat history?'**
+  String get chatSettingsDeleteTitle;
+
+  /// No description provided for @chatSettingsDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove the chat history for you. This action cannot be undone.'**
+  String get chatSettingsDeleteMessage;
+
   /// No description provided for @messagesTitle.
   ///
   /// In en, this message translates to:

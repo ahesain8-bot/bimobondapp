@@ -1,5 +1,5 @@
 import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../entities/live_entity.dart';
 import '../repositories/live_repository.dart';
 
@@ -13,10 +13,6 @@ class GetLiveFeedUseCase {
     int limit = 10,
     String? category,
   }) {
-    return repository.getLiveFeed(
-      page: page,
-      limit: limit,
-      category: category,
-    );
+    return repository.getLiveFeed(page: page, limit: limit, category: category);
   }
 }

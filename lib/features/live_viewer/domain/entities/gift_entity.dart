@@ -54,27 +54,20 @@ class GiftEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        name,
-        description,
-        iconUrl,
-        animationUrl,
-        coinCost,
-        rarity,
-        hasAnimation,
-        durationMs,
-        metadata,
-      ];
+    id,
+    name,
+    description,
+    iconUrl,
+    animationUrl,
+    coinCost,
+    rarity,
+    hasAnimation,
+    durationMs,
+    metadata,
+  ];
 }
 
-enum GiftRarity {
-  common,
-  uncommon,
-  rare,
-  epic,
-  legendary,
-  mythic,
-}
+enum GiftRarity { common, uncommon, rare, epic, legendary, mythic }
 
 extension GiftRarityExtension on GiftRarity {
   String get displayName {
@@ -143,16 +136,16 @@ class GiftSentEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        giftId,
-        liveId,
-        senderId,
-        senderName,
-        senderAvatar,
-        quantity,
-        totalCost,
-        sentAt,
-        giftDetails,
-        senderGifterLevel,
-      ];
+    id,
+    giftId,
+    liveId,
+    senderId,
+    senderName,
+    senderAvatar,
+    quantity,
+    totalCost,
+    sentAt,
+    giftDetails,
+    senderGifterLevel,
+  ];
 }

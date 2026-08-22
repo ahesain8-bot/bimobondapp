@@ -1066,6 +1066,62 @@
   "chatWallpaperPlus": "Plus",
   "chatWallpaperSquares": "Squares",
   "chatWallpaperMaze": "Maze",
+  "chatWallpaperChooseFromPhotos": "Choose from Photos",
+  "chatWallpaperUploadDeviceSubtitle": "Upload personal photo from device",
+  "chatWallpaperDefault": "Default (No Wallpaper)",
+  "chatWallpaperCatalog": "Wallpapers Catalog",
+  "chatWallpaperUpdated": "Personal background updated",
+  "chatSettingsTitle": "Details",
+  "chatSettingsProfile": "Profile",
+  "chatSettingsMute": "Mute",
+  "chatSettingsMuted": "Muted",
+  "chatSettingsReport": "Report",
+  "chatSettingsMuteNotifications": "Mute notifications",
+  "chatSettingsPinToTop": "Pin to top",
+  "chatSettingsWallpaperSubtitle": "Custom theme background",
+  "chatSettingsSearch": "Search in conversation",
+  "chatSettingsBlock": "Block @{username}",
+  "@chatSettingsBlock": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsBlocked": "Blocked",
+  "unblock": "Unblock",
+  "chatYouBlockedUser": "You blocked this user. Unblock to send a message.",
+  "userNotFound": "User not found",
+  "chatSettingsDeleteHistory": "Delete chat history",
+  "chatSettingsSearchHint": "Type keyword...",
+  "chatSettingsSearching": "Searching for \"{query}\"...",
+  "@chatSettingsSearching": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "chatSettingsReportTitle": "Report @{username}",
+  "@chatSettingsReportTitle": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsReportSpam": "Spam or Scam",
+  "chatSettingsReportHarassment": "Harassment or Bullying",
+  "chatSettingsReportInappropriate": "Inappropriate Content",
+  "chatSettingsReportSubmitted": "Report submitted: {reason}",
+  "@chatSettingsReportSubmitted": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "chatSettingsBlockTitle": "Block @{username}?",
+  "@chatSettingsBlockTitle": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsBlockMessage": "They won't be able to message you or view your profile.",
+  "chatSettingsDeleteTitle": "Delete chat history?",
+  "chatSettingsDeleteMessage": "This will remove the chat history for you. This action cannot be undone.",
   "messagesTitle": "Messages",
   "messagesInboxTitle": "Inbox",
   "messagesNewChatTitle": "New chat",

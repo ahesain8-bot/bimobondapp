@@ -22,7 +22,8 @@ class LiveApiClient {
     };
     if (auth && idTokenProvider != null) {
       final token = await idTokenProvider!();
-      if (token != null && token.isNotEmpty) {
+      final hasToken = token != null && token.isNotEmpty;
+      if (hasToken) {
         headers['Authorization'] = 'Bearer $token';
       }
     }
@@ -117,7 +118,7 @@ class LiveApiClient {
     final message = decoded is Map && decoded['message'] != null
         ? (decoded['message'] is List
             ? (decoded['message'] as List).join(', ')
-            : decoded['message'].toString())
+          : decoded['message'].toString())
         : 'Request failed with status ${response.statusCode}';
 
     switch (response.statusCode) {

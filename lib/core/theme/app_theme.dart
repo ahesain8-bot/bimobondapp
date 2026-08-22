@@ -75,7 +75,7 @@ class AppTheme {
             seedColor: primaryColor,
             brightness: Brightness.light,
             primary: primaryColor,
-            secondary: secondaryColor,
+            secondary: const Color.fromRGBO(32, 112, 192, 1),
             surface: Colors.white,
           ),
         ),

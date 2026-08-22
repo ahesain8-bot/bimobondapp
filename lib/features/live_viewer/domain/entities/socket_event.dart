@@ -178,15 +178,18 @@ class UserJoinedEvent extends SocketEvent {
   }) : super(type: SocketEventType.userJoined);
 
   @override
-  List<Object?> get props =>
-      [...super.props, userId, username, avatarUrl, viewerCount];
+  List<Object?> get props => [
+    ...super.props,
+    userId,
+    username,
+    avatarUrl,
+    viewerCount,
+  ];
 }
 
 class NetworkLostEvent extends SocketEvent {
-  const NetworkLostEvent({
-    required super.liveId,
-    required super.timestamp,
-  }) : super(type: SocketEventType.networkLost);
+  const NetworkLostEvent({required super.liveId, required super.timestamp})
+    : super(type: SocketEventType.networkLost);
 }
 
 class ReconnectingEvent extends SocketEvent {
@@ -203,8 +206,6 @@ class ReconnectingEvent extends SocketEvent {
 }
 
 class ReconnectedEvent extends SocketEvent {
-  const ReconnectedEvent({
-    required super.liveId,
-    required super.timestamp,
-  }) : super(type: SocketEventType.reconnected);
+  const ReconnectedEvent({required super.liveId, required super.timestamp})
+    : super(type: SocketEventType.reconnected);
 }

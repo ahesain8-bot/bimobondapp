@@ -23,17 +23,62 @@ List<Color> _gradientFromSeed(String seed) {
 /// Returns a list of decorative icon/emoji-like widgets based on category.
 List<IconData> _iconsForCategory(String? category) {
   final cat = (category ?? '').toLowerCase();
-  if (cat.contains('music')) return [Icons.music_note, Icons.audiotrack, Icons.headphones, Icons.album];
-  if (cat.contains('game')) return [Icons.sports_esports, Icons.gamepad, Icons.videogame_asset, Icons.stadium];
-  if (cat.contains('talk') || cat.contains('chat')) return [Icons.chat, Icons.record_voice_over, Icons.forum, Icons.mic];
-  if (cat.contains('cook') || cat.contains('food')) return [Icons.restaurant, Icons.local_dining, Icons.ramen_dining, Icons.local_cafe];
-  if (cat.contains('fashion') || cat.contains('beauty')) return [Icons.checkroom, Icons.umbrella, Icons.dry_cleaning, Icons.brush];
-  if (cat.contains('sport')) return [Icons.sports_soccer, Icons.fitness_center, Icons.directions_run, Icons.sports_basketball];
-  if (cat.contains('edu') || cat.contains('study') || cat.contains('book')) return [Icons.school, Icons.menu_book, Icons.psychology, Icons.science];
-  if (cat.contains('comedy') || cat.contains('funny')) return [Icons.sentiment_very_satisfied, Icons.theater_comedy, Icons.emoji_events, Icons.celebration];
-  if (cat.contains('dance')) return [Icons.music_video, Icons.sports_gymnastics, Icons.celebration, Icons.wb_incandescent];
-  if (cat.contains('asmr') || cat.contains('relax')) return [Icons.self_improvement, Icons.nights_stay, Icons.spa, Icons.bedtime];
-  return [Icons.live_tv, Icons.favorite, Icons.star, Icons.local_fire_department];
+  if (cat.contains('music'))
+    return [Icons.music_note, Icons.audiotrack, Icons.headphones, Icons.album];
+  if (cat.contains('game'))
+    return [
+      Icons.sports_esports,
+      Icons.gamepad,
+      Icons.videogame_asset,
+      Icons.stadium,
+    ];
+  if (cat.contains('talk') || cat.contains('chat'))
+    return [Icons.chat, Icons.record_voice_over, Icons.forum, Icons.mic];
+  if (cat.contains('cook') || cat.contains('food'))
+    return [
+      Icons.restaurant,
+      Icons.local_dining,
+      Icons.ramen_dining,
+      Icons.local_cafe,
+    ];
+  if (cat.contains('fashion') || cat.contains('beauty'))
+    return [Icons.checkroom, Icons.umbrella, Icons.dry_cleaning, Icons.brush];
+  if (cat.contains('sport'))
+    return [
+      Icons.sports_soccer,
+      Icons.fitness_center,
+      Icons.directions_run,
+      Icons.sports_basketball,
+    ];
+  if (cat.contains('edu') || cat.contains('study') || cat.contains('book'))
+    return [Icons.school, Icons.menu_book, Icons.psychology, Icons.science];
+  if (cat.contains('comedy') || cat.contains('funny'))
+    return [
+      Icons.sentiment_very_satisfied,
+      Icons.theater_comedy,
+      Icons.emoji_events,
+      Icons.celebration,
+    ];
+  if (cat.contains('dance'))
+    return [
+      Icons.music_video,
+      Icons.sports_gymnastics,
+      Icons.celebration,
+      Icons.wb_incandescent,
+    ];
+  if (cat.contains('asmr') || cat.contains('relax'))
+    return [
+      Icons.self_improvement,
+      Icons.nights_stay,
+      Icons.spa,
+      Icons.bedtime,
+    ];
+  return [
+    Icons.live_tv,
+    Icons.favorite,
+    Icons.star,
+    Icons.local_fire_department,
+  ];
 }
 
 /// A deterministic locally-generated "cover image" — gradient + floating decor.
@@ -106,17 +151,15 @@ class FallbackLiveCover extends StatelessWidget {
             final top = rand.nextDouble() * 80;
             final size = 28 + rand.nextDouble() * 48;
             return Positioned(
-              left: left,
-              top: top,
-              child: Opacity(
-                opacity: 0.18 + rand.nextDouble() * 0.18,
-                child: Icon(
-                  icon,
-                  size: size,
-                  color: Colors.white,
-                ),
-              ),
-            ).animate(onPlay: (c) => c.repeat(reverse: true)).moveY(
+                  left: left,
+                  top: top,
+                  child: Opacity(
+                    opacity: 0.18 + rand.nextDouble() * 0.18,
+                    child: Icon(icon, size: size, color: Colors.white),
+                  ),
+                )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .moveY(
                   begin: 0,
                   end: -8,
                   duration: Duration(milliseconds: 1400 + rand.nextInt(1200)),
@@ -187,7 +230,10 @@ class FallbackLiveCover extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.4),
                       borderRadius: BorderRadius.circular(8),
@@ -226,7 +272,8 @@ class FallbackAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = _gradientFromSeed(seed);
-    final initial = (name?.isNotEmpty == true ? name![0] : seed[0]).toUpperCase();
+    final initial = (name?.isNotEmpty == true ? name![0] : seed[0])
+        .toUpperCase();
     return Container(
       width: radius * 2,
       height: radius * 2,
@@ -298,50 +345,56 @@ class AnimatedVideoPlaceholder extends StatelessWidget {
         ),
         // Pulsing center LIVE icon
         Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              color: const Color(0xFFFE2C55).withOpacity(0.85),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFE2C55).withOpacity(0.5),
-                  blurRadius: 40,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
+          child:
+              Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: const Color(0xFFFE2C55).withOpacity(0.85),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFE2C55).withOpacity(0.5),
+                          blurRadius: 40,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                            )
+                            .animate(onPlay: (c) => c.repeat())
+                            .fadeIn(duration: 500.ms)
+                            .fadeOut(duration: 500.ms),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .scale(
+                    begin: const Offset(1, 1),
+                    end: const Offset(1.06, 1.06),
+                    duration: 1200.ms,
                   ),
-                )
-                    .animate(onPlay: (c) => c.repeat())
-                    .fadeIn(duration: 500.ms)
-                    .fadeOut(duration: 500.ms),
-                const SizedBox(width: 8),
-                const Text(
-                  'LIVE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-          ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(
-                begin: const Offset(1, 1),
-                end: const Offset(1.06, 1.06),
-                duration: 1200.ms,
-              ),
         ),
         // Simulated audio wave bars at bottom
         Positioned(
@@ -351,26 +404,31 @@ class AnimatedVideoPlaceholder extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(16, (i) {
-              final rand = Random(seed.codeUnits.fold<int>(0, (a, b) => a + b) + i);
+              final rand = Random(
+                seed.codeUnits.fold<int>(0, (a, b) => a + b) + i,
+              );
               final minH = 6.0 + rand.nextDouble() * 6;
               final maxH = 26.0 + rand.nextDouble() * 30;
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Container(
-                  width: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .custom(
-                      duration: Duration(milliseconds: 400 + rand.nextInt(600)),
-                      builder: (context, value, child) {
-                        final height = minH + (maxH - minH) * value;
-                        return SizedBox(height: height, child: child);
-                      },
-                    ),
+                child:
+                    Container(
+                          width: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .custom(
+                          duration: Duration(
+                            milliseconds: 400 + rand.nextInt(600),
+                          ),
+                          builder: (context, value, child) {
+                            final height = minH + (maxH - minH) * value;
+                            return SizedBox(height: height, child: child);
+                          },
+                        ),
               );
             }),
           ),

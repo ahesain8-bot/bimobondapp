@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../entities/gift_entity.dart';
 
 abstract class GiftRepository {

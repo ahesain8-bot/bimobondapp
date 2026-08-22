@@ -13,7 +13,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_voice_record
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_attachment_picker.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_sheets.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
-import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
+import 'package:bimobondapp/core/navigation/user_profile_navigation.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
 import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -22,6 +22,9 @@ import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_state.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/active_call_banner.dart';
+import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -37,6 +40,8 @@ class ChatView extends StatefulWidget {
     this.lastSeenAt,
     this.lastSeenText,
     this.openCamera = false,
+    this.initialIsPinned = false,
+    this.initialIsMuted = false,
     super.key,
   });
 
@@ -49,6 +54,8 @@ class ChatView extends StatefulWidget {
   final String? lastSeenAt;
   final String? lastSeenText;
   final bool openCamera;
+  final bool initialIsPinned;
+  final bool initialIsMuted;
 
   @override
   State<ChatView> createState() => _ChatViewState();
@@ -57,6 +64,13 @@ class ChatView extends StatefulWidget {
 class _ChatViewState extends State<ChatView> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late bool _isMuted;
+  late bool _isPinned;
+  late bool _isPeerActive;
+  String? _lastSeenAt;
+  String? _lastSeenText;
+  bool _isBlocked = false;
+  String? _wallpaperUrl;
 
   bool _isRecording = false;
   Map<String, dynamic>? _replyTo;
@@ -64,14 +78,32 @@ class _ChatViewState extends State<ChatView> {
   Future<void>? _startRecordingFuture;
   bool _didRequestCamera = false;
 
+  bool _isTypingLocal = false;
+
+  void _onInputChanged() {
+    final isTyping = _messageController.text.isNotEmpty;
+    if (_isTypingLocal != isTyping) {
+      _isTypingLocal = isTyping;
+      context.read<ChatBloc>().add(ChatTypingChanged(isTyping: isTyping));
+    }
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
-    _messageController.addListener(() => setState(() {}));
+    _isMuted = widget.initialIsMuted;
+    _isPinned = widget.initialIsPinned;
+    _isPeerActive = widget.isPeerActive;
+    _lastSeenAt = widget.lastSeenAt;
+    _lastSeenText = widget.lastSeenText;
+    _messageController.addListener(_onInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<CallBloc>().socketService.joinChat(widget.chatId);
       context.read<CallBloc>().add(CheckActiveCallEvent(chatId: widget.chatId));
+      _checkBlockStatus();
+      _fetchChatDetails();
     });
     if (widget.openCamera) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -79,6 +111,278 @@ class _ChatViewState extends State<ChatView> {
         _didRequestCamera = true;
         _pickAndSend(ChatAttachmentPicker.pickFromCamera);
       });
+    }
+  }
+
+  Future<void> _fetchPeerUserStatus(String peerId) async {
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConstants.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ApiConstants.apiKey,
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      final response = await dio.get(ApiConstants.userById(peerId));
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = Map<String, dynamic>.from(response.data as Map);
+        final isOnline = data['isOnline'] == true ||
+            data['is_online'] == true ||
+            data['isActive'] == true ||
+            data['is_active'] == true;
+        final lastSeen = data['lastSeen']?.toString() ??
+            data['last_seen']?.toString() ??
+            data['lastSeenAt']?.toString() ??
+            data['last_seen_at']?.toString();
+
+        if (mounted) {
+          setState(() {
+            _isPeerActive = isOnline;
+            if (lastSeen != null && lastSeen.trim().isNotEmpty) {
+              _lastSeenAt = lastSeen;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('ChatView: Error fetching peer user status: $e');
+    }
+  }
+
+  Future<void> _fetchChatDetails() async {
+    if (widget.chatId.isEmpty) return;
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConstants.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ApiConstants.apiKey,
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      final response = await dio.get(ApiConstants.chatById(widget.chatId));
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = Map<String, dynamic>.from(response.data as Map);
+        final settingsMap =
+            data['settings'] is Map ? data['settings'] as Map : null;
+
+        final isBlockedInChat = data['isBlocked'] == true ||
+            data['isBlockedByYou'] == true ||
+            data['isBlockedByThem'] == true ||
+            data['is_blocked'] == true ||
+            data['blocked'] == true ||
+            settingsMap?['isBlocked'] == true ||
+            settingsMap?['is_blocked'] == true;
+
+        if (isBlockedInChat && mounted) {
+          setState(() {
+            _isBlocked = true;
+          });
+        }
+
+        // Extract peerUserId from chat participants if not available
+        final participants = data['participants'] is List
+            ? data['participants'] as List
+            : (data['members'] is List ? data['members'] as List : []);
+
+        String? targetPeerId = widget.peerUserId;
+        final myId = FirebaseAuth.instance.currentUser?.uid;
+        for (final item in participants) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? item['_id']?.toString();
+            if (id != null && id != myId) {
+              if (targetPeerId == null || targetPeerId.isEmpty) {
+                targetPeerId = id;
+              }
+              final isOnline = item['isOnline'] == true ||
+                  item['is_online'] == true ||
+                  item['isActive'] == true ||
+                  item['is_active'] == true;
+              final lastSeen = item['lastSeen']?.toString() ??
+                  item['last_seen']?.toString() ??
+                  item['lastSeenAt']?.toString() ??
+                  item['last_seen_at']?.toString();
+              if (mounted) {
+                setState(() {
+                  _isPeerActive = isOnline;
+                  if (lastSeen != null && lastSeen.trim().isNotEmpty) {
+                    _lastSeenAt = lastSeen;
+                  }
+                });
+              }
+              break;
+            }
+          }
+        }
+
+        if (targetPeerId != null && targetPeerId.isNotEmpty) {
+          _fetchPeerUserStatus(targetPeerId);
+          try {
+            final relRes = await dio.get(
+              ApiConstants.userRelationship(targetPeerId),
+            );
+            if (relRes.statusCode == 200 && relRes.data is Map) {
+              final rData = Map<String, dynamic>.from(relRes.data as Map);
+              final isBlockedInRel = rData['isBlocked'] == true ||
+                  rData['isBlockedByYou'] == true ||
+                  rData['isBlockedByThem'] == true;
+              if (isBlockedInRel && mounted) {
+                setState(() {
+                  _isBlocked = true;
+                });
+              }
+            }
+          } catch (e) {
+            debugPrint('ChatView: Error checking relationship in _fetchChatDetails: $e');
+          }
+        }
+
+        // Precedence: personalWallpaperUrl -> sharedWallpaperUrl -> wallpaperUrl
+        final personalUrl = data['personalWallpaperUrl']?.toString() ??
+            data['personalWallpaper']?.toString() ??
+            settingsMap?['personalWallpaperUrl']?.toString();
+
+        final sharedUrl = data['sharedWallpaperUrl']?.toString() ??
+            data['wallpaperUrl']?.toString() ??
+            settingsMap?['wallpaperUrl']?.toString();
+
+        final effectiveWallpaper = (personalUrl != null && personalUrl.trim().isNotEmpty)
+            ? personalUrl
+            : sharedUrl;
+
+        if (mounted && effectiveWallpaper != null && effectiveWallpaper.trim().isNotEmpty) {
+          setState(() {
+            _wallpaperUrl = effectiveWallpaper;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('ChatView: Error fetching chat details for wallpaper: $e');
+    }
+  }
+
+  Future<void> _checkBlockStatus() async {
+    String? peerId = widget.peerUserId;
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConstants.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ApiConstants.apiKey,
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (peerId == null || peerId.isEmpty) {
+        try {
+          final response = await dio.get(ApiConstants.chatById(widget.chatId));
+          if (response.statusCode == 200 && response.data is Map) {
+            final data = Map<String, dynamic>.from(response.data as Map);
+            final participants = data['participants'] is List
+                ? data['participants'] as List
+                : (data['members'] is List ? data['members'] as List : []);
+            final myId = FirebaseAuth.instance.currentUser?.uid;
+            for (final item in participants) {
+              if (item is Map) {
+                final id = item['id']?.toString() ?? item['_id']?.toString();
+                if (id != null && id.isNotEmpty && id != myId) {
+                  peerId = id;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('ChatView: Error resolving peerId in _checkBlockStatus: $e');
+        }
+      }
+
+      if (peerId == null || peerId.isEmpty) return;
+
+      // 1. Check My Blocks list
+      try {
+        final blocksRes = await dio.get(ApiConstants.myBlocks);
+        if (blocksRes.statusCode == 200) {
+          final List blocksList = blocksRes.data is List
+              ? blocksRes.data as List
+              : (blocksRes.data is Map && blocksRes.data['data'] is List
+                  ? blocksRes.data['data'] as List
+                  : []);
+          final isBlockedInList = blocksList.any((item) {
+            if (item is Map) {
+              final id = item['id'] ??
+                  item['userId'] ??
+                  item['blockedUserId'] ??
+                  item['targetUserId'];
+              return id?.toString() == peerId;
+            }
+            return item?.toString() == peerId;
+          });
+          if (isBlockedInList && mounted) {
+            setState(() {
+              _isBlocked = true;
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('ChatView: Error checking blocks list: $e');
+      }
+
+      // 2. Check relationship endpoint
+      try {
+        final relRes = await dio.get(
+          ApiConstants.userRelationship(peerId),
+        );
+        if (relRes.statusCode == 200 && relRes.data is Map) {
+          final rData = Map<String, dynamic>.from(relRes.data as Map);
+          final isBlockedInRel = rData['isBlocked'] == true ||
+              rData['isBlockedByYou'] == true ||
+              rData['isBlockedByThem'] == true;
+          if (isBlockedInRel && mounted) {
+            setState(() {
+              _isBlocked = true;
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('ChatView: Error checking relationship: $e');
+      }
+
+      // 3. Check follow status endpoint
+      try {
+        final followRes = await dio.get(
+          ApiConstants.userFollowStatus(peerId),
+        );
+        if (followRes.statusCode == 200 && followRes.data is Map) {
+          final fData = Map<String, dynamic>.from(followRes.data as Map);
+          final isBlockedInFollow = fData['isBlocked'] == true ||
+              fData['is_blocked'] == true ||
+              fData['blocked'] == true;
+          if (isBlockedInFollow && mounted) {
+            setState(() {
+              _isBlocked = true;
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('ChatView: Error checking follow status: $e');
+      }
+    } catch (e) {
+      debugPrint('ChatView: Error in _checkBlockStatus: $e');
     }
   }
 
@@ -108,6 +412,11 @@ class _ChatViewState extends State<ChatView> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    if (_isTypingLocal) {
+      _isTypingLocal = false;
+      context.read<ChatBloc>().add(const ChatTypingChanged(isTyping: false));
+    }
+
     context.read<ChatBloc>().add(
       ChatMessageSendRequested(
         content: text,
@@ -133,22 +442,29 @@ class _ChatViewState extends State<ChatView> {
       return;
     }
 
-    await openUserActiveStoriesOrProfile(
+    await openUserProfile(
       context,
       userId: id,
       username: widget.username,
-      fullName: widget.username,
       avatarUrl: widget.imageUrl,
     );
   }
 
   void _showMessageActions(Map<String, dynamic> msg) {
     if (msg['isDeleted'] == true) return;
+    final messageId = msg['id']?.toString();
 
     ChatSheets.showMessageActions(
       context: context,
       onReply: () => setState(() => _replyTo = msg),
       onReact: () => _showReactionPicker(msg),
+      onEmojiSelected: (emoji) {
+        if (messageId != null) {
+          context.read<ChatBloc>().add(
+            ChatMessageReactRequested(messageId: messageId, emoji: emoji),
+          );
+        }
+      },
       onDelete: msg['isMe'] == true ? () => _confirmDeleteMessage(msg) : null,
     );
   }
@@ -177,8 +493,20 @@ class _ChatViewState extends State<ChatView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.chatDeleteMessageTitle),
-        content: Text(l10n.chatDeleteMessageMessage),
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          l10n.chatDeleteMessageTitle,
+          style: TextStyle(color: theme.colorScheme.onSurface),
+        ),
+        content: Text(
+          l10n.chatDeleteMessageMessage,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -186,9 +514,13 @@ class _ChatViewState extends State<ChatView> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: Text(
               l10n.chatActionDelete,
-              style: TextStyle(color: theme.colorScheme.error),
+              style: const TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -415,6 +747,44 @@ class _ChatViewState extends State<ChatView> {
     _scrollToBottom();
   }
 
+  Future<void> _unblockUserInChat() async {
+    if (widget.peerUserId == null || widget.peerUserId!.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConstants.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ApiConstants.apiKey,
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      try {
+        await dio.post(ApiConstants.unblockUser(widget.peerUserId!));
+      } catch (_) {
+        await dio.delete(ApiConstants.blockUser(widget.peerUserId!));
+      }
+
+      if (mounted) {
+        setState(() {
+          _isBlocked = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.unblock),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ChatView: Error unblocking user: $e');
+    }
+  }
+
   bool get _isRtl => Directionality.of(context) == TextDirection.rtl;
 
   @override
@@ -473,6 +843,13 @@ class _ChatViewState extends State<ChatView> {
           activeCall = callState.call;
         }
 
+        final isRemoteTyping =
+            state is ChatLoadSuccess && state.isTypingRemote;
+        final isAr = l10n.localeName == 'ar';
+        final effectiveLastSeenText = isRemoteTyping
+            ? (isAr ? 'يكتب الآن...' : 'Typing...')
+            : _lastSeenText;
+
         return Scaffold(
           backgroundColor: chatTheme.chatBackgroundColor,
           appBar: ChatAppBar(
@@ -480,9 +857,16 @@ class _ChatViewState extends State<ChatView> {
             username: widget.username,
             imageUrl: widget.imageUrl,
             userId: widget.peerUserId,
-            isPeerActive: widget.isPeerActive,
-            lastSeenAt: widget.lastSeenAt,
-            lastSeenText: widget.lastSeenText,
+            isPeerActive: isRemoteTyping ? true : _isPeerActive,
+            lastSeenAt: _lastSeenAt,
+            lastSeenText: effectiveLastSeenText,
+            isMuted: _isMuted,
+            isPinned: _isPinned,
+            isBlocked: _isBlocked,
+            onMutedChanged: (val) => setState(() => _isMuted = val),
+            onPinnedChanged: (val) => setState(() => _isPinned = val),
+            onBlockedChanged: (val) => setState(() => _isBlocked = val),
+            onWallpaperUrlChanged: (url) => setState(() => _wallpaperUrl = url),
             onProfileTap: _onPeerHeaderTap,
             onAudioCallTap: () {
               final invitees = widget.peerUserId != null && widget.peerUserId!.isNotEmpty
@@ -514,6 +898,7 @@ class _ChatViewState extends State<ChatView> {
             children: [
               ChatPatternBackground(
                 backgroundColor: chatTheme.chatBackgroundColor,
+                wallpaperUrl: _wallpaperUrl,
                 child: Column(
                   children: [
                     if (activeCall != null)
@@ -543,6 +928,7 @@ class _ChatViewState extends State<ChatView> {
                                   ),
                                 );
                               },
+                              onProfileTap: _onPeerHeaderTap,
                             ),
                     ),
                     if (state is ChatFailure)
@@ -558,38 +944,102 @@ class _ChatViewState extends State<ChatView> {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                    ChatInputBar(
-                      controller: _messageController,
-                      hasText: hasText,
-                      replyPreviewText: replyPreviewText,
-                      onSend: _sendMessage,
-                      onMoreMenu: () => ChatSheets.showMoreMenu(
-                        context: context,
-                        onGallery: () =>
-                            _pickAndSend(ChatAttachmentPicker.pickFromGallery),
-                        onCamera: () =>
-                            _pickAndSend(ChatAttachmentPicker.pickFromCamera),
-                        onVideo: () =>
-                            _pickAndSend(ChatAttachmentPicker.pickVideo),
-                        onLocation: _sendLocationAttachment,
-                        onContact: _sendContactAttachment,
-                        onFile: () =>
-                            _pickAndSend(ChatAttachmentPicker.pickFile),
+                    if (_isBlocked)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, -2),
+                            ),
+                          ],
+                        ),
+                        child: SafeArea(
+                          top: false,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                l10n.chatYouBlockedUser,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.7),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextButton(
+                                onPressed: _unblockUserInChat,
+                                style: TextButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primary
+                                      .withValues(alpha: 0.1),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: Text(
+                                  l10n.unblock,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ChatInputBar(
+                        controller: _messageController,
+                        hasText: hasText,
+                        replyPreviewText: replyPreviewText,
+                        onSend: _sendMessage,
+                        onMoreMenu: () => ChatSheets.showMoreMenu(
+                          context: context,
+                          onGallery: () => _pickAndSend(
+                            ChatAttachmentPicker.pickFromGallery,
+                          ),
+                          onCamera: () => _pickAndSend(
+                            ChatAttachmentPicker.pickFromCamera,
+                          ),
+                          onVideo: () => _pickAndSend(
+                            ChatAttachmentPicker.pickVideo,
+                          ),
+                          onLocation: _sendLocationAttachment,
+                          onContact: _sendContactAttachment,
+                          onFile: () => _pickAndSend(
+                            ChatAttachmentPicker.pickFile,
+                          ),
+                        ),
+                        onEmojiPicker: () => ChatSheets.showEmojiPicker(
+                          context: context,
+                          messageController: _messageController,
+                          onEmojiInserted: () => setState(() {}),
+                        ),
+                        onRecordingStart: _onRecordingStart,
+                        onRecordingEnd: _onRecordingEnd,
+                        onRecordingCancel: _onRecordingCancel,
+                        onReplyClose: () => setState(() => _replyTo = null),
+                        onTextChanged: (typing) => _onTypingChanged(typing),
+                        isRecording: _isRecording,
+                        onRecordingPause: () => _voiceRecorder.pause(),
+                        onRecordingResume: () => _voiceRecorder.resume(),
                       ),
-                      onEmojiPicker: () => ChatSheets.showEmojiPicker(
-                        context: context,
-                        messageController: _messageController,
-                        onEmojiInserted: () => setState(() {}),
-                      ),
-                      onRecordingStart: _onRecordingStart,
-                      onRecordingEnd: _onRecordingEnd,
-                      onRecordingCancel: _onRecordingCancel,
-                      onReplyClose: () => setState(() => _replyTo = null),
-                      onTextChanged: (typing) => _onTypingChanged(typing),
-                      isRecording: _isRecording,
-                      onRecordingPause: () => _voiceRecorder.pause(),
-                      onRecordingResume: () => _voiceRecorder.resume(),
-                    ),
                   ],
                 ),
               ),

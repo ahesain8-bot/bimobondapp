@@ -120,9 +120,7 @@ class AppTheme {
         foregroundColor: Colors.black,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         textStyle: AppTextStyles.labelLarge.copyWith(
           fontWeight: FontWeight.w600,
         ),
@@ -135,9 +133,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         textStyle: AppTextStyles.labelLarge,
       ),
     );
@@ -178,9 +174,7 @@ class AppTheme {
     return SnackBarThemeData(
       backgroundColor: AppColors.surface,
       contentTextStyle: AppTextStyles.bodyMedium,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       behavior: SnackBarBehavior.floating,
       actionTextColor: AppColors.primary,
     );

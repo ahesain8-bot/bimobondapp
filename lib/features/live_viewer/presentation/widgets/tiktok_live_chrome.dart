@@ -40,7 +40,9 @@ class TikTokLiveTopBar extends StatelessWidget {
           children: [
             Row(
               children: [
-                Flexible(child: _HostPill(live: live, onFollow: onFollow)),
+                Flexible(
+                  child: _HostPill(live: live, onFollow: onFollow),
+                ),
                 const SizedBox(width: 6),
                 _ViewerCountPill(
                   avatars: topViewerAvatars,
@@ -274,8 +276,11 @@ class _ViewerCountPill extends StatelessWidget {
                                   fit: BoxFit.cover,
                                   errorWidget: (_, __, ___) => Container(
                                     color: const Color(0xFF333333),
-                                    child: const Icon(Icons.person,
-                                        size: 11, color: Colors.white54),
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 11,
+                                      color: Colors.white54,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -286,14 +291,18 @@ class _ViewerCountPill extends StatelessWidget {
                                 bottom: -1,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 2.5, vertical: 0.5),
+                                    horizontal: 2.5,
+                                    vertical: 0.5,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: i == 0
                                         ? const Color(0xFFFFB020)
                                         : const Color(0xFF3D7EFF),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                        color: Colors.black, width: 0.8),
+                                      color: Colors.black,
+                                      width: 0.8,
+                                    ),
                                   ),
                                   child: Text(
                                     badge,
@@ -326,11 +335,7 @@ class _BadgeRow extends StatelessWidget {
   final VoidCallback? onHourlyRankTap;
   final VoidCallback? onLeagueTap;
 
-  const _BadgeRow({
-    required this.live,
-    this.onHourlyRankTap,
-    this.onLeagueTap,
-  });
+  const _BadgeRow({required this.live, this.onHourlyRankTap, this.onLeagueTap});
 
   @override
   Widget build(BuildContext context) {
@@ -412,8 +417,11 @@ class _BadgeRow extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.emoji_events,
-                      color: Color(0xFFFFC107), size: 11),
+                  const Icon(
+                    Icons.emoji_events,
+                    color: Color(0xFFFFC107),
+                    size: 11,
+                  ),
                   const SizedBox(width: 3),
                   Text(
                     'No.$rank · $location',
@@ -453,12 +461,8 @@ class _PopularityBadge extends StatelessWidget {
     final icon = isBoost ? '🚀' : '⭐';
     const label = 'Popular';
     final gradient = isBoost
-        ? const LinearGradient(
-            colors: [Color(0xFF7B61FF), Color(0xFFFF6BD6)],
-          )
-        : const LinearGradient(
-            colors: [Color(0xFFFF5A3F), Color(0xFFFFC371)],
-          );
+        ? const LinearGradient(colors: [Color(0xFF7B61FF), Color(0xFFFF6BD6)])
+        : const LinearGradient(colors: [Color(0xFFFF5A3F), Color(0xFFFFC371)]);
 
     return Container(
       height: 20,
@@ -642,32 +646,33 @@ class PkBattleBar extends StatelessWidget {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xE60A2430),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.diamond, color: Color(0xFF7EC8FF), size: 11),
-                SizedBox(width: 4),
-                Text(
-                  'Win to get 2x points ›',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.1,
-                  ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 3,
                 ),
-              ],
-            ),
-          ).animate(onPlay: (c) => c.repeat(reverse: true)).fade(
-                begin: 0.85,
-                end: 1,
-                duration: 900.ms,
-              ),
+                decoration: BoxDecoration(
+                  color: const Color(0xE60A2430),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.diamond, color: Color(0xFF7EC8FF), size: 11),
+                    SizedBox(width: 4),
+                    Text(
+                      'Win to get 2x points ›',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .fade(begin: 0.85, end: 1, duration: 900.ms),
         ],
       ),
     );
@@ -676,9 +681,9 @@ class PkBattleBar extends StatelessWidget {
   static String _fmt(int n) {
     if (n >= 1000) {
       return n.toString().replaceAllMapped(
-            RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-            (m) => '${m[1]},',
-          );
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]},',
+      );
     }
     return '$n';
   }
@@ -728,13 +733,17 @@ class TikTokLiveBottomBar extends StatelessWidget {
               if (onTreasureTap != null) ...[
                 GestureDetector(
                   onTap: onTreasureTap,
-                  child: const Icon(Icons.inventory_2_rounded,
-                      color: Color(0xFFFFB020), size: 26),
+                  child: const Icon(
+                    Icons.inventory_2_rounded,
+                    color: Color(0xFFFFB020),
+                    size: 26,
+                  ),
                 ),
                 const SizedBox(width: 8),
               ],
               Expanded(
-                child: commentField ??
+                child:
+                    commentField ??
                     GestureDetector(
                       onTap: onTypeTap,
                       child: Container(
@@ -767,8 +776,11 @@ class TikTokLiveBottomBar extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.14),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.emoji_emotions_outlined,
-                      color: Color(0xD9FFFFFF), size: 22),
+                  child: const Icon(
+                    Icons.emoji_emotions_outlined,
+                    color: Color(0xD9FFFFFF),
+                    size: 22,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -782,8 +794,11 @@ class TikTokLiveBottomBar extends StatelessWidget {
                     children: [
                       Transform.flip(
                         flipX: true,
-                        child: const Icon(Icons.reply_rounded,
-                            color: Colors.white, size: 26),
+                        child: const Icon(
+                          Icons.reply_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
                       ),
                       if (shareCount != null && shareCount! > 0)
                         Text(
@@ -802,8 +817,11 @@ class TikTokLiveBottomBar extends StatelessWidget {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: onGiftTap,
-                child: const Icon(Icons.card_giftcard,
-                    color: Color(0xFFFF2D55), size: 30),
+                child: const Icon(
+                  Icons.card_giftcard,
+                  color: Color(0xFFFF2D55),
+                  size: 30,
+                ),
               ),
               if (onRoseTap != null) ...[
                 const SizedBox(width: 8),
@@ -825,14 +843,20 @@ class TikTokLiveBottomBar extends StatelessWidget {
                         const Positioned(
                           left: 0,
                           top: 4,
-                          child: Icon(Icons.person,
-                              color: Color(0xFF25F4EE), size: 20),
+                          child: Icon(
+                            Icons.person,
+                            color: Color(0xFF25F4EE),
+                            size: 20,
+                          ),
                         ),
                         const Positioned(
                           right: 0,
                           top: 4,
-                          child: Icon(Icons.person,
-                              color: Color(0xFFFF2D55), size: 20),
+                          child: Icon(
+                            Icons.person,
+                            color: Color(0xFFFF2D55),
+                            size: 20,
+                          ),
                         ),
                         Positioned(
                           right: -1,

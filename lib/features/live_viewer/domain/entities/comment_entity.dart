@@ -69,21 +69,21 @@ class CommentEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        liveId,
-        userId,
-        username,
-        userAvatar,
-        content,
-        createdAt,
-        replyToUserId,
-        replyToUsername,
-        mentions,
-        metadata,
-        gifterLevel,
-        isVerified,
-        isPinned,
-      ];
+    id,
+    liveId,
+    userId,
+    username,
+    userAvatar,
+    content,
+    createdAt,
+    replyToUserId,
+    replyToUsername,
+    mentions,
+    metadata,
+    gifterLevel,
+    isVerified,
+    isPinned,
+  ];
 }
 
 class CommentBatch {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_quick_actions_bar.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_reply_preview_bar.dart';
 import 'package:bimobondapp/core/constants/chat_layout_constants.dart';
 import 'package:bimobondapp/core/theme/chat_theme.dart';
@@ -219,18 +220,21 @@ class _ChatInputBarState extends State<ChatInputBar> {
             width: ChatLayoutConstants.inputActionSize,
             height: ChatLayoutConstants.inputActionSize,
             decoration: BoxDecoration(
-              color: (showSend || widget.isRecording)
-                  ? primary
-                  : chatTheme.sendIdleFill,
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.secondary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               shape: BoxShape.circle,
             ),
             child: Icon(
               showSend || showLockedSend
                   ? LucideIcons.sendHorizonal
                   : LucideIcons.mic,
-              color: (showSend || widget.isRecording)
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              color: Colors.white,
               size: showSend || showLockedSend
                   ? ChatLayoutConstants.inputSendIconSize
                   : ChatLayoutConstants.inputMicIconSize,
@@ -243,11 +247,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
-    final primary = theme.colorScheme.primary;
+    final primary = theme.colorScheme.secondary;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       decoration: const BoxDecoration(color: Colors.transparent),
@@ -261,6 +266,18 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (!widget.isRecording && widget.replyPreviewText == null)
+            ChatQuickActionsBar(
+              onEmojiSelected: (emoji) {
+                widget.controller.text += emoji;
+                widget.onTextChanged?.call(true);
+              },
+              onNudge: () {
+                widget.controller.text = '👋 Nudge';
+                widget.onSend();
+              },
+              onSharePost: widget.onMoreMenu,
+            ),
           if (widget.replyPreviewText != null)
             ChatReplyPreviewBar(
               text: widget.replyPreviewText!,
@@ -271,27 +288,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
             textDirection: TextDirection.ltr,
             child: Row(
               children: [
-                if (!widget.isRecording) ...[
-                  GestureDetector(
-                    onTap: widget.onMoreMenu,
-                    child: Container(
-                      width: ChatLayoutConstants.inputActionSize,
-                      height: ChatLayoutConstants.inputActionSize,
-                      decoration: BoxDecoration(
-                        color: chatTheme.sendIdleFill,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        LucideIcons.plus,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.7,
-                        ),
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSizes.p8),
-                ] else if (_isLocked) ...[
+                if (widget.isRecording && _isLocked) ...[
                   GestureDetector(
                     onTap: () => widget.onRecordingCancel?.call(),
                     child: Container(
@@ -322,9 +319,14 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           ),
                     decoration: BoxDecoration(
                       color: chatTheme.inputFill,
-                      borderRadius: BorderRadius.circular(
-                        ChatLayoutConstants.inputFieldRadius,
-                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: widget.isRecording
                         ? Row(
@@ -355,7 +357,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Transform.translate(
-                                    // Follow finger while sliding left to cancel.
                                     offset: Offset(math.min(0.0, _dragX), 0.0),
                                     child: Opacity(
                                       opacity: (1.0 + (_dragX / 80.0)).clamp(
@@ -372,9 +373,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                           const SizedBox(width: 6),
                                           Flexible(
                                             child: Text(
-                                              isArabic
-                                                  ? 'اسحب للإلغاء'
-                                                  : 'Slide to cancel',
+                                              l10n.chatSlideUpToCancel,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: theme.textTheme.bodyMedium
@@ -413,59 +412,77 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           )
                         : Row(
                             children: [
-                              const SizedBox(width: 14),
+                              const SizedBox(width: 16),
                               Expanded(
-                                child: TextField(
-                                  controller: widget.controller,
-                                  onSubmitted: (_) => widget.onSend(),
-                                  onChanged: (value) => widget.onTextChanged
-                                      ?.call(value.isNotEmpty),
+                                child: Directionality(
                                   textDirection: isArabic
                                       ? TextDirection.rtl
                                       : TextDirection.ltr,
-                                  textAlign: TextAlign.start,
-                                  minLines: 1,
-                                  maxLines: 3,
-                                  maxLength: 100,
-                                  keyboardType: TextInputType.multiline,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontSize:
-                                        ChatLayoutConstants.inputFieldFontSize,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: l10n.chatSendMessageHint,
-                                    hintTextDirection: isArabic
+                                  child: TextField(
+                                    controller: widget.controller,
+                                    onSubmitted: (_) => widget.onSend(),
+                                    onChanged: (value) => widget.onTextChanged
+                                        ?.call(value.isNotEmpty),
+                                    textDirection: isArabic
                                         ? TextDirection.rtl
                                         : TextDirection.ltr,
-                                    counterText: '',
-                                    hintStyle: theme.textTheme.bodyMedium
-                                        ?.copyWith(
-                                          color: chatTheme.inboxSecondaryText,
-                                          fontSize: ChatLayoutConstants
-                                              .inputHintFontSize,
-                                        ),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 12,
+                                    textAlign: isArabic
+                                        ? TextAlign.right
+                                        : TextAlign.left,
+                                    minLines: 1,
+                                    maxLines: 3,
+                                    maxLength: 100,
+                                    keyboardType: TextInputType.multiline,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 14,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: l10n.chatAddComment,
+                                      hintTextDirection: isArabic
+                                          ? TextDirection.rtl
+                                          : TextDirection.ltr,
+                                      counterText: '',
+                                      hintStyle: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: theme.hintColor.withValues(alpha: 0.6),
+                                            fontSize: 14,
+                                          ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                               IconButton(
                                 icon: Icon(
-                                  LucideIcons.smile,
-                                  color: chatTheme.inboxSecondaryText,
-                                  size: 22,
+                                  LucideIcons.paperclip,
+                                  color: theme.colorScheme.secondary,
+                                  size: 20,
                                 ),
-                                onPressed: widget.onEmojiPicker,
+                                onPressed: widget.onMoreMenu,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
-                                  minWidth: 40,
-                                  minHeight: 40,
+                                  minWidth: 36,
+                                  minHeight: 36,
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: Icon(
+                                  LucideIcons.camera,
+                                  color: theme.colorScheme.secondary,
+                                  size: 20,
+                                ),
+                                onPressed: widget.onMoreMenu,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                             ],
                           ),
                   ),

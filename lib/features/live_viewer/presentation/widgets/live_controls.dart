@@ -49,16 +49,10 @@ class LiveControls extends StatelessWidget {
               child: CachedNetworkImage(
                 imageUrl: hostAvatar,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => FallbackAvatar(
-                  seed: hostId,
-                  name: hostName,
-                  radius: 24,
-                ),
-                errorWidget: (_, __, ___) => FallbackAvatar(
-                  seed: hostId,
-                  name: hostName,
-                  radius: 24,
-                ),
+                placeholder: (_, __) =>
+                    FallbackAvatar(seed: hostId, name: hostName, radius: 24),
+                errorWidget: (_, __, ___) =>
+                    FallbackAvatar(seed: hostId, name: hostName, radius: 24),
               ),
             ),
           ),
@@ -131,9 +125,7 @@ class _ControlButton extends StatelessWidget {
           badgeWidget ??
               Text(
                 badge ?? '',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: Colors.white70,
-                ),
+                style: AppTextStyles.labelSmall.copyWith(color: Colors.white70),
               ),
         ],
       ),

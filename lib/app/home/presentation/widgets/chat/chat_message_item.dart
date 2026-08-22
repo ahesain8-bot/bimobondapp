@@ -82,6 +82,7 @@ class ChatMessageItem extends StatelessWidget {
             replyText: replyText,
             maxWidth: maxBubbleWidth,
             currentUserId: currentUserId,
+            peerUserId: peerUserId,
             onPollVote: onPollVote,
           ),
           if (reactions.isNotEmpty)
@@ -134,9 +135,7 @@ class ChatMessageItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: ChatLayoutConstants.senderHeaderFontSize,
                   fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary.withValues(
-                    alpha: ChatLayoutConstants.senderHeaderPrimaryAlpha,
-                  ),
+                  color: theme.colorScheme.secondary,
                 ),
               ),
             ),
@@ -288,7 +287,9 @@ class ChatMessageBubble extends StatelessWidget {
     required this.replyText,
     required this.maxWidth,
     this.currentUserId,
+    this.peerUserId,
     this.onPollVote,
+    super.key,
   });
 
   final Map<String, dynamic> msg;
@@ -298,32 +299,13 @@ class ChatMessageBubble extends StatelessWidget {
   final String? replyText;
   final double maxWidth;
   final String? currentUserId;
+  final String? peerUserId;
   final void Function(String messageId, int optionIndex)? onPollVote;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final chatTheme = ChatTheme.of(context);
     final type = msg['type']?.toString() ?? 'text';
-
-    final borderRadius = BorderRadiusDirectional.only(
-      topStart: const Radius.circular(ChatLayoutConstants.bubbleRadius),
-      topEnd: const Radius.circular(ChatLayoutConstants.bubbleRadius),
-      bottomStart: Radius.circular(
-        isMe
-            ? ChatLayoutConstants.bubbleRadius
-            : (isFirstInGroup
-                  ? ChatLayoutConstants.bubbleTailRadius
-                  : ChatLayoutConstants.bubbleRadius),
-      ),
-      bottomEnd: Radius.circular(
-        isMe
-            ? (isFirstInGroup
-                  ? ChatLayoutConstants.bubbleTailRadius
-                  : ChatLayoutConstants.bubbleRadius)
-            : ChatLayoutConstants.bubbleRadius,
-      ),
-    );
 
     final denseType = type == 'image' || type == 'video' || type == 'voice';
     final padding = denseType
@@ -353,6 +335,7 @@ class ChatMessageBubble extends StatelessWidget {
           messageText: messageText,
           isMe: isMe,
           currentUserId: currentUserId,
+          peerUserId: peerUserId,
           onPollVote: onPollVote,
         ),
       ],
@@ -372,7 +355,7 @@ class ChatMessageBubble extends StatelessWidget {
         padding: padding,
         decoration: BoxDecoration(
           color: chatTheme.receivedBubbleColor,
-          borderRadius: borderRadius,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: shadow,
         ),
         child: content,
@@ -383,13 +366,15 @@ class ChatMessageBubble extends StatelessWidget {
       constraints: BoxConstraints(maxWidth: maxWidth),
       padding: padding,
       decoration: BoxDecoration(
-        color: chatTheme.sentBubbleColor,
-        borderRadius: borderRadius,
-        border: Border.all(
-          color: theme.dividerColor.withValues(
-            alpha: ChatLayoutConstants.sentBubbleBorderAlpha,
-          ),
+        gradient: LinearGradient(
+          colors: [
+            chatTheme.sentBubbleGradientStart,
+            chatTheme.sentBubbleGradientEnd,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: shadow,
       ),
       child: content,
@@ -409,37 +394,41 @@ class ChatBubbleReplyPreview extends StatelessWidget {
     final chatTheme = ChatTheme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: AppSizes.p6),
-      padding: const EdgeInsets.all(AppSizes.p8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: (isMe ? chatTheme.replyAccent : chatTheme.onReceivedBubbleMuted)
-            .withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(
-          ChatLayoutConstants.replyPreviewRadius,
+        color: Colors.white.withValues(alpha: isMe ? 0.6 : 0.8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.08),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: ChatLayoutConstants.replyPreviewBarWidth,
-            height: ChatLayoutConstants.replyPreviewBarHeight,
-            color: isMe ? chatTheme.replyAccent : chatTheme.onReceivedBubble,
-          ),
-          const SizedBox(width: AppSizes.p8),
-          Flexible(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: ChatLayoutConstants.replyPreviewFontSize,
-                color: isMe
-                    ? chatTheme.onSentBubbleMuted
-                    : chatTheme.onReceivedBubbleMuted,
+      child: IntrinsicHeight(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: chatTheme.replyAccent,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 12,
+                  color: const Color(0xFF475569),
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -451,13 +440,16 @@ class ChatMessageContent extends StatelessWidget {
     required this.messageText,
     required this.isMe,
     this.currentUserId,
+    this.peerUserId,
     this.onPollVote,
+    super.key,
   });
 
   final Map<String, dynamic> msg;
   final String messageText;
   final bool isMe;
   final String? currentUserId;
+  final String? peerUserId;
   final void Function(String messageId, int optionIndex)? onPollVote;
 
   @override
@@ -571,7 +563,11 @@ class ChatMessageContent extends StatelessWidget {
           audioUrl: msg['audioUrl']?.toString() ?? msg['mediaUrl']?.toString(),
         );
       case 'call':
-        return ChatCallMessageWidget(msg: msg, isMe: isMe);
+        return ChatCallMessageWidget(
+          msg: msg,
+          isMe: isMe,
+          peerUserId: peerUserId,
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -597,7 +593,7 @@ class ChatMessageContent extends StatelessWidget {
       phone: msg['contactPhone']?.toString() ?? '',
       email: msg['contactEmail']?.toString(),
       userId: msg['contactUserId']?.toString(),
-      avatarUrl: msg['contactAvatarUrl']?.toString(),
+avatarUrl: msg['contactAvatarUrl']?.toString(),
     );
   }
 }
@@ -642,10 +638,10 @@ class ChatMessageFooter extends StatelessWidget {
             if (isMe) ...[
               const SizedBox(width: AppSizes.p4),
               Icon(
-                status == 'read' ? Icons.done_all : Icons.check,
+                status == 'read' ? LucideIcons.checkCheck : LucideIcons.check,
                 size: ChatLayoutConstants.statusIconSize,
                 color: status == 'read'
-                    ? chatTheme.readReceipt
+                    ? const Color(0xFF34B7F1)
                     : chatTheme.pendingReceipt,
               ),
             ],
@@ -657,37 +653,32 @@ class ChatMessageFooter extends StatelessWidget {
 }
 
 class ChatReactionBadge extends StatelessWidget {
-  const ChatReactionBadge({required this.emoji});
+  const ChatReactionBadge({required this.emoji, super.key});
 
   final String emoji;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final chatTheme = ChatTheme.of(context);
     return Container(
-      padding: const EdgeInsets.all(ChatLayoutConstants.reactionBadgePadding),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.dividerColor.withValues(
-            alpha: ChatLayoutConstants.reactionBadgeBorderAlpha,
-          ),
+          color: theme.dividerColor.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: chatTheme.bubbleShadow.withValues(
-              alpha: ChatLayoutConstants.reactionBadgeShadowAlpha,
-            ),
-            blurRadius: ChatLayoutConstants.reactionBadgeShadowBlur,
-            offset: ChatLayoutConstants.reactionBadgeShadowOffset,
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Text(
         emoji,
-        style: const TextStyle(fontSize: ChatLayoutConstants.reactionBadgeSize),
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -695,13 +686,15 @@ class ChatReactionBadge extends StatelessWidget {
 
 class ChatCallMessageWidget extends StatelessWidget {
   const ChatCallMessageWidget({
-    super.key,
     required this.msg,
     required this.isMe,
+    this.peerUserId,
+    super.key,
   });
 
   final Map<String, dynamic> msg;
   final bool isMe;
+  final String? peerUserId;
 
   String _formatDuration(int? seconds) {
     if (seconds == null || seconds <= 0) return '';
@@ -713,22 +706,28 @@ class ChatCallMessageWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final chatTheme = ChatTheme.of(context);
+    final colorScheme = theme.colorScheme;
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
-    final isDark = theme.brightness == Brightness.dark;
 
     final payload = msg['payload'] is Map
         ? Map<String, dynamic>.from(msg['payload'] as Map)
         : <String, dynamic>{};
 
-    final callType = (msg['callType'] ?? payload['callType'] ?? 'AUDIO')
+    final rawCallType = (msg['callType'] ??
+            payload['callType'] ??
+            payload['type'] ??
+            msg['mediaType'] ??
+            '')
         .toString()
         .toUpperCase();
+    final isVideo = rawCallType.contains('VIDEO') ||
+        msg['isVideo'] == true ||
+        payload['isVideo'] == true ||
+        payload['type']?.toString().toUpperCase() == 'VIDEO';
     final status = (msg['callStatus'] ?? payload['status'] ?? 'ENDED')
         .toString()
         .toUpperCase();
-    final isVideo = callType == 'VIDEO';
 
     final rawDuration = msg['durationSeconds'] ?? payload['durationSeconds'];
     int? durationSecs;
@@ -746,16 +745,20 @@ class ChatCallMessageWidget extends StatelessWidget {
     String statusLabel;
 
     if (isMissed) {
-      iconData = LucideIcons.phoneMissed;
+      iconData = isVideo ? LucideIcons.videoOff : LucideIcons.phoneMissed;
       iconColor = colorScheme.error;
-      statusLabel = isAr ? 'مكالمة فائتة' : 'Missed call';
+      statusLabel = isVideo
+          ? (isAr ? 'مكالمة فيديو فائتة' : 'Missed video call')
+          : (isAr ? 'مكالمة فائتة' : 'Missed call');
     } else if (isCancelled) {
       iconData = isVideo ? LucideIcons.videoOff : LucideIcons.phoneOff;
       iconColor = colorScheme.secondary;
-      statusLabel = isAr ? 'مكالمة ملغاة' : 'Cancelled call';
+      statusLabel = isVideo
+          ? (isAr ? 'مكالمة فيديو ملغاة' : 'Cancelled video call')
+          : (isAr ? 'مكالمة ملغاة' : 'Cancelled call');
     } else {
       iconData = isVideo ? LucideIcons.video : LucideIcons.phone;
-      iconColor = colorScheme.primary;
+      iconColor = colorScheme.secondary;
       final dur = _formatDuration(durationSecs);
       final title = isVideo
           ? (isAr ? 'مكالمة فيديو' : 'Video call')
@@ -763,105 +766,88 @@ class ChatCallMessageWidget extends StatelessWidget {
       statusLabel = dur.isNotEmpty ? '$title ($dur)' : title;
     }
 
-    final peerUserId =
-        (msg['peerUserId'] ?? msg['senderId'] ?? payload['initiatorId'] ?? '')
-            .toString();
-    final chatId = (msg['chatId'] ?? payload['chatId'] ?? '').toString();
+    final targetChatId = (msg['chatId'] ?? payload['chatId'] ?? '').toString();
 
-    final cardBgColor = isMe
-        ? (isDark
-            ? colorScheme.primaryContainer.withValues(alpha: 0.35)
-            : colorScheme.primary.withValues(alpha: 0.10))
-        : (isDark
-            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-            : colorScheme.surfaceContainerHigh);
+    String targetPeerId = '';
+    if (peerUserId != null && peerUserId!.trim().isNotEmpty) {
+      targetPeerId = peerUserId!.trim();
+    } else {
+      final raw = msg['peerUserId'] ??
+          (isMe ? msg['receiverId'] : msg['senderId']) ??
+          payload['initiatorId'] ??
+          payload['targetUserId'];
+      if (raw != null && raw.toString().trim().isNotEmpty) {
+        targetPeerId = raw.toString().trim();
+      }
+    }
 
-    final titleTextColor = isMe
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSurface;
-
-    final subTextColor = isMe
-        ? colorScheme.onPrimaryContainer.withValues(alpha: 0.75)
-        : colorScheme.onSurfaceVariant;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: cardBgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isMe
-              ? colorScheme.primary.withValues(alpha: 0.25)
-              : colorScheme.outline.withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
+    void handleCallBack() {
+      final String callTypeToStart = isVideo ? 'VIDEO' : 'AUDIO';
+      context.read<CallBloc>().add(
+            StartCallEvent(
+              chatId: targetChatId,
+              type: callTypeToStart,
+              inviteeIds: targetPeerId.isNotEmpty ? [targetPeerId] : null,
             ),
-            child: Icon(iconData, size: 20, color: iconColor),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  statusLabel,
-                  style: TextStyle(
-                    color: titleTextColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isAr ? 'انقر لإعادة الاتصال' : 'Tap to call back',
-                  style: TextStyle(
-                    color: subTextColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            onPressed: () {
-              context.read<CallBloc>().add(
-                    StartCallEvent(
-                      chatId: chatId,
-                      type: isVideo ? 'VIDEO' : 'AUDIO',
-                      inviteeIds: peerUserId.isNotEmpty ? [peerUserId] : null,
-                    ),
-                  );
-            },
-            icon: Container(
-              padding: const EdgeInsets.all(6),
+          );
+    }
+
+    return InkWell(
+      onTap: handleCallBack,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
-                color: colorScheme.primary.withValues(alpha: 0.15),
               ),
-              child: Icon(
-                isVideo ? LucideIcons.video : LucideIcons.phone,
-                size: 16,
-                color: colorScheme.primary,
+              child: Icon(iconData, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    statusLabel,
+                    style: TextStyle(
+                      color: isMe
+                          ? chatTheme.onSentBubble
+                          : chatTheme.onReceivedBubble,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isAr ? 'انقر لإعادة الاتصال' : 'Tap to call back',
+                    style: TextStyle(
+                      color: isMe
+                          ? chatTheme.onSentBubbleMuted
+                          : chatTheme.onReceivedBubbleMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ),
-            constraints: const BoxConstraints(),
-            padding: EdgeInsets.zero,
-          ),
-        ],
+            const SizedBox(width: 10),
+            Icon(
+              isVideo ? LucideIcons.video : LucideIcons.phone,
+              size: 18,
+              color: iconColor,
+            ),
+          ],
+        ),
       ),
     );
   }

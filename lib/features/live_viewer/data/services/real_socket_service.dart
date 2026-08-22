@@ -23,7 +23,7 @@ import 'fake_socket_service.dart' show SocketService;
 /// liveLike, liveViewers, liveEnded, userJoined + reconnect lifecycle.
 class RealSocketService implements SocketService {
   RealSocketService({Future<String?> Function()? idTokenProvider})
-      : _idTokenProvider = idTokenProvider ?? _defaultTokenProvider;
+    : _idTokenProvider = idTokenProvider ?? _defaultTokenProvider;
 
   final Future<String?> Function() _idTokenProvider;
 
@@ -46,10 +46,7 @@ class RealSocketService implements SocketService {
   String? get currentLiveId => _liveId;
 
   @override
-  Future<void> connect({
-    required String liveId,
-    required String token,
-  }) async {
+  Future<void> connect({required String liveId, required String token}) async {
     await disconnect();
 
     _liveId = liveId;
@@ -87,10 +84,9 @@ class RealSocketService implements SocketService {
       final wasConnected = _connected;
       _connected = false;
       if (wasConnected && _liveId != null) {
-        _controller.add(NetworkLostEvent(
-          liveId: _liveId!,
-          timestamp: DateTime.now(),
-        ));
+        _controller.add(
+          NetworkLostEvent(liveId: _liveId!, timestamp: DateTime.now()),
+        );
       }
     });
 
@@ -105,21 +101,22 @@ class RealSocketService implements SocketService {
 
     socket.onReconnectAttempt((attempt) {
       if (_liveId == null) return;
-      _controller.add(ReconnectingEvent(
-        liveId: _liveId!,
-        attempt: attempt,
-        timestamp: DateTime.now(),
-      ));
+      _controller.add(
+        ReconnectingEvent(
+          liveId: _liveId!,
+          attempt: attempt,
+          timestamp: DateTime.now(),
+        ),
+      );
     });
 
     socket.onReconnect((_) {
       _connected = true;
       if (_liveId != null) {
         socket.emit('joinLive', {'liveId': _liveId});
-        _controller.add(ReconnectedEvent(
-          liveId: _liveId!,
-          timestamp: DateTime.now(),
-        ));
+        _controller.add(
+          ReconnectedEvent(liveId: _liveId!, timestamp: DateTime.now()),
+        );
       }
     });
 

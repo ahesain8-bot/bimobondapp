@@ -131,12 +131,15 @@ class _ConversationTile extends StatelessWidget {
         if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
           'imageUrl': chat.imageUrl,
         if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
+        'isPinned': chat.isPinned,
+        'isMuted': chat.isMuted,
       };
 
   Future<void> _openChat(
     BuildContext context, {
     bool openCamera = false,
   }) async {
+    context.read<InboxBloc>().add(InboxChatOpened(chat.chatId));
     await context.pushNamed(
       'chat',
       extra: {
@@ -175,6 +178,7 @@ class _ConversationTile extends StatelessWidget {
           ),
         ),
         leading: Stack(
+          clipBehavior: Clip.none,
           children: [
             Container(
               padding: chat.unread ? const EdgeInsets.all(2) : EdgeInsets.zero,
@@ -184,40 +188,30 @@ class _ConversationTile extends StatelessWidget {
                     ? Border.all(color: theme.colorScheme.primary, width: 2)
                     : null,
               ),
-              child: ClipOval(
-                child: StoryProfileAvatar(
-                  userId: chat.peerUserId,
-                  imageUrl: chat.imageUrl,
-                  radius: MessagesLayoutConstants.conversationAvatarRadius,
-                  fallbackText: chat.name,
-                  username: chat.name,
-                  fullName: chat.name,
-                ),
+              child: StoryProfileAvatar(
+                userId: chat.peerUserId,
+                imageUrl: chat.imageUrl,
+                radius: MessagesLayoutConstants.conversationAvatarRadius,
+                fallbackText: chat.name,
+                username: chat.name,
+                fullName: chat.name,
+                isOnline: chat.active,
               ),
             ),
-            if (chat.active)
-              PositionedDirectional(
-                end: 4,
-                bottom: 4,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: MessagesLayoutConstants.activeDotColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: theme.scaffoldBackgroundColor,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
         title: Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             children: [
+              if (chat.isPinned) ...[
+                Icon(
+                  LucideIcons.pin,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+              ],
               Expanded(
                 child: Text(
                   chat.name,
@@ -246,22 +240,50 @@ class _ConversationTile extends StatelessWidget {
         ),
         subtitle: Row(
           children: [
+            if (chat.isLastFromMe && !chat.isTyping) ...[
+              Icon(
+                chat.isLastReadByPeer
+                    ? LucideIcons.checkCheck
+                    : LucideIcons.check,
+                size: 16,
+                color: chat.isLastReadByPeer
+                    ? const Color(0xFF34B7F1)
+                    : theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+              ),
+              const SizedBox(width: 4),
+            ],
             Expanded(
               child: Text(
                 chat.preview,
                 style: TextStyle(
-                  color: chat.unread
-                      ? theme.textTheme.bodyLarge?.color
-                      : theme.textTheme.bodyMedium?.color?.withValues(
-                          alpha: 0.5,
-                        ),
-                  fontWeight: chat.unread ? FontWeight.w600 : FontWeight.w400,
+                  color: chat.isTyping
+                      ? theme.colorScheme.primary
+                      : (chat.unread
+                          ? theme.textTheme.bodyLarge?.color
+                          : theme.textTheme.bodyMedium?.color?.withValues(
+                              alpha: 0.5,
+                            )),
+                  fontWeight: chat.isTyping || chat.unread
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  fontStyle:
+                      chat.isTyping ? FontStyle.italic : FontStyle.normal,
                   fontSize: 14,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (chat.isMuted) ...[
+              const SizedBox(width: 6),
+              Icon(
+                LucideIcons.bellOff,
+                size: 14,
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.4,
+                ),
+              ),
+            ],
             if (chat.unread) ...[
               const SizedBox(width: 8),
               Container(

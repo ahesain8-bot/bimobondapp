@@ -48,11 +48,13 @@ class _FloatingHeartState extends State<FloatingHeart>
     _horizontalOffset = (random.nextDouble() - 0.5) * 48;
     _rotation = (random.nextDouble() - 0.5) * 0.55;
     _color = widget.color ?? _palette[random.nextInt(_palette.length)];
-    _size = TikTokLiveTokens.heartMin +
+    _size =
+        TikTokLiveTokens.heartMin +
         random.nextDouble() *
             (TikTokLiveTokens.heartMax - TikTokLiveTokens.heartMin);
 
-    final ms = TikTokLiveTokens.heartMsMin +
+    final ms =
+        TikTokLiveTokens.heartMsMin +
         random.nextInt(
           TikTokLiveTokens.heartMsMax - TikTokLiveTokens.heartMsMin,
         );
@@ -62,9 +64,10 @@ class _FloatingHeartState extends State<FloatingHeart>
       duration: Duration(milliseconds: ms),
     );
 
-    _rise = Tween<double>(begin: 0, end: TikTokLiveTokens.heartRise).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    _rise = Tween<double>(
+      begin: 0,
+      end: TikTokLiveTokens.heartRise,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0.35, end: 1.15), weight: 18),
@@ -106,10 +109,7 @@ class _FloatingHeartState extends State<FloatingHeart>
                   color: _color,
                   size: _size,
                   shadows: [
-                    Shadow(
-                      color: _color.withValues(alpha: 0.4),
-                      blurRadius: 6,
-                    ),
+                    Shadow(color: _color.withValues(alpha: 0.4), blurRadius: 6),
                   ],
                 ),
               ),

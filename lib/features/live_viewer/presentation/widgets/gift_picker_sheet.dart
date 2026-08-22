@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../domain/entities/gift_entity.dart';
-import '../providers/live_dependencies.dart';
+import '../../domain/repositories/gift_repository.dart';
+import '../di/live_viewer_injector.dart' as di;
 import 'gift_icon.dart';
 
-class GiftPickerSheet extends ConsumerStatefulWidget {
+class GiftPickerSheet extends StatefulWidget {
   final int coinBalance;
   final ValueChanged<GiftEntity> onGiftSelected;
 
@@ -19,10 +19,10 @@ class GiftPickerSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<GiftPickerSheet> createState() => _GiftPickerSheetState();
+  State<GiftPickerSheet> createState() => _GiftPickerSheetState();
 }
 
-class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
+class _GiftPickerSheetState extends State<GiftPickerSheet> {
   List<GiftEntity> _gifts = const [];
   bool _loading = true;
   String? _selectedId;
@@ -34,16 +34,20 @@ class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
   }
 
   Future<void> _load() async {
-    final result = await ref.read(giftRepositoryProvider).getAllGifts();
+    final giftRepository = di.sl<GiftRepository>();
+    final result = await giftRepository.getAllGifts();
     if (!mounted) return;
-    result.fold((_) {
-      setState(() => _loading = false);
-    }, (gifts) {
-      setState(() {
-        _gifts = gifts;
-        _loading = false;
-      });
-    });
+    result.fold(
+      (_) {
+        setState(() => _loading = false);
+      },
+      (gifts) {
+        setState(() {
+          _gifts = gifts;
+          _loading = false;
+        });
+      },
+    );
   }
 
   @override
@@ -89,8 +93,11 @@ class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.monetization_on,
-                    color: AppColors.coinGold, size: 16),
+                const Icon(
+                  Icons.monetization_on,
+                  color: AppColors.coinGold,
+                  size: 16,
+                ),
                 const SizedBox(width: 3),
                 Text(
                   '${widget.coinBalance}',
@@ -102,8 +109,10 @@ class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.coinGold.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(10),
@@ -132,11 +141,11 @@ class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      childAspectRatio: 0.82,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
+                          crossAxisCount: 4,
+                          childAspectRatio: 0.82,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
                     itemCount: _gifts.length,
                     itemBuilder: (context, index) {
                       final gift = _gifts[index];
@@ -188,8 +197,11 @@ class _GiftPickerSheetState extends ConsumerState<GiftPickerSheet> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(Icons.monetization_on,
-                                        size: 10, color: AppColors.coinGold),
+                                    const Icon(
+                                      Icons.monetization_on,
+                                      size: 10,
+                                      color: AppColors.coinGold,
+                                    ),
                                     const SizedBox(width: 1),
                                     Text(
                                       '${gift.coinCost}',

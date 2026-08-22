@@ -1,5 +1,5 @@
 import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../entities/live_entity.dart';
 import '../entities/live_session_entity.dart';
 
@@ -50,5 +50,35 @@ abstract class LiveRepository {
 
   Future<Either<Failure, List<LiveEntity>>> getRecommendedLives({
     int limit = 10,
+  });
+
+  /// POST /lives/:id/viewers/:userId/ban
+  /// Emits `liveModeration` type: viewer_banned
+  Future<Either<Failure, void>> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  });
+
+  /// POST /lives/:id/viewers/:userId/unban
+  /// Emits `liveModeration` type: viewer_unbanned
+  Future<Either<Failure, void>> unbanViewer({
+    required String liveId,
+    required String userId,
+  });
+
+  /// POST /lives/:id/viewers/:userId/mute-chat
+  /// Emits `liveModeration` type: chat_muted
+  Future<Either<Failure, void>> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  });
+
+  /// POST /lives/:id/viewers/:userId/unmute-chat
+  /// Emits `liveModeration` type: chat_unmuted
+  Future<Either<Failure, void>> unmuteViewerChat({
+    required String liveId,
+    required String userId,
   });
 }

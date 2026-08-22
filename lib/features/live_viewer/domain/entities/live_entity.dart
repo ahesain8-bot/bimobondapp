@@ -82,33 +82,27 @@ class LiveEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        hostId,
-        hostName,
-        hostAvatar,
-        title,
-        description,
-        thumbnailUrl,
-        streamUrl,
-        category,
-        viewerCount,
-        likeCount,
-        startTime,
-        endTime,
-        status,
-        isLive,
-        isFollowing,
-        metadata,
-      ];
+    id,
+    hostId,
+    hostName,
+    hostAvatar,
+    title,
+    description,
+    thumbnailUrl,
+    streamUrl,
+    category,
+    viewerCount,
+    likeCount,
+    startTime,
+    endTime,
+    status,
+    isLive,
+    isFollowing,
+    metadata,
+  ];
 }
 
-enum LiveStatus {
-  scheduled,
-  live,
-  paused,
-  ended,
-  banned,
-}
+enum LiveStatus { scheduled, live, paused, ended, banned }
 
 extension LiveStatusExtension on LiveStatus {
   String get displayName {

@@ -157,8 +157,10 @@ class _HourlyRankingSheetState extends State<HourlyRankingSheet> {
             child: Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFF3D6),
                     borderRadius: BorderRadius.circular(6),
@@ -320,8 +322,8 @@ class _RankingRow extends StatelessWidget {
               border: entry.isLive
                   ? Border.all(color: const Color(0xFFFF2D55), width: 2.5)
                   : (entry.rank <= 3
-                      ? Border.all(color: const Color(0xFFFF2D55), width: 2)
-                      : null),
+                        ? Border.all(color: const Color(0xFFFF2D55), width: 2)
+                        : null),
             ),
             child: ClipOval(
               child: CachedNetworkImage(
@@ -355,7 +357,10 @@ class _RankingRow extends StatelessWidget {
                     entry.subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.5, color: Colors.black45),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Colors.black45,
+                    ),
                   ),
               ],
             ),

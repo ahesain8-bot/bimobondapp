@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/comment_repository.dart';
@@ -30,20 +30,19 @@ class FakeCommentRepository implements CommentRepository {
       _ensureRoom(liveId);
       final all = _comments[liveId]!;
       if (all.isEmpty) {
-        final seed = List.generate(
-          8,
-          (_) => _seedComment(liveId),
-        );
+        final seed = List.generate(8, (_) => _seedComment(liveId));
         all.addAll(seed);
       }
       final slice = all.length > limit
           ? all.sublist(all.length - limit)
           : List<CommentEntity>.from(all);
-      return Right(CommentBatch(
-        comments: slice.reversed.toList(),
-        hasMore: all.length > limit,
-        nextCursor: all.length > limit ? 'cursor_${all.length}' : null,
-      ));
+      return Right(
+        CommentBatch(
+          comments: slice.reversed.toList(),
+          hasMore: all.length > limit,
+          nextCursor: all.length > limit ? 'cursor_${all.length}' : null,
+        ),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to fetch comments: $e'));
     }
@@ -77,8 +76,18 @@ class FakeCommentRepository implements CommentRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteComment(String commentId) async {
+  Future<Either<Failure, void>> deleteComment(
+    String commentId, {
+    String? liveId,
+  }) async {
     await Future.delayed(const Duration(milliseconds: 200));
+    if (liveId != null) {
+      final list = _comments[liveId];
+      if (list != null) {
+        list.removeWhere((c) => c.id == commentId);
+        _controllers[liveId]?.add(List.unmodifiable(list));
+      }
+    }
     return const Right(null);
   }
 
@@ -164,7 +173,9 @@ class FakeCommentRepository implements CommentRepository {
       username: username,
       userAvatar: 'https://i.pravatar.cc/150?u=$username',
       content: msgs[_random.nextInt(msgs.length)],
-      createdAt: DateTime.now().subtract(Duration(seconds: _random.nextInt(90))),
+      createdAt: DateTime.now().subtract(
+        Duration(seconds: _random.nextInt(90)),
+      ),
     );
   }
 

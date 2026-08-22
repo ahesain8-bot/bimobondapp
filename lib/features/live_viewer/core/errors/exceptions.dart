@@ -10,27 +10,18 @@ abstract class AppException implements Exception {
 }
 
 class ServerException extends AppException {
-  const ServerException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const ServerException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class NetworkException extends AppException {
-  const NetworkException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const NetworkException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class CacheException extends AppException {
-  const CacheException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const CacheException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class ValidationException extends AppException {
@@ -45,49 +36,31 @@ class ValidationException extends AppException {
 }
 
 class AuthenticationException extends AppException {
-  const AuthenticationException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const AuthenticationException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class AuthorizationException extends AppException {
-  const AuthorizationException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const AuthorizationException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class NotFoundException extends AppException {
-  const NotFoundException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const NotFoundException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class TimeoutException extends AppException {
-  const TimeoutException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const TimeoutException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class UnknownException extends AppException {
-  const UnknownException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const UnknownException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }
 
 class WebsocketException extends AppException {
-  const WebsocketException(
-    String message, {
-    String? code,
-    dynamic details,
-  }) : super(message, code: code, details: details);
+  const WebsocketException(String message, {String? code, dynamic details})
+    : super(message, code: code, details: details);
 }

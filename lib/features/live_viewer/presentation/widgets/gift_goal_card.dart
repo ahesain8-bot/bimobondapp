@@ -56,7 +56,11 @@ class GiftGoalCard extends StatelessWidget {
                     color: Color(0xFFEEEEEE),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.close, size: 14, color: Colors.black45),
+                  child: const Icon(
+                    Icons.close,
+                    size: 14,
+                    color: Colors.black45,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -122,14 +126,16 @@ class GiftGoalCard extends StatelessWidget {
                     value: progress,
                     minHeight: 8,
                     backgroundColor: const Color(0xFFE8E8E8),
-                    valueColor:
-                        const AlwaysStoppedAnimation(Color(0xFFB388FF)),
+                    valueColor: const AlwaysStoppedAnimation(Color(0xFFB388FF)),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.monetization_on,
-                  color: Color(0xFFFFC107), size: 18),
+              const Icon(
+                Icons.monetization_on,
+                color: Color(0xFFFFC107),
+                size: 18,
+              ),
               const SizedBox(width: 2),
               Text(
                 '$coinCost',

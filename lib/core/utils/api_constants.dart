@@ -167,6 +167,10 @@ class ApiConstants {
   static String chatById(String chatId) => '/chats/$chatId';
   static String chatSettings(String chatId) => '/chats/$chatId/settings';
   static String chatWallpaper(String chatId) => '/chats/$chatId/wallpaper';
+  static String chatPersonalWallpaperUpload(String chatId) =>
+      '/chats/$chatId/personal-wallpaper/upload';
+  static String chatPersonalWallpaper(String chatId) =>
+      '/chats/$chatId/personal-wallpaper';
   static String chatRead(String chatId) => '/chats/$chatId/read';
   static const String chatWallpapersCatalog = '/chats/wallpapers';
   static String chatMessages(String chatId) => '/chats/$chatId/messages';
@@ -192,7 +196,10 @@ class ApiConstants {
   static String userById(String userId) => '/users/$userId';
   static String userFollowStatus(String userId) =>
       '/users/$userId/follow-status';
+  static String userRelationship(String userId) =>
+      '/users/$userId/relationship';
   static String blockUser(String userId) => '/users/$userId/block';
+  static String unblockUser(String userId) => '/users/$userId/unblock';
   static const String myBlocks = '/users/me/blocks';
   static String adminUserActivity(String userId) =>
       '/users/admin/$userId/activity';

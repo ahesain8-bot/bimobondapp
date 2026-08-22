@@ -155,22 +155,22 @@ class _GiftToast extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          'x${gift.quantity}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: TikTokLiveTokens.comboFont,
-            fontWeight: FontWeight.w900,
-            fontStyle: FontStyle.italic,
-            height: 1,
-            shadows: [
-              Shadow(
-                color: Colors.black87,
-                blurRadius: 2,
-                offset: Offset(1, 1),
+              'x${gift.quantity}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: TikTokLiveTokens.comboFont,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                height: 1,
+                shadows: [
+                  Shadow(
+                    color: Colors.black87,
+                    blurRadius: 2,
+                    offset: Offset(1, 1),
+                  ),
+                ],
               ),
-            ],
-          ),
-        )
+            )
             .animate(onPlay: (c) => c.forward())
             .scale(
               begin: const Offset(0.55, 0.55),
@@ -237,8 +237,8 @@ class _GiftBurstState extends State<_GiftBurst>
         final scale = t < 0.2
             ? (t / 0.2) * 1.2
             : t < 0.45
-                ? 1.2 - ((t - 0.2) / 0.25) * 0.12
-                : 1.08;
+            ? 1.2 - ((t - 0.2) / 0.25) * 0.12
+            : 1.08;
 
         return IgnorePointer(
           child: Stack(
@@ -304,11 +304,7 @@ class CoinBalanceChip extends StatelessWidget {
   final int balance;
   final int delta;
 
-  const CoinBalanceChip({
-    super.key,
-    required this.balance,
-    this.delta = 0,
-  });
+  const CoinBalanceChip({super.key, required this.balance, this.delta = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -327,8 +323,11 @@ class CoinBalanceChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.monetization_on,
-                  color: AppColors.coinGold, size: 16),
+              const Icon(
+                Icons.monetization_on,
+                color: AppColors.coinGold,
+                size: 16,
+              ),
               const SizedBox(width: 4),
               Text(
                 balance.formatCompactLike,
@@ -344,17 +343,18 @@ class CoinBalanceChip extends StatelessWidget {
           Positioned(
             right: -4,
             top: -14,
-            child: Text(
-              '$delta',
-              style: AppTextStyles.labelMedium.copyWith(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.w700,
-              ),
-            )
-                .animate()
-                .fadeIn()
-                .slideY(begin: 0.4, end: -0.6)
-                .fadeOut(delay: 500.ms),
+            child:
+                Text(
+                      '$delta',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                    .animate()
+                    .fadeIn()
+                    .slideY(begin: 0.4, end: -0.6)
+                    .fadeOut(delay: 500.ms),
           ),
       ],
     );
