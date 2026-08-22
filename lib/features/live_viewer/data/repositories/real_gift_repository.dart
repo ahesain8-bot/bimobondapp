@@ -4,7 +4,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/gift_repository.dart';
@@ -23,8 +23,8 @@ class RealGiftRepository implements GiftRepository {
   RealGiftRepository({
     required LiveApiClient apiClient,
     required SocketService socket,
-  })  : _api = apiClient,
-        _socket = socket;
+  }) : _api = apiClient,
+       _socket = socket;
 
   final LiveApiClient _api;
   final SocketService _socket;
@@ -40,8 +40,9 @@ class RealGiftRepository implements GiftRepository {
   Future<Either<Failure, List<GiftEntity>>> getGiftsByRarity(
     GiftRarity rarity,
   ) async {
-    final gifts =
-        MockGiftCatalog.gifts.where((g) => g.rarity == rarity).toList();
+    final gifts = MockGiftCatalog.gifts
+        .where((g) => g.rarity == rarity)
+        .toList();
     return Right(gifts);
   }
 
@@ -88,7 +89,8 @@ class RealGiftRepository implements GiftRepository {
 
       final total = gift.coinCost * quantity;
       final sent = GiftSentEntity(
-        id: payload['id']?.toString() ??
+        id:
+            payload['id']?.toString() ??
             'sent_${DateTime.now().microsecondsSinceEpoch}',
         giftId: giftId,
         liveId: liveId,
@@ -101,7 +103,9 @@ class RealGiftRepository implements GiftRepository {
         giftDetails: gift,
         senderGifterLevel: _asInt(
           payload['sender'] is Map
-              ? Map<String, dynamic>.from(payload['sender'] as Map)['gifterLevel']
+              ? Map<String, dynamic>.from(
+                  payload['sender'] as Map,
+                )['gifterLevel']
               : payload['gifterLevel'],
         ),
       );
@@ -143,17 +147,21 @@ class RealGiftRepository implements GiftRepository {
           final userMap = user is Map<String, dynamic>
               ? user
               : (user is Map ? Map<String, dynamic>.from(user) : null);
-          entries.add(GiftLeaderboardEntry(
-            userId: userMap?['id']?.toString() ??
-                item['userId']?.toString() ??
-                '',
-            username: userMap?['username']?.toString() ??
-                userMap?['fullName']?.toString() ??
-                'User',
-            avatarUrl: userMap?['avatarUrl']?.toString(),
-            totalCoins: _asInt(item['coins'] ?? item['totalCoins']) ?? 0,
-            rank: _asInt(item['rank']) ?? rank,
-          ));
+          entries.add(
+            GiftLeaderboardEntry(
+              userId:
+                  userMap?['id']?.toString() ??
+                  item['userId']?.toString() ??
+                  '',
+              username:
+                  userMap?['username']?.toString() ??
+                  userMap?['fullName']?.toString() ??
+                  'User',
+              avatarUrl: userMap?['avatarUrl']?.toString(),
+              totalCoins: _asInt(item['coins'] ?? item['totalCoins']) ?? 0,
+              rank: _asInt(item['rank']) ?? rank,
+            ),
+          );
           rank++;
         }
       }

@@ -38,16 +38,24 @@ class LiveDto {
       id: json['id'] as String,
       hostId: json['host_id'] as String? ?? json['hostId'] as String,
       hostName: json['host_name'] as String? ?? json['hostName'] as String,
-      hostAvatar: json['host_avatar'] as String? ?? json['hostAvatar'] as String?,
+      hostAvatar:
+          json['host_avatar'] as String? ?? json['hostAvatar'] as String?,
       title: json['title'] as String,
       description: json['description'] as String?,
       thumbnailUrl:
           json['thumbnail_url'] as String? ?? json['thumbnailUrl'] as String?,
       streamUrl: json['stream_url'] as String? ?? json['streamUrl'] as String?,
       category: json['category'] as String? ?? 'Other',
-      viewerCount: (json['viewer_count'] as num?)?.toInt() ?? (json['viewerCount'] as num?)?.toInt() ?? 0,
-      likeCount: (json['like_count'] as num?)?.toInt() ?? (json['likeCount'] as num?)?.toInt() ?? 0,
-      startTime: DateTime.tryParse(
+      viewerCount:
+          (json['viewer_count'] as num?)?.toInt() ??
+          (json['viewerCount'] as num?)?.toInt() ??
+          0,
+      likeCount:
+          (json['like_count'] as num?)?.toInt() ??
+          (json['likeCount'] as num?)?.toInt() ??
+          0,
+      startTime:
+          DateTime.tryParse(
             json['start_time'] as String? ?? json['startTime'] as String? ?? '',
           ) ??
           DateTime.now(),
@@ -56,20 +64,20 @@ class LiveDto {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'host_id': hostId,
-        'host_name': hostName,
-        'host_avatar': hostAvatar,
-        'title': title,
-        'description': description,
-        'thumbnail_url': thumbnailUrl,
-        'stream_url': streamUrl,
-        'category': category,
-        'viewer_count': viewerCount,
-        'like_count': likeCount,
-        'start_time': startTime.toIso8601String(),
-        'status': status,
-      };
+    'id': id,
+    'host_id': hostId,
+    'host_name': hostName,
+    'host_avatar': hostAvatar,
+    'title': title,
+    'description': description,
+    'thumbnail_url': thumbnailUrl,
+    'stream_url': streamUrl,
+    'category': category,
+    'viewer_count': viewerCount,
+    'like_count': likeCount,
+    'start_time': startTime.toIso8601String(),
+    'status': status,
+  };
 
   LiveEntity toEntity() {
     return LiveEntity(

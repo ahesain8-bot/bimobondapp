@@ -151,8 +151,10 @@ class _GuestSlotTile extends StatelessWidget {
                 top: 3,
                 right: 3,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2F6BFF),
                     borderRadius: BorderRadius.circular(4),
@@ -173,8 +175,10 @@ class _GuestSlotTile extends StatelessWidget {
                 top: 3,
                 left: 3,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: TikTokLiveTokens.hostTagOrange,
                     borderRadius: BorderRadius.circular(3),
@@ -252,15 +256,9 @@ Future<bool?> showGuestRequestSheet(
           children: [
             Row(
               children: [
-                _SheetIconBtn(
-                  icon: Icons.settings_outlined,
-                  onTap: () {},
-                ),
+                _SheetIconBtn(icon: Icons.settings_outlined, onTap: () {}),
                 const SizedBox(width: 8),
-                _SheetIconBtn(
-                  icon: Icons.auto_awesome_outlined,
-                  onTap: () {},
-                ),
+                _SheetIconBtn(icon: Icons.auto_awesome_outlined, onTap: () {}),
                 const Spacer(),
               ],
             ),
@@ -292,8 +290,11 @@ Future<bool?> showGuestRequestSheet(
                                   color: Colors.black38,
                                 ),
                               )
-                            : const Icon(Icons.person,
-                                size: 32, color: Colors.black38),
+                            : const Icon(
+                                Icons.person,
+                                size: 32,
+                                color: Colors.black38,
+                              ),
                       ),
                     ),
                   ),
@@ -391,8 +392,11 @@ Future<bool?> showGuestRequestSheet(
               ),
               child: Row(
                 children: [
-                  Icon(Icons.chevron_left,
-                      size: 18, color: Colors.black.withValues(alpha: 0.45)),
+                  Icon(
+                    Icons.chevron_left,
+                    size: 18,
+                    color: Colors.black.withValues(alpha: 0.45),
+                  ),
                   Expanded(
                     child: Text(
                       'Find more available spots',

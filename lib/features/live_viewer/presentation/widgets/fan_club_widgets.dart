@@ -10,53 +10,54 @@ class FanClubJoinButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            height: 28,
-            padding: const EdgeInsets.fromLTRB(8, 0, 10, 0),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE11D48),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFFFD54F), width: 1.8),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
-                  blurRadius: 8,
-                  spreadRadius: 0.5,
+          onTap: onTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                height: 28,
+                padding: const EdgeInsets.fromLTRB(8, 0, 10, 0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE11D48),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFFFD54F),
+                    width: 1.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
+                      blurRadius: 8,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: const Text(
-              'Join my Fan Club',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                height: 1,
+                alignment: Alignment.center,
+                child: const Text(
+                  'Join my Fan Club',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
               ),
-            ),
+              const Positioned(
+                right: -10,
+                top: -14,
+                child: Text('💖', style: TextStyle(fontSize: 22)),
+              ),
+              const Positioned(
+                right: 8,
+                top: -10,
+                child: Text('🌹', style: TextStyle(fontSize: 14)),
+              ),
+            ],
           ),
-          const Positioned(
-            right: -10,
-            top: -14,
-            child: Text('💖', style: TextStyle(fontSize: 22)),
-          ),
-          const Positioned(
-            right: 8,
-            top: -10,
-            child: Text('🌹', style: TextStyle(fontSize: 14)),
-          ),
-        ],
-      ),
-    ).animate(onPlay: (c) => c.repeat(reverse: true)).moveY(
-          begin: 0,
-          end: -1.2,
-          duration: 900.ms,
-        );
+        )
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .moveY(begin: 0, end: -1.2, duration: 900.ms);
   }
 }
 
@@ -106,7 +107,9 @@ class FanClubBottomBar extends StatelessWidget {
                         top: -4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 3, vertical: 1),
+                            horizontal: 3,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFE2C55),
                             borderRadius: BorderRadius.circular(7),
@@ -142,10 +145,7 @@ class FanClubBottomBar extends StatelessWidget {
                         ),
                         const Text(
                           'Join with 1 coin for exclusive perks',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.black45,
-                          ),
+                          style: TextStyle(fontSize: 11, color: Colors.black45),
                         ),
                       ],
                     ),

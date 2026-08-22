@@ -18,7 +18,7 @@ import 'live_remote_datasource.dart';
 /// - `DELETE /creators/:id/fan-club/subscribe` (unfollow)
 class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   HttpLiveRemoteDataSource({LiveApiClient? apiClient})
-      : _api = apiClient ?? _defaultApiClient();
+    : _api = apiClient ?? _defaultApiClient();
 
   final LiveApiClient _api;
 
@@ -44,8 +44,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
       query: {
         'page': '$page',
         'limit': '$limit',
-        if (category != null && category.isNotEmpty)
-          'categoryId': category,
+        if (category != null && category.isNotEmpty) 'categoryId': category,
       },
     );
     return LiveMapper.listFromPayload(payload);
@@ -71,9 +70,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     final payload = await _api.post(ApiEndpoints.liveJoin(liveId));
 
     final nestedLive = payload['live'];
-    final liveJson = nestedLive is Map<String, dynamic>
-        ? nestedLive
-        : payload;
+    final liveJson = nestedLive is Map<String, dynamic> ? nestedLive : payload;
 
     final live = LiveMapper.fromJson(liveJson);
     final liveKitUrl = payload['url']?.toString() ?? '';
@@ -91,7 +88,8 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
 
     // The socket handshake uses the Firebase ID token itself — no separate
     // socket token from the backend. Keep a placeholder for contract parity.
-    final socketToken = await _api.idTokenProvider?.call() ??
+    final socketToken =
+        await _api.idTokenProvider?.call() ??
         'socket_${liveId}_${DateTime.now().millisecondsSinceEpoch}';
 
     return JoinLiveResult(
@@ -145,5 +143,46 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   @override
   Future<void> unfollowHost(String hostId) async {
     await _api.delete(ApiEndpoints.creatorsFanClubSubscribe(hostId));
+  }
+
+  @override
+  Future<void> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    final body = <String, dynamic>{};
+    if (reason != null && reason.isNotEmpty) body['reason'] = reason;
+    await _api.post(ApiEndpoints.liveViewerBan(liveId, userId), body: body);
+  }
+
+  @override
+  Future<void> unbanViewer({
+    required String liveId,
+    required String userId,
+  }) async {
+    await _api.post(ApiEndpoints.liveViewerUnban(liveId, userId));
+  }
+
+  @override
+  Future<void> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    final body = <String, dynamic>{};
+    if (reason != null && reason.isNotEmpty) body['reason'] = reason;
+    await _api.post(
+      ApiEndpoints.liveViewerMuteChat(liveId, userId),
+      body: body,
+    );
+  }
+
+  @override
+  Future<void> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  }) async {
+    await _api.post(ApiEndpoints.liveViewerUnmuteChat(liveId, userId));
   }
 }

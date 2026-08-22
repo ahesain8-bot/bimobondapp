@@ -86,9 +86,7 @@ class _LeagueMatchOverlayState extends State<LeagueMatchOverlay> {
                   ),
                 ),
                 // Diagonal light rays (red left / blue right)
-                const CustomPaint(
-                  painter: _LeagueRayBurstPainter(),
-                ),
+                const CustomPaint(painter: _LeagueRayBurstPainter()),
                 // Trophy (frost circle) — top-left
                 Positioned(
                   top: 12,
@@ -176,8 +174,9 @@ class _LeagueMatchOverlayState extends State<LeagueMatchOverlay> {
                         child: Text(
                           _path == path ? 'Path $path' : path,
                           style: TextStyle(
-                            color: Colors.white
-                                .withValues(alpha: _path == path ? 1 : 0.55),
+                            color: Colors.white.withValues(
+                              alpha: _path == path ? 1 : 0.55,
+                            ),
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
                           ),
@@ -245,7 +244,9 @@ class _LeagueMatchOverlayState extends State<LeagueMatchOverlay> {
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2A4A8A),
                                 borderRadius: BorderRadius.circular(8),
@@ -306,7 +307,9 @@ class _LeagueMatchOverlayState extends State<LeagueMatchOverlay> {
                         top: -4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 1),
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFF2D55),
                             borderRadius: BorderRadius.circular(8),
@@ -341,7 +344,9 @@ class _LeagueMatchOverlayState extends State<LeagueMatchOverlay> {
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 1),
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2A4A8A),
                                 borderRadius: BorderRadius.circular(6),
@@ -374,7 +379,9 @@ class _LeagueMatchOverlayState extends State<LeagueMatchOverlay> {
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFF2D55),
                         borderRadius: BorderRadius.circular(18),
@@ -413,29 +420,35 @@ class _LeagueRayBurstPainter extends CustomPainter {
       origin.translate(-size.width * 0.08, -8),
       size.width * 0.42,
       Paint()
-        ..shader = RadialGradient(
-          colors: [
-            const Color(0xFFB02040).withValues(alpha: 0.45),
-            const Color(0x00000000),
-          ],
-        ).createShader(Rect.fromCircle(
-          center: origin.translate(-size.width * 0.08, -8),
-          radius: size.width * 0.42,
-        )),
+        ..shader =
+            RadialGradient(
+              colors: [
+                const Color(0xFFB02040).withValues(alpha: 0.45),
+                const Color(0x00000000),
+              ],
+            ).createShader(
+              Rect.fromCircle(
+                center: origin.translate(-size.width * 0.08, -8),
+                radius: size.width * 0.42,
+              ),
+            ),
     );
     canvas.drawCircle(
       origin.translate(size.width * 0.08, -8),
       size.width * 0.42,
       Paint()
-        ..shader = RadialGradient(
-          colors: [
-            const Color(0xFF1A4A9A).withValues(alpha: 0.45),
-            const Color(0x00000000),
-          ],
-        ).createShader(Rect.fromCircle(
-          center: origin.translate(size.width * 0.08, -8),
-          radius: size.width * 0.42,
-        )),
+        ..shader =
+            RadialGradient(
+              colors: [
+                const Color(0xFF1A4A9A).withValues(alpha: 0.45),
+                const Color(0x00000000),
+              ],
+            ).createShader(
+              Rect.fromCircle(
+                center: origin.translate(size.width * 0.08, -8),
+                radius: size.width * 0.42,
+              ),
+            ),
     );
 
     void drawFan({

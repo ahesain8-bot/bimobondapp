@@ -4,7 +4,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/like_repository.dart';
 import '../services/fake_socket_service.dart' show SocketService;
@@ -19,8 +19,8 @@ class RealLikeRepository implements LikeRepository {
   RealLikeRepository({
     required LiveApiClient apiClient,
     required SocketService socket,
-  })  : _api = apiClient,
-        _socket = socket;
+  }) : _api = apiClient,
+       _socket = socket;
 
   final LiveApiClient _api;
   final SocketService _socket;
@@ -64,10 +64,7 @@ class RealLikeRepository implements LikeRepository {
   }
 
   @override
-  Future<Either<Failure, void>> sendBurstLikes(
-    String liveId,
-    int count,
-  ) async {
+  Future<Either<Failure, void>> sendBurstLikes(String liveId, int count) async {
     // Soft limit: max 15 taps/sec/user/live.
     final safe = count.clamp(1, 15);
     try {

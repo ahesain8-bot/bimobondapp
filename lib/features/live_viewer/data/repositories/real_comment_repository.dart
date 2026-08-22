@@ -4,7 +4,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/comment_repository.dart';
@@ -19,8 +19,8 @@ class RealCommentRepository implements CommentRepository {
   RealCommentRepository({
     required LiveApiClient apiClient,
     required SocketService socket,
-  })  : _api = apiClient,
-        _socket = socket;
+  }) : _api = apiClient,
+       _socket = socket;
 
   final LiveApiClient _api;
   final SocketService _socket;
@@ -39,10 +39,7 @@ class RealCommentRepository implements CommentRepository {
       final page = int.tryParse(cursor ?? '') ?? 1;
       final payload = await _api.get(
         ApiEndpoints.liveComments(liveId),
-        query: {
-          'page': '$page',
-          'limit': '$limit',
-        },
+        query: {'page': '$page', 'limit': '$limit'},
       );
 
       final data = payload['data'];
@@ -73,11 +70,13 @@ class RealCommentRepository implements CommentRepository {
           ? (meta['hasMore'] == true || meta['totalPages'] is int)
           : comments.length >= limit;
 
-      return Right(CommentBatch(
-        comments: comments,
-        hasMore: hasMore,
-        nextCursor: hasMore ? '${page + 1}' : null,
-      ));
+      return Right(
+        CommentBatch(
+          comments: comments,
+          hasMore: hasMore,
+          nextCursor: hasMore ? '${page + 1}' : null,
+        ),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to fetch comments: $e'));
     }
@@ -96,7 +95,8 @@ class RealCommentRepository implements CommentRepository {
       );
 
       // Backend returns the comment directly or wrapped.
-      final comment = _commentFromJson(payload, liveId) ??
+      final comment =
+          _commentFromJson(payload, liveId) ??
           CommentEntity(
             id: 'c_${DateTime.now().microsecondsSinceEpoch}',
             liveId: liveId,
@@ -116,15 +116,28 @@ class RealCommentRepository implements CommentRepository {
   }
 
   @override
-  Future<Either<Failure, void>> deleteComment(String commentId) async {
+  Future<Either<Failure, void>> deleteComment(
+    String commentId, {
+    String? liveId,
+  }) async {
     try {
+      if (liveId != null && liveId.isNotEmpty) {
+        await _api.delete(ApiEndpoints.liveCommentById(liveId, commentId));
+        // Also remove from cache immediately for optimistic UI.
+        final list = _cache[liveId];
+        if (list != null) {
+          list.removeWhere((c) => c.id == commentId);
+          _controllers[liveId]?.add(List.unmodifiable(list));
+        }
+      }
       // Live id is not known here — fall back to local cache lookup.
       for (final entry in _cache.entries) {
         if (entry.value.any((c) => c.id == commentId)) {
-          await _api.delete(
-            ApiEndpoints.liveCommentById(entry.key, commentId),
-          );
-          return const Right(null);
+          await _api.delete(ApiEndpoints.liveCommentById(entry.key, commentId));
+          final list = List<CommentEntity>.from(entry.value);
+          list.removeWhere((c) => c.id == commentId);
+          _cache[entry.key] = list;
+          _controllers[entry.key]?.add(List.unmodifiable(list));
         }
       }
       return const Right(null);
@@ -139,14 +152,22 @@ class RealCommentRepository implements CommentRepository {
     required String reason,
     String? details,
   }) async {
-    // No dedicated endpoint in mobile-api.md — treat as no-op success.
-    return const Right(null);
-  }
-
-  @override
-  Stream<Either<Failure, List<CommentEntity>>> watchComments(String liveId) {
-    _ensureRoom(liveId);
-    return _controllers[liveId]!.stream.map(Right.new);
+    try {
+      final liveEntry = _cache.entries.cast<MapEntry<String, List<CommentEntity>>?>().firstWhere(
+        (entry) => entry!.value.any((comment) => comment.id == commentId),
+        orElse: () => null,
+      );
+      if (liveEntry == null) {
+        return Left(ServerFailure('Comment $commentId is not available locally'));
+      }
+      await _api.post(
+        '${ApiEndpoints.liveCommentById(liveEntry.key, commentId)}/report',
+        body: {'reason': reason, 'details': details},
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Failed to report comment: $e'));
+    }
   }
 
   @override
@@ -154,137 +175,136 @@ class RealCommentRepository implements CommentRepository {
     return const Right(null);
   }
 
-  void _ensureRoom(String liveId) {
-    _cache.putIfAbsent(liveId, () => []);
-    _controllers.putIfAbsent(
-      liveId,
-      () => StreamController<List<CommentEntity>>.broadcast(),
+  @override
+  Stream<Either<Failure, List<CommentEntity>>> watchComments(String liveId) {
+    _ensureRoom(liveId);
+    return _controllers[liveId]!.stream.map(
+      (comments) => Right<Failure, List<CommentEntity>>(comments),
     );
-    _subs.putIfAbsent(liveId, () {
-      return _socket.events.listen((event) {
-        if (event.liveId != liveId) return;
-        if (event is LiveCommentEvent) {
-          _append(liveId, event.comment, fromSocket: true);
-        } else if (event is LiveCommentDeletedEvent) {
-          _remove(liveId, event.commentId);
-        } else if (event is LiveCommentPinnedEvent) {
-          _setPinned(liveId, event.comment);
-        } else if (event is LiveCommentUnpinnedEvent) {
-          _clearPinned(liveId, event.commentId);
-        } else if (event is UserJoinedEvent) {
-          final joinComment = CommentEntity(
-            id: 'join_${event.userId}_${event.timestamp.microsecondsSinceEpoch}',
-            liveId: liveId,
-            userId: event.userId,
-            username: event.username,
-            userAvatar: event.avatarUrl,
-            content: 'joined',
-            createdAt: event.timestamp,
-            metadata: const {'type': 'join'},
-          );
-          _append(liveId, joinComment, fromSocket: true);
+  }
+
+  void _ensureRoom(String liveId) {
+    if (_controllers.containsKey(liveId)) return;
+    _controllers[liveId] = StreamController<List<CommentEntity>>.broadcast();
+    final socket = _socket;
+    final sub = socket.events.listen((event) {
+        if (event is LiveCommentEvent && event.liveId == liveId) {
+          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
+          // Silently drop duplicates (both local echo and socket can deliver).
+          if (!current.any((c) => c.id == event.comment.id)) {
+            current.add(event.comment);
+            final trimmed = current.length > 80 ? current.sublist(current.length - 80) : current;
+            _cache[liveId] = trimmed;
+            _controllers[liveId]?.add(List.unmodifiable(trimmed));
+          }
+        } else if (event is LiveCommentDeletedEvent && event.liveId == liveId) {
+          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
+          current.removeWhere((c) => c.id == event.commentId);
+          _cache[liveId] = current;
+          _controllers[liveId]?.add(List.unmodifiable(current));
+        } else if (event is LiveCommentPinnedEvent && event.liveId == liveId) {
+          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
+          final pinned = event.comment.copyWith(isPinned: true);
+          var replaced = false;
+          for (var i = 0; i < current.length; i++) {
+            if (current[i].isPinned) {
+              current[i] = current[i].copyWith(isPinned: false);
+            }
+            if (current[i].id == pinned.id) {
+              current[i] = pinned;
+              replaced = true;
+            }
+          }
+          if (!replaced) current.insert(0, pinned);
+          _cache[liveId] = current;
+          _controllers[liveId]?.add(List.unmodifiable(current));
+        } else if (event is LiveCommentUnpinnedEvent && event.liveId == liveId) {
+          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
+          for (var i = 0; i < current.length; i++) {
+            if (current[i].id == event.commentId) {
+              current[i] = current[i].copyWith(isPinned: false);
+            }
+          }
+          _cache[liveId] = current;
+          _controllers[liveId]?.add(List.unmodifiable(current));
         }
-      });
     });
+    _subs[liveId] = sub;
   }
 
-  void _append(
-    String liveId,
-    CommentEntity comment, {
-    bool fromSocket = false,
-  }) {
-    final list = _cache.putIfAbsent(liveId, () => []);
-    if (fromSocket && list.any((c) => c.id == comment.id)) return;
+  void _append(String liveId, CommentEntity comment) {
+    _ensureRoom(liveId);
+    final list = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
     list.add(comment);
-    if (list.length > 120) {
-      list.removeRange(0, list.length - 120);
+    final trimmed = list.length > 80 ? list.sublist(list.length - 80) : list;
+    _cache[liveId] = trimmed;
+    _controllers[liveId]?.add(List.unmodifiable(trimmed));
+  }
+
+  CommentEntity? _commentFromJson(dynamic data, String liveId) {
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+    // Try wrapped payload shape { data: {comment...} } or { comment: {...} }
+    final inner = map['comment'] ?? map['data'] ?? data;
+    final Map<String, dynamic> c;
+    if (inner is Map<String, dynamic>) {
+      c = inner;
+    } else {
+      c = map;
     }
-    _controllers[liveId]?.add(List.unmodifiable(list));
-  }
+    final id = c['id']?.toString();
+    if (id == null || id.isEmpty) return null;
 
-  void _remove(String liveId, String commentId) {
-    final list = _cache[liveId];
-    if (list == null) return;
-    list.removeWhere((c) => c.id == commentId);
-    _controllers[liveId]?.add(List.unmodifiable(list));
-  }
+    final user = c['user'];
+    final userMap = user is Map ? Map<String, dynamic>.from(user) : null;
+    final userId = userMap?['id']?.toString() ?? c['userId']?.toString() ?? '';
+    final username = userMap?['username']?.toString() ?? c['username']?.toString() ?? 'User';
+    final avatar = userMap?['avatarUrl']?.toString() ?? userMap?['profilePicture']?.toString() ?? c['avatarUrl']?.toString() ?? c['userAvatar']?.toString();
+    final content = c['content']?.toString() ?? '';
+    if (content.isEmpty) return null;
 
-  void _setPinned(String liveId, CommentEntity comment) {
-    final list = _cache.putIfAbsent(liveId, () => []);
-    final pinned = comment.copyWith(isPinned: true);
-    list.removeWhere((c) => c.id == pinned.id);
-    for (var i = 0; i < list.length; i++) {
-      if (list[i].isPinned) {
-        list[i] = list[i].copyWith(isPinned: false);
-      }
+    final gifterLevelRaw = userMap?['gifterLevel'] ?? c['gifterLevel'];
+    final gifterLevel = gifterLevelRaw is int
+        ? gifterLevelRaw
+        : gifterLevelRaw is String
+            ? int.tryParse(gifterLevelRaw)
+            : null;
+
+    final createdAtRaw = c['createdAt'] ?? c['created_at'] ?? c['timestamp'];
+    final DateTime createdAt;
+    if (createdAtRaw is String) {
+      createdAt = DateTime.tryParse(createdAtRaw) ?? DateTime.now();
+    } else if (createdAtRaw is int) {
+      createdAt = DateTime.fromMillisecondsSinceEpoch(
+        createdAtRaw > 1000000000000 ? createdAtRaw : createdAtRaw * 1000,
+      );
+    } else {
+      createdAt = DateTime.now();
     }
-    list.insert(0, pinned);
-    _controllers[liveId]?.add(List.unmodifiable(list));
-  }
 
-  void _clearPinned(String liveId, String commentId) {
-    final list = _cache[liveId];
-    if (list == null) return;
-    for (var i = 0; i < list.length; i++) {
-      if (list[i].id == commentId || list[i].isPinned) {
-        list[i] = list[i].copyWith(isPinned: false);
-      }
-    }
-    _controllers[liveId]?.add(List.unmodifiable(list));
-  }
-
-  CommentEntity? _commentFromJson(
-    Map<String, dynamic> json,
-    String liveId,
-  ) {
-    final user = json['user'];
-    final userMap = user is Map<String, dynamic>
-        ? user
-        : (user is Map ? Map<String, dynamic>.from(user) : null);
-
-    final content = json['content']?.toString() ??
-        json['text']?.toString() ??
-        '';
-    if (content.isEmpty && json['id'] == null) return null;
+    final replyTo = c['replyToUserId']?.toString() ?? c['replyTo']?.toString() ?? c['replyToUser']?['id']?.toString();
+    final isPinned = c['isPinned'] == true || c['pinned'] == true;
 
     return CommentEntity(
-      id: json['id']?.toString() ??
-          'c_${DateTime.now().microsecondsSinceEpoch}',
-      liveId: json['liveId']?.toString() ?? liveId,
-      userId: userMap?['id']?.toString() ??
-          json['userId']?.toString() ??
-          '',
-      username: userMap?['username']?.toString() ??
-          userMap?['fullName']?.toString() ??
-          'User',
-      userAvatar: userMap?['avatarUrl']?.toString(),
+      id: id,
+      liveId: liveId,
+      userId: userId,
+      username: username,
+      userAvatar: avatar,
       content: content,
-      createdAt:
-          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
-              DateTime.now(),
-      replyToUserId: json['replyToUserId']?.toString(),
-      gifterLevel: _asInt(userMap?['gifterLevel']),
-      isVerified: userMap?['isVerified'] == true,
-      isPinned: json['isPinned'] == true || json['pinned'] == true,
-      metadata: json['isPinned'] == true || json['pinned'] == true
-          ? const {'pinned': true}
-          : null,
+      createdAt: createdAt,
+      isPinned: isPinned,
+      replyToUserId: replyTo,
+      gifterLevel: gifterLevel,
     );
   }
 
-  int? _asInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value.toString());
-  }
-
-  void dispose() {
-    for (final s in _subs.values) {
-      s.cancel();
+  Future<void> dispose() async {
+    for (final sub in _subs.values) {
+      await sub.cancel();
     }
     for (final c in _controllers.values) {
-      c.close();
+      await c.close();
     }
   }
 }

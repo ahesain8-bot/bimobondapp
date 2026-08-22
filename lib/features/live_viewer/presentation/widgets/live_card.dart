@@ -14,57 +14,48 @@ class LiveCard extends StatelessWidget {
   final VoidCallback? onTap;
   final double? height;
 
-  const LiveCard({
-    super.key,
-    required this.live,
-    this.onTap,
-    this.height,
-  });
+  const LiveCard({super.key, required this.live, this.onTap, this.height});
 
   @override
   Widget build(BuildContext context) {
     final cardHeight = height ?? context.screenHeight * 0.58;
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: cardHeight,
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.28),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Hero(
-                tag: 'live_thumb_${live.id}',
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: _buildBackgroundImage(),
+          onTap: onTap,
+          child: Container(
+            height: cardHeight,
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.28),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Hero(
+                    tag: 'live_thumb_${live.id}',
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: _buildBackgroundImage(),
+                    ),
+                  ),
+                  _buildGradientOverlay(),
+                  _buildContent(),
+                  const Positioned(top: 12, left: 12, child: LiveBadge()),
+                  _buildViewerCount(),
+                ],
               ),
-              _buildGradientOverlay(),
-              _buildContent(),
-              const Positioned(
-                top: 12,
-                left: 12,
-                child: LiveBadge(),
-              ),
-              _buildViewerCount(),
-            ],
+            ),
           ),
-        ),
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: 350.ms)
         .scale(
@@ -179,26 +170,28 @@ class LiveCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   live.category,
-                  style: AppTextStyles.labelSmall
-                      .copyWith(color: Colors.white70),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: Colors.white70,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
-              Icon(Icons.favorite,
-                  size: 14, color: AppColors.secondary.withOpacity(0.9)),
+              Icon(
+                Icons.favorite,
+                size: 14,
+                color: AppColors.secondary.withOpacity(0.9),
+              ),
               const SizedBox(width: 4),
               Text(
                 live.likeCount.formatNumber,
-                style: AppTextStyles.labelSmall
-                    .copyWith(color: Colors.white70),
+                style: AppTextStyles.labelSmall.copyWith(color: Colors.white70),
               ),
             ],
           ),

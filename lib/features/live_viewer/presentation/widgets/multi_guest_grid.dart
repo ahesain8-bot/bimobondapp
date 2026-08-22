@@ -78,9 +78,7 @@ class MultiGuestGrid extends StatelessWidget {
                       child: _HostTile(live: live, isActive: isActive),
                     ),
                     const SizedBox(width: gap),
-                    Expanded(
-                      child: _GuestTile(guest: topGuest, large: true),
-                    ),
+                    Expanded(child: _GuestTile(guest: topGuest, large: true)),
                   ],
                 ),
               ),
@@ -173,8 +171,7 @@ class _HostTile extends StatelessWidget {
             bottom: 6,
             child: Center(
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(10),
@@ -249,8 +246,10 @@ class _GuestTile extends StatelessWidget {
                 top: 4,
                 right: 4,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1.5,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.45),
                     borderRadius: BorderRadius.circular(4),
@@ -286,8 +285,10 @@ class _GuestTile extends StatelessWidget {
                 alignment: Alignment.bottomLeft,
                 child: Container(
                   constraints: BoxConstraints(maxWidth: large ? 140 : 86),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2.5,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(10),

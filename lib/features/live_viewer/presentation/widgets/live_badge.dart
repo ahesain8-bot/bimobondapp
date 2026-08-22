@@ -7,11 +7,7 @@ class LiveBadge extends StatelessWidget {
   final bool compact;
   final bool pulse;
 
-  const LiveBadge({
-    super.key,
-    this.compact = false,
-    this.pulse = true,
-  });
+  const LiveBadge({super.key, this.compact = false, this.pulse = true});
 
   @override
   Widget build(BuildContext context) {
@@ -30,16 +26,14 @@ class LiveBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: compact ? 5 : 6,
-            height: compact ? 5 : 6,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-          )
-              .animate(
-                onPlay: pulse ? (c) => c.repeat(reverse: true) : null,
+                width: compact ? 5 : 6,
+                height: compact ? 5 : 6,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
               )
+              .animate(onPlay: pulse ? (c) => c.repeat(reverse: true) : null)
               .fade(begin: 1, end: 0.25, duration: 600.ms),
           SizedBox(width: compact ? 3 : 4),
           Text('LIVE', style: AppTextStyles.liveBadge),

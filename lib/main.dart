@@ -55,6 +55,8 @@ import 'package:bimobondapp/app/calls/presentation/widgets/global_call_listener.
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/di/live_viewer_injector.dart'
+    as live_viewer_di;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bimobondapp/firebase_options.dart';
@@ -88,6 +90,7 @@ void main() async {
   await chats_di.initChats();
   await notifications_di.initNotifications();
   await calls_di.initCalls();
+  await live_viewer_di.initLiveViewer();
   runApp(const ProviderScope(child: MyApp()));
 }
 

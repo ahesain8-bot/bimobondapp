@@ -27,10 +27,7 @@ class AnimatedCounter extends StatelessWidget {
         final display = compact
             ? animated.round().formatNumber
             : animated.round().toString();
-        return Text(
-          display,
-          style: style ?? AppTextStyles.viewerCount,
-        );
+        return Text(display, style: style ?? AppTextStyles.viewerCount);
       },
     );
   }

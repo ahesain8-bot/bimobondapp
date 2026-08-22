@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:dartz/dartz.dart';
 
-import '../../core/errors/failures.dart';
+import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/repositories/gift_repository.dart';
 import '../services/fake_socket_service.dart';
@@ -25,8 +25,9 @@ class FakeGiftRepository implements GiftRepository {
   Future<Either<Failure, List<GiftEntity>>> getGiftsByRarity(
     GiftRarity rarity,
   ) async {
-    final gifts =
-        MockGiftCatalog.gifts.where((g) => g.rarity == rarity).toList();
+    final gifts = MockGiftCatalog.gifts
+        .where((g) => g.rarity == rarity)
+        .toList();
     return Right(gifts);
   }
 

@@ -25,6 +25,25 @@ abstract class LiveRemoteDataSource {
   Future<void> followHost(String hostId);
 
   Future<void> unfollowHost(String hostId);
+
+  Future<void> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  });
+
+  Future<void> unbanViewer({required String liveId, required String userId});
+
+  Future<void> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  });
+
+  Future<void> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  });
 }
 
 class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
@@ -85,10 +104,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
 
     final lives = List.generate(
       limit,
-      (i) => _generateLive(
-        id: 'live_p${page}_$i',
-        category: category,
-      ),
+      (i) => _generateLive(id: 'live_p${page}_$i', category: category),
     );
 
     for (final live in lives) {
@@ -124,9 +140,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
       socketToken: 'sock_${liveId}_${DateTime.now().millisecondsSinceEpoch}',
       liveKitToken: 'lk_${liveId}_${DateTime.now().millisecondsSinceEpoch}',
       liveKitUrl: 'wss://livekit.tiktoklive.mock',
-      live: live.copyWith(
-        streamUrl: FakeLiveKitService.defaultMockStreamUrl,
-      ),
+      live: live.copyWith(streamUrl: FakeLiveKitService.defaultMockStreamUrl),
     );
   }
 
@@ -152,12 +166,44 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     await Future.delayed(const Duration(milliseconds: 280));
   }
 
+  @override
+  Future<void> banViewer({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 320));
+  }
+
+  @override
+  Future<void> unbanViewer({
+    required String liveId,
+    required String userId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  @override
+  Future<void> muteViewerChat({
+    required String liveId,
+    required String userId,
+    String? reason,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  @override
+  Future<void> unmuteViewerChat({
+    required String liveId,
+    required String userId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
   /// Endpoint path helpers for documentation / future Dio mapping.
   String feedPath() => ApiConstants.livesFeed;
-  String joinPath(String id) =>
-      ApiConstants.joinLive.replaceAll('{id}', id);
-  String leavePath(String id) =>
-      ApiConstants.leaveLive.replaceAll('{id}', id);
+  String joinPath(String id) => ApiConstants.joinLive.replaceAll('{id}', id);
+  String leavePath(String id) => ApiConstants.leaveLive.replaceAll('{id}', id);
 
   LiveEntity _generateLive({String? id, String? category}) {
     final host = _hosts[_random.nextInt(_hosts.length)];
@@ -187,8 +233,9 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
       category: cat,
       viewerCount: 100 + _random.nextInt(50000),
       likeCount: _random.nextInt(1000000),
-      startTime:
-          DateTime.now().subtract(Duration(minutes: _random.nextInt(120))),
+      startTime: DateTime.now().subtract(
+        Duration(minutes: _random.nextInt(120)),
+      ),
       status: status,
       isLive: status == LiveStatus.live,
       metadata: _buildMetadata(liveId, host['name']!),
@@ -202,26 +249,28 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     final isMultiGrid = !isPk && roll < 0.48;
     final isMultiGuest = !isPk && !isMultiGrid && roll < 0.68;
     final guest = _hosts[random.nextInt(_hosts.length)];
-    final guests = List.generate(
-      isMultiGrid ? 7 : (isMultiGuest ? 1 : 0),
-      (i) {
-        final g = _hosts[(random.nextInt(_hosts.length) + i) % _hosts.length];
-        return {
-          'id': 'guest_${liveId}_$i',
-          'name': g['name'],
-          'avatar': g['avatar'],
-          'level': 8 + random.nextInt(70),
-          'muted': random.nextBool(),
-        };
-      },
-    );
+    final guests = List.generate(isMultiGrid ? 7 : (isMultiGuest ? 1 : 0), (i) {
+      final g = _hosts[(random.nextInt(_hosts.length) + i) % _hosts.length];
+      return {
+        'id': 'guest_${liveId}_$i',
+        'name': g['name'],
+        'avatar': g['avatar'],
+        'level': 8 + random.nextInt(70),
+        'muted': random.nextBool(),
+      };
+    });
 
     return {
       'isPk': isPk,
       'isMultiGrid': isMultiGrid,
       'isMultiGuest': isMultiGuest,
-      'location': ['Yalla KSA', 'Riyadh', 'Dubai', 'Cairo', 'Live'][
-          random.nextInt(5)],
+      'location': [
+        'Yalla KSA',
+        'Riyadh',
+        'Dubai',
+        'Cairo',
+        'Live',
+      ][random.nextInt(5)],
       'hourlyRank': 1 + random.nextInt(50),
       'goalProgress': '${random.nextInt(8)}/${1 + random.nextInt(3)}',
       'shareCount': 20 + random.nextInt(200),
