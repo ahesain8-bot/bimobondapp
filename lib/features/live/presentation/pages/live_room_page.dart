@@ -37,6 +37,7 @@ import '../widgets/room/live_room_info_row.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
 import '../../../live_viewer/presentation/widgets/floating_hearts.dart';
+import '../widgets/room/live_room_gift_banner.dart';
 
 /// Host live-room screen: full-screen camera with TikTok-style Arabic overlays.
 class LiveRoomPage extends StatefulWidget {
@@ -359,6 +360,11 @@ class _LiveRoomBody extends StatelessWidget {
                   SizedBox(height: AppSpacing.xs),
                   LiveRoomInfoRow(),
                   Spacer(),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: LiveRoomGiftBanner(),
+                  ),
+                  SizedBox(height: AppSpacing.xs),
                   Padding(
                     padding: EdgeInsetsDirectional.only(
                       start: AppSpacing.xl,
@@ -377,16 +383,17 @@ class _LiveRoomBody extends StatelessWidget {
               buildWhen: (previous, current) =>
                   current is LiveRoomReady &&
                   (previous is! LiveRoomReady ||
-                      previous.floatingHeartBurst != current.floatingHeartBurst),
+                      previous.floatingHeartBurst !=
+                          current.floatingHeartBurst),
               builder: (context, overlayState) {
                 if (overlayState is! LiveRoomReady) {
                   return const SizedBox.shrink();
                 }
                 return FloatingHeartsOverlay(
                   burst: overlayState.floatingHeartBurst,
-                  onConsumed: () => context
-                      .read<LiveRoomBloc>()
-                      .add(const LiveRoomHeartBurstConsumed()),
+                  onConsumed: () => context.read<LiveRoomBloc>().add(
+                    const LiveRoomHeartBurstConsumed(),
+                  ),
                 );
               },
             ),

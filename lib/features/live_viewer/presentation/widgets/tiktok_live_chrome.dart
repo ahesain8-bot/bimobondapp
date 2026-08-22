@@ -742,29 +742,32 @@ class TikTokLiveBottomBar extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               Expanded(
-                child:
-                    commentField ??
-                    GestureDetector(
-                      onTap: onTypeTap,
-                      child: Container(
-                        height: 36,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        alignment: Alignment.centerLeft,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Text(
-                          'Write...',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w400,
-                            height: 1.1,
+                child: commentField == null
+                    ? GestureDetector(
+                        onTap: onTypeTap,
+                        child: Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          alignment: Alignment.centerLeft,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            'Write...',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w400,
+                              height: 1.1,
+                            ),
                           ),
                         ),
+                      )
+                    : Align(
+                        alignment: Alignment.bottomCenter,
+                        child: commentField,
                       ),
-                    ),
               ),
               const SizedBox(width: 8),
               GestureDetector(

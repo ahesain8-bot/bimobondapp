@@ -43,11 +43,13 @@ class LivesSocketDataSource {
     );
 
     _socket = socket;
+    final connected = Completer<void>();
 
     socket.onConnect((_) {
       debugPrint('Socket.IO connected');
       socket.emit('joinLive', {'liveId': liveId});
       socket.emit('joinUser', {});
+      if (!connected.isCompleted) connected.complete();
       _controller.add(const LiveHudConnectionEvent(connected: true));
     });
 
@@ -59,6 +61,9 @@ class LivesSocketDataSource {
     });
     socket.onConnectError((e) {
       debugPrint('Socket.IO connect error: $e');
+      if (!connected.isCompleted) {
+        connected.completeError(StateError('Socket.IO connect error: $e'));
+      }
       _controller.add(
         LiveHudConnectionEvent(connected: false, reason: e.toString()),
       );
@@ -68,6 +73,13 @@ class LivesSocketDataSource {
       _controller.add(
         LiveHudConnectionEvent(connected: false, reason: e.toString()),
       );
+    });
+
+    socket.onReconnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
+      debugPrint('Socket.IO reconnected; rejoining live room');
+      socket.emit('joinLive', {'liveId': liveId});
+      socket.emit('joinUser', {});
     });
 
     socket.on('liveComment', (data) {
@@ -119,7 +131,11 @@ class LivesSocketDataSource {
 
     socket.on('liveViewers', (data) {
       final map = _asMap(data);
-      final rawViewers = map?['viewers'] ?? map?['count'];
+      final rawViewers =
+          map?['viewers'] ??
+          map?['viewerCount'] ??
+          map?['viewer_count'] ??
+          map?['count'];
       final viewers = _asInt(rawViewers) ??
           (rawViewers is List ? rawViewers.length : null);
       if (viewers != null) {
@@ -141,7 +157,12 @@ class LivesSocketDataSource {
               'مشاهد',
           avatarUrl:
               user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
-          viewers: _asInt(map['viewers'] ?? map['count']),
+          viewers: _asInt(
+            map['viewers'] ??
+                map['viewerCount'] ??
+                map['viewer_count'] ??
+                map['count'],
+          ),
         ),
       );
     });
@@ -173,15 +194,50 @@ class LivesSocketDataSource {
     socket.on('liveGift', (data) {
       final map = _asMap(data);
       final sender = _asMap(map?['sender']) ?? _asMap(map?['user']);
+      final gift = _asMap(map?['gift']) ?? map;
+      // Same key fallbacks GiftModel uses: the catalog is not consistent
+      // about name/title or icon/emoji, and neither is this payload.
+      final senderFullName = sender?['fullName']?.toString();
       _controller.add(
         LiveHudGiftEvent(
           summaryText: map?['message']?.toString() ??
               map?['summary']?.toString(),
           totalEarnedCoins: _asInt(map?['totalEarnedCoins']),
-          senderName: sender?['username']?.toString() ??
-              sender?['fullName']?.toString() ??
-              map?['senderName']?.toString(),
+          senderName:
+              (senderFullName != null && senderFullName.trim().isNotEmpty)
+                  ? senderFullName.trim()
+                  : (sender?['username']?.toString() ??
+                      map?['senderName']?.toString()),
           senderGifterLevel: _asInt(sender?['gifterLevel']),
+          senderAvatarUrl: sender?['avatarUrl']?.toString() ??
+              sender?['avatar']?.toString(),
+          giftName: (gift?['name'] ?? gift?['title'] ?? gift?['label'])
+              ?.toString(),
+          giftIcon: (gift?['icon'] ?? gift?['emoji'] ?? gift?['symbol'])
+              ?.toString(),
+          giftImageUrl: (gift?['imageUrl'] ?? gift?['image'] ?? gift?['iconUrl'])
+              ?.toString(),
+          quantity: _asInt(
+            map?['quantity'] ?? map?['count'] ?? gift?['quantity'],
+          ),
+        ),
+      );
+    });
+
+    // Personal room `user_*`, not the live room: an invite can land while the
+    // user is watching something else entirely (mobile-api.md, Personal room).
+    socket.on('liveGuestInvite', (data) {
+      final map = _asMap(data);
+      final host = _asMap(map?['host']) ?? _asMap(map?['user']);
+      final fullName = host?['fullName']?.toString();
+      _controller.add(
+        LiveHudGuestInviteEvent(
+          liveId: map?['liveId']?.toString(),
+          hostName: (fullName != null && fullName.trim().isNotEmpty)
+              ? fullName.trim()
+              : (host?['username']?.toString() ??
+                  map?['hostName']?.toString()),
+          role: (map?['role'] ?? map?['guestRole'])?.toString(),
         ),
       );
     });
@@ -198,6 +254,7 @@ class LivesSocketDataSource {
     });
 
     socket.connect();
+    await connected.future.timeout(const Duration(seconds: 10));
   }
 
   Future<void> disconnect() async {

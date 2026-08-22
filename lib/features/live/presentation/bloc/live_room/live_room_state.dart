@@ -4,6 +4,7 @@ import 'package:livekit_client/livekit_client.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_session.dart';
 import 'live_room_event.dart';
+import '../../../domain/entities/live_gift_banner.dart';
 
 const Object _unset = Object();
 
@@ -78,6 +79,7 @@ class LiveRoomReady extends LiveRoomState {
     this.isEnding = false,
     this.actionMessage,
     this.floatingHeartBurst = 0,
+    this.giftBanner,
   });
 
   final LiveSession session;
@@ -115,6 +117,9 @@ class LiveRoomReady extends LiveRoomState {
   /// Increment to spawn floating hearts (TikTok-style like burst).
   final int floatingHeartBurst;
 
+  /// Most recent gift to celebrate, cleared once the banner has played.
+  final LiveGiftBanner? giftBanner;
+
   LiveRoomReady copyWith({
     LiveSession? session,
     Object? controller = _unset,
@@ -139,6 +144,7 @@ class LiveRoomReady extends LiveRoomState {
     String? actionMessage,
     bool clearActionMessage = false,
     int? floatingHeartBurst,
+    Object? giftBanner = _unset,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -171,6 +177,9 @@ class LiveRoomReady extends LiveRoomState {
       actionMessage:
           clearActionMessage ? null : (actionMessage ?? this.actionMessage),
       floatingHeartBurst: floatingHeartBurst ?? this.floatingHeartBurst,
+      giftBanner: identical(giftBanner, _unset)
+          ? this.giftBanner
+          : giftBanner as LiveGiftBanner?,
     );
   }
 }

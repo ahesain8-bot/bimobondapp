@@ -87,11 +87,24 @@ class LiveHudGiftEvent extends LiveHudEvent {
     this.totalEarnedCoins,
     this.senderName,
     this.senderGifterLevel,
+    this.senderAvatarUrl,
+    this.giftName,
+    this.giftIcon,
+    this.giftImageUrl,
+    this.quantity,
   });
   final String? summaryText;
   final int? totalEarnedCoins;
   final String? senderName;
   final int? senderGifterLevel;
+
+  /// Everything below is what the banner draws. All optional: the payload
+  /// varies by gift and older events carry only the summary line.
+  final String? senderAvatarUrl;
+  final String? giftName;
+  final String? giftIcon;
+  final String? giftImageUrl;
+  final int? quantity;
 }
 
 class LiveHudHourlyRankEvent extends LiveHudEvent {
@@ -101,6 +114,19 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   });
   final int? hourlyRank;
   final String? label;
+}
+
+/// Someone invited you onto their stage. Arrives on the personal `user_*`
+/// room rather than the live room, so it can land while you are anywhere.
+class LiveHudGuestInviteEvent extends LiveHudEvent {
+  const LiveHudGuestInviteEvent({
+    this.liveId,
+    this.hostName,
+    this.role,
+  });
+  final String? liveId;
+  final String? hostName;
+  final String? role;
 }
 
 /// The HUD socket came up, or refused to. Comments, the viewer counter and
