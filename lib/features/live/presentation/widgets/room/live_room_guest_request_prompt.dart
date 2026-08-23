@@ -98,9 +98,7 @@ class _RequestBar extends StatelessWidget {
               // Buttons keep their own width as the text scales, so a large
               // font setting shrinks the name rather than pushing them out.
               ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: scale.scale(160),
-                ),
+                constraints: BoxConstraints(maxWidth: scale.scale(160)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

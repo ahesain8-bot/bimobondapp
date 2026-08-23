@@ -67,10 +67,13 @@ void main() {
       expect(wide.width, greaterThan(narrow.width));
     });
 
-    test('the stage never claims more than half the space below the header', () {
-      expect(kStageMaxHeightFactor, lessThanOrEqualTo(0.6));
-      expect(kStageAspect, greaterThan(1.0));
-    });
+    test(
+      'the stage never claims more than half the space below the header',
+      () {
+        expect(kStageMaxHeightFactor, lessThanOrEqualTo(0.6));
+        expect(kStageAspect, greaterThan(1.0));
+      },
+    );
   });
 
   group('request roster', () {
@@ -137,7 +140,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.byType(CommentsSection)).height, 64);
+      // CommentsSection fills its slot and sizes the run inside it, so the
+      // shaded list is what must honour the height it was handed.
+      expect(tester.getSize(find.byType(ShaderMask).first).height, 64);
     });
 
     testWidgets('a large text scale does not overflow the feed', (
