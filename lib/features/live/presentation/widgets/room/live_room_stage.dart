@@ -5,24 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../../core/utils/build_safe_notifier.dart';
+import '../../../../../core/widgets/stage_tiles.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_camera_layer.dart';
-
-/// Width ÷ height of the shared video box when more than one person is on
-/// stage, matched to the TikTok reference: the two feeds sit side by side in a
-/// landscape-ish box under the header rather than filling the screen.
-const double kStageAspect = 1.35;
-
-/// The most of the space below the header the stage may claim, so the chat
-/// feed and the bottom bars always keep room on a short screen.
-const double kStageMaxHeightFactor = 0.52;
-
-/// Gap and corner radius between stage tiles.
-const double _tileGap = 2;
-const double _tileRadius = 6;
 
 /// The video area of the host room.
 ///
@@ -69,7 +57,7 @@ class LiveRoomStage extends StatelessWidget {
             child: SizedBox(
               width: width,
               height: height,
-              child: LiveRoomStageTiles(
+              child: StageTiles(
                 tiles: [
                   const _StageTile(child: LiveRoomCameraLayer()),
                   for (final guest in guests)
@@ -89,61 +77,6 @@ class LiveRoomStage extends StatelessWidget {
   }
 }
 
-/// Host first, then every guest, all the same size.
-///
-/// Two people split the box down the middle, which is the case the reference
-/// shows. Three or four wrap into a 2×2 so nobody is ever the odd one out in a
-/// row of unequal tiles.
-class LiveRoomStageTiles extends StatelessWidget {
-  const LiveRoomStageTiles({super.key, required this.tiles});
-
-  /// Host first, then one per guest.
-  final List<Widget> tiles;
-
-  @override
-  Widget build(BuildContext context) {
-    // Local override only: the host holds the first tile on the LEFT, the way
-    // the reference lays it out. Left to itself the Row mirrors in Arabic and
-    // the two feeds swap sides.
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: tiles.length <= 3
-          ? _TileRow(tiles: tiles)
-          : Column(
-              children: [
-                Expanded(child: _TileRow(tiles: _topRow)),
-                const SizedBox(height: _tileGap),
-                Expanded(child: _TileRow(tiles: _bottomRow)),
-              ],
-            ),
-    );
-  }
-
-  /// Splits 4+ tiles so the wider row comes first — a 5-up reads as 3 over 2,
-  /// never as 2 over 3 with a stretched pair underneath.
-  List<Widget> get _topRow => tiles.take((tiles.length / 2).ceil()).toList();
-
-  List<Widget> get _bottomRow => tiles.skip((tiles.length / 2).ceil()).toList();
-}
-
-class _TileRow extends StatelessWidget {
-  const _TileRow({required this.tiles});
-
-  final List<Widget> tiles;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < tiles.length; i++) ...[
-          if (i > 0) const SizedBox(width: _tileGap),
-          Expanded(child: tiles[i]),
-        ],
-      ],
-    );
-  }
-}
-
 class _StageTile extends StatelessWidget {
   const _StageTile({required this.child});
 
@@ -152,7 +85,7 @@ class _StageTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(_tileRadius),
+      borderRadius: BorderRadius.circular(kStageTileRadius),
       child: ColoredBox(
         color: const Color(0xFF101012),
         child: SizedBox.expand(child: child),

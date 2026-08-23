@@ -2,7 +2,7 @@ import 'package:bimobondapp/features/live/domain/entities/live_guest.dart';
 import 'package:bimobondapp/features/live/domain/entities/live_host.dart';
 import 'package:bimobondapp/features/live/domain/entities/live_session.dart';
 import 'package:bimobondapp/features/live/presentation/bloc/live_room/live_room_state.dart';
-import 'package:bimobondapp/features/live/presentation/widgets/room/live_room_stage.dart';
+import 'package:bimobondapp/core/widgets/stage_tiles.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/comment_entity.dart';
 import 'package:bimobondapp/features/live_viewer/presentation/widgets/comments_section.dart';
 import 'package:flutter/material.dart';
@@ -41,7 +41,7 @@ Future<Size> stageSize(WidgetTester tester, Size screen) async {
         child: SizedBox(
           width: screen.width,
           height: screen.height,
-          child: LiveRoomStageTiles(
+          child: StageTiles(
             tiles: const [
               SizedBox.expand(key: ValueKey('a')),
               SizedBox.expand(key: ValueKey('b')),

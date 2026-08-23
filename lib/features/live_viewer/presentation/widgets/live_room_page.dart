@@ -20,7 +20,10 @@ import 'fan_club_widgets.dart';
 import 'floating_gifts.dart';
 import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
+import '../../data/services/fake_livekit_service.dart' show LiveKitService;
+import '../di/live_viewer_injector.dart' as di;
 import 'guest_panel.dart';
+import 'viewer_stage.dart';
 import 'guest_stage_prompt.dart';
 import 'league_overlay.dart';
 import 'live_state_overlay.dart';
@@ -544,12 +547,24 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   bottom: contentBottom,
                   child: Column(
                     children: [
-                      MultiGuestGrid(
-                        live: live,
-                        isActive: widget.isActive && connected,
-                        guests: guests,
-                        onRequestTap: () => _openGuestRequest(live),
-                      ),
+                      // Real LiveKit tiles once the server says someone is on
+                      // stage; the mock grid stays for rooms the guest API has
+                      // nothing to say about.
+                      if (hasLiveGuests)
+                        ViewerStage(
+                          live: live,
+                          guests: stageGuests,
+                          liveKit: di.sl<LiveKitService>(),
+                          isSelfOnStage: state.isOnStage,
+                          currentUserId: state.currentUserId,
+                        )
+                      else
+                        MultiGuestGrid(
+                          live: live,
+                          isActive: widget.isActive && connected,
+                          guests: guests,
+                          onRequestTap: () => _openGuestRequest(live),
+                        ),
                       if (widget.isActive && isThisRoom)
                         Expanded(
                           child: Padding(

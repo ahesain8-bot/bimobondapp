@@ -101,10 +101,7 @@ class LiveHudGiftEvent extends LiveHudEvent {
 }
 
 class LiveHudGiftComboEvent extends LiveHudEvent {
-  const LiveHudGiftComboEvent({
-    required this.payload,
-    this.totalEarnedCoins,
-  });
+  const LiveHudGiftComboEvent({required this.payload, this.totalEarnedCoins});
 
   final Map<String, dynamic> payload;
   final int? totalEarnedCoins;
@@ -342,10 +339,15 @@ abstract class LiveSessionRepository {
   Stream<LiveHudEvent> get hudEvents;
 
   /// Publishes host A/V to LiveKit using token/url from start.
+  /// [maxAttempts] bounds the camera-open retry budget. The opportunistic
+  /// first pass — made while the Flutter camera still holds the lens — passes
+  /// 1, because that attempt is expected to fail and its whole point is to
+  /// find out fast.
   Future<void> connectMedia({
     required String url,
     required String token,
     bool useFrontCamera = true,
+    int maxAttempts = 6,
   });
 
   /// Viewer subscribe-only LiveKit connect.

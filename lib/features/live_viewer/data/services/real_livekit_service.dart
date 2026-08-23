@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'fake_livekit_service.dart' show LiveKitConnectionState, LiveKitService;
 
@@ -186,6 +187,13 @@ class RealLiveKitService implements LiveKitService {
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Guest publish url/token missing');
     }
+
+    // The viewer app is subscribe-only, so it has never asked for the camera
+    // or the mic. Going on stage is the first moment it needs them, and
+    // setCameraEnabled() on Android without CAMERA granted fails without ever
+    // opening the lens — the guest joins and stays a black tile.
+    await _ensureCapturePermissions();
+
     // A fresh connect, not an upgrade: the viewer's token carries no publish
     // grant, so the room has to be re-established with the one the server
     // issued on accept before the camera can go out.
@@ -204,6 +212,27 @@ class RealLiveKitService implements LiveKitService {
       // Stay in the room as a viewer rather than dropping them out entirely.
       _publishing = false;
       rethrow;
+    }
+  }
+
+  /// Requests camera + mic, throwing a message the room can show verbatim.
+  Future<void> _ensureCapturePermissions() async {
+    final statuses = await [Permission.camera, Permission.microphone].request();
+    final camera = statuses[Permission.camera];
+    final mic = statuses[Permission.microphone];
+
+    if (camera != null && camera.isPermanentlyDenied) {
+      throw StateError(
+        'صلاحية الكاميرا مرفوضة نهائياً. فعّلها من إعدادات التطبيق للانضمام '
+        'إلى المسرح.',
+      );
+    }
+    if (camera == null || !camera.isGranted) {
+      throw StateError('لا يمكن الانضمام إلى المسرح بدون صلاحية الكاميرا.');
+    }
+    // A muted guest is still a guest, so the mic is not a hard requirement.
+    if (mic == null || !mic.isGranted) {
+      debugPrint('⚠️ Joining the stage without microphone permission');
     }
   }
 

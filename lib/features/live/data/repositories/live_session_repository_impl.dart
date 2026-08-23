@@ -500,9 +500,11 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required String url,
     required String token,
     bool useFrontCamera = true,
+    int maxAttempts = 6,
   }) => _media.connectAndPublish(
     url: url,
     token: token,
+    maxAttempts: maxAttempts,
     cameraPosition: useFrontCamera ? CameraPosition.front : CameraPosition.back,
   );
 

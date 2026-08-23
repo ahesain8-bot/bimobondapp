@@ -518,10 +518,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       debugPrint(
         '🔍 [BLoC] Phase A: connectMedia (no Flutter camera release)...',
       );
+      // ONE attempt, no backoff. The Flutter camera still holds the lens, so
+      // on most devices this is expected to fail — the point is to find out
+      // in milliseconds. With the full six-attempt budget it burned up to
+      // 10.5s of retry delays before the handoff below could even start,
+      // which is the "stream frozen for the first seconds" the host sees.
       await _sessionRepository.connectMedia(
         url: url,
         token: token,
         useFrontCamera: useFront,
+        maxAttempts: 1,
       );
       debugPrint('🔍 [BLoC] Phase A: connectMedia SUCCESS ✅');
     } catch (e) {
@@ -544,7 +550,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         await _disposeCamera(local);
         if (isClosed) return;
         releasedEarly = true;
-        await Future<void>.delayed(const Duration(milliseconds: 800));
+        // Long enough for a slow camera2 teardown, short enough that the
+        // host is not staring at a dead preview. 800 was pure guesswork.
+        await Future<void>.delayed(const Duration(milliseconds: 350));
         if (isClosed) return;
       }
       try {

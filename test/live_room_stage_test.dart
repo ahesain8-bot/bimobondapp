@@ -1,4 +1,4 @@
-import 'package:bimobondapp/features/live/presentation/widgets/room/live_room_stage.dart';
+import 'package:bimobondapp/core/widgets/stage_tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,7 +17,7 @@ Future<List<Rect>> layout(WidgetTester tester, int count) async {
           child: SizedBox(
             width: _boxWidth,
             height: _boxHeight,
-            child: LiveRoomStageTiles(tiles: [for (final l in labels) tile(l)]),
+            child: StageTiles(tiles: [for (final l in labels) tile(l)]),
           ),
         ),
       ),
