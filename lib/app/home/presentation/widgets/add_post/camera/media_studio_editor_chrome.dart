@@ -124,6 +124,7 @@ class MediaStudioSideTool {
     required this.label,
     required this.onTap,
     this.active = false,
+    this.showActiveBadge,
     this.useAa = false,
     this.customIcon,
   });
@@ -132,6 +133,7 @@ class MediaStudioSideTool {
   final String label;
   final VoidCallback onTap;
   final bool active;
+  final bool? showActiveBadge;
   final bool useAa;
   final Widget? customIcon;
 }
@@ -365,7 +367,7 @@ class _MediaStudioSideRailState extends State<MediaStudioSideRail> {
       label: tool.label,
       onTap: tool.onTap,
       active: tool.active,
-      showActiveBadge: false,
+      showActiveBadge: tool.showActiveBadge ?? tool.active,
       iconOnStartEdge: widget.iconOnStartEdge,
       showLabel: _expanded,
       customIcon: tool.customIcon,
@@ -517,6 +519,7 @@ class MediaStudioBottomActions extends StatelessWidget {
     required this.nextLabel,
     required this.onYourStory,
     required this.onNext,
+    this.showNextButton = true,
     this.autoCutLabel = 'AutoCut',
     this.onAutoCut,
     this.autoCutActive = false,
@@ -528,6 +531,7 @@ class MediaStudioBottomActions extends StatelessWidget {
   final String nextLabel;
   final VoidCallback onYourStory;
   final VoidCallback onNext;
+  final bool showNextButton;
   /// TikTok-style entry above the action pills — opens templates.
   final String autoCutLabel;
   final VoidCallback? onAutoCut;
@@ -582,24 +586,26 @@ class MediaStudioBottomActions extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 1,
-                child: _PillButton(
-                  onTap: enabled ? onNext : null,
-                  background: LivesLayoutConstants.liveBadgeColor,
-                  foreground: Colors.white,
-                  child: Text(
-                    nextLabel,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
+              if (showNextButton) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 1,
+                  child: _PillButton(
+                    onTap: enabled ? onNext : null,
+                    background: LivesLayoutConstants.liveBadgeColor,
+                    foreground: Colors.white,
+                    child: Text(
+                      nextLabel,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ],

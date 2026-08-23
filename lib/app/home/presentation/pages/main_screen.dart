@@ -159,6 +159,7 @@ class _MainScreenState extends State<MainScreen> {
                   }
                 } else if (state is CreatePostSuccess) {
                   if (state.post.isStory) {
+                    auth_di.sl<ActiveStoriesRegistry>().addStory(state.post);
                     setState(() {
                       _currentIndex = 4;
                       _pendingOpenStoryUserId = state.post.userId;

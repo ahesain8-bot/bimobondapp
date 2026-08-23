@@ -11,6 +11,8 @@ import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
 import 'package:bimobondapp/app/chats/domain/usecases/create_or_get_chat_usecase.dart';
 import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
@@ -23,6 +25,7 @@ import 'package:bimobondapp/app/social/presentation/pages/user_connections_scree
 import 'package:bimobondapp/app/home/presentation/widgets/profile/create_highlight_sheet.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_grid_tile.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_header_section.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_format_utils.dart';
@@ -39,9 +42,10 @@ import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:bimobondapp/core/widgets/profile_bio_text.dart';
 import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
 import 'package:bimobondapp/app/auth/domain/entities/profile_enums.dart';
-import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_verification_badge.dart';
-import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_links_sheet.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/close_friends_sheet.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/profile/user_profile_header_details.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/profile/user_profile_highlights_section.dart';
+import 'package:bimobondapp/app/auth/presentation/widgets/profile/user_profile_posts_grid.dart';
 import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
@@ -73,17 +77,7 @@ class UserProfileScreen extends StatefulWidget {
   State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfilePostsState {
-  static const int pageSize = ProfileLayoutConstants.postsPageSize;
 
-  final List<PostEntity> posts = [];
-  int page = 1;
-  bool hasReachedMax = false;
-  bool isLoadingMore = false;
-  bool isInitialLoading = true;
-  bool isRefreshing = false;
-  int? pendingLoadKey;
-}
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   final ProfileRemoteDataSource _profileRemoteDS =
@@ -102,7 +96,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   int? _fetchingLoadKey;
   Completer<void>? _pullRefreshCompleter;
   final ScrollController _scrollController = ScrollController();
-  final _postsState = _UserProfilePostsState();
+  final _postsState = UserProfilePostsState();
+  int _selectedTabIndex = 0;
 
   @override
   void initState() {
@@ -169,11 +164,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   List<String> _pinnedPostIds = [];
   List<PostEntity> _pinnedPostsList = [];
 
+  bool _isLoadingHighlights = false;
+
   Future<void> _loadHighlights() async {
     final isMe = _isSelf;
     final targetUserId = _effectiveUserId;
     if (!isMe && targetUserId.isEmpty) return;
 
+    if (mounted) setState(() => _isLoadingHighlights = true);
     try {
       final highlights = await _profileRemoteDS.getHighlights(
         isMe ? 'me' : targetUserId,
@@ -193,6 +191,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       }
     } catch (e) {
       debugPrint('[UserProfileScreen] getHighlights error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingHighlights = false);
     }
   }
 
@@ -308,8 +308,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _showHighlightOptions(HighlightEntity h) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+
     showModalBottomSheet<void>(
       context: context,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -318,8 +323,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit_rounded),
-              title: const Text('Edit Highlight'),
+              leading: Icon(Icons.edit_rounded, color: cs.onSurface),
+              title: Text(
+                l10n.editHighlight,
+                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 CreateHighlightSheet.show(
@@ -331,13 +339,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-              title: const Text('Delete Highlight', style: TextStyle(color: Colors.red)),
+              title: Text(
+                l10n.deleteHighlight,
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+              ),
               onTap: () async {
                 Navigator.pop(ctx);
                 try {
                   await _profileRemoteDS.deleteHighlight(h.id);
                   if (mounted) {
-                    PopupDialogs.showSuccessDialog(context, 'Highlight deleted');
+                    PopupDialogs.showSuccessDialog(context, l10n.highlightDeleted);
                     _loadHighlights();
                   }
                 } catch (e) {
@@ -351,6 +362,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
       ),
     );
+  }
+
+  void _onTabSelected(int index) {
+    if (_selectedTabIndex == index) return;
+    setState(() => _selectedTabIndex = index);
+    _fetchPosts(refresh: true);
   }
 
   void _onScroll() {
@@ -497,13 +514,53 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _postsState.pendingLoadKey = loadKey;
     _fetchingLoadKey = loadKey;
 
+    final bool isRepostsTab =
+        _selectedTabIndex == ProfileLayoutConstants.repostsTabIndex;
+    final bool isAuctionsTab =
+        _selectedTabIndex == ProfileLayoutConstants.auctionsTabIndex;
+    final bool isPostsTab =
+        _selectedTabIndex == ProfileLayoutConstants.postsTabIndex;
+
+    if (isRepostsTab) {
+      if (_isSelf) {
+        context.read<PostsBloc>().add(
+          FetchMyRepostsRequestedEvent(
+            page: _postsState.page,
+            limit: UserProfilePostsState.pageSize,
+            isRefresh: refresh || _postsState.page == 1,
+            profileLoadKey: loadKey,
+          ),
+        );
+      } else {
+        context.read<PostsBloc>().add(
+          FetchFeedRequestedEvent(
+            page: _postsState.page,
+            limit: UserProfilePostsState.pageSize,
+            userId: widget.userId,
+            contentType: FeedContentType.reposts,
+            sort: ProfileLayoutConstants.postsSortNewestFirst,
+            isRefresh: refresh || _postsState.page == 1,
+            isStory: false,
+            profileLoadKey: loadKey,
+          ),
+        );
+      }
+      return;
+    }
+
     context.read<PostsBloc>().add(
       FetchFeedRequestedEvent(
         page: _postsState.page,
-        limit: _UserProfilePostsState.pageSize,
+        limit: UserProfilePostsState.pageSize,
         userId: widget.userId,
         sort: ProfileLayoutConstants.postsSortNewestFirst,
         isRefresh: refresh || _postsState.page == 1,
+        auctionQuery: isAuctionsTab
+            ? const FeedAuctionQuery(isAuctionable: true)
+            : isPostsTab
+                ? const FeedAuctionQuery(isAuctionable: false)
+                : null,
+        contentType: isPostsTab ? FeedContentType.all : null,
         isStory: false,
         profileLoadKey: loadKey,
       ),
@@ -514,6 +571,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _pullRefreshCompleter = Completer<void>();
     setState(() => _postsState.isRefreshing = true);
     await _loadUser(showLoadingShell: false);
+    _loadHighlights();
     _fetchPosts(refresh: true);
 
     try {
@@ -678,18 +736,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
     return BlocListener<PostsBloc, PostsState>(
       listener: (context, state) {
-        if (state is ProfilePostsLoadSuccess) {
-          if (_postsState.pendingLoadKey != state.profileLoadKey) return;
+        if (state is ProfilePostsLoadSuccess || state is MyRepostsLoadSuccess) {
+          final posts = state is ProfilePostsLoadSuccess
+              ? state.posts
+              : (state as MyRepostsLoadSuccess).posts;
+          final hasReachedMax = state is ProfilePostsLoadSuccess
+              ? state.hasReachedMax
+              : (state as MyRepostsLoadSuccess).hasReachedMax;
+          final loadKey = state is ProfilePostsLoadSuccess
+              ? state.profileLoadKey
+              : (state as MyRepostsLoadSuccess).profileLoadKey;
+
+          if (_postsState.pendingLoadKey != loadKey) return;
 
           setState(() {
             if (_postsState.page == 1) {
               _postsState.posts
                 ..clear()
-                ..addAll(state.posts);
+                ..addAll(posts);
             } else {
               final existingIds = _postsState.posts.map((p) => p.id).toSet();
               _postsState.posts.addAll(
-                state.posts.where((p) => !existingIds.contains(p.id)),
+                posts.where((p) => !existingIds.contains(p.id)),
               );
             }
             for (var i = 0; i < _postsState.posts.length; i++) {
@@ -699,7 +767,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               }
             }
             sortProfilePostsNewestFirst(_postsState.posts);
-            _postsState.hasReachedMax = state.hasReachedMax;
+            _postsState.hasReachedMax = hasReachedMax;
             _postsState.isLoadingMore = false;
             _postsState.isInitialLoading = false;
             _postsState.isRefreshing = false;
@@ -795,723 +863,86 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           ),
                           child: Column(
                             children: [
-                              const SizedBox(height: AppSizes.p12),
-                              if (_isLoadingUser && user == null)
-                                const SkeletonWidget.circular(size: 96)
-                              else
-                                StoryProfileAvatar(
-                                  userId: widget.userId,
-                                  imageUrl: user?.avatarUrl,
-                                  radius: ProfileLayoutConstants.avatarRadius,
-                                  fallbackText: user?.username ?? username,
-                                  backgroundColor: theme.dividerColor
-                                      .withValues(alpha: 0.08),
-                                  username: user?.username ?? username,
-                                  fullName: user?.fullName,
-                                  isFollowing: _isFollowing,
-                                  onTap: () => handleProfileScreenAvatarTap(
-                                    context,
-                                    userId: widget.userId,
-                                    avatarUrl: user?.avatarUrl,
-                                  ),
-                                ),
-                              const SizedBox(height: AppSizes.p12),
-                              if (_isLoadingUser && user?.fullName == null)
-                                const SkeletonWidget(height: 18, width: 160)
-                              else
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      user?.fullName?.trim().isNotEmpty == true
-                                          ? user!.fullName!.trim()
-                                          : username,
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 18,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    ProfileVerificationBadge(
-                                      badge: VerificationBadge.fromString(user?.verificationBadge),
-                                      isVerified: user?.isVerified == true,
-                                    ),
-                                  ],
-                                ),
-                              const SizedBox(height: AppSizes.p6),
-                              CustomText(
-                                '@$username',
-                                fontSize: 14,
-                                variant: TextVariant.secondary,
-                                textAlign: TextAlign.center,
-                              ),
-                              if (user?.creatorCategory != null || user?.pronouns != null || (user?.accountType != null && user?.accountType != 'PERSONAL')) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (user?.accountType != null && user?.accountType != 'PERSONAL') ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.secondary.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          user!.accountType == 'BUSINESS'
-                                              ? l10n.accountTypeBusiness
-                                              : l10n.accountTypeCreator,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: theme.colorScheme.secondary,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    if (user?.creatorCategory != null && user!.creatorCategory!.isNotEmpty) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          user.creatorCategory!,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    if (user?.pronouns != null && user!.pronouns!.isNotEmpty)
-                                      Text(
-                                        '(${user.pronouns})',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                              if (!_isSelf) ...[
-                                const SizedBox(height: AppSizes.p16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    ProfileFollowButton(
-                                      width: 140,
-                                      isFollowing: _isFollowing,
-                                      isFollowedBy: _isFollowedBy,
-                                      isLoading: _isFollowLoading,
-                                      onPressed: _toggleFollow,
-                                    ),
-                                    const SizedBox(width: AppSizes.p12),
-                                    SizedBox(
-                                      width: 140,
-                                      height: 40,
-                                      child: OutlinedButton(
-                                        onPressed: _isMessageLoading
-                                            ? null
-                                            : _openMessage,
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor:
-                                              theme.colorScheme.primary,
-                                          side: BorderSide(
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd,
-                                            ),
-                                          ),
-                                        ),
-                                        child: _isMessageLoading
-                                            ? SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: theme
-                                                          .colorScheme
-                                                          .primary,
-                                                    ),
-                                              )
-                                            : CustomText(
-                                                l10n.profileMessageButton,
-                                                fontWeight: FontWeight.bold,
-                                                color:
-                                                    theme.colorScheme.primary,
-                                              ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              const SizedBox(height: AppSizes.p16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _UserProfileStatItem(
-                                      number: _formatCount(displayPostCount),
-                                      label: l10n.profilePostsTab,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _UserProfileStatItem(
-                                      number: _formatCount(
-                                        user?.followerCount ?? 0,
-                                      ),
-                                      label: l10n.followers,
-                                      onTap: () =>
-                                          _refreshProfileAfterNavigation(
-                                            context.pushNamed(
-                                              'user_connections',
-                                              extra: {
-                                                'userId': widget.userId,
-                                                'type': UserConnectionType
-                                                    .followers,
-                                              },
-                                            ),
-                                          ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _UserProfileStatItem(
-                                      number: _formatCount(
-                                        user?.followingCount ?? 0,
-                                      ),
-                                      label: l10n.following,
-                                      onTap: () =>
-                                          _refreshProfileAfterNavigation(
-                                            context.pushNamed(
-                                              'user_connections',
-                                              extra: {
-                                                'userId': widget.userId,
-                                                'type': UserConnectionType
-                                                    .following,
-                                              },
-                                            ),
-                                          ),
-                                    ),
-                                  ),
-                                  // _UserProfileStatItem(
-                                  //   number: _formatCount(user?.totalLikes ?? 0),
-                                  //   label: l10n.likes,
-                                  // ),
-                                ],
-                              ),
-                              ProfileBioText(
-                                bio: user?.bio,
-                                placeholder: l10n.noBio,
-                              ),
-                              const SizedBox(height: 2),
-                              GestureDetector(
-                                onTap: () {
-                                  if (user != null) {
-                                    ProfileLinksSheet.show(context, user: user);
-                                  }
-                                },
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.link_rounded,
-                                      size: 16,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      (user?.websiteUrl?.isNotEmpty == true)
-                                          ? user!.websiteUrl!
-                                          : l10n.profileLinksTitle,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Story Highlights Row (Authentic Instagram Highlights Style)
-                              Builder(
-                                builder: (context) {
-                                  final visibleHighlights = _isSelf
-                                      ? _highlights
-                                      : _highlights
-                                          .where(
-                                            (h) =>
-                                                h.stories.isNotEmpty ||
-                                                (h.coverUrl != null &&
-                                                    h.coverUrl!.isNotEmpty),
-                                          )
-                                          .toList();
-
-                                  if (!_isSelf && visibleHighlights.isEmpty) {
-                                    return const SizedBox.shrink();
-                                  }
-
-                                  return Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const SizedBox(height: 14),
-                                      SizedBox(
-                                        height: 104,
-                                        child: ListView.builder(
-                                          scrollDirection: Axis.horizontal,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                          ),
-                                          itemCount:
-                                              visibleHighlights.length +
-                                                  (_isSelf ? 1 : 0),
-                                          itemBuilder: (context, index) {
-                                            final theme = Theme.of(context);
-                                            final cs = theme.colorScheme;
-
-                                            if (_isSelf && index == 0) {
-                                              return GestureDetector(
-                                                onTap: _showCreateHighlightDialog,
-                                                child: Padding(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Container(
-                                                        width: 72,
-                                                        height: 72,
-                                                        padding: const EdgeInsets.all(3),
-                                                        decoration: BoxDecoration(
-                                                          shape: BoxShape.circle,
-                                                          border: Border.all(
-                                                            color: cs.onSurface
-                                                                .withValues(
-                                                                  alpha: 0.2,
-                                                                ),
-                                                            width: 1.5,
-                                                          ),
-                                                        ),
-                                                        child: Container(
-                                                          decoration: BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: cs.surfaceContainerHighest
-                                                                .withValues(alpha: 0.4),
-                                                          ),
-                                                          child: Center(
-                                                            child: Icon(
-                                                              Icons.add,
-                                                              color: cs.onSurface
-                                                                  .withValues(
-                                                                    alpha: 0.8,
-                                                                  ),
-                                                              size: 28,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 6),
-                                                      SizedBox(
-                                                        width: 76,
-                                                        child: Text(
-                                                          l10n.newHighlightButton,
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight: FontWeight.w500,
-                                                            color: cs.onSurface,
-                                                          ),
-                                                          textAlign: TextAlign.center,
-                                                          maxLines: 1,
-                                                          overflow:
-                                                              TextOverflow.ellipsis,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            }
-
-                                            final h =
-                                                visibleHighlights[_isSelf
-                                                    ? index - 1
-                                                    : index];
-                                      String? displayImage = h.coverUrl;
-                                      if ((displayImage == null || displayImage.isEmpty) &&
-                                          h.stories.isNotEmpty) {
-                                        displayImage = h.stories.first.thumbnailUrl ??
-                                            h.stories.first.videoUrl;
-                                      }
-                                      return GestureDetector(
-                                        onLongPress: _isSelf
-                                            ? () => _showHighlightOptions(h)
-                                            : null,
-                                        onTap: () async {
-                                          List<PostEntity> highlightPosts = [];
-                                          PopupDialogs.showLoadingDialog(context);
-                                          try {
-                                            final fullHighlight =
-                                                await _profileRemoteDS
-                                                    .getHighlightById(h.id);
-                                            if (fullHighlight.stories.isNotEmpty) {
-                                              highlightPosts = fullHighlight.stories
-                                                  .map((s) => s.toPostEntity())
-                                                  .toList();
-                                            } else {
-                                              highlightPosts = h.stories
-                                                  .map((s) => s.toPostEntity())
-                                                  .toList();
-                                            }
-                                          } catch (_) {
-                                            highlightPosts = h.stories
-                                                .map((s) => s.toPostEntity())
-                                                .toList();
-                                          } finally {
-                                            if (mounted) {
-                                              PopupDialogs.hideLoadingDialog(
-                                                context,
-                                              );
-                                            }
-                                          }
-
-                                          if (highlightPosts.isNotEmpty &&
-                                              mounted) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => StoriesViewerScreen(
-                                                  stories: highlightPosts,
-                                                  initialIndex: 0,
-                                                  highlightId: h.id,
-                                                  highlightTitle: h.title,
-                                                ),
-                                              ),
-                                            );
-                                          }
+                              UserProfileHeaderDetails(
+                                user: user,
+                                userId: widget.userId,
+                                username: username,
+                                isSelf: _isSelf,
+                                isLoadingUser: _isLoadingUser,
+                                isFollowing: _isFollowing,
+                                isFollowedBy: _isFollowedBy,
+                                isFollowLoading: _isFollowLoading,
+                                isMessageLoading: _isMessageLoading,
+                                displayPostCount: displayPostCount,
+                                onToggleFollow: _toggleFollow,
+                                onOpenMessage: _openMessage,
+                                onNavigateFollowers: () =>
+                                    _refreshProfileAfterNavigation(
+                                      context.pushNamed(
+                                        'user_connections',
+                                        extra: {
+                                          'userId': widget.userId,
+                                          'type':
+                                              UserConnectionType.followers,
                                         },
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                          ),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Container(
-                                                width: 72,
-                                                height: 72,
-                                                padding: const EdgeInsets.all(3),
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: cs.onSurface
-                                                        .withValues(
-                                                          alpha: 0.2,
-                                                        ),
-                                                    width: 1.5,
-                                                  ),
-                                                ),
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(2),
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    color: theme.scaffoldBackgroundColor,
-                                                  ),
-                                                  child: ClipOval(
-                                                    child: (displayImage != null &&
-                                                            displayImage.isNotEmpty)
-                                                        ? Image.network(
-                                                            displayImage,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder:
-                                                                (_, __, ___) =>
-                                                                    _buildFallbackHighlightCover(
-                                                                      cs,
-                                                                    ),
-                                                          )
-                                                        : _buildFallbackHighlightCover(
-                                                            cs,
-                                                          ),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              SizedBox(
-                                                width: 76,
-                                                child: Text(
-                                                  h.title,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: cs.onSurface,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                       );
-                                     },
-                                   ),
-                                 ),
-                                ],
-                              );
-                            },
+                                      ),
+                                    ),
+                                onNavigateFollowing: () =>
+                                    _refreshProfileAfterNavigation(
+                                      context.pushNamed(
+                                        'user_connections',
+                                        extra: {
+                                          'userId': widget.userId,
+                                          'type':
+                                              UserConnectionType.following,
+                                        },
+                                      ),
+                                    ),
+                              ),
+                              UserProfileHighlightsSection(
+                                highlights: _highlights,
+                                isLoading: _isLoadingHighlights,
+                                isSelf: _isSelf,
+                                onCreateHighlight: _showCreateHighlightDialog,
+                                onLongPressHighlight: _showHighlightOptions,
+                                onRefreshHighlights: _loadHighlights,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                        child: ProfileUserPostsTabBar(
-                          backgroundColor: theme.scaffoldBackgroundColor,
                         ),
                       ),
-                      _UserProfilePostsGrid(
+                      SliverToBoxAdapter(
+                        child: _isSelf
+                            ? ProfileIconTabBar(
+                                selectedIndex: _selectedTabIndex,
+                                onSelected: _onTabSelected,
+                                backgroundColor: theme.scaffoldBackgroundColor,
+                              )
+                            : ProfileUserPostsTabBar(
+                                selectedIndex: _selectedTabIndex,
+                                onSelected: _onTabSelected,
+                                backgroundColor: theme.scaffoldBackgroundColor,
+                              ),
+                      ),
+                      UserProfilePostsGrid(
                         state: _postsState,
-                        emptyMessage: l10n.noPostsYet,
+                        emptyMessage:
+                            _selectedTabIndex == ProfileLayoutConstants.auctionsTabIndex
+                                ? 'لا يوجد مزادات حالياً'
+                                : l10n.noPostsYet,
                         userId: widget.userId,
                         pinnedPostIds: _pinnedPostIds,
                         pinnedPostsList: _pinnedPostsList,
                         onTogglePin: _isSelf ? _togglePinPost : null,
                         onNavigationReturn: _refreshProfile,
                         isSelf: _isSelf,
+                        tabIndex: _selectedTabIndex,
                       ),
                     ],
                   ),
                 ),
         ),
       ),
-    );
-  }
-
-  Widget _buildFallbackHighlightCover(ColorScheme cs) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [cs.surfaceContainerHighest, cs.surfaceContainerHigh],
-        ),
-      ),
-      child: Center(
-        child: Icon(Icons.star_rounded, color: Colors.amber.shade600, size: 26),
-      ),
-    );
-  }
-}
-
-class _UserProfileStatItem extends StatelessWidget {
-  const _UserProfileStatItem({
-    required this.number,
-    required this.label,
-    this.onTap,
-  });
-
-  final String number;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomText(number, fontSize: 18, fontWeight: FontWeight.bold),
-        const SizedBox(height: AppSizes.p4),
-        CustomText(label, fontSize: 13, variant: TextVariant.secondary),
-      ],
-    );
-
-    final child = Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.p12,
-        vertical: AppSizes.p4,
-      ),
-      child: Center(child: content),
-    );
-
-    if (onTap == null) return child;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-      child: child,
-    );
-  }
-}
-
-class _UserProfilePostsGrid extends StatelessWidget {
-  const _UserProfilePostsGrid({
-    required this.state,
-    required this.emptyMessage,
-    required this.userId,
-    this.pinnedPostIds = const [],
-    this.pinnedPostsList = const [],
-    this.onTogglePin,
-    this.onNavigationReturn,
-    this.isSelf = false,
-  });
-
-  final _UserProfilePostsState state;
-  final String emptyMessage;
-  final String userId;
-  final List<String> pinnedPostIds;
-  final List<PostEntity> pinnedPostsList;
-  final Function(PostEntity)? onTogglePin;
-  final VoidCallback? onNavigationReturn;
-  final bool isSelf;
-
-  @override
-  Widget build(BuildContext context) {
-    const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: ProfileLayoutConstants.gridCrossAxisCount,
-      crossAxisSpacing: ProfileLayoutConstants.gridSpacing,
-      mainAxisSpacing: ProfileLayoutConstants.gridSpacing,
-      childAspectRatio: ProfileLayoutConstants.gridAspectRatio,
-    );
-
-    if (state.isRefreshing || (state.isInitialLoading && state.posts.isEmpty && pinnedPostsList.isEmpty)) {
-      return SliverGrid(
-        gridDelegate: gridDelegate,
-        delegate: SliverChildBuilderDelegate(
-          (_, _) => SkeletonWidget(
-            borderRadius: ProfileLayoutConstants.gridItemRadius,
-          ),
-          childCount: 9,
-        ),
-      );
-    }
-
-    final pinnedPosts = <PostEntity>[];
-    final unpinnedPosts = <PostEntity>[];
-    final addedPinnedIds = <String>{};
-
-    // 1. Add pinned posts from pinnedPostsList if still pinned in pinnedPostIds
-    for (final p in pinnedPostsList) {
-      final isStillPinned = pinnedPostIds.isEmpty || pinnedPostIds.contains(p.id);
-      if (isStillPinned) {
-        pinnedPosts.add(p.copyWith(isPinned: true));
-        addedPinnedIds.add(p.id);
-      }
-    }
-
-    // 2. Add pinned posts from state.posts
-    for (final p in state.posts) {
-      final isPinned = p.isPinned || pinnedPostIds.contains(p.id);
-      if (isPinned) {
-        if (!addedPinnedIds.contains(p.id)) {
-          pinnedPosts.add(p.copyWith(isPinned: true));
-          addedPinnedIds.add(p.id);
-        }
-      }
-    }
-
-    // 3. Add all unpinned posts
-    for (final p in state.posts) {
-      final isPinned = p.isPinned || pinnedPostIds.contains(p.id);
-      if (!isPinned && !addedPinnedIds.contains(p.id)) {
-        unpinnedPosts.add(p.copyWith(isPinned: false));
-      }
-    }
-
-    final displayPosts = [...pinnedPosts, ...unpinnedPosts];
-
-    if (displayPosts.isEmpty) {
-      return SliverToBoxAdapter(
-        child: SizedBox(
-          height: 220,
-          child: Center(
-            child: CustomText(emptyMessage, variant: TextVariant.secondary),
-          ),
-        ),
-      );
-    }
-
-    final showLoadMoreFooter =
-        state.isLoadingMore && !state.hasReachedMax && state.posts.isNotEmpty;
-
-    final grid = SliverGrid(
-      gridDelegate: gridDelegate,
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final post = displayPosts[index];
-        final isPinned = post.isPinned;
-        final tile = ProfileGridTile(
-          post: post,
-          tabIndex: ProfileLayoutConstants.postsTabIndex,
-          theme: Theme.of(context),
-          onTap: () async {
-            await openProfilePosts(
-              context,
-              posts: displayPosts,
-              initialIndex: index,
-              source: ProfilePostsViewerSource.userPosts,
-              page: state.page,
-              hasReachedMax: state.hasReachedMax,
-              userId: userId,
-            );
-            onNavigationReturn?.call();
-          },
-        );
-
-        if (!isSelf || onTogglePin == null) return tile;
-
-        return GestureDetector(
-          onLongPress: () {
-            showModalBottomSheet<void>(
-              context: context,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              builder: (ctx) => SafeArea(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.push_pin_rounded),
-                      title: Text(
-                        isPinned ? 'Unpin from profile' : 'Pin to profile',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        onTogglePin!(post);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          child: tile,
-        );
-      }, childCount: displayPosts.length),
-    );
-
-    if (!showLoadMoreFooter) return grid;
-
-    return SliverMainAxisGroup(
-      slivers: [
-        grid,
-        const SliverToBoxAdapter(child: ProfilePostsLoadMoreFooter()),
-      ],
     );
   }
 }

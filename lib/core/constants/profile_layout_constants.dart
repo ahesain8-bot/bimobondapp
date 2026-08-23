@@ -48,12 +48,13 @@ class ProfileLayoutConstants {
   static const String postsSortNewestFirst = 'LATEST';
   static const double scrollLoadMoreThreshold = 200;
 
-  static const int tabCount = 5;
+  static const int tabCount = 6;
   static const int postsTabIndex = 0;
-  static const int repostsTabIndex = 1;
-  static const int onlyMeTabIndex = 2;
-  static const int likedTabIndex = 3;
-  static const int savedTabIndex = 4;
+  static const int auctionsTabIndex = 1;
+  static const int repostsTabIndex = 2;
+  static const int onlyMeTabIndex = 3;
+  static const int likedTabIndex = 4;
+  static const int savedTabIndex = 5;
   static const String onlyMePrivacyStatus = 'PRIVATE';
   static const double iconTabBarHeight = 48;
   static const double iconTabSize = 22;

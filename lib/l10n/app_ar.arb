@@ -1976,5 +1976,16 @@
   "chooseFromGallery": "اختيار من المعرض",
   "takePhoto": "التقاط صورة",
   "pasteImageUrl": "لصق رابط الصورة",
-  "newHighlightButton": "جديد"
+  "newHighlightButton": "جديد",
+  "aboutThisStory": "عن هذه القصة",
+  "editHighlight": "تعديل الهايلايت",
+  "deleteHighlight": "حذف الهايلايت",
+  "highlightDeleted": "تم حذف الهايلايت",
+  "highlightEmptyRemoved": "هذا الهايلايت فارغ وتم إزالته",
+  "highlightNameLabel": "اسم الهايلايت",
+  "highlightNameHint": "مثل: سفر، ذكريات",
+  "coverUpdated": "تم تحديث الغلاف",
+  "failedToUploadCover": "فشل تحميل صورة الغلاف",
+  "failedToLoadHighlightDetails": "فشل تحميل تفاصيل الهايلايت",
+  "failedToAddStoryToHighlight": "فشل إضافة القصة إلى الهايلايت"
 }

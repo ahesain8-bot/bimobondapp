@@ -4480,4 +4480,37 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get newHighlightButton => 'جديد';
+
+  @override
+  String get aboutThisStory => 'عن هذه القصة';
+
+  @override
+  String get editHighlight => 'تعديل الهايلايت';
+
+  @override
+  String get deleteHighlight => 'حذف الهايلايت';
+
+  @override
+  String get highlightDeleted => 'تم حذف الهايلايت';
+
+  @override
+  String get highlightEmptyRemoved => 'هذا الهايلايت فارغ وتم إزالته';
+
+  @override
+  String get highlightNameLabel => 'اسم الهايلايت';
+
+  @override
+  String get highlightNameHint => 'مثل: سفر، ذكريات';
+
+  @override
+  String get coverUpdated => 'تم تحديث الغلاف';
+
+  @override
+  String get failedToUploadCover => 'فشل تحميل صورة الغلاف';
+
+  @override
+  String get failedToLoadHighlightDetails => 'فشل تحميل تفاصيل الهايلايت';
+
+  @override
+  String get failedToAddStoryToHighlight => 'فشل إضافة القصة إلى الهايلايت';
 }

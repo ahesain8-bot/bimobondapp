@@ -82,4 +82,74 @@ class MentionUserIdResolver {
 
     return map;
   }
+
+  static String displayNameForUsernameSync(
+    String username, {
+    Map<String, String> knownNames = const {},
+    PostEntity? post,
+  }) {
+    final fromMap = lookupInMap(username, knownNames);
+    if (fromMap != null && fromMap.trim().isNotEmpty) return fromMap.trim();
+
+    final author = post?.user;
+    if (author != null &&
+        author.username.isNotEmpty &&
+        author.username.toLowerCase() == username.toLowerCase()) {
+      final name = author.fullName?.trim() ?? author.username.trim();
+      if (name.isNotEmpty) return name;
+    }
+
+    final friendName = MentionFriendsSource.fullNameForUsernameSync(username);
+    if (friendName != null && friendName.trim().isNotEmpty) {
+      return friendName.trim();
+    }
+
+    return username;
+  }
+
+  /// Builds a map of @username → displayName for all tokens in [text].
+  static Map<String, String> buildDisplayNameMap(
+    String text,
+    List<MentionRefEntity> mentions, {
+    PostEntity? post,
+  }) {
+    final map = <String, String>{};
+
+    void put(String username, String displayName) {
+      if (username.isEmpty || displayName.isEmpty) return;
+      map[username] = displayName;
+      map[username.toLowerCase()] = displayName;
+    }
+
+    for (final ref in mentions) {
+      final display = ref.displayName?.trim() ?? '';
+      if (display.isNotEmpty) {
+        put(ref.username ?? '', display);
+      }
+    }
+
+    final tokens = TagParser.extractMentionUsernames(text);
+    for (var i = 0; i < tokens.length && i < mentions.length; i++) {
+      final display = mentions[i].displayName?.trim() ?? '';
+      if (display.isNotEmpty) {
+        put(tokens[i], display);
+      }
+    }
+
+    for (final token in tokens) {
+      if (lookupInMap(token, map) != null) continue;
+      final fromFriends = MentionFriendsSource.fullNameForUsernameSync(token);
+      if (fromFriends != null && fromFriends.isNotEmpty) put(token, fromFriends);
+    }
+
+    final author = post?.user;
+    if (author != null && author.username.isNotEmpty) {
+      final name = author.fullName?.trim() ?? author.username.trim();
+      if (name.isNotEmpty) {
+        put(author.username, name);
+      }
+    }
+
+    return map;
+  }
 }

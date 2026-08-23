@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.da
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/core/widgets/skeleton_widget.dart';
 
 class ProfileHeaderSection extends StatelessWidget {
   const ProfileHeaderSection({
@@ -28,6 +29,8 @@ class ProfileHeaderSection extends StatelessWidget {
     this.postsCount,
     this.highlights = const [],
     this.onAddHighlight,
+    this.isLoadingHighlights = false,
+    this.onReloadHighlights,
     super.key,
   });
 
@@ -39,6 +42,8 @@ class ProfileHeaderSection extends StatelessWidget {
   final int? postsCount;
   final List<HighlightEntity> highlights;
   final VoidCallback? onAddHighlight;
+  final bool isLoadingHighlights;
+  final VoidCallback? onReloadHighlights;
 
   @override
   Widget build(BuildContext context) {
@@ -213,6 +218,10 @@ class ProfileHeaderSection extends StatelessWidget {
           // Story Highlights Row (directly under links)
           Builder(
             builder: (context) {
+              if (isLoadingHighlights && highlights.isEmpty) {
+                return const HighlightsSkeletonRow();
+              }
+
               final visibleHighlights = (onAddHighlight != null)
                   ? highlights
                   : highlights
@@ -301,43 +310,20 @@ class ProfileHeaderSection extends StatelessWidget {
                   }
 
                   return GestureDetector(
-                    onTap: () async {
-                      List<PostEntity> highlightPosts = [];
-                      PopupDialogs.showLoadingDialog(context);
-                      try {
-                        final fullHighlight =
-                            await ProfileRemoteDataSourceImpl()
-                                .getHighlightById(h.id);
-                        if (fullHighlight.stories.isNotEmpty) {
-                          highlightPosts = fullHighlight.stories
-                              .map((s) => s.toPostEntity())
-                              .toList();
-                        } else {
-                          highlightPosts =
-                              h.stories.map((s) => s.toPostEntity()).toList();
-                        }
-                      } catch (_) {
-                        highlightPosts =
-                            h.stories.map((s) => s.toPostEntity()).toList();
-                      } finally {
-                        if (context.mounted) {
-                          PopupDialogs.hideLoadingDialog(context);
-                        }
-                      }
-
-                      if (highlightPosts.isNotEmpty && context.mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => StoriesViewerScreen(
-                              stories: highlightPosts,
-                              initialIndex: 0,
-                              highlightId: h.id,
-                              highlightTitle: h.title,
-                            ),
+                    onTap: () {
+                      final highlightPosts =
+                          h.stories.map((s) => s.toPostEntity()).toList();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StoriesViewerScreen(
+                            stories: highlightPosts,
+                            initialIndex: 0,
+                            highlightId: h.id,
+                            highlightTitle: h.title,
                           ),
-                        );
-                      }
+                        ),
+                      ).then((_) => onReloadHighlights?.call());
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -419,6 +405,61 @@ class ProfileHeaderSection extends StatelessWidget {
           const SizedBox(height: AppSizes.p8),
         ],
       ),
+    );
+  }
+}
+
+class HighlightsSkeletonRow extends StatelessWidget {
+  const HighlightsSkeletonRow({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 104,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 5,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: cs.onSurface.withValues(alpha: 0.1),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const SkeletonWidget.circular(size: 64),
+                    ),
+                    const SizedBox(height: 6),
+                    const SkeletonWidget(
+                      height: 10,
+                      width: 48,
+                      borderRadius: 4,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

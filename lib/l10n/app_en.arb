@@ -1992,5 +1992,16 @@
   "chooseFromGallery": "Choose from Gallery",
   "takePhoto": "Take Photo",
   "pasteImageUrl": "Paste Image URL",
-  "newHighlightButton": "New"
+  "newHighlightButton": "New",
+  "aboutThisStory": "About this story",
+  "editHighlight": "Edit highlight",
+  "deleteHighlight": "Delete Highlight",
+  "highlightDeleted": "Highlight deleted",
+  "highlightEmptyRemoved": "This highlight is empty and was removed",
+  "highlightNameLabel": "Highlight Name",
+  "highlightNameHint": "e.g. Travel, Memories",
+  "coverUpdated": "Cover updated",
+  "failedToUploadCover": "Failed to upload cover image",
+  "failedToLoadHighlightDetails": "Failed to load highlight details",
+  "failedToAddStoryToHighlight": "Failed to add story to highlight"
 }

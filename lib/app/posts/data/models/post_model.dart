@@ -421,6 +421,7 @@ class PostModel extends PostEntity {
     String? description,
     String? privacyStatus,
     PostSoundEntity? sound,
+    String? filterName,
     bool? isPinned,
   }) {
     return PostModel(
@@ -456,7 +457,7 @@ class PostModel extends PostEntity {
       promotion: promotion,
       location: location,
       sound: sound ?? this.sound,
-      filterName: filterName,
+      filterName: filterName ?? this.filterName,
       filterCategory: filterCategory,
       filter: filter,
       isPinned: isPinned ?? this.isPinned,

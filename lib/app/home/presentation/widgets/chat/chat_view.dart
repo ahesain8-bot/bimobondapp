@@ -27,6 +27,9 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/chat/chat_message_text.dart';
+import 'package:bimobondapp/core/utils/comment_translator.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ChatView extends StatefulWidget {
@@ -79,6 +82,10 @@ class _ChatViewState extends State<ChatView> {
   bool _didRequestCamera = false;
 
   bool _isTypingLocal = false;
+
+  final Map<String, String> _translatedMessageTexts = {};
+  final Set<String> _showTranslationMessageIds = {};
+  final Set<String> _translatingMessageIds = {};
 
   void _onInputChanged() {
     final isTyping = _messageController.text.isNotEmpty;
@@ -450,9 +457,66 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
+  Future<void> _toggleMessageTranslation(Map<String, dynamic> msg) async {
+    final messageId = msg['id']?.toString();
+    if (messageId == null || messageId.isEmpty) return;
+
+    if (_showTranslationMessageIds.contains(messageId)) {
+      setState(() {
+        _showTranslationMessageIds.remove(messageId);
+      });
+      return;
+    }
+
+    if (_translatedMessageTexts.containsKey(messageId)) {
+      setState(() {
+        _showTranslationMessageIds.add(messageId);
+      });
+      return;
+    }
+
+    final l10n = AppLocalizations.of(context)!;
+    final messageText = chatMessageText(msg, l10n);
+    if (messageText.trim().isEmpty) return;
+
+    setState(() {
+      _translatingMessageIds.add(messageId);
+    });
+
+    final targetLang = Localizations.localeOf(context).languageCode;
+    final translated = await CommentTranslator.translate(
+      text: messageText,
+      targetLang: targetLang,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _translatingMessageIds.remove(messageId);
+      if (translated != null && translated.trim().isNotEmpty) {
+        _translatedMessageTexts[messageId] = translated;
+        _showTranslationMessageIds.add(messageId);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.translationFailed),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
+  }
+
   void _showMessageActions(Map<String, dynamic> msg) {
     if (msg['isDeleted'] == true) return;
     final messageId = msg['id']?.toString();
+    final type = msg['type']?.toString() ?? 'text';
+    final l10n = AppLocalizations.of(context)!;
+    final text = chatMessageText(msg, l10n);
+    final canTranslate = type == 'text' && text.trim().isNotEmpty && msg['isDeleted'] != true;
+    final isTranslated = messageId != null && _showTranslationMessageIds.contains(messageId);
+    final isTranslating = messageId != null && _translatingMessageIds.contains(messageId);
 
     ChatSheets.showMessageActions(
       context: context,
@@ -465,6 +529,9 @@ class _ChatViewState extends State<ChatView> {
           );
         }
       },
+      onTranslate: canTranslate ? () => _toggleMessageTranslation(msg) : null,
+      isTranslated: isTranslated,
+      isTranslating: isTranslating,
       onDelete: msg['isMe'] == true ? () => _confirmDeleteMessage(msg) : null,
     );
   }
@@ -908,7 +975,23 @@ class _ChatViewState extends State<ChatView> {
                           ? const ChatMessageListSkeleton()
                           : ChatMessageList(
                               scrollController: _scrollController,
-                              messages: messages,
+                              messages: messages.map((m) {
+                                final mId = m['id']?.toString();
+                                if (mId != null) {
+                                  final isTrans = _showTranslationMessageIds.contains(mId);
+                                  final transText = _translatedMessageTexts[mId];
+                                  final isTranslating = _translatingMessageIds.contains(mId);
+                                  if (isTrans || transText != null || isTranslating) {
+                                    return {
+                                      ...m,
+                                      if (transText != null) 'translatedText': transText,
+                                      'showTranslation': isTrans,
+                                      'isTranslating': isTranslating,
+                                    };
+                                  }
+                                }
+                                return m;
+                              }).toList(),
                               isTyping: isTypingRemote,
                               username: widget.username,
                               peerImageUrl: widget.imageUrl,
@@ -918,6 +1001,7 @@ class _ChatViewState extends State<ChatView> {
                               currentUserId: widget.currentUserId,
                               isRtl: _isRtl,
                               onReactionPicker: _showMessageActions,
+                              onToggleTranslate: _toggleMessageTranslation,
                               onReplyTo: (msg) =>
                                   setState(() => _replyTo = msg),
                               onPollVote: (messageId, optionIndex) {

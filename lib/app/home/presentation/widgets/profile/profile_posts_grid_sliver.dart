@@ -97,9 +97,11 @@ class ProfilePostsGridSliver extends StatelessWidget {
 
     final displayPosts = <PostEntity>[];
     if (tabIndex == ProfileLayoutConstants.postsTabIndex) {
+      final nonAuctionPosts =
+          tab.posts.where((p) => !p.isAuctionable && p.auction == null).toList();
       final pinned = <PostEntity>[];
       final unpinned = <PostEntity>[];
-      for (final p in tab.posts) {
+      for (final p in nonAuctionPosts) {
         if (p.isPinned) {
           pinned.add(p);
         } else {
@@ -107,6 +109,10 @@ class ProfilePostsGridSliver extends StatelessWidget {
         }
       }
       displayPosts.addAll([...pinned, ...unpinned]);
+    } else if (tabIndex == ProfileLayoutConstants.auctionsTabIndex) {
+      displayPosts.addAll(
+        tab.posts.where((p) => p.isAuctionable || p.auction != null),
+      );
     } else {
       displayPosts.addAll(tab.posts);
     }

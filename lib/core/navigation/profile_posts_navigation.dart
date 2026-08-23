@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 enum ProfilePostsViewerSource {
   ownPosts,
+  ownAuctions,
   ownReposts,
   ownOnlyMe,
   ownLiked,
@@ -23,6 +24,7 @@ extension ProfilePostsViewerSourceX on ProfilePostsViewerSource {
       case ProfilePostsViewerSource.ownReposts:
         return TrafficSource.repost;
       case ProfilePostsViewerSource.ownPosts:
+      case ProfilePostsViewerSource.ownAuctions:
       case ProfilePostsViewerSource.ownOnlyMe:
       case ProfilePostsViewerSource.userPosts:
         return TrafficSource.profile;
@@ -32,6 +34,8 @@ extension ProfilePostsViewerSourceX on ProfilePostsViewerSource {
 
 ProfilePostsViewerSource profilePostsSourceForTab(int tabIndex) {
   switch (tabIndex) {
+    case ProfileLayoutConstants.auctionsTabIndex:
+      return ProfilePostsViewerSource.ownAuctions;
     case ProfileLayoutConstants.repostsTabIndex:
       return ProfilePostsViewerSource.ownReposts;
     case ProfileLayoutConstants.onlyMeTabIndex:

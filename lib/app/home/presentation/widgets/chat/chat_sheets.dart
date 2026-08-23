@@ -74,6 +74,9 @@ class ChatSheets {
     required VoidCallback onReply,
     required VoidCallback onReact,
     required void Function(String emoji) onEmojiSelected,
+    VoidCallback? onTranslate,
+    bool isTranslated = false,
+    bool isTranslating = false,
     VoidCallback? onDelete,
   }) {
     final l10n = AppLocalizations.of(context)!;
@@ -197,6 +200,46 @@ class ChatSheets {
                     onReact();
                   },
                 ),
+                if (onTranslate != null)
+                  ListTile(
+                    leading: isTranslating
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        : Icon(
+                            LucideIcons.languages,
+                            color: theme.colorScheme.primary,
+                          ),
+                    title: Text(
+                      isTranslating
+                          ? (l10n.localeName.startsWith('ar')
+                              ? 'جاري الترجمة...'
+                              : 'Translating...')
+                          : isTranslated
+                              ? (l10n.localeName.startsWith('ar')
+                                  ? 'عرض النص الأصلي'
+                                  : 'Show original')
+                              : (l10n.localeName.startsWith('ar')
+                                  ? 'ترجمة الرسالة'
+                                  : 'Translate message'),
+                      style: TextStyle(
+                        color: onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: isTranslating
+                        ? null
+                        : () {
+                            Navigator.pop(sheetCtx);
+                            onTranslate();
+                          },
+                  ),
                 if (onDelete != null) ...[
                   Divider(
                     height: 1,

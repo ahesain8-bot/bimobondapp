@@ -10,6 +10,7 @@ import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -31,6 +32,7 @@ class ChatMessageItem extends StatelessWidget {
     required this.onSwipeReply,
     required this.isRtl,
     this.onPollVote,
+    this.onToggleTranslate,
     super.key,
   });
 
@@ -49,12 +51,17 @@ class ChatMessageItem extends StatelessWidget {
   final VoidCallback onSwipeReply;
   final bool isRtl;
   final void Function(String messageId, int optionIndex)? onPollVote;
+  final void Function(Map<String, dynamic> msg)? onToggleTranslate;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isMe = msg['isMe'] as bool? ?? false;
     final isDeleted = msg['isDeleted'] == true;
+    final type = msg['type']?.toString() ?? 'text';
+    final showTranslation = msg['showTranslation'] == true;
+    final isTranslating = msg['isTranslating'] == true;
     final reactions = msg['reactions'] as List? ?? [];
     final screenWidth = MediaQuery.sizeOf(context).width;
     final maxBubbleWidth =
@@ -84,12 +91,13 @@ class ChatMessageItem extends StatelessWidget {
             currentUserId: currentUserId,
             peerUserId: peerUserId,
             onPollVote: onPollVote,
+            onToggleTranslate: onToggleTranslate,
           ),
           if (reactions.isNotEmpty)
             Positioned(
               bottom: ChatLayoutConstants.reactionBadgeBottomOffset,
-              right: isMe ? null : 0,
-              left: isMe ? 0 : null,
+              right: !isMe ? null : 0,
+              left: !isMe ? 0 : null,
               child: ChatReactionBadge(
                 emoji: reactions.map((e) => e.toString()).join(),
               ),
@@ -121,7 +129,7 @@ class ChatMessageItem extends StatelessWidget {
     final contentInset = ChatLayoutConstants.receivedMessageAvatarRowWidth;
 
     final messageColumn = Column(
-      crossAxisAlignment: isMe
+      crossAxisAlignment: !isMe
           ? CrossAxisAlignment.end
           : CrossAxisAlignment.start,
       children: [
@@ -195,6 +203,52 @@ class ChatMessageItem extends StatelessWidget {
           ),
           child: displayFooter,
         ),
+        if (type == 'text' &&
+            !isDeleted &&
+            messageText.trim().isNotEmpty &&
+            onToggleTranslate != null) ...[
+          const SizedBox(height: 2),
+          Padding(
+            padding: EdgeInsets.only(
+              left: isMe ? 0 : contentInset + 4,
+              right: isMe ? contentInset + 4 : 0,
+            ),
+            child: GestureDetector(
+              onTap: isTranslating ? null : () => onToggleTranslate?.call(msg),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isTranslating)
+                    SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: theme.colorScheme.primary,
+                      ),
+                    )
+                  else ...[
+                    Icon(
+                      LucideIcons.languages,
+                      size: 11,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      showTranslation ? l10n.seeOriginal : l10n.seeTranslation,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
 
@@ -227,21 +281,20 @@ class _SentMessageAvatarSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const radius = ChatLayoutConstants.receivedMessageAvatarRadius;
-    const size = radius * 2;
-
-    if (showAvatar) {
-      return StoryProfileAvatar(
-        userId: userId,
-        imageUrl: imageUrl,
-        radius: radius,
-        fallbackText: username,
-        username: username,
-        fullName: username,
+    if (!showAvatar) {
+      return const SizedBox(
+        width: ChatLayoutConstants.receivedMessageAvatarRadius * 2,
       );
     }
 
-    return const SizedBox(width: size, height: size);
+    return StoryProfileAvatar(
+      userId: userId,
+      imageUrl: imageUrl,
+      radius: ChatLayoutConstants.receivedMessageAvatarRadius,
+      fallbackText: username,
+      username: username,
+      fullName: username,
+    );
   }
 }
 
@@ -260,21 +313,20 @@ class _ReceivedMessageAvatarSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const radius = ChatLayoutConstants.receivedMessageAvatarRadius;
-    const size = radius * 2;
-
-    if (showAvatar) {
-      return StoryProfileAvatar(
-        userId: peerUserId,
-        imageUrl: imageUrl,
-        radius: radius,
-        fallbackText: username,
-        username: username,
-        fullName: username,
+    if (!showAvatar) {
+      return const SizedBox(
+        width: ChatLayoutConstants.receivedMessageAvatarRadius * 2,
       );
     }
 
-    return const SizedBox(width: size, height: size);
+    return StoryProfileAvatar(
+      userId: peerUserId,
+      imageUrl: imageUrl,
+      radius: ChatLayoutConstants.receivedMessageAvatarRadius,
+      fallbackText: username,
+      username: username,
+      fullName: username,
+    );
   }
 }
 
@@ -289,6 +341,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.currentUserId,
     this.peerUserId,
     this.onPollVote,
+    this.onToggleTranslate,
     super.key,
   });
 
@@ -301,6 +354,7 @@ class ChatMessageBubble extends StatelessWidget {
   final String? currentUserId;
   final String? peerUserId;
   final void Function(String messageId, int optionIndex)? onPollVote;
+  final void Function(Map<String, dynamic> msg)? onToggleTranslate;
 
   @override
   Widget build(BuildContext context) {
@@ -337,6 +391,7 @@ class ChatMessageBubble extends StatelessWidget {
           currentUserId: currentUserId,
           peerUserId: peerUserId,
           onPollVote: onPollVote,
+          onToggleTranslate: onToggleTranslate,
         ),
       ],
     );
@@ -398,9 +453,7 @@ class ChatBubbleReplyPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: isMe ? 0.6 : 0.8),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.08),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.08)),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -442,6 +495,7 @@ class ChatMessageContent extends StatelessWidget {
     this.currentUserId,
     this.peerUserId,
     this.onPollVote,
+    this.onToggleTranslate,
     super.key,
   });
 
@@ -451,6 +505,7 @@ class ChatMessageContent extends StatelessWidget {
   final String? currentUserId;
   final String? peerUserId;
   final void Function(String messageId, int optionIndex)? onPollVote;
+  final void Function(Map<String, dynamic> msg)? onToggleTranslate;
 
   @override
   Widget build(BuildContext context) {
@@ -461,14 +516,56 @@ class ChatMessageContent extends StatelessWidget {
 
     switch (type) {
       case 'text':
-        return Text(
-          messageText,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: isMe ? chatTheme.onSentBubble : chatTheme.onReceivedBubble,
-            fontSize: ChatLayoutConstants.messageFontSize,
-            height: ChatLayoutConstants.messageLineHeight,
-            fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
-          ),
+        final translatedText = msg['translatedText']?.toString();
+        final showTranslation =
+            msg['showTranslation'] == true &&
+            translatedText != null &&
+            translatedText.trim().isNotEmpty;
+        final displayText = showTranslation ? translatedText : messageText;
+        final bubbleTextColor = isMe
+            ? chatTheme.onSentBubble
+            : chatTheme.onReceivedBubble;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              displayText,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: bubbleTextColor,
+                fontSize: ChatLayoutConstants.messageFontSize,
+                height: ChatLayoutConstants.messageLineHeight,
+                fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
+            if (showTranslation) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    LucideIcons.languages,
+                    size: 11,
+                    color: bubbleTextColor.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    Localizations.localeOf(
+                          context,
+                        ).languageCode.startsWith('ar')
+                        ? 'مترجم'
+                        : 'Translated',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: bubbleTextColor.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         );
       case 'image':
         final imageUrl = msg['imageUrl']?.toString() ?? '';
@@ -593,7 +690,7 @@ class ChatMessageContent extends StatelessWidget {
       phone: msg['contactPhone']?.toString() ?? '',
       email: msg['contactEmail']?.toString(),
       userId: msg['contactUserId']?.toString(),
-avatarUrl: msg['contactAvatarUrl']?.toString(),
+      avatarUrl: msg['contactAvatarUrl']?.toString(),
     );
   }
 }
@@ -665,9 +762,7 @@ class ChatReactionBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.dividerColor.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -714,14 +809,16 @@ class ChatCallMessageWidget extends StatelessWidget {
         ? Map<String, dynamic>.from(msg['payload'] as Map)
         : <String, dynamic>{};
 
-    final rawCallType = (msg['callType'] ??
-            payload['callType'] ??
-            payload['type'] ??
-            msg['mediaType'] ??
-            '')
-        .toString()
-        .toUpperCase();
-    final isVideo = rawCallType.contains('VIDEO') ||
+    final rawCallType =
+        (msg['callType'] ??
+                payload['callType'] ??
+                payload['type'] ??
+                msg['mediaType'] ??
+                '')
+            .toString()
+            .toUpperCase();
+    final isVideo =
+        rawCallType.contains('VIDEO') ||
         msg['isVideo'] == true ||
         payload['isVideo'] == true ||
         payload['type']?.toString().toUpperCase() == 'VIDEO';
@@ -772,7 +869,8 @@ class ChatCallMessageWidget extends StatelessWidget {
     if (peerUserId != null && peerUserId!.trim().isNotEmpty) {
       targetPeerId = peerUserId!.trim();
     } else {
-      final raw = msg['peerUserId'] ??
+      final raw =
+          msg['peerUserId'] ??
           (isMe ? msg['receiverId'] : msg['senderId']) ??
           payload['initiatorId'] ??
           payload['targetUserId'];
@@ -784,12 +882,12 @@ class ChatCallMessageWidget extends StatelessWidget {
     void handleCallBack() {
       final String callTypeToStart = isVideo ? 'VIDEO' : 'AUDIO';
       context.read<CallBloc>().add(
-            StartCallEvent(
-              chatId: targetChatId,
-              type: callTypeToStart,
-              inviteeIds: targetPeerId.isNotEmpty ? [targetPeerId] : null,
-            ),
-          );
+        StartCallEvent(
+          chatId: targetChatId,
+          type: callTypeToStart,
+          inviteeIds: targetPeerId.isNotEmpty ? [targetPeerId] : null,
+        ),
+      );
     }
 
     return InkWell(

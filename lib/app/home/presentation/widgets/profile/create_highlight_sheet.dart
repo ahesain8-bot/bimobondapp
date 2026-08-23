@@ -303,23 +303,25 @@ class _CreateHighlightSheetState extends State<CreateHighlightSheet> {
       uploadResult.fold(
         (failure) {
           if (mounted) {
-            PopupDialogs.showErrorDialog(context, 'Failed to upload cover image');
+            final l10n = AppLocalizations.of(context)!;
+            PopupDialogs.showErrorDialog(context, l10n.failedToUploadCover);
           }
         },
         (uploadedUrl) {
           if (mounted) {
+            final l10n = AppLocalizations.of(context)!;
             setState(() {
               _selectedCoverUrl = uploadedUrl;
               _coverController.text = uploadedUrl;
             });
-            PopupDialogs.showSuccessDialog(context, 'Cover updated');
+            PopupDialogs.showSuccessDialog(context, l10n.coverUpdated);
           }
         },
       );
     } catch (e) {
       if (mounted) {
         PopupDialogs.hideLoadingDialog(context);
-        PopupDialogs.showErrorDialog(context, 'Unable to pick image: $e');
+        PopupDialogs.showErrorDialog(context, '$e');
       }
     }
   }

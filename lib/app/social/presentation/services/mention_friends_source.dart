@@ -122,6 +122,24 @@ class MentionFriendsSource {
     return null;
   }
 
+  /// Case-insensitive username → full name / display name from the cached list.
+  static String? fullNameForUsernameSync(String username) {
+    final trimmed = username.trim();
+    if (trimmed.isEmpty) return null;
+    final people = _people;
+    if (people == null) return null;
+
+    final lower = trimmed.toLowerCase();
+    for (final user in people) {
+      final un = user.username?.trim();
+      if (un != null && un.toLowerCase() == lower) {
+        final display = user.displayName.trim();
+        if (display.isNotEmpty) return display;
+      }
+    }
+    return null;
+  }
+
   static void clearCache() {
     _people = null;
     _loading = null;

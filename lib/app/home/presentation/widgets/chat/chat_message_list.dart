@@ -21,6 +21,7 @@ class ChatMessageList extends StatelessWidget {
     required this.onReactionPicker,
     required this.onReplyTo,
     this.onPollVote,
+    this.onToggleTranslate,
     this.followersCount,
     this.postsCount,
     this.statsText,
@@ -42,6 +43,7 @@ class ChatMessageList extends StatelessWidget {
   final void Function(Map<String, dynamic> msg) onReactionPicker;
   final void Function(Map<String, dynamic> msg) onReplyTo;
   final void Function(String messageId, int optionIndex)? onPollVote;
+  final void Function(Map<String, dynamic> msg)? onToggleTranslate;
   final int? followersCount;
   final int? postsCount;
   final String? statsText;
@@ -110,6 +112,7 @@ class ChatMessageList extends StatelessWidget {
           onLongPress: () => onReactionPicker(msg),
           onSwipeReply: () => onReplyTo(msg),
           onPollVote: onPollVote,
+          onToggleTranslate: onToggleTranslate,
           isRtl: isRtl,
         );
       },

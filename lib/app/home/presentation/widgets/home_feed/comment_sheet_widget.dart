@@ -61,9 +61,9 @@ class CommentSheetWidget extends StatefulWidget {
   static const int likesTabIndex = 1;
   static const int ownerViewsTabIndex = 2;
 
-  static const double sheetInitialFraction = 0.55;
+  static const double sheetInitialFraction = 0.50;
   static const double sheetMinFraction = 0.38;
-  static const double sheetMaxFraction = 0.95;
+  static const double sheetMaxFraction = 0.80;
 
   /// Engagement sheet: Comments / Likes (+ Views for owner).
   /// Returns the latest comment count when the sheet closes.

@@ -10,7 +10,7 @@ class CustomLoadingWidget extends StatelessWidget {
 
   const CustomLoadingWidget({
     super.key,
-    this.size = 120,
+    this.size = 48,
     this.isFullScreen = false,
     this.progress,
     this.message,

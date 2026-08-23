@@ -18,9 +18,10 @@ class ProfileIconTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // TikTok order: Posts · Private · Reposts · Saved · Liked
+    // TikTok order: Posts · Auctions · Private · Reposts · Saved · Liked
     final tabs = <(int index, IconData icon)>[
       (ProfileLayoutConstants.postsTabIndex, LucideIcons.layoutGrid),
+      (ProfileLayoutConstants.auctionsTabIndex, LucideIcons.gavel),
       (ProfileLayoutConstants.onlyMeTabIndex, LucideIcons.lock),
       (ProfileLayoutConstants.repostsTabIndex, LucideIcons.repeat2),
       (ProfileLayoutConstants.savedTabIndex, LucideIcons.bookmark),
@@ -56,46 +57,83 @@ class ProfileIconTabBar extends StatelessWidget {
   }
 }
 
-/// Posts-only tab strip for another user's profile (flush with grid below).
+/// Tab strip for another user's profile (Posts vs Auctions).
 class ProfileUserPostsTabBar extends StatelessWidget {
   const ProfileUserPostsTabBar({
     required this.backgroundColor,
+    this.selectedIndex = 0,
+    this.onSelected,
     super.key,
   });
 
   final Color backgroundColor;
+  final int selectedIndex;
+  final ValueChanged<int>? onSelected;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (onSelected == null) {
+      return ColoredBox(
+        color: backgroundColor,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: ProfileLayoutConstants.iconTabBarHeight,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.layoutGrid,
+                      size: ProfileLayoutConstants.iconTabSize,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    const SizedBox(height: AppSizes.p6),
+                    Container(
+                      height: ProfileLayoutConstants.iconTabIndicatorHeight,
+                      width: ProfileLayoutConstants.iconTabIndicatorWidth,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Divider(
+              height: 1,
+              thickness: 0.5,
+              color: theme.dividerColor.withValues(alpha: 0.2),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final tabs = <(int index, IconData icon)>[
+      (ProfileLayoutConstants.postsTabIndex, LucideIcons.layoutGrid),
+      (ProfileLayoutConstants.auctionsTabIndex, LucideIcons.gavel),
+    ];
 
     return ColoredBox(
       color: backgroundColor,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
             height: ProfileLayoutConstants.iconTabBarHeight,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    LucideIcons.layoutGrid,
-                    size: ProfileLayoutConstants.iconTabSize,
-                    color: theme.colorScheme.onSurface,
+            child: Row(
+              children: [
+                for (final tab in tabs)
+                  _ProfileIconTab(
+                    isSelected: selectedIndex == tab.$1,
+                    icon: tab.$2,
+                    theme: theme,
+                    onTap: () => onSelected!(tab.$1),
                   ),
-                  const SizedBox(height: AppSizes.p6),
-                  Container(
-                    height: ProfileLayoutConstants.iconTabIndicatorHeight,
-                    width: ProfileLayoutConstants.iconTabIndicatorWidth,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurface,
-                      borderRadius: BorderRadius.circular(1),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
           Divider(

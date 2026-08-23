@@ -4480,4 +4480,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get newHighlightButton => 'New';
+
+  @override
+  String get aboutThisStory => 'About this story';
+
+  @override
+  String get editHighlight => 'Edit highlight';
+
+  @override
+  String get deleteHighlight => 'Delete Highlight';
+
+  @override
+  String get highlightDeleted => 'Highlight deleted';
+
+  @override
+  String get highlightEmptyRemoved => 'This highlight is empty and was removed';
+
+  @override
+  String get highlightNameLabel => 'Highlight Name';
+
+  @override
+  String get highlightNameHint => 'e.g. Travel, Memories';
+
+  @override
+  String get coverUpdated => 'Cover updated';
+
+  @override
+  String get failedToUploadCover => 'Failed to upload cover image';
+
+  @override
+  String get failedToLoadHighlightDetails => 'Failed to load highlight details';
+
+  @override
+  String get failedToAddStoryToHighlight => 'Failed to add story to highlight';
 }

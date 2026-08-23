@@ -19,8 +19,8 @@ String chatTextFromKey(String? key, AppLocalizations l10n) {
 
 String chatMessageText(Map<String, dynamic> msg, AppLocalizations l10n) {
   if (msg['isDeleted'] == true) return l10n.chatMessageDeleted;
-  final direct = msg['text'] as String?;
-  if (direct != null && direct.isNotEmpty) return direct;
+  final direct = (msg['text'] ?? msg['content'] ?? msg['message']) as String?;
+  if (direct != null && direct.trim().isNotEmpty) return direct.trim();
   return chatTextFromKey(msg['textKey'] as String?, l10n);
 }
 

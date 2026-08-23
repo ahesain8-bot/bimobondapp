@@ -12,6 +12,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_event.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_state.dart';
@@ -101,7 +102,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  bool _isLoadingHighlights = false;
+
   Future<void> _loadHighlights() async {
+    if (mounted) setState(() => _isLoadingHighlights = true);
     try {
       final highlights = await _profileRemoteDS.getHighlights('me', isMe: true);
       if (mounted) {
@@ -109,6 +113,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     } catch (e) {
       debugPrint('[ProfileScreen] getHighlights error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingHighlights = false);
     }
   }
 
@@ -131,6 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (authState is! AuthSuccess) return;
 
     context.read<AuthBloc>().add(const FetchProfileEvent());
+    _loadHighlights();
   }
 
   void _onTabSelected(int index) {
@@ -184,6 +191,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         _selectedTabIndex == ProfileLayoutConstants.repostsTabIndex;
     final bool isOnlyMeTab =
         _selectedTabIndex == ProfileLayoutConstants.onlyMeTabIndex;
+    final bool isAuctionsTab =
+        _selectedTabIndex == ProfileLayoutConstants.auctionsTabIndex;
+    final bool isPostsTab =
+        _selectedTabIndex == ProfileLayoutConstants.postsTabIndex;
     final bool isEngagementTab = isLiked == true || isSaved == true;
 
     if (isRepostsTab) {
@@ -210,9 +221,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         privacyStatus: isOnlyMeTab
             ? ProfileLayoutConstants.onlyMePrivacyStatus
             : null,
-        contentType: _selectedTabIndex == ProfileLayoutConstants.postsTabIndex
-            ? FeedContentType.all
-            : null,
+        auctionQuery: isAuctionsTab
+            ? const FeedAuctionQuery(isAuctionable: true)
+            : isPostsTab
+                ? const FeedAuctionQuery(isAuctionable: false)
+                : null,
+        contentType: isPostsTab ? FeedContentType.all : null,
         isStory: false,
         profileLoadKey: loadKey,
       ),
@@ -234,6 +248,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   String _emptyMessageForTab(AppLocalizations l10n) {
     switch (_selectedTabIndex) {
+      case ProfileLayoutConstants.auctionsTabIndex:
+        return 'لا يوجد مزادات حالياً';
       case ProfileLayoutConstants.repostsTabIndex:
         return l10n.noRepostedPosts;
       case ProfileLayoutConstants.onlyMeTabIndex:
@@ -258,8 +274,14 @@ class _ProfileScreenState extends State<ProfileScreen>
           .where(
             (post) =>
                 post.privacyStatus !=
-                ProfileLayoutConstants.onlyMePrivacyStatus,
+                    ProfileLayoutConstants.onlyMePrivacyStatus &&
+                !post.isAuctionable &&
+                post.auction == null,
           )
+          .toList();
+    } else if (tabIndex == ProfileLayoutConstants.auctionsTabIndex) {
+      merged = merged
+          .where((post) => post.isAuctionable || post.auction != null)
           .toList();
     }
 
@@ -345,6 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _pullRefreshCompleter = Completer<void>();
     setState(() => tab.isRefreshing = true);
     context.read<AuthBloc>().add(const FetchProfileEvent());
+    _loadHighlights();
     _fetchUserPosts(refresh: true);
 
     try {
@@ -540,6 +563,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           ),
                           highlights: _highlights,
+                          isLoadingHighlights: _isLoadingHighlights,
+                          onReloadHighlights: _loadHighlights,
                           onAddHighlight: () {
                             CreateHighlightSheet.show(
                               context,

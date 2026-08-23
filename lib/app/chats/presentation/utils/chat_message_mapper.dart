@@ -79,9 +79,9 @@ Map<String, dynamic> chatMessageToUiMap(
   final isMe = message.senderId == currentUserId;
   final isReadByPeer =
       message.readByUserIds.any((id) => id.isNotEmpty && id != currentUserId) ||
-          message.payload?['isRead'] == true ||
-          message.payload?['read'] == true ||
-          message.payload?['is_read'] == true;
+      message.payload?['isRead'] == true ||
+      message.payload?['read'] == true ||
+      message.payload?['is_read'] == true;
   final reactions = <String>[];
   final seenEmojis = <String>{};
   for (final reaction in message.reactions) {

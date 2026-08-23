@@ -8584,6 +8584,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New'**
   String get newHighlightButton;
+
+  String get aboutThisStory;
+  String get editHighlight;
+  String get deleteHighlight;
+  String get highlightDeleted;
+  String get highlightEmptyRemoved;
+  String get highlightNameLabel;
+  String get highlightNameHint;
+  String get coverUpdated;
+  String get failedToUploadCover;
+  String get failedToLoadHighlightDetails;
+  String get failedToAddStoryToHighlight;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
