@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/utils/app_sizes.dart';
+import '../../../../../core/utils/live_feed_fade.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
 import '../../../../../core/widgets/gifter_level_badge.dart';
@@ -84,7 +85,10 @@ class LiveRoomChatFeed extends StatelessWidget {
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxHeight: listMaxHeight),
                           child: ShaderMask(
-                            shaderCallback: _fadeOlderLines,
+                            shaderCallback: (rect) => liveFeedFadeShader(
+                              rect,
+                              scrollableHeight: listMaxHeight,
+                            ),
                             blendMode: BlendMode.dstIn,
                             child: ListView.separated(
                               reverse: true,
@@ -152,17 +156,6 @@ class _RealtimeOfflineChip extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Older lines dissolve as they climb out of the feed, the way they do on
-/// TikTok, so the run never ends on a hard cut against the video.
-Shader _fadeOlderLines(Rect bounds) {
-  return const LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Colors.transparent, Colors.white],
-    stops: [0.0, AppSizes.roomChatFadeStop],
-  ).createShader(bounds);
 }
 
 class _ChatMessageTile extends StatelessWidget {

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../../core/constants/app_spacing.dart';
+import '../../../../../core/utils/build_safe_notifier.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
@@ -85,8 +86,13 @@ class _GuestTile extends StatelessWidget {
 
     if (room == null) return tile;
     // The Room is a ChangeNotifier: a guest publishing, unpublishing or
-    // toggling their camera repaints the tile without any polling.
-    return ListenableBuilder(listenable: room!, builder: (_, _) => tile);
+    // toggling their camera repaints the tile without any polling. Those
+    // notifications come off WebRTC/signalling callbacks with no regard for
+    // what the framework is doing, so the rebuild has to be build-safe.
+    return BuildSafeListenableBuilder(
+      listenable: room!,
+      builder: (_, _) => tile,
+    );
   }
 }
 
