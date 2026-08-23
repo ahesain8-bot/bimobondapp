@@ -351,7 +351,13 @@ class _LiveRoomBody extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            const LiveRoomCameraLayer(),
+            // The stage *is* the video area: alone it renders the full-bleed
+            // camera, and as soon as someone else is publishing it becomes the
+            // shared split box under the header.
+            LiveRoomStage(
+              topInset:
+                  MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
+            ),
             const VignetteLayer(),
             const IgnorePointer(
               child: Align(
@@ -416,7 +422,6 @@ class _LiveRoomBody extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        LiveRoomStage(),
                         SizedBox(height: AppSpacing.xs),
                         Flexible(
                           child: Padding(

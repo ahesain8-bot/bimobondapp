@@ -347,19 +347,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       }
     });
 
-    // Skipped for the offline fallback below: a `local_live_<ts>` id means
-    // POST /lives never succeeded, so there is no room on the server and the
-    // join would subscribe to nothing.
-    String? socketError;
-    if (startedOnServer && session.id.isNotEmpty) {
-      try {
-        await _sessionRepository.connectRealtime(session.id);
-      } catch (e) {
-        socketError = 'Socket connection failed: $e';
-      }
-    }
-
     // Preview is already on screen (Opening → Ready keeps same controller).
+    //
+    // Emitted BEFORE the socket is dialled. Awaiting `connectRealtime` here
+    // held the room in `Opening` for the whole handshake — and on a failure
+    // that is the full connect timeout, so starting a broadcast looked frozen
+    // for several seconds with the camera already running underneath.
     emit(
       LiveRoomReady(
         session: session,
@@ -367,9 +360,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         isCameraInitialized: controller != null,
         isFrontCamera: true,
         isMediaConnected: false,
-        actionMessage: socketError,
       ),
     );
+
+    // Skipped for the offline fallback below: a `local_live_<ts>` id means
+    // POST /lives never succeeded, so there is no room on the server and the
+    // join would subscribe to nothing.
+    if (startedOnServer && session.id.isNotEmpty) {
+      unawaited(_connectRealtimeInBackground(session.id));
+    }
 
     // The offline fallback invents a `local_live_…` id, so there is no room on
     // the server to join: viewers, comments and likes would all stay empty with
@@ -395,6 +394,44 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     // LiveKit publish after local preview is visible (handoff camera ownership).
     await _publishLiveKitAfterPreview(emit);
+  }
+
+  /// Dials the HUD socket off the critical path, retrying with a short backoff.
+  ///
+  /// The room is already interactive by the time this runs, so a slow or dead
+  /// socket costs comments and the viewer counter — surfaced by the standing
+  /// warning in the chat feed — but never the ability to broadcast. Without the
+  /// retry a single failed handshake left the room silent for its whole run.
+  Future<void> _connectRealtimeInBackground(String liveId) async {
+    const delays = [
+      Duration.zero,
+      Duration(seconds: 2),
+      Duration(seconds: 5),
+      Duration(seconds: 10),
+    ];
+
+    for (final delay in delays) {
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
+      // Bail out if the host left, ended the stream, or started another one.
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null || ready.session.id != liveId) return;
+
+      try {
+        await _sessionRepository.connectRealtime(liveId);
+        return;
+      } catch (e) {
+        debugPrint('HUD socket connect failed for $liveId: $e');
+        if (isClosed) return;
+        add(
+          LiveRoomHudEventReceived(
+            LiveHudConnectionEvent(connected: false, reason: e.toString()),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _enrichSession(Emitter<LiveRoomState> emit) async {
