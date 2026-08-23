@@ -53,10 +53,11 @@ class ToolsRow extends StatelessWidget {
               builder: (context, state) {
                 final isExpanded = _expandedOf(state);
                 return GestureDetector(
-                  onTap: () =>
-                      liveBloc.add(const LiveToolsToggleRequested()),
+                  onTap: () => liveBloc.add(const LiveToolsToggleRequested()),
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.toolsToggleGap),
+                    padding: const EdgeInsets.only(
+                      bottom: AppSpacing.toolsToggleGap,
+                    ),
                     child: Image.asset(
                       isExpanded
                           ? AppAssets.toolsExpanded
@@ -69,61 +70,79 @@ class ToolsRow extends StatelessWidget {
                 );
               },
             ),
-            // Primary tools.
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                ToolButton(
-                  asset: AppAssets.service,
-                  label: 'Services+',
-                  onTap: onServiceTap,
-                ),
-                ToolButton(
-                  asset: AppAssets.settings,
-                  label: 'الإعدادات',
-                  onTap: onSettingsTap,
-                ),
-                ToolButton(
-                  asset: AppAssets.guests,
-                  label: 'المؤثرات',
-                  onTap: onEffectsTap,
-                ),
-                ToolButton(
-                  asset: AppAssets.edit,
-                  label: 'تجميل',
-                  onTap: onBeautifyTap,
-                ),
-                ToolButton(asset: AppAssets.heart,label: 'قلب',onTap: () => liveBloc.add(const LiveCameraSwitchRequested()),),
-              ],
-            ),
-            // Secondary tools are visible only while the tools panel is expanded.
-            BlocBuilder<LiveBloc, LiveState>(
-              buildWhen: (previous, current) =>
-                  _expandedOf(previous) != _expandedOf(current),
-              builder: (_, state) {
-                if (!_expandedOf(state)) return const SizedBox.shrink();
+            // Both rows scale as one unit. Five 48px buttons with 8px gaps
+            // need 320px, and a 360dp phone leaves only 300 after the 30px
+            // side padding — which is exactly the 20px this row used to
+            // overflow by. Scaling keeps the design and fits any width.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Primary tools.
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ToolButton(
+                        asset: AppAssets.service,
+                        label: 'Services+',
+                        onTap: onServiceTap,
+                      ),
+                      ToolButton(
+                        asset: AppAssets.settings,
+                        label: 'الإعدادات',
+                        onTap: onSettingsTap,
+                      ),
+                      ToolButton(
+                        asset: AppAssets.guests,
+                        label: 'المؤثرات',
+                        onTap: onEffectsTap,
+                      ),
+                      ToolButton(
+                        asset: AppAssets.edit,
+                        label: 'تجميل',
+                        onTap: onBeautifyTap,
+                      ),
+                      ToolButton(
+                        asset: AppAssets.heart,
+                        label: 'قلب',
+                        onTap: () =>
+                            liveBloc.add(const LiveCameraSwitchRequested()),
+                      ),
+                    ],
+                  ),
+                  // Secondary tools are visible only while the tools panel
+                  // is expanded.
+                  BlocBuilder<LiveBloc, LiveState>(
+                    buildWhen: (previous, current) =>
+                        _expandedOf(previous) != _expandedOf(current),
+                    builder: (_, state) {
+                      if (!_expandedOf(state)) return const SizedBox.shrink();
 
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    ToolButton(
-                      asset: AppAssets.share,
-                      label: 'مشاركة',
-                      onTap: onShareTap,
-                    ),
-                    ToolButton(
-                      asset: AppAssets.interaction,
-                      label: 'تفاعل',
-                      onTap: onInteractionTap,
-                    ),
-                    ToolButton(
-                      asset: AppAssets.followHosts,
-                      label: 'مجتمع المعجبين',
-                      onTap: onFansTap,
-                    ),
-                  ],
-                );
-              },
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ToolButton(
+                            asset: AppAssets.share,
+                            label: 'مشاركة',
+                            onTap: onShareTap,
+                          ),
+                          ToolButton(
+                            asset: AppAssets.interaction,
+                            label: 'تفاعل',
+                            onTap: onInteractionTap,
+                          ),
+                          ToolButton(
+                            asset: AppAssets.followHosts,
+                            label: 'مجتمع المعجبين',
+                            onTap: onFansTap,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ],
         ),
