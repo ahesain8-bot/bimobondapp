@@ -144,6 +144,10 @@ class LiveRoomReady extends LiveRoomState {
   List<LiveGuest> get activeGuests =>
       guests.where((g) => g.isActive).toList(growable: false);
 
+  /// Viewers waiting on the host to let them on stage.
+  List<LiveGuest> get requestingGuests =>
+      guests.where((g) => g.isRequesting).toList(growable: false);
+
   LiveRoomReady copyWith({
     LiveSession? session,
     Object? controller = _unset,

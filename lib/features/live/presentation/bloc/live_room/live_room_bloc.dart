@@ -10,6 +10,7 @@ import '../../../../../core/network/api_exceptions.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_chat_feed_merge.dart';
+import '../../../domain/entities/live_guest.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../../domain/entities/live_host.dart';
 import '../../../domain/entities/live_session.dart';
@@ -442,7 +443,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final results = await Future.wait([
       _sessionRepository.loadComments(liveId),
       _sessionRepository.loadGalleryCounts(liveId),
-      _sessionRepository.loadGuestPendingCount(liveId),
+      // Full roster, not just the count: a request that arrived before the
+      // host opened the room would otherwise sit invisible until the next
+      // socket event, and there may not be one.
+      _sessionRepository.loadGuests(liveId),
       _sessionRepository.loadHourlyRank(liveId),
     ]);
     if (isClosed) return;
@@ -451,7 +455,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     final comments = results[0] as List<LiveChatMessage>;
     final gallery = results[1] as ({int current, int total});
-    final guests = results[2] as int;
+    final guests = results[2] as List<LiveGuest>;
     final hourly =
         results[3] as ({int? rank, String label, int? score, int? coins});
 
@@ -460,11 +464,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // HTTP history landing on top of it.
     emit(
       ready.copyWith(
+        guests: guests,
         session: ready.session.copyWith(
           messages: mergeLiveChatMessages(comments, ready.session.messages),
           galleryCurrent: gallery.current,
           galleryTotal: gallery.total,
-          guestInviteCount: guests,
+          guestInviteCount: guests.where((g) => g.isPending).length,
           hourlyRank: hourly.rank,
           hourlyRankingLabel: hourly.label,
         ),

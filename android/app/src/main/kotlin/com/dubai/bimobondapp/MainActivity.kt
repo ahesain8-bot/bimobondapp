@@ -45,8 +45,11 @@ class MainActivity : FlutterActivity() {
 
         // Load OpenCV early so first beauty apply is fast.
         beautyExecutor.execute { BeautyFilterProcessor.ensureOpenCv() }
-        // Prefetch CameraX + MediaPipe before the user taps + (cuts open delay).
-        warmArCameraPipeline()
+        // Prefetch CameraX + MediaPipe before the user taps + (cuts open delay),
+        // but only once the first frame is on screen. Run straight from
+        // configureFlutterEngine it competed with startup rendering for the
+        // main thread, which is what "Skipped 209 frames" in the launch log was.
+        window.decorView.post { warmArCameraPipeline() }
 
         flutterEngine.platformViewsController.registry.registerViewFactory(
             AR_CAMERA_VIEW_TYPE,
@@ -541,9 +544,19 @@ class MainActivity : FlutterActivity() {
     private fun warmArCameraPipeline() {
         if (!arPipelineWarmupStarted.compareAndSet(false, true)) return
         FaceLandmarkerHolder.warmup(this)
-        try {
-            ProcessCameraProvider.getInstance(this)
-        } catch (_: Throwable) {
+        // Off the main thread: getInstance() loads the camera provider, reads
+        // every camera's metadata and builds the CameraPipe — tens of
+        // milliseconds of blocking work, per the launch log.
+        val cameraWarm = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "ar-camerax-warm").apply { isDaemon = true }
+        }
+        cameraWarm.execute {
+            try {
+                ProcessCameraProvider.getInstance(applicationContext)
+            } catch (_: Throwable) {
+            } finally {
+                cameraWarm.shutdown()
+            }
         }
         // Warm H.264 encoder so the first record tap isn't cold.
         val executor = Executors.newSingleThreadExecutor { r ->

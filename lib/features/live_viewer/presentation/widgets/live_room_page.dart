@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -821,7 +823,19 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                             context: context,
                             state: state,
                             live: live,
-                            height: TikTokLiveTokens.commentFeedH,
+                            // A fixed 216 is most of a short phone once the
+                            // header, the bars and a pinned comment are out.
+                            // Cap it at the space actually between them.
+                            height: math.min(
+                              TikTokLiveTokens.commentFeedH,
+                              (MediaQuery.sizeOf(context).height -
+                                      headerBottom -
+                                      barTotalH -
+                                      giftGoalH -
+                                      (pinned == null ? 0 : 58) -
+                                      24)
+                                  .clamp(64.0, TikTokLiveTokens.commentFeedH),
+                            ),
                           ),
                         ],
                       );
