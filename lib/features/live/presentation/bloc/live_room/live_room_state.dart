@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_session.dart';
@@ -80,6 +81,7 @@ class LiveRoomReady extends LiveRoomState {
     this.actionMessage,
     this.floatingHeartBurst = 0,
     this.giftBanner,
+    this.latestGiftCombo,
   });
 
   final LiveSession session;
@@ -120,6 +122,9 @@ class LiveRoomReady extends LiveRoomState {
   /// Most recent gift to celebrate, cleared once the banner has played.
   final LiveGiftBanner? giftBanner;
 
+  /// Canonical `gift_combo` payload for the shared gift presentation layer.
+  final GiftComboPayload? latestGiftCombo;
+
   LiveRoomReady copyWith({
     LiveSession? session,
     Object? controller = _unset,
@@ -145,6 +150,7 @@ class LiveRoomReady extends LiveRoomState {
     bool clearActionMessage = false,
     int? floatingHeartBurst,
     Object? giftBanner = _unset,
+    Object? latestGiftCombo = _unset,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -180,6 +186,9 @@ class LiveRoomReady extends LiveRoomState {
       giftBanner: identical(giftBanner, _unset)
           ? this.giftBanner
           : giftBanner as LiveGiftBanner?,
+      latestGiftCombo: identical(latestGiftCombo, _unset)
+          ? this.latestGiftCombo
+          : latestGiftCombo as GiftComboPayload?,
     );
   }
 }

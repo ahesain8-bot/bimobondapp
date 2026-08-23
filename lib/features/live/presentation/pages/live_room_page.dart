@@ -37,7 +37,7 @@ import '../widgets/room/live_room_info_row.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
 import '../../../live_viewer/presentation/widgets/floating_hearts.dart';
-import '../widgets/room/live_room_gift_banner.dart';
+import '../../../live_viewer/presentation/widgets/floating_gifts.dart';
 
 /// Host live-room screen: full-screen camera with TikTok-style Arabic overlays.
 class LiveRoomPage extends StatefulWidget {
@@ -351,6 +351,52 @@ class _LiveRoomBody extends StatelessWidget {
           children: [
             const LiveRoomCameraLayer(),
             const VignetteLayer(),
+            const IgnorePointer(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  height: 168,
+                  width: double.infinity,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x99000000),
+                          Color(0x3D000000),
+                          Colors.transparent,
+                        ],
+                        stops: [0.0, 0.52, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const IgnorePointer(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox(
+                  height: 330,
+                  width: double.infinity,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Color(0xCC000000),
+                          Color(0x66000000),
+                          Colors.transparent,
+                        ],
+                        stops: [0.0, 0.52, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SafeArea(
               bottom: false,
               child: Column(
@@ -360,10 +406,6 @@ class _LiveRoomBody extends StatelessWidget {
                   SizedBox(height: AppSpacing.xs),
                   LiveRoomInfoRow(),
                   Spacer(),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: LiveRoomGiftBanner(),
-                  ),
                   SizedBox(height: AppSpacing.xs),
                   Padding(
                     padding: EdgeInsetsDirectional.only(
@@ -377,6 +419,23 @@ class _LiveRoomBody extends StatelessWidget {
                   LiveRoomBottomBar(),
                   LiveRoomEffectsPanel(),
                 ],
+              ),
+            ),
+            Positioned.fill(
+              child: BlocBuilder<LiveRoomBloc, LiveRoomState>(
+                buildWhen: (previous, current) =>
+                    current is LiveRoomReady &&
+                    (previous is! LiveRoomReady ||
+                        previous.latestGiftCombo != current.latestGiftCombo),
+                builder: (context, state) {
+                  if (state is! LiveRoomReady) {
+                    return const SizedBox.shrink();
+                  }
+                  return FloatingGiftsLayer(
+                    recentGifts: const [],
+                    latestCombo: state.latestGiftCombo,
+                  );
+                },
               ),
             ),
             BlocBuilder<LiveRoomBloc, LiveRoomState>(

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/gift_entity.dart';
 import '../../../domain/entities/live_entity.dart';
@@ -9,6 +10,7 @@ class LiveViewerState extends Equatable {
   final List<CommentEntity> comments;
   final List<GiftSentEntity> recentGifts;
   final GiftSentEntity? activeGiftAnimation;
+  final GiftComboPayload? latestGiftCombo;
   final int floatingHeartBurst;
   final int coinDelta;
   final bool showJoinSuccess;
@@ -28,6 +30,7 @@ class LiveViewerState extends Equatable {
     this.comments = const [],
     this.recentGifts = const [],
     this.activeGiftAnimation,
+    this.latestGiftCombo,
     this.floatingHeartBurst = 0,
     this.coinDelta = 0,
     this.showJoinSuccess = false,
@@ -55,6 +58,7 @@ class LiveViewerState extends Equatable {
     List<CommentEntity>? comments,
     List<GiftSentEntity>? recentGifts,
     GiftSentEntity? activeGiftAnimation,
+    GiftComboPayload? latestGiftCombo,
     bool clearGiftAnimation = false,
     int? floatingHeartBurst,
     int? coinDelta,
@@ -79,6 +83,7 @@ class LiveViewerState extends Equatable {
       activeGiftAnimation: clearGiftAnimation
           ? null
           : (activeGiftAnimation ?? this.activeGiftAnimation),
+      latestGiftCombo: latestGiftCombo ?? this.latestGiftCombo,
       floatingHeartBurst: floatingHeartBurst ?? this.floatingHeartBurst,
       coinDelta: coinDelta ?? this.coinDelta,
       showJoinSuccess: showJoinSuccess ?? this.showJoinSuccess,
@@ -105,6 +110,7 @@ class LiveViewerState extends Equatable {
     comments,
     recentGifts,
     activeGiftAnimation,
+    latestGiftCombo,
     floatingHeartBurst,
     coinDelta,
     showJoinSuccess,

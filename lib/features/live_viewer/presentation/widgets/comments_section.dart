@@ -300,88 +300,96 @@ class TikTokCommentBubble extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipOval(
-            child: SizedBox(
-              width: TikTokLiveTokens.commentAvatar,
-              height: TikTokLiveTokens.commentAvatar,
-              child: CachedNetworkImage(
-                imageUrl: comment.userAvatar ?? '',
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => FallbackAvatar(
-                  seed: comment.userId,
-                  name: comment.username,
-                  radius: 12,
-                ),
-                placeholder: (_, __) => FallbackAvatar(
-                  seed: comment.userId,
-                  name: comment.username,
-                  radius: 12,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipOval(
+              child: SizedBox(
+                width: TikTokLiveTokens.commentAvatar,
+                height: TikTokLiveTokens.commentAvatar,
+                child: CachedNetworkImage(
+                  imageUrl: comment.userAvatar ?? '',
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => FallbackAvatar(
+                    seed: comment.userId,
+                    name: comment.username,
+                    radius: 12,
+                  ),
+                  placeholder: (_, __) => FallbackAvatar(
+                    seed: comment.userId,
+                    name: comment.username,
+                    radius: 12,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: TikTokLiveTokens.commentAvatarGap),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (level > 0) ...[
-                      GifterLevelBadge(level: level, compact: true),
-                      const SizedBox(width: 4),
-                    ],
-                    if (comment.isVerified) ...[
-                      const Icon(
-                        Icons.verified,
-                        size: 12,
-                        color: Color(0xFF20D5EC),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    if (comment.isPinned) ...[
-                      const Icon(
-                        Icons.push_pin,
-                        size: 11,
-                        color: Colors.white70,
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    Flexible(
-                      child: Text(
-                        comment.username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TikTokLiveTokens.commentUser.copyWith(
-                          color: isYou
-                              ? TikTokLiveTokens.liveCyan
-                              : const Color(0xE6FFFFFF),
+            const SizedBox(width: TikTokLiveTokens.commentAvatarGap),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (level > 0) ...[
+                        GifterLevelBadge(level: level, compact: true),
+                        const SizedBox(width: 4),
+                      ],
+                      if (comment.isVerified) ...[
+                        const Icon(
+                          Icons.verified,
+                          size: 12,
+                          color: Color(0xFF20D5EC),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (comment.isPinned) ...[
+                        const Icon(
+                          Icons.push_pin,
+                          size: 11,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Flexible(
+                        child: Text(
+                          comment.username,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TikTokLiveTokens.commentUser.copyWith(
+                            color: isYou
+                                ? TikTokLiveTokens.liveCyan
+                                : const Color(0xE6FFFFFF),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 1),
-                Text(comment.content, style: TikTokLiveTokens.commentBody),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 1),
+                  Text(comment.content, style: TikTokLiveTokens.commentBody),
+                ],
+              ),
             ),
-          ),
-          if (showModerationMenu) ...[
-            const SizedBox(width: 4),
-            _CommentModerationMenu(
-              isMuted: isMuted,
-              isBanned: isBanned,
-              onDelete: onDelete,
-              onMute: onMute,
-              onUnmute: onUnmute,
-              onBan: onBan,
-              onUnban: onUnban,
-            ),
+            if (showModerationMenu) ...[
+              const SizedBox(width: 4),
+              _CommentModerationMenu(
+                isMuted: isMuted,
+                isBanned: isBanned,
+                onDelete: onDelete,
+                onMute: onMute,
+                onUnmute: onUnmute,
+                onBan: onBan,
+                onUnban: onUnban,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

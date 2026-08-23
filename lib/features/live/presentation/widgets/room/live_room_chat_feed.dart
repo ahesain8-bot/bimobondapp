@@ -218,55 +218,63 @@ class _ChatMessageTile extends StatelessWidget {
 
     return GestureDetector(
       onLongPress: () => _showModeration(context),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (message.isJoinEvent) ...[
-            const _JoinBadge(),
-            const SizedBox(width: AppSpacing.xs),
-          ] else if (isComment) ...[
-            _CommenterAvatar(url: message.avatarUrl),
-            const SizedBox(width: AppSpacing.xs),
-          ] else if ((message.gifterLevel ?? 0) > 0) ...[
-            GifterLevelBadge(level: message.gifterLevel!, compact: true),
-            const SizedBox(width: AppSpacing.xs),
-          ] else if (message.showBadge) ...[
-            const _SystemBadge(),
-            const SizedBox(width: AppSpacing.xs),
-          ],
-          Expanded(
-            child: isComment
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          if ((message.gifterLevel ?? 0) > 0) ...[
-                            GifterLevelBadge(
-                              level: message.gifterLevel!,
-                              compact: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.25),
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (message.isJoinEvent) ...[
+              const _JoinBadge(),
+              const SizedBox(width: AppSpacing.xs),
+            ] else if (isComment) ...[
+              _CommenterAvatar(url: message.avatarUrl),
+              const SizedBox(width: AppSpacing.xs),
+            ] else if ((message.gifterLevel ?? 0) > 0) ...[
+              GifterLevelBadge(level: message.gifterLevel!, compact: true),
+              const SizedBox(width: AppSpacing.xs),
+            ] else if (message.showBadge) ...[
+              const _SystemBadge(),
+              const SizedBox(width: AppSpacing.xs),
+            ],
+            Expanded(
+              child: isComment
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            if ((message.gifterLevel ?? 0) > 0) ...[
+                              GifterLevelBadge(
+                                level: message.gifterLevel!,
+                                compact: true,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Flexible(
+                              child: Text(
+                                message.isPinned
+                                    ? '📌 ${message.username}'
+                                    : message.username!,
+                                style: AppTextStyles.roomChatAuthor,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const SizedBox(width: 4),
                           ],
-                          Flexible(
-                            child: Text(
-                              message.isPinned
-                                  ? '📌 ${message.username}'
-                                  : message.username!,
-                              style: AppTextStyles.roomChatAuthor,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(message.body!, style: AppTextStyles.roomChatBody),
-                    ],
-                  )
-                : _MessageText(message: message),
-          ),
-        ],
+                        ),
+                        Text(message.body!, style: AppTextStyles.roomChatBody),
+                      ],
+                    )
+                  : _MessageText(message: message),
+            ),
+          ],
+        ),
       ),
     );
   }

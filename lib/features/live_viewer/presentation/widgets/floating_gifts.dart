@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/auction_audio_gift_chip_session.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_price_with_audio_badge.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/live_details/gift_animation_overlay.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -13,22 +18,202 @@ import 'tiktok_live_tokens.dart';
 import '../../../../core/widgets/gifter_level_badge.dart';
 
 /// Combo gift toast (left) + center burst — TikTok LIVE timing/layout.
-class FloatingGiftsLayer extends StatelessWidget {
+class FloatingGiftsLayer extends StatefulWidget {
   final List<GiftSentEntity> recentGifts;
   final GiftSentEntity? activeGift;
+  final GiftComboPayload? latestCombo;
   final VoidCallback? onAnimationComplete;
 
   const FloatingGiftsLayer({
     super.key,
     required this.recentGifts,
     this.activeGift,
+    this.latestCombo,
     this.onAnimationComplete,
   });
+
+  @override
+  State<FloatingGiftsLayer> createState() => _FloatingGiftsLayerState();
+}
+
+class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
+  final Map<String, GiftComboItem> _activeCombos = {};
+  final Map<String, Timer> _comboTimers = {};
+  final Set<String> _playedAnimations = {};
+  final _audioSession = AuctionAudioGiftChipSession();
+  String? _audioLabel;
+  String? _audioColor;
+
+  @override
+  void initState() {
+    super.initState();
+    final combo = widget.latestCombo;
+    if (combo != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _consumeCombo(combo);
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FloatingGiftsLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final combo = widget.latestCombo;
+    if (combo == null && oldWidget.latestCombo != null) {
+      _clearCombos();
+    }
+    if (combo != null && combo != oldWidget.latestCombo) {
+      _consumeCombo(combo);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _comboTimers.values) {
+      timer.cancel();
+    }
+    _comboTimers.clear();
+    _audioSession.dispose();
+    super.dispose();
+  }
+
+  void _clearCombos() {
+    for (final timer in _comboTimers.values) {
+      timer.cancel();
+    }
+    _comboTimers.clear();
+    _activeCombos.clear();
+    _playedAnimations.clear();
+    unawaited(_audioSession.clear(onUpdate: _onAudioUpdate));
+  }
+
+  void _consumeCombo(GiftComboPayload payload) {
+    final gift = payload.gift ?? const <String, dynamic>{};
+    final sender = payload.sender ?? const <String, dynamic>{};
+    final giftName = _readString(payload.giftName) ??
+        _readString(gift['name']) ??
+        'Gift';
+    final senderName = _readString(payload.senderName) ??
+        _readString(sender['fullName']) ??
+        _readString(sender['username']) ??
+        'User';
+    final senderAvatar = _readString(payload.senderAvatarUrl) ??
+        _readString(sender['avatarUrl']) ??
+        _readString(sender['avatar']);
+    final animationUrl = _readString(
+      gift['animationUrl'] ?? gift['animation_url'] ?? gift['imageUrl'],
+    );
+    final thumbnailUrl = _readString(
+      gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'],
+    );
+    final audioUrl = _readString(gift['audioUrl']);
+    final type = _readString(gift['type'])?.toUpperCase();
+    final isAudio = type == 'AUDIO';
+    final color = _readString(gift['color']);
+
+    if (isAudio) {
+      unawaited(
+        _audioSession.play(
+          onUpdate: _onAudioUpdate,
+          label: giftName,
+          colorHex: color,
+          audioUrl: audioUrl,
+        ),
+      );
+      return;
+    }
+
+    final mediaUrl = animationUrl ?? thumbnailUrl ?? '';
+    if (mediaUrl.isEmpty) return;
+
+    final size = _readString(gift['size'] ?? gift['giftSize']);
+    final normalizedSize = size?.toUpperCase();
+    final isSmall = normalizedSize == 'SMALL' ||
+        (normalizedSize == null && animationUrl == null);
+    final comboKey = payload.overlayKey.isNotEmpty
+        ? payload.overlayKey
+        : '${payload.senderId}_${payload.giftId}';
+    final combo = payload.combo > 0 ? payload.combo : 1;
+
+    if (isSmall) {
+      final current = _activeCombos[comboKey];
+      if (current == null) {
+        setState(() {
+          _activeCombos[comboKey] = GiftComboItem(
+            senderId: payload.senderId,
+            senderName: senderName,
+            senderAvatarUrl: senderAvatar,
+            giftId: payload.giftId,
+            giftName: giftName,
+            animationUrl: mediaUrl,
+            thumbnailUrl: thumbnailUrl,
+            combo: combo,
+          );
+        });
+      } else if (combo > current.combo) {
+        setState(() => current.combo = combo);
+      }
+      _restartComboTimer(comboKey);
+      return;
+    }
+
+    final shouldPlay = _playedAnimations.add(comboKey);
+    _restartComboTimer(comboKey);
+    if (shouldPlay && mounted) {
+      unawaited(
+        GiftAnimationOverlay.show(
+          context,
+          animationUrl: mediaUrl,
+          thumbnailUrl: thumbnailUrl,
+          senderName: senderName,
+          giftName: giftName,
+          size: size,
+        ),
+      );
+    }
+  }
+
+  void _restartComboTimer(String key) {
+    _comboTimers[key]?.cancel();
+    _comboTimers[key] = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      setState(() => _activeCombos.remove(key));
+      _playedAnimations.remove(key);
+      _comboTimers.remove(key);
+    });
+  }
+
+  void _onAudioUpdate(String? label, String? colorHex) {
+    if (!mounted) return;
+    setState(() {
+      _audioLabel = label;
+      _audioColor = colorHex;
+    });
+  }
+
+  String? _readString(dynamic value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
+  Color _audioAccent() {
+    final raw = _audioColor?.replaceFirst('#', '');
+    if (raw == null || (raw.length != 6 && raw.length != 8)) {
+      return Colors.white;
+    }
+    try {
+      final value = int.parse(raw, radix: 16);
+      return Color(raw.length == 6 ? 0xFF000000 | value : value);
+    } catch (_) {
+      return Colors.white;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final top =
         MediaQuery.paddingOf(context).top + TikTokLiveTokens.toastTopFromSafe;
+    final activeCombos = _activeCombos.values.toList();
 
     return Stack(
       children: [
@@ -37,27 +222,68 @@ class FloatingGiftsLayer extends StatelessWidget {
           top: top,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: recentGifts.take(2).map((g) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _GiftToast(gift: g)
-                    .animate(key: ValueKey(g.id))
-                    .slideX(
-                      begin: -0.5,
-                      end: 0,
-                      duration: 300.ms,
-                      curve: Curves.easeOutCubic,
-                    )
-                    .fadeIn(duration: 180.ms),
-              );
-            }).toList(),
+            children: activeCombos.isNotEmpty
+                ? activeCombos.take(2).map((combo) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: SmallGiftHighestPriceBadge(
+                        key: ValueKey(combo.key),
+                        animationUrl: combo.animationUrl,
+                        thumbnailUrl: combo.thumbnailUrl,
+                        giftName: combo.giftName,
+                        senderName: combo.senderName,
+                        senderAvatarUrl: combo.senderAvatarUrl,
+                        quantity: combo.combo,
+                      ),
+                    );
+                  }).toList()
+                : widget.recentGifts.take(2).map((g) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _GiftToast(gift: g)
+                          .animate(key: ValueKey(g.id))
+                          .slideX(
+                            begin: -0.5,
+                            end: 0,
+                            duration: 300.ms,
+                            curve: Curves.easeOutCubic,
+                          )
+                          .fadeIn(duration: 180.ms),
+                    );
+                  }).toList(),
           ),
         ),
-        if (activeGift != null)
+        if (_audioLabel != null)
+          Positioned(
+            left: TikTokLiveTokens.toastLeft,
+            top: top + 58,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _audioAccent().withValues(alpha: 0.7)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                child: Text(
+                  _audioLabel!,
+                  style: TextStyle(
+                    color: _audioAccent(),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (widget.activeGift != null)
           Positioned.fill(
             child: _GiftBurst(
-              gift: activeGift!,
-              onComplete: onAnimationComplete,
+              gift: widget.activeGift!,
+              onComplete: widget.onAnimationComplete,
             ),
           ),
       ],

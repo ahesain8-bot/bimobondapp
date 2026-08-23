@@ -4,12 +4,12 @@ import 'dart:math';
 import 'package:dartz/dartz.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
 import '../../../data/services/fake_livekit_service.dart';
 import '../../../data/services/fake_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
-import '../../../domain/entities/gift_entity.dart';
 import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
 import '../../../domain/entities/socket_event.dart';
@@ -23,7 +23,6 @@ import '../../../domain/usecases/join_live_usecase.dart';
 import '../../../domain/usecases/leave_live_usecase.dart';
 import '../../../domain/usecases/like_live_usecase.dart';
 import '../../../domain/usecases/mute_viewer_chat_usecase.dart';
-import '../../../domain/usecases/send_gift_usecase.dart';
 import '../../../domain/usecases/unban_viewer_usecase.dart';
 import '../../../domain/usecases/unmute_viewer_chat_usecase.dart';
 import 'live_viewer_event.dart';
@@ -34,7 +33,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required this.joinLiveUseCase,
     required this.leaveLiveUseCase,
     required this.likeLiveUseCase,
-    required this.sendGiftUseCase,
+    required this.giftSocketService,
     required this.banViewerUseCase,
     required this.unbanViewerUseCase,
     required this.muteViewerChatUseCase,
@@ -53,7 +52,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerRetryRequested>(_onRetryRequested);
     on<LiveViewerCommentSent>(_onCommentSent);
     on<LiveViewerLiked>(_onLiked);
-    on<LiveViewerGiftSent>(_onGiftSent);
+    on<LiveViewerGiftBalanceRefreshRequested>(_onGiftBalanceRefreshRequested);
+    on<LiveViewerGiftComboReceived>(_onGiftComboReceived);
     on<LiveViewerFollowToggled>(_onFollowToggled);
     on<LiveViewerHeartBurstConsumed>(_onHeartBurstConsumed);
     on<LiveViewerGiftAnimationCleared>(_onGiftAnimationCleared);
@@ -69,7 +69,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   final JoinLiveUseCase joinLiveUseCase;
   final LeaveLiveUseCase leaveLiveUseCase;
   final LikeLiveUseCase likeLiveUseCase;
-  final SendGiftUseCase sendGiftUseCase;
+  final AuctionSocketService giftSocketService;
   final BanViewerUseCase banViewerUseCase;
   final UnbanViewerUseCase unbanViewerUseCase;
   final MuteViewerChatUseCase muteViewerChatUseCase;
@@ -84,13 +84,13 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   final LiveApiClient apiClient;
 
   StreamSubscription<SocketEvent>? _socketSub;
+  StreamSubscription<GiftComboPayload>? _giftComboSub;
   String? _activeLiveId;
   bool _busy = false;
   LiveEntity? _pendingActivate;
   String? _currentUserId;
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
-  Timer? _coinDeltaClearTimer;
 
   String? get activeLiveId => _activeLiveId;
 
@@ -261,6 +261,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             liveId: result.liveId,
             token: result.socketToken,
           );
+          _listenGiftSocket(live.id);
+          unawaited(
+            giftSocketService.ensureJoined(liveId: live.id).catchError((_) {}),
+          );
           final coinsFuture = giftRepository.getCoinBalance();
           final commentsFuture = commentRepository.getComments(
             liveId: live.id,
@@ -410,41 +414,33 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     await likeLiveUseCase(id, burst: event.burst);
   }
 
-  Future<void> _onGiftSent(
-    LiveViewerGiftSent event,
+  Future<void> _onGiftBalanceRefreshRequested(
+    LiveViewerGiftBalanceRefreshRequested event,
     Emitter<LiveViewerState> emit,
   ) async {
     final session = state.session;
     final id = _activeLiveId;
     if (session == null || id == null) return;
-    final result = await sendGiftUseCase(
-      liveId: id,
-      giftId: event.gift.id,
-      quantity: event.quantity,
-      receiverId: session.live.hostId,
+    final result = await giftRepository.getCoinBalance();
+    if (_activeLiveId != id || isClosed) return;
+    result.fold(
+      (_) {},
+      (balance) => emit(
+        state.copyWith(session: session.copyWith(coinBalance: balance)),
+      ),
     );
-    await result.fold((_) async {}, (sent) async {
-      final balance = session.coinBalance - sent.totalCost;
-      var left = state.pkScoreLeft;
-      var right = state.pkScoreRight;
-      if (state.isPk) left += sent.totalCost;
-      emit(
-        state.copyWith(
-          session: session.copyWith(coinBalance: balance < 0 ? 0 : balance),
-          recentGifts: [sent, ...state.recentGifts].take(8).toList(),
-          activeGiftAnimation: sent,
-          coinDelta: -sent.totalCost,
-          pkScoreLeft: left,
-          pkScoreRight: right,
-        ),
-      );
-      _coinDeltaClearTimer?.cancel();
-      _coinDeltaClearTimer = Timer(const Duration(milliseconds: 800), () {
-        if (_activeLiveId == id && !isClosed) {
-          emit(state.copyWith(coinDelta: 0));
-        }
-      });
-    });
+  }
+
+  Future<void> _onGiftComboReceived(
+    LiveViewerGiftComboReceived event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final session = state.session;
+    final id = _activeLiveId;
+    if (session == null || id == null) return;
+    final eventLiveId = event.payload.liveId.trim();
+    if (eventLiveId.isNotEmpty && eventLiveId != id) return;
+    emit(state.copyWith(latestGiftCombo: event.payload));
   }
 
   Future<void> _onFollowToggled(
@@ -690,6 +686,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     });
   }
 
+  void _listenGiftSocket(String liveId) {
+    _giftComboSub?.cancel();
+    _giftComboSub = giftSocketService.onGiftCombo.listen((payload) {
+      if (_activeLiveId != liveId) return;
+      final payloadLiveId = payload.liveId.trim();
+      if (payloadLiveId.isNotEmpty && payloadLiveId != liveId) return;
+      add(LiveViewerGiftComboReceived(payload));
+    });
+  }
+
   Future<void> _handleSocketEvent(
     SocketEvent event,
     Emitter<LiveViewerState> emit,
@@ -803,40 +809,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           topViewerAvatars: event.topViewerAvatars.isNotEmpty
               ? event.topViewerAvatars
               : state.topViewerAvatars,
-        ),
-      );
-    } else if (event is LiveGiftEvent) {
-      final random = Random();
-      var left = state.pkScoreLeft;
-      var right = state.pkScoreRight;
-      if (state.isPk) {
-        if (random.nextBool()) {
-          left += event.gift.totalCost;
-        } else {
-          right += event.gift.totalCost;
-        }
-      }
-      final giftNotice = CommentEntity(
-        id: 'gift_c_${event.gift.id}',
-        liveId: event.liveId,
-        userId: event.gift.senderId,
-        username: event.gift.senderName,
-        userAvatar: event.gift.senderAvatar,
-        content: event.gift.giftDetails?.name ?? 'a gift',
-        createdAt: event.gift.sentAt,
-        gifterLevel: event.gift.senderGifterLevel,
-        metadata: const {'type': 'gift'},
-      );
-      final nextComments = [...state.comments, giftNotice];
-      emit(
-        state.copyWith(
-          recentGifts: [event.gift, ...state.recentGifts].take(8).toList(),
-          activeGiftAnimation: event.gift,
-          pkScoreLeft: left,
-          pkScoreRight: right,
-          comments: nextComments.length > 80
-              ? nextComments.sublist(nextComments.length - 80)
-              : nextComments,
         ),
       );
     } else if (event is LiveEndedEvent) {
@@ -1092,12 +1064,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   }) async {
     _socketSub?.cancel();
     _socketSub = null;
+    _giftComboSub?.cancel();
+    _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
-    _coinDeltaClearTimer?.cancel();
     final id = _activeLiveId;
     _activeLiveId = null;
     if (id != null) {
+      giftSocketService.leaveLive(id);
       try {
         await leaveLiveUseCase(id);
       } catch (_) {}
@@ -1117,12 +1091,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   Future<void> close() async {
     _socketSub?.cancel();
     _socketSub = null;
+    _giftComboSub?.cancel();
+    _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
-    _coinDeltaClearTimer?.cancel();
     final id = _activeLiveId;
     _activeLiveId = null;
     if (id != null) {
+      giftSocketService.leaveLive(id);
       try {
         await leaveLiveUseCase(id);
       } catch (_) {}

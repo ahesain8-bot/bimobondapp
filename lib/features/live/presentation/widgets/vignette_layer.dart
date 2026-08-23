@@ -11,10 +11,7 @@ class VignetteLayer extends StatelessWidget {
         gradient: RadialGradient(
           center: const Alignment(0, -0.3),
           radius: 1.2,
-          colors: [
-            Colors.transparent,
-            Colors.black.withValues(alpha: 0.15),
-          ],
+          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.24)],
         ),
       ),
     );

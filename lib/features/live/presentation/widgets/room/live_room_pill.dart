@@ -30,6 +30,14 @@ class LiveRoomPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: child,
     );
