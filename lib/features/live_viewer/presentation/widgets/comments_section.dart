@@ -87,82 +87,88 @@ class _CommentsSectionState extends State<CommentsSection> {
         MediaQuery.sizeOf(context).width *
         TikTokLiveTokens.commentMaxWidthFactor;
 
-    return Align(
-      alignment: widget.alignTop ? Alignment.topLeft : Alignment.bottomLeft,
-      child: SizedBox(
-        width: maxW,
-        height: widget.height,
-        child: ShaderMask(
-          shaderCallback: (rect) {
-            return LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: const [Colors.transparent, Colors.black, Colors.black],
-              stops: [0.0, TikTokLiveTokens.commentFade / widget.height, 1.0],
-            ).createShader(rect);
-          },
-          blendMode: BlendMode.dstIn,
-          child: ListView.builder(
-            controller: _scrollController,
-            reverse: !widget.alignTop,
-            padding: EdgeInsets.zero,
-            itemCount: visible.length,
-            itemBuilder: (context, index) {
-              final comment = widget.alignTop
-                  ? visible[index]
-                  : visible[visible.length - 1 - index];
-              final isHostOrMod =
-                  (widget.currentUserId != null &&
-                      widget.currentUserId == widget.hostId) ||
-                  widget.moderatorIds.contains(widget.currentUserId);
-              final isSelf = comment.userId == widget.currentUserId;
-              final cIsJoin = comment.metadata?['type'] == 'join';
-              final cIsGift = comment.metadata?['type'] == 'gift';
-              final isMuted = widget.mutedUserIds.contains(comment.userId);
-              final isBanned = widget.bannedUserIds.contains(comment.userId);
-              return TikTokCommentBubble(
-                    comment: comment,
-                    showModerationMenu:
-                        isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
-                    isMuted: isMuted,
-                    isBanned: isBanned,
-                    onDelete: widget.onDeleteComment == null
-                        ? null
-                        : () => widget.onDeleteComment!(
-                            comment.id,
-                            comment.userId,
-                          ),
-                    onMute: widget.onMuteUser == null
-                        ? null
-                        : () => widget.onMuteUser!(
-                            comment.userId,
-                            comment.username,
-                            null,
-                          ),
-                    onUnmute: widget.onUnmuteUser == null
-                        ? null
-                        : () => widget.onUnmuteUser!(
-                            comment.userId,
-                            comment.username,
-                          ),
-                    onBan: widget.onBanUser == null
-                        ? null
-                        : () => widget.onBanUser!(
-                            comment.userId,
-                            comment.username,
-                            null,
-                          ),
-                    onUnban: widget.onUnbanUser == null
-                        ? null
-                        : () => widget.onUnbanUser!(
-                            comment.userId,
-                            comment.username,
-                          ),
-                  )
-                  .animate(key: ValueKey(comment.id))
-                  .fadeIn(duration: 140.ms)
-                  .slideY(begin: 0.12, end: 0, duration: 180.ms);
+    // Local override only: Arabic still shapes right-to-left inside each
+    // line, but the feed itself hugs the left edge like the host room does
+    // rather than following the RTL start edge into the middle of the screen.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Align(
+        alignment: widget.alignTop ? Alignment.topLeft : Alignment.bottomLeft,
+        child: SizedBox(
+          width: maxW,
+          height: widget.height,
+          child: ShaderMask(
+            shaderCallback: (rect) {
+              return LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: const [Colors.transparent, Colors.black, Colors.black],
+                stops: [0.0, TikTokLiveTokens.commentFade / widget.height, 1.0],
+              ).createShader(rect);
             },
+            blendMode: BlendMode.dstIn,
+            child: ListView.builder(
+              controller: _scrollController,
+              reverse: !widget.alignTop,
+              padding: EdgeInsets.zero,
+              itemCount: visible.length,
+              itemBuilder: (context, index) {
+                final comment = widget.alignTop
+                    ? visible[index]
+                    : visible[visible.length - 1 - index];
+                final isHostOrMod =
+                    (widget.currentUserId != null &&
+                        widget.currentUserId == widget.hostId) ||
+                    widget.moderatorIds.contains(widget.currentUserId);
+                final isSelf = comment.userId == widget.currentUserId;
+                final cIsJoin = comment.metadata?['type'] == 'join';
+                final cIsGift = comment.metadata?['type'] == 'gift';
+                final isMuted = widget.mutedUserIds.contains(comment.userId);
+                final isBanned = widget.bannedUserIds.contains(comment.userId);
+                return TikTokCommentBubble(
+                      comment: comment,
+                      showModerationMenu:
+                          isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
+                      isMuted: isMuted,
+                      isBanned: isBanned,
+                      onDelete: widget.onDeleteComment == null
+                          ? null
+                          : () => widget.onDeleteComment!(
+                              comment.id,
+                              comment.userId,
+                            ),
+                      onMute: widget.onMuteUser == null
+                          ? null
+                          : () => widget.onMuteUser!(
+                              comment.userId,
+                              comment.username,
+                              null,
+                            ),
+                      onUnmute: widget.onUnmuteUser == null
+                          ? null
+                          : () => widget.onUnmuteUser!(
+                              comment.userId,
+                              comment.username,
+                            ),
+                      onBan: widget.onBanUser == null
+                          ? null
+                          : () => widget.onBanUser!(
+                              comment.userId,
+                              comment.username,
+                              null,
+                            ),
+                      onUnban: widget.onUnbanUser == null
+                          ? null
+                          : () => widget.onUnbanUser!(
+                              comment.userId,
+                              comment.username,
+                            ),
+                    )
+                    .animate(key: ValueKey(comment.id))
+                    .fadeIn(duration: 140.ms)
+                    .slideY(begin: 0.12, end: 0, duration: 180.ms);
+              },
+            ),
           ),
         ),
       ),
@@ -543,53 +549,58 @@ class PinnedCommentBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-      decoration: BoxDecoration(
-        color: TikTokLiveTokens.frost(0.62),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.push_pin, color: Colors.white, size: 14),
-          const SizedBox(width: 6),
-          if ((comment.gifterLevel ?? 0) > 0) ...[
-            GifterLevelBadge(level: comment.gifterLevel!, compact: true),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '${comment.username}: ',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+    // Same left-edge anchor as the feed below it: the bar keeps its pin
+    // icon on the left in Arabic instead of mirroring to the RTL start.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+        decoration: BoxDecoration(
+          color: TikTokLiveTokens.frost(0.62),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.push_pin, color: Colors.white, size: 14),
+            const SizedBox(width: 6),
+            if ((comment.gifterLevel ?? 0) > 0) ...[
+              GifterLevelBadge(level: comment.gifterLevel!, compact: true),
+              const SizedBox(width: 4),
+            ],
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '${comment.username}: ',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  TextSpan(
-                    text: comment.content,
-                    style: const TextStyle(
-                      color: Color(0xE6FFFFFF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
+                    TextSpan(
+                      text: comment.content,
+                      style: const TextStyle(
+                        color: Color(0xE6FFFFFF),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          if (onClose != null)
-            GestureDetector(
-              onTap: onClose,
-              child: const Icon(Icons.close, color: Colors.white54, size: 16),
-            ),
-        ],
+            if (onClose != null)
+              GestureDetector(
+                onTap: onClose,
+                child: const Icon(Icons.close, color: Colors.white54, size: 16),
+              ),
+          ],
+        ),
       ),
     );
   }
