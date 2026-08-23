@@ -8,10 +8,7 @@ class LiveSessionMapper {
 
   static LiveHost hostFromUser(Map<String, dynamic>? user, {String? userId}) {
     if (user == null) {
-      return LiveHost(
-        id: userId ?? '',
-        displayName: 'Host',
-      );
+      return LiveHost(id: userId ?? '', displayName: 'Host');
     }
     final fullName = user['fullName']?.toString();
     final username = user['username']?.toString();
@@ -41,10 +38,9 @@ class LiveSessionMapper {
     String? hourlyRankingLabel,
   }) {
     final hourlyRank = _asInt(live['hourlyRank']);
-    final label = hourlyRankingLabel ??
-        (hourlyRank != null
-            ? 'ترتيب #$hourlyRank'
-            : 'ترتيب كل ساعة');
+    final label =
+        hourlyRankingLabel ??
+        (hourlyRank != null ? 'ترتيب #$hourlyRank' : 'ترتيب كل ساعة');
 
     return LiveSession(
       id: live['id']?.toString() ?? '',
@@ -93,15 +89,12 @@ class LiveSessionMapper {
     final nested = json['comment'];
     final source = nested is Map<String, dynamic>
         ? nested
-        : (nested is Map
-            ? Map<String, dynamic>.from(nested)
-            : json);
+        : (nested is Map ? _asStringMap(nested)! : json);
 
-    final user = source['user'] as Map<String, dynamic>?;
+    final user = _asStringMap(source['user']);
     final gifterLevel = _asInt(user?['gifterLevel']);
-    final content = source['content']?.toString() ??
-        source['text']?.toString() ??
-        '';
+    final content =
+        source['content']?.toString() ?? source['text']?.toString() ?? '';
     // Same order the host branch above uses: the real name first, the
     // generated handle only as a fallback. Reversed, every comment showed
     // `user_e309173c` instead of the person's name.
@@ -115,7 +108,8 @@ class LiveSessionMapper {
         : '$username: $content';
 
     return LiveChatMessage(
-      id: source['id']?.toString() ??
+      id:
+          source['id']?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       text: displayText,
       body: content,
@@ -126,6 +120,15 @@ class LiveSessionMapper {
       gifterLevel: gifterLevel,
       isPinned: source['isPinned'] == true || source['pinned'] == true,
     );
+  }
+
+  /// Tolerant map read. A hard `as Map<String, dynamic>?` threw on any payload
+  /// whose nested objects arrived as `Map<dynamic, dynamic>` — and because the
+  /// throw happened inside a Socket.IO handler it was swallowed, so the host
+  /// silently lost every viewer comment while their own still appeared.
+  static Map<String, dynamic>? _asStringMap(dynamic value) {
+    if (value is! Map) return null;
+    return value.map((key, v) => MapEntry(key.toString(), v));
   }
 
   static int? _asInt(dynamic value) {

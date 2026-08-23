@@ -172,8 +172,57 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
+  var _publishing = false;
+
+  @override
+  bool get isPublishing => _publishing;
+
+  @override
+  Future<void> joinStage({
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    if (url.isEmpty || token.isEmpty) {
+      throw StateError('Guest publish url/token missing');
+    }
+    // A fresh connect, not an upgrade: the viewer's token carries no publish
+    // grant, so the room has to be re-established with the one the server
+    // issued on accept before the camera can go out.
+    await connect(url: url, token: token, roomName: roomName);
+
+    final room = _room;
+    if (room == null) {
+      throw StateError('LiveKit room unavailable after joining the stage');
+    }
+    try {
+      await room.localParticipant?.setCameraEnabled(true);
+      await room.localParticipant?.setMicrophoneEnabled(true);
+      _publishing = true;
+    } catch (e, st) {
+      debugPrint('❌ Guest publish failed: $e\n$st');
+      // Stay in the room as a viewer rather than dropping them out entirely.
+      _publishing = false;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> leaveStage() async {
+    final room = _room;
+    _publishing = false;
+    if (room == null) return;
+    try {
+      await room.localParticipant?.setCameraEnabled(false);
+      await room.localParticipant?.setMicrophoneEnabled(false);
+    } catch (e, st) {
+      debugPrint('LiveKit leaveStage error: $e\n$st');
+    }
+  }
+
   @override
   Future<void> disconnect() async {
+    _publishing = false;
     _setState(LiveKitConnectionState.disconnected);
     final room = _room;
     _room = null;

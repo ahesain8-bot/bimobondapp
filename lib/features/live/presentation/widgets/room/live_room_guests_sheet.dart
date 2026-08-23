@@ -120,84 +120,95 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
     final pending = _guests.where((g) => g.isPending).toList();
     final active = _guests.where((g) => g.isActive).toList();
 
-    return LiveRoomHostSheetChrome(
-      title: 'الضيوف والتعاون',
-      actions: [
-        IconButton(
-          onPressed: _loading || _busy ? null : _load,
-          icon: const Icon(Icons.refresh, color: Colors.white70),
-        ),
-      ],
-      child: _loading
-          ? const LiveRoomSheetStatus.loading()
-          : _error != null
-              ? LiveRoomSheetStatus.error(message: _error!)
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  children: [
-                    const Text(
-                      'دعوة ضيف',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+    // The bloc keeps the roster fresh off `liveGuestUpdate`; mirroring it here
+    // means a viewer's request lands in the open sheet without a manual pull.
+    return BlocListener<LiveRoomBloc, LiveRoomState>(
+      listenWhen: (previous, current) =>
+          current is LiveRoomReady &&
+          (previous is! LiveRoomReady || previous.guests != current.guests),
+      listener: (context, state) {
+        if (state is! LiveRoomReady || _busy) return;
+        setState(() => _guests = state.guests);
+      },
+      child: LiveRoomHostSheetChrome(
+        title: 'الضيوف والتعاون',
+        actions: [
+          IconButton(
+            onPressed: _loading || _busy ? null : _load,
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+          ),
+        ],
+        child: _loading
+            ? const LiveRoomSheetStatus.loading()
+            : _error != null
+            ? LiveRoomSheetStatus.error(message: _error!)
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                children: [
+                  const Text(
+                    'دعوة ضيف',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _inviteController,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
-                              hintText: 'userId',
-                              hintStyle: const TextStyle(color: Colors.white38),
-                              filled: true,
-                              fillColor: Colors.white10,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _inviteController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'userId',
+                            hintStyle: const TextStyle(color: Colors.white38),
+                            filled: true,
+                            fillColor: Colors.white10,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _busy ? null : _invite,
-                          child: const Text('دعوة'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    _sectionTitle('طلبات معلقة (${pending.length})'),
-                    if (pending.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'لا توجد طلبات حالياً',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      )
-                    else
-                      ...pending.map(_pendingTile),
-                    const SizedBox(height: 14),
-                    _sectionTitle('على المسرح (${active.length})'),
-                    if (active.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'لا يوجد ضيوف نشطون',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      )
-                    else
-                      ...active.map(_activeTile),
-                  ],
-                ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _busy ? null : _invite,
+                        child: const Text('دعوة'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _sectionTitle('طلبات معلقة (${pending.length})'),
+                  if (pending.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'لا توجد طلبات حالياً',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    )
+                  else
+                    ...pending.map(_pendingTile),
+                  const SizedBox(height: 14),
+                  _sectionTitle('على المسرح (${active.length})'),
+                  if (active.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'لا يوجد ضيوف نشطون',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    )
+                  else
+                    ...active.map(_activeTile),
+                ],
+              ),
+      ),
     );
   }
 
@@ -234,12 +245,12 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
                 onPressed: _busy
                     ? null
                     : () => _run(
-                          () => repository.acceptGuest(
-                            liveId: widget.liveId,
-                            userId: guest.userId,
-                          ),
-                          success: 'تم القبول',
+                        () => repository.acceptGuest(
+                          liveId: widget.liveId,
+                          userId: guest.userId,
                         ),
+                        success: 'تم القبول',
+                      ),
                 icon: const Icon(Icons.check_circle, color: Colors.greenAccent),
               ),
             IconButton(
@@ -247,12 +258,12 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
               onPressed: _busy
                   ? null
                   : () => _run(
-                        () => repository.rejectGuest(
-                          liveId: widget.liveId,
-                          userId: guest.userId,
-                        ),
-                        success: 'تم الرفض',
+                      () => repository.rejectGuest(
+                        liveId: widget.liveId,
+                        userId: guest.userId,
                       ),
+                      success: 'تم الرفض',
+                    ),
               icon: const Icon(Icons.cancel, color: Colors.redAccent),
             ),
           ],

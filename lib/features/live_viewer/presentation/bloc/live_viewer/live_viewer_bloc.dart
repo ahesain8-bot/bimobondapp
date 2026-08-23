@@ -15,6 +15,7 @@ import '../../../domain/entities/live_session_entity.dart';
 import '../../../domain/entities/socket_event.dart';
 import '../../../domain/repositories/comment_repository.dart';
 import '../../../domain/repositories/gift_repository.dart';
+import '../../../domain/repositories/guest_repository.dart';
 import '../../../domain/repositories/live_repository.dart';
 import '../../../domain/repositories/like_repository.dart';
 import '../../../domain/usecases/ban_viewer_usecase.dart';
@@ -46,6 +47,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required this.socketService,
     required this.liveKitService,
     required this.apiClient,
+    required this.guestRepository,
   }) : super(const LiveViewerState()) {
     on<LiveViewerActivated>(_onActivated);
     on<LiveViewerDeactivated>(_onDeactivated);
@@ -65,6 +67,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerViewerBannedRequested>(_onViewerBannedRequested);
     on<LiveViewerViewerUnbannedRequested>(_onViewerUnbannedRequested);
     on<LiveViewerSendStateChanged>(_onSendStateChanged);
+    on<LiveViewerGuestSeatRequested>(_onGuestSeatRequested);
+    on<LiveViewerGuestInviteAnswered>(_onGuestInviteAnswered);
+    on<LiveViewerLeftStage>(_onLeftStage);
+    on<LiveViewerGuestsRefreshed>(_onGuestsRefreshed);
   }
   final JoinLiveUseCase joinLiveUseCase;
   final LeaveLiveUseCase leaveLiveUseCase;
@@ -75,6 +81,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   final MuteViewerChatUseCase muteViewerChatUseCase;
   final UnmuteViewerChatUseCase unmuteViewerChatUseCase;
   final DeleteCommentUseCase deleteCommentUseCase;
+  final GuestRepository guestRepository;
   final LiveRepository liveRepository;
   final CommentRepository commentRepository;
   final GiftRepository giftRepository;
@@ -348,7 +355,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
     final currentUserUid = state.currentUserId ?? _currentUserId;
     final chatMutedFlag = state.chatMuted;
-    final inMutedUserIds = currentUserUid != null && state.mutedUserIds.contains(currentUserUid);
+    final inMutedUserIds =
+        currentUserUid != null && state.mutedUserIds.contains(currentUserUid);
     final muted = chatMutedFlag || inMutedUserIds;
     if (muted) {
       emit(state.copyWith(moderationBanner: 'Your chat is muted on this live'));
@@ -676,6 +684,142 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     await _handleSocketEvent(ev, emit);
   }
 
+  // ---------- Multi-guest ----------
+
+  /// Ask the host for a seat on stage. Nothing happens locally until they
+  /// accept — the camera only comes on once the server issues publish creds.
+  Future<void> _onGuestSeatRequested(
+    LiveViewerGuestSeatRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = state.live?.id;
+    if (liveId == null || liveId.isEmpty || state.isGuestActionBusy) return;
+
+    emit(state.copyWith(isGuestActionBusy: true));
+    final result = await guestRepository.requestSeat(liveId);
+    if (isClosed) return;
+    emit(
+      result.fold(
+        (failure) => state.copyWith(
+          isGuestActionBusy: false,
+          moderationBanner: 'تعذر إرسال طلب الانضمام: ${failure.message}',
+        ),
+        (_) => state.copyWith(
+          isGuestActionBusy: false,
+          moderationBanner: 'تم إرسال طلب الانضمام إلى المضيف',
+        ),
+      ),
+    );
+    add(const LiveViewerGuestsRefreshed());
+  }
+
+  /// Accept or decline an invite. Accepting swaps the subscribe-only LiveKit
+  /// connection for the publish one the server just issued.
+  Future<void> _onGuestInviteAnswered(
+    LiveViewerGuestInviteAnswered event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final invite = state.pendingGuestInvite;
+    if (invite == null) return;
+
+    // Clear first either way: an invite left standing through a failed accept
+    // is what makes the button look dead.
+    emit(state.copyWith(clearPendingGuestInvite: true));
+    if (!event.accepted) return;
+
+    emit(state.copyWith(isGuestActionBusy: true));
+    final result = await guestRepository.acceptInvite(invite.liveId);
+    if (isClosed) return;
+
+    await result.fold(
+      (failure) async {
+        emit(
+          state.copyWith(
+            isGuestActionBusy: false,
+            moderationBanner: 'تعذر الانضمام إلى المسرح: ${failure.message}',
+          ),
+        );
+      },
+      (creds) async {
+        if (!creds.isUsable) {
+          emit(
+            state.copyWith(
+              isGuestActionBusy: false,
+              moderationBanner:
+                  'قبلت الدعوة، لكن الخادم لم يرسل بيانات LiveKit للنشر.',
+            ),
+          );
+          return;
+        }
+        try {
+          await liveKitService.joinStage(
+            url: creds.url,
+            token: creds.token,
+            roomName: invite.liveId,
+          );
+          if (isClosed) return;
+          emit(
+            state.copyWith(
+              isGuestActionBusy: false,
+              isOnStage: true,
+              moderationBanner: creds.isCoHost
+                  ? 'انضممت كمضيف مشارك'
+                  : 'انضممت إلى المسرح',
+            ),
+          );
+          add(const LiveViewerGuestsRefreshed());
+        } catch (e) {
+          if (isClosed) return;
+          emit(
+            state.copyWith(
+              isGuestActionBusy: false,
+              isOnStage: false,
+              moderationBanner: 'تعذر تشغيل الكاميرا للنشر: $e',
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// Step off the stage and go back to watching.
+  Future<void> _onLeftStage(
+    LiveViewerLeftStage event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = state.live?.id;
+    if (liveId == null || liveId.isEmpty) return;
+
+    emit(state.copyWith(isGuestActionBusy: true));
+    await liveKitService.leaveStage();
+    final result = await guestRepository.leaveStage(liveId);
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        isGuestActionBusy: false,
+        isOnStage: false,
+        moderationBanner: result.fold(
+          (failure) =>
+              'غادرت المسرح محلياً، لكن الخادم لم يستجب: '
+              '${failure.message}',
+          (_) => 'غادرت المسرح',
+        ),
+      ),
+    );
+    add(const LiveViewerGuestsRefreshed());
+  }
+
+  Future<void> _onGuestsRefreshed(
+    LiveViewerGuestsRefreshed event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = state.live?.id;
+    if (liveId == null || liveId.isEmpty) return;
+    final result = await guestRepository.listGuests(liveId);
+    if (isClosed) return;
+    result.fold((_) {}, (guests) => emit(state.copyWith(guests: guests)));
+  }
+
   // ---------- Internal helpers ----------
 
   void _listenSocket(String liveId) {
@@ -702,6 +846,37 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   ) async {
     final session = state.session;
     if (session == null) return;
+
+    if (event is LiveGuestInviteEvent) {
+      // Parked in state: the prompt has to still be tappable a few seconds
+      // after it lands, which a one-shot banner never was.
+      emit(
+        state.copyWith(
+          pendingGuestInvite: PendingGuestInvite(
+            liveId: event.liveId,
+            hostName: event.hostName ?? 'المضيف',
+            role: event.role,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (event is LiveGuestUpdateEvent) {
+      if (event.affectsStage) {
+        add(const LiveViewerGuestsRefreshed());
+      }
+      // Being removed from the stage has to stop the camera locally too — the
+      // server revoking the grant does not turn the hardware off by itself.
+      final isMe =
+          event.guestUserId != null && event.guestUserId == state.currentUserId;
+      if (isMe &&
+          (event.updateType == 'kicked' || event.updateType == 'left')) {
+        await liveKitService.leaveStage();
+        emit(state.copyWith(isOnStage: false));
+      }
+      return;
+    }
 
     if (event is LiveCommentEvent) {
       // Silently drop comments from viewers who have been banned.

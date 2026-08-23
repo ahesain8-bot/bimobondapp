@@ -14,6 +14,8 @@ enum SocketEventType {
   liveViewers,
   liveEnded,
   userJoined,
+  liveGuestInvite,
+  liveGuestUpdate,
   reconnecting,
   reconnected,
   networkLost,
@@ -185,6 +187,46 @@ class UserJoinedEvent extends SocketEvent {
     avatarUrl,
     viewerCount,
   ];
+}
+
+/// You were invited onto a host's stage. Arrives on the personal `user_*`
+/// room, so it can land while watching any live at all.
+class LiveGuestInviteEvent extends SocketEvent {
+  final String? hostName;
+  final String role;
+
+  const LiveGuestInviteEvent({
+    required super.liveId,
+    this.hostName,
+    this.role = 'GUEST',
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveGuestInvite);
+
+  bool get isCoHost => role.toUpperCase() == 'CO_HOST';
+
+  @override
+  List<Object?> get props => [...super.props, hostName, role];
+}
+
+/// Someone on the stage changed (mobile-api.md §16, `liveGuestUpdate.type`):
+/// requested, invited, joined, left, rejected, kicked, muted, unmuted,
+/// camera_off, camera_on, role — or `settings` for the policy itself.
+class LiveGuestUpdateEvent extends SocketEvent {
+  final String updateType;
+  final String? guestUserId;
+
+  const LiveGuestUpdateEvent({
+    required super.liveId,
+    required this.updateType,
+    this.guestUserId,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveGuestUpdate);
+
+  /// Whether the stage roster changed, as opposed to policy only.
+  bool get affectsStage => updateType != 'settings';
+
+  @override
+  List<Object?> get props => [...super.props, updateType, guestUserId];
 }
 
 class NetworkLostEvent extends SocketEvent {

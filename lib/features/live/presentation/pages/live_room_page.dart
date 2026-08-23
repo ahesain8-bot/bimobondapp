@@ -31,6 +31,8 @@ import '../widgets/room/live_room_bottom_bar.dart';
 import '../widgets/room/live_room_camera_layer.dart';
 import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
+import '../widgets/room/live_room_guest_invite_prompt.dart';
+import '../widgets/room/live_room_stage.dart';
 import '../widgets/room/live_room_effects_panel.dart';
 import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
@@ -405,16 +407,31 @@ class _LiveRoomBody extends StatelessWidget {
                   LiveRoomHeader(),
                   SizedBox(height: AppSpacing.xs),
                   LiveRoomInfoRow(),
-                  Spacer(),
-                  SizedBox(height: AppSpacing.xs),
-                  Padding(
-                    padding: EdgeInsetsDirectional.only(
-                      start: AppSpacing.xl,
-                      end: AppSpacing.roomHorizontal,
-                      bottom: AppSpacing.xs,
+                  // Everything between the header and the bars lives in one
+                  // flexible slot pinned to its bottom. Previously the feed was
+                  // a rigid child after a Spacer, so the moment the keyboard or
+                  // the effects panel claimed the space the column overflowed
+                  // and the feed was the part that got clipped.
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        LiveRoomStage(),
+                        SizedBox(height: AppSpacing.xs),
+                        Flexible(
+                          child: Padding(
+                            padding: EdgeInsetsDirectional.only(
+                              start: AppSpacing.xl,
+                              end: AppSpacing.roomHorizontal,
+                              bottom: AppSpacing.xs,
+                            ),
+                            child: LiveRoomChatFeed(),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: LiveRoomChatFeed(),
                   ),
+                  LiveRoomGuestInvitePrompt(),
                   LiveRoomChatComposer(),
                   LiveRoomBottomBar(),
                   LiveRoomEffectsPanel(),

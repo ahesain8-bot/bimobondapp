@@ -7,6 +7,7 @@ import '../../data/datasources/live_remote_datasource.dart';
 import '../../data/repositories/fake_live_repository.dart';
 import '../../data/repositories/real_comment_repository.dart';
 import '../../data/repositories/real_gift_repository.dart';
+import '../../data/repositories/real_guest_repository.dart';
 import '../../data/repositories/real_like_repository.dart';
 import '../../data/services/fake_livekit_service.dart';
 import '../../data/services/fake_socket_service.dart';
@@ -14,6 +15,7 @@ import '../../data/services/real_livekit_service.dart';
 import '../../data/services/real_socket_service.dart';
 import '../../domain/repositories/comment_repository.dart';
 import '../../domain/repositories/gift_repository.dart';
+import '../../domain/repositories/guest_repository.dart';
 import '../../domain/repositories/like_repository.dart';
 import '../../domain/repositories/live_repository.dart';
 import '../../domain/usecases/ban_viewer_usecase.dart';
@@ -59,6 +61,10 @@ Future<void> initLiveViewer() async {
 
   sl.registerLazySingleton<LiveRepository>(() => FakeLiveRepository(sl()));
 
+  sl.registerLazySingleton<GuestRepository>(
+    () => RealGuestRepository(apiClient: sl()),
+  );
+
   sl.registerLazySingleton<CommentRepository>(
     () => RealCommentRepository(apiClient: sl(), socket: sl()),
   );
@@ -100,6 +106,7 @@ Future<void> initLiveViewer() async {
       likeRepository: sl(),
       socketService: sl(),
       liveKitService: sl(),
+      guestRepository: sl(),
       apiClient: sl(),
     ),
   );

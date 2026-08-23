@@ -3,6 +3,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 
 import '../../../domain/effects/live_effects_catalog.dart';
+import '../../../domain/entities/live_guest.dart';
 import '../../../domain/entities/live_session.dart';
 import 'live_room_event.dart';
 import '../../../domain/entities/live_gift_banner.dart';
@@ -82,6 +83,9 @@ class LiveRoomReady extends LiveRoomState {
     this.floatingHeartBurst = 0,
     this.giftBanner,
     this.latestGiftCombo,
+    this.isRealtimeConnected = false,
+    this.guests = const [],
+    this.pendingGuestInvite,
   });
 
   final LiveSession session;
@@ -125,6 +129,21 @@ class LiveRoomReady extends LiveRoomState {
   /// Canonical `gift_combo` payload for the shared gift presentation layer.
   final GiftComboPayload? latestGiftCombo;
 
+  /// Whether the HUD socket is up. Comments, the viewer counter and likes all
+  /// ride it, so the room shows this instead of letting three features look
+  /// independently broken.
+  final bool isRealtimeConnected;
+
+  /// Everyone on or waiting for the stage (`GET /lives/:id/guests`).
+  final List<LiveGuest> guests;
+
+  /// An invite addressed to this user that has not been answered yet.
+  final LivePendingGuestInvite? pendingGuestInvite;
+
+  /// Guests actually publishing right now — what the stage renders.
+  List<LiveGuest> get activeGuests =>
+      guests.where((g) => g.isActive).toList(growable: false);
+
   LiveRoomReady copyWith({
     LiveSession? session,
     Object? controller = _unset,
@@ -151,6 +170,9 @@ class LiveRoomReady extends LiveRoomState {
     int? floatingHeartBurst,
     Object? giftBanner = _unset,
     Object? latestGiftCombo = _unset,
+    bool? isRealtimeConnected,
+    List<LiveGuest>? guests,
+    Object? pendingGuestInvite = _unset,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -180,8 +202,9 @@ class LiveRoomReady extends LiveRoomState {
           isChatComposerVisible ?? this.isChatComposerVisible,
       isSendingChat: isSendingChat ?? this.isSendingChat,
       isEnding: isEnding ?? this.isEnding,
-      actionMessage:
-          clearActionMessage ? null : (actionMessage ?? this.actionMessage),
+      actionMessage: clearActionMessage
+          ? null
+          : (actionMessage ?? this.actionMessage),
       floatingHeartBurst: floatingHeartBurst ?? this.floatingHeartBurst,
       giftBanner: identical(giftBanner, _unset)
           ? this.giftBanner
@@ -189,8 +212,29 @@ class LiveRoomReady extends LiveRoomState {
       latestGiftCombo: identical(latestGiftCombo, _unset)
           ? this.latestGiftCombo
           : latestGiftCombo as GiftComboPayload?,
+      isRealtimeConnected: isRealtimeConnected ?? this.isRealtimeConnected,
+      guests: guests ?? this.guests,
+      pendingGuestInvite: identical(pendingGuestInvite, _unset)
+          ? this.pendingGuestInvite
+          : pendingGuestInvite as LivePendingGuestInvite?,
     );
   }
+}
+
+/// An unanswered `liveGuestInvite` for this user, kept in state so the prompt
+/// survives a rebuild instead of flashing past in a SnackBar.
+class LivePendingGuestInvite {
+  const LivePendingGuestInvite({
+    required this.liveId,
+    required this.hostName,
+    required this.role,
+  });
+
+  final String liveId;
+  final String hostName;
+  final String role;
+
+  bool get isCoHost => role.toUpperCase() == 'CO_HOST';
 }
 
 class LiveRoomEnded extends LiveRoomState {

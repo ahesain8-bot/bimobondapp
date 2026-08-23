@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sh
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
+import '../../domain/repositories/guest_repository.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
 import '../bloc/live_viewer/live_viewer_event.dart';
 import '../bloc/live_viewer/live_viewer_state.dart';
@@ -18,6 +19,7 @@ import 'floating_gifts.dart';
 import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
 import 'guest_panel.dart';
+import 'guest_stage_prompt.dart';
 import 'league_overlay.dart';
 import 'live_state_overlay.dart';
 import 'live_video_player.dart';
@@ -129,21 +131,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   Future<void> _openGuestRequest(LiveEntity live) async {
+    final bloc = context.read<LiveViewerBloc>();
     final requested = await showGuestRequestSheet(
       context,
       hostName: live.hostName,
       hostAvatar: live.hostAvatar,
       viewerAvatar: 'https://i.pravatar.cc/150?u=me',
     );
-    if (requested == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Guest request sent'),
-          backgroundColor: AppColors.surface,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    if (requested != true) return;
+    // Real request now (`POST /lives/:id/guests/request`) — this used to stop
+    // at a SnackBar, so the host never saw anyone asking to come on stage.
+    bloc.add(const LiveViewerGuestSeatRequested());
   }
 
   void _openRanking(LiveEntity live) {
@@ -200,7 +198,22 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
   }
 
-  List<GuestSlotData> _guestsFrom(LiveEntity live) {
+  /// Stage slots for the grid. The live roster from `GET /lives/:id/guests`
+  /// wins whenever the server has one; `metadata.guests` stays as the fallback
+  /// for rooms the guest API has nothing to say about.
+  List<GuestSlotData> _guestsFrom(LiveEntity live, List<GuestSummary> roster) {
+    if (roster.isNotEmpty) {
+      return roster
+          .map(
+            (g) => GuestSlotData(
+              userId: g.userId,
+              name: g.displayName,
+              avatarUrl: g.avatarUrl,
+              isMuted: g.mutedByHost,
+            ),
+          )
+          .toList(growable: false);
+    }
     final raw = live.metadata?['guests'];
     if (raw is! List) return const [];
     return raw.map((e) {
@@ -358,8 +371,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             (connectionState == LiveConnectionState.connected ||
                 connectionState == LiveConnectionState.reconnecting);
         final isPk = live.metadata?['isPk'] == true;
-        final isMultiGrid = live.metadata?['isMultiGrid'] == true;
-        final isMultiGuest = live.metadata?['isMultiGuest'] == true;
+        // Someone actually publishing on stage puts the room in grid layout on
+        // its own — waiting for a metadata flag meant an accepted co-host was
+        // invisible to everyone watching.
+        final stageGuests = isThisRoom
+            ? state.activeGuests
+            : const <GuestSummary>[];
+        final hasLiveGuests = stageGuests.isNotEmpty;
+        final isMultiGrid =
+            live.metadata?['isMultiGrid'] == true || (hasLiveGuests && !isPk);
+        final isMultiGuest =
+            live.metadata?['isMultiGuest'] == true || hasLiveGuests;
         final showFanClub =
             !isPk && !isMultiGrid && live.metadata?['showFanClub'] != false;
         final showGiftGoal =
@@ -367,7 +389,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             !_giftGoalDismissed &&
             (isMultiGrid || live.metadata?['showGiftGoal'] == true);
         final bottomPad = MediaQuery.paddingOf(context).bottom;
-        final guests = _guestsFrom(live);
+        final guests = _guestsFrom(live, stageGuests);
         final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
         final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
         final screenW = MediaQuery.sizeOf(context).width;
@@ -922,6 +944,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       ),
                     );
                   },
+                ),
+              // Sits directly above the input bar so an invite (or the leave
+              // control once on stage) is never buried behind the HUD.
+              if (widget.isActive && isThisRoom)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: barTotalH + 6,
+                  child: const GuestStagePrompt(),
                 ),
               Positioned(
                 left: 0,

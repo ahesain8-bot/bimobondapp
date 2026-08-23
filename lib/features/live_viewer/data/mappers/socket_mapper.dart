@@ -50,6 +50,44 @@ class SocketMapper {
     );
   }
 
+  static LiveGuestInviteEvent? guestInviteEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final liveId = map['liveId']?.toString() ?? fallbackLiveId ?? '';
+    if (liveId.isEmpty) return null;
+    final host = _asMap(map['host']) ?? _asMap(map['user']);
+    final fullName = host?['fullName']?.toString();
+    return LiveGuestInviteEvent(
+      liveId: liveId,
+      hostName: (fullName != null && fullName.trim().isNotEmpty)
+          ? fullName.trim()
+          : (host?['username']?.toString() ?? map['hostName']?.toString()),
+      role: (map['role'] ?? map['guestRole'])?.toString() ?? 'GUEST',
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveGuestUpdateEvent? guestUpdateEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final type = map['type']?.toString();
+    if (type == null || type.isEmpty) return null;
+    final guest = _asMap(map['guest']);
+    final user = guest == null ? null : _asMap(guest['user']);
+    return LiveGuestUpdateEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      updateType: type,
+      guestUserId: user?['id']?.toString() ?? guest?['userId']?.toString(),
+      timestamp: DateTime.now(),
+    );
+  }
+
   static LiveGiftEvent? giftEvent(dynamic data, String? fallbackLiveId) {
     final map = _asMap(data);
     if (map == null) return null;

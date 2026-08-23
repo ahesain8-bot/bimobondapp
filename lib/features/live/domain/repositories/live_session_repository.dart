@@ -39,20 +39,13 @@ class LiveHudUserJoinedEvent extends LiveHudEvent {
 }
 
 class LiveHudLikeEvent extends LiveHudEvent {
-  const LiveHudLikeEvent({
-    required this.likeCount,
-    this.userId,
-  });
+  const LiveHudLikeEvent({required this.likeCount, this.userId});
   final int likeCount;
   final String? userId;
 }
 
 class LiveHudEndedEvent extends LiveHudEvent {
-  const LiveHudEndedEvent({
-    required this.liveId,
-    this.status,
-    this.reason,
-  });
+  const LiveHudEndedEvent({required this.liveId, this.status, this.reason});
   final String liveId;
   final String? status;
   final String? reason;
@@ -118,10 +111,7 @@ class LiveHudGiftComboEvent extends LiveHudEvent {
 }
 
 class LiveHudHourlyRankEvent extends LiveHudEvent {
-  const LiveHudHourlyRankEvent({
-    this.hourlyRank,
-    this.label,
-  });
+  const LiveHudHourlyRankEvent({this.hourlyRank, this.label});
   final int? hourlyRank;
   final String? label;
 }
@@ -129,14 +119,32 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
 /// Someone invited you onto their stage. Arrives on the personal `user_*`
 /// room rather than the live room, so it can land while you are anywhere.
 class LiveHudGuestInviteEvent extends LiveHudEvent {
-  const LiveHudGuestInviteEvent({
-    this.liveId,
-    this.hostName,
-    this.role,
-  });
+  const LiveHudGuestInviteEvent({this.liveId, this.hostName, this.role});
   final String? liveId;
   final String? hostName;
   final String? role;
+}
+
+/// Someone on the stage changed: invited, joined, left, kicked, muted,
+/// camera toggled or promoted/demoted — plus `settings` when the host edits
+/// the multi-guest policy (mobile-api.md §16, `liveGuestUpdate.type`).
+class LiveHudGuestUpdateEvent extends LiveHudEvent {
+  const LiveHudGuestUpdateEvent({
+    required this.type,
+    required this.liveId,
+    this.guest,
+    this.settings,
+  });
+
+  final String type;
+  final String liveId;
+
+  /// Raw guest card from the payload; null for `settings` updates.
+  final Map<String, dynamic>? guest;
+  final Map<String, dynamic>? settings;
+
+  /// Whether the stage roster itself changed, as opposed to policy only.
+  bool get affectsStage => type != 'settings';
 }
 
 /// The HUD socket came up, or refused to. Comments, the viewer counter and
@@ -146,6 +154,22 @@ class LiveHudConnectionEvent extends LiveHudEvent {
   const LiveHudConnectionEvent({required this.connected, this.reason});
   final bool connected;
   final String? reason;
+}
+
+/// LiveKit publish credentials handed to a guest who joined the stage
+/// (`POST /lives/:id/guests/accept-invite` / `…/:userId/accept`).
+class LiveGuestStageCredentials {
+  const LiveGuestStageCredentials({
+    required this.token,
+    required this.url,
+    required this.role,
+  });
+
+  final String token;
+  final String url;
+  final String role;
+
+  bool get isUsable => token.isNotEmpty && url.isNotEmpty;
 }
 
 /// Contract for loading and updating an active live session.
@@ -182,10 +206,7 @@ abstract class LiveSessionRepository {
   });
 
   /// Pins a comment (`POST /lives/:id/comments/:commentId/pin`).
-  Future<void> pinComment({
-    required String liveId,
-    required String commentId,
-  });
+  Future<void> pinComment({required String liveId, required String commentId});
 
   /// Unpins a comment (`POST /lives/:id/comments/:commentId/unpin`).
   Future<void> unpinComment({
@@ -214,10 +235,7 @@ abstract class LiveSessionRepository {
   });
 
   /// Unbans a viewer for this live.
-  Future<void> unbanViewer({
-    required String liveId,
-    required String userId,
-  });
+  Future<void> unbanViewer({required String liveId, required String userId});
 
   /// Registers a like tap (`POST /lives/:id/like`).
   Future<int> like(String liveId);
@@ -267,30 +285,22 @@ abstract class LiveSessionRepository {
     String role = 'GUEST',
   });
 
-  Future<void> acceptGuest({
-    required String liveId,
-    required String userId,
-  });
+  /// Invitee accepts their own invite (`POST /lives/:id/guests/accept-invite`).
+  /// Returns the LiveKit publish credentials that put them on stage.
+  Future<LiveGuestStageCredentials> acceptGuestInvite(String liveId);
 
-  Future<void> rejectGuest({
-    required String liveId,
-    required String userId,
-  });
+  /// Active guest steps off the stage (`POST /lives/:id/guests/leave`).
+  Future<void> leaveGuestStage(String liveId);
 
-  Future<void> kickGuest({
-    required String liveId,
-    required String userId,
-  });
+  Future<void> acceptGuest({required String liveId, required String userId});
 
-  Future<void> muteGuest({
-    required String liveId,
-    required String userId,
-  });
+  Future<void> rejectGuest({required String liveId, required String userId});
 
-  Future<void> unmuteGuest({
-    required String liveId,
-    required String userId,
-  });
+  Future<void> kickGuest({required String liveId, required String userId});
+
+  Future<void> muteGuest({required String liveId, required String userId});
+
+  Future<void> unmuteGuest({required String liveId, required String userId});
 
   Future<void> setGuestCameraOff({
     required String liveId,
@@ -302,15 +312,9 @@ abstract class LiveSessionRepository {
     required String userId,
   });
 
-  Future<void> promoteGuest({
-    required String liveId,
-    required String userId,
-  });
+  Future<void> promoteGuest({required String liveId, required String userId});
 
-  Future<void> demoteGuest({
-    required String liveId,
-    required String userId,
-  });
+  Future<void> demoteGuest({required String liveId, required String userId});
 
   /// Hourly rank for this live (`GET /lives/:id/leaderboard/hourly`).
   Future<({int? rank, String label, int? score, int? coins})> loadHourlyRank(
@@ -359,6 +363,10 @@ abstract class LiveSessionRepository {
 
   /// Opaque local LiveKit video track for UI preview (`LocalVideoTrack`).
   Object? get localPreviewTrack;
+
+  /// Opaque LiveKit `Room`, or null before media connects. The stage reads
+  /// remote participants from it to render guests who are publishing.
+  Object? get mediaRoom;
 
   /// Whether LiveKit host/guest publish is active (video published).
   bool get isMediaConnected;

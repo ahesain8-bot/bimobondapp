@@ -4,6 +4,7 @@ import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/gift_entity.dart';
 import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
+import '../../../domain/repositories/guest_repository.dart';
 
 class LiveViewerState extends Equatable {
   final LiveSessionEntity? session;
@@ -25,6 +26,18 @@ class LiveViewerState extends Equatable {
   final Set<String> mutedUserIds;
   final bool isCommentSending;
 
+  /// Everyone on or waiting for the stage (`GET /lives/:id/guests`).
+  final List<GuestSummary> guests;
+
+  /// An invite for this viewer that has not been answered yet.
+  final PendingGuestInvite? pendingGuestInvite;
+
+  /// True once this device is publishing camera/mic into the room.
+  final bool isOnStage;
+
+  /// True while a request/accept/leave call is in flight.
+  final bool isGuestActionBusy;
+
   const LiveViewerState({
     this.session,
     this.comments = const [],
@@ -44,7 +57,15 @@ class LiveViewerState extends Equatable {
     this.bannedUserIds = const {},
     this.mutedUserIds = const {},
     this.isCommentSending = false,
+    this.guests = const [],
+    this.pendingGuestInvite,
+    this.isOnStage = false,
+    this.isGuestActionBusy = false,
   });
+
+  /// Guests actually publishing right now — what the stage renders.
+  List<GuestSummary> get activeGuests =>
+      guests.where((g) => g.isActive).toList(growable: false);
 
   LiveConnectionState get connectionState =>
       session?.connectionState ?? LiveConnectionState.idle;
@@ -75,6 +96,11 @@ class LiveViewerState extends Equatable {
     Set<String>? bannedUserIds,
     Set<String>? mutedUserIds,
     bool? isCommentSending,
+    List<GuestSummary>? guests,
+    PendingGuestInvite? pendingGuestInvite,
+    bool clearPendingGuestInvite = false,
+    bool? isOnStage,
+    bool? isGuestActionBusy,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -101,6 +127,12 @@ class LiveViewerState extends Equatable {
       bannedUserIds: bannedUserIds ?? this.bannedUserIds,
       mutedUserIds: mutedUserIds ?? this.mutedUserIds,
       isCommentSending: isCommentSending ?? this.isCommentSending,
+      guests: guests ?? this.guests,
+      pendingGuestInvite: clearPendingGuestInvite
+          ? null
+          : (pendingGuestInvite ?? this.pendingGuestInvite),
+      isOnStage: isOnStage ?? this.isOnStage,
+      isGuestActionBusy: isGuestActionBusy ?? this.isGuestActionBusy,
     );
   }
 
@@ -124,5 +156,28 @@ class LiveViewerState extends Equatable {
     bannedUserIds,
     mutedUserIds,
     isCommentSending,
+    guests,
+    pendingGuestInvite,
+    isOnStage,
+    isGuestActionBusy,
   ];
+}
+
+/// An unanswered `liveGuestInvite`, kept in state so the prompt stays on
+/// screen until the viewer actually answers it.
+class PendingGuestInvite extends Equatable {
+  const PendingGuestInvite({
+    required this.liveId,
+    required this.hostName,
+    required this.role,
+  });
+
+  final String liveId;
+  final String hostName;
+  final String role;
+
+  bool get isCoHost => role.toUpperCase() == 'CO_HOST';
+
+  @override
+  List<Object?> get props => [liveId, hostName, role];
 }
