@@ -128,11 +128,7 @@ class LiveRoomRankingTapped extends LiveRoomEvent {
 }
 
 /// Visibility of the live effects UI.
-enum LiveEffectsPanelMode {
-  hidden,
-  tray,
-  expanded,
-}
+enum LiveEffectsPanelMode { hidden, tray, expanded }
 
 /// Opens, closes, or expands the effects UI.
 class LiveRoomEffectsPanelModeChanged extends LiveRoomEvent {
@@ -243,6 +239,30 @@ class LiveRoomShareChannelRequested extends LiveRoomEvent {
   const LiveRoomShareChannelRequested(this.channel);
 
   final LiveRoomShareChannel channel;
+}
+
+/// Re-pulls the comment history after the HUD socket comes back, so anything
+/// broadcast while it was down is not lost for the rest of the stream.
+class LiveRoomCommentsResyncRequested extends LiveRoomEvent {
+  const LiveRoomCommentsResyncRequested();
+}
+
+/// This user answered a `liveGuestInvite` addressed to them.
+class LiveRoomGuestInviteAnswered extends LiveRoomEvent {
+  const LiveRoomGuestInviteAnswered({required this.accepted});
+
+  final bool accepted;
+}
+
+/// Host or moderator acted on someone waiting for the stage.
+class LiveRoomGuestRequestAnswered extends LiveRoomEvent {
+  const LiveRoomGuestRequestAnswered({
+    required this.userId,
+    required this.accepted,
+  });
+
+  final String userId;
+  final bool accepted;
 }
 
 /// Guest list changed — refresh pending invite badge.

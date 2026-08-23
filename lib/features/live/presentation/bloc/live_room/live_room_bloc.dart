@@ -9,6 +9,7 @@ import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service
 import '../../../../../core/network/api_exceptions.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
+import '../../../domain/entities/live_chat_feed_merge.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../../domain/entities/live_host.dart';
 import '../../../domain/entities/live_session.dart';
@@ -35,15 +36,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required LikeLiveSession likeLiveSession,
     required UpdateLiveTitle updateLiveTitle,
     required LiveSessionRepository sessionRepository,
-  })  : _startLiveSession = startLiveSession,
-        _endLiveSession = endLiveSession,
-        _initializeCamera = initializeCamera,
-        _disposeCamera = disposeCamera,
-        _sendLiveComment = sendLiveComment,
-        _likeLiveSession = likeLiveSession,
-        _updateLiveTitle = updateLiveTitle,
-        _sessionRepository = sessionRepository,
-        super(const LiveRoomInitial()) {
+  }) : _startLiveSession = startLiveSession,
+       _endLiveSession = endLiveSession,
+       _initializeCamera = initializeCamera,
+       _disposeCamera = disposeCamera,
+       _sendLiveComment = sendLiveComment,
+       _likeLiveSession = likeLiveSession,
+       _updateLiveTitle = updateLiveTitle,
+       _sessionRepository = sessionRepository,
+       super(const LiveRoomInitial()) {
     on<LiveRoomStarted>(_onStarted);
     on<LiveRoomRecoverEndAndRestart>(_onRecoverEndAndRestart);
     on<LiveRoomRecoverResumeActive>(_onRecoverResumeActive);
@@ -78,6 +79,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomShareContactSelected>(_onShareContactSelected);
     on<LiveRoomShareChannelRequested>(_onShareChannelRequested);
     on<LiveRoomGuestsChanged>(_onGuestsChanged);
+    on<LiveRoomCommentsResyncRequested>(_onCommentsResync);
+    on<LiveRoomGuestInviteAnswered>(_onGuestInviteAnswered);
+    on<LiveRoomGuestRequestAnswered>(_onGuestRequestAnswered);
     on<LiveRoomGalleryChanged>(_onGalleryChanged);
     on<LiveRoomSettingsApplied>(_onSettingsApplied);
     on<LiveRoomModerationRequested>(_onModerationRequested);
@@ -202,7 +206,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     Emitter<LiveRoomState> emit,
   ) async {
     final failure = state is LiveRoomFailure ? state as LiveRoomFailure : null;
-    if (failure == null || !failure.isActiveLiveConflict || failure.isRecovering) {
+    if (failure == null ||
+        !failure.isActiveLiveConflict ||
+        failure.isRecovering) {
       return;
     }
 
@@ -251,7 +257,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     Emitter<LiveRoomState> emit,
   ) async {
     final failure = state is LiveRoomFailure ? state as LiveRoomFailure : null;
-    if (failure == null || !failure.isActiveLiveConflict || failure.isRecovering) {
+    if (failure == null ||
+        !failure.isActiveLiveConflict ||
+        failure.isRecovering) {
       return;
     }
 
@@ -278,8 +286,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       }
 
       final cameraFuture = _initializeCamera(useFront: true);
-      final sessionFuture =
-          _sessionRepository.reconnectHostSession(active.id);
+      final sessionFuture = _sessionRepository.reconnectHostSession(active.id);
       final controller = await cameraFuture;
       if (isClosed) {
         if (controller != null) await _disposeCamera(controller);
@@ -411,10 +418,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final hourly =
         results[3] as ({int? rank, String label, int? score, int? coins});
 
+    // Merged, not assigned: enrichment runs a beat after the room goes Ready,
+    // and anything the socket delivered in that window used to be wiped by the
+    // HTTP history landing on top of it.
     emit(
       ready.copyWith(
         session: ready.session.copyWith(
-          messages: comments,
+          messages: mergeLiveChatMessages(comments, ready.session.messages),
           galleryCurrent: gallery.current,
           galleryTotal: gallery.total,
           guestInviteCount: guests,
@@ -428,7 +438,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   Future<void> _publishLiveKitAfterPreview(Emitter<LiveRoomState> emit) async {
     final current = _readyOrNull;
     if (current == null) {
-      debugPrint('🔍 [BLoC] _publishLiveKitAfterPreview: _readyOrNull is null → abort');
+      debugPrint(
+        '🔍 [BLoC] _publishLiveKitAfterPreview: _readyOrNull is null → abort',
+      );
       return;
     }
 
@@ -438,10 +450,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       '🔍 [BLoC] _publishLiveKitAfterPreview: '
       'url=${url ?? "NULL"}, token=${token != null ? "${token.substring(0, 10)}..." : "NULL"}',
     );
-    if (token == null ||
-        token.isEmpty ||
-        url == null ||
-        url.isEmpty) {
+    if (token == null || token.isEmpty || url == null || url.isEmpty) {
       final ready = _readyOrNull;
       if (ready != null && !isClosed) {
         emit(
@@ -464,7 +473,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // ── Two-phase camera handoff (no black screen) ─────────────────────────
     var releasedEarly = false;
     try {
-      debugPrint('🔍 [BLoC] Phase A: connectMedia (no Flutter camera release)...');
+      debugPrint(
+        '🔍 [BLoC] Phase A: connectMedia (no Flutter camera release)...',
+      );
       await _sessionRepository.connectMedia(
         url: url,
         token: token,
@@ -553,8 +564,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(
       ready.copyWith(
         controller: swapToLiveKit ? null : ready.controller,
-        isCameraInitialized:
-            swapToLiveKit ? false : ready.isCameraInitialized,
+        isCameraInitialized: swapToLiveKit ? false : ready.isCameraInitialized,
         isMediaConnected: mediaUp,
         localVideoTrack: liveTrack,
         isFrontCamera: useFront,
@@ -668,12 +678,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Drop the controller from the widget tree first (no rebuild can race
     // the slow Xiaomi teardown and render a disposed controller).
     if (controller != null) {
-      emit(
-        current.copyWith(
-          controller: null,
-          isCameraInitialized: false,
-        ),
-      );
+      emit(current.copyWith(controller: null, isCameraInitialized: false));
       await _disposeCamera(controller);
     }
     await _sessionRepository.disconnectRealtime();
@@ -698,12 +703,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     // Emit null first so no HUD-triggered rebuild renders the disposed
     // controller during the slow camera teardown.
-    emit(
-      current.copyWith(
-        controller: null,
-        isCameraInitialized: false,
-      ),
-    );
+    emit(current.copyWith(controller: null, isCameraInitialized: false));
     await _disposeCamera(controller);
     if (isClosed) return;
   }
@@ -717,8 +717,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (current.isMediaConnected) return;
     if (current.controller != null && current.isCameraInitialized) return;
 
-    final controller =
-        await _initializeCamera(useFront: current.isFrontCamera);
+    final controller = await _initializeCamera(useFront: current.isFrontCamera);
     if (isClosed) return;
     emit(
       current.copyWith(
@@ -728,10 +727,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     );
   }
 
-  void _onChatTapped(
-    LiveRoomChatTapped event,
-    Emitter<LiveRoomState> emit,
-  ) {
+  void _onChatTapped(LiveRoomChatTapped event, Emitter<LiveRoomState> emit) {
     final current = _readyOrNull;
     if (current == null) return;
     emit(current.copyWith(isChatComposerVisible: true));
@@ -763,8 +759,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       );
       if (isClosed) return;
       final ready = _readyOrNull ?? current;
-      final exists =
-          ready.session.messages.any((m) => m.id == message.id);
+      final exists = ready.session.messages.any((m) => m.id == message.id);
       final messages = exists
           ? ready.session.messages
           : [...ready.session.messages, message];
@@ -776,19 +771,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         ),
       );
     } on ApiException catch (e) {
-      emit(
-        current.copyWith(
-          isSendingChat: false,
-          actionMessage: e.message,
-        ),
-      );
+      emit(current.copyWith(isSendingChat: false, actionMessage: e.message));
     } catch (e) {
-      emit(
-        current.copyWith(
-          isSendingChat: false,
-          actionMessage: e.toString(),
-        ),
-      );
+      emit(current.copyWith(isSendingChat: false, actionMessage: e.toString()));
     }
   }
 
@@ -855,8 +840,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     try {
-      final hourly =
-          await _sessionRepository.loadHourlyRank(current.session.id);
+      final hourly = await _sessionRepository.loadHourlyRank(
+        current.session.id,
+      );
       if (isClosed) return;
       emit(
         current.copyWith(
@@ -878,18 +864,167 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     Emitter<LiveRoomState> emit,
   ) async {
     final current = _readyOrNull;
-    if (current == null) return;
+    if (current == null || current.session.id.isEmpty) return;
     try {
-      final pending =
-          await _sessionRepository.loadGuestPendingCount(current.session.id);
+      // One call now covers both the badge and the stage: the pending count is
+      // derived from the same roster the multi-guest grid renders.
+      final guests = await _sessionRepository.loadGuests(current.session.id);
       if (isClosed) return;
       final ready = _readyOrNull ?? current;
       emit(
         ready.copyWith(
-          session: ready.session.copyWith(guestInviteCount: pending),
+          guests: guests,
+          session: ready.session.copyWith(
+            guestInviteCount: guests.where((g) => g.isPending).length,
+          ),
         ),
       );
     } catch (_) {}
+  }
+
+  /// Pulls the comment history again, keeping whatever the socket delivered
+  /// since. Runs whenever the HUD socket (re)connects.
+  Future<void> _onCommentsResync(
+    LiveRoomCommentsResyncRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null || current.session.id.isEmpty) return;
+    final liveId = current.session.id;
+    try {
+      final history = await _sessionRepository.loadComments(liveId);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null || ready.session.id != liveId) return;
+      emit(
+        ready.copyWith(
+          session: ready.session.copyWith(
+            messages: mergeLiveChatMessages(history, ready.session.messages),
+          ),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  /// This user accepting or declining an invite onto someone else's stage.
+  Future<void> _onGuestInviteAnswered(
+    LiveRoomGuestInviteAnswered event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    final invite = current?.pendingGuestInvite;
+    if (current == null || invite == null) return;
+
+    // Clear the prompt first either way: leaving it up through a failed accept
+    // is what makes a stuck invite look like the button did nothing.
+    emit(current.copyWith(pendingGuestInvite: null));
+
+    if (!event.accepted) return;
+
+    // Accepting means republishing this camera into the *inviter's* LiveKit
+    // room, which tears down the publish feeding this host's own stream. Their
+    // live would stay LIVE on the server with nothing going out, so refuse
+    // rather than silently hijacking a broadcast that is already on air.
+    if (invite.liveId != current.session.id) {
+      emit(
+        (_readyOrNull ?? current).copyWith(
+          actionMessage:
+              'لا يمكن الانضمام إلى مسرح بث آخر أثناء بثك الحالي. أنهِ بثك '
+              'أولاً ثم اقبل الدعوة.',
+        ),
+      );
+      return;
+    }
+
+    try {
+      final creds = await _sessionRepository.acceptGuestInvite(invite.liveId);
+      if (isClosed) return;
+      final ready = _readyOrNull ?? current;
+      if (!creds.isUsable) {
+        emit(
+          ready.copyWith(
+            actionMessage:
+                'قبلت الدعوة، لكن الخادم لم يرسل بيانات LiveKit للنشر.',
+          ),
+        );
+        return;
+      }
+      await _sessionRepository.connectMedia(
+        url: creds.url,
+        token: creds.token,
+        useFrontCamera: ready.isFrontCamera,
+      );
+      if (isClosed) return;
+      emit(
+        (_readyOrNull ?? ready).copyWith(
+          isMediaConnected: true,
+          actionMessage: creds.role.toUpperCase() == 'CO_HOST'
+              ? 'انضممت كمضيف مشارك.'
+              : 'انضممت إلى المسرح.',
+        ),
+      );
+      add(const LiveRoomGuestsChanged());
+    } on ApiException catch (e) {
+      if (!isClosed) {
+        emit((_readyOrNull ?? current).copyWith(actionMessage: e.message));
+      }
+    } catch (e) {
+      if (!isClosed) {
+        emit((_readyOrNull ?? current).copyWith(actionMessage: e.toString()));
+      }
+    }
+  }
+
+  /// Host or moderator answering a viewer who asked to come on stage.
+  Future<void> _onGuestRequestAnswered(
+    LiveRoomGuestRequestAnswered event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null || current.session.id.isEmpty) return;
+    final liveId = current.session.id;
+    try {
+      if (event.accepted) {
+        await _sessionRepository.acceptGuest(
+          liveId: liveId,
+          userId: event.userId,
+        );
+      } else {
+        await _sessionRepository.rejectGuest(
+          liveId: liveId,
+          userId: event.userId,
+        );
+      }
+      if (isClosed) return;
+      add(const LiveRoomGuestsChanged());
+    } on ApiException catch (e) {
+      if (!isClosed) {
+        emit((_readyOrNull ?? current).copyWith(actionMessage: e.message));
+      }
+    } catch (e) {
+      if (!isClosed) {
+        emit((_readyOrNull ?? current).copyWith(actionMessage: e.toString()));
+      }
+    }
+  }
+
+  /// Arabic line for a `liveGuestUpdate.type`, or null when the roster refresh
+  /// already tells the story on screen.
+  String? _guestUpdateMessage(String type) {
+    switch (type) {
+      case 'joined':
+        return 'انضم ضيف إلى المسرح.';
+      case 'left':
+        return 'غادر ضيف المسرح.';
+      case 'kicked':
+        return 'تمت إزالة ضيف من المسرح.';
+      case 'requested':
+        return 'طلب مشاهد الانضمام إلى المسرح.';
+      case 'role':
+        return 'تم تغيير دور أحد الضيوف.';
+      default:
+        return null;
+    }
   }
 
   Future<void> _onGalleryChanged(
@@ -899,8 +1034,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     try {
-      final gallery =
-          await _sessionRepository.loadGalleryCounts(current.session.id);
+      final gallery = await _sessionRepository.loadGalleryCounts(
+        current.session.id,
+      );
       if (isClosed) return;
       final ready = _readyOrNull ?? current;
       emit(
@@ -1018,30 +1154,52 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final hud = event.event;
 
     switch (hud) {
-      case LiveHudGuestInviteEvent(:final hostName, :final role):
+      case LiveHudGuestInviteEvent(:final liveId, :final hostName, :final role):
         // Arrives on the personal room, so it can reach a host who is already
-        // broadcasting. Surfaced, not acted on: accepting is a deliberate tap.
-        final who = (hostName == null || hostName.isEmpty) ? 'المضيف' : hostName;
-        final asCoHost = role != null && role.toUpperCase() == 'CO_HOST';
+        // broadcasting. Parked in state, not shouted once: accepting is a
+        // deliberate tap and the prompt has to survive until it is answered.
+        final who = (hostName == null || hostName.isEmpty)
+            ? 'المضيف'
+            : hostName;
+        final target = liveId ?? current.session.id;
+        if (target.isEmpty) return;
         emit(
           current.copyWith(
-            actionMessage: asCoHost
-                ? 'دعاك $who للانضمام كمضيف مشارك.'
-                : 'دعاك $who للانضمام إلى المسرح.',
+            pendingGuestInvite: LivePendingGuestInvite(
+              liveId: target,
+              hostName: who,
+              role: role ?? 'GUEST',
+            ),
           ),
         );
+      case LiveHudGuestUpdateEvent(:final type, :final affectsStage):
+        // The stage roster is authoritative on the server, so every change
+        // re-reads it rather than trying to patch a card in place.
+        if (affectsStage) {
+          add(const LiveRoomGuestsChanged());
+        }
+        final note = _guestUpdateMessage(type);
+        if (note != null) {
+          emit(current.copyWith(actionMessage: note));
+        }
       case LiveHudConnectionEvent(:final connected, :final reason):
-        // Comments, viewers and likes all ride this socket. Losing it used to
-        // be printed to the console and nowhere else, so the host just saw
-        // three features quietly stop working.
+        // Comments, viewers and likes all ride this socket. The flag is kept in
+        // state so the room can show a standing warning: a SnackBar alone
+        // flashed past and left the host staring at a feed that never fills.
         if (connected) {
-          if (current.actionMessage != null) {
-            emit(current.copyWith(clearActionMessage: true));
-          }
+          emit(
+            current.copyWith(
+              isRealtimeConnected: true,
+              clearActionMessage: current.actionMessage != null,
+            ),
+          );
+          // The socket may have missed comments while it was down.
+          add(const LiveRoomCommentsResyncRequested());
           return;
         }
         emit(
           current.copyWith(
+            isRealtimeConnected: false,
             actionMessage:
                 'انقطع الاتصال المباشر بالغرفة، فلن تصل تعليقات المشاهدين '
                 'ولا عدد المشاهدين ولا الإعجابات${reason == null ? '' : ' ($reason)'}.',
@@ -1054,7 +1212,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         emit(
           current.copyWith(
             session: current.session.copyWith(
-              messages: [...current.session.messages, message],
+              messages: capLiveChatMessages([
+                ...current.session.messages,
+                message,
+              ]),
             ),
           ),
         );
@@ -1075,9 +1236,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             .toList(growable: false);
         emit(
           current.copyWith(
-            session: current.session.copyWith(
-              messages: [message, ...others],
-            ),
+            session: current.session.copyWith(messages: [message, ...others]),
           ),
         );
       case LiveHudCommentUnpinnedEvent(:final commentId):
@@ -1086,9 +1245,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             session: current.session.copyWith(
               messages: current.session.messages
                   .map(
-                    (m) => m.id == commentId
-                        ? m.copyWith(isPinned: false)
-                        : m,
+                    (m) => m.id == commentId ? m.copyWith(isPinned: false) : m,
                   )
                   .toList(growable: false),
             ),
@@ -1103,10 +1260,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           ),
         );
       case LiveHudUserJoinedEvent(
-          :final userId,
-          :final username,
-          :final viewers,
-        ):
+        :final userId,
+        :final username,
+        :final viewers,
+      ):
         if (userId == current.session.host.id) {
           if (viewers != null) {
             emit(
@@ -1132,9 +1289,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           current.copyWith(
             session: current.session.copyWith(
               viewerCount: viewers ?? current.session.viewerCount,
-              messages: messages.length > 80
-                  ? messages.sublist(messages.length - 80)
-                  : messages,
+              messages: capLiveChatMessages(messages),
             ),
           ),
         );
@@ -1161,23 +1316,18 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         if (totalEarnedCoins != null) {
           session = session.copyWith(totalEarnedCoins: totalEarnedCoins);
         }
-        emit(
-          current.copyWith(
-            session: session,
-            latestGiftCombo: giftCombo,
-          ),
-        );
+        emit(current.copyWith(session: session, latestGiftCombo: giftCombo));
       case LiveHudGiftEvent(
-          :final summaryText,
-          :final totalEarnedCoins,
-          :final senderName,
-          :final senderGifterLevel,
-          :final senderAvatarUrl,
-          :final giftName,
-          :final giftIcon,
-          :final giftImageUrl,
-          :final quantity,
-        ):
+        :final summaryText,
+        :final totalEarnedCoins,
+        :final senderName,
+        :final senderGifterLevel,
+        :final senderAvatarUrl,
+        :final giftName,
+        :final giftIcon,
+        :final giftImageUrl,
+        :final quantity,
+      ):
         var session = current.session;
         if (totalEarnedCoins != null) {
           session = session.copyWith(totalEarnedCoins: totalEarnedCoins);
@@ -1185,8 +1335,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         final giftText = (summaryText != null && summaryText.isNotEmpty)
             ? summaryText
             : (senderName == null || senderName.isEmpty)
-                ? null
-                : '$senderName أرسل هدية';
+            ? null
+            : '$senderName أرسل هدية';
         final messages = giftText == null
             ? session.messages
             : [
@@ -1224,8 +1374,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           current.copyWith(
             session: current.session.copyWith(
               hourlyRank: hourlyRank ?? current.session.hourlyRank,
-              hourlyRankingLabel:
-                  label ?? current.session.hourlyRankingLabel,
+              hourlyRankingLabel: label ?? current.session.hourlyRankingLabel,
             ),
           ),
         );
@@ -1312,9 +1461,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         } catch (e) {
           if (isClosed) return;
           emit(
-            current.copyWith(
-              actionMessage: 'تعذر تبديل كاميرا LiveKit: $e',
-            ),
+            current.copyWith(actionMessage: 'تعذر تبديل كاميرا LiveKit: $e'),
           );
         }
         return;
@@ -1432,9 +1579,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     emit(
-      current.copyWith(
-        isStabilizationEnabled: !current.isStabilizationEnabled,
-      ),
+      current.copyWith(isStabilizationEnabled: !current.isStabilizationEnabled),
     );
   }
 
@@ -1518,8 +1663,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (current == null) return;
     emit(
       current.copyWith(
-        actionMessage:
-            'قائمة جهات المشاركة غير متوفرة من الـ backend بعد',
+        actionMessage: 'قائمة جهات المشاركة غير متوفرة من الـ backend بعد',
       ),
     );
   }

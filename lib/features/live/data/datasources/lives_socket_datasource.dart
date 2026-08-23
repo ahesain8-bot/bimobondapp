@@ -9,9 +9,8 @@ import '../mappers/live_session_mapper.dart';
 
 /// Socket.IO HUD client for `live_{id}` (lives/mobile-api.md §16).
 class LivesSocketDataSource {
-  LivesSocketDataSource({
-    required Future<String?> Function() idTokenProvider,
-  }) : _idTokenProvider = idTokenProvider;
+  LivesSocketDataSource({required Future<String?> Function() idTokenProvider})
+    : _idTokenProvider = idTokenProvider;
 
   final Future<String?> Function() _idTokenProvider;
 
@@ -82,7 +81,7 @@ class LivesSocketDataSource {
       socket.emit('joinUser', {});
     });
 
-    socket.on('liveComment', (data) {
+    _on(socket, 'liveComment', (data) {
       final map = _asMap(data);
       if (map == null) return;
       _controller.add(
@@ -90,7 +89,7 @@ class LivesSocketDataSource {
       );
     });
 
-    socket.on('liveCommentDeleted', (data) {
+    _on(socket, 'liveCommentDeleted', (data) {
       final map = _asMap(data);
       final id = map?['commentId']?.toString();
       if (id != null) {
@@ -98,7 +97,7 @@ class LivesSocketDataSource {
       }
     });
 
-    socket.on('liveCommentPinned', (data) {
+    _on(socket, 'liveCommentPinned', (data) {
       final map = _asMap(data);
       if (map == null) return;
       _controller.add(
@@ -106,7 +105,7 @@ class LivesSocketDataSource {
       );
     });
 
-    socket.on('liveCommentUnpinned', (data) {
+    _on(socket, 'liveCommentUnpinned', (data) {
       final map = _asMap(data);
       final id = map?['commentId']?.toString();
       if (id != null) {
@@ -114,7 +113,7 @@ class LivesSocketDataSource {
       }
     });
 
-    socket.on('liveModeration', (data) {
+    _on(socket, 'liveModeration', (data) {
       final map = _asMap(data);
       if (map == null) return;
       final type = map['type']?.toString();
@@ -129,21 +128,21 @@ class LivesSocketDataSource {
       );
     });
 
-    socket.on('liveViewers', (data) {
+    _on(socket, 'liveViewers', (data) {
       final map = _asMap(data);
       final rawViewers =
           map?['viewers'] ??
           map?['viewerCount'] ??
           map?['viewer_count'] ??
           map?['count'];
-      final viewers = _asInt(rawViewers) ??
-          (rawViewers is List ? rawViewers.length : null);
+      final viewers =
+          _asInt(rawViewers) ?? (rawViewers is List ? rawViewers.length : null);
       if (viewers != null) {
         _controller.add(LiveHudViewersEvent(viewers));
       }
     });
 
-    socket.on('userJoined', (data) {
+    _on(socket, 'userJoined', (data) {
       final map = _asMap(data);
       if (map == null) return;
       final user = _asMap(map['user']) ?? map;
@@ -152,7 +151,8 @@ class LivesSocketDataSource {
       _controller.add(
         LiveHudUserJoinedEvent(
           userId: userId,
-          username: user['username']?.toString() ??
+          username:
+              user['username']?.toString() ??
               user['fullName']?.toString() ??
               'مشاهد',
           avatarUrl:
@@ -167,7 +167,7 @@ class LivesSocketDataSource {
       );
     });
 
-    socket.on('liveLike', (data) {
+    _on(socket, 'liveLike', (data) {
       final map = _asMap(data);
       final likeCount = _asInt(map?['likeCount']);
       if (likeCount != null) {
@@ -180,7 +180,7 @@ class LivesSocketDataSource {
       }
     });
 
-    socket.on('liveEnded', (data) {
+    _on(socket, 'liveEnded', (data) {
       final map = _asMap(data);
       _controller.add(
         LiveHudEndedEvent(
@@ -195,7 +195,7 @@ class LivesSocketDataSource {
     // legacy `liveGift` alias is intentionally not consumed here: parsing
     // both would show the same gift twice and route it through the old text
     // banner path.
-    socket.on('gift_combo', (data) {
+    _on(socket, 'gift_combo', (data) {
       final map = _unwrapPayload(data);
       if (map == null) return;
       _controller.add(
@@ -208,7 +208,7 @@ class LivesSocketDataSource {
 
     // Personal room `user_*`, not the live room: an invite can land while the
     // user is watching something else entirely (mobile-api.md, Personal room).
-    socket.on('liveGuestInvite', (data) {
+    _on(socket, 'liveGuestInvite', (data) {
       final map = _asMap(data);
       final host = _asMap(map?['host']) ?? _asMap(map?['user']);
       final fullName = host?['fullName']?.toString();
@@ -217,14 +217,32 @@ class LivesSocketDataSource {
           liveId: map?['liveId']?.toString(),
           hostName: (fullName != null && fullName.trim().isNotEmpty)
               ? fullName.trim()
-              : (host?['username']?.toString() ??
-                  map?['hostName']?.toString()),
+              : (host?['username']?.toString() ?? map?['hostName']?.toString()),
           role: (map?['role'] ?? map?['guestRole'])?.toString(),
         ),
       );
     });
 
-    socket.on('liveHourlyRankUpdated', (data) {
+    // Stage changes (mobile-api.md §16): a guest was invited, joined, left,
+    // was kicked, muted or had their role changed — plus `settings` when the
+    // host edits the multi-guest policy. Without this the room never learns
+    // anyone came on stage.
+    _on(socket, 'liveGuestUpdate', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      final type = map['type']?.toString();
+      if (type == null || type.isEmpty) return;
+      _controller.add(
+        LiveHudGuestUpdateEvent(
+          type: type,
+          liveId: map['liveId']?.toString() ?? liveId,
+          guest: _asMap(map['guest']),
+          settings: _asMap(map['settings']),
+        ),
+      );
+    });
+
+    _on(socket, 'liveHourlyRankUpdated', (data) {
       final map = _asMap(data);
       final rank = _asInt(map?['hourlyRank'] ?? map?['rank']);
       _controller.add(
@@ -257,12 +275,37 @@ class LivesSocketDataSource {
     await _controller.close();
   }
 
+  /// Registers [handler] so a throw inside it is logged instead of killing
+  /// delivery. Socket.IO swallows the error, and the symptom is a feed that
+  /// silently stops updating for the rest of the session.
+  void _on(
+    io.Socket socket,
+    String event,
+    void Function(dynamic data) handler,
+  ) {
+    socket.on(event, (data) {
+      try {
+        handler(data);
+      } catch (e, stack) {
+        debugPrint('Socket.IO handler for "$event" threw: $e\n$stack');
+      }
+    });
+  }
+
+  /// Nested objects are converted too: the payload arrives as `Map<dynamic,
+  /// dynamic>` on some transports, and a shallow copy left `map['user']`
+  /// un-castable further down the mapper.
   Map<String, dynamic>? _asMap(dynamic data) {
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) {
-      return data.map((key, value) => MapEntry(key.toString(), value));
+    if (data is! Map) return null;
+    return data.map((key, value) => MapEntry(key.toString(), _deep(value)));
+  }
+
+  dynamic _deep(dynamic value) {
+    if (value is Map) {
+      return value.map((key, v) => MapEntry(key.toString(), _deep(v)));
     }
-    return null;
+    if (value is List) return value.map(_deep).toList();
+    return value;
   }
 
   Map<String, dynamic>? _unwrapPayload(dynamic data) {

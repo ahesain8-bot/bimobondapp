@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -21,7 +23,8 @@ class LiveRoomChatFeed extends StatelessWidget {
       buildWhen: (previous, current) =>
           current is LiveRoomReady &&
           (previous is! LiveRoomReady ||
-              previous.session.messages != current.session.messages),
+              previous.session.messages != current.session.messages ||
+              previous.isRealtimeConnected != current.isRealtimeConnected),
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();
@@ -35,58 +38,118 @@ class LiveRoomChatFeed extends StatelessWidget {
             break;
           }
         }
-        final maxWidth =
-            MediaQuery.sizeOf(context).width * AppSizes.roomChatMaxWidthFactor;
+        final size = MediaQuery.sizeOf(context);
+        final maxWidth = size.width * AppSizes.roomChatMaxWidthFactor;
+        final isOffline = !state.isRealtimeConnected;
 
-        return Directionality(
-          // Local override only: Arabic still shapes right-to-left inside each
-          // line, but the run itself hugs the left edge like the reference.
-          textDirection: TextDirection.ltr,
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (pinned != null) ...[
-                    _PinnedCommentBar(message: pinned),
-                    const SizedBox(height: AppSpacing.roomChatGap),
-                  ],
-                  // Laid out bottom-up so the newest line sits just above the
-                  // composer and anything older is clipped off the top, instead
-                  // of the whole 80-message backlog pushing the column over.
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight:
-                          MediaQuery.sizeOf(context).height *
-                          AppSizes.roomChatMaxHeightFactor,
-                    ),
-                    child: ShaderMask(
-                      shaderCallback: _fadeOlderLines,
-                      blendMode: BlendMode.dstIn,
-                      child: ListView.separated(
-                        reverse: true,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: EdgeInsets.zero,
-                        itemCount: messages.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: AppSpacing.roomChatGap),
-                        itemBuilder: (context, index) {
-                          final message = messages[messages.length - 1 - index];
-                          return _ChatMessageTile(message: message);
-                        },
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            // Honour whatever slot the room actually gave us. The screen
+            // fraction is only a cap now: hard-coding it overflowed the column
+            // whenever the keyboard or the effects panel took the space away.
+            final cap = size.height * AppSizes.roomChatMaxHeightFactor;
+            final listMaxHeight = constraints.hasBoundedHeight
+                ? math.min(constraints.maxHeight, cap)
+                : cap;
+
+            return Directionality(
+              // Local override only: Arabic still shapes right-to-left inside
+              // each line, but the run itself hugs the left edge like the
+              // reference.
+              textDirection: TextDirection.ltr,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Standing, not a SnackBar that flashes past: when the
+                      // HUD socket is down the feed simply stops filling, and
+                      // the host has no other way to tell that apart from
+                      // "nobody is commenting".
+                      if (isOffline) ...[
+                        const _RealtimeOfflineChip(),
+                        const SizedBox(height: AppSpacing.roomChatGap),
+                      ],
+                      if (pinned != null) ...[
+                        _PinnedCommentBar(message: pinned),
+                        const SizedBox(height: AppSpacing.roomChatGap),
+                      ],
+                      // Laid out bottom-up so the newest line sits just above
+                      // the composer, and scrollable so the backlog above it is
+                      // reachable rather than clipped away for good.
+                      Flexible(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: listMaxHeight),
+                          child: ShaderMask(
+                            shaderCallback: _fadeOlderLines,
+                            blendMode: BlendMode.dstIn,
+                            child: ListView.separated(
+                              reverse: true,
+                              shrinkWrap: true,
+                              physics: const ClampingScrollPhysics(),
+                              padding: EdgeInsets.zero,
+                              itemCount: messages.length,
+                              separatorBuilder: (_, _) => const SizedBox(
+                                height: AppSpacing.roomChatGap,
+                              ),
+                              itemBuilder: (context, index) {
+                                final message =
+                                    messages[messages.length - 1 - index];
+                                return _ChatMessageTile(message: message);
+                              },
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
+    );
+  }
+}
+
+/// Shown in place of a silent feed while the HUD socket is down, because a
+/// dropped socket and an empty room look identical from the host's seat.
+class _RealtimeOfflineChip extends StatelessWidget {
+  const _RealtimeOfflineChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xCCB3261E),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Directionality(
+          textDirection: TextDirection.rtl,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_off, size: 13, color: Colors.white),
+              SizedBox(width: 6),
+              Text(
+                'الاتصال المباشر منقطع — التعليقات لن تصل',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -21,9 +21,9 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required LivesRemoteDataSource remote,
     required LivesSocketDataSource socket,
     required LivesMediaDataSource media,
-  })  : _remote = remote,
-        _socket = socket,
-        _media = media;
+  }) : _remote = remote,
+       _socket = socket,
+       _media = media;
 
   final LivesRemoteDataSource _remote;
   final LivesSocketDataSource _socket;
@@ -37,6 +37,9 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
 
   @override
   Object? get localPreviewTrack => _media.localVideoTrack;
+
+  @override
+  Object? get mediaRoom => _media.room;
 
   @override
   Future<LiveSession> startHostSession({required String title}) async {
@@ -137,9 +140,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       return raw
           .whereType<Map>()
           .map(
-            (e) => LiveSessionMapper.commentFromJson(
-              Map<String, dynamic>.from(e),
-            ),
+            (e) =>
+                LiveSessionMapper.commentFromJson(Map<String, dynamic>.from(e)),
           )
           .toList(growable: false)
           .reversed
@@ -154,10 +156,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required String liveId,
     required String content,
   }) async {
-    final json = await _remote.sendComment(
-      liveId: liveId,
-      content: content,
-    );
+    final json = await _remote.sendComment(liveId: liveId, content: content);
     final map = (json['id'] != null)
         ? json
         : (json['data'] as Map<String, dynamic>? ?? json);
@@ -173,10 +172,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> pinComment({
-    required String liveId,
-    required String commentId,
-  }) {
+  Future<void> pinComment({required String liveId, required String commentId}) {
     return _remote.pinComment(liveId: liveId, commentId: commentId);
   }
 
@@ -219,10 +215,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> unbanViewer({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> unbanViewer({required String liveId, required String userId}) {
     return _remote.unbanViewer(liveId: liveId, userId: userId);
   }
 
@@ -326,9 +319,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     return raw
         .whereType<Map>()
         .map(
-          (e) => LiveHostExtrasMapper.guestFromJson(
-            Map<String, dynamic>.from(e),
-          ),
+          (e) =>
+              LiveHostExtrasMapper.guestFromJson(Map<String, dynamic>.from(e)),
         )
         .toList(growable: false);
   }
@@ -343,42 +335,48 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> acceptGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<LiveGuestStageCredentials> acceptGuestInvite(String liveId) async {
+    final json = await _remote.acceptGuestInvite(liveId);
+    return _stageCredentials(json);
+  }
+
+  @override
+  Future<void> leaveGuestStage(String liveId) =>
+      _remote.leaveGuestStage(liveId);
+
+  /// `{ guest, token, url, role }`, sometimes wrapped in `data`.
+  LiveGuestStageCredentials _stageCredentials(Map<String, dynamic> json) {
+    final inner = json['data'];
+    final source = inner is Map ? Map<String, dynamic>.from(inner) : json;
+    return LiveGuestStageCredentials(
+      token: source['token']?.toString() ?? '',
+      url: source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '',
+      role: source['role']?.toString() ?? 'GUEST',
+    );
+  }
+
+  @override
+  Future<void> acceptGuest({required String liveId, required String userId}) {
     return _remote.acceptGuest(liveId: liveId, userId: userId);
   }
 
   @override
-  Future<void> rejectGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> rejectGuest({required String liveId, required String userId}) {
     return _remote.rejectGuest(liveId: liveId, userId: userId);
   }
 
   @override
-  Future<void> kickGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> kickGuest({required String liveId, required String userId}) {
     return _remote.kickGuest(liveId: liveId, userId: userId);
   }
 
   @override
-  Future<void> muteGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> muteGuest({required String liveId, required String userId}) {
     return _remote.muteGuest(liveId: liveId, userId: userId);
   }
 
   @override
-  Future<void> unmuteGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> unmuteGuest({required String liveId, required String userId}) {
     return _remote.unmuteGuest(liveId: liveId, userId: userId);
   }
 
@@ -399,18 +397,12 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> promoteGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> promoteGuest({required String liveId, required String userId}) {
     return _remote.promoteGuest(liveId: liveId, userId: userId);
   }
 
   @override
-  Future<void> demoteGuest({
-    required String liveId,
-    required String userId,
-  }) {
+  Future<void> demoteGuest({required String liveId, required String userId}) {
     return _remote.demoteGuest(liveId: liveId, userId: userId);
   }
 
@@ -426,26 +418,11 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       final score = _asInt(map['hourlyScore'] ?? map['score']);
       final coins = _asInt(map['hourlyCoins'] ?? map['coins']);
       if (rank != null) {
-        return (
-          rank: rank,
-          label: 'ترتيب #$rank',
-          score: score,
-          coins: coins,
-        );
+        return (rank: rank, label: 'ترتيب #$rank', score: score, coins: coins);
       }
-      return (
-        rank: null,
-        label: 'ترتيب كل ساعة',
-        score: score,
-        coins: coins,
-      );
+      return (rank: null, label: 'ترتيب كل ساعة', score: score, coins: coins);
     } catch (_) {
-      return (
-        rank: null,
-        label: 'ترتيب كل ساعة',
-        score: null,
-        coins: null,
-      );
+      return (rank: null, label: 'ترتيب كل ساعة', score: null, coins: null);
     }
   }
 
@@ -506,16 +483,14 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     return raw
         .whereType<Map>()
         .map(
-          (e) => LiveHostExtrasMapper.viewerFromJson(
-            Map<String, dynamic>.from(e),
-          ),
+          (e) =>
+              LiveHostExtrasMapper.viewerFromJson(Map<String, dynamic>.from(e)),
         )
         .toList(growable: false);
   }
 
   @override
-  Future<void> connectRealtime(String liveId) =>
-      _socket.connectAndJoin(liveId);
+  Future<void> connectRealtime(String liveId) => _socket.connectAndJoin(liveId);
 
   @override
   Future<void> disconnectRealtime() => _socket.disconnect();
@@ -525,20 +500,17 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required String url,
     required String token,
     bool useFrontCamera = true,
-  }) =>
-      _media.connectAndPublish(
-        url: url,
-        token: token,
-        cameraPosition:
-            useFrontCamera ? CameraPosition.front : CameraPosition.back,
-      );
+  }) => _media.connectAndPublish(
+    url: url,
+    token: token,
+    cameraPosition: useFrontCamera ? CameraPosition.front : CameraPosition.back,
+  );
 
   @override
   Future<void> connectMediaSubscribe({
     required String url,
     required String token,
-  }) =>
-      _media.connectAndSubscribe(url: url, token: token);
+  }) => _media.connectAndSubscribe(url: url, token: token);
 
   @override
   Future<void> disconnectMedia() => _media.disconnect();

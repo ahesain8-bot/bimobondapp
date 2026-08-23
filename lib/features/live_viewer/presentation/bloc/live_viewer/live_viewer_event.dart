@@ -150,3 +150,28 @@ class LiveViewerSendStateChanged extends LiveViewerEvent {
   @override
   List<Object?> get props => [isSending];
 }
+
+/// Viewer asked the host to come on stage (`POST …/guests/request`).
+class LiveViewerGuestSeatRequested extends LiveViewerEvent {
+  const LiveViewerGuestSeatRequested();
+}
+
+/// Viewer answered an invite addressed to them.
+class LiveViewerGuestInviteAnswered extends LiveViewerEvent {
+  const LiveViewerGuestInviteAnswered({required this.accepted});
+
+  final bool accepted;
+
+  @override
+  List<Object?> get props => [accepted];
+}
+
+/// Viewer stepped off the stage and went back to watching.
+class LiveViewerLeftStage extends LiveViewerEvent {
+  const LiveViewerLeftStage();
+}
+
+/// Re-reads the stage roster (`GET /lives/:id/guests`).
+class LiveViewerGuestsRefreshed extends LiveViewerEvent {
+  const LiveViewerGuestsRefreshed();
+}
