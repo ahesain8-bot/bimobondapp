@@ -16,6 +16,7 @@ import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 
 class ProfileHeaderSection extends StatelessWidget {
   const ProfileHeaderSection({
@@ -302,18 +303,26 @@ class ProfileHeaderSection extends StatelessWidget {
                   return GestureDetector(
                     onTap: () async {
                       List<PostEntity> highlightPosts = [];
-                      if (h.stories.isNotEmpty) {
-                        highlightPosts =
-                            h.stories.map((s) => s.toPostEntity()).toList();
-                      } else {
-                        try {
-                          final fullHighlight =
-                              await ProfileRemoteDataSourceImpl()
-                                  .getHighlightById(h.id);
+                      PopupDialogs.showLoadingDialog(context);
+                      try {
+                        final fullHighlight =
+                            await ProfileRemoteDataSourceImpl()
+                                .getHighlightById(h.id);
+                        if (fullHighlight.stories.isNotEmpty) {
                           highlightPosts = fullHighlight.stories
                               .map((s) => s.toPostEntity())
                               .toList();
-                        } catch (_) {}
+                        } else {
+                          highlightPosts =
+                              h.stories.map((s) => s.toPostEntity()).toList();
+                        }
+                      } catch (_) {
+                        highlightPosts =
+                            h.stories.map((s) => s.toPostEntity()).toList();
+                      } finally {
+                        if (context.mounted) {
+                          PopupDialogs.hideLoadingDialog(context);
+                        }
                       }
 
                       if (highlightPosts.isNotEmpty && context.mounted) {

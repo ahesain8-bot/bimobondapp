@@ -1,5 +1,4 @@
 import 'package:bimobondapp/app/auth/domain/entities/profile_enums.dart';
-import 'package:bimobondapp/app/stories/domain/entities/story_entities.dart';
 import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/data/models/post_model.dart';
@@ -227,23 +226,39 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     List<String> storyIds,
   ) async {
     final opts = await _authOptions();
-    final res = await dio.post(
-      '/stories/highlights/$highlightId/stories/bulk',
-      data: {'storyIds': storyIds},
-      options: opts,
-    );
-    final data = res.data;
-    Map<String, dynamic> map = {};
-    if (data is Map) {
-      if (data['data'] is Map) {
-        map = Map<String, dynamic>.from(data['data']);
-      } else if (data['highlight'] is Map) {
-        map = Map<String, dynamic>.from(data['highlight']);
-      } else {
-        map = Map<String, dynamic>.from(data);
+    try {
+      final res = await dio.post(
+        '/stories/highlights/$highlightId/stories/bulk',
+        data: {'storyIds': storyIds},
+        options: opts,
+      );
+      final data = res.data;
+      Map<String, dynamic> map = {};
+      if (data is Map) {
+        if (data['data'] is Map) {
+          map = Map<String, dynamic>.from(data['data']);
+        } else if (data['highlight'] is Map) {
+          map = Map<String, dynamic>.from(data['highlight']);
+        } else {
+          map = Map<String, dynamic>.from(data);
+        }
+      }
+      final parsed = HighlightEntity.fromJson(map);
+      if (parsed.stories.isNotEmpty) {
+        return parsed;
+      }
+    } catch (e) {
+      debugPrint('[ProfileRemoteDS] addBulkStoriesToHighlight bulk failed: $e, falling back to sequential add');
+    }
+
+    for (int i = 0; i < storyIds.length; i++) {
+      try {
+        await addStoryToHighlight(highlightId, storyIds[i], sortOrder: i);
+      } catch (e) {
+        debugPrint('[ProfileRemoteDS] addStoryToHighlight fallback failed for ${storyIds[i]}: $e');
       }
     }
-    return HighlightEntity.fromJson(map);
+    return getHighlightById(highlightId);
   }
 
   @override

@@ -572,9 +572,13 @@ class AppRouter {
             final stories = extra['stories'];
             final initialIndex = extra['initialIndex'] as int? ?? 0;
             if (stories is List<PostEntity>) {
+              final highlightId = extra['highlightId'] as String?;
+              final highlightTitle = extra['highlightTitle'] as String?;
               return StoriesViewerScreen(
                 stories: stories,
                 initialIndex: initialIndex,
+                highlightId: highlightId,
+                highlightTitle: highlightTitle,
               );
             }
           }

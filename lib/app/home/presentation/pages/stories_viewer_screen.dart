@@ -87,7 +87,9 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
   @override
   void initState() {
     super.initState();
-    _stories = onlyStoryPosts(widget.stories);
+    _stories = widget.highlightId != null
+        ? List<PostEntity>.from(widget.stories)
+        : onlyStoryPosts(widget.stories);
     _engagement = {
       for (final s in _stories)
         s.id: _StoryLocalEngagement(
@@ -234,7 +236,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     });
 
     final post = _stories[index];
-    if (!isStoryStillActive(post)) {
+    if (widget.highlightId == null && !isStoryStillActive(post)) {
       _removeStoryAt(index);
       return;
     }
@@ -854,7 +856,11 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            formatStoryTimeAgo(post, l10n),
+                            formatStoryTimeAgo(
+                              post,
+                              l10n,
+                              isHighlight: widget.highlightId != null,
+                            ),
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.75),
                               fontSize: 11,

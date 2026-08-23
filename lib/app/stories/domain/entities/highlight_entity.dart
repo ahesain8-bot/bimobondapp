@@ -24,14 +24,25 @@ class HighlightEntity extends Equatable {
     final rawCover = json['coverUrl'] ?? json['cover_url'] ?? json['cover'] ?? json['thumbnailUrl'];
 
     List<StoryEntity> items = [];
-    final storiesRaw = json['stories'] ?? json['items'] ?? json['data'];
+    final storiesRaw = json['stories'] ??
+        json['items'] ??
+        json['highlightStories'] ??
+        json['data'];
     if (storiesRaw is List) {
       items = storiesRaw
           .whereType<Map>()
           .map((m) {
-            final storyMap = Map<String, dynamic>.from(m['story'] ?? m);
+            final rawMap = Map<String, dynamic>.from(m);
+            final inner = rawMap['story'] ?? rawMap['post'];
+            final storyMap = inner is Map
+                ? Map<String, dynamic>.from(inner)
+                : rawMap;
+            if (storyMap['id'] == null && rawMap['storyId'] != null) {
+              storyMap['id'] = rawMap['storyId'];
+            }
             return StoryEntity.fromJson(storyMap);
           })
+          .where((s) => s.id.isNotEmpty)
           .toList();
     }
 

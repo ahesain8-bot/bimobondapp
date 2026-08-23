@@ -1154,35 +1154,40 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                         displayImage = h.stories.first.thumbnailUrl ??
                                             h.stories.first.videoUrl;
                                       }
-
                                       return GestureDetector(
                                         onLongPress: _isSelf
                                             ? () => _showHighlightOptions(h)
                                             : null,
                                         onTap: () async {
                                           List<PostEntity> highlightPosts = [];
-                                          if (h.stories.isNotEmpty) {
-                                            highlightPosts = h.stories
-                                                .map((s) => s.toPostEntity())
-                                                .toList();
-                                          } else {
-                                            PopupDialogs.showLoadingDialog(context);
-                                            try {
-                                              final fullHighlight =
-                                                  await _profileRemoteDS
-                                                      .getHighlightById(h.id);
+                                          PopupDialogs.showLoadingDialog(context);
+                                          try {
+                                            final fullHighlight =
+                                                await _profileRemoteDS
+                                                    .getHighlightById(h.id);
+                                            if (fullHighlight.stories.isNotEmpty) {
                                               highlightPosts = fullHighlight.stories
                                                   .map((s) => s.toPostEntity())
                                                   .toList();
-                                            } catch (_) {
-                                            } finally {
-                                              if (mounted) {
-                                                PopupDialogs.hideLoadingDialog(context);
-                                              }
+                                            } else {
+                                              highlightPosts = h.stories
+                                                  .map((s) => s.toPostEntity())
+                                                  .toList();
+                                            }
+                                          } catch (_) {
+                                            highlightPosts = h.stories
+                                                .map((s) => s.toPostEntity())
+                                                .toList();
+                                          } finally {
+                                            if (mounted) {
+                                              PopupDialogs.hideLoadingDialog(
+                                                context,
+                                              );
                                             }
                                           }
 
-                                          if (highlightPosts.isNotEmpty && mounted) {
+                                          if (highlightPosts.isNotEmpty &&
+                                              mounted) {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
