@@ -356,6 +356,9 @@ class _LiveRoomBody extends StatelessWidget {
             // camera, and as soon as someone else is publishing it becomes the
             // shared split box under the header.
             LiveRoomStage(
+              // Header + info row, measured off the same tokens they are built
+              // from, so the stage sits under them on every screen instead of
+              // trusting one hard-coded offset.
               topInset:
                   MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
             ),

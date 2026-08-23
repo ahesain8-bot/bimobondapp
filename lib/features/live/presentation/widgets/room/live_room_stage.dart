@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -13,6 +15,10 @@ import 'live_room_camera_layer.dart';
 /// stage, matched to the TikTok reference: the two feeds sit side by side in a
 /// landscape-ish box under the header rather than filling the screen.
 const double kStageAspect = 1.35;
+
+/// The most of the space below the header the stage may claim, so the chat
+/// feed and the bottom bars always keep room on a short screen.
+const double kStageMaxHeightFactor = 0.52;
 
 /// Gap and corner radius between stage tiles.
 const double _tileGap = 2;
@@ -46,8 +52,15 @@ class LiveRoomStage extends StatelessWidget {
         // Nobody else on stage: the camera keeps the whole screen.
         if (guests.isEmpty) return const LiveRoomCameraLayer();
 
-        final width = MediaQuery.sizeOf(context).width;
+        final size = MediaQuery.sizeOf(context);
         final room = context.read<LiveSessionRepository>().mediaRoom;
+
+        // Never taller than the room actually has. On a short phone the
+        // reference aspect alone would push the stage under the chat feed and
+        // the bars, so height gives way and the box narrows to keep the ratio.
+        final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
+        final height = math.min(size.width / kStageAspect, maxHeight);
+        final width = math.min(size.width, height * kStageAspect);
 
         return Align(
           alignment: Alignment.topCenter,
@@ -55,7 +68,7 @@ class LiveRoomStage extends StatelessWidget {
             padding: EdgeInsets.only(top: topInset),
             child: SizedBox(
               width: width,
-              height: width / kStageAspect,
+              height: height,
               child: LiveRoomStageTiles(
                 tiles: [
                   const _StageTile(child: LiveRoomCameraLayer()),
