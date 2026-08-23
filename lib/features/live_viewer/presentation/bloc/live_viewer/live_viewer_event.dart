@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../domain/entities/live_entity.dart';
 
 abstract class LiveViewerEvent extends Equatable {
@@ -44,14 +44,17 @@ class LiveViewerLiked extends LiveViewerEvent {
   List<Object?> get props => [burst];
 }
 
-class LiveViewerGiftSent extends LiveViewerEvent {
-  final GiftEntity gift;
-  final int quantity;
+class LiveViewerGiftBalanceRefreshRequested extends LiveViewerEvent {
+  const LiveViewerGiftBalanceRefreshRequested();
+}
 
-  const LiveViewerGiftSent(this.gift, {this.quantity = 1});
+class LiveViewerGiftComboReceived extends LiveViewerEvent {
+  final GiftComboPayload payload;
+
+  const LiveViewerGiftComboReceived(this.payload);
 
   @override
-  List<Object?> get props => [gift, quantity];
+  List<Object?> get props => [payload];
 }
 
 class LiveViewerFollowToggled extends LiveViewerEvent {
@@ -146,4 +149,29 @@ class LiveViewerSendStateChanged extends LiveViewerEvent {
 
   @override
   List<Object?> get props => [isSending];
+}
+
+/// Viewer asked the host to come on stage (`POST …/guests/request`).
+class LiveViewerGuestSeatRequested extends LiveViewerEvent {
+  const LiveViewerGuestSeatRequested();
+}
+
+/// Viewer answered an invite addressed to them.
+class LiveViewerGuestInviteAnswered extends LiveViewerEvent {
+  const LiveViewerGuestInviteAnswered({required this.accepted});
+
+  final bool accepted;
+
+  @override
+  List<Object?> get props => [accepted];
+}
+
+/// Viewer stepped off the stage and went back to watching.
+class LiveViewerLeftStage extends LiveViewerEvent {
+  const LiveViewerLeftStage();
+}
+
+/// Re-reads the stage roster (`GET /lives/:id/guests`).
+class LiveViewerGuestsRefreshed extends LiveViewerEvent {
+  const LiveViewerGuestsRefreshed();
 }

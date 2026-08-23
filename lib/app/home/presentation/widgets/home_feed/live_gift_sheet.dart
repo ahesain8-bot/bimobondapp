@@ -747,7 +747,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
     final ordered = _orderedCatalog;
     return GridView.builder(
       physics: const BouncingScrollPhysics(),
-      clipBehavior: Clip.none,
+      clipBehavior: Clip.hardEdge,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: LiveDetailsLayoutConstants.giftGridCrossCount,

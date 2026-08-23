@@ -34,7 +34,12 @@ class TikTokLiveTopBar extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
+        padding: const EdgeInsets.fromLTRB(
+          TikTokLiveTokens.topInsetH,
+          TikTokLiveTokens.topInsetV,
+          TikTokLiveTokens.topInsetH,
+          0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -52,9 +57,23 @@ class TikTokLiveTopBar extends StatelessWidget {
                 const SizedBox(width: 4),
                 GestureDetector(
                   onTap: onClose,
-                  child: const Padding(
-                    padding: EdgeInsets.all(2),
-                    child: Icon(Icons.close, color: Colors.white, size: 22),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: TikTokLiveTokens.closeIcon,
+                    height: TikTokLiveTokens.closeIcon,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.42),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],
@@ -84,31 +103,44 @@ class _HostPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 36,
-      padding: const EdgeInsets.fromLTRB(3, 3, 3, 3),
+      height: TikTokLiveTokens.hostPillH,
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          colors: [
+            Colors.black.withValues(alpha: 0.72),
+            Colors.black.withValues(alpha: 0.42),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(TikTokLiveTokens.hostPillR),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           ClipOval(
             child: SizedBox(
-              width: 30,
-              height: 30,
+                width: TikTokLiveTokens.hostAvatar,
+                height: TikTokLiveTokens.hostAvatar,
               child: CachedNetworkImage(
                 imageUrl: live.hostAvatar ?? '',
                 fit: BoxFit.cover,
                 placeholder: (_, __) => FallbackAvatar(
                   seed: live.hostId,
                   name: live.hostName,
-                  radius: 15,
+                  radius: TikTokLiveTokens.hostAvatar / 2,
                 ),
                 errorWidget: (_, __, ___) => FallbackAvatar(
                   seed: live.hostId,
                   name: live.hostName,
-                  radius: 15,
+                  radius: TikTokLiveTokens.hostAvatar / 2,
                 ),
               ),
             ),
@@ -145,7 +177,7 @@ class _HostPill extends StatelessWidget {
                     const SizedBox(width: 2),
                     // Screenshots: white heart next to like count
                     Icon(
-                      Icons.favorite,
+                      Icons.favorite_rounded,
                       size: 10,
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -159,14 +191,17 @@ class _HostPill extends StatelessWidget {
             onTap: onFollow,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
-              height: 24,
+              height: TikTokLiveTokens.followH,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: live.isFollowing
                     ? Colors.white.withValues(alpha: 0.18)
                     : const Color(0xFFFE2C55),
-                borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(TikTokLiveTokens.followR),
+              border: live.isFollowing
+                  ? Border.all(color: Colors.white.withValues(alpha: 0.24))
+                  : null,
               ),
               child: live.isFollowing
                   ? const Text(
@@ -224,11 +259,12 @@ class _ViewerCountPill extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 28,
+        height: 30,
         padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.42),
-          borderRadius: BorderRadius.circular(14),
+          color: Colors.black.withValues(alpha: 0.48),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -552,10 +588,11 @@ class _Pill extends StatelessWidget {
       height: 20,
       padding: const EdgeInsets.symmetric(horizontal: 7),
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.40),
-        borderRadius: BorderRadius.circular(10),
-      ),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.44),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
       child: child,
     );
   }
@@ -724,9 +761,20 @@ class TikTokLiveBottomBar extends StatelessWidget {
       top: false,
       minimum: const EdgeInsets.only(bottom: 16),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-        child: SizedBox(
-          height: 42,
+        padding: const EdgeInsets.fromLTRB(
+          TikTokLiveTokens.bottomInsetH,
+          0,
+          TikTokLiveTokens.bottomInsetH,
+          TikTokLiveTokens.bottomInsetV,
+        ),
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.34),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -757,7 +805,7 @@ class TikTokLiveBottomBar extends StatelessWidget {
                             'Write...',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.55),
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w400,
                               height: 1.1,
                             ),
@@ -776,8 +824,11 @@ class TikTokLiveBottomBar extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
+                    color: Colors.white.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
                   ),
                   child: const Icon(
                     Icons.emoji_emotions_outlined,
@@ -820,10 +871,19 @@ class TikTokLiveBottomBar extends StatelessWidget {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: onGiftTap,
-                child: const Icon(
-                  Icons.card_giftcard,
-                  color: Color(0xFFFF2D55),
-                  size: 30,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF2D55),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.card_giftcard_rounded,
+                    color: Colors.white,
+                    size: 23,
+                  ),
                 ),
               ),
               if (onRoseTap != null) ...[

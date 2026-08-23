@@ -22,13 +22,13 @@ class LiveRoomProfilePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LiveRoomPill(
-      height: 40,
-      padding: const EdgeInsetsDirectional.only(start: 3, end: 10),
+      height: 42,
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           _HostAvatar(host: host),
-          const SizedBox(width: 6),
+          const SizedBox(width: 7),
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -38,7 +38,7 @@ class LiveRoomProfilePill extends StatelessWidget {
                 child: Text(
                   host.displayName,
                   style: AppTextStyles.roomHostName.copyWith(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     height: 1.1,
                   ),
                   maxLines: 1,
@@ -90,14 +90,14 @@ class _HostAvatar extends StatelessWidget {
       height: AppSizes.roomAvatar,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 0.8),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.9),
+          width: 1.2,
+        ),
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            AppColors.hostAvatarStart,
-            AppColors.hostAvatarEnd,
-          ],
+          colors: [AppColors.hostAvatarStart, AppColors.hostAvatarEnd],
         ),
         image: host.avatarUrl != null
             ? DecorationImage(
@@ -112,10 +112,7 @@ class _HostAvatar extends StatelessWidget {
 
 /// Orange heart likes chip that sits beside the profile pill.
 class LiveRoomLikesPill extends StatelessWidget {
-  const LiveRoomLikesPill({
-    super.key,
-    required this.likeCount,
-  });
+  const LiveRoomLikesPill({super.key, required this.likeCount});
 
   final int likeCount;
 
@@ -125,21 +122,17 @@ class LiveRoomLikesPill extends StatelessWidget {
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: AppColors.overlayPill,
+        color: const Color(0xA6000000),
         borderRadius: BorderRadius.circular(AppSizes.radiusPill),
         border: Border.all(
-          color: AppColors.heartOrange.withValues(alpha: 0.85),
-          width: 1.2,
+          color: const Color(0xFFFF2D55).withValues(alpha: 0.78),
+          width: 1.0,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(
-            AppAssets.roomHeart,
-            width: 13,
-            height: 12,
-          ),
+          SvgPicture.asset(AppAssets.roomHeart, width: 14, height: 13),
           const SizedBox(width: 4),
           Text(
             '$likeCount',

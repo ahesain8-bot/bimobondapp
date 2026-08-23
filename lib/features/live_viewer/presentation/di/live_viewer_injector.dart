@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:get_it/get_it.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../core/network/live_api_client.dart';
 import '../../data/datasources/http_live_remote_datasource.dart';
 import '../../data/datasources/live_remote_datasource.dart';
 import '../../data/repositories/fake_live_repository.dart';
 import '../../data/repositories/real_comment_repository.dart';
 import '../../data/repositories/real_gift_repository.dart';
+import '../../data/repositories/real_guest_repository.dart';
 import '../../data/repositories/real_like_repository.dart';
 import '../../data/services/fake_livekit_service.dart';
 import '../../data/services/fake_socket_service.dart';
@@ -13,6 +15,7 @@ import '../../data/services/real_livekit_service.dart';
 import '../../data/services/real_socket_service.dart';
 import '../../domain/repositories/comment_repository.dart';
 import '../../domain/repositories/gift_repository.dart';
+import '../../domain/repositories/guest_repository.dart';
 import '../../domain/repositories/like_repository.dart';
 import '../../domain/repositories/live_repository.dart';
 import '../../domain/usecases/ban_viewer_usecase.dart';
@@ -22,7 +25,6 @@ import '../../domain/usecases/join_live_usecase.dart';
 import '../../domain/usecases/leave_live_usecase.dart';
 import '../../domain/usecases/like_live_usecase.dart';
 import '../../domain/usecases/mute_viewer_chat_usecase.dart';
-import '../../domain/usecases/send_gift_usecase.dart';
 import '../../domain/usecases/unban_viewer_usecase.dart';
 import '../../domain/usecases/unmute_viewer_chat_usecase.dart';
 import '../bloc/live_feed/live_feed_bloc.dart';
@@ -59,6 +61,10 @@ Future<void> initLiveViewer() async {
 
   sl.registerLazySingleton<LiveRepository>(() => FakeLiveRepository(sl()));
 
+  sl.registerLazySingleton<GuestRepository>(
+    () => RealGuestRepository(apiClient: sl()),
+  );
+
   sl.registerLazySingleton<CommentRepository>(
     () => RealCommentRepository(apiClient: sl(), socket: sl()),
   );
@@ -75,7 +81,6 @@ Future<void> initLiveViewer() async {
   sl.registerLazySingleton(() => JoinLiveUseCase(sl()));
   sl.registerLazySingleton(() => LeaveLiveUseCase(sl()));
   sl.registerLazySingleton(() => LikeLiveUseCase(sl()));
-  sl.registerLazySingleton(() => SendGiftUseCase(sl()));
   sl.registerLazySingleton(() => BanViewerUseCase(sl()));
   sl.registerLazySingleton(() => UnbanViewerUseCase(sl()));
   sl.registerLazySingleton(() => MuteViewerChatUseCase(sl()));
@@ -89,7 +94,7 @@ Future<void> initLiveViewer() async {
       joinLiveUseCase: sl(),
       leaveLiveUseCase: sl(),
       likeLiveUseCase: sl(),
-      sendGiftUseCase: sl(),
+      giftSocketService: sl<AuctionSocketService>(),
       banViewerUseCase: sl(),
       unbanViewerUseCase: sl(),
       muteViewerChatUseCase: sl(),
@@ -101,6 +106,7 @@ Future<void> initLiveViewer() async {
       likeRepository: sl(),
       socketService: sl(),
       liveKitService: sl(),
+      guestRepository: sl(),
       apiClient: sl(),
     ),
   );

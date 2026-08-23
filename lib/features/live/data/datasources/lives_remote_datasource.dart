@@ -4,7 +4,7 @@ import '../../../../core/network/live_api_client.dart';
 /// HTTP access to `/lives` and `/gifts` endpoints documented in mobile-api.md.
 class LivesRemoteDataSource {
   LivesRemoteDataSource({LiveApiClient? apiClient})
-      : _api = apiClient ?? LiveApiClient();
+    : _api = apiClient ?? LiveApiClient();
 
   final LiveApiClient _api;
 
@@ -68,16 +68,10 @@ class LivesRemoteDataSource {
   }
 
   /// `GET /lives/mine` → `{ data, meta }` (all statuses for the caller).
-  Future<Map<String, dynamic>> mine({
-    int page = 1,
-    int limit = 20,
-  }) {
+  Future<Map<String, dynamic>> mine({int page = 1, int limit = 20}) {
     return _api.get(
       ApiEndpoints.livesMine,
-      query: {
-        'page': '$page',
-        'limit': '$limit',
-      },
+      query: {'page': '$page', 'limit': '$limit'},
     );
   }
 
@@ -116,10 +110,7 @@ class LivesRemoteDataSource {
   }) {
     return _api.get(
       ApiEndpoints.liveComments(liveId),
-      query: {
-        'page': '$page',
-        'limit': '$limit',
-      },
+      query: {'page': '$page', 'limit': '$limit'},
     );
   }
 
@@ -151,9 +142,7 @@ class LivesRemoteDataSource {
   }) {
     return _api.post(
       ApiEndpoints.liveViewerMuteChat(liveId, userId),
-      body: {
-        if (reason != null && reason.isNotEmpty) 'reason': reason,
-      },
+      body: {if (reason != null && reason.isNotEmpty) 'reason': reason},
     );
   }
 
@@ -171,9 +160,7 @@ class LivesRemoteDataSource {
   }) {
     return _api.post(
       ApiEndpoints.liveViewerBan(liveId, userId),
-      body: {
-        if (reason != null && reason.isNotEmpty) 'reason': reason,
-      },
+      body: {if (reason != null && reason.isNotEmpty) 'reason': reason},
     );
   }
 
@@ -220,11 +207,23 @@ class LivesRemoteDataSource {
   }) {
     return _api.post(
       ApiEndpoints.liveGuestInvite(liveId),
-      body: {
-        'userId': userId,
-        'role': role,
-      },
+      body: {'userId': userId, 'role': role},
     );
+  }
+
+  /// Invitee accepts their own invite → `{ guest, token, url, role }`.
+  Future<Map<String, dynamic>> acceptGuestInvite(String liveId) {
+    return _api.post(ApiEndpoints.liveGuestAcceptInvite(liveId));
+  }
+
+  /// Viewer asks to come on stage → `{ guest }`.
+  Future<Map<String, dynamic>> requestGuestSeat(String liveId) {
+    return _api.post(ApiEndpoints.liveGuestRequest(liveId));
+  }
+
+  /// Active guest steps off the stage.
+  Future<Map<String, dynamic>> leaveGuestStage(String liveId) {
+    return _api.post(ApiEndpoints.liveGuestLeave(liveId));
   }
 
   Future<Map<String, dynamic>> acceptGuest({
@@ -309,11 +308,7 @@ class LivesRemoteDataSource {
   }) {
     return _api.get(
       ApiEndpoints.liveViewers(liveId),
-      query: {
-        'page': '$page',
-        'limit': '$limit',
-        'activeOnly': '$activeOnly',
-      },
+      query: {'page': '$page', 'limit': '$limit', 'activeOnly': '$activeOnly'},
     );
   }
 

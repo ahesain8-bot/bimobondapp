@@ -120,57 +120,86 @@ class RealSocketService implements SocketService {
       }
     });
 
-    socket.on('liveComment', (data) {
+    _on(socket, 'liveComment', (data) {
       final event = SocketMapper.commentEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveCommentDeleted', (data) {
+    _on(socket, 'liveCommentDeleted', (data) {
       final event = SocketMapper.commentDeletedEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveCommentPinned', (data) {
+    _on(socket, 'liveCommentPinned', (data) {
       final event = SocketMapper.commentPinnedEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveCommentUnpinned', (data) {
+    _on(socket, 'liveCommentUnpinned', (data) {
       final event = SocketMapper.commentUnpinnedEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveModeration', (data) {
+    _on(socket, 'liveModeration', (data) {
       final event = SocketMapper.moderationEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveGift', (data) {
+    _on(socket, 'liveGift', (data) {
       final event = SocketMapper.giftEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveLike', (data) {
+    _on(socket, 'liveLike', (data) {
       final event = SocketMapper.likeEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveViewers', (data) {
+    _on(socket, 'liveViewers', (data) {
       final event = SocketMapper.viewersEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('liveEnded', (data) {
+    _on(socket, 'liveEnded', (data) {
       final event = SocketMapper.endedEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
-    socket.on('userJoined', (data) {
+    _on(socket, 'userJoined', (data) {
       final event = SocketMapper.userJoinedEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
+    // Stage events. The invite rides the personal `user_*` room, the update
+    // rides `live_{id}` — neither was listened for, so a viewer could be put on
+    // stage by the host and never find out.
+    _on(socket, 'liveGuestInvite', (data) {
+      final event = SocketMapper.guestInviteEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveGuestUpdate', (data) {
+      final event = SocketMapper.guestUpdateEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
     socket.connect();
+  }
+
+  /// Registers [handler] so a throw inside it is logged instead of silently
+  /// ending delivery for that event.
+  void _on(
+    io.Socket socket,
+    String event,
+    void Function(dynamic data) handler,
+  ) {
+    socket.on(event, (data) {
+      try {
+        handler(data);
+      } catch (e, stack) {
+        debugPrint('⚠️ Live viewer socket "$event" handler threw: $e\n$stack');
+      }
+    });
   }
 
   @override

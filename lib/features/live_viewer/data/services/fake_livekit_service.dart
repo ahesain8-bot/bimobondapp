@@ -31,6 +31,24 @@ abstract class LiveKitService {
 
   Future<void> disconnect();
   Future<void> reconnect();
+
+  /// Whether this device is publishing camera/mic into the room right now.
+  bool get isPublishing => false;
+
+  /// Re-joins the room with the publish credentials the server issued when the
+  /// guest was accepted, then turns the camera and mic on. Subscribe-only
+  /// tokens cannot publish, so this always reconnects rather than upgrading
+  /// the existing connection in place.
+  Future<void> joinStage({
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    throw UnsupportedError('joinStage is not supported by this service');
+  }
+
+  /// Stops publishing but stays in the room as a viewer.
+  Future<void> leaveStage() async {}
 }
 
 /// Simulates LiveKit join / leave / reconnect with realistic delays.
@@ -45,6 +63,25 @@ class FakeLiveKitService implements LiveKitService {
 
   @override
   Room? get room => null;
+
+  var _publishing = false;
+
+  @override
+  bool get isPublishing => _publishing;
+
+  @override
+  Future<void> joinStage({
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    _publishing = true;
+  }
+
+  @override
+  Future<void> leaveStage() async {
+    _publishing = false;
+  }
 
   /// Public sample MP4 used as the mock "live" video source.
   static const defaultMockStreamUrl =

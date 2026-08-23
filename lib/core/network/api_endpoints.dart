@@ -48,6 +48,10 @@ class ApiEndpoints {
   static String liveSettings(String id) => '/lives/$id/settings';
   static String liveGuests(String id) => '/lives/$id/guests';
   static String liveGuestInvite(String id) => '/lives/$id/guests/invite';
+  static String liveGuestAcceptInvite(String id) =>
+      '/lives/$id/guests/accept-invite';
+  static String liveGuestRequest(String id) => '/lives/$id/guests/request';
+  static String liveGuestLeave(String id) => '/lives/$id/guests/leave';
   static String liveGuestAccept(String id, String userId) =>
       '/lives/$id/guests/$userId/accept';
   static String liveGuestReject(String id, String userId) =>

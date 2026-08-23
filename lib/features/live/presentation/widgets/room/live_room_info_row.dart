@@ -32,7 +32,7 @@ class LiveRoomInfoRow extends StatelessWidget {
 
         final session = state.session;
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
               _RankingChip(
@@ -119,8 +119,11 @@ class _InviteChip extends StatelessWidget {
         height: AppSizes.roomChipHeight,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: AppColors.inviteGreen,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2EBD59), Color(0xFF159447)],
+          ),
           borderRadius: BorderRadius.circular(AppSizes.radiusPill),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
