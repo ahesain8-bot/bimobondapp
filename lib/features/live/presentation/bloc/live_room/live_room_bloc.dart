@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 
 import '../../../../../core/network/api_exceptions.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
@@ -1149,6 +1150,23 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         );
       case LiveHudEndedEvent():
         add(const LiveRoomRemoteEnded());
+      case LiveHudGiftComboEvent(:final payload, :final totalEarnedCoins):
+        final giftCombo = GiftComboPayload.fromMap(payload);
+        if (giftCombo == null ||
+            (giftCombo.liveId.isNotEmpty &&
+                giftCombo.liveId != current.session.id)) {
+          return;
+        }
+        var session = current.session;
+        if (totalEarnedCoins != null) {
+          session = session.copyWith(totalEarnedCoins: totalEarnedCoins);
+        }
+        emit(
+          current.copyWith(
+            session: session,
+            latestGiftCombo: giftCombo,
+          ),
+        );
       case LiveHudGiftEvent(
           :final summaryText,
           :final totalEarnedCoins,

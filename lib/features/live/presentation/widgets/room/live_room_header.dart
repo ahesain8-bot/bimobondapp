@@ -28,7 +28,7 @@ class LiveRoomHeader extends StatelessWidget {
 
         final session = state.session;
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -39,17 +39,17 @@ class LiveRoomHeader extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               GestureDetector(
-                onTap: () => context
-                    .read<LiveRoomBloc>()
-                    .add(const LiveRoomLikeTapped()),
+                onTap: () => context.read<LiveRoomBloc>().add(
+                  const LiveRoomLikeTapped(),
+                ),
                 child: LiveRoomLikesPill(likeCount: session.likeCount),
               ),
               const Spacer(),
               GestureDetector(
                 onTap: () {
-                  context
-                      .read<LiveRoomBloc>()
-                      .add(const LiveRoomViewersTapped());
+                  context.read<LiveRoomBloc>().add(
+                    const LiveRoomViewersTapped(),
+                  );
                   LiveRoomPeopleSheet.show(context);
                 },
                 child: LiveRoomPill(
@@ -74,9 +74,9 @@ class LiveRoomHeader extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               _PowerButton(
-                onTap: () => context
-                    .read<LiveRoomBloc>()
-                    .add(const LiveRoomEndRequested()),
+                onTap: () => context.read<LiveRoomBloc>().add(
+                  const LiveRoomEndRequested(),
+                ),
               ),
             ],
           ),
@@ -96,18 +96,15 @@ class _PowerButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 30,
-        height: 30,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.22),
+          color: Colors.black.withValues(alpha: 0.46),
           shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
         ),
         alignment: Alignment.center,
-        child: SvgPicture.asset(
-          AppAssets.roomPower,
-          width: 18,
-          height: 18,
-        ),
+        child: SvgPicture.asset(AppAssets.roomPower, width: 18, height: 18),
       ),
     );
   }

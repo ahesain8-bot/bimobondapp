@@ -14,9 +14,9 @@ import 'live_room_share_sheet.dart';
 class LiveRoomBottomBar extends StatelessWidget {
   const LiveRoomBottomBar({super.key});
 
-  static const double _buttonSize = 42;
-  static const double _actionGap = 8;
-  static const Color _buttonFill = Color(0xFF202022);
+  static const double _buttonSize = 40;
+  static const double _actionGap = 6;
+  static const Color _buttonFill = Color(0x70202024);
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +27,14 @@ class LiveRoomBottomBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + bottomInset),
       child: Directionality(
         textDirection: TextDirection.ltr,
-        child: SizedBox(
-          height: _buttonSize,
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.36),
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
           child: Row(
             children: [
               Expanded(
@@ -39,8 +45,11 @@ class LiveRoomBottomBar extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     alignment: Alignment.centerLeft,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
+                      color: Colors.white.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
                     ),
                     child: Text(
                       'اكتب تعليقاً…',
@@ -120,16 +129,20 @@ class _CircleSvgButton extends StatelessWidget {
       child: Container(
         width: LiveRoomBottomBar._buttonSize,
         height: LiveRoomBottomBar._buttonSize,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: LiveRoomBottomBar._buttonFill,
           shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26000000),
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         alignment: Alignment.center,
-        child: SvgPicture.asset(
-          asset,
-          width: iconWidth,
-          height: iconHeight,
-        ),
+        child: SvgPicture.asset(asset, width: iconWidth, height: iconHeight),
       ),
     );
   }

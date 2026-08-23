@@ -107,6 +107,16 @@ class LiveHudGiftEvent extends LiveHudEvent {
   final int? quantity;
 }
 
+class LiveHudGiftComboEvent extends LiveHudEvent {
+  const LiveHudGiftComboEvent({
+    required this.payload,
+    this.totalEarnedCoins,
+  });
+
+  final Map<String, dynamic> payload;
+  final int? totalEarnedCoins;
+}
+
 class LiveHudHourlyRankEvent extends LiveHudEvent {
   const LiveHudHourlyRankEvent({
     this.hourlyRank,

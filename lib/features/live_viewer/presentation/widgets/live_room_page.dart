@@ -2,9 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../data/services/fake_socket_service.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
@@ -17,8 +17,6 @@ import 'fan_club_widgets.dart';
 import 'floating_gifts.dart';
 import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
-import 'gift_icon.dart';
-import 'gift_picker_sheet.dart';
 import 'guest_panel.dart';
 import 'league_overlay.dart';
 import 'live_state_overlay.dart';
@@ -107,26 +105,27 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     }
   }
 
-  void _openGifts(int balance) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => GiftPickerSheet(
-        coinBalance: balance,
-        onGiftSelected: (gift) {
-          Navigator.pop(ctx);
-          context.read<LiveViewerBloc>().add(LiveViewerGiftSent(gift));
-        },
-      ),
+  void _openGifts() {
+    final viewerState = context.read<LiveViewerBloc>().state;
+    final canSendToHost =
+        viewerState.currentUserId == null ||
+        viewerState.currentUserId != widget.live.hostId;
+    LiveGiftSheet.show(
+      context,
+      liveId: widget.live.id,
+      receiverId: widget.live.hostId,
+      canSendToHost: canSendToHost,
+      onGiftSent: (_) {
+        if (!mounted) return;
+        context.read<LiveViewerBloc>().add(
+          const LiveViewerGiftBalanceRefreshRequested(),
+        );
+      },
     );
   }
 
   void _sendRose() {
-    final rose = MockGiftCatalog.byId('gift_rose');
-    if (rose != null) {
-      context.read<LiveViewerBloc>().add(LiveViewerGiftSent(rose));
-    }
+    _openGifts();
   }
 
   Future<void> _openGuestRequest(LiveEntity live) async {
@@ -177,7 +176,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openLeague(LiveEntity live) {
-    final viewerBloc = context.read<LiveViewerBloc>();
     final entries = List.generate(6, (i) {
       return RankingEntry(
         rank: i + 1,
@@ -198,8 +196,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         score: 1100000,
       ),
       pointsToNext: 1100000,
-      onSendGift: () =>
-          _openGifts(viewerBloc.state.session?.coinBalance ?? 1250),
+      onSendGift: _openGifts,
     );
   }
 
@@ -583,22 +580,24 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 child: Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
-                    height:
-                        MediaQuery.sizeOf(context).height *
-                        (isPk || isMultiGrid ? 0.32 : 0.36),
+                    height: isPk || isMultiGrid
+                        ? MediaQuery.sizeOf(context).height * 0.34
+                        : TikTokLiveTokens.bottomScrimH,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
                           Colors.black.withValues(
-                            alpha: (isPk || isMultiGrid) ? 0.72 : 0.97,
+                            alpha: (isPk || isMultiGrid)
+                                ? 0.76
+                                : TikTokLiveTokens.bottomScrimAlpha,
                           ),
                           Colors.black.withValues(
-                            alpha: (isPk || isMultiGrid) ? 0.28 : 0.82,
+                            alpha: (isPk || isMultiGrid) ? 0.3 : 0.78,
                           ),
                           Colors.black.withValues(
-                            alpha: (isPk || isMultiGrid) ? 0.06 : 0.45,
+                            alpha: (isPk || isMultiGrid) ? 0.08 : 0.38,
                           ),
                           Colors.transparent,
                         ],
@@ -612,13 +611,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: Container(
-                    height: MediaQuery.paddingOf(context).top + 100,
+                    height:
+                        MediaQuery.paddingOf(context).top +
+                        TikTokLiveTokens.topScrimH,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0.45),
+                          Colors.black.withValues(
+                            alpha: TikTokLiveTokens.topScrimAlpha,
+                          ),
                           Colors.transparent,
                         ],
                       ),
@@ -846,12 +849,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         current: goal.current,
                         target: goal.target,
                         onSend: () {
-                          final rose = MockGiftCatalog.byId('gift_rose');
-                          if (rose != null) {
-                            context.read<LiveViewerBloc>().add(
-                              LiveViewerGiftSent(rose),
-                            );
-                          }
+                          _openGifts();
                         },
                         onClose: () =>
                             setState(() => _giftGoalDismissed = true),
@@ -863,11 +861,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) =>
                       prev.recentGifts != curr.recentGifts ||
-                      prev.activeGiftAnimation != curr.activeGiftAnimation,
+                      prev.activeGiftAnimation != curr.activeGiftAnimation ||
+                      prev.latestGiftCombo != curr.latestGiftCombo,
                   builder: (context, state) {
                     return FloatingGiftsLayer(
                       recentGifts: state.recentGifts,
                       activeGift: state.activeGiftAnimation,
+                      latestCombo: state.latestGiftCombo,
                       onAnimationComplete: () => context
                           .read<LiveViewerBloc>()
                           .add(const LiveViewerGiftAnimationCleared()),
@@ -940,9 +940,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         pShare != cShare;
                   },
                   builder: (context, state) {
-                    final coinBalance = isThisRoom
-                        ? state.session?.coinBalance
-                        : null;
                     final chatMuted = isThisRoom ? state.chatMuted : false;
                     final isCommentSending = isThisRoom
                         ? state.isCommentSending
@@ -964,7 +961,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         }
                         setState(() => _showComposer = true);
                       },
-                      onGiftTap: () => _openGifts(coinBalance ?? 1250),
+                      onGiftTap: _openGifts,
                       onShareTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

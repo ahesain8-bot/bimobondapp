@@ -191,35 +191,17 @@ class LivesSocketDataSource {
       );
     });
 
-    socket.on('liveGift', (data) {
-      final map = _asMap(data);
-      final sender = _asMap(map?['sender']) ?? _asMap(map?['user']);
-      final gift = _asMap(map?['gift']) ?? map;
-      // Same key fallbacks GiftModel uses: the catalog is not consistent
-      // about name/title or icon/emoji, and neither is this payload.
-      final senderFullName = sender?['fullName']?.toString();
+    // `gift_combo` is the canonical live gift presentation event. The
+    // legacy `liveGift` alias is intentionally not consumed here: parsing
+    // both would show the same gift twice and route it through the old text
+    // banner path.
+    socket.on('gift_combo', (data) {
+      final map = _unwrapPayload(data);
+      if (map == null) return;
       _controller.add(
-        LiveHudGiftEvent(
-          summaryText: map?['message']?.toString() ??
-              map?['summary']?.toString(),
-          totalEarnedCoins: _asInt(map?['totalEarnedCoins']),
-          senderName:
-              (senderFullName != null && senderFullName.trim().isNotEmpty)
-                  ? senderFullName.trim()
-                  : (sender?['username']?.toString() ??
-                      map?['senderName']?.toString()),
-          senderGifterLevel: _asInt(sender?['gifterLevel']),
-          senderAvatarUrl: sender?['avatarUrl']?.toString() ??
-              sender?['avatar']?.toString(),
-          giftName: (gift?['name'] ?? gift?['title'] ?? gift?['label'])
-              ?.toString(),
-          giftIcon: (gift?['icon'] ?? gift?['emoji'] ?? gift?['symbol'])
-              ?.toString(),
-          giftImageUrl: (gift?['imageUrl'] ?? gift?['image'] ?? gift?['iconUrl'])
-              ?.toString(),
-          quantity: _asInt(
-            map?['quantity'] ?? map?['count'] ?? gift?['quantity'],
-          ),
+        LiveHudGiftComboEvent(
+          payload: map,
+          totalEarnedCoins: _asInt(map['totalEarnedCoins']),
         ),
       );
     });
@@ -281,6 +263,22 @@ class LivesSocketDataSource {
       return data.map((key, value) => MapEntry(key.toString(), value));
     }
     return null;
+  }
+
+  Map<String, dynamic>? _unwrapPayload(dynamic data) {
+    if (data is List && data.isNotEmpty) {
+      return _unwrapPayload(data.first);
+    }
+    final map = _asMap(data);
+    if (map == null) return null;
+
+    final nested = _asMap(map['data']);
+    if (nested != null &&
+        (map.containsKey('event') ||
+            (!map.containsKey('giftId') && !map.containsKey('gift')))) {
+      return nested;
+    }
+    return map;
   }
 
   int? _asInt(dynamic value) {
