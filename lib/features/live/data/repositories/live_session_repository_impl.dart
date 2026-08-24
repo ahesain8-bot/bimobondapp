@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/network/api_exceptions.dart';
+import '../../../../core/models/live_battle.dart';
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
@@ -28,6 +29,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   final LivesRemoteDataSource _remote;
   final LivesSocketDataSource _socket;
   final LivesMediaDataSource _media;
+  String? _battleOpponentLiveId;
 
   @override
   Stream<LiveHudEvent> get hudEvents => _socket.events;
@@ -40,6 +42,9 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
 
   @override
   Object? get mediaRoom => _media.room;
+
+  @override
+  Object? get battleMediaRoom => _media.battleRoom;
 
   @override
   Future<LiveSession> startHostSession({required String title}) async {
@@ -407,6 +412,121 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
+  Future<LiveBattle?> loadBattle(String liveId) async {
+    final json = await _remote.battle(liveId);
+    final raw = json['battle'] ?? json['data'];
+    if (raw == null && json['id'] == null) return null;
+    final source = raw is Map ? Map<String, dynamic>.from(raw) : json;
+    if (source['id'] == null) return null;
+    return LiveBattle.fromJson(source);
+  }
+
+  @override
+  Future<List<LiveBattleOpponent>> loadBattleOpponents(
+    String liveId, {
+    int limit = 20,
+  }) async {
+    final json = await _remote.battleOpponents(liveId, limit: limit);
+    final raw = json['data'] ?? json['items'] ?? json['opponents'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map(
+          (item) =>
+              LiveBattleOpponent.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .where((item) => item.liveId.isNotEmpty && item.liveId != liveId)
+        .toList(growable: false);
+  }
+
+  LiveBattle _battleFrom(Map<String, dynamic> json) {
+    final raw = json['battle'] ?? json['data'];
+    final source = raw is Map ? Map<String, dynamic>.from(raw) : json;
+    return LiveBattle.fromJson(source);
+  }
+
+  @override
+  Future<LiveBattle> startBattle({
+    required String liveId,
+    required String opponentLiveId,
+    int durationSeconds = 300,
+  }) async {
+    return _battleFrom(
+      await _remote.startBattle(
+        liveId: liveId,
+        opponentLiveId: opponentLiveId,
+        durationSeconds: durationSeconds,
+      ),
+    );
+  }
+
+  @override
+  Future<LiveBattle> matchBattle(
+    String liveId, {
+    int durationSeconds = 300,
+  }) async {
+    return _battleFrom(
+      await _remote.matchBattle(
+        liveId: liveId,
+        durationSeconds: durationSeconds,
+      ),
+    );
+  }
+
+  @override
+  Future<LiveBattle> activateBattleMultiplier({
+    required String liveId,
+    required double multiplier,
+    required int durationSeconds,
+  }) async {
+    return _battleFrom(
+      await _remote.activateBattleMultiplier(
+        liveId: liveId,
+        multiplier: multiplier,
+        durationSeconds: durationSeconds,
+      ),
+    );
+  }
+
+  @override
+  Future<LiveBattle> endBattle({
+    required String liveId,
+    required String battleId,
+  }) async {
+    return _battleFrom(
+      await _remote.endBattle(liveId: liveId, battleId: battleId),
+    );
+  }
+
+  @override
+  Future<void> connectBattleOpponentMedia(String opponentLiveId) async {
+    if (_battleOpponentLiveId == opponentLiveId && _media.battleRoom != null) {
+      return;
+    }
+    await disconnectBattleOpponentMedia();
+    final json = await _remote.join(opponentLiveId);
+    final data = json['data'];
+    final source = data is Map ? Map<String, dynamic>.from(data) : json;
+    final token = source['token']?.toString() ?? '';
+    final url =
+        source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '';
+    await _media.connectBattleAndSubscribe(url: url, token: token);
+    _battleOpponentLiveId = opponentLiveId;
+  }
+
+  @override
+  Future<void> disconnectBattleOpponentMedia() async {
+    final liveId = _battleOpponentLiveId;
+    _battleOpponentLiveId = null;
+    await _media.disconnectBattle();
+    if (liveId != null) {
+      try {
+        await _remote.leave(liveId);
+      } catch (_) {}
+    }
+  }
+
+  @override
   Future<({int? rank, String label, int? score, int? coins})> loadHourlyRank(
     String liveId,
   ) async {
@@ -517,7 +637,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }) => _media.connectAndSubscribe(url: url, token: token);
 
   @override
-  Future<void> disconnectMedia() => _media.disconnect();
+  Future<void> disconnectMedia() async {
+    await disconnectBattleOpponentMedia();
+    await _media.disconnect();
+  }
 
   @override
   Future<void> setMicrophoneEnabled(bool enabled) =>

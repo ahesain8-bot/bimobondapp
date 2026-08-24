@@ -12,10 +12,13 @@ class RealGuestRepository implements GuestRepository {
   final LiveApiClient _api;
 
   @override
-  Future<Either<Failure, void>> requestSeat(String liveId) async {
+  Future<Either<Failure, GuestStageCredentials?>> requestSeat(
+    String liveId,
+  ) async {
     try {
-      await _api.post(ApiEndpoints.liveGuestRequest(liveId));
-      return const Right(null);
+      final payload = await _api.post(ApiEndpoints.liveGuestRequest(liveId));
+      final credentials = _credentialsFromPayload(payload);
+      return Right(credentials.isUsable ? credentials : null);
     } catch (e) {
       return Left(ServerFailure('Failed to request a guest seat: $e'));
     }
@@ -29,20 +32,21 @@ class RealGuestRepository implements GuestRepository {
       final payload = await _api.post(
         ApiEndpoints.liveGuestAcceptInvite(liveId),
       );
-      final inner = payload['data'];
-      final source = inner is Map ? Map<String, dynamic>.from(inner) : payload;
-      return Right(
-        GuestStageCredentials(
-          token: source['token']?.toString() ?? '',
-          url:
-              source['url']?.toString() ??
-              source['livekitUrl']?.toString() ??
-              '',
-          role: source['role']?.toString() ?? 'GUEST',
-        ),
-      );
+      return Right(_credentialsFromPayload(payload));
     } catch (e) {
       return Left(ServerFailure('Failed to accept the guest invite: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, GuestStageCredentials>> refreshStageCredentials(
+    String liveId,
+  ) async {
+    try {
+      final payload = await _api.post(ApiEndpoints.liveGuestToken(liveId));
+      return Right(_credentialsFromPayload(payload));
+    } catch (e) {
+      return Left(ServerFailure('Failed to refresh guest credentials: $e'));
     }
   }
 
@@ -90,6 +94,16 @@ class RealGuestRepository implements GuestRepository {
           userMap?['profilePicture']?.toString(),
       mutedByHost: json['mutedByHost'] == true,
       cameraOffByHost: json['cameraOffByHost'] == true,
+    );
+  }
+
+  GuestStageCredentials _credentialsFromPayload(Map<String, dynamic> payload) {
+    final inner = payload['data'];
+    final source = inner is Map ? Map<String, dynamic>.from(inner) : payload;
+    return GuestStageCredentials(
+      token: source['token']?.toString() ?? '',
+      url: source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '',
+      role: source['role']?.toString() ?? 'GUEST',
     );
   }
 }

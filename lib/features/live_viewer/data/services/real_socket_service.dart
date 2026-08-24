@@ -213,6 +213,16 @@ class RealSocketService implements SocketService {
       if (event != null) _controller.add(event);
     });
 
+    _on(socket, 'liveBattle', (data) {
+      final event = SocketMapper.battleEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveBattlePhase', (data) {
+      final event = SocketMapper.battleEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
     socket.connect();
     await connected.future.timeout(const Duration(seconds: 10));
   }

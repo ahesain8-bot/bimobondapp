@@ -4,7 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
+import '../../../../core/utils/build_safe_notifier.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
@@ -340,6 +342,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               );
         return prev.connectionState != curr.connectionState ||
             (prev.live?.id) != (curr.live?.id) ||
+            prev.battle != curr.battle ||
             prevInfo != currInfo;
       },
       builder: (context, state) {
@@ -375,7 +378,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             isThisRoom &&
             (connectionState == LiveConnectionState.connected ||
                 connectionState == LiveConnectionState.reconnecting);
-        final isPk = live.metadata?['isPk'] == true;
+        final isPk = isThisRoom ? state.isPk : live.metadata?['isPk'] == true;
         // Someone actually publishing on stage puts the room in grid layout on
         // its own — waiting for a metadata flag meant an accepted co-host was
         // invisible to everyone watching.
@@ -439,6 +442,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                             _PkVideoLayout(
                               live: live,
                               isActive: widget.isActive && connected,
+                              battleRoom: isThisRoom
+                                  ? di.sl<LiveKitService>().battleRoom
+                                  : null,
                             ),
                             if (isThisRoom)
                               Positioned(
@@ -454,11 +460,27 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                           prev.pkScoreLeft !=
                                               curr.pkScoreLeft ||
                                           prev.pkScoreRight !=
-                                              curr.pkScoreRight,
+                                              curr.pkScoreRight ||
+                                          prev.battle != curr.battle,
                                       builder: (context, state) {
-                                        return PkBattleBar(
-                                          scoreLeft: state.pkScoreLeft,
-                                          scoreRight: state.pkScoreRight,
+                                        return Stack(
+                                          alignment: Alignment.topCenter,
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            PkBattleBar(
+                                              scoreLeft: state.pkScoreLeft,
+                                              scoreRight: state.pkScoreRight,
+                                            ),
+                                            Positioned(
+                                              top: 22,
+                                              child: _PkBattleTimer(
+                                                endTime: state.battle?.endTime,
+                                                multiplier:
+                                                    state.battle?.multiplier ??
+                                                    1,
+                                              ),
+                                            ),
+                                          ],
                                         );
                                       },
                                     ),
@@ -1119,8 +1141,13 @@ class _SideAction extends StatelessWidget {
 class _PkVideoLayout extends StatelessWidget {
   final LiveEntity live;
   final bool isActive;
+  final Room? battleRoom;
 
-  const _PkVideoLayout({required this.live, required this.isActive});
+  const _PkVideoLayout({
+    required this.live,
+    required this.isActive,
+    required this.battleRoom,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1158,6 +1185,7 @@ class _PkVideoLayout extends StatelessWidget {
                   liveId: live.id,
                   guestName: guestName,
                   guestAvatar: guestAvatar,
+                  room: battleRoom,
                   fit: BoxFit.fitWidth,
                 ),
                 const Positioned(
@@ -1187,17 +1215,47 @@ class _PkGuestFeed extends StatelessWidget {
   final String liveId;
   final String guestName;
   final String? guestAvatar;
+  final Room? room;
   final BoxFit fit;
 
   const _PkGuestFeed({
     required this.liveId,
     required this.guestName,
     this.guestAvatar,
+    this.room,
     this.fit = BoxFit.fitWidth,
   });
 
   @override
   Widget build(BuildContext context) {
+    final currentRoom = room;
+    if (currentRoom != null) {
+      return BuildSafeListenableBuilder(
+        listenable: currentRoom,
+        builder: (_, __) {
+          final track = _remoteVideoTrack(currentRoom);
+          return track == null
+              ? _fallback()
+              : VideoTrackRenderer(track, fit: VideoViewFit.cover);
+        },
+      );
+    }
+    return _fallback();
+  }
+
+  VideoTrack? _remoteVideoTrack(Room room) {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (publication.subscribed && !publication.muted && track != null) {
+          return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  Widget _fallback() {
     final url =
         guestAvatar ?? 'https://i.pravatar.cc/600?u=${liveId.hashCode + 99}';
     return ColoredBox(
@@ -1232,6 +1290,47 @@ class _PkGuestFeed extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PkBattleTimer extends StatelessWidget {
+  const _PkBattleTimer({required this.endTime, required this.multiplier});
+
+  final DateTime? endTime;
+  final double multiplier;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: Stream<int>.periodic(
+        const Duration(seconds: 1),
+        (value) => value,
+      ),
+      builder: (_, __) {
+        final seconds = math.max(
+          0,
+          endTime?.difference(DateTime.now()).inSeconds ?? 0,
+        );
+        final time =
+            '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
+            '${(seconds % 60).toString().padLeft(2, '0')}';
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xE60A2430),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(
+            '${multiplier > 1 ? '×${multiplier.toStringAsFixed(1)}  ' : ''}$time',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      },
     );
   }
 }

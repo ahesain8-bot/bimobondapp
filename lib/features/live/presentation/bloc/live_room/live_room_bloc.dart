@@ -7,6 +7,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 
 import '../../../../../core/network/api_exceptions.dart';
+import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_chat_feed_merge.dart';
@@ -80,6 +81,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomShareContactSelected>(_onShareContactSelected);
     on<LiveRoomShareChannelRequested>(_onShareChannelRequested);
     on<LiveRoomGuestsChanged>(_onGuestsChanged);
+    on<LiveRoomBattleChanged>(_onBattleChanged);
     on<LiveRoomCommentsResyncRequested>(_onCommentsResync);
     on<LiveRoomGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveRoomGuestRequestAnswered>(_onGuestRequestAnswered);
@@ -449,6 +451,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       // socket event, and there may not be one.
       _sessionRepository.loadGuests(liveId),
       _sessionRepository.loadHourlyRank(liveId),
+      _loadBattleSafely(liveId),
     ]);
     if (isClosed) return;
     final ready = _readyOrNull;
@@ -459,6 +462,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final guests = results[2] as List<LiveGuest>;
     final hourly =
         results[3] as ({int? rank, String label, int? score, int? coins});
+    final battle = results[4] as LiveBattle?;
+    // A `liveBattle` event may have arrived while the parallel HTTP snapshot
+    // was still loading. Never let an older null response erase that event.
+    final effectiveBattle = battle ?? ready.battle;
 
     // Merged, not assigned: enrichment runs a beat after the room goes Ready,
     // and anything the socket delivered in that window used to be wiped by the
@@ -466,6 +473,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(
       ready.copyWith(
         guests: guests,
+        battle: effectiveBattle,
         session: ready.session.copyWith(
           messages: mergeLiveChatMessages(comments, ready.session.messages),
           galleryCurrent: gallery.current,
@@ -476,6 +484,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         ),
       ),
     );
+    if (effectiveBattle?.isActive == true) {
+      add(LiveRoomBattleChanged(effectiveBattle));
+    }
+  }
+
+  Future<LiveBattle?> _loadBattleSafely(String liveId) async {
+    try {
+      return await _sessionRepository.loadBattle(liveId);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _publishLiveKitAfterPreview(Emitter<LiveRoomState> emit) async {
@@ -902,6 +921,42 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     } catch (_) {}
   }
 
+  Future<void> _onBattleChanged(
+    LiveRoomBattleChanged event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null) return;
+    final battle = event.battle?.withTimingFrom(current.battle);
+    emit(current.copyWith(battle: battle));
+    if (battle?.isActive != true) {
+      await _sessionRepository.disconnectBattleOpponentMedia();
+      return;
+    }
+    final opponentId = battle!.opponentLiveId(current.session.id);
+    if (opponentId.isEmpty || opponentId == current.session.id) return;
+    try {
+      await _sessionRepository.connectBattleOpponentMedia(opponentId);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready != null && ready.battle?.id == battle.id) {
+        // The state identity change tells the stage to pick up battleMediaRoom;
+        // subsequent track publications repaint through Room notifications.
+        emit(ready.copyWith(battle: battle));
+      }
+    } catch (e) {
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready != null) {
+        emit(
+          ready.copyWith(
+            actionMessage: 'بدأت المعركة لكن تعذر فتح فيديو الخصم: $e',
+          ),
+        );
+      }
+    }
+  }
+
   /// Pulls the comment history again, keeping whatever the socket delivered
   /// since. Runs whenever the HUD socket (re)connects.
   Future<void> _onCommentsResync(
@@ -1202,6 +1257,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         if (note != null) {
           emit(current.copyWith(actionMessage: note));
         }
+      case LiveHudBattleEvent(:final battle):
+        add(LiveRoomBattleChanged(battle));
       case LiveHudConnectionEvent(:final connected, :final reason):
         // Comments, viewers and likes all ride this socket. The flag is kept in
         // state so the room can show a standing warning: a SnackBar alone

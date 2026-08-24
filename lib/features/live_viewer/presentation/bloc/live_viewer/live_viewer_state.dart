@@ -5,6 +5,7 @@ import '../../../domain/entities/gift_entity.dart';
 import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
 import '../../../domain/repositories/guest_repository.dart';
+import '../../../../../core/models/live_battle.dart';
 
 class LiveViewerState extends Equatable {
   final LiveSessionEntity? session;
@@ -38,6 +39,9 @@ class LiveViewerState extends Equatable {
   /// True while a request/accept/leave call is in flight.
   final bool isGuestActionBusy;
 
+  /// Current battle snapshot from REST/Socket.IO.
+  final LiveBattle? battle;
+
   const LiveViewerState({
     this.session,
     this.comments = const [],
@@ -61,6 +65,7 @@ class LiveViewerState extends Equatable {
     this.pendingGuestInvite,
     this.isOnStage = false,
     this.isGuestActionBusy = false,
+    this.battle,
   });
 
   /// Guests actually publishing right now — what the stage renders.
@@ -72,7 +77,8 @@ class LiveViewerState extends Equatable {
 
   LiveEntity? get live => session?.live;
 
-  bool get isPk => live?.metadata?['isPk'] == true;
+  bool get isPk =>
+      battle != null ? battle!.isActive : live?.metadata?['isPk'] == true;
 
   LiveViewerState copyWith({
     LiveSessionEntity? session,
@@ -101,6 +107,8 @@ class LiveViewerState extends Equatable {
     bool clearPendingGuestInvite = false,
     bool? isOnStage,
     bool? isGuestActionBusy,
+    LiveBattle? battle,
+    bool clearBattle = false,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -133,6 +141,7 @@ class LiveViewerState extends Equatable {
           : (pendingGuestInvite ?? this.pendingGuestInvite),
       isOnStage: isOnStage ?? this.isOnStage,
       isGuestActionBusy: isGuestActionBusy ?? this.isGuestActionBusy,
+      battle: clearBattle ? null : (battle ?? this.battle),
     );
   }
 
@@ -160,6 +169,7 @@ class LiveViewerState extends Equatable {
     pendingGuestInvite,
     isOnStage,
     isGuestActionBusy,
+    battle,
   ];
 }
 

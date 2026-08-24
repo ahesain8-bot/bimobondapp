@@ -20,6 +20,7 @@ class RealLiveKitService implements LiveKitService {
   String? _url;
   String? _token;
   Room? _room;
+  Room? _battleRoom;
 
   @override
   LiveKitConnectionState get state => _state;
@@ -35,7 +36,54 @@ class RealLiveKitService implements LiveKitService {
 
   /// The underlying LiveKit room — exposed for future `LiveKitVideoView`
   /// rendering of subscribed remote tracks.
+  @override
   Room? get room => _room;
+
+  @override
+  Room? get battleRoom => _battleRoom;
+
+  @override
+  Future<void> connectBattle({
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    await disconnectBattle();
+    if (url.isEmpty || token.isEmpty) {
+      throw StateError('Opponent LiveKit url/token missing');
+    }
+    final room = Room(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: false,
+        defaultVideoPublishOptions: VideoPublishOptions(
+          backupVideoCodec: BackupVideoCodec(enabled: false),
+        ),
+      ),
+    );
+    room.events
+      ..on<ReconnectingEvent>((_) {
+        debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        debugPrint('🔗 Battle LiveKit reconnected: $roomName');
+      });
+    await room.connect(url, token);
+    _battleRoom = room;
+  }
+
+  @override
+  Future<void> disconnectBattle() async {
+    final room = _battleRoom;
+    _battleRoom = null;
+    if (room == null) return;
+    try {
+      await room.disconnect();
+      await room.dispose();
+    } catch (e, st) {
+      debugPrint('Battle LiveKit disconnect error: $e\n$st');
+    }
+  }
 
   void _setState(LiveKitConnectionState next) {
     _state = next;
@@ -250,7 +298,20 @@ class RealLiveKitService implements LiveKitService {
   }
 
   @override
+  Future<void> setStageMicrophoneEnabled(bool enabled) async {
+    if (!_publishing) return;
+    await _room?.localParticipant?.setMicrophoneEnabled(enabled);
+  }
+
+  @override
+  Future<void> setStageCameraEnabled(bool enabled) async {
+    if (!_publishing) return;
+    await _room?.localParticipant?.setCameraEnabled(enabled);
+  }
+
+  @override
   Future<void> disconnect() async {
+    await disconnectBattle();
     _publishing = false;
     _setState(LiveKitConnectionState.disconnected);
     final room = _room;

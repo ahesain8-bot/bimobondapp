@@ -9,6 +9,7 @@ import '../../domain/entities/live_capture_profile.dart';
 /// Never mints JWTs or stores `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`.
 class LivesMediaDataSource {
   Room? _room;
+  Room? _battleRoom;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
@@ -28,6 +29,9 @@ class LivesMediaDataSource {
   bool get isVideoPublished => _videoPublished;
 
   Room? get room => _room;
+
+  /// Subscribe-only room for the other host during a PK battle.
+  Room? get battleRoom => _battleRoom;
 
   /// Local camera track for [VideoTrackRenderer] preview (host/guest).
   LocalVideoTrack? get localVideoTrack => _videoTrack;
@@ -396,6 +400,41 @@ class LivesMediaDataSource {
   /// Whether the LiveKit room is connected (including viewer subscribe-only).
   bool get isRoomConnected => _room != null;
 
+  /// Joins the opponent's separate LiveKit room without touching the host's
+  /// publishing room.
+  Future<void> connectBattleAndSubscribe({
+    required String url,
+    required String token,
+  }) async {
+    await disconnectBattle();
+    if (url.isEmpty || token.isEmpty) {
+      throw StateError('Opponent LiveKit url/token missing');
+    }
+    final room = Room(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: false,
+        defaultVideoPublishOptions: VideoPublishOptions(
+          backupVideoCodec: BackupVideoCodec(enabled: false),
+        ),
+      ),
+    );
+    await room.connect(url, token);
+    _battleRoom = room;
+  }
+
+  Future<void> disconnectBattle() async {
+    final room = _battleRoom;
+    _battleRoom = null;
+    if (room == null) return;
+    try {
+      await room.disconnect();
+      await room.dispose();
+    } catch (e, st) {
+      debugPrint('Battle LiveKit disconnect error: $e\n$st');
+    }
+  }
+
   Future<void> setMicrophoneEnabled(bool enabled) async {
     await _room?.localParticipant?.setMicrophoneEnabled(enabled);
   }
@@ -453,6 +492,7 @@ class LivesMediaDataSource {
       '_videoTrack=${_videoTrack != null ? "SET" : "NULL"}, '
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
+    await disconnectBattle();
     try {
       // Fully release the native camera/audio sources. stop() alone can leave
       // flutter_webrtc's capturer cached ("camera already active ... reusing

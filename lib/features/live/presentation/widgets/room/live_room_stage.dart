@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../../core/utils/build_safe_notifier.dart';
+import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/widgets/stage_tiles.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
@@ -31,11 +32,20 @@ class LiveRoomStage extends StatelessWidget {
           previous.runtimeType != current.runtimeType ||
           (current is LiveRoomReady &&
               (previous is! LiveRoomReady ||
-                  previous.guests != current.guests)),
+                  previous.guests != current.guests ||
+                  previous.battle != current.battle)),
       builder: (context, state) {
         final guests = state is LiveRoomReady
             ? state.activeGuests
             : const <LiveGuest>[];
+
+        if (state is LiveRoomReady && state.isBattleActive) {
+          return _BattleStage(
+            battle: state.battle!,
+            currentLiveId: state.session.id,
+            topInset: topInset,
+          );
+        }
 
         // Nobody else on stage: the camera keeps the whole screen.
         if (guests.isEmpty) return const LiveRoomCameraLayer();
@@ -75,6 +85,213 @@ class LiveRoomStage extends StatelessWidget {
       },
     );
   }
+}
+
+class _BattleStage extends StatelessWidget {
+  const _BattleStage({
+    required this.battle,
+    required this.currentLiveId,
+    required this.topInset,
+  });
+
+  final LiveBattle battle;
+  final String currentLiveId;
+  final double topInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
+    final height = math.min(size.width / kStageAspect, maxHeight);
+    final width = math.min(size.width, height * kStageAspect);
+    final room = context.read<LiveSessionRepository>().battleMediaRoom;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Expanded(
+                    child: _StageTile(child: LiveRoomCameraLayer()),
+                  ),
+                  const SizedBox(width: kStageTileGap),
+                  Expanded(
+                    child: _StageTile(
+                      child: _OpponentVideo(room: room is Room ? room : null),
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: _HostBattleBar(
+                  leftScore: battle.scoreFor(currentLiveId),
+                  rightScore: battle.opponentScoreFor(currentLiveId),
+                  endTime: battle.endTime,
+                  multiplier: battle.multiplier,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OpponentVideo extends StatelessWidget {
+  const _OpponentVideo({required this.room});
+
+  final Room? room;
+
+  VideoTrack? get _track {
+    final participants = room?.remoteParticipants.values;
+    if (participants == null) return null;
+    for (final participant in participants) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (publication.subscribed && !publication.muted && track != null) {
+          return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  Widget _content() {
+    final track = _track;
+    if (track != null) {
+      return VideoTrackRenderer(track, fit: VideoViewFit.cover);
+    }
+    return const ColoredBox(
+      color: Color(0xFF17171A),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.person, size: 42, color: Colors.white38),
+            SizedBox(height: 8),
+            Text(
+              'جاري توصيل بث الخصم…',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = room;
+    if (value == null) return _content();
+    return BuildSafeListenableBuilder(
+      listenable: value,
+      builder: (_, __) => _content(),
+    );
+  }
+}
+
+class _HostBattleBar extends StatefulWidget {
+  const _HostBattleBar({
+    required this.leftScore,
+    required this.rightScore,
+    required this.endTime,
+    required this.multiplier,
+  });
+
+  final int leftScore;
+  final int rightScore;
+  final DateTime? endTime;
+  final double multiplier;
+
+  @override
+  State<_HostBattleBar> createState() => _HostBattleBarState();
+}
+
+class _HostBattleBarState extends State<_HostBattleBar> {
+  late final Stream<int> _ticks = Stream<int>.periodic(
+    const Duration(seconds: 1),
+    (value) => value,
+  );
+
+  String get _remaining {
+    final end = widget.endTime;
+    if (end == null) return '--:--';
+    final seconds = math.max(0, end.difference(DateTime.now()).inSeconds);
+    return '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
+        '${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = math.max(1, widget.leftScore + widget.rightScore);
+    final left = (widget.leftScore / total * 1000).round().clamp(80, 920);
+    return SizedBox(
+      height: 42,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: left,
+                child: _score(Color(0xFFFF2D6F), widget.leftScore, false),
+              ),
+              Expanded(
+                flex: 1000 - left,
+                child: _score(Color(0xFF22CEDA), widget.rightScore, true),
+              ),
+            ],
+          ),
+          Positioned(
+            top: 18,
+            child: StreamBuilder<int>(
+              stream: _ticks,
+              builder: (_, __) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xDD14202A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${widget.multiplier > 1 ? '×${widget.multiplier.toStringAsFixed(1)}  ' : ''}$_remaining',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _score(Color color, int value, bool right) => Container(
+    height: 18,
+    color: color,
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+    child: Text(
+      '$value',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }
 
 class _StageTile extends StatelessWidget {

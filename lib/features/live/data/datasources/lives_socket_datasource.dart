@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/models/live_battle.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../mappers/live_session_mapper.dart';
 
@@ -275,6 +276,22 @@ class LivesSocketDataSource {
         ),
       );
     });
+
+    void battleEvent(dynamic data, String fallbackType) {
+      final map = _unwrapPayload(data) ?? _asMap(data);
+      if (map == null) return;
+      final raw = _asMap(map['battle']) ?? map;
+      if (raw['id'] == null) return;
+      _controller.add(
+        LiveHudBattleEvent(
+          type: map['type']?.toString() ?? fallbackType,
+          battle: LiveBattle.fromJson(raw),
+        ),
+      );
+    }
+
+    _on(socket, 'liveBattle', (data) => battleEvent(data, 'score'));
+    _on(socket, 'liveBattlePhase', (data) => battleEvent(data, 'phase'));
 
     _on(socket, 'liveHourlyRankUpdated', (data) {
       final map = _asMap(data);
