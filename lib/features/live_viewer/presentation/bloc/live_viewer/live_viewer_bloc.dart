@@ -70,6 +70,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveViewerLeftStage>(_onLeftStage);
     on<LiveViewerGuestsRefreshed>(_onGuestsRefreshed);
+    on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
+
+    _liveKitSub = liveKitService.stateStream.listen((mediaState) {
+      if (!isClosed) add(LiveViewerLiveKitStateChanged(mediaState));
+    });
   }
   final JoinLiveUseCase joinLiveUseCase;
   final LeaveLiveUseCase leaveLiveUseCase;
@@ -91,6 +96,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   StreamSubscription<SocketEvent>? _socketSub;
   StreamSubscription<GiftComboPayload>? _giftComboSub;
+  StreamSubscription<LiveKitConnectionState>? _liveKitSub;
   String? _activeLiveId;
   bool _busy = false;
   LiveEntity? _pendingActivate;
@@ -98,6 +104,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
   String? _battleOpponentLiveId;
+  bool _tearingDown = false;
+  bool _recoveringMedia = false;
+  int _mediaRecoveryAttempt = 0;
 
   String? get activeLiveId => _activeLiveId;
 
@@ -815,6 +824,160 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     result.fold((_) {}, (guests) => emit(state.copyWith(guests: guests)));
   }
 
+  Future<void> _onLiveKitStateChanged(
+    LiveViewerLiveKitStateChanged event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final session = state.session;
+    final liveId = _activeLiveId;
+    if (session == null || liveId == null || _tearingDown) return;
+    if (session.connectionState == LiveConnectionState.liveEnded ||
+        session.connectionState == LiveConnectionState.banned) {
+      return;
+    }
+
+    switch (event.state) {
+      case LiveKitConnectionState.connected:
+        _mediaRecoveryAttempt = 0;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.connected,
+              isLiveKitConnected: true,
+              reconnectAttempt: 0,
+            ),
+          ),
+        );
+        return;
+      case LiveKitConnectionState.connecting:
+      case LiveKitConnectionState.reconnecting:
+        if (_busy || _recoveringMedia) return;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.reconnecting,
+              isLiveKitConnected: false,
+            ),
+          ),
+        );
+        return;
+      case LiveKitConnectionState.disconnected:
+      case LiveKitConnectionState.failed:
+        // connect() deliberately disconnects the previous Room first. Ignore
+        // that internal transition while activation/recovery is in flight.
+        if (_busy || _recoveringMedia) return;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.reconnecting,
+              isLiveKitConnected: false,
+            ),
+          ),
+        );
+        await _recoverMedia(liveId, emit);
+        return;
+    }
+  }
+
+  /// A terminal LiveKit disconnect cannot safely reuse its old JWT (tokens
+  /// expire and ICE restarts can outlive them). Re-join REST to obtain fresh
+  /// subscribe credentials, or a fresh publish token when this viewer is on
+  /// the guest stage, then rebuild the Room with bounded backoff.
+  Future<void> _recoverMedia(
+    String liveId,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (_recoveringMedia || _tearingDown || _activeLiveId != liveId) return;
+    _recoveringMedia = true;
+    try {
+      for (var attempt = 1; attempt <= 4; attempt++) {
+        if (_tearingDown || isClosed || _activeLiveId != liveId) return;
+        _mediaRecoveryAttempt = attempt;
+        if (attempt > 1) {
+          await Future<void>.delayed(Duration(seconds: attempt - 1));
+        }
+        if (_tearingDown || isClosed || _activeLiveId != liveId) return;
+
+        try {
+          if (state.isOnStage) {
+            final credentials = await guestRepository
+                .refreshStageCredentials(liveId);
+            final creds = credentials.fold<GuestStageCredentials?>(
+              (_) => null,
+              (value) => value,
+            );
+            if (creds == null || !creds.isUsable) continue;
+            await liveKitService.joinStage(
+              url: creds.url,
+              token: creds.token,
+              roomName: liveId,
+            );
+          } else {
+            final joined = await joinLiveUseCase(liveId);
+            final result = joined.fold<JoinLiveResult?>(
+              (_) => null,
+              (value) => value,
+            );
+            if (result == null) continue;
+            await liveKitService.connect(
+              url: result.liveKitUrl,
+              token: result.liveKitToken,
+              roomName: result.liveId,
+              mockStreamUrl: result.live.streamUrl,
+            );
+          }
+          if (isClosed || _activeLiveId != liveId) return;
+          final current = state.session;
+          if (current != null) {
+            emit(
+              state.copyWith(
+                session: current.copyWith(
+                  connectionState: LiveConnectionState.connected,
+                  isLiveKitConnected: true,
+                  reconnectAttempt: 0,
+                ),
+                moderationBanner: attempt > 1
+                    ? 'تمت استعادة اتصال البث'
+                    : null,
+              ),
+            );
+          }
+          _mediaRecoveryAttempt = 0;
+          return;
+        } catch (_) {
+          final current = state.session;
+          if (current != null && !isClosed) {
+            emit(
+              state.copyWith(
+                session: current.copyWith(
+                  connectionState: LiveConnectionState.reconnecting,
+                  isLiveKitConnected: false,
+                  reconnectAttempt: attempt,
+                ),
+              ),
+            );
+          }
+        }
+      }
+
+      final current = state.session;
+      if (current != null && !isClosed && _activeLiveId == liveId) {
+        emit(
+          state.copyWith(
+            session: current.copyWith(
+              connectionState: LiveConnectionState.networkLost,
+              isLiveKitConnected: false,
+              reconnectAttempt: _mediaRecoveryAttempt,
+              errorMessage: 'تعذر استعادة اتصال الفيديو. اضغط لإعادة المحاولة.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _recoveringMedia = false;
+    }
+  }
+
   // ---------- Internal helpers ----------
 
   void _listenSocket(String liveId) {
@@ -1049,12 +1212,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       );
     } else if (event is ReconnectedEvent) {
+      final mediaConnected = liveKitService.state ==
+          LiveKitConnectionState.connected;
       emit(
         state.copyWith(
           session: session.copyWith(
-            connectionState: LiveConnectionState.connected,
+            connectionState: mediaConnected
+                ? LiveConnectionState.connected
+                : LiveConnectionState.reconnecting,
             isSocketConnected: true,
-            isLiveKitConnected: true,
+            // Socket.IO only restores comments/HUD. It must never hide a
+            // still-disconnected LiveKit video room.
+            isLiveKitConnected: mediaConnected,
           ),
         ),
       );
@@ -1410,6 +1579,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required bool silent,
     required Emitter<LiveViewerState> emit,
   }) async {
+    _tearingDown = true;
     _socketSub?.cancel();
     _socketSub = null;
     _giftComboSub?.cancel();
@@ -1431,6 +1601,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     try {
       await liveKitService.disconnect();
     } catch (_) {}
+    _tearingDown = false;
+    _recoveringMedia = false;
+    _mediaRecoveryAttempt = 0;
     if (!silent && !isClosed) {
       emit(const LiveViewerState());
     }
@@ -1438,6 +1611,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   @override
   Future<void> close() async {
+    _tearingDown = true;
+    await _liveKitSub?.cancel();
+    _liveKitSub = null;
     _socketSub?.cancel();
     _socketSub = null;
     _giftComboSub?.cancel();
