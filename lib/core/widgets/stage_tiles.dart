@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Width ÷ height of the shared video box when more than one person is on
 /// stage, matched to the TikTok reference: the two feeds sit side by side in a
 /// landscape-ish box under the header rather than filling the screen.
-const double kStageAspect = 1.35;
+const double kStageAspect = 1.15;
 
 /// The most of the space below the header the stage may claim, so the chat
 /// feed and the bottom bars always keep room on a short screen.

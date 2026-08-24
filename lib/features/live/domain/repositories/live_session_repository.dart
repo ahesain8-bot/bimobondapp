@@ -339,15 +339,17 @@ abstract class LiveSessionRepository {
   Stream<LiveHudEvent> get hudEvents;
 
   /// Publishes host A/V to LiveKit using token/url from start.
-  /// [maxAttempts] bounds the camera-open retry budget. The opportunistic
-  /// first pass — made while the Flutter camera still holds the lens — passes
-  /// 1, because that attempt is expected to fail and its whole point is to
-  /// find out fast.
+  ///
+  /// [beforeVideoCapture] runs after the room and microphone are connected but
+  /// immediately before WebRTC opens the camera. The host uses it to release
+  /// the setup preview, guaranteeing that two camera engines never contend for
+  /// the same lens. [maxAttempts] bounds the resolution fallback ladder.
   Future<void> connectMedia({
     required String url,
     required String token,
     bool useFrontCamera = true,
-    int maxAttempts = 6,
+    int maxAttempts = 3,
+    Future<void> Function()? beforeVideoCapture,
   });
 
   /// Viewer subscribe-only LiveKit connect.

@@ -6,27 +6,22 @@ Duration backoffFor(int maxAttempts) {
   var total = Duration.zero;
   for (var attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt < maxAttempts - 1) {
-      total += Duration(milliseconds: 500 * (attempt + 1));
+      total += Duration(milliseconds: 250 * (attempt + 1));
     }
   }
   return total;
 }
 
 void main() {
-  test('the opportunistic first pass costs no backoff at all', () {
-    // Phase A runs while the Flutter camera still holds the lens, so it is
-    // expected to fail. Its whole value is failing fast.
+  test('one camera profile costs no backoff at all', () {
     expect(backoffFor(1), Duration.zero);
   });
 
-  test('the full budget no longer sleeps after its final attempt', () {
-    // 500 + 1000 + 1500 + 2000 + 2500 = 7.5s of waiting between six tries;
-    // the old loop also slept 3000ms after the last one for nothing.
-    expect(backoffFor(6), const Duration(milliseconds: 7500));
+  test('the three-profile ladder has a short bounded backoff', () {
+    expect(backoffFor(3), const Duration(milliseconds: 750));
   });
 
-  test('a one-attempt pass is 10.5s cheaper than the full budget', () {
-    final saved = backoffFor(6) + const Duration(seconds: 3) - backoffFor(1);
-    expect(saved, const Duration(milliseconds: 10500));
+  test('the retry budget remains below one second', () {
+    expect(backoffFor(3), lessThan(const Duration(seconds: 1)));
   });
 }

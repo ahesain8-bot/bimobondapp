@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
-import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:bimobondapp/core/network/api_endpoints.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -26,6 +26,7 @@ class AuctionSocketEvent {
 
   /// Prefer this single live animation event (do not also listen to aliases).
   static const giftCombo = 'gift_combo';
+
   /// Server emits camelCase `auctionGiftCombo` (see EventsGateway logs).
   static const auctionGiftCombo = 'auctionGiftCombo';
   static const liveAuction = 'liveAuction';
@@ -93,6 +94,7 @@ class GiftComboPayload {
   final Map<String, dynamic>? gift;
   final Map<String, dynamic>? sender;
   final Map<String, dynamic>? receiver;
+
   /// Flat field from `auctionGiftCombo` when nested `gift` is omitted.
   final String? giftName;
   final String? senderName;
@@ -110,8 +112,9 @@ class GiftComboPayload {
   }
 
   static GiftComboPayload? fromMap(Map<String, dynamic> map) {
-    final senderObj = map['sender'] is Map
-        ? Map<String, dynamic>.from(map['sender'] as Map)
+    final senderRaw = map['sender'] ?? map['user'];
+    final senderObj = senderRaw is Map
+        ? Map<String, dynamic>.from(senderRaw)
         : null;
     final receiverObj = map['receiver'] is Map
         ? Map<String, dynamic>.from(map['receiver'] as Map)
@@ -132,20 +135,18 @@ class GiftComboPayload {
         ? Map<String, dynamic>.from(map['gift'] as Map)
         : null;
 
-    final giftName =
-        (map['giftName'] ?? giftObj?['name'])?.toString();
+    final giftName = (map['giftName'] ?? giftObj?['name'])?.toString();
     final senderName =
         (map['senderName'] ?? senderObj?['fullName'] ?? senderObj?['username'])
             ?.toString();
     final senderAvatarUrl = (map['senderAvatarUrl'] ?? senderObj?['avatarUrl'])
         ?.toString();
     final rawCoins = map['coins'];
-    final coins = rawCoins is int
-        ? rawCoins
-        : int.tryParse('$rawCoins');
+    final coins = rawCoins is int ? rawCoins : int.tryParse('$rawCoins');
 
     // Server auctionGiftCombo is often flat (giftId/giftName/coins) with no nested gift.
-    final resolvedGift = giftObj ??
+    final resolvedGift =
+        giftObj ??
         (giftName != null && giftName.isNotEmpty
             ? <String, dynamic>{'id': giftId, 'name': giftName}
             : null);
@@ -262,7 +263,10 @@ class AuctionSocketService {
 
       _socket?.dispose();
       _socket = io.io(
-        ApiConstants.baseUrl,
+        // Use the same configurable host as the live room. Otherwise a build
+        // with API_BASE_URL set joins live_<id> on one server but sends the
+        // gift through the hard-coded default server.
+        ApiEndpoints.baseUrl,
         io.OptionBuilder()
             .setTransports(['websocket'])
             .enableForceNew()

@@ -27,6 +27,10 @@ Future<List<Rect>> layout(WidgetTester tester, int count) async {
 }
 
 void main() {
+  test('shared live box matches the taller TikTok reference proportions', () {
+    expect(kStageAspect, closeTo(1.15, 0.001));
+  });
+
   testWidgets('two people split the box down the middle', (tester) async {
     final rects = await layout(tester, 2);
 

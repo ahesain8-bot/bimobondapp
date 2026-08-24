@@ -84,7 +84,8 @@ class LivesMediaDataSource {
     required String url,
     required String token,
     CameraPosition cameraPosition = CameraPosition.front,
-    int maxAttempts = 6,
+    int maxAttempts = 3,
+    Future<void> Function()? beforeVideoCapture,
   }) async {
     await disconnect();
 
@@ -178,19 +179,34 @@ class LivesMediaDataSource {
       debugPrint('🔴 [Host] LiveKit audio publish failed: $e\n$st');
     }
 
+    // Room signalling and microphone setup do not need the camera, so keep the
+    // Flutter preview alive through those potentially slow operations. Release
+    // it exactly here, immediately before WebRTC asks Camera2 for the lens.
+    // This avoids both a long black gap and the two-capturer race that froze
+    // the first several seconds on Android.
+    try {
+      await beforeVideoCapture?.call();
+    } catch (e, st) {
+      debugPrint('🔴 [Host] camera handoff failed: $e\n$st');
+      await disconnect();
+      rethrow;
+    }
+
     try {
       Object? lastError;
       final ladder = LiveVideoQualityPreference.instance.profile.fallbacks;
-      for (var attempt = 0; attempt < maxAttempts; attempt++) {
-        // Two passes per profile: the retry budget the Xiaomi camera2
-        // pipeline needed is kept, but a sensor that refuses the host's
-        // ceiling now steps down a tier instead of being asked the same
-        // resolution six times.
-        final profile = ladder[(attempt ~/ 2).clamp(0, ladder.length - 1)];
+      final attemptCount = maxAttempts.clamp(1, ladder.length);
+      for (var attempt = 0; attempt < attemptCount; attempt++) {
+        // Try each profile once, highest to lowest. Repeating every failed
+        // profile twice added 7.5 seconds of sleeps on a busy lens and looked
+        // exactly like a frozen live; a lower supported mode is the useful
+        // recovery action.
+        final profile = ladder[attempt];
         try {
           debugPrint(
             '🔍 [Host] connectAndPublish: '
-            'createCameraTrack attempt ${attempt + 1}/6 at ${profile.label}...',
+            'createCameraTrack attempt ${attempt + 1}/$attemptCount '
+            'at ${profile.label}...',
           );
           _videoTrack = await LocalVideoTrack.createCameraTrack(
             _captureOptionsFor(profile, cameraPosition),
@@ -246,9 +262,9 @@ class LivesMediaDataSource {
           );
           // No backoff after the final try: the caller is about to act on
           // the failure, and sleeping first only delays that.
-          if (attempt < maxAttempts - 1) {
+          if (attempt < attemptCount - 1) {
             await Future<void>.delayed(
-              Duration(milliseconds: 500 * (attempt + 1)),
+              Duration(milliseconds: 250 * (attempt + 1)),
             );
           }
         }
@@ -283,7 +299,7 @@ class LivesMediaDataSource {
       try {
         final pubs = room.localParticipant?.videoTrackPublications ?? [];
         for (final p in pubs) {
-          final lvTrack = p.track as LocalVideoTrack?;
+          final lvTrack = p.track;
           final sim = p.simulcasted;
           final mime = p.mimeType; // 2.11.0 direct getter (no .codec wrapper)
           final trackCodec = lvTrack?.codec; // LocalTrack.codec String

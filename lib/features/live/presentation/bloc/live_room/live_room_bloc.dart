@@ -390,11 +390,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       return;
     }
 
-    // Enrichment off the critical path.
-    await _enrichSession(emit);
-
-    // LiveKit publish after local preview is visible (handoff camera ownership).
+    // Publishing is the critical path. Waiting for four HUD HTTP requests here
+    // delayed the first outgoing frame by several seconds.
     await _publishLiveKitAfterPreview(emit);
+
+    // Comments/gallery/guests/rank can arrive after video is already flowing.
+    await _enrichSession(emit);
   }
 
   /// Dials the HUD socket off the critical path, retrying with a short backoff.
@@ -513,78 +514,60 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     );
 
     // ── Two-phase camera handoff (no black screen) ─────────────────────────
-    var releasedEarly = false;
-    try {
-      debugPrint(
-        '🔍 [BLoC] Phase A: connectMedia (no Flutter camera release)...',
+    // Keep the local preview alive while room signalling and audio connect.
+    // Release it exactly once immediately before WebRTC opens the camera, so
+    // CameraX and LiveKit never contend for the same lens.
+    var localReleased = false;
+    Future<void> releaseLocalCamera() async {
+      if (local == null || localReleased || isClosed) return;
+      final beforeRelease = _readyOrNull;
+      if (beforeRelease == null) return;
+      emit(
+        beforeRelease.copyWith(
+          controller: null,
+          isCameraInitialized: false,
+          clearActionMessage: true,
+        ),
       );
-      // ONE attempt, no backoff. The Flutter camera still holds the lens, so
-      // on most devices this is expected to fail — the point is to find out
-      // in milliseconds. With the full six-attempt budget it burned up to
-      // 10.5s of retry delays before the handoff below could even start,
-      // which is the "stream frozen for the first seconds" the host sees.
+      await _disposeCamera(local);
+      localReleased = true;
+      debugPrint('🔍 [BLoC] Flutter camera handed off to LiveKit ✅');
+    }
+
+    try {
+      debugPrint('🔍 [BLoC] connectMedia with serialized camera handoff...');
       await _sessionRepository.connectMedia(
         url: url,
         token: token,
         useFrontCamera: useFront,
-        maxAttempts: 1,
+        beforeVideoCapture: releaseLocalCamera,
       );
-      debugPrint('🔍 [BLoC] Phase A: connectMedia SUCCESS ✅');
+      debugPrint('🔍 [BLoC] connectMedia SUCCESS ✅');
     } catch (e) {
-      debugPrint('🔴 [BLoC] Phase A failed (lens busy?): $e');
-      if (local != null) {
-        // Drop the Flutter camera from the widget tree BEFORE disposing it.
-        // A viewer joining during the slow Xiaomi teardown would otherwise
-        // rebuild the preview with the still-set controller and crash with
-        // "A CameraController was used after being disposed".
-        final afterDispose = _readyOrNull;
-        if (afterDispose != null) {
-          emit(
-            afterDispose.copyWith(
-              controller: null,
-              isCameraInitialized: false,
-              clearActionMessage: true,
-            ),
-          );
-        }
-        await _disposeCamera(local);
-        if (isClosed) return;
-        releasedEarly = true;
-        // Long enough for a slow camera2 teardown, short enough that the
-        // host is not staring at a dead preview. 800 was pure guesswork.
-        await Future<void>.delayed(const Duration(milliseconds: 350));
-        if (isClosed) return;
+      debugPrint('🔴 [BLoC] connectMedia failed: $e');
+      CameraController? fallback = localReleased ? null : local;
+      if (localReleased) {
+        fallback = await _initializeCamera(useFront: useFront);
       }
-      try {
-        await _sessionRepository.connectMedia(
-          url: url,
-          token: token,
-          useFrontCamera: useFront,
-        );
-      } catch (e2) {
-        // Both attempts failed → fall back to a brand new Flutter camera
-        // so the host is never left on a black screen.
-        final fallback = await _initializeCamera(useFront: useFront);
-        if (isClosed) {
-          if (fallback != null) await _disposeCamera(fallback);
-          return;
-        }
-        final ready = _readyOrNull;
-        if (ready == null) {
-          if (fallback != null) await _disposeCamera(fallback);
-          return;
-        }
-        emit(
-          ready.copyWith(
-            controller: fallback,
-            isCameraInitialized: fallback != null,
-            isMediaConnected: false,
-            localVideoTrack: null,
-            actionMessage: 'تعذر نشر الفيديو عبر LiveKit: $e2',
-          ),
-        );
+      if (isClosed) {
+        if (localReleased && fallback != null) await _disposeCamera(fallback);
         return;
       }
+      final ready = _readyOrNull;
+      if (ready == null) {
+        if (localReleased && fallback != null) await _disposeCamera(fallback);
+        return;
+      }
+      emit(
+        ready.copyWith(
+          controller: fallback,
+          isCameraInitialized: fallback != null,
+          isMediaConnected: false,
+          localVideoTrack: null,
+          actionMessage: 'تعذر نشر الفيديو عبر LiveKit: $e',
+        ),
+      );
+      return;
     }
     if (isClosed) return;
 
@@ -600,14 +583,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       'localPreviewTrack=${_sessionRepository.localPreviewTrack != null ? "SET" : "NULL"}',
     );
 
-    // LiveKit publish is UP. DROP the Flutter camera from the widget tree
-    // FIRST (state update), THEN release the underlying controller.
-    //
-    // Only swap when there is genuinely something to swap TO. isMediaConnected
-    // is true as soon as the room holds an audio OR a video track, so a run
-    // where the mic came up but the lens did not would otherwise clear the
-    // controller with no LiveKit frame behind it and leave the host on a
-    // permanently black room.
+    // Only swap when there is genuinely something to swap TO.
     final liveTrack = _sessionRepository.localPreviewTrack as VideoTrack?;
     final mediaUp = _sessionRepository.isMediaConnected;
     final swapToLiveKit = liveTrack != null && mediaUp;
@@ -627,12 +603,6 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       'localVideoTrack=${_sessionRepository.localPreviewTrack != null ? "SET" : "NULL"}',
     );
 
-    if (swapToLiveKit && !releasedEarly && local != null) {
-      debugPrint('🔍 [BLoC] Disposing Flutter camera (not released early)...');
-      await _disposeCamera(local);
-      debugPrint('🔍 [BLoC] Flutter camera disposed ✅');
-      if (isClosed) return;
-    }
     debugPrint('🟢 [BLoC] _publishLiveKitAfterPreview: COMPLETE');
   }
 

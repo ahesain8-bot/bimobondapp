@@ -34,6 +34,7 @@ class RealSocketService implements SocketService {
   io.Socket? _socket;
   String? _liveId;
   bool _connected = false;
+  Completer<void>? _connectionReady;
   final _controller = StreamController<SocketEvent>.broadcast();
 
   @override
@@ -47,6 +48,19 @@ class RealSocketService implements SocketService {
 
   @override
   Future<void> connect({required String liveId, required String token}) async {
+    // Let Socket.IO finish its own reconnect rather than replacing the manager
+    // every time the caller retries a handshake.
+    final existing = _socket;
+    if (_liveId == liveId && existing != null) {
+      if (existing.connected) return;
+      existing.connect();
+      final signal = _connectionReady;
+      if (signal != null) {
+        await signal.future.timeout(const Duration(seconds: 10));
+        return;
+      }
+    }
+
     await disconnect();
 
     _liveId = liveId;
@@ -63,7 +77,15 @@ class RealSocketService implements SocketService {
     final socket = io.io(
       ApiEndpoints.baseUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          // Other app features connect to the same host/namespace. A private
+          // manager prevents stale auth and disconnects from leaking between
+          // chat, notifications and a live room.
+          .enableForceNew()
+          .setTransports(['websocket', 'polling'])
+          .enableReconnection()
+          .setReconnectionDelay(500)
+          .setReconnectionDelayMax(5000)
+          .setTimeout(8000)
           .disableAutoConnect()
           .setAuth({'token': authToken})
           .setExtraHeaders({'Authorization': 'Bearer $authToken'})
@@ -71,15 +93,22 @@ class RealSocketService implements SocketService {
     );
 
     _socket = socket;
+    final connected = Completer<void>();
+    _connectionReady = connected;
 
     socket.onConnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('🔌 Live viewer socket connected');
       _connected = true;
-      socket.emit('joinLive', {'liveId': liveId});
-      socket.emit('joinUser', {});
+      _joinRooms(socket, liveId);
+      if (!connected.isCompleted) connected.complete();
+      _controller.add(
+        ReconnectedEvent(liveId: liveId, timestamp: DateTime.now()),
+      );
     });
 
     socket.onDisconnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('🔌 Live viewer socket disconnected');
       final wasConnected = _connected;
       _connected = false;
@@ -91,19 +120,23 @@ class RealSocketService implements SocketService {
     });
 
     socket.onConnectError((e) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('⚠️ Live viewer socket connect error: $e');
       _connected = false;
+      // Automatic reconnection is still running. Keep the handshake pending
+      // so a polling fallback or the next network attempt can complete it.
     });
 
     socket.onError((e) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('⚠️ Live viewer socket error: $e');
     });
 
     socket.onReconnectAttempt((attempt) {
-      if (_liveId == null) return;
+      if (_socket != socket || _liveId != liveId) return;
       _controller.add(
         ReconnectingEvent(
-          liveId: _liveId!,
+          liveId: liveId,
           attempt: attempt,
           timestamp: DateTime.now(),
         ),
@@ -111,13 +144,10 @@ class RealSocketService implements SocketService {
     });
 
     socket.onReconnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
       _connected = true;
-      if (_liveId != null) {
-        socket.emit('joinLive', {'liveId': _liveId});
-        _controller.add(
-          ReconnectedEvent(liveId: _liveId!, timestamp: DateTime.now()),
-        );
-      }
+      _joinRooms(socket, liveId);
+      if (!connected.isCompleted) connected.complete();
     });
 
     _on(socket, 'liveComment', (data) {
@@ -184,6 +214,12 @@ class RealSocketService implements SocketService {
     });
 
     socket.connect();
+    await connected.future.timeout(const Duration(seconds: 10));
+  }
+
+  void _joinRooms(io.Socket socket, String liveId) {
+    socket.emit('joinLive', {'liveId': liveId});
+    socket.emit('joinUser', {});
   }
 
   /// Registers [handler] so a throw inside it is logged instead of silently
@@ -209,6 +245,7 @@ class RealSocketService implements SocketService {
     _socket = null;
     _liveId = null;
     _connected = false;
+    _connectionReady = null;
     if (socket != null) {
       if (liveId != null) {
         try {

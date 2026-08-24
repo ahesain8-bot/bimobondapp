@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'package:dartz/dartz.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
@@ -211,7 +210,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               subClaims.remove('apiSecret');
               subClaims.remove('privateKey');
             }
-          } catch (e) {}
+          } catch (_) {
+            // Diagnostics only; token parsing must never block joining.
+          }
 
           try {
             await liveKitService.connect(
@@ -264,11 +265,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             },
           );
 
-          final socketFuture = socketService.connect(
-            liveId: result.liveId,
-            token: result.socketToken,
-          );
+          // Subscribe before dialing so a fast initial connection cannot be
+          // missed. Realtime is independent from LiveKit: a HUD timeout must
+          // never tear down video or block comments/coin enrichment.
+          _listenSocket(live.id);
           _listenGiftSocket(live.id);
+          unawaited(
+            socketService
+                .connect(liveId: result.liveId, token: result.socketToken)
+                .catchError((_) {}),
+          );
           unawaited(
             giftSocketService.ensureJoined(liveId: live.id).catchError((_) {}),
           );
@@ -281,16 +287,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
           try {
             final results = await Future.wait<dynamic>([
-              socketFuture,
               coinsFuture,
               commentsFuture,
               meFuture,
             ]);
             if (_activeLiveId != live.id) return;
 
-            final coins = results[1];
-            final commentsResult = results[2];
-            _currentUserId = results[3] as String? ?? _currentUserId;
+            final coins = results[0];
+            final commentsResult = results[1];
+            _currentUserId = results[2] as String? ?? _currentUserId;
             final comments = commentsResult
                 .fold(
                   (_) => <CommentEntity>[],
@@ -303,11 +308,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             }
             pinned ??= _pinnedFromLiveMetadata(result.live);
 
-            _listenSocket(live.id);
             emit(
               state.copyWith(
                 session: state.session!.copyWith(
-                  isSocketConnected: true,
+                  isSocketConnected: socketService.isConnected,
                   coinBalance: coins.getOrElse(() => 1250),
                 ),
                 comments: comments,
@@ -371,7 +375,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     await result.fold(
       (failure) async {
-        final msg = failure.message ?? 'Unknown error';
+        final msg = failure.message;
         final muted = msg.toLowerCase().contains('mute');
         emit(
           state.copyWith(
@@ -433,9 +437,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (_activeLiveId != id || isClosed) return;
     result.fold(
       (_) {},
-      (balance) => emit(
-        state.copyWith(session: session.copyWith(coinBalance: balance)),
-      ),
+      (balance) =>
+          emit(state.copyWith(session: session.copyWith(coinBalance: balance))),
     );
   }
 
@@ -551,8 +554,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           mutedUserIds: revert,
-          moderationBanner:
-              'Failed to mute: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to mute: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -585,8 +587,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           mutedUserIds: revert,
-          moderationBanner:
-              'Failed to unmute: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to unmute: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -626,8 +627,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           bannedUserIds: revertBanned,
-          moderationBanner:
-              'Failed to ban: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to ban: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -660,8 +660,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           bannedUserIds: revert,
-          moderationBanner:
-              'Failed to unban: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to unban: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -999,7 +998,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           session: session.copyWith(
-            connectionState: LiveConnectionState.networkLost,
+            // Socket.IO carries comments and HUD events only. Keep rendering
+            // the LiveKit stream while it reconnects in the background.
+            connectionState: session.isLiveKitConnected
+                ? LiveConnectionState.connected
+                : LiveConnectionState.networkLost,
             isSocketConnected: false,
           ),
         ),
@@ -1008,14 +1011,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           session: session.copyWith(
-            connectionState: LiveConnectionState.reconnecting,
+            connectionState: session.isLiveKitConnected
+                ? LiveConnectionState.connected
+                : LiveConnectionState.reconnecting,
             reconnectAttempt: event.attempt,
+            isSocketConnected: false,
           ),
         ),
       );
-      try {
-        await liveKitService.reconnect();
-      } catch (_) {}
     } else if (event is ReconnectedEvent) {
       emit(
         state.copyWith(
