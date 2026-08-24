@@ -342,6 +342,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               );
         return prev.connectionState != curr.connectionState ||
             (prev.live?.id) != (curr.live?.id) ||
+            prev.guests != curr.guests ||
+            prev.isOnStage != curr.isOnStage ||
             prev.battle != curr.battle ||
             prevInfo != currInfo;
       },
@@ -392,10 +394,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             live.metadata?['isMultiGuest'] == true || hasLiveGuests;
         final showFanClub =
             !isPk && !isMultiGrid && live.metadata?['showFanClub'] != false;
+        final giftGoalTarget =
+            (live.metadata?['giftGoalTarget'] as num?)?.toInt() ?? 0;
         final showGiftGoal =
             !isPk &&
             !_giftGoalDismissed &&
-            (isMultiGrid || live.metadata?['showGiftGoal'] == true);
+            live.metadata?['showGiftGoal'] == true &&
+            giftGoalTarget > 0;
         final bottomPad = MediaQuery.paddingOf(context).bottom;
         final guests = _guestsFrom(live, stageGuests);
         final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
@@ -1239,7 +1244,7 @@ class _PkGuestFeed extends StatelessWidget {
     if (currentRoom != null) {
       return BuildSafeListenableBuilder(
         listenable: currentRoom,
-        builder: (_, __) {
+        builder: (_, _) {
           final track = _remoteVideoTrack(currentRoom);
           return track == null
               ? _fallback()
@@ -1273,8 +1278,8 @@ class _PkGuestFeed extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.center,
-        placeholder: (_, __) => const ColoredBox(color: Color(0xFF2A1A3A)),
-        errorWidget: (_, __, ___) => Container(
+        placeholder: (_, _) => const ColoredBox(color: Color(0xFF2A1A3A)),
+        errorWidget: (_, _, _) => Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -1290,7 +1295,7 @@ class _PkGuestFeed extends StatelessWidget {
               child: CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) =>
+                errorWidget: (_, _, _) =>
                     FallbackAvatar(seed: liveId, name: guestName, radius: 36),
               ),
             ),
@@ -1314,7 +1319,7 @@ class _PkBattleTimer extends StatelessWidget {
         const Duration(seconds: 1),
         (value) => value,
       ),
-      builder: (_, __) {
+      builder: (_, _) {
         final seconds = math.max(
           0,
           endTime?.difference(DateTime.now()).inSeconds ?? 0,
@@ -1409,7 +1414,7 @@ class _PkContributors extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: list[i],
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(
+                    errorWidget: (_, _, _) => Container(
                       color: AppColors.surface,
                       child: const Icon(
                         Icons.person,
@@ -1477,7 +1482,7 @@ class _GuestChip extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: avatar!,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) =>
+                  errorWidget: (_, _, _) =>
                       FallbackAvatar(seed: name, name: name, radius: 9),
                 ),
               ),

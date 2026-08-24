@@ -94,78 +94,24 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
-  CameraCaptureOptions _cameraOptions(LiveMediaHints hints) {
-    final dimensions = switch (hints.maxVideoResolution.toLowerCase()) {
-      '1080p' => const VideoDimensions(1920, 1080),
-      '720p' => const VideoDimensions(1280, 720),
-      '360p' => const VideoDimensions(640, 360),
-      _ => const VideoDimensions(854, 480),
-    };
-    return CameraCaptureOptions(
-      cameraPosition: CameraPosition.front,
-      params: VideoParameters(
-        dimensions: dimensions,
-        encoding: VideoEncoding(
-          maxBitrate: hints.maxBitrateKbps.clamp(800, 4500) * 1000,
-          maxFramerate: 30,
-        ),
-      ),
-    );
-  }
-
-  VideoPublishOptions _videoPublishOptions(LiveMediaHints hints) {
-    final capture = _cameraOptions(hints).params;
-    return VideoPublishOptions(
-      videoCodec: hints.preferredCodec,
-      simulcast: hints.simulcast,
-      backupVideoCodec: const BackupVideoCodec(enabled: false),
-      videoEncoding: capture.encoding,
-      videoSimulcastLayers: hints.simulcast
-          ? _simulcastLayers(hints, capture)
-          : const [],
-      degradationPreference: DegradationPreference.maintainFramerate,
-    );
-  }
-
-  List<VideoParameters> _simulcastLayers(
-    LiveMediaHints hints,
-    VideoParameters capture,
-  ) {
-    final ceiling = hints.maxBitrateKbps.clamp(800, 4500) * 1000;
-    final layers = <VideoParameters>[capture];
-
-    void addLayer(int width, int height, int bitrate) {
-      if (capture.dimensions.width <= width) return;
-      layers.add(
-        VideoParameters(
-          dimensions: VideoDimensions(width, height),
-          encoding: VideoEncoding(
-            maxBitrate: bitrate.clamp(300000, ceiling),
-            maxFramerate: 30,
-          ),
-        ),
-      );
-    }
-
-    addLayer(1280, 720, 2500000);
-    addLayer(854, 480, 1200000);
-    addLayer(640, 360, 650000);
-    return layers;
-  }
-
-  RoomOptions _roomOptions(LiveMediaHints hints) => RoomOptions(
-    adaptiveStream: hints.adaptiveStream,
-    dynacast: hints.dynacast,
-    defaultCameraCaptureOptions: _cameraOptions(hints),
-    defaultAudioCaptureOptions: const AudioCaptureOptions(
+  /// Stable LiveKit 2.11 profile. Dynamic codec/dynacast changes caused the
+  /// host track to disappear on Android, so mediaHints are retained for role
+  /// authorization but never allowed to renegotiate the active video codec.
+  RoomOptions _roomOptions(LiveMediaHints _) => const RoomOptions(
+    adaptiveStream: true,
+    dynacast: false,
+    defaultAudioCaptureOptions: AudioCaptureOptions(
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
       voiceIsolation: true,
       stopAudioCaptureOnMute: false,
     ),
-    defaultAudioPublishOptions: const AudioPublishOptions(dtx: true, red: true),
-    defaultVideoPublishOptions: _videoPublishOptions(hints),
+    defaultAudioPublishOptions: AudioPublishOptions(dtx: true, red: true),
+    defaultVideoPublishOptions: VideoPublishOptions(
+      simulcast: true,
+      backupVideoCodec: BackupVideoCodec(enabled: false),
+    ),
   );
 
   Future<void> _retryRemoteSubscription(
@@ -250,7 +196,14 @@ class RealLiveKitService implements LiveKitService {
     String? mockStreamUrl,
     LiveMediaHints? mediaHints,
   }) async {
-    await disconnect();
+    // Replacing the viewer JWT with the accepted guest JWT is an intentional
+    // in-room upgrade. Emitting `disconnected` here lets the viewer BLoC start
+    // its recovery path concurrently, which can dispose the brand-new guest
+    // room and produces "room unavailable after joining the stage". Retire
+    // the old primary room silently; only a real user/network disconnect is
+    // exposed through [disconnect] or the Room lifecycle callbacks.
+    await disconnectBattle();
+    await _disposePrimaryRoom(notify: false);
 
     if (url.isEmpty || token.isEmpty) {
       _setState(LiveKitConnectionState.failed);
@@ -546,15 +499,23 @@ class RealLiveKitService implements LiveKitService {
   @override
   Future<void> disconnect() async {
     await disconnectBattle();
-    _publishing = false;
-    _setState(LiveKitConnectionState.disconnected);
+    await _disposePrimaryRoom(notify: true);
+  }
+
+  Future<void> _disposePrimaryRoom({required bool notify}) async {
     final room = _room;
+    // Clear identity first so a late RoomDisconnectedEvent from the room being
+    // replaced cannot mutate the state of its successor.
     _room = null;
+    _publishing = false;
     _streamUrl = null;
     _roomName = null;
     _url = null;
     _token = null;
     _mediaHints = null;
+    if (notify) {
+      _setState(LiveKitConnectionState.disconnected);
+    }
     if (room != null) {
       try {
         await room.disconnect();

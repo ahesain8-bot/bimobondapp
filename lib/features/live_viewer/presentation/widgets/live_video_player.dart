@@ -125,12 +125,15 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       final dims = isActive
           ? VideoDimensions(capWidth, capHeight)
           : const VideoDimensions(854, 480);
+      final quality = isActive ? VideoQuality.HIGH : VideoQuality.LOW;
       debugPrint(
         '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
         '  isActive=$isActive'
-        '  → subscribe cap ${dims.width}x${dims.height}',
+        '  → setVideoDimensions(${dims.width}x${dims.height})'
+        ' + setVideoQuality(${quality.name.toUpperCase()})',
       );
       await pub.setVideoDimensions(dims);
+      await pub.setVideoQuality(quality);
 
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final track = _track;
@@ -391,12 +394,12 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
           height: double.infinity,
           alignment: Alignment.center,
           memCacheWidth: 720,
-          placeholder: (_, __) => AnimatedVideoPlaceholder(
+          placeholder: (_, _) => AnimatedVideoPlaceholder(
             seed: widget.live.id,
             category: widget.live.category,
             hostInitial: widget.live.hostName,
           ),
-          errorWidget: (_, __, ___) => AnimatedVideoPlaceholder(
+          errorWidget: (_, _, _) => AnimatedVideoPlaceholder(
             seed: widget.live.id,
             category: widget.live.category,
             hostInitial: widget.live.hostName,

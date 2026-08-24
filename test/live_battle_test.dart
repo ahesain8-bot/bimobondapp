@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bimobondapp/core/models/live_battle.dart';
 import 'package:bimobondapp/features/live_viewer/data/mappers/socket_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/socket_event.dart';
+import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
+import 'package:bimobondapp/features/live_viewer/domain/entities/live_session_entity.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/bloc/live_viewer/live_viewer_state.dart';
 
 void main() {
   group('LiveBattle', () {
@@ -53,6 +56,27 @@ void main() {
       expect(event!.battle.multiplier, 3);
       expect(event.battle.opponentLiveId('live-b'), 'live-a');
     });
+
+    test('missing status never starts a battle', () {
+      final battle = LiveBattle.fromJson({...json}..remove('status'));
+
+      expect(battle.isActive, isFalse);
+    });
+  });
+
+  test('stale PK metadata cannot replace an accepted guest stage', () {
+    final live = LiveEntity(
+      id: 'live-a',
+      hostId: 'host-a',
+      hostName: 'Host',
+      title: 'Live',
+      category: 'General',
+      startTime: DateTime(2026, 8, 24),
+      metadata: const {'isPk': true, 'layout': 'GRID'},
+    );
+    final state = LiveViewerState(session: LiveSessionEntity(live: live));
+
+    expect(state.isPk, isFalse);
   });
 
   test('battle opponent maps the documented live/user shape', () {

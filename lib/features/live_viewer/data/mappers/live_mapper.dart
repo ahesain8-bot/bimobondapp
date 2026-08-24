@@ -153,7 +153,9 @@ class LiveMapper {
   ) {
     final meta = <String, dynamic>{};
 
-    final isPk = json['isPk'] == true || json['battle'] != null;
+    final battleSnapshot = _asMap(json['battle']);
+    final isPk =
+        battleSnapshot?['status']?.toString().toUpperCase() == 'ACTIVE';
     final isMultiGrid = json['isMultiGrid'] == true;
     final isMultiGuest = json['isMultiGuest'] == true;
 
@@ -217,7 +219,7 @@ class LiveMapper {
     }
 
     // PK battle snapshot.
-    final battle = _asMap(json['battle']);
+    final battle = battleSnapshot;
     if (battle != null) {
       meta['scoreLeft'] = _asInt(battle['scoreLeft']) ?? 0;
       meta['scoreRight'] = _asInt(battle['scoreRight']) ?? 0;

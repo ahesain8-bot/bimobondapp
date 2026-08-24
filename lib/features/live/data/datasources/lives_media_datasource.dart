@@ -16,7 +16,6 @@ class LivesMediaDataSource {
   Room? _battleRoom;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
-  LiveMediaHints? _activeHints;
   var _videoPublished = false;
 
   /// The profile the camera actually opened at — not the one we asked for.
@@ -78,23 +77,17 @@ class LivesMediaDataSource {
     ];
   }
 
-  VideoPublishOptions _publishOptionsFor(
-    LiveCaptureProfile profile, {
-    LiveMediaHints? mediaHints,
-  }) {
-    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('host');
+  VideoPublishOptions _publishOptionsFor(LiveCaptureProfile profile) {
     return VideoPublishOptions(
-      videoCodec: hints.preferredCodec,
-      simulcast: hints.simulcast,
+      // This is the proven stable Android publishing path used before the
+      // regression: one codec negotiation with fixed simulcast layers.
+      simulcast: true,
       backupVideoCodec: const BackupVideoCodec(enabled: false),
       videoEncoding: VideoEncoding(
         maxBitrate: profile.maxBitrate,
         maxFramerate: profile.maxFps,
       ),
-      videoSimulcastLayers: hints.simulcast
-          ? _simulcastLayersFor(profile)
-          : const [],
-      degradationPreference: DegradationPreference.maintainFramerate,
+      videoSimulcastLayers: _simulcastLayersFor(profile),
     );
   }
 
@@ -144,21 +137,15 @@ class LivesMediaDataSource {
     await disconnect();
 
     final hints = mediaHints ?? LiveMediaHints.defaultsForRole('host');
-    _activeHints = hints;
     if (!hints.canPublish) {
       throw StateError('The server did not grant media publishing permission');
     }
     final requestedProfile = _profileForHints(hints);
 
     // ── RoomOptions tuned for stable host publishing ──────────────────────
-    // • dynacast follows the backend mediaHints for this room. When enabled,
-    //   the SFU sends SubscribedQualityUpdate signals on every subscriber
-    //   join/leave. The handler in room.dart processes `subscribedCodecs`
-    //   which calls publishAdditionalCodecForPublication → engine.negotiate()
-    //   → full SDP renegotiation. On Xiaomi's slow camera2 pipeline, if SDP
-    //   munging fails → NegotiationError → fullReconnectOnNext → camera freeze.
-    //   LiveKit can disable unused simulcast layers per subscriber. The server
-    //   can still disable it for devices that need the conservative path.
+    // • dynacast stays FALSE. Enabling it made subscriber changes trigger
+    //   extra codec/SDP negotiation on Android; a failed negotiation left the
+    //   host preview running locally while viewers received no camera track.
     // • backupVideoCodec DISABLED: defense in depth — prevents backup codec
     //   from being advertised in simulcastCodecs at publish time.
     // • adaptiveStream TRUE on the HOST (paired with viewer-side TRUE): the
@@ -180,8 +167,8 @@ class LivesMediaDataSource {
     //   profile the camera actually accepted.
     final room = Room(
       roomOptions: RoomOptions(
-        adaptiveStream: hints.adaptiveStream,
-        dynacast: hints.dynacast,
+        adaptiveStream: true,
+        dynacast: false,
         defaultAudioCaptureOptions: const AudioCaptureOptions(
           echoCancellation: true,
           noiseSuppression: true,
@@ -193,10 +180,7 @@ class LivesMediaDataSource {
           dtx: true,
           red: true,
         ),
-        defaultVideoPublishOptions: _publishOptionsFor(
-          requestedProfile,
-          mediaHints: hints,
-        ),
+        defaultVideoPublishOptions: _publishOptionsFor(requestedProfile),
       ),
     );
 
@@ -410,7 +394,7 @@ class LivesMediaDataSource {
       }
       await local.publishVideoTrack(
         _videoTrack!,
-        publishOptions: _publishOptionsFor(_activeProfile, mediaHints: hints),
+        publishOptions: _publishOptionsFor(_activeProfile),
       );
       _videoPublished = true;
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
@@ -505,13 +489,13 @@ class LivesMediaDataSource {
     LiveMediaHints? mediaHints,
   }) async {
     await disconnect();
-    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
-    // Apply the server-issued adaptive-stream and dynacast policy to viewers.
+    // Keep viewer negotiation on the stable subscribe-only profile. In
+    // particular dynacast must not be enabled by a generic server default.
     final room = Room(
-      roomOptions: RoomOptions(
-        adaptiveStream: hints.adaptiveStream,
-        dynacast: hints.dynacast,
-        defaultVideoPublishOptions: const VideoPublishOptions(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: false,
+        defaultVideoPublishOptions: VideoPublishOptions(
           backupVideoCodec: BackupVideoCodec(enabled: false),
         ),
       ),
@@ -537,12 +521,11 @@ class LivesMediaDataSource {
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
-    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
     final room = Room(
-      roomOptions: RoomOptions(
-        adaptiveStream: hints.adaptiveStream,
-        dynacast: hints.dynacast,
-        defaultVideoPublishOptions: const VideoPublishOptions(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: false,
+        defaultVideoPublishOptions: VideoPublishOptions(
           backupVideoCodec: BackupVideoCodec(enabled: false),
         ),
       ),
@@ -613,10 +596,7 @@ class LivesMediaDataSource {
     }
     await local.publishVideoTrack(
       next,
-      publishOptions: _publishOptionsFor(
-        _activeProfile,
-        mediaHints: _activeHints,
-      ),
+      publishOptions: _publishOptionsFor(_activeProfile),
     );
     _videoTrack = next;
     _videoPublished = true;
@@ -649,7 +629,6 @@ class LivesMediaDataSource {
     } finally {
       _videoTrack = null;
       _audioTrack = null;
-      _activeHints = null;
       _room = null;
       _videoPublished = false;
     }

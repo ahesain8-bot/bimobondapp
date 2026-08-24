@@ -60,7 +60,9 @@ class LiveBattle extends Equatable {
       live2Id: source['live2Id']?.toString() ?? '',
       live1Score: _integer(source['live1Score']),
       live2Score: _integer(source['live2Score']),
-      status: source['status']?.toString() ?? 'ACTIVE',
+      // Missing status is not proof that a battle started. Treating any stale
+      // battle object as ACTIVE is what made accepted guests open the PK UI.
+      status: source['status']?.toString() ?? '',
       phase: source['phase']?.toString() ?? 'BATTLE',
       multiplier: _decimal(source['multiplier'], fallback: 1),
       multiplierEndsAt: _date(source['multiplierEndsAt']),
@@ -101,6 +103,7 @@ class LiveBattle extends Equatable {
   LiveBattle withTimingFrom(LiveBattle? previous) {
     if (previous == null || previous.id != id) return this;
     return copyWith(
+      status: status.isEmpty ? previous.status : status,
       startTime: startTime ?? previous.startTime,
       endTime: endTime ?? previous.endTime,
       multiplierEndsAt: multiplierEndsAt ?? previous.multiplierEndsAt,

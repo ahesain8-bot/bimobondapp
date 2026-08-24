@@ -52,22 +52,16 @@ class LiveRoomStage extends StatelessWidget {
 
         final size = MediaQuery.sizeOf(context);
         final room = context.read<LiveSessionRepository>().mediaRoom;
-        final useGrid =
-            state is LiveRoomReady &&
-            state.session.layout?.toUpperCase() == 'GRID';
-
         final maxHeight = (size.height - topInset) * 0.66;
         final height = math.min(size.width / 0.78, maxHeight);
         final width = size.width;
         final visibleGuests = guests.take(3).toList(growable: false);
-
-        if (useGrid) {
-          return _HostGridStage(
-            guests: visibleGuests,
-            room: room is Room ? room : null,
-            topInset: topInset,
-          );
-        }
+        final railWidth = (width * 0.27).clamp(94.0, 116.0);
+        final railTop = math.max(18.0, height * 0.08);
+        final seatHeight = math.min(
+          railWidth * 1.24,
+          math.max(72.0, (height - railTop - 40) / 3),
+        );
 
         return Align(
           alignment: Alignment.topCenter,
@@ -81,10 +75,10 @@ class LiveRoomStage extends StatelessWidget {
                 children: [
                   const LiveRoomCameraLayer(),
                   Positioned(
-                    right: 8,
-                    top: height * 0.12,
-                    bottom: 8,
-                    width: math.max(104, width * 0.29),
+                    key: const ValueKey('host_tiktok_guest_rail'),
+                    right: 6,
+                    top: railTop,
+                    width: railWidth,
                     child: Directionality(
                       textDirection: TextDirection.ltr,
                       child: Column(
@@ -107,22 +101,21 @@ class LiveRoomStage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          for (
-                            var index = 0;
-                            index < visibleGuests.length;
-                            index++
-                          ) ...[
-                            Expanded(
-                              child: _StageTile(
-                                highlighted: index == 0,
-                                child: _GuestVideo(
-                                  guest: visibleGuests[index],
-                                  room: room is Room ? room : null,
-                                ),
-                              ),
+                          for (var index = 0; index < 3; index++) ...[
+                            SizedBox(
+                              key: ValueKey('host_tiktok_guest_seat_$index'),
+                              height: seatHeight,
+                              child: index < visibleGuests.length
+                                  ? _StageTile(
+                                      highlighted: index == 0,
+                                      child: _GuestVideo(
+                                        guest: visibleGuests[index],
+                                        room: room is Room ? room : null,
+                                      ),
+                                    )
+                                  : const _EmptyGuestSeat(),
                             ),
-                            if (index != visibleGuests.length - 1)
-                              const SizedBox(height: 4),
+                            if (index != 2) const SizedBox(height: 4),
                           ],
                         ],
                       ),
@@ -134,44 +127,6 @@ class LiveRoomStage extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _HostGridStage extends StatelessWidget {
-  const _HostGridStage({
-    required this.guests,
-    required this.room,
-    required this.topInset,
-  });
-
-  final List<LiveGuest> guests;
-  final Room? room;
-  final double topInset;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
-    final height = math.min(size.width / kStageAspect, maxHeight);
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: EdgeInsets.only(top: topInset),
-        child: SizedBox(
-          width: size.width,
-          height: height,
-          child: StageTiles(
-            tiles: [
-              const _StageTile(child: LiveRoomCameraLayer()),
-              for (final guest in guests)
-                _StageTile(
-                  child: _GuestVideo(guest: guest, room: room),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -405,6 +360,41 @@ class _StageTile extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: SizedBox.expand(child: child),
+      ),
+    );
+  }
+}
+
+class _EmptyGuestSeat extends StatelessWidget {
+  const _EmptyGuestSeat();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xD9262629),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.7)),
+      ),
+      child: Stack(
+        children: [
+          const Center(
+            child: Icon(Icons.person, size: 42, color: Colors.white30),
+          ),
+          Positioned(
+            right: 6,
+            bottom: 6,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add, size: 15, color: Color(0xFF161823)),
+            ),
+          ),
+        ],
       ),
     );
   }

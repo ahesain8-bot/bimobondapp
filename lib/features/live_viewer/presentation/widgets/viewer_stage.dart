@@ -5,7 +5,6 @@ import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/utils/build_safe_notifier.dart';
 import '../../../../core/utils/livekit_participant_match.dart';
-import '../../../../core/widgets/stage_tiles.dart';
 import '../../data/services/fake_livekit_service.dart' show LiveKitService;
 import '../../domain/entities/live_entity.dart';
 import '../../domain/repositories/guest_repository.dart';
@@ -52,70 +51,65 @@ class ViewerStage extends StatelessWidget {
     final width = size.width;
     final room = liveKit.room;
     final visibleGuests = guests.take(3).toList(growable: false);
-    final useGrid =
-        live.metadata?['layout']?.toString().toUpperCase() == 'GRID';
-
-    Widget buildStage() => useGrid
-        ? _ViewerGridStage(
-            live: live,
-            guests: visibleGuests,
-            room: room,
-            height: math.min(width / kStageAspect, heightLimit),
-            topInset: topInset,
-            isSelfOnStage: isSelfOnStage,
-            currentUserId: currentUserId,
-          )
-        : Align(
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: EdgeInsets.only(top: topInset),
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _ParticipantVideo(
-                      identity: live.hostId,
-                      name: live.hostName,
-                      avatarUrl: live.hostAvatar,
-                      room: room,
-                      isLocal: false,
-                    ),
-                    Positioned(
-                      right: 8,
-                      top: height * 0.12,
-                      bottom: 8,
-                      width: math.max(104, width * 0.29),
-                      child: Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Container(
-                              height: 28,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.48),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'Request',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            for (
-                              var index = 0;
-                              index < visibleGuests.length;
-                              index++
-                            ) ...[
-                              Expanded(
-                                child: _StageTile(
+    final railWidth = (width * 0.27).clamp(94.0, 116.0);
+    final railTop = math.max(18.0, height * 0.08);
+    final seatHeight = math.min(
+      railWidth * 1.24,
+      math.max(72.0, (height - railTop - 40) / 3),
+    );
+    // A guest session is never a PK battle. Keep the TikTok guest rail even
+    // when an older backend value says GRID; only a real ACTIVE battle may
+    // switch the room to the equal 50/50 layout.
+    Widget buildStage() => Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _ParticipantVideo(
+                identity: live.hostId,
+                name: live.hostName,
+                avatarUrl: live.hostAvatar,
+                room: room,
+                isLocal: false,
+              ),
+              Positioned(
+                key: const ValueKey('tiktok_guest_rail'),
+                right: 6,
+                top: railTop,
+                width: railWidth,
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.48),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Request',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      for (var index = 0; index < 3; index++) ...[
+                        SizedBox(
+                          key: ValueKey('tiktok_guest_seat_$index'),
+                          height: seatHeight,
+                          child: index < visibleGuests.length
+                              ? _StageTile(
                                   highlighted: index == 0,
                                   child: _ParticipantVideo(
                                     identity: visibleGuests[index].userId,
@@ -130,20 +124,20 @@ class ViewerStage extends StatelessWidget {
                                     cameraOff:
                                         visibleGuests[index].cameraOffByHost,
                                   ),
-                                ),
-                              ),
-                              if (index != visibleGuests.length - 1)
-                                const SizedBox(height: 4),
-                            ],
-                          ],
+                                )
+                              : const _EmptyStageSeat(),
                         ),
-                      ),
-                    ),
-                  ],
+                        if (index != 2) const SizedBox(height: 4),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
+            ],
+          ),
+        ),
+      ),
+    );
 
     if (room == null) return buildStage();
     // Publishing, unpublishing and camera toggles all arrive as Room
@@ -156,60 +150,36 @@ class ViewerStage extends StatelessWidget {
   }
 }
 
-class _ViewerGridStage extends StatelessWidget {
-  const _ViewerGridStage({
-    required this.live,
-    required this.guests,
-    required this.room,
-    required this.height,
-    required this.topInset,
-    required this.isSelfOnStage,
-    required this.currentUserId,
-  });
-
-  final LiveEntity live;
-  final List<GuestSummary> guests;
-  final Room? room;
-  final double height;
-  final double topInset;
-  final bool isSelfOnStage;
-  final String? currentUserId;
+class _EmptyStageSeat extends StatelessWidget {
+  const _EmptyStageSeat();
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: EdgeInsets.only(top: topInset),
-        child: SizedBox(
-          width: MediaQuery.sizeOf(context).width,
-          height: height,
-          child: StageTiles(
-            tiles: [
-              _StageTile(
-                child: _ParticipantVideo(
-                  identity: live.hostId,
-                  name: live.hostName,
-                  avatarUrl: live.hostAvatar,
-                  room: room,
-                  isLocal: false,
-                ),
-              ),
-              for (final guest in guests)
-                _StageTile(
-                  child: _ParticipantVideo(
-                    identity: guest.userId,
-                    name: guest.displayName,
-                    avatarUrl: guest.avatarUrl,
-                    room: room,
-                    isLocal: isSelfOnStage && guest.userId == currentUserId,
-                    isMuted: guest.mutedByHost,
-                    cameraOff: guest.cameraOffByHost,
-                  ),
-                ),
-            ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xD9262629),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.7)),
+      ),
+      child: Stack(
+        children: [
+          const Center(
+            child: Icon(Icons.person, size: 42, color: Colors.white30),
           ),
-        ),
+          Positioned(
+            right: 6,
+            bottom: 6,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add, size: 15, color: Color(0xFF161823)),
+            ),
+          ),
+        ],
       ),
     );
   }

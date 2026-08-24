@@ -77,8 +77,9 @@ class LiveViewerState extends Equatable {
 
   LiveEntity? get live => session?.live;
 
-  bool get isPk =>
-      battle != null ? battle!.isActive : live?.metadata?['isPk'] == true;
+  /// PK is server-authoritative. A stale `isPk`/`battle` field in live
+  /// metadata must never turn an accepted guest into the battle UI.
+  bool get isPk => battle?.isActive == true;
 
   LiveViewerState copyWith({
     LiveSessionEntity? session,

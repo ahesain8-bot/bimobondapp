@@ -66,7 +66,7 @@ void main() {
     expect(gift.left, lessThan(share.left));
   });
 
-  testWidgets('GRID layout renders host and guest below the live header', (
+  testWidgets('stale GRID layout cannot turn a guest into a battle', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(360, 800);
@@ -90,14 +90,12 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Host'), findsOneWidget);
+    expect(find.text('Request'), findsOneWidget);
     expect(find.text('Guest'), findsOneWidget);
-    expect(tester.getRect(find.text('Host')).top, greaterThan(120));
-    expect(
-      tester.getRect(find.text('Host')).left,
-      lessThan(tester.getRect(find.text('Guest')).left),
-      reason: 'host remains first and on the left even in an Arabic app',
-    );
+    expect(tester.getRect(find.text('Guest')).left, greaterThan(200));
+    expect(find.byKey(const ValueKey('tiktok_guest_seat_0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tiktok_guest_seat_1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tiktok_guest_seat_2')), findsOneWidget);
   });
 
   testWidgets('PANEL layout uses the TikTok guest rail', (tester) async {
@@ -125,5 +123,18 @@ void main() {
     expect(find.text('Request'), findsOneWidget);
     expect(find.text('Guest'), findsOneWidget);
     expect(tester.getRect(find.text('Guest')).left, greaterThan(200));
+
+    final seats = [
+      for (var index = 0; index < 3; index++)
+        tester.getRect(find.byKey(ValueKey('tiktok_guest_seat_$index'))),
+    ];
+    expect(seats[0].height, lessThan(150));
+    expect(seats[0].height, moreOrLessEquals(seats[1].height, epsilon: 0.5));
+    expect(seats[1].height, moreOrLessEquals(seats[2].height, epsilon: 0.5));
+    expect(
+      seats[1].top,
+      greaterThan(seats[0].bottom),
+      reason: 'one guest must not stretch across the full side rail',
+    );
   });
 }

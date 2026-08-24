@@ -172,6 +172,15 @@ class LiveViewerLeftStage extends LiveViewerEvent {
   const LiveViewerLeftStage();
 }
 
+/// An accepted guest asks the host to start a TikTok-style competition.
+///
+/// The current server exposes PK creation to live owners only, so this is a
+/// stage request delivered through the live conversation for the host to act
+/// on; it must not fabricate a local battle state.
+class LiveViewerCompetitionRequested extends LiveViewerEvent {
+  const LiveViewerCompetitionRequested();
+}
+
 /// Re-reads the stage roster (`GET /lives/:id/guests`).
 class LiveViewerGuestsRefreshed extends LiveViewerEvent {
   const LiveViewerGuestsRefreshed();

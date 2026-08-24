@@ -69,6 +69,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerGuestSeatRequested>(_onGuestSeatRequested);
     on<LiveViewerGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveViewerLeftStage>(_onLeftStage);
+    on<LiveViewerCompetitionRequested>(_onCompetitionRequested);
     on<LiveViewerGuestsRefreshed>(_onGuestsRefreshed);
     on<LiveViewerGuestApprovalChecked>(_onGuestApprovalChecked);
     on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
@@ -835,6 +836,49 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     add(const LiveViewerGuestsRefreshed());
   }
 
+  Future<void> _onCompetitionRequested(
+    LiveViewerCompetitionRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = state.live?.id;
+    if (liveId == null || liveId.isEmpty || !state.isOnStage) return;
+    if (state.isGuestActionBusy) return;
+
+    emit(state.copyWith(isGuestActionBusy: true));
+    final result = await commentRepository.sendComment(
+      liveId: liveId,
+      content: '⚔️ أطلب بدء جولة منافسة',
+    );
+    if (isClosed || _activeLiveId != liveId) return;
+    await result.fold(
+      (failure) async {
+        emit(
+          state.copyWith(
+            isGuestActionBusy: false,
+            moderationBanner: 'تعذر إرسال طلب المنافسة: ${failure.message}',
+          ),
+        );
+      },
+      (comment) async {
+        if (comment.userId.isNotEmpty) {
+          _currentUserId ??= comment.userId;
+        }
+        final comments = state.comments.any((item) => item.id == comment.id)
+            ? state.comments
+            : [...state.comments, comment];
+        emit(
+          state.copyWith(
+            comments: comments,
+            currentUserId: _currentUserId,
+            isGuestActionBusy: false,
+            moderationBanner: 'تم إرسال طلب المنافسة إلى المضيف',
+          ),
+        );
+      },
+    );
+    _scheduleBannerClear();
+  }
+
   Future<void> _onGuestsRefreshed(
     LiveViewerGuestsRefreshed event,
     Emitter<LiveViewerState> emit,
@@ -1488,11 +1532,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       add(const LiveViewerGuestsRefreshed());
     } catch (e) {
       if (isClosed) return;
+      final message = e.toString().replaceFirst('Bad state: ', '');
       emit(
         state.copyWith(
           isGuestActionBusy: false,
           isOnStage: false,
-          moderationBanner: 'تعذر تشغيل الكاميرا للنشر: $e',
+          moderationBanner: 'تعذر تشغيل الكاميرا للنشر: $message',
         ),
       );
     }
