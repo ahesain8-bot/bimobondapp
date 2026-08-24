@@ -88,11 +88,7 @@ class MessagesConversationList extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(
-                  Icons.delete_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                const Icon(Icons.delete_rounded, color: Colors.white, size: 24),
               ],
             ),
           ),
@@ -108,10 +104,12 @@ class MessagesConversationList extends StatelessWidget {
             return false;
           },
           onDismissed: (direction) {
-            context.read<InboxBloc>().add(InboxChatDismissed(
-              chatId: chat.chatId,
-              deleteForEveryone: deleteForEveryone,
-            ));
+            context.read<InboxBloc>().add(
+              InboxChatDismissed(
+                chatId: chat.chatId,
+                deleteForEveryone: deleteForEveryone,
+              ),
+            );
           },
           child: _ConversationTile(chat: chat),
         );
@@ -126,14 +124,14 @@ class _ConversationTile extends StatelessWidget {
   final InboxChatItem chat;
 
   Map<String, dynamic> get _chatExtra => {
-        'chatId': chat.chatId,
-        'username': chat.name,
-        if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
-          'imageUrl': chat.imageUrl,
-        if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
-        'isPinned': chat.isPinned,
-        'isMuted': chat.isMuted,
-      };
+    'chatId': chat.chatId,
+    'username': chat.name,
+    if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
+      'imageUrl': chat.imageUrl,
+    if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
+    'isPinned': chat.isPinned,
+    'isMuted': chat.isMuted,
+  };
 
   Future<void> _openChat(
     BuildContext context, {
@@ -142,15 +140,10 @@ class _ConversationTile extends StatelessWidget {
     context.read<InboxBloc>().add(InboxChatOpened(chat.chatId));
     await context.pushNamed(
       'chat',
-      extra: {
-        ..._chatExtra,
-        if (openCamera) 'openCamera': true,
-      },
+      extra: {..._chatExtra, if (openCamera) 'openCamera': true},
     );
     if (context.mounted) {
-      context.read<InboxBloc>().add(
-        const InboxLoadRequested(refresh: true),
-      );
+      context.read<InboxBloc>().add(const InboxLoadRequested(refresh: true));
     }
   }
 
@@ -158,16 +151,17 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: chat.unread
-            ? theme.colorScheme.primary.withValues(
-                alpha: MessagesLayoutConstants.conversationUnreadAlpha,
-              )
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(
-          MessagesLayoutConstants.conversationTileRadius,
-        ),
+    // ListTile paints its ink on the nearest Material. A decorated Container
+    // here hid that ink and triggers a framework assertion once per visible
+    // conversation on current Flutter versions.
+    return Material(
+      color: chat.unread
+          ? theme.colorScheme.primary.withValues(
+              alpha: MessagesLayoutConstants.conversationUnreadAlpha,
+            )
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(
+        MessagesLayoutConstants.conversationTileRadius,
       ),
       child: ListTile(
         onTap: () => _openChat(context),
@@ -259,15 +253,16 @@ class _ConversationTile extends StatelessWidget {
                   color: chat.isTyping
                       ? theme.colorScheme.primary
                       : (chat.unread
-                          ? theme.textTheme.bodyLarge?.color
-                          : theme.textTheme.bodyMedium?.color?.withValues(
-                              alpha: 0.5,
-                            )),
+                            ? theme.textTheme.bodyLarge?.color
+                            : theme.textTheme.bodyMedium?.color?.withValues(
+                                alpha: 0.5,
+                              )),
                   fontWeight: chat.isTyping || chat.unread
                       ? FontWeight.w600
                       : FontWeight.w400,
-                  fontStyle:
-                      chat.isTyping ? FontStyle.italic : FontStyle.normal,
+                  fontStyle: chat.isTyping
+                      ? FontStyle.italic
+                      : FontStyle.normal,
                   fontSize: 14,
                 ),
                 maxLines: 1,

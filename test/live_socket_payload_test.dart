@@ -1,9 +1,36 @@
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/features/live/data/mappers/live_session_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/data/mappers/socket_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/socket_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('host gift combo payload', () {
+    test('accepts the legacy liveGift user alias and nested gift', () {
+      final payload = GiftComboPayload.fromMap({
+        'liveId': 'l1',
+        'id': 'tx1',
+        'quantity': 1,
+        'user': {
+          'id': 'u1',
+          'fullName': 'Maya',
+          'avatarUrl': 'https://example.com/maya.jpg',
+        },
+        'gift': {
+          'id': 'rose',
+          'name': 'Rose',
+          'imageUrl': 'https://example.com/rose.png',
+        },
+      });
+
+      expect(payload, isNotNull);
+      expect(payload!.giftId, 'rose');
+      expect(payload.senderId, 'u1');
+      expect(payload.senderName, 'Maya');
+      expect(payload.giftName, 'Rose');
+    });
+  });
+
   group('LiveSessionMapper.commentFromJson (host)', () {
     test('reads a plain liveComment payload', () {
       final message = LiveSessionMapper.commentFromJson({

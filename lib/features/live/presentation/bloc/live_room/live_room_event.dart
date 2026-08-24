@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import '../../../../../core/models/live_battle.dart';
 
 import '../../../domain/entities/live_session.dart';
 import '../../../domain/repositories/live_session_repository.dart';
@@ -81,6 +82,12 @@ class LiveRoomHudEventReceived extends LiveRoomEvent {
   const LiveRoomHudEventReceived(this.event);
 
   final LiveHudEvent event;
+}
+
+class LiveRoomMediaEventReceived extends LiveRoomEvent {
+  const LiveRoomMediaEventReceived(this.event);
+
+  final LiveMediaConnectionEvent event;
 }
 
 class LiveRoomClearActionMessage extends LiveRoomEvent {
@@ -268,6 +275,13 @@ class LiveRoomGuestRequestAnswered extends LiveRoomEvent {
 /// Guest list changed — refresh pending invite badge.
 class LiveRoomGuestsChanged extends LiveRoomEvent {
   const LiveRoomGuestsChanged();
+}
+
+/// Applies an HTTP/socket battle snapshot and connects the opponent video.
+class LiveRoomBattleChanged extends LiveRoomEvent {
+  const LiveRoomBattleChanged(this.battle);
+
+  final LiveBattle? battle;
 }
 
 /// Gallery list changed — refresh gallery counts chip.

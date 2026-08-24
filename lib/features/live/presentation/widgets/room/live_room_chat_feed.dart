@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/utils/app_sizes.dart';
+import '../../../../../core/utils/live_feed_fade.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
 import '../../../../../core/widgets/gifter_level_badge.dart';
@@ -23,8 +24,7 @@ class LiveRoomChatFeed extends StatelessWidget {
       buildWhen: (previous, current) =>
           current is LiveRoomReady &&
           (previous is! LiveRoomReady ||
-              previous.session.messages != current.session.messages ||
-              previous.isRealtimeConnected != current.isRealtimeConnected),
+              previous.session.messages != current.session.messages),
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();
@@ -40,8 +40,6 @@ class LiveRoomChatFeed extends StatelessWidget {
         }
         final size = MediaQuery.sizeOf(context);
         final maxWidth = size.width * AppSizes.roomChatMaxWidthFactor;
-        final isOffline = !state.isRealtimeConnected;
-
         return LayoutBuilder(
           builder: (context, constraints) {
             // Honour whatever slot the room actually gave us. The screen
@@ -65,14 +63,6 @@ class LiveRoomChatFeed extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Standing, not a SnackBar that flashes past: when the
-                      // HUD socket is down the feed simply stops filling, and
-                      // the host has no other way to tell that apart from
-                      // "nobody is commenting".
-                      if (isOffline) ...[
-                        const _RealtimeOfflineChip(),
-                        const SizedBox(height: AppSpacing.roomChatGap),
-                      ],
                       if (pinned != null) ...[
                         _PinnedCommentBar(message: pinned),
                         const SizedBox(height: AppSpacing.roomChatGap),
@@ -84,7 +74,10 @@ class LiveRoomChatFeed extends StatelessWidget {
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxHeight: listMaxHeight),
                           child: ShaderMask(
-                            shaderCallback: _fadeOlderLines,
+                            shaderCallback: (rect) => liveFeedFadeShader(
+                              rect,
+                              scrollableHeight: listMaxHeight,
+                            ),
                             blendMode: BlendMode.dstIn,
                             child: ListView.separated(
                               reverse: true,
@@ -114,55 +107,6 @@ class LiveRoomChatFeed extends StatelessWidget {
       },
     );
   }
-}
-
-/// Shown in place of a silent feed while the HUD socket is down, because a
-/// dropped socket and an empty room look identical from the host's seat.
-class _RealtimeOfflineChip extends StatelessWidget {
-  const _RealtimeOfflineChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xCCB3261E),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Directionality(
-          textDirection: TextDirection.rtl,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.wifi_off, size: 13, color: Colors.white),
-              SizedBox(width: 6),
-              Text(
-                'الاتصال المباشر منقطع — التعليقات لن تصل',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Older lines dissolve as they climb out of the feed, the way they do on
-/// TikTok, so the run never ends on a hard cut against the video.
-Shader _fadeOlderLines(Rect bounds) {
-  return const LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Colors.transparent, Colors.white],
-    stops: [0.0, AppSizes.roomChatFadeStop],
-  ).createShader(bounds);
 }
 
 class _ChatMessageTile extends StatelessWidget {

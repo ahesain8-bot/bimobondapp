@@ -36,9 +36,9 @@ extension LiveConnectionStateX on LiveConnectionState {
       case LiveConnectionState.connected:
         return 'Live';
       case LiveConnectionState.reconnecting:
-        return 'Reconnecting…';
+        return '';
       case LiveConnectionState.networkLost:
-        return 'Network lost';
+        return '';
       case LiveConnectionState.liveEnded:
         return 'Live ended';
       case LiveConnectionState.banned:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/models/live_battle.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
@@ -47,6 +48,8 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
   var _busy = false;
   String? _error;
   List<LiveGuest> _guests = const [];
+  List<LiveBattleOpponent> _opponents = const [];
+  LiveBattle? _battle;
   final _inviteController = TextEditingController();
 
   @override
@@ -70,10 +73,16 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
       _error = null;
     });
     try {
-      final guests = await repository.loadGuests(widget.liveId);
+      final results = await Future.wait<dynamic>([
+        repository.loadGuests(widget.liveId),
+        _loadBattleSafely(),
+        _loadOpponentsSafely(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _guests = guests;
+        _guests = results[0] as List<LiveGuest>;
+        _battle = results[1] as LiveBattle?;
+        _opponents = results[2] as List<LiveBattleOpponent>;
         _loading = false;
       });
       context.read<LiveRoomBloc>().add(const LiveRoomGuestsChanged());
@@ -83,6 +92,41 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
         _loading = false;
         _error = errorMessage(e);
       });
+    }
+  }
+
+  Future<LiveBattle?> _loadBattleSafely() async {
+    try {
+      return await repository.loadBattle(widget.liveId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<LiveBattleOpponent>> _loadOpponentsSafely() async {
+    try {
+      return await repository.loadBattleOpponents(widget.liveId);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _runBattle(
+    Future<LiveBattle> Function() action, {
+    required String success,
+  }) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final battle = await action();
+      if (!mounted) return;
+      setState(() => _battle = battle);
+      context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(battle));
+      snack(success);
+    } catch (e) {
+      if (mounted) snack(errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -125,10 +169,15 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
     return BlocListener<LiveRoomBloc, LiveRoomState>(
       listenWhen: (previous, current) =>
           current is LiveRoomReady &&
-          (previous is! LiveRoomReady || previous.guests != current.guests),
+          (previous is! LiveRoomReady ||
+              previous.guests != current.guests ||
+              previous.battle != current.battle),
       listener: (context, state) {
         if (state is! LiveRoomReady || _busy) return;
-        setState(() => _guests = state.guests);
+        setState(() {
+          _guests = state.guests;
+          _battle = state.battle;
+        });
       },
       child: LiveRoomHostSheetChrome(
         title: 'الضيوف والتعاون',
@@ -145,6 +194,8 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
+                  _battleSection(),
+                  const SizedBox(height: 22),
                   const Text(
                     'دعوة ضيف',
                     style: TextStyle(
@@ -209,6 +260,144 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
                 ],
               ),
       ),
+    );
+  }
+
+  Widget _battleSection() {
+    final battle = _battle;
+    if (battle?.isActive == true) {
+      final mine = battle!.scoreFor(widget.liveId);
+      final theirs = battle.opponentScoreFor(widget.liveId);
+      return Card(
+        color: const Color(0x3325F4EE),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'المعركة جارية الآن',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$mine  —  $theirs · ${battle.phase}',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _runBattle(
+                            () => repository.activateBattleMultiplier(
+                              liveId: widget.liveId,
+                              multiplier: 2,
+                              durationSeconds: 30,
+                            ),
+                            success: 'تم تفعيل مضاعف ×2 لمدة 30 ثانية',
+                          ),
+                    child: const Text('مضاعف ×2'),
+                  ),
+                  FilledButton.tonal(
+                    onPressed: _busy
+                        ? null
+                        : () => _runBattle(
+                            () => repository.endBattle(
+                              liveId: widget.liveId,
+                              battleId: battle.id,
+                            ),
+                            success: 'تم إنهاء المعركة',
+                          ),
+                    style: FilledButton.styleFrom(
+                      foregroundColor: Colors.red.shade100,
+                      backgroundColor: Colors.red.shade900,
+                    ),
+                    child: const Text('إنهاء المعركة'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'المعارك المباشرة',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'اختر مضيفاً مباشراً أو دع الخادم يجد خصماً متاحاً.',
+          style: TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+        FilledButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _runBattle(
+                  () => repository.matchBattle(widget.liveId),
+                  success: 'بدأت المعركة',
+                ),
+          icon: const Icon(Icons.bolt),
+          label: const Text('مطابقة تلقائية وبدء المعركة'),
+        ),
+        if (_opponents.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ..._opponents
+              .take(8)
+              .map(
+                (opponent) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundImage: opponent.hostAvatar?.isNotEmpty == true
+                        ? NetworkImage(opponent.hostAvatar!)
+                        : null,
+                    child: opponent.hostAvatar?.isNotEmpty == true
+                        ? null
+                        : const Icon(Icons.person),
+                  ),
+                  title: Text(
+                    opponent.hostName,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    '${opponent.viewers} مشاهد · ${opponent.title}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  trailing: OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _runBattle(
+                            () => repository.startBattle(
+                              liveId: widget.liveId,
+                              opponentLiveId: opponent.liveId,
+                            ),
+                            success: 'بدأت المعركة مع ${opponent.hostName}',
+                          ),
+                    child: const Text('تحدّي'),
+                  ),
+                ),
+              ),
+        ],
+      ],
     );
   }
 

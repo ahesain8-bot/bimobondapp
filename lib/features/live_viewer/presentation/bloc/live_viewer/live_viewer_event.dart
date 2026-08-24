@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../domain/entities/live_entity.dart';
+import '../../../data/services/fake_livekit_service.dart';
 
 abstract class LiveViewerEvent extends Equatable {
   const LiveViewerEvent();
@@ -174,4 +175,32 @@ class LiveViewerLeftStage extends LiveViewerEvent {
 /// Re-reads the stage roster (`GET /lives/:id/guests`).
 class LiveViewerGuestsRefreshed extends LiveViewerEvent {
   const LiveViewerGuestsRefreshed();
+}
+
+/// Internal fallback for a requested seat. The host acceptance event can be
+/// lost while Socket.IO is reconnecting, so the authenticated guest checks
+/// for publish credentials for a short, bounded window.
+class LiveViewerGuestApprovalChecked extends LiveViewerEvent {
+  const LiveViewerGuestApprovalChecked({
+    required this.liveId,
+    this.attempt = 1,
+  });
+
+  final String liveId;
+  final int attempt;
+
+  @override
+  List<Object?> get props => [liveId, attempt];
+}
+
+/// Internal bridge from the LiveKit room lifecycle into the session BLoC.
+/// Socket.IO and LiveKit reconnect independently, so socket recovery must not
+/// be allowed to claim that the video room recovered too.
+class LiveViewerLiveKitStateChanged extends LiveViewerEvent {
+  const LiveViewerLiveKitStateChanged(this.state);
+
+  final LiveKitConnectionState state;
+
+  @override
+  List<Object?> get props => [state];
 }

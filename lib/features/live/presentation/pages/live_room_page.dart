@@ -32,10 +32,12 @@ import '../widgets/room/live_room_camera_layer.dart';
 import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
 import '../widgets/room/live_room_guest_invite_prompt.dart';
+import '../widgets/room/live_room_guest_request_prompt.dart';
 import '../widgets/room/live_room_stage.dart';
 import '../widgets/room/live_room_effects_panel.dart';
 import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
+import '../widgets/room/live_starting_indicator.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
 import '../../../live_viewer/presentation/widgets/floating_hearts.dart';
@@ -62,6 +64,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   LiveSessionRepository? _sessionRepository;
   late final CameraRepository _cameraRepository;
   late final LiveFaceTracker _faceTracker;
+  late final DateTime _startIndicatorDeadline;
   var _depsReady = false;
 
   @override
@@ -70,6 +73,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     WidgetsBinding.instance.addObserver(this);
     _cameraRepository = CameraRepositoryImpl();
     _faceTracker = LiveFaceTracker();
+    _startIndicatorDeadline = DateTime.now().add(const Duration(seconds: 7));
     _preRequestPermissions();
     LiveScreenWakelock.enable();
   }
@@ -238,9 +242,11 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                   },
                 ),
               ],
-              child: const Scaffold(
+              child: Scaffold(
                 backgroundColor: Colors.black,
-                body: _LiveRoomBody(),
+                body: _LiveRoomBody(
+                  startIndicatorDeadline: _startIndicatorDeadline,
+                ),
               ),
             ),
           ),
@@ -251,7 +257,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
 }
 
 class _LiveRoomBody extends StatelessWidget {
-  const _LiveRoomBody();
+  const _LiveRoomBody({required this.startIndicatorDeadline});
+
+  final DateTime startIndicatorDeadline;
 
   @override
   Widget build(BuildContext context) {
@@ -340,10 +348,10 @@ class _LiveRoomBody extends StatelessWidget {
             children: [
               const LiveRoomCameraLayer(),
               const VignetteLayer(),
-              if (!state.isCameraInitialized)
-                const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
+              LiveStartingIndicator(
+                deadline: startIndicatorDeadline,
+                isPublished: false,
+              ),
             ],
           );
         }
@@ -351,8 +359,21 @@ class _LiveRoomBody extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            const LiveRoomCameraLayer(),
+            // The stage *is* the video area: alone it renders the full-bleed
+            // camera, and as soon as someone else is publishing it becomes the
+            // shared split box under the header.
+            LiveRoomStage(
+              // Header + info row, measured off the same tokens they are built
+              // from, so the stage sits under them on every screen instead of
+              // trusting one hard-coded offset.
+              topInset:
+                  MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
+            ),
             const VignetteLayer(),
+            LiveStartingIndicator(
+              deadline: startIndicatorDeadline,
+              isPublished: state is LiveRoomReady && state.isMediaConnected,
+            ),
             const IgnorePointer(
               child: Align(
                 alignment: Alignment.topCenter,
@@ -416,7 +437,6 @@ class _LiveRoomBody extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        LiveRoomStage(),
                         SizedBox(height: AppSpacing.xs),
                         Flexible(
                           child: Padding(
@@ -431,6 +451,7 @@ class _LiveRoomBody extends StatelessWidget {
                       ],
                     ),
                   ),
+                  LiveRoomGuestRequestPrompt(),
                   LiveRoomGuestInvitePrompt(),
                   LiveRoomChatComposer(),
                   LiveRoomBottomBar(),

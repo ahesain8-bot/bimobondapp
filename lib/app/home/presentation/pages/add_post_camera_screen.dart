@@ -621,30 +621,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
   }
 
-  /// Kept for filter / reset paths that still need to re-sync beauty params
-  /// while preserving Magic On smooth.
-  void _applyMagicSmoothOnly() {
-    if (_photoEditorMagicOn) {
-      final strength =
-          (_photoAdjustments[MediaPhotoEditorTool.smooth] ?? _kMagicAutoSmooth)
-              .clamp(0.0, 1.0);
-      ArCameraBridge.setMagicEnabled(true, strength: strength);
-      return;
-    }
-    ArCameraBridge.setMagicEnabled(false);
-    final id = ArFilterCatalog.items[_arFilterIndex].id;
-    final params = ArFilterCatalog.colorFilterById(id)?.params;
-    if (params != null) {
-      final intensity = ArFilterCatalog.isColorFilter(id)
-          ? _arFilterIntensity
-          : 1.0;
-      _pushBeautyParams(params, intensity);
-    } else {
-      ArCameraBridge.clearBeautyFilter();
-      _syncRetouchToNative();
-    }
-  }
-
   Timer? _smoothAdjustDebounce;
   Timer? _retouchAdjustDebounce;
 
@@ -1857,34 +1833,41 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   Future<void> _handleGoLiveTap() async {
     if (_isRecording || _isBusy || _isProcessingCapture) return;
     try {
+      // Remove the preview from the widget tree for BOTH camera engines. On
+      // Android, calling stopCamera() while leaving the platform view mounted
+      // lets its visibility callbacks bind CameraX again during the next route
+      // transition. That races the Flutter/LiveKit cameras and is the source of
+      // the several-second freeze seen at the start of a live.
+      setState(() => _liveHandoffActive = true);
       if (_useNativeArFilters) {
         await ArCameraBridge.stopCamera();
-      } else {
-        setState(() => _liveHandoffActive = true);
-        // Let the unmount reach the platform before the live page asks for
-        // the camera, otherwise iOS still reports the device as in use.
-        await Future<void>.delayed(const Duration(milliseconds: 120));
       }
-      if (!context.mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const LiveStartPage(),
-        ),
-      );
+      // Let AndroidView/CameraX (or CamerAwesome on iOS) finish unmounting
+      // before the live start page asks the operating system for the lens.
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+      if (!mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const LiveStartPage()));
     } catch (_) {
       // Never leave a frozen preview.
     } finally {
-      if (!_useNativeArFilters && mounted) {
-        setState(() => _liveHandoffActive = false);
-      }
+      if (mounted) setState(() => _liveHandoffActive = false);
       // Back from the live start page: bring the camera preview back.
       if (_useNativeArFilters && mounted) {
-        await ArCameraBridge.startCamera();
-        _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
-        if (_photoEditorMagicOn) {
-          ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+        // The AndroidView is created asynchronously after setState. Give its
+        // platform controller one frame to attach before asking it to start.
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        if (mounted) {
+          await ArCameraBridge.startCamera();
+          if (mounted) {
+            _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
+            if (_photoEditorMagicOn) {
+              ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+            }
+            _syncRetouchToNative();
+          }
         }
-        _syncRetouchToNative();
       }
     }
   }
@@ -2605,10 +2588,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (_useNativeArFilters)
-              _buildNativeArCameraBody(l10n, filters)
-            else if (_liveHandoffActive)
+            if (_liveHandoffActive)
               const ColoredBox(color: Colors.black)
+            else if (_useNativeArFilters)
+              _buildNativeArCameraBody(l10n, filters)
             else
               _buildCamerAwesomeBody(l10n, filters),
             if (_showShutterFlash)

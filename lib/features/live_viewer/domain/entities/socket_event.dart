@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'comment_entity.dart';
 import 'gift_entity.dart';
+import '../../../../core/models/live_battle.dart';
 
 /// Socket event types matching the backend contract.
 enum SocketEventType {
@@ -16,6 +17,7 @@ enum SocketEventType {
   userJoined,
   liveGuestInvite,
   liveGuestUpdate,
+  liveBattle,
   reconnecting,
   reconnected,
   networkLost,
@@ -227,6 +229,21 @@ class LiveGuestUpdateEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, updateType, guestUserId];
+}
+
+class LiveBattleEvent extends SocketEvent {
+  const LiveBattleEvent({
+    required super.liveId,
+    required this.updateType,
+    required this.battle,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveBattle);
+
+  final String updateType;
+  final LiveBattle battle;
+
+  @override
+  List<Object?> get props => [...super.props, updateType, battle];
 }
 
 class NetworkLostEvent extends SocketEvent {

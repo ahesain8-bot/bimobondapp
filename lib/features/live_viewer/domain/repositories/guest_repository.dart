@@ -46,10 +46,18 @@ class GuestSummary {
 /// Viewer-side multi-guest participation (lives/mobile-api.md §10).
 abstract class GuestRepository {
   /// Ask to come on stage (`POST /lives/:id/guests/request`).
-  Future<Either<Failure, void>> requestSeat(String liveId);
+  ///
+  /// When the viewer already has an invite (or is already ACTIVE), the same
+  /// endpoint can immediately return publish credentials.
+  Future<Either<Failure, GuestStageCredentials?>> requestSeat(String liveId);
 
   /// Accept an invite addressed to you (`POST …/guests/accept-invite`).
   Future<Either<Failure, GuestStageCredentials>> acceptInvite(String liveId);
+
+  /// Gets a fresh publish token after the host accepts a REQUESTED guest.
+  Future<Either<Failure, GuestStageCredentials>> refreshStageCredentials(
+    String liveId,
+  );
 
   /// Step off the stage (`POST /lives/:id/guests/leave`).
   Future<Either<Failure, void>> leaveStage(String liveId);

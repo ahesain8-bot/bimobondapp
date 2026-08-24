@@ -5,21 +5,22 @@ class VideoPostGradientOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.4),
-                Colors.transparent,
-                Colors.transparent,
-                Colors.black.withValues(alpha: 0.75),
-              ],
-              stops: const [0.0, 0.15, 0.6, 1.0],
-            ),
+    // Deliberately NOT a Positioned. The caller wraps this in its own
+    // Positioned sized to the media area, and two Positioned widgets writing
+    // StackParentData to the same RenderObject is an assertion, not a merge.
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.4),
+              Colors.transparent,
+              Colors.transparent,
+              Colors.black.withValues(alpha: 0.75),
+            ],
+            stops: const [0.0, 0.15, 0.6, 1.0],
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import '../../../../../core/models/live_battle.dart';
 
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_guest.dart';
@@ -86,6 +87,7 @@ class LiveRoomReady extends LiveRoomState {
     this.isRealtimeConnected = false,
     this.guests = const [],
     this.pendingGuestInvite,
+    this.battle,
   });
 
   final LiveSession session;
@@ -140,9 +142,18 @@ class LiveRoomReady extends LiveRoomState {
   /// An invite addressed to this user that has not been answered yet.
   final LivePendingGuestInvite? pendingGuestInvite;
 
+  /// Current server-authoritative PK battle, if this live is paired.
+  final LiveBattle? battle;
+
+  bool get isBattleActive => battle?.isActive == true;
+
   /// Guests actually publishing right now — what the stage renders.
   List<LiveGuest> get activeGuests =>
       guests.where((g) => g.isActive).toList(growable: false);
+
+  /// Viewers waiting on the host to let them on stage.
+  List<LiveGuest> get requestingGuests =>
+      guests.where((g) => g.isRequesting).toList(growable: false);
 
   LiveRoomReady copyWith({
     LiveSession? session,
@@ -173,6 +184,7 @@ class LiveRoomReady extends LiveRoomState {
     bool? isRealtimeConnected,
     List<LiveGuest>? guests,
     Object? pendingGuestInvite = _unset,
+    Object? battle = _unset,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -217,6 +229,7 @@ class LiveRoomReady extends LiveRoomState {
       pendingGuestInvite: identical(pendingGuestInvite, _unset)
           ? this.pendingGuestInvite
           : pendingGuestInvite as LivePendingGuestInvite?,
+      battle: identical(battle, _unset) ? this.battle : battle as LiveBattle?,
     );
   }
 }
