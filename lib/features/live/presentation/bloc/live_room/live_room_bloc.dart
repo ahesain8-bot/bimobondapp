@@ -1278,7 +1278,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         }
       case LiveHudBattleEvent(:final battle):
         add(LiveRoomBattleChanged(battle));
-      case LiveHudConnectionEvent(:final connected, :final reason):
+      case LiveHudConnectionEvent(:final connected):
         // Comments, viewers and likes all ride this socket. The flag is kept in
         // state so the room can show a standing warning: a SnackBar alone
         // flashed past and left the host staring at a feed that never fills.
@@ -1293,14 +1293,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           add(const LiveRoomCommentsResyncRequested());
           return;
         }
-        emit(
-          current.copyWith(
-            isRealtimeConnected: false,
-            actionMessage:
-                'انقطع الاتصال المباشر بالغرفة، فلن تصل تعليقات المشاهدين '
-                'ولا عدد المشاهدين ولا الإعجابات${reason == null ? '' : ' ($reason)'}.',
-          ),
-        );
+        // Recover silently. A dropped HUD socket must not cover the live with
+        // a red banner/SnackBar; Socket.IO keeps retrying in the background.
+        emit(current.copyWith(isRealtimeConnected: false));
       case LiveHudCommentEvent(:final message):
         if (current.session.messages.any((m) => m.id == message.id)) {
           return;
@@ -1490,12 +1485,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
     switch (event.event.state) {
       case LiveMediaConnectionState.reconnecting:
-        emit(
-          current.copyWith(
-            isMediaConnected: false,
-            actionMessage: 'جاري استعادة اتصال الفيديو…',
-          ),
-        );
+        emit(current.copyWith(isMediaConnected: false));
         return;
       case LiveMediaConnectionState.reconnected:
         final track = _sessionRepository.localPreviewTrack as VideoTrack?;
@@ -1503,20 +1493,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           current.copyWith(
             isMediaConnected: track != null,
             localVideoTrack: track,
-            clearActionMessage: true,
           ),
         );
         return;
       case LiveMediaConnectionState.disconnected:
-        emit(
-          current.copyWith(
-            isMediaConnected: false,
-            localVideoTrack: null,
-            actionMessage: _appPaused
-                ? 'توقف إرسال الفيديو مؤقتاً في الخلفية.'
-                : 'انقطع اتصال الفيديو، جارٍ الاتصال من جديد…',
-          ),
-        );
+        emit(current.copyWith(isMediaConnected: false, localVideoTrack: null));
         if (!_appPaused) {
           await _recoverHostMedia(current.session.id, emit);
         }

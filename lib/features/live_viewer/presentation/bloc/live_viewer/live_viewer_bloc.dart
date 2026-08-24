@@ -937,7 +937,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                   isLiveKitConnected: true,
                   reconnectAttempt: 0,
                 ),
-                moderationBanner: attempt > 1 ? 'تمت استعادة اتصال البث' : null,
+                // Recovery is intentionally silent; the viewer keeps the last
+                // frame instead of seeing disconnect/reconnect banners.
+                moderationBanner: null,
               ),
             );
           }
