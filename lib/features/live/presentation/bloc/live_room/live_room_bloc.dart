@@ -1563,8 +1563,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
               isCameraInitialized: false,
               isMediaConnected: true,
               localVideoTrack: track,
-              actionMessage: attempt > 1 ? 'تمت استعادة اتصال البث' : null,
-              clearActionMessage: attempt == 1,
+              clearActionMessage: true,
             ),
           );
           return;
@@ -1576,9 +1575,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
               ready.copyWith(
                 isMediaConnected: false,
                 localVideoTrack: null,
-                actionMessage: attempt < 4
-                    ? 'تعذر اتصال الفيديو، إعادة المحاولة ($attempt/4)…'
-                    : 'تعذر استعادة الفيديو. اخرج من البث ثم استأنف البث النشط.',
+                clearActionMessage: true,
               ),
             );
           }
