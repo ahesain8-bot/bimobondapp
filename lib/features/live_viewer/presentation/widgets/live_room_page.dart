@@ -944,6 +944,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       prev.activeGiftAnimation != curr.activeGiftAnimation ||
                       prev.latestGiftCombo != curr.latestGiftCombo,
                   builder: (context, state) {
+                    final bloc = context.read<LiveViewerBloc>();
                     return FloatingGiftsLayer(
                       recentGifts: state.recentGifts,
                       activeGift: state.activeGiftAnimation,
@@ -951,6 +952,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       onAnimationComplete: () => context
                           .read<LiveViewerBloc>()
                           .add(const LiveViewerGiftAnimationCleared()),
+                      onComboConsumed: (payload) {
+                        if (bloc.isClosed) return;
+                        bloc.add(LiveViewerGiftComboConsumed(payload));
+                      },
                     );
                   },
                 ),

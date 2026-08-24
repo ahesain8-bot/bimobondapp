@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:bimobondapp/app/gifts/data/datasources/gift_catalog_hydrator.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -10,8 +12,18 @@ import '../mappers/live_session_mapper.dart';
 
 /// Socket.IO HUD client for `live_{id}` (lives/mobile-api.md §16).
 class LivesSocketDataSource {
-  LivesSocketDataSource({required Future<String?> Function() idTokenProvider})
-    : _idTokenProvider = idTokenProvider;
+  LivesSocketDataSource({
+    required Future<String?> Function() idTokenProvider,
+  }) : _idTokenProvider = idTokenProvider;
+
+  /// Legacy aliases retained for payload compatibility. Visual combo delivery
+  /// is owned by the shared AuctionSocketService stream.
+  static const giftEventNames = <String>[
+    'gift_combo',
+    'auctionGiftCombo',
+    'liveGiftCombo',
+    'liveGift',
+  ];
 
   final Future<String?> Function() _idTokenProvider;
 
@@ -244,22 +256,15 @@ class LivesSocketDataSource {
       );
     });
 
-    _on(socket, 'gift_combo', (data) {
-      _handleGiftPayload(data, fallbackLiveId: liveId);
-    });
-
-    // The rapid-gift gateway is deployed with this camelCase name on some
-    // backend versions (lives/logic.md). Keep all aliases behind the same
-    // transaction de-duplicator so the host always sees the animation once.
-    _on(socket, 'liveGiftCombo', (data) {
-      _handleGiftPayload(data, fallbackLiveId: liveId);
-    });
-
-    // Some backend deployments still emit `liveGift`. Supporting both names
-    // is safe because _handleGiftPayload de-duplicates the transaction before
-    // it reaches the host overlay.
+    // Visual gift combos are owned by the shared AuctionSocketService now.
+    // Keep the legacy liveGift callback only for old display/comment payloads;
+    // rich combo payloads are ignored here so the host has one visual owner.
     _on(socket, 'liveGift', (data) {
-      _handleGiftPayload(data, fallbackLiveId: liveId);
+      _handleGiftPayload(
+        data,
+        fallbackLiveId: liveId,
+        sourceEvent: 'liveGift',
+      );
     });
 
     // Personal room `user_*`, not the live room: an invite can land while the
@@ -378,22 +383,30 @@ class LivesSocketDataSource {
     socket.emit('joinUser', {});
   }
 
-  void _handleGiftPayload(dynamic data, {required String fallbackLiveId}) {
+  void _handleGiftPayload(
+    dynamic data, {
+    required String fallbackLiveId,
+    required String sourceEvent,
+  }) {
+    unawaited(
+      _handleGiftPayloadAsync(
+        data,
+        fallbackLiveId: fallbackLiveId,
+        sourceEvent: sourceEvent,
+      ).catchError((error, stack) {
+        debugPrint('Socket.IO gift payload failed: $error\n$stack');
+      }),
+    );
+  }
+
+  Future<void> _handleGiftPayloadAsync(
+    dynamic data, {
+    required String fallbackLiveId,
+    required String sourceEvent,
+  }) async {
     final map = _unwrapPayload(data);
     if (map == null) return;
     map.putIfAbsent('liveId', () => fallbackLiveId);
-
-    final key = _giftEventKey(map);
-    final now = DateTime.now();
-    _recentGiftEvents.removeWhere(
-      (_, seenAt) => now.difference(seenAt) > const Duration(seconds: 4),
-    );
-    final previous = _recentGiftEvents[key];
-    if (previous != null &&
-        now.difference(previous) < const Duration(seconds: 2)) {
-      return;
-    }
-    _recentGiftEvents[key] = now;
 
     final sender = _asMap(map['sender']) ?? _asMap(map['user']);
     final gift = _asMap(map['gift']);
@@ -403,19 +416,16 @@ class LivesSocketDataSource {
       map.putIfAbsent('giftId', () => giftId);
     }
 
-    // Normal path: the shared gift animation parser accepts both the flat
-    // gift_combo shape and the nested liveGift shape.
+    // Rich visual combo payloads are parsed by the shared
+    // AuctionSocketService.onGiftCombo stream instead.
     if (giftId != null && giftId.isNotEmpty) {
-      _controller.add(
-        LiveHudGiftComboEvent(
-          payload: map,
-          totalEarnedCoins: _asInt(
-            map['totalEarnedCoins'] ?? map['earnedCoins'],
-          ),
-        ),
-      );
+      // The canonical AuctionSocketService.onGiftCombo subscription feeds
+      // LiveRoomBloc.latestGiftCombo. Do not forward this alias into the HUD
+      // stream, otherwise the active host could render the same gift twice.
       return;
     }
+
+    if (_isDuplicateGiftEvent(map, sourceEvent: sourceEvent)) return;
 
     // Very old payloads carried only display fields. Keep a banner/chat
     // fallback so the host still sees that a gift arrived.
@@ -444,6 +454,39 @@ class LivesSocketDataSource {
       ),
     );
   }
+
+  bool _isDuplicateGiftEvent(
+    Map<String, dynamic> map, {
+    required String sourceEvent,
+  }) {
+    final now = DateTime.now();
+    _recentGiftEvents.removeWhere(
+      (_, seenAt) => now.difference(seenAt) > const Duration(seconds: 4),
+    );
+
+    // De-duplicate repeats from the same socket event only. A metadata-poor
+    // liveGift must not suppress a richer auctionGiftCombo for the same
+    // transaction; FloatingGiftsLayer performs the final presentation-level
+    // de-duplication after both aliases reach the canonical combo pipeline.
+    final key = '$sourceEvent:${_giftEventKey(map)}';
+    final previous = _recentGiftEvents[key];
+    if (previous != null &&
+        now.difference(previous) < const Duration(seconds: 2)) {
+      return true;
+    }
+    _recentGiftEvents[key] = now;
+    return false;
+  }
+
+  /// Merges catalog presentation fields into a flat socket payload.
+  ///
+  /// Hydration itself is owned by [GiftCatalogHydrator], which the shared
+  /// `AuctionSocketService.onGiftCombo` stream applies before any listener sees
+  /// the payload.
+  static Map<String, dynamic> enrichGiftPayloadWithCatalog(
+    Map<String, dynamic> payload,
+    GiftEntity catalogGift,
+  ) => GiftCatalogHydrator.enrich(payload, catalogGift);
 
   String _giftEventKey(Map<String, dynamic> map) {
     final gift = _asMap(map['gift']);

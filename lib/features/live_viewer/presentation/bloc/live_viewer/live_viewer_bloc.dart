@@ -55,6 +55,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerLiked>(_onLiked);
     on<LiveViewerGiftBalanceRefreshRequested>(_onGiftBalanceRefreshRequested);
     on<LiveViewerGiftComboReceived>(_onGiftComboReceived);
+    on<LiveViewerGiftComboConsumed>(_onGiftComboConsumed);
     on<LiveViewerFollowToggled>(_onFollowToggled);
     on<LiveViewerHeartBurstConsumed>(_onHeartBurstConsumed);
     on<LiveViewerGiftAnimationCleared>(_onGiftAnimationCleared);
@@ -469,6 +470,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final eventLiveId = event.payload.liveId.trim();
     if (eventLiveId.isNotEmpty && eventLiveId != id) return;
     emit(state.copyWith(latestGiftCombo: event.payload));
+  }
+
+  Future<void> _onGiftComboConsumed(
+    LiveViewerGiftComboConsumed event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    // Only the combo that was actually presented is released, so a gift that
+    // arrived while the previous one was playing is still rendered.
+    if (!identical(state.latestGiftCombo, event.payload)) return;
+    emit(state.copyWith(clearGiftCombo: true));
   }
 
   Future<void> _onFollowToggled(
@@ -1511,7 +1522,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     } catch (_) {}
     return fb.FirebaseAuth.instance.currentUser?.uid;
   }
-
   Future<void> _refreshBattle(
     String liveId,
     Emitter<LiveViewerState> emit,
@@ -1539,7 +1549,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       // fail because this optional enrichment endpoint is unavailable.
     }
   }
-
   Future<void> _applyBattle(
     LiveBattle battle,
     Emitter<LiveViewerState> emit,
@@ -1596,7 +1605,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       },
     );
   }
-
   Future<void> _disconnectBattleOpponent() async {
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
@@ -1609,7 +1617,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       } catch (_) {}
     }
   }
-
   CommentEntity? _pinnedFromLiveMetadata(LiveEntity live) {
     final raw = live.metadata?['pinnedComment'];
     if (raw is! Map) return null;
@@ -1638,7 +1645,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       isPinned: true,
     );
   }
-
   Future<void> _teardown({
     required bool silent,
     required Emitter<LiveViewerState> emit,
@@ -1674,7 +1680,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(const LiveViewerState());
     }
   }
-
   @override
   Future<void> close() async {
     _tearingDown = true;

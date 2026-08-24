@@ -10,12 +10,24 @@ import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_details_use
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_pricing_preview_usecase.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_auction_seller_eligibility_usecase.dart';
 import 'package:bimobondapp/app/auctions/domain/usecases/get_my_auctions_usecase.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/gifts/domain/repositories/gifts_repository.dart';
+import 'package:bimobondapp/app/gifts/domain/usecases/get_gifts_usecase.dart';
 import 'package:get_it/get_it.dart';
 
 final sl = GetIt.instance;
 
 Future<void> initAuctions() async {
-  sl.registerLazySingleton<AuctionSocketService>(() => AuctionSocketService());
+  sl.registerLazySingleton<AuctionSocketService>(
+    () => AuctionSocketService(
+      // Server combo payloads are flat (giftId/giftName only), so the catalog
+      // supplies the animation url and size the gift renderer needs.
+      giftCatalogLoader: () async {
+        final result = await sl<GetGiftsUseCase>()(const GetGiftsParams());
+        return result.fold((_) => const <GiftEntity>[], (gifts) => gifts);
+      },
+    ),
+  );
 
   sl.registerLazySingleton<AuctionsRemoteDataSource>(
     () => AuctionsRemoteDataSourceImpl(apiClient: sl()),

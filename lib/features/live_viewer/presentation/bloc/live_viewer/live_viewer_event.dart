@@ -58,6 +58,17 @@ class LiveViewerGiftComboReceived extends LiveViewerEvent {
   List<Object?> get props => [payload];
 }
 
+/// The gift layer presented [payload]; release it so remounting the layer
+/// cannot replay an animation the viewer has already seen.
+class LiveViewerGiftComboConsumed extends LiveViewerEvent {
+  final GiftComboPayload payload;
+
+  const LiveViewerGiftComboConsumed(this.payload);
+
+  @override
+  List<Object?> get props => [payload];
+}
+
 class LiveViewerFollowToggled extends LiveViewerEvent {
   const LiveViewerFollowToggled();
 }
