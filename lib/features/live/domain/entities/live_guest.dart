@@ -25,5 +25,9 @@ class LiveGuest {
   final bool cameraOffByHost;
 
   bool get isPending => status == 'REQUESTED' || status == 'INVITED';
+
+  /// A viewer asking to come on stage, as opposed to someone the host already
+  /// invited. Only these need the host to decide something.
+  bool get isRequesting => status == 'REQUESTED';
   bool get isActive => status == 'ACTIVE';
 }

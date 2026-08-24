@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../../core/utils/live_feed_fade.dart';
 import '../../../../core/widgets/gifter_level_badge.dart';
 import '../../domain/entities/comment_entity.dart';
 import 'fallback_media.dart';
@@ -98,14 +99,10 @@ class _CommentsSectionState extends State<CommentsSection> {
           width: maxW,
           height: widget.height,
           child: ShaderMask(
-            shaderCallback: (rect) {
-              return LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: const [Colors.transparent, Colors.black, Colors.black],
-                stops: [0.0, TikTokLiveTokens.commentFade / widget.height, 1.0],
-              ).createShader(rect);
-            },
+            // Same rule as the host feed: a band measured in pixels, capped
+            // so a short slot cannot have most of it faded away.
+            shaderCallback: (rect) =>
+                liveFeedFadeShader(rect, scrollableHeight: widget.height),
             blendMode: BlendMode.dstIn,
             child: ListView.builder(
               controller: _scrollController,

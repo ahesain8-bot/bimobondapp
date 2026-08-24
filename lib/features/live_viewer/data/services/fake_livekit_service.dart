@@ -22,6 +22,9 @@ abstract class LiveKitService {
   /// video tracks), or null while disconnected. Fakes return null.
   Room? get room => null;
 
+  /// Separate subscribe-only room for the other host in a PK battle.
+  Room? get battleRoom => null;
+
   Future<void> connect({
     required String url,
     required String token,
@@ -31,6 +34,14 @@ abstract class LiveKitService {
 
   Future<void> disconnect();
   Future<void> reconnect();
+
+  Future<void> connectBattle({
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {}
+
+  Future<void> disconnectBattle() async {}
 
   /// Whether this device is publishing camera/mic into the room right now.
   bool get isPublishing => false;
@@ -49,6 +60,11 @@ abstract class LiveKitService {
 
   /// Stops publishing but stays in the room as a viewer.
   Future<void> leaveStage() async {}
+
+  /// Applies a host moderation command to this guest's local tracks.
+  Future<void> setStageMicrophoneEnabled(bool enabled) async {}
+
+  Future<void> setStageCameraEnabled(bool enabled) async {}
 }
 
 /// Simulates LiveKit join / leave / reconnect with realistic delays.
@@ -63,6 +79,19 @@ class FakeLiveKitService implements LiveKitService {
 
   @override
   Room? get room => null;
+
+  @override
+  Room? get battleRoom => null;
+
+  @override
+  Future<void> connectBattle({
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {}
+
+  @override
+  Future<void> disconnectBattle() async {}
 
   var _publishing = false;
 
@@ -82,6 +111,12 @@ class FakeLiveKitService implements LiveKitService {
   Future<void> leaveStage() async {
     _publishing = false;
   }
+
+  @override
+  Future<void> setStageMicrophoneEnabled(bool enabled) async {}
+
+  @override
+  Future<void> setStageCameraEnabled(bool enabled) async {}
 
   /// Public sample MP4 used as the mock "live" video source.
   static const defaultMockStreamUrl =

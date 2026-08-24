@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
-import 'package:dartz/dartz.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
+import '../../../../../core/models/live_battle.dart';
 import '../../../data/services/fake_livekit_service.dart';
 import '../../../data/services/fake_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
@@ -71,6 +70,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveViewerLeftStage>(_onLeftStage);
     on<LiveViewerGuestsRefreshed>(_onGuestsRefreshed);
+    on<LiveViewerGuestApprovalChecked>(_onGuestApprovalChecked);
+    on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
+
+    _liveKitSub = liveKitService.stateStream.listen((mediaState) {
+      if (!isClosed) add(LiveViewerLiveKitStateChanged(mediaState));
+    });
   }
   final JoinLiveUseCase joinLiveUseCase;
   final LeaveLiveUseCase leaveLiveUseCase;
@@ -92,12 +97,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   StreamSubscription<SocketEvent>? _socketSub;
   StreamSubscription<GiftComboPayload>? _giftComboSub;
+  StreamSubscription<LiveKitConnectionState>? _liveKitSub;
   String? _activeLiveId;
   bool _busy = false;
   LiveEntity? _pendingActivate;
   String? _currentUserId;
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
+  Timer? _guestApprovalTimer;
+  String? _battleOpponentLiveId;
+  bool _tearingDown = false;
+  bool _recoveringMedia = false;
+  int _mediaRecoveryAttempt = 0;
 
   String? get activeLiveId => _activeLiveId;
 
@@ -125,7 +136,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
       final isPk = live.metadata?['isPk'] == true;
       final initialAvatars = _avatarsFromLive(live);
-      final random = Random();
 
       emit(
         LiveViewerState(
@@ -140,12 +150,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                   (i) => 'https://i.pravatar.cc/150?u=${live.id}_v$i',
                 ),
           pkScoreLeft: isPk
-              ? ((live.metadata?['scoreLeft'] as num?)?.toInt() ??
-                    (8000 + random.nextInt(8000)))
+              ? ((live.metadata?['scoreLeft'] as num?)?.toInt() ?? 0)
               : 0,
           pkScoreRight: isPk
-              ? ((live.metadata?['scoreRight'] as num?)?.toInt() ??
-                    (1000 + random.nextInt(3000)))
+              ? ((live.metadata?['scoreRight'] as num?)?.toInt() ?? 0)
               : 0,
           currentUserId: _currentUserId,
         ),
@@ -211,7 +219,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               subClaims.remove('apiSecret');
               subClaims.remove('privateKey');
             }
-          } catch (e) {}
+          } catch (_) {
+            // Diagnostics only; token parsing must never block joining.
+          }
 
           try {
             await liveKitService.connect(
@@ -264,11 +274,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             },
           );
 
-          final socketFuture = socketService.connect(
-            liveId: result.liveId,
-            token: result.socketToken,
-          );
+          // Subscribe before dialing so a fast initial connection cannot be
+          // missed. Realtime is independent from LiveKit: a HUD timeout must
+          // never tear down video or block comments/coin enrichment.
+          _listenSocket(live.id);
           _listenGiftSocket(live.id);
+          unawaited(
+            socketService
+                .connect(liveId: result.liveId, token: result.socketToken)
+                .catchError((_) {}),
+          );
           unawaited(
             giftSocketService.ensureJoined(liveId: live.id).catchError((_) {}),
           );
@@ -278,19 +293,21 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             limit: 20,
           );
           final meFuture = _loadCurrentUserId();
+          final guestsFuture = guestRepository.listGuests(live.id);
 
           try {
             final results = await Future.wait<dynamic>([
-              socketFuture,
               coinsFuture,
               commentsFuture,
               meFuture,
+              guestsFuture,
             ]);
             if (_activeLiveId != live.id) return;
 
-            final coins = results[1];
-            final commentsResult = results[2];
-            _currentUserId = results[3] as String? ?? _currentUserId;
+            final coins = results[0];
+            final commentsResult = results[1];
+            _currentUserId = results[2] as String? ?? _currentUserId;
+            final guestsResult = results[3];
             final comments = commentsResult
                 .fold(
                   (_) => <CommentEntity>[],
@@ -303,19 +320,23 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             }
             pinned ??= _pinnedFromLiveMetadata(result.live);
 
-            _listenSocket(live.id);
             emit(
               state.copyWith(
                 session: state.session!.copyWith(
-                  isSocketConnected: true,
+                  isSocketConnected: socketService.isConnected,
                   coinBalance: coins.getOrElse(() => 1250),
                 ),
                 comments: comments,
                 pinnedComment: pinned,
                 currentUserId: _currentUserId,
+                guests: guestsResult.fold(
+                  (_) => state.guests,
+                  (items) => items,
+                ),
               ),
             );
           } catch (_) {}
+          await _refreshBattle(live.id, emit);
         },
       );
     } finally {
@@ -371,7 +392,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     await result.fold(
       (failure) async {
-        final msg = failure.message ?? 'Unknown error';
+        final msg = failure.message;
         final muted = msg.toLowerCase().contains('mute');
         emit(
           state.copyWith(
@@ -433,9 +454,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (_activeLiveId != id || isClosed) return;
     result.fold(
       (_) {},
-      (balance) => emit(
-        state.copyWith(session: session.copyWith(coinBalance: balance)),
-      ),
+      (balance) =>
+          emit(state.copyWith(session: session.copyWith(coinBalance: balance))),
     );
   }
 
@@ -551,8 +571,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           mutedUserIds: revert,
-          moderationBanner:
-              'Failed to mute: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to mute: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -585,8 +604,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           mutedUserIds: revert,
-          moderationBanner:
-              'Failed to unmute: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to unmute: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -626,8 +644,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           bannedUserIds: revertBanned,
-          moderationBanner:
-              'Failed to ban: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to ban: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -660,8 +677,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           bannedUserIds: revert,
-          moderationBanner:
-              'Failed to unban: ${failure.message ?? 'Unknown error'}',
+          moderationBanner: 'Failed to unban: ${failure.message}',
         ),
       );
       _scheduleBannerClear();
@@ -698,17 +714,34 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     emit(state.copyWith(isGuestActionBusy: true));
     final result = await guestRepository.requestSeat(liveId);
     if (isClosed) return;
-    emit(
-      result.fold(
-        (failure) => state.copyWith(
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
           isGuestActionBusy: false,
           moderationBanner: 'تعذر إرسال طلب الانضمام: ${failure.message}',
         ),
-        (_) => state.copyWith(
-          isGuestActionBusy: false,
-          moderationBanner: 'تم إرسال طلب الانضمام إلى المضيف',
-        ),
       ),
+      (credentials) async {
+        if (credentials != null && credentials.isUsable) {
+          await _joinGuestStage(
+            liveId: liveId,
+            credentials: credentials,
+            emit: emit,
+          );
+          return;
+        }
+        emit(
+          state.copyWith(
+            isGuestActionBusy: true,
+            moderationBanner: 'تم إرسال طلب الانضمام إلى المضيف',
+          ),
+        );
+        // Keep the request pending while we wait for the host. Socket.IO is
+        // still the fast path; this bounded token poll covers an acceptance
+        // event lost during a reconnect without ever granting publication to
+        // a user the backend has not marked ACTIVE.
+        _scheduleGuestApprovalCheck(liveId);
+      },
     );
     add(const LiveViewerGuestsRefreshed());
   }
@@ -751,33 +784,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           );
           return;
         }
-        try {
-          await liveKitService.joinStage(
-            url: creds.url,
-            token: creds.token,
-            roomName: invite.liveId,
-          );
-          if (isClosed) return;
-          emit(
-            state.copyWith(
-              isGuestActionBusy: false,
-              isOnStage: true,
-              moderationBanner: creds.isCoHost
-                  ? 'انضممت كمضيف مشارك'
-                  : 'انضممت إلى المسرح',
-            ),
-          );
-          add(const LiveViewerGuestsRefreshed());
-        } catch (e) {
-          if (isClosed) return;
-          emit(
-            state.copyWith(
-              isGuestActionBusy: false,
-              isOnStage: false,
-              moderationBanner: 'تعذر تشغيل الكاميرا للنشر: $e',
-            ),
-          );
-        }
+        await _joinGuestStage(
+          liveId: invite.liveId,
+          credentials: creds,
+          emit: emit,
+        );
       },
     );
   }
@@ -818,6 +829,206 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final result = await guestRepository.listGuests(liveId);
     if (isClosed) return;
     result.fold((_) {}, (guests) => emit(state.copyWith(guests: guests)));
+  }
+
+  Future<void> _onGuestApprovalChecked(
+    LiveViewerGuestApprovalChecked event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (_activeLiveId != event.liveId ||
+        state.isOnStage ||
+        !state.isGuestActionBusy) {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      return;
+    }
+
+    final result = await guestRepository.refreshStageCredentials(event.liveId);
+    if (isClosed || _activeLiveId != event.liveId) return;
+
+    final credentials = result.fold<GuestStageCredentials?>(
+      (_) => null,
+      (c) => c,
+    );
+    if (credentials != null && credentials.isUsable) {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      await _joinGuestStage(
+        liveId: event.liveId,
+        credentials: credentials,
+        emit: emit,
+      );
+      return;
+    }
+
+    if (event.attempt >= 15) {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      emit(
+        state.copyWith(
+          isGuestActionBusy: false,
+          moderationBanner: 'طلب الانضمام ما زال بانتظار المضيف',
+        ),
+      );
+      return;
+    }
+
+    _scheduleGuestApprovalCheck(event.liveId, attempt: event.attempt + 1);
+  }
+
+  Future<void> _onLiveKitStateChanged(
+    LiveViewerLiveKitStateChanged event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final session = state.session;
+    final liveId = _activeLiveId;
+    if (session == null || liveId == null || _tearingDown) return;
+    if (session.connectionState == LiveConnectionState.liveEnded ||
+        session.connectionState == LiveConnectionState.banned) {
+      return;
+    }
+
+    switch (event.state) {
+      case LiveKitConnectionState.connected:
+        _mediaRecoveryAttempt = 0;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.connected,
+              isLiveKitConnected: true,
+              reconnectAttempt: 0,
+            ),
+          ),
+        );
+        return;
+      case LiveKitConnectionState.connecting:
+      case LiveKitConnectionState.reconnecting:
+        if (_busy || _recoveringMedia) return;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.reconnecting,
+              isLiveKitConnected: false,
+            ),
+          ),
+        );
+        return;
+      case LiveKitConnectionState.disconnected:
+      case LiveKitConnectionState.failed:
+        // connect() deliberately disconnects the previous Room first. Ignore
+        // that internal transition while activation/recovery is in flight.
+        if (_busy || _recoveringMedia) return;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.reconnecting,
+              isLiveKitConnected: false,
+            ),
+          ),
+        );
+        await _recoverMedia(liveId, emit);
+        return;
+    }
+  }
+
+  /// A terminal LiveKit disconnect cannot safely reuse its old JWT (tokens
+  /// expire and ICE restarts can outlive them). Re-join REST to obtain fresh
+  /// subscribe credentials, or a fresh publish token when this viewer is on
+  /// the guest stage, then rebuild the Room with bounded backoff.
+  Future<void> _recoverMedia(
+    String liveId,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (_recoveringMedia || _tearingDown || _activeLiveId != liveId) return;
+    _recoveringMedia = true;
+    try {
+      for (var attempt = 1; attempt <= 4; attempt++) {
+        if (_tearingDown || isClosed || _activeLiveId != liveId) return;
+        _mediaRecoveryAttempt = attempt;
+        if (attempt > 1) {
+          await Future<void>.delayed(Duration(seconds: attempt - 1));
+        }
+        if (_tearingDown || isClosed || _activeLiveId != liveId) return;
+
+        try {
+          if (state.isOnStage) {
+            final credentials = await guestRepository.refreshStageCredentials(
+              liveId,
+            );
+            final creds = credentials.fold<GuestStageCredentials?>(
+              (_) => null,
+              (value) => value,
+            );
+            if (creds == null || !creds.isUsable) continue;
+            await liveKitService.joinStage(
+              url: creds.url,
+              token: creds.token,
+              roomName: liveId,
+            );
+          } else {
+            final joined = await joinLiveUseCase(liveId);
+            final result = joined.fold<JoinLiveResult?>(
+              (_) => null,
+              (value) => value,
+            );
+            if (result == null) continue;
+            await liveKitService.connect(
+              url: result.liveKitUrl,
+              token: result.liveKitToken,
+              roomName: result.liveId,
+              mockStreamUrl: result.live.streamUrl,
+            );
+          }
+          if (isClosed || _activeLiveId != liveId) return;
+          final current = state.session;
+          if (current != null) {
+            emit(
+              state.copyWith(
+                session: current.copyWith(
+                  connectionState: LiveConnectionState.connected,
+                  isLiveKitConnected: true,
+                  reconnectAttempt: 0,
+                ),
+                // Recovery is intentionally silent; the viewer keeps the last
+                // frame instead of seeing disconnect/reconnect banners.
+                moderationBanner: null,
+              ),
+            );
+          }
+          _mediaRecoveryAttempt = 0;
+          return;
+        } catch (_) {
+          final current = state.session;
+          if (current != null && !isClosed) {
+            emit(
+              state.copyWith(
+                session: current.copyWith(
+                  connectionState: LiveConnectionState.reconnecting,
+                  isLiveKitConnected: false,
+                  reconnectAttempt: attempt,
+                ),
+              ),
+            );
+          }
+        }
+      }
+
+      final current = state.session;
+      if (current != null && !isClosed && _activeLiveId == liveId) {
+        emit(
+          state.copyWith(
+            session: current.copyWith(
+              connectionState: LiveConnectionState.networkLost,
+              isLiveKitConnected: false,
+              reconnectAttempt: _mediaRecoveryAttempt,
+              errorMessage: 'تعذر استعادة اتصال الفيديو. اضغط لإعادة المحاولة.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      _recoveringMedia = false;
+    }
   }
 
   // ---------- Internal helpers ----------
@@ -868,13 +1079,46 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       }
       // Being removed from the stage has to stop the camera locally too — the
       // server revoking the grant does not turn the hardware off by itself.
-      final isMe =
-          event.guestUserId != null && event.guestUserId == state.currentUserId;
+      final isMe = _isMe(event.guestUserId);
+      if (isMe && event.updateType == 'joined' && !state.isOnStage) {
+        final result = await guestRepository.refreshStageCredentials(
+          event.liveId,
+        );
+        if (isClosed) return;
+        await result.fold(
+          (failure) async => emit(
+            state.copyWith(
+              isGuestActionBusy: false,
+              moderationBanner:
+                  'تم قبولك، لكن تعذر تشغيل الكاميرا: ${failure.message}',
+            ),
+          ),
+          (credentials) => _joinGuestStage(
+            liveId: event.liveId,
+            credentials: credentials,
+            emit: emit,
+          ),
+        );
+        return;
+      }
       if (isMe &&
           (event.updateType == 'kicked' || event.updateType == 'left')) {
         await liveKitService.leaveStage();
         emit(state.copyWith(isOnStage: false));
+      } else if (isMe && event.updateType == 'muted') {
+        await liveKitService.setStageMicrophoneEnabled(false);
+      } else if (isMe && event.updateType == 'unmuted') {
+        await liveKitService.setStageMicrophoneEnabled(true);
+      } else if (isMe && event.updateType == 'camera_off') {
+        await liveKitService.setStageCameraEnabled(false);
+      } else if (isMe && event.updateType == 'camera_on') {
+        await liveKitService.setStageCameraEnabled(true);
       }
+      return;
+    }
+
+    if (event is LiveBattleEvent) {
+      await _applyBattle(event.battle, emit);
       return;
     }
 
@@ -999,7 +1243,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           session: session.copyWith(
-            connectionState: LiveConnectionState.networkLost,
+            // Socket.IO carries comments and HUD events only. Keep rendering
+            // the LiveKit stream while it reconnects in the background.
+            connectionState: session.isLiveKitConnected
+                ? LiveConnectionState.connected
+                : LiveConnectionState.networkLost,
             isSocketConnected: false,
           ),
         ),
@@ -1008,21 +1256,27 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(
         state.copyWith(
           session: session.copyWith(
-            connectionState: LiveConnectionState.reconnecting,
+            connectionState: session.isLiveKitConnected
+                ? LiveConnectionState.connected
+                : LiveConnectionState.reconnecting,
             reconnectAttempt: event.attempt,
+            isSocketConnected: false,
           ),
         ),
       );
-      try {
-        await liveKitService.reconnect();
-      } catch (_) {}
     } else if (event is ReconnectedEvent) {
+      final mediaConnected =
+          liveKitService.state == LiveKitConnectionState.connected;
       emit(
         state.copyWith(
           session: session.copyWith(
-            connectionState: LiveConnectionState.connected,
+            connectionState: mediaConnected
+                ? LiveConnectionState.connected
+                : LiveConnectionState.reconnecting,
             isSocketConnected: true,
-            isLiveKitConnected: true,
+            // Socket.IO only restores comments/HUD. It must never hide a
+            // still-disconnected LiveKit video room.
+            isLiveKitConnected: mediaConnected,
           ),
         ),
       );
@@ -1172,6 +1426,60 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     return firebaseUid != null && userId == firebaseUid;
   }
 
+  void _scheduleGuestApprovalCheck(String liveId, {int attempt = 1}) {
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = Timer(const Duration(seconds: 2), () {
+      if (!isClosed && _activeLiveId == liveId) {
+        add(LiveViewerGuestApprovalChecked(liveId: liveId, attempt: attempt));
+      }
+    });
+  }
+
+  Future<void> _joinGuestStage({
+    required String liveId,
+    required GuestStageCredentials credentials,
+    required Emitter<LiveViewerState> emit,
+  }) async {
+    if (!credentials.isUsable) {
+      emit(
+        state.copyWith(
+          isGuestActionBusy: false,
+          moderationBanner: 'الخادم لم يرسل بيانات LiveKit للنشر.',
+        ),
+      );
+      return;
+    }
+    try {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      await liveKitService.joinStage(
+        url: credentials.url,
+        token: credentials.token,
+        roomName: liveId,
+      );
+      if (isClosed || _activeLiveId != liveId) return;
+      emit(
+        state.copyWith(
+          isGuestActionBusy: false,
+          isOnStage: true,
+          moderationBanner: credentials.isCoHost
+              ? 'انضممت كمضيف مشارك'
+              : 'انضممت إلى المسرح',
+        ),
+      );
+      add(const LiveViewerGuestsRefreshed());
+    } catch (e) {
+      if (isClosed) return;
+      emit(
+        state.copyWith(
+          isGuestActionBusy: false,
+          isOnStage: false,
+          moderationBanner: 'تعذر تشغيل الكاميرا للنشر: $e',
+        ),
+      );
+    }
+  }
+
   List<String> _avatarsFromLive(LiveEntity live) {
     final raw = live.metadata?['topViewerAvatars'];
     if (raw is! List) return const [];
@@ -1202,6 +1510,104 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       }
     } catch (_) {}
     return fb.FirebaseAuth.instance.currentUser?.uid;
+  }
+
+  Future<void> _refreshBattle(
+    String liveId,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    try {
+      final payload = await apiClient.get(ApiEndpoints.liveBattle(liveId));
+      if (_activeLiveId != liveId || isClosed) return;
+      final raw = payload['battle'] ?? payload['data'];
+      if (raw == null && payload['id'] == null) {
+        // A socket `started` event can beat this initial GET. Keep the newer
+        // event instead of replacing it with an older no-battle snapshot.
+        if (state.battle?.isActive == true) return;
+        await _disconnectBattleOpponent();
+        emit(
+          state.copyWith(clearBattle: true, pkScoreLeft: 0, pkScoreRight: 0),
+        );
+        return;
+      }
+      final source = raw is Map ? Map<String, dynamic>.from(raw) : payload;
+      if (source['id'] != null) {
+        await _applyBattle(LiveBattle.fromJson(source), emit);
+      }
+    } catch (_) {
+      // A room can simply have no battle; watching the primary video must not
+      // fail because this optional enrichment endpoint is unavailable.
+    }
+  }
+
+  Future<void> _applyBattle(
+    LiveBattle battle,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = _activeLiveId;
+    if (liveId == null || isClosed) return;
+    battle = battle.withTimingFrom(state.battle);
+    emit(
+      state.copyWith(
+        battle: battle,
+        pkScoreLeft: battle.scoreFor(liveId),
+        pkScoreRight: battle.opponentScoreFor(liveId),
+      ),
+    );
+    if (!battle.isActive) {
+      await _disconnectBattleOpponent();
+      return;
+    }
+    final opponentId = battle.opponentLiveId(liveId);
+    if (opponentId.isEmpty || opponentId == liveId) return;
+    if (_battleOpponentLiveId == opponentId &&
+        liveKitService.battleRoom != null) {
+      return;
+    }
+    await _disconnectBattleOpponent();
+    final result = await joinLiveUseCase(opponentId);
+    if (_activeLiveId != liveId || isClosed) return;
+    await result.fold(
+      (failure) async => emit(
+        state.copyWith(
+          moderationBanner:
+              'بدأت المعركة لكن تعذر فتح فيديو الخصم: ${failure.message}',
+        ),
+      ),
+      (join) async {
+        try {
+          await liveKitService.connectBattle(
+            url: join.liveKitUrl,
+            token: join.liveKitToken,
+            roomName: opponentId,
+          );
+          if (_activeLiveId != liveId || isClosed) return;
+          _battleOpponentLiveId = opponentId;
+          // A new state instance makes the PK renderer read battleRoom now;
+          // track changes after that are driven by the Room notifier itself.
+          emit(state.copyWith(battle: battle));
+        } catch (e) {
+          if (!isClosed) {
+            emit(
+              state.copyWith(moderationBanner: 'تعذر توصيل فيديو الخصم: $e'),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  Future<void> _disconnectBattleOpponent() async {
+    final opponentId = _battleOpponentLiveId;
+    _battleOpponentLiveId = null;
+    try {
+      await liveKitService.disconnectBattle();
+    } catch (_) {}
+    if (opponentId != null) {
+      try {
+        await leaveLiveUseCase(opponentId);
+      } catch (_) {}
+    }
   }
 
   CommentEntity? _pinnedFromLiveMetadata(LiveEntity live) {
@@ -1237,12 +1643,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required bool silent,
     required Emitter<LiveViewerState> emit,
   }) async {
+    _tearingDown = true;
     _socketSub?.cancel();
     _socketSub = null;
     _giftComboSub?.cancel();
     _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = null;
+    await _disconnectBattleOpponent();
     final id = _activeLiveId;
     _activeLiveId = null;
     if (id != null) {
@@ -1257,6 +1667,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     try {
       await liveKitService.disconnect();
     } catch (_) {}
+    _tearingDown = false;
+    _recoveringMedia = false;
+    _mediaRecoveryAttempt = 0;
     if (!silent && !isClosed) {
       emit(const LiveViewerState());
     }
@@ -1264,12 +1677,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   @override
   Future<void> close() async {
+    _tearingDown = true;
+    await _liveKitSub?.cancel();
+    _liveKitSub = null;
     _socketSub?.cancel();
     _socketSub = null;
     _giftComboSub?.cancel();
     _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = null;
+    await _disconnectBattleOpponent();
     final id = _activeLiveId;
     _activeLiveId = null;
     if (id != null) {

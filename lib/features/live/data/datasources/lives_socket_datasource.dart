@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/models/live_battle.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../mappers/live_session_mapper.dart';
 
@@ -16,6 +17,10 @@ class LivesSocketDataSource {
 
   io.Socket? _socket;
   String? _liveId;
+  String? _desiredLiveId;
+  Completer<void>? _connectionReady;
+  bool _authRefreshInFlight = false;
+  final Map<String, DateTime> _recentGiftEvents = {};
   final _controller = StreamController<LiveHudEvent>.broadcast();
 
   Stream<LiveHudEvent> get events => _controller.stream;
@@ -23,7 +28,22 @@ class LivesSocketDataSource {
   bool get isConnected => _socket?.connected ?? false;
 
   Future<void> connectAndJoin(String liveId) async {
+    // A timed-out handshake may still reconnect successfully. Reuse it instead
+    // of disposing the manager on every BLoC retry, which previously prevented
+    // Socket.IO's own reconnection loop from ever completing.
+    final existing = _socket;
+    if (_liveId == liveId && existing != null) {
+      if (existing.connected) return;
+      existing.connect();
+      final signal = _connectionReady;
+      if (signal != null) {
+        await signal.future.timeout(const Duration(seconds: 10));
+        return;
+      }
+    }
+
     await disconnect();
+    _desiredLiveId = liveId;
     _liveId = liveId;
 
     final token = await _idTokenProvider();
@@ -34,7 +54,16 @@ class LivesSocketDataSource {
     final socket = io.io(
       ApiEndpoints.baseUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          // Every feature opens the same namespace on the same API host. Force
+          // a manager here so an older notification/chat socket cannot donate
+          // stale auth/options or be disconnected when the live room leaves.
+          .enableForceNew()
+          .setTransports(['websocket', 'polling'])
+          .enableReconnection()
+          .setReconnectionDelay(500)
+          .setReconnectionDelayMax(5000)
+          .setReconnectionAttempts(6)
+          .setTimeout(8000)
           .disableAutoConnect()
           .setAuth({'token': token})
           .setExtraHeaders({'Authorization': 'Bearer $token'})
@@ -43,31 +72,34 @@ class LivesSocketDataSource {
 
     _socket = socket;
     final connected = Completer<void>();
+    _connectionReady = connected;
 
     socket.onConnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO connected');
-      socket.emit('joinLive', {'liveId': liveId});
-      socket.emit('joinUser', {});
+      _joinRooms(socket, liveId);
       if (!connected.isCompleted) connected.complete();
       _controller.add(const LiveHudConnectionEvent(connected: true));
     });
 
     socket.onDisconnect((_) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO disconnected');
       _controller.add(
         const LiveHudConnectionEvent(connected: false, reason: 'disconnected'),
       );
     });
     socket.onConnectError((e) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO connect error: $e');
-      if (!connected.isCompleted) {
-        connected.completeError(StateError('Socket.IO connect error: $e'));
-      }
+      // Do not complete the handshake with an error: automatic reconnection is
+      // still active and may succeed on polling or the next network attempt.
       _controller.add(
         LiveHudConnectionEvent(connected: false, reason: e.toString()),
       );
     });
     socket.onError((e) {
+      if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO error: $e');
       _controller.add(
         LiveHudConnectionEvent(connected: false, reason: e.toString()),
@@ -77,8 +109,29 @@ class LivesSocketDataSource {
     socket.onReconnect((_) {
       if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO reconnected; rejoining live room');
-      socket.emit('joinLive', {'liveId': liveId});
-      socket.emit('joinUser', {});
+      _joinRooms(socket, liveId);
+      if (!connected.isCompleted) connected.complete();
+      _controller.add(const LiveHudConnectionEvent(connected: true));
+    });
+
+    socket.onReconnectAttempt((attempt) {
+      if (_socket != socket || _liveId != liveId) return;
+      _controller.add(
+        LiveHudConnectionEvent(
+          connected: false,
+          reason: 'reconnecting ($attempt)',
+        ),
+      );
+    });
+    socket.onReconnectFailed((_) {
+      if (_socket != socket || _liveId != liveId) return;
+      _controller.add(
+        const LiveHudConnectionEvent(
+          connected: false,
+          reason: 'refreshing authentication',
+        ),
+      );
+      unawaited(_rebuildWithFreshAuth(socket, liveId));
     });
 
     _on(socket, 'liveComment', (data) {
@@ -191,19 +244,22 @@ class LivesSocketDataSource {
       );
     });
 
-    // `gift_combo` is the canonical live gift presentation event. The
-    // legacy `liveGift` alias is intentionally not consumed here: parsing
-    // both would show the same gift twice and route it through the old text
-    // banner path.
     _on(socket, 'gift_combo', (data) {
-      final map = _unwrapPayload(data);
-      if (map == null) return;
-      _controller.add(
-        LiveHudGiftComboEvent(
-          payload: map,
-          totalEarnedCoins: _asInt(map['totalEarnedCoins']),
-        ),
-      );
+      _handleGiftPayload(data, fallbackLiveId: liveId);
+    });
+
+    // The rapid-gift gateway is deployed with this camelCase name on some
+    // backend versions (lives/logic.md). Keep all aliases behind the same
+    // transaction de-duplicator so the host always sees the animation once.
+    _on(socket, 'liveGiftCombo', (data) {
+      _handleGiftPayload(data, fallbackLiveId: liveId);
+    });
+
+    // Some backend deployments still emit `liveGift`. Supporting both names
+    // is safe because _handleGiftPayload de-duplicates the transaction before
+    // it reaches the host overlay.
+    _on(socket, 'liveGift', (data) {
+      _handleGiftPayload(data, fallbackLiveId: liveId);
     });
 
     // Personal room `user_*`, not the live room: an invite can land while the
@@ -242,6 +298,22 @@ class LivesSocketDataSource {
       );
     });
 
+    void battleEvent(dynamic data, String fallbackType) {
+      final map = _unwrapPayload(data) ?? _asMap(data);
+      if (map == null) return;
+      final raw = _asMap(map['battle']) ?? map;
+      if (raw['id'] == null) return;
+      _controller.add(
+        LiveHudBattleEvent(
+          type: map['type']?.toString() ?? fallbackType,
+          battle: LiveBattle.fromJson(raw),
+        ),
+      );
+    }
+
+    _on(socket, 'liveBattle', (data) => battleEvent(data, 'score'));
+    _on(socket, 'liveBattlePhase', (data) => battleEvent(data, 'phase'));
+
     _on(socket, 'liveHourlyRankUpdated', (data) {
       final map = _asMap(data);
       final rank = _asInt(map?['hourlyRank'] ?? map?['rank']);
@@ -262,12 +334,128 @@ class LivesSocketDataSource {
     final liveId = _liveId;
     _socket = null;
     _liveId = null;
+    _desiredLiveId = null;
+    _connectionReady = null;
+    _recentGiftEvents.clear();
     if (socket != null) {
       if (liveId != null) {
         socket.emit('leaveLive', {'liveId': liveId});
       }
       socket.dispose();
     }
+  }
+
+  /// A Socket.IO manager keeps the auth map it was created with. After the
+  /// Firebase JWT expires, infinite reconnects therefore repeat the same 401
+  /// forever. Rebuild the manager after a bounded cycle so the provider can
+  /// supply a fresh token, while still retrying until the host leaves.
+  Future<void> _rebuildWithFreshAuth(io.Socket stale, String liveId) async {
+    if (_authRefreshInFlight || _socket != stale || _liveId != liveId) return;
+    _authRefreshInFlight = true;
+    try {
+      stale.dispose();
+      if (_socket == stale) {
+        _socket = null;
+        _liveId = null;
+        _connectionReady = null;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (_desiredLiveId != liveId ||
+          _socket != null ||
+          (_liveId != null && _liveId != liveId)) {
+        return;
+      }
+      await connectAndJoin(liveId);
+    } catch (e) {
+      debugPrint('Socket.IO fresh-auth reconnect failed: $e');
+    } finally {
+      _authRefreshInFlight = false;
+    }
+  }
+
+  void _joinRooms(io.Socket socket, String liveId) {
+    socket.emit('joinLive', {'liveId': liveId});
+    socket.emit('joinUser', {});
+  }
+
+  void _handleGiftPayload(dynamic data, {required String fallbackLiveId}) {
+    final map = _unwrapPayload(data);
+    if (map == null) return;
+    map.putIfAbsent('liveId', () => fallbackLiveId);
+
+    final key = _giftEventKey(map);
+    final now = DateTime.now();
+    _recentGiftEvents.removeWhere(
+      (_, seenAt) => now.difference(seenAt) > const Duration(seconds: 4),
+    );
+    final previous = _recentGiftEvents[key];
+    if (previous != null &&
+        now.difference(previous) < const Duration(seconds: 2)) {
+      return;
+    }
+    _recentGiftEvents[key] = now;
+
+    final sender = _asMap(map['sender']) ?? _asMap(map['user']);
+    final gift = _asMap(map['gift']);
+    if (sender != null) map.putIfAbsent('sender', () => sender);
+    final giftId = map['giftId']?.toString() ?? gift?['id']?.toString();
+    if (giftId != null && giftId.isNotEmpty) {
+      map.putIfAbsent('giftId', () => giftId);
+    }
+
+    // Normal path: the shared gift animation parser accepts both the flat
+    // gift_combo shape and the nested liveGift shape.
+    if (giftId != null && giftId.isNotEmpty) {
+      _controller.add(
+        LiveHudGiftComboEvent(
+          payload: map,
+          totalEarnedCoins: _asInt(
+            map['totalEarnedCoins'] ?? map['earnedCoins'],
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Very old payloads carried only display fields. Keep a banner/chat
+    // fallback so the host still sees that a gift arrived.
+    final senderName =
+        sender?['fullName']?.toString() ??
+        sender?['username']?.toString() ??
+        map['senderName']?.toString();
+    _controller.add(
+      LiveHudGiftEvent(
+        summaryText: map['summaryText']?.toString(),
+        totalEarnedCoins: _asInt(map['totalEarnedCoins']),
+        senderName: senderName,
+        senderGifterLevel: _asInt(
+          sender?['gifterLevel'] ?? map['senderGifterLevel'],
+        ),
+        senderAvatarUrl:
+            sender?['avatarUrl']?.toString() ??
+            map['senderAvatarUrl']?.toString(),
+        giftName: gift?['name']?.toString() ?? map['giftName']?.toString(),
+        giftIcon: gift?['icon']?.toString() ?? map['giftIcon']?.toString(),
+        giftImageUrl:
+            gift?['imageUrl']?.toString() ??
+            gift?['iconUrl']?.toString() ??
+            map['giftImageUrl']?.toString(),
+        quantity: _asInt(map['quantity'] ?? map['qty']) ?? 1,
+      ),
+    );
+  }
+
+  String _giftEventKey(Map<String, dynamic> map) {
+    final gift = _asMap(map['gift']);
+    final sender = _asMap(map['sender']) ?? _asMap(map['user']);
+    final transaction =
+        map['transactionId'] ?? map['transaction_id'] ?? map['tx'] ?? map['id'];
+    if (transaction != null && transaction.toString().isNotEmpty) {
+      return 'tx:${transaction.toString()}:'
+          '${map['combo'] ?? map['quantity'] ?? map['qty'] ?? 1}';
+    }
+    return 'gift:${map['liveId']}:${sender?['id'] ?? map['senderId']}:'
+        '${gift?['id'] ?? map['giftId']}:${map['combo'] ?? map['quantity'] ?? 1}';
   }
 
   Future<void> dispose() async {

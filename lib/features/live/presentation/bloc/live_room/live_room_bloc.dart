@@ -7,9 +7,11 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 
 import '../../../../../core/network/api_exceptions.dart';
+import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_chat_feed_merge.dart';
+import '../../../domain/entities/live_guest.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../../domain/entities/live_host.dart';
 import '../../../domain/entities/live_session.dart';
@@ -79,6 +81,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomShareContactSelected>(_onShareContactSelected);
     on<LiveRoomShareChannelRequested>(_onShareChannelRequested);
     on<LiveRoomGuestsChanged>(_onGuestsChanged);
+    on<LiveRoomBattleChanged>(_onBattleChanged);
     on<LiveRoomCommentsResyncRequested>(_onCommentsResync);
     on<LiveRoomGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveRoomGuestRequestAnswered>(_onGuestRequestAnswered);
@@ -86,6 +89,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomSettingsApplied>(_onSettingsApplied);
     on<LiveRoomModerationRequested>(_onModerationRequested);
     on<LiveRoomHudEventReceived>(_onHudEvent);
+    on<LiveRoomMediaEventReceived>(_onMediaEvent);
     on<LiveRoomClearActionMessage>(_onClearActionMessage);
     on<LiveRoomRemoteEnded>(_onRemoteEnded);
   }
@@ -100,12 +104,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   final LiveSessionRepository _sessionRepository;
 
   StreamSubscription<LiveHudEvent>? _hudSub;
+  StreamSubscription<LiveMediaConnectionEvent>? _mediaSub;
 
   /// Set after a successful `POST /end` or remote `liveEnded`.
   var _sessionTeardownDone = false;
 
   /// Prevents overlapping camera init / flip requests.
   var _cameraOpInFlight = false;
+  var _mediaRecoveryInFlight = false;
+  var _appPaused = false;
+  var _closing = false;
 
   LiveRoomReady? get _readyOrNull =>
       state is LiveRoomReady ? state as LiveRoomReady : null;
@@ -346,20 +354,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         add(LiveRoomHudEventReceived(hudEvent));
       }
     });
-
-    // Skipped for the offline fallback below: a `local_live_<ts>` id means
-    // POST /lives never succeeded, so there is no room on the server and the
-    // join would subscribe to nothing.
-    String? socketError;
-    if (startedOnServer && session.id.isNotEmpty) {
-      try {
-        await _sessionRepository.connectRealtime(session.id);
-      } catch (e) {
-        socketError = 'Socket connection failed: $e';
-      }
-    }
+    await _mediaSub?.cancel();
+    _mediaSub = _sessionRepository.mediaEvents.listen((mediaEvent) {
+      if (!isClosed) add(LiveRoomMediaEventReceived(mediaEvent));
+    });
 
     // Preview is already on screen (Opening → Ready keeps same controller).
+    //
+    // Emitted BEFORE the socket is dialled. Awaiting `connectRealtime` here
+    // held the room in `Opening` for the whole handshake — and on a failure
+    // that is the full connect timeout, so starting a broadcast looked frozen
+    // for several seconds with the camera already running underneath.
     emit(
       LiveRoomReady(
         session: session,
@@ -367,9 +372,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         isCameraInitialized: controller != null,
         isFrontCamera: true,
         isMediaConnected: false,
-        actionMessage: socketError,
       ),
     );
+
+    // Skipped for the offline fallback below: a `local_live_<ts>` id means
+    // POST /lives never succeeded, so there is no room on the server and the
+    // join would subscribe to nothing.
+    if (startedOnServer && session.id.isNotEmpty) {
+      unawaited(_connectRealtimeInBackground(session.id));
+    }
 
     // The offline fallback invents a `local_live_…` id, so there is no room on
     // the server to join: viewers, comments and likes would all stay empty with
@@ -390,11 +401,50 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       return;
     }
 
-    // Enrichment off the critical path.
-    await _enrichSession(emit);
-
-    // LiveKit publish after local preview is visible (handoff camera ownership).
+    // Publishing is the critical path. Waiting for four HUD HTTP requests here
+    // delayed the first outgoing frame by several seconds.
     await _publishLiveKitAfterPreview(emit);
+
+    // Comments/gallery/guests/rank can arrive after video is already flowing.
+    await _enrichSession(emit);
+  }
+
+  /// Dials the HUD socket off the critical path, retrying with a short backoff.
+  ///
+  /// The room is already interactive by the time this runs, so a slow or dead
+  /// socket costs comments and the viewer counter — surfaced by the standing
+  /// warning in the chat feed — but never the ability to broadcast. Without the
+  /// retry a single failed handshake left the room silent for its whole run.
+  Future<void> _connectRealtimeInBackground(String liveId) async {
+    const delays = [
+      Duration.zero,
+      Duration(seconds: 2),
+      Duration(seconds: 5),
+      Duration(seconds: 10),
+    ];
+
+    for (final delay in delays) {
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
+      // Bail out if the host left, ended the stream, or started another one.
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null || ready.session.id != liveId) return;
+
+      try {
+        await _sessionRepository.connectRealtime(liveId);
+        return;
+      } catch (e) {
+        debugPrint('HUD socket connect failed for $liveId: $e');
+        if (isClosed) return;
+        add(
+          LiveRoomHudEventReceived(
+            LiveHudConnectionEvent(connected: false, reason: e.toString()),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _enrichSession(Emitter<LiveRoomState> emit) async {
@@ -405,8 +455,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final results = await Future.wait([
       _sessionRepository.loadComments(liveId),
       _sessionRepository.loadGalleryCounts(liveId),
-      _sessionRepository.loadGuestPendingCount(liveId),
+      // Full roster, not just the count: a request that arrived before the
+      // host opened the room would otherwise sit invisible until the next
+      // socket event, and there may not be one.
+      _sessionRepository.loadGuests(liveId),
       _sessionRepository.loadHourlyRank(liveId),
+      _loadBattleSafely(liveId),
     ]);
     if (isClosed) return;
     final ready = _readyOrNull;
@@ -414,25 +468,42 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     final comments = results[0] as List<LiveChatMessage>;
     final gallery = results[1] as ({int current, int total});
-    final guests = results[2] as int;
+    final guests = results[2] as List<LiveGuest>;
     final hourly =
         results[3] as ({int? rank, String label, int? score, int? coins});
+    final battle = results[4] as LiveBattle?;
+    // A `liveBattle` event may have arrived while the parallel HTTP snapshot
+    // was still loading. Never let an older null response erase that event.
+    final effectiveBattle = battle ?? ready.battle;
 
     // Merged, not assigned: enrichment runs a beat after the room goes Ready,
     // and anything the socket delivered in that window used to be wiped by the
     // HTTP history landing on top of it.
     emit(
       ready.copyWith(
+        guests: guests,
+        battle: effectiveBattle,
         session: ready.session.copyWith(
           messages: mergeLiveChatMessages(comments, ready.session.messages),
           galleryCurrent: gallery.current,
           galleryTotal: gallery.total,
-          guestInviteCount: guests,
+          guestInviteCount: guests.where((g) => g.isPending).length,
           hourlyRank: hourly.rank,
           hourlyRankingLabel: hourly.label,
         ),
       ),
     );
+    if (effectiveBattle?.isActive == true) {
+      add(LiveRoomBattleChanged(effectiveBattle));
+    }
+  }
+
+  Future<LiveBattle?> _loadBattleSafely(String liveId) async {
+    try {
+      return await _sessionRepository.loadBattle(liveId);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _publishLiveKitAfterPreview(Emitter<LiveRoomState> emit) async {
@@ -471,70 +542,60 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     );
 
     // ── Two-phase camera handoff (no black screen) ─────────────────────────
-    var releasedEarly = false;
-    try {
-      debugPrint(
-        '🔍 [BLoC] Phase A: connectMedia (no Flutter camera release)...',
+    // Keep the local preview alive while room signalling and audio connect.
+    // Release it exactly once immediately before WebRTC opens the camera, so
+    // CameraX and LiveKit never contend for the same lens.
+    var localReleased = false;
+    Future<void> releaseLocalCamera() async {
+      if (local == null || localReleased || isClosed) return;
+      final beforeRelease = _readyOrNull;
+      if (beforeRelease == null) return;
+      emit(
+        beforeRelease.copyWith(
+          controller: null,
+          isCameraInitialized: false,
+          clearActionMessage: true,
+        ),
       );
+      await _disposeCamera(local);
+      localReleased = true;
+      debugPrint('🔍 [BLoC] Flutter camera handed off to LiveKit ✅');
+    }
+
+    try {
+      debugPrint('🔍 [BLoC] connectMedia with serialized camera handoff...');
       await _sessionRepository.connectMedia(
         url: url,
         token: token,
         useFrontCamera: useFront,
+        beforeVideoCapture: releaseLocalCamera,
       );
-      debugPrint('🔍 [BLoC] Phase A: connectMedia SUCCESS ✅');
+      debugPrint('🔍 [BLoC] connectMedia SUCCESS ✅');
     } catch (e) {
-      debugPrint('🔴 [BLoC] Phase A failed (lens busy?): $e');
-      if (local != null) {
-        // Drop the Flutter camera from the widget tree BEFORE disposing it.
-        // A viewer joining during the slow Xiaomi teardown would otherwise
-        // rebuild the preview with the still-set controller and crash with
-        // "A CameraController was used after being disposed".
-        final afterDispose = _readyOrNull;
-        if (afterDispose != null) {
-          emit(
-            afterDispose.copyWith(
-              controller: null,
-              isCameraInitialized: false,
-              clearActionMessage: true,
-            ),
-          );
-        }
-        await _disposeCamera(local);
-        if (isClosed) return;
-        releasedEarly = true;
-        await Future<void>.delayed(const Duration(milliseconds: 800));
-        if (isClosed) return;
+      debugPrint('🔴 [BLoC] connectMedia failed: $e');
+      CameraController? fallback = localReleased ? null : local;
+      if (localReleased) {
+        fallback = await _initializeCamera(useFront: useFront);
       }
-      try {
-        await _sessionRepository.connectMedia(
-          url: url,
-          token: token,
-          useFrontCamera: useFront,
-        );
-      } catch (e2) {
-        // Both attempts failed → fall back to a brand new Flutter camera
-        // so the host is never left on a black screen.
-        final fallback = await _initializeCamera(useFront: useFront);
-        if (isClosed) {
-          if (fallback != null) await _disposeCamera(fallback);
-          return;
-        }
-        final ready = _readyOrNull;
-        if (ready == null) {
-          if (fallback != null) await _disposeCamera(fallback);
-          return;
-        }
-        emit(
-          ready.copyWith(
-            controller: fallback,
-            isCameraInitialized: fallback != null,
-            isMediaConnected: false,
-            localVideoTrack: null,
-            actionMessage: 'تعذر نشر الفيديو عبر LiveKit: $e2',
-          ),
-        );
+      if (isClosed) {
+        if (localReleased && fallback != null) await _disposeCamera(fallback);
         return;
       }
+      final ready = _readyOrNull;
+      if (ready == null) {
+        if (localReleased && fallback != null) await _disposeCamera(fallback);
+        return;
+      }
+      emit(
+        ready.copyWith(
+          controller: fallback,
+          isCameraInitialized: fallback != null,
+          isMediaConnected: false,
+          localVideoTrack: null,
+          actionMessage: 'تعذر نشر الفيديو عبر LiveKit: $e',
+        ),
+      );
+      return;
     }
     if (isClosed) return;
 
@@ -550,14 +611,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       'localPreviewTrack=${_sessionRepository.localPreviewTrack != null ? "SET" : "NULL"}',
     );
 
-    // LiveKit publish is UP. DROP the Flutter camera from the widget tree
-    // FIRST (state update), THEN release the underlying controller.
-    //
-    // Only swap when there is genuinely something to swap TO. isMediaConnected
-    // is true as soon as the room holds an audio OR a video track, so a run
-    // where the mic came up but the lens did not would otherwise clear the
-    // controller with no LiveKit frame behind it and leave the host on a
-    // permanently black room.
+    // Only swap when there is genuinely something to swap TO.
     final liveTrack = _sessionRepository.localPreviewTrack as VideoTrack?;
     final mediaUp = _sessionRepository.isMediaConnected;
     final swapToLiveKit = liveTrack != null && mediaUp;
@@ -577,12 +631,6 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       'localVideoTrack=${_sessionRepository.localPreviewTrack != null ? "SET" : "NULL"}',
     );
 
-    if (swapToLiveKit && !releasedEarly && local != null) {
-      debugPrint('🔍 [BLoC] Disposing Flutter camera (not released early)...');
-      await _disposeCamera(local);
-      debugPrint('🔍 [BLoC] Flutter camera disposed ✅');
-      if (isClosed) return;
-    }
     debugPrint('🟢 [BLoC] _publishLiveKitAfterPreview: COMPLETE');
   }
 
@@ -655,6 +703,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     } catch (_) {}
     await _hudSub?.cancel();
     _hudSub = null;
+    await _mediaSub?.cancel();
+    _mediaSub = null;
 
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
@@ -685,6 +735,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     await _sessionRepository.disconnectMedia();
     await _hudSub?.cancel();
     _hudSub = null;
+    await _mediaSub?.cancel();
+    _mediaSub = null;
     _sessionTeardownDone = true;
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
@@ -696,6 +748,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     LiveRoomAppPaused event,
     Emitter<LiveRoomState> emit,
   ) async {
+    _appPaused = true;
     final current = _readyOrNull;
     if (current == null) return;
     final controller = current.controller;
@@ -712,9 +765,14 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     LiveRoomAppResumed event,
     Emitter<LiveRoomState> emit,
   ) async {
+    _appPaused = false;
     final current = _readyOrNull;
     if (current == null) return;
     if (current.isMediaConnected) return;
+    if (current.session.isLive && !current.isEnding) {
+      await _recoverHostMedia(current.session.id, emit);
+      if (_readyOrNull?.isMediaConnected == true) return;
+    }
     if (current.controller != null && current.isCameraInitialized) return;
 
     final controller = await _initializeCamera(useFront: current.isFrontCamera);
@@ -880,6 +938,42 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         ),
       );
     } catch (_) {}
+  }
+
+  Future<void> _onBattleChanged(
+    LiveRoomBattleChanged event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null) return;
+    final battle = event.battle?.withTimingFrom(current.battle);
+    emit(current.copyWith(battle: battle));
+    if (battle?.isActive != true) {
+      await _sessionRepository.disconnectBattleOpponentMedia();
+      return;
+    }
+    final opponentId = battle!.opponentLiveId(current.session.id);
+    if (opponentId.isEmpty || opponentId == current.session.id) return;
+    try {
+      await _sessionRepository.connectBattleOpponentMedia(opponentId);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready != null && ready.battle?.id == battle.id) {
+        // The state identity change tells the stage to pick up battleMediaRoom;
+        // subsequent track publications repaint through Room notifications.
+        emit(ready.copyWith(battle: battle));
+      }
+    } catch (e) {
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready != null) {
+        emit(
+          ready.copyWith(
+            actionMessage: 'بدأت المعركة لكن تعذر فتح فيديو الخصم: $e',
+          ),
+        );
+      }
+    }
   }
 
   /// Pulls the comment history again, keeping whatever the socket delivered
@@ -1182,7 +1276,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         if (note != null) {
           emit(current.copyWith(actionMessage: note));
         }
-      case LiveHudConnectionEvent(:final connected, :final reason):
+      case LiveHudBattleEvent(:final battle):
+        add(LiveRoomBattleChanged(battle));
+      case LiveHudConnectionEvent(:final connected):
         // Comments, viewers and likes all ride this socket. The flag is kept in
         // state so the room can show a standing warning: a SnackBar alone
         // flashed past and left the host staring at a feed that never fills.
@@ -1197,14 +1293,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           add(const LiveRoomCommentsResyncRequested());
           return;
         }
-        emit(
-          current.copyWith(
-            isRealtimeConnected: false,
-            actionMessage:
-                'انقطع الاتصال المباشر بالغرفة، فلن تصل تعليقات المشاهدين '
-                'ولا عدد المشاهدين ولا الإعجابات${reason == null ? '' : ' ($reason)'}.',
-          ),
-        );
+        // Recover silently. A dropped HUD socket must not cover the live with
+        // a red banner/SnackBar; Socket.IO keeps retrying in the background.
+        emit(current.copyWith(isRealtimeConnected: false));
       case LiveHudCommentEvent(:final message):
         if (current.session.messages.any((m) => m.id == message.id)) {
           return;
@@ -1378,6 +1469,120 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             ),
           ),
         );
+    }
+  }
+
+  Future<void> _onMediaEvent(
+    LiveRoomMediaEventReceived event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null ||
+        current.isEnding ||
+        _sessionTeardownDone ||
+        _closing) {
+      return;
+    }
+    switch (event.event.state) {
+      case LiveMediaConnectionState.reconnecting:
+        emit(current.copyWith(isMediaConnected: false));
+        return;
+      case LiveMediaConnectionState.reconnected:
+        final track = _sessionRepository.localPreviewTrack as VideoTrack?;
+        emit(
+          current.copyWith(
+            isMediaConnected: track != null,
+            localVideoTrack: track,
+          ),
+        );
+        return;
+      case LiveMediaConnectionState.disconnected:
+        emit(current.copyWith(isMediaConnected: false, localVideoTrack: null));
+        if (!_appPaused) {
+          await _recoverHostMedia(current.session.id, emit);
+        }
+        return;
+    }
+  }
+
+  /// Re-starting an already-LIVE session is the documented host token refresh
+  /// path. Reusing the JWT kept by the old Room makes a hard disconnect remain
+  /// permanent after token expiry or a failed ICE restart.
+  Future<void> _recoverHostMedia(
+    String liveId,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    if (_mediaRecoveryInFlight ||
+        _sessionTeardownDone ||
+        _appPaused ||
+        _closing) {
+      return;
+    }
+    _mediaRecoveryInFlight = true;
+    try {
+      for (var attempt = 1; attempt <= 4; attempt++) {
+        if (isClosed || _sessionTeardownDone || _appPaused) return;
+        final before = _readyOrNull;
+        if (before == null || before.session.id != liveId || before.isEnding) {
+          return;
+        }
+        if (attempt > 1) {
+          await Future<void>.delayed(Duration(seconds: attempt - 1));
+        }
+        if (isClosed || _sessionTeardownDone || _appPaused) return;
+
+        try {
+          final refreshed = await _sessionRepository.reconnectHostSession(
+            liveId,
+          );
+          final token = refreshed.liveKitToken;
+          final url = refreshed.liveKitUrl;
+          if (token == null || token.isEmpty || url == null || url.isEmpty) {
+            throw StateError('LiveKit token/url missing after host reconnect');
+          }
+          await _sessionRepository.connectMedia(
+            url: url,
+            token: token,
+            useFrontCamera: before.isFrontCamera,
+          );
+          if (isClosed || _sessionTeardownDone) return;
+          final ready = _readyOrNull;
+          if (ready == null || ready.session.id != liveId) return;
+          final track = _sessionRepository.localPreviewTrack as VideoTrack?;
+          final mediaUp = _sessionRepository.isMediaConnected && track != null;
+          if (!mediaUp) {
+            throw StateError('Host video track was not republished');
+          }
+          emit(
+            ready.copyWith(
+              session: ready.session.copyWith(
+                liveKitToken: token,
+                liveKitUrl: url,
+              ),
+              controller: null,
+              isCameraInitialized: false,
+              isMediaConnected: true,
+              localVideoTrack: track,
+              clearActionMessage: true,
+            ),
+          );
+          return;
+        } catch (e) {
+          debugPrint('Host media recovery attempt $attempt failed: $e');
+          final ready = _readyOrNull;
+          if (ready != null && ready.session.id == liveId && !isClosed) {
+            emit(
+              ready.copyWith(
+                isMediaConnected: false,
+                localVideoTrack: null,
+                clearActionMessage: true,
+              ),
+            );
+          }
+        }
+      }
+    } finally {
+      _mediaRecoveryInFlight = false;
     }
   }
 
@@ -1688,6 +1893,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
   @override
   Future<void> close() async {
+    _closing = true;
+    await _mediaSub?.cancel();
+    _mediaSub = null;
     await _hudSub?.cancel();
     _hudSub = null;
     final current = _readyOrNull;

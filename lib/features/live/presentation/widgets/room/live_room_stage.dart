@@ -1,48 +1,122 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
-import '../../../../../core/constants/app_spacing.dart';
+import '../../../../../core/utils/build_safe_notifier.dart';
+import '../../../../../core/models/live_battle.dart';
+import '../../../../../core/widgets/stage_tiles.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import 'live_room_camera_layer.dart';
 
-/// Strip of everyone else on stage, drawn above the chat feed.
+/// The video area of the host room.
 ///
-/// The roster comes from the API (`GET /lives/:id/guests`, refreshed on every
-/// `liveGuestUpdate`); the picture comes from LiveKit. Those two arrive
-/// independently, so a guest the server already lists shows an avatar tile
-/// until their track lands, rather than the row popping in late.
+/// Alone, the camera stays full-bleed and this adds nothing. As soon as someone
+/// else is publishing, the host stays full-size and guests appear in a narrow
+/// right-hand rail, matching the product reference for multi-guest LIVE.
 class LiveRoomStage extends StatelessWidget {
-  const LiveRoomStage({super.key});
+  const LiveRoomStage({super.key, this.topInset = 0});
+
+  /// Distance from the top of the screen to the bottom of the room header.
+  final double topInset;
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LiveRoomBloc, LiveRoomState>(
       buildWhen: (previous, current) =>
-          current is LiveRoomReady &&
-          (previous is! LiveRoomReady || previous.guests != current.guests),
+          previous.runtimeType != current.runtimeType ||
+          (current is LiveRoomReady &&
+              (previous is! LiveRoomReady ||
+                  previous.guests != current.guests ||
+                  previous.battle != current.battle)),
       builder: (context, state) {
-        if (state is! LiveRoomReady) return const SizedBox.shrink();
-        final guests = state.activeGuests;
-        if (guests.isEmpty) return const SizedBox.shrink();
+        final guests = state is LiveRoomReady
+            ? state.activeGuests
+            : const <LiveGuest>[];
 
+        if (state is LiveRoomReady && state.isBattleActive) {
+          return _BattleStage(
+            battle: state.battle!,
+            currentLiveId: state.session.id,
+            topInset: topInset,
+          );
+        }
+
+        // Nobody else on stage: the camera keeps the whole screen.
+        if (guests.isEmpty) return const LiveRoomCameraLayer();
+
+        final size = MediaQuery.sizeOf(context);
         final room = context.read<LiveSessionRepository>().mediaRoom;
-        return Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.roomHorizontal,
-          ),
-          child: SizedBox(
-            height: _tileHeight,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.zero,
-              itemCount: guests.length,
-              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
-              itemBuilder: (context, index) => _GuestTile(
-                guest: guests[index],
-                room: room is Room ? room : null,
+
+        final maxHeight = (size.height - topInset) * 0.66;
+        final height = math.min(size.width / 0.78, maxHeight);
+        final width = size.width;
+        final visibleGuests = guests.take(3).toList(growable: false);
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: EdgeInsets.only(top: topInset),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const LiveRoomCameraLayer(),
+                  Positioned(
+                    right: 8,
+                    top: height * 0.12,
+                    bottom: 8,
+                    width: math.max(104, width * 0.29),
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            height: 28,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.48),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'طلبات الضيوف',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          for (
+                            var index = 0;
+                            index < visibleGuests.length;
+                            index++
+                          ) ...[
+                            Expanded(
+                              child: _StageTile(
+                                highlighted: index == 0,
+                                child: _GuestVideo(
+                                  guest: visibleGuests[index],
+                                  room: room is Room ? room : null,
+                                ),
+                              ),
+                            ),
+                            if (index != visibleGuests.length - 1)
+                              const SizedBox(height: 4),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -52,41 +126,237 @@ class LiveRoomStage extends StatelessWidget {
   }
 }
 
-const double _tileWidth = 96;
-const double _tileHeight = 128;
+class _BattleStage extends StatelessWidget {
+  const _BattleStage({
+    required this.battle,
+    required this.currentLiveId,
+    required this.topInset,
+  });
 
-class _GuestTile extends StatelessWidget {
-  const _GuestTile({required this.guest, required this.room});
-
-  final LiveGuest guest;
-  final Room? room;
+  final LiveBattle battle;
+  final String currentLiveId;
+  final double topInset;
 
   @override
   Widget build(BuildContext context) {
-    final tile = ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: _tileWidth,
-        height: _tileHeight,
-        child: Stack(
-          fit: StackFit.expand,
+    final size = MediaQuery.sizeOf(context);
+    final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
+    final height = math.min(size.width / kStageAspect, maxHeight);
+    final width = math.min(size.width, height * kStageAspect);
+    final room = context.read<LiveSessionRepository>().battleMediaRoom;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Expanded(
+                    child: _StageTile(child: LiveRoomCameraLayer()),
+                  ),
+                  const SizedBox(width: kStageTileGap),
+                  Expanded(
+                    child: _StageTile(
+                      child: _OpponentVideo(room: room is Room ? room : null),
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: _HostBattleBar(
+                  leftScore: battle.scoreFor(currentLiveId),
+                  rightScore: battle.opponentScoreFor(currentLiveId),
+                  endTime: battle.endTime,
+                  multiplier: battle.multiplier,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OpponentVideo extends StatelessWidget {
+  const _OpponentVideo({required this.room});
+
+  final Room? room;
+
+  VideoTrack? get _track {
+    final participants = room?.remoteParticipants.values;
+    if (participants == null) return null;
+    for (final participant in participants) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (publication.subscribed && !publication.muted && track != null) {
+          return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  Widget _content() {
+    final track = _track;
+    if (track != null) {
+      return VideoTrackRenderer(track, fit: VideoViewFit.cover);
+    }
+    return const ColoredBox(
+      color: Color(0xFF17171A),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _GuestVideo(guest: guest, room: room),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _GuestNamePlate(guest: guest),
+            Icon(Icons.person, size: 42, color: Colors.white38),
+            SizedBox(height: 8),
+            Text(
+              'جاري توصيل بث الخصم…',
+              style: TextStyle(color: Colors.white54),
             ),
           ],
         ),
       ),
     );
+  }
 
-    if (room == null) return tile;
-    // The Room is a ChangeNotifier: a guest publishing, unpublishing or
-    // toggling their camera repaints the tile without any polling.
-    return ListenableBuilder(listenable: room!, builder: (_, _) => tile);
+  @override
+  Widget build(BuildContext context) {
+    final value = room;
+    if (value == null) return _content();
+    return BuildSafeListenableBuilder(
+      listenable: value,
+      builder: (_, _) => _content(),
+    );
+  }
+}
+
+class _HostBattleBar extends StatefulWidget {
+  const _HostBattleBar({
+    required this.leftScore,
+    required this.rightScore,
+    required this.endTime,
+    required this.multiplier,
+  });
+
+  final int leftScore;
+  final int rightScore;
+  final DateTime? endTime;
+  final double multiplier;
+
+  @override
+  State<_HostBattleBar> createState() => _HostBattleBarState();
+}
+
+class _HostBattleBarState extends State<_HostBattleBar> {
+  late final Stream<int> _ticks = Stream<int>.periodic(
+    const Duration(seconds: 1),
+    (value) => value,
+  );
+
+  String get _remaining {
+    final end = widget.endTime;
+    if (end == null) return '--:--';
+    final seconds = math.max(0, end.difference(DateTime.now()).inSeconds);
+    return '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
+        '${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = math.max(1, widget.leftScore + widget.rightScore);
+    final left = (widget.leftScore / total * 1000).round().clamp(80, 920);
+    return SizedBox(
+      height: 42,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: left,
+                child: _score(Color(0xFFFF2D6F), widget.leftScore, false),
+              ),
+              Expanded(
+                flex: 1000 - left,
+                child: _score(Color(0xFF22CEDA), widget.rightScore, true),
+              ),
+            ],
+          ),
+          Positioned(
+            top: 18,
+            child: StreamBuilder<int>(
+              stream: _ticks,
+              builder: (_, _) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xDD14202A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${widget.multiplier > 1 ? '×${widget.multiplier.toStringAsFixed(1)}  ' : ''}$_remaining',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _score(Color color, int value, bool right) => Container(
+    height: 18,
+    color: color,
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+    child: Text(
+      '$value',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
+}
+
+class _StageTile extends StatelessWidget {
+  const _StageTile({required this.child, this.highlighted = false});
+
+  final Widget child;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF252527),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: highlighted
+              ? const Color(0xFF20D9E8)
+              : Colors.black.withValues(alpha: 0.72),
+          width: highlighted ? 1.5 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox.expand(child: child),
+      ),
+    );
   }
 }
 
@@ -112,13 +382,36 @@ class _GuestVideo extends StatelessWidget {
     return null;
   }
 
+  Widget _build(BuildContext context) {
+    final track = guest.cameraOffByHost ? null : _track;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (track != null)
+          VideoTrackRenderer(track, fit: VideoViewFit.cover)
+        else
+          _GuestPlaceholder(guest: guest),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _GuestNamePlate(guest: guest),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final track = guest.cameraOffByHost ? null : _track;
-    if (track != null) {
-      return VideoTrackRenderer(track, fit: VideoViewFit.cover);
-    }
-    return _GuestPlaceholder(guest: guest);
+    if (room == null) return _build(context);
+    // The Room is a ChangeNotifier: a guest publishing, unpublishing or
+    // toggling their camera repaints the tile without any polling. Those
+    // notifications come off WebRTC/signalling callbacks with no regard for
+    // what the framework is doing, so the rebuild has to be build-safe.
+    return BuildSafeListenableBuilder(
+      listenable: room!,
+      builder: (context, _) => _build(context),
+    );
   }
 }
 
@@ -132,19 +425,14 @@ class _GuestPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avatar = guest.avatarUrl;
-    return Container(
-      color: const Color(0xFF1A1A1C),
-      alignment: Alignment.center,
-      child: avatar != null && avatar.isNotEmpty
-          ? Image.network(
-              avatar,
-              fit: BoxFit.cover,
-              width: _tileWidth,
-              height: _tileHeight,
-              errorBuilder: (_, _, _) => const _GuestGlyph(),
-            )
-          : const _GuestGlyph(),
-    );
+    if (avatar != null && avatar.isNotEmpty) {
+      return Image.network(
+        avatar,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const _GuestGlyph(),
+      );
+    }
+    return const _GuestGlyph();
   }
 }
 
@@ -153,7 +441,10 @@ class _GuestGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Icon(Icons.person, size: 30, color: Colors.white38);
+    return const ColoredBox(
+      color: Color(0xFF1A1A1C),
+      child: Center(child: Icon(Icons.person, size: 36, color: Colors.white38)),
+    );
   }
 }
 
@@ -165,7 +456,7 @@ class _GuestNamePlate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
@@ -176,8 +467,8 @@ class _GuestNamePlate extends StatelessWidget {
       child: Row(
         children: [
           if (guest.mutedByHost) ...[
-            const Icon(Icons.mic_off, size: 11, color: Color(0xFFFF6B6B)),
-            const SizedBox(width: 3),
+            const Icon(Icons.mic_off, size: 12, color: Color(0xFFFF6B6B)),
+            const SizedBox(width: 4),
           ],
           Expanded(
             child: Text(
@@ -187,14 +478,14 @@ class _GuestNamePlate extends StatelessWidget {
               textAlign: TextAlign.left,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           if (guest.role.toUpperCase() == 'CO_HOST') ...[
-            const SizedBox(width: 3),
-            const Icon(Icons.star, size: 11, color: Color(0xFFFFC107)),
+            const SizedBox(width: 4),
+            const Icon(Icons.star, size: 12, color: Color(0xFFFFC107)),
           ],
         ],
       ),

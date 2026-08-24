@@ -74,6 +74,9 @@ class AppSpacing {
   /// Horizontal padding for live-room overlays.
   static const double roomHorizontal = sm;
 
+  /// Gap between the room header and the top of the shared multi-guest stage.
+  static const double roomStageTop = 96;
+
   /// Vertical gap between chat feed messages.
   static const double roomChatGap = xs;
 

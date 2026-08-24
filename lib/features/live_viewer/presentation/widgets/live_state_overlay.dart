@@ -25,7 +25,9 @@ class LiveStateOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state == LiveConnectionState.connected ||
-        state == LiveConnectionState.idle) {
+        state == LiveConnectionState.idle ||
+        state == LiveConnectionState.reconnecting ||
+        state == LiveConnectionState.networkLost) {
       return const SizedBox.shrink();
     }
 
@@ -60,28 +62,10 @@ class LiveStateOverlay extends StatelessWidget {
           ),
         );
       case LiveConnectionState.reconnecting:
-        return _Banner(
-          key: const ValueKey('reconnecting'),
-          color: AppColors.warning,
-          icon: Icons.sync,
-          title: 'Reconnecting…',
-          subtitle: reconnectAttempt > 0
-              ? 'Attempt $reconnectAttempt'
-              : 'Restoring your connection',
-        );
       case LiveConnectionState.networkLost:
-        return _Scrim(
-          key: const ValueKey('network'),
-          child: _StatusBody(
-            icon: Icons.wifi_off_rounded,
-            title: 'Network lost',
-            subtitle: message ?? 'Check your connection and try again',
-            primaryLabel: 'Retry',
-            onPrimary: onRetry,
-            secondaryLabel: 'Leave',
-            onSecondary: onLeave,
-          ),
-        );
+        // The player keeps the last rendered frame while LiveKit/Socket.IO
+        // recover in the background. Do not expose transient disconnect UI.
+        return const SizedBox.shrink();
       case LiveConnectionState.liveEnded:
         return _Scrim(
           key: const ValueKey('ended'),
@@ -147,80 +131,13 @@ class _Scrim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black.withOpacity(blur ? 0.72 : 0.55),
+      color: Colors.black.withValues(alpha: blur ? 0.72 : 0.55),
       alignment: Alignment.center,
       child: child
           .animate()
           .fadeIn(duration: 250.ms)
           .scale(begin: const Offset(0.96, 0.96), end: const Offset(1, 1)),
     );
-  }
-}
-
-class _Banner extends StatelessWidget {
-  final Color color;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  const _Banner({
-    super.key,
-    required this.color,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          margin: const EdgeInsets.only(top: 72, left: 20, right: 20),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.75),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: color.withOpacity(0.6)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(color),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTextStyles.labelLarge.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ).animate().slideY(begin: -0.4, end: 0).fadeIn();
   }
 }
 
@@ -259,7 +176,7 @@ class _StatusBody extends StatelessWidget {
             height: 72,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white.withValues(alpha: 0.08),
               border: Border.all(color: Colors.white24),
             ),
             child: Icon(icon, color: iconColor ?? Colors.white, size: 34),

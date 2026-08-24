@@ -52,6 +52,7 @@ class ApiEndpoints {
       '/lives/$id/guests/accept-invite';
   static String liveGuestRequest(String id) => '/lives/$id/guests/request';
   static String liveGuestLeave(String id) => '/lives/$id/guests/leave';
+  static String liveGuestToken(String id) => '/lives/$id/guests/token';
   static String liveGuestAccept(String id, String userId) =>
       '/lives/$id/guests/$userId/accept';
   static String liveGuestReject(String id, String userId) =>
@@ -70,6 +71,13 @@ class ApiEndpoints {
       '/lives/$id/guests/$userId/promote';
   static String liveGuestDemote(String id, String userId) =>
       '/lives/$id/guests/$userId/demote';
+  static String liveBattle(String id) => '/lives/$id/battle';
+  static String liveBattleOpponents(String id) => '/lives/$id/battle/opponents';
+  static String liveBattleMatch(String id) => '/lives/$id/battle/match';
+  static String liveBattleMultiplier(String id) =>
+      '/lives/$id/battle/multiplier';
+  static String liveBattleEnd(String id, String battleId) =>
+      '/lives/$id/battle/$battleId/end';
   static String liveGallery(String id) => '/lives/$id/gallery';
   static String liveAuctionPin(String liveId, String auctionId) =>
       '/lives/$liveId/auctions/$auctionId/pin';

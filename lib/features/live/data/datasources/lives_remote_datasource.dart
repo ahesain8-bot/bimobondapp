@@ -226,6 +226,11 @@ class LivesRemoteDataSource {
     return _api.post(ApiEndpoints.liveGuestLeave(liveId));
   }
 
+  /// Fresh publish credentials after a requested guest is accepted.
+  Future<Map<String, dynamic>> guestStageToken(String liveId) {
+    return _api.post(ApiEndpoints.liveGuestToken(liveId));
+  }
+
   Future<Map<String, dynamic>> acceptGuest({
     required String liveId,
     required String userId,
@@ -287,6 +292,62 @@ class LivesRemoteDataSource {
     required String userId,
   }) {
     return _api.post(ApiEndpoints.liveGuestDemote(liveId, userId));
+  }
+
+  Future<Map<String, dynamic>> battle(String liveId) {
+    return _api.get(ApiEndpoints.liveBattle(liveId));
+  }
+
+  Future<Map<String, dynamic>> battleOpponents(
+    String liveId, {
+    int limit = 20,
+  }) {
+    return _api.get(
+      ApiEndpoints.liveBattleOpponents(liveId),
+      query: {'limit': '$limit'},
+    );
+  }
+
+  Future<Map<String, dynamic>> startBattle({
+    required String liveId,
+    required String opponentLiveId,
+    int durationSeconds = 300,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveBattle(liveId),
+      body: {
+        'opponentLiveId': opponentLiveId,
+        'durationSeconds': durationSeconds,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> matchBattle({
+    required String liveId,
+    int durationSeconds = 300,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveBattleMatch(liveId),
+      body: {'durationSeconds': durationSeconds},
+    );
+  }
+
+  Future<Map<String, dynamic>> activateBattleMultiplier({
+    required String liveId,
+    required double multiplier,
+    required int durationSeconds,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveBattleMultiplier(liveId),
+      body: {'multiplier': multiplier, 'durationSeconds': durationSeconds},
+    );
+  }
+
+  Future<Map<String, dynamic>> endBattle({
+    required String liveId,
+    required String battleId,
+  }) {
+    return _api.post(ApiEndpoints.liveBattleEnd(liveId, battleId));
   }
 
   Future<Map<String, dynamic>> hourlyLeaderboard(String liveId) {

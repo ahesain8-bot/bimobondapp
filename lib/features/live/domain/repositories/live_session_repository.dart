@@ -4,6 +4,7 @@ import '../entities/live_guest.dart';
 import '../entities/live_leaderboard_entry.dart';
 import '../entities/live_session.dart';
 import '../entities/live_viewer.dart';
+import '../../../../core/models/live_battle.dart';
 
 /// Real-time HUD events from Socket.IO (`live_{id}` room).
 sealed class LiveHudEvent {
@@ -101,10 +102,7 @@ class LiveHudGiftEvent extends LiveHudEvent {
 }
 
 class LiveHudGiftComboEvent extends LiveHudEvent {
-  const LiveHudGiftComboEvent({
-    required this.payload,
-    this.totalEarnedCoins,
-  });
+  const LiveHudGiftComboEvent({required this.payload, this.totalEarnedCoins});
 
   final Map<String, dynamic> payload;
   final int? totalEarnedCoins;
@@ -147,12 +145,30 @@ class LiveHudGuestUpdateEvent extends LiveHudEvent {
   bool get affectsStage => type != 'settings';
 }
 
+class LiveHudBattleEvent extends LiveHudEvent {
+  const LiveHudBattleEvent({required this.type, required this.battle});
+
+  final String type;
+  final LiveBattle battle;
+}
+
 /// The HUD socket came up, or refused to. Comments, the viewer counter and
 /// likes all arrive over that socket, so a silent failure looks to the host
 /// like three separate features being broken.
 class LiveHudConnectionEvent extends LiveHudEvent {
   const LiveHudConnectionEvent({required this.connected, this.reason});
   final bool connected;
+  final String? reason;
+}
+
+/// LiveKit media health is intentionally separate from [LiveHudConnectionEvent].
+/// The video can fail while comments remain connected (and vice versa).
+enum LiveMediaConnectionState { reconnecting, reconnected, disconnected }
+
+class LiveMediaConnectionEvent {
+  const LiveMediaConnectionEvent({required this.state, this.reason});
+
+  final LiveMediaConnectionState state;
   final String? reason;
 }
 
@@ -316,6 +332,37 @@ abstract class LiveSessionRepository {
 
   Future<void> demoteGuest({required String liveId, required String userId});
 
+  Future<LiveBattle?> loadBattle(String liveId);
+
+  Future<List<LiveBattleOpponent>> loadBattleOpponents(
+    String liveId, {
+    int limit = 20,
+  });
+
+  Future<LiveBattle> startBattle({
+    required String liveId,
+    required String opponentLiveId,
+    int durationSeconds = 300,
+  });
+
+  Future<LiveBattle> matchBattle(String liveId, {int durationSeconds = 300});
+
+  Future<LiveBattle> activateBattleMultiplier({
+    required String liveId,
+    required double multiplier,
+    required int durationSeconds,
+  });
+
+  Future<LiveBattle> endBattle({
+    required String liveId,
+    required String battleId,
+  });
+
+  /// Subscribe to the opponent host's separate LiveKit room.
+  Future<void> connectBattleOpponentMedia(String opponentLiveId);
+
+  Future<void> disconnectBattleOpponentMedia();
+
   /// Hourly rank for this live (`GET /lives/:id/leaderboard/hourly`).
   Future<({int? rank, String label, int? score, int? coins})> loadHourlyRank(
     String liveId,
@@ -341,11 +388,22 @@ abstract class LiveSessionRepository {
   /// HUD event stream while connected.
   Stream<LiveHudEvent> get hudEvents;
 
+  /// Host LiveKit room lifecycle. A terminal disconnect requires a fresh host
+  /// token from `POST /lives/:id/start`, not only a Socket.IO reconnect.
+  Stream<LiveMediaConnectionEvent> get mediaEvents;
+
   /// Publishes host A/V to LiveKit using token/url from start.
+  ///
+  /// [beforeVideoCapture] runs after the room and microphone are connected but
+  /// immediately before WebRTC opens the camera. The host uses it to release
+  /// the setup preview, guaranteeing that two camera engines never contend for
+  /// the same lens. [maxAttempts] bounds the resolution fallback ladder.
   Future<void> connectMedia({
     required String url,
     required String token,
     bool useFrontCamera = true,
+    int maxAttempts = 3,
+    Future<void> Function()? beforeVideoCapture,
   });
 
   /// Viewer subscribe-only LiveKit connect.
@@ -367,6 +425,8 @@ abstract class LiveSessionRepository {
   /// Opaque LiveKit `Room`, or null before media connects. The stage reads
   /// remote participants from it to render guests who are publishing.
   Object? get mediaRoom;
+
+  Object? get battleMediaRoom;
 
   /// Whether LiveKit host/guest publish is active (video published).
   bool get isMediaConnected;

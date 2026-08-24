@@ -1,6 +1,7 @@
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/socket_event.dart';
+import '../../../../core/models/live_battle.dart';
 
 /// Converts Socket.IO payloads (lives/mobile-api.md §16) into typed
 /// [SocketEvent]s consumed by the live room UI.
@@ -84,6 +85,21 @@ class SocketMapper {
       liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
       updateType: type,
       guestUserId: user?['id']?.toString() ?? guest?['userId']?.toString(),
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveBattleEvent? battleEvent(dynamic data, String? fallbackLiveId) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final battle = _asMap(map['battle']) ?? _asMap(map['data']) ?? map;
+    if (battle['id'] == null) return null;
+    final parsed = LiveBattle.fromJson(battle);
+    final liveId = map['liveId']?.toString() ?? fallbackLiveId ?? '';
+    return LiveBattleEvent(
+      liveId: liveId,
+      updateType: map['type']?.toString() ?? 'score',
+      battle: parsed,
       timestamp: DateTime.now(),
     );
   }

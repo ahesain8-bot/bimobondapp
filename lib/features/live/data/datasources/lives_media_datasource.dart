@@ -9,6 +9,7 @@ import '../../domain/entities/live_capture_profile.dart';
 /// Never mints JWTs or stores `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`.
 class LivesMediaDataSource {
   Room? _room;
+  Room? _battleRoom;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
@@ -28,6 +29,9 @@ class LivesMediaDataSource {
   bool get isVideoPublished => _videoPublished;
 
   Room? get room => _room;
+
+  /// Subscribe-only room for the other host during a PK battle.
+  Room? get battleRoom => _battleRoom;
 
   /// Local camera track for [VideoTrackRenderer] preview (host/guest).
   LocalVideoTrack? get localVideoTrack => _videoTrack;
@@ -84,6 +88,8 @@ class LivesMediaDataSource {
     required String url,
     required String token,
     CameraPosition cameraPosition = CameraPosition.front,
+    int maxAttempts = 3,
+    Future<void> Function()? beforeVideoCapture,
   }) async {
     await disconnect();
 
@@ -130,21 +136,28 @@ class LivesMediaDataSource {
     // ── Room event listeners for connection health ─────────────────────────
     room.events
       ..on<RoomDisconnectedEvent>((event) {
-        debugPrint('🔴 [Host] LiveKit room disconnected — reason=${event.reason}');
+        if (_room != room) return;
+        debugPrint(
+          '🔴 [Host] LiveKit room disconnected — reason=${event.reason}',
+        );
         onRoomEvent?.call('room', 'disconnected:${event.reason}');
       })
       ..on<ReconnectingEvent>((event) {
+        if (_room != room) return;
         debugPrint('🔄 [Host] LiveKit reconnecting…');
         onRoomEvent?.call('room', 'reconnecting');
       })
       ..on<RoomReconnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint('🟢 [Host] LiveKit reconnected');
         onRoomEvent?.call('room', 'reconnected');
       })
       ..on<RoomConnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint('🟢 [Host] LiveKit connected');
       })
       ..on<ParticipantConnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint(
           '👤 [Host] Participant joined: ${event.participant.identity}',
         );
@@ -155,9 +168,19 @@ class LivesMediaDataSource {
       });
 
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
-    await room.connect(url, token);
     _room = room;
-    debugPrint('🔍 [Host] connectAndPublish: room connected, name=${room.name}');
+    try {
+      await room.connect(url, token);
+    } catch (_) {
+      if (_room == room) _room = null;
+      try {
+        await room.dispose();
+      } catch (_) {}
+      rethrow;
+    }
+    debugPrint(
+      '🔍 [Host] connectAndPublish: room connected, name=${room.name}',
+    );
 
     Object? audioError;
     Object? videoError;
@@ -173,19 +196,34 @@ class LivesMediaDataSource {
       debugPrint('🔴 [Host] LiveKit audio publish failed: $e\n$st');
     }
 
+    // Room signalling and microphone setup do not need the camera, so keep the
+    // Flutter preview alive through those potentially slow operations. Release
+    // it exactly here, immediately before WebRTC asks Camera2 for the lens.
+    // This avoids both a long black gap and the two-capturer race that froze
+    // the first several seconds on Android.
+    try {
+      await beforeVideoCapture?.call();
+    } catch (e, st) {
+      debugPrint('🔴 [Host] camera handoff failed: $e\n$st');
+      await disconnect();
+      rethrow;
+    }
+
     try {
       Object? lastError;
       final ladder = LiveVideoQualityPreference.instance.profile.fallbacks;
-      for (var attempt = 0; attempt < 6; attempt++) {
-        // Two passes per profile: the retry budget the Xiaomi camera2
-        // pipeline needed is kept, but a sensor that refuses the host's
-        // ceiling now steps down a tier instead of being asked the same
-        // resolution six times.
-        final profile = ladder[(attempt ~/ 2).clamp(0, ladder.length - 1)];
+      final attemptCount = maxAttempts.clamp(1, ladder.length);
+      for (var attempt = 0; attempt < attemptCount; attempt++) {
+        // Try each profile once, highest to lowest. Repeating every failed
+        // profile twice added 7.5 seconds of sleeps on a busy lens and looked
+        // exactly like a frozen live; a lower supported mode is the useful
+        // recovery action.
+        final profile = ladder[attempt];
         try {
           debugPrint(
             '🔍 [Host] connectAndPublish: '
-            'createCameraTrack attempt ${attempt + 1}/6 at ${profile.label}...',
+            'createCameraTrack attempt ${attempt + 1}/$attemptCount '
+            'at ${profile.label}...',
           );
           _videoTrack = await LocalVideoTrack.createCameraTrack(
             _captureOptionsFor(profile, cameraPosition),
@@ -208,8 +246,10 @@ class LivesMediaDataSource {
           // ============================================================
           try {
             final t = _videoTrack!;
-            final opts = t.currentOptions; // VideoCaptureOptions (2.11.0 correct name, not .options)
-            final params = opts.params;     // VideoParameters (dimensions + encoding)
+            final opts = t
+                .currentOptions; // VideoCaptureOptions (2.11.0 correct name, not .options)
+            final params =
+                opts.params; // VideoParameters (dimensions + encoding)
             final dims = params.dimensions;
             final enc = params.encoding;
             final capW = dims.width;
@@ -237,9 +277,13 @@ class LivesMediaDataSource {
             '🔴 [Host] LiveKit camera open attempt ${attempt + 1} '
             'failed: $e\n$st',
           );
-          await Future<void>.delayed(
-            Duration(milliseconds: 500 * (attempt + 1)),
-          );
+          // No backoff after the final try: the caller is about to act on
+          // the failure, and sleeping first only delays that.
+          if (attempt < attemptCount - 1) {
+            await Future<void>.delayed(
+              Duration(milliseconds: 250 * (attempt + 1)),
+            );
+          }
         }
       }
       if (_videoTrack == null) {
@@ -272,7 +316,7 @@ class LivesMediaDataSource {
       try {
         final pubs = room.localParticipant?.videoTrackPublications ?? [];
         for (final p in pubs) {
-          final lvTrack = p.track as LocalVideoTrack?;
+          final lvTrack = p.track;
           final sim = p.simulcasted;
           final mime = p.mimeType; // 2.11.0 direct getter (no .codec wrapper)
           final trackCodec = lvTrack?.codec; // LocalTrack.codec String
@@ -292,7 +336,7 @@ class LivesMediaDataSource {
             '  mime=$mime'
             '  trackCodec=$trackCodec'
             '  pubDimensions=${pubDim?.width}x${pubDim?.height}'
-            '  declaredSimLayers=${simLayers == null ? "null" : simLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}fps/${l.encoding == null ? "?" : "${(l.encoding!.maxBitrate~/1000)}kbps"}").toList()}'
+            '  declaredSimLayers=${simLayers == null ? "null" : simLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}fps/${l.encoding == null ? "?" : "${(l.encoding!.maxBitrate ~/ 1000)}kbps"}").toList()}'
             '  scCount=${scEntries.length}'
             '  scRIDs=${scEntries.map((e) => "${e.key}(${e.value.codec})").toList()}'
             '  encodings_per_rid=${scEntries.map((e) => "rid:${e.key} enc=${e.value.encodings?.map((en) => "rid:${en.rid ?? "f"} on:${en.active} scale:${en.scaleResolutionDownBy ?? 1.0} fps:${en.maxFramerate ?? "?"} br:${en.maxBitrate ?? "?"}").toList()}").toList()}',
@@ -327,7 +371,9 @@ class LivesMediaDataSource {
     );
 
     if (!_videoPublished) {
-      debugPrint('🔴 [Host] connectAndPublish: video NOT published → disconnect + throw');
+      debugPrint(
+        '🔴 [Host] connectAndPublish: video NOT published → disconnect + throw',
+      );
       await disconnect();
       throw StateError(
         'LiveKit video publish failed'
@@ -335,7 +381,9 @@ class LivesMediaDataSource {
         '${audioError != null ? ' (audio: $audioError)' : ''}',
       );
     }
-    debugPrint('🟢 [Host] connectAndPublish: SUCCESS — room + video + audio all up');
+    debugPrint(
+      '🟢 [Host] connectAndPublish: SUCCESS — room + video + audio all up',
+    );
   }
 
   /// Viewer: connect and subscribe only (no publish).
@@ -365,6 +413,41 @@ class LivesMediaDataSource {
   /// Whether the LiveKit room is connected (including viewer subscribe-only).
   bool get isRoomConnected => _room != null;
 
+  /// Joins the opponent's separate LiveKit room without touching the host's
+  /// publishing room.
+  Future<void> connectBattleAndSubscribe({
+    required String url,
+    required String token,
+  }) async {
+    await disconnectBattle();
+    if (url.isEmpty || token.isEmpty) {
+      throw StateError('Opponent LiveKit url/token missing');
+    }
+    final room = Room(
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: false,
+        defaultVideoPublishOptions: VideoPublishOptions(
+          backupVideoCodec: BackupVideoCodec(enabled: false),
+        ),
+      ),
+    );
+    await room.connect(url, token);
+    _battleRoom = room;
+  }
+
+  Future<void> disconnectBattle() async {
+    final room = _battleRoom;
+    _battleRoom = null;
+    if (room == null) return;
+    try {
+      await room.disconnect();
+      await room.dispose();
+    } catch (e, st) {
+      debugPrint('Battle LiveKit disconnect error: $e\n$st');
+    }
+  }
+
   Future<void> setMicrophoneEnabled(bool enabled) async {
     await _room?.localParticipant?.setMicrophoneEnabled(enabled);
   }
@@ -379,8 +462,7 @@ class LivesMediaDataSource {
     final old = _videoTrack;
     if (room == null || old == null || !_videoPublished) return _videoTrack;
 
-    final position =
-        useFront ? CameraPosition.front : CameraPosition.back;
+    final position = useFront ? CameraPosition.front : CameraPosition.back;
     // Flip at whatever the session is already running — dropping back to a
     // fixed 720p here would silently downgrade a 1080p stream mid-broadcast.
     final options = _captureOptionsFor(_activeProfile, position);
@@ -418,9 +500,16 @@ class LivesMediaDataSource {
   }
 
   Future<void> disconnect() async {
-    debugPrint('🔍 [Host] disconnect() called — _room=${_room != null ? "SET" : "NULL"}, '
-        '_videoTrack=${_videoTrack != null ? "SET" : "NULL"}, '
-        '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}');
+    debugPrint(
+      '🔍 [Host] disconnect() called — _room=${_room != null ? "SET" : "NULL"}, '
+      '_videoTrack=${_videoTrack != null ? "SET" : "NULL"}, '
+      '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
+    );
+    await disconnectBattle();
+    final room = _room;
+    // Detach ownership first: RoomDisconnectedEvent emitted by this deliberate
+    // teardown must not start the host recovery loop.
+    _room = null;
     try {
       // Fully release the native camera/audio sources. stop() alone can leave
       // flutter_webrtc's capturer cached ("camera already active ... reusing
@@ -429,9 +518,8 @@ class LivesMediaDataSource {
       _videoTrack = null;
       await _audioTrack?.dispose();
       _audioTrack = null;
-      await _room?.disconnect();
-      await _room?.dispose();
-      _room = null;
+      await room?.disconnect();
+      await room?.dispose();
     } catch (e, st) {
       debugPrint('LiveKit disconnect error: $e\n$st');
     } finally {

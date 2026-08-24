@@ -1,6 +1,8 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/utils/build_safe_notifier.dart';
+
 import '../../data/effects/face_detection_service.dart';
 import '../../domain/entities/tracked_face.dart';
 
@@ -8,9 +10,12 @@ import '../../domain/entities/tracked_face.dart';
 ///
 /// Face updates intentionally stay outside BLoC to avoid rebuilding the
 /// entire Live Room on every processed frame.
-class LiveFaceTracker extends ChangeNotifier {
+/// Notifies at camera frame rate from a platform image-stream callback, which
+/// is exactly the kind of source that eventually lands mid-build — hence
+/// [BuildSafeNotifier].
+class LiveFaceTracker extends ChangeNotifier with BuildSafeNotifier {
   LiveFaceTracker({FaceDetectionService? service})
-      : _service = service ?? FaceDetectionService();
+    : _service = service ?? FaceDetectionService();
 
   final FaceDetectionService _service;
 
@@ -30,7 +35,7 @@ class LiveFaceTracker extends ChangeNotifier {
     await _stopStream();
     _controller = controller;
     _face = null;
-    notifyListeners();
+    notifySafely();
     await _syncStream();
   }
 
@@ -40,7 +45,7 @@ class LiveFaceTracker extends ChangeNotifier {
     _enabled = enabled;
     if (!enabled) {
       _face = null;
-      notifyListeners();
+      notifySafely();
     }
     await _syncStream();
   }
@@ -48,9 +53,8 @@ class LiveFaceTracker extends ChangeNotifier {
   Future<void> _syncStream() async {
     if (_disposed) return;
     final controller = _controller;
-    final canStream = _enabled &&
-        controller != null &&
-        controller.value.isInitialized;
+    final canStream =
+        _enabled && controller != null && controller.value.isInitialized;
 
     if (canStream && !_streaming) {
       await _startStream(controller);
@@ -108,7 +112,7 @@ class LiveFaceTracker extends ChangeNotifier {
           now.difference(_lastEmit) > const Duration(milliseconds: 120)) {
         _face = null;
         _lastEmit = now;
-        notifyListeners();
+        notifySafely();
       }
       return;
     }
@@ -118,7 +122,7 @@ class LiveFaceTracker extends ChangeNotifier {
       return;
     }
     _lastEmit = now;
-    notifyListeners();
+    notifySafely();
   }
 
   @override
