@@ -401,6 +401,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
         final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
         final screenW = MediaQuery.sizeOf(context).width;
+        final screenH = MediaQuery.sizeOf(context).height;
         final pkVideoH = screenW / TikTokLiveTokens.pkVideoAspect;
         final chromeGap = isMultiGrid
             ? TikTokLiveTokens.multiGridChromeGap
@@ -579,6 +580,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           liveKit: di.sl<LiveKitService>(),
                           isSelfOnStage: state.isOnStage,
                           currentUserId: state.currentUserId,
+                          // Always reserve a usable comment band and the
+                          // composer on short phones / large text scales.
+                          maxHeight: math.max(
+                            180,
+                            screenH - headerBottom - contentBottom - 112,
+                          ),
                         )
                       else
                         MultiGuestGrid(

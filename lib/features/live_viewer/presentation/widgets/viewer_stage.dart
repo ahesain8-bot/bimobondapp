@@ -23,6 +23,7 @@ class ViewerStage extends StatelessWidget {
     this.topInset = 0,
     this.isSelfOnStage = false,
     this.currentUserId,
+    this.maxHeight,
   });
 
   final LiveEntity live;
@@ -36,12 +37,16 @@ class ViewerStage extends StatelessWidget {
   /// Whether this device is one of the publishers.
   final bool isSelfOnStage;
   final String? currentUserId;
+  final double? maxHeight;
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final maxHeight = (size.height - topInset) * 0.66;
-    final height = math.min(size.width / 0.78, maxHeight);
+    final heightLimit = math.min(
+      (size.height - topInset) * 0.66,
+      maxHeight ?? double.infinity,
+    );
+    final height = math.min(size.width / 0.78, heightLimit);
     final width = size.width;
     final room = liveKit.room;
     final visibleGuests = guests.take(3).toList(growable: false);
