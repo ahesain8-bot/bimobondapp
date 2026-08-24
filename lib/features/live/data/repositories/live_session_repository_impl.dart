@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/models/live_battle.dart';
+import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
@@ -111,6 +112,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       liveKitToken: token,
       liveKitUrl: url,
       liveKitRole: role,
+      mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: role),
     );
   }
 
@@ -130,6 +132,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       liveKitToken: response['token']?.toString(),
       liveKitUrl: response['url']?.toString(),
       liveKitRole: response['role']?.toString() ?? 'host',
+      mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: 'host'),
     );
   }
 
@@ -387,6 +390,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       token: source['token']?.toString() ?? '',
       url: source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '',
       role: source['role']?.toString() ?? 'GUEST',
+      mediaHints: LiveMediaHints.fromPayload(
+        source,
+        fallbackRole: source['role']?.toString() ?? 'guest',
+      ),
     );
   }
 
@@ -540,7 +547,11 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     final token = source['token']?.toString() ?? '';
     final url =
         source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '';
-    await _media.connectBattleAndSubscribe(url: url, token: token);
+    await _media.connectBattleAndSubscribe(
+      url: url,
+      token: token,
+      mediaHints: LiveMediaHints.fromPayload(source, fallbackRole: 'viewer'),
+    );
     _battleOpponentLiveId = opponentLiveId;
   }
 
@@ -652,19 +663,26 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     bool useFrontCamera = true,
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
+    LiveMediaHints? mediaHints,
   }) => _media.connectAndPublish(
     url: url,
     token: token,
     maxAttempts: maxAttempts,
     cameraPosition: useFrontCamera ? CameraPosition.front : CameraPosition.back,
     beforeVideoCapture: beforeVideoCapture,
+    mediaHints: mediaHints,
   );
 
   @override
   Future<void> connectMediaSubscribe({
     required String url,
     required String token,
-  }) => _media.connectAndSubscribe(url: url, token: token);
+    LiveMediaHints? mediaHints,
+  }) => _media.connectAndSubscribe(
+    url: url,
+    token: token,
+    mediaHints: mediaHints,
+  );
 
   @override
   Future<void> disconnectMedia() async {

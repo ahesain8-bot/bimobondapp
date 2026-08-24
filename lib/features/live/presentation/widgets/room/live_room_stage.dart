@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../../core/utils/build_safe_notifier.dart';
+import '../../../../../core/utils/livekit_participant_match.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/widgets/stage_tiles.dart';
 import '../../../domain/entities/live_guest.dart';
@@ -51,11 +52,22 @@ class LiveRoomStage extends StatelessWidget {
 
         final size = MediaQuery.sizeOf(context);
         final room = context.read<LiveSessionRepository>().mediaRoom;
+        final useGrid =
+            state is LiveRoomReady &&
+            state.session.layout?.toUpperCase() == 'GRID';
 
         final maxHeight = (size.height - topInset) * 0.66;
         final height = math.min(size.width / 0.78, maxHeight);
         final width = size.width;
         final visibleGuests = guests.take(3).toList(growable: false);
+
+        if (useGrid) {
+          return _HostGridStage(
+            guests: visibleGuests,
+            room: room is Room ? room : null,
+            topInset: topInset,
+          );
+        }
 
         return Align(
           alignment: Alignment.topCenter,
@@ -86,7 +98,7 @@ class LiveRoomStage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
-                              'طلبات الضيوف',
+                              'Request',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
@@ -122,6 +134,44 @@ class LiveRoomStage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _HostGridStage extends StatelessWidget {
+  const _HostGridStage({
+    required this.guests,
+    required this.room,
+    required this.topInset,
+  });
+
+  final List<LiveGuest> guests;
+  final Room? room;
+  final double topInset;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
+    final height = math.min(size.width / kStageAspect, maxHeight);
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: SizedBox(
+          width: size.width,
+          height: height,
+          child: StageTiles(
+            tiles: [
+              const _StageTile(child: LiveRoomCameraLayer()),
+              for (final guest in guests)
+                _StageTile(
+                  child: _GuestVideo(guest: guest, room: room),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -371,7 +421,7 @@ class _GuestVideo extends StatelessWidget {
     final participants = room?.remoteParticipants.values;
     if (participants == null) return null;
     for (final participant in participants) {
-      if (participant.identity != guest.userId) continue;
+      if (!liveKitParticipantMatches(participant, guest.userId)) continue;
       for (final publication in participant.videoTrackPublications) {
         if (publication.subscribed && !publication.muted) {
           final track = publication.track;

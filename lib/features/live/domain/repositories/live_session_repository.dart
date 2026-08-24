@@ -3,6 +3,7 @@ import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
 import '../entities/live_leaderboard_entry.dart';
 import '../entities/live_session.dart';
+import '../../../../core/models/live_media_hints.dart';
 import '../entities/live_viewer.dart';
 import '../../../../core/models/live_battle.dart';
 
@@ -179,11 +180,13 @@ class LiveGuestStageCredentials {
     required this.token,
     required this.url,
     required this.role,
+    this.mediaHints,
   });
 
   final String token;
   final String url;
   final String role;
+  final LiveMediaHints? mediaHints;
 
   bool get isUsable => token.isNotEmpty && url.isNotEmpty;
 }
@@ -404,12 +407,14 @@ abstract class LiveSessionRepository {
     bool useFrontCamera = true,
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
+    LiveMediaHints? mediaHints,
   });
 
   /// Viewer subscribe-only LiveKit connect.
   Future<void> connectMediaSubscribe({
     required String url,
     required String token,
+    LiveMediaHints? mediaHints,
   });
 
   Future<void> disconnectMedia();

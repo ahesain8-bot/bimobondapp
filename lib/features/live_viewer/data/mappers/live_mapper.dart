@@ -160,6 +160,10 @@ class LiveMapper {
     meta['isPk'] = isPk;
     meta['isMultiGrid'] = isMultiGrid;
     meta['isMultiGuest'] = isMultiGuest;
+    meta['layout'] = json['layout']?.toString().toUpperCase() ?? 'PANEL';
+    meta['guestsEnabled'] = json['guestsEnabled'] != false;
+    meta['allowGuestCamera'] = json['allowGuestCamera'] != false;
+    meta['maxGuests'] = _asInt(json['maxGuests']) ?? 3;
     meta['location'] = json['location']?.toString() ?? 'Live';
     meta['hourlyRank'] = hourlyRank ?? _asInt(json['hourlyRank']);
     meta['shareCount'] = _asInt(json['shareCount']) ?? 0;

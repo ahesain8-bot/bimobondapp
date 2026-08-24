@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:livekit_client/livekit_client.dart' show Room;
+import '../../../../core/models/live_media_hints.dart';
 
 /// Connection states mirroring a LiveKit room lifecycle.
 enum LiveKitConnectionState {
@@ -17,6 +18,7 @@ abstract class LiveKitService {
   Stream<LiveKitConnectionState> get stateStream;
   String? get roomName;
   String? get streamUrl;
+  LiveMediaHints? get mediaHints => null;
 
   /// The underlying LiveKit [Room] once connected (used to render remote
   /// video tracks), or null while disconnected. Fakes return null.
@@ -30,6 +32,7 @@ abstract class LiveKitService {
     required String token,
     required String roomName,
     String? mockStreamUrl,
+    LiveMediaHints? mediaHints,
   });
 
   Future<void> disconnect();
@@ -39,12 +42,17 @@ abstract class LiveKitService {
     required String url,
     required String token,
     required String roomName,
+    LiveMediaHints? mediaHints,
   }) async {}
 
   Future<void> disconnectBattle() async {}
 
   /// Whether this device is publishing camera/mic into the room right now.
   bool get isPublishing => false;
+
+  /// Requests camera/microphone before a seat request is sent so accepting the
+  /// request can publish immediately instead of waiting on a system dialog.
+  Future<void> prepareStage() async {}
 
   /// Re-joins the room with the publish credentials the server issued when the
   /// guest was accepted, then turns the camera and mic on. Subscribe-only
@@ -54,6 +62,7 @@ abstract class LiveKitService {
     required String url,
     required String token,
     required String roomName,
+    LiveMediaHints? mediaHints,
   }) async {
     throw UnsupportedError('joinStage is not supported by this service');
   }
@@ -76,6 +85,10 @@ class FakeLiveKitService implements LiveKitService {
   String? _streamUrl;
   String? _url;
   String? _token;
+  LiveMediaHints? _mediaHints;
+
+  @override
+  LiveMediaHints? get mediaHints => _mediaHints;
 
   @override
   Room? get room => null;
@@ -88,6 +101,7 @@ class FakeLiveKitService implements LiveKitService {
     required String url,
     required String token,
     required String roomName,
+    LiveMediaHints? mediaHints,
   }) async {}
 
   @override
@@ -99,11 +113,16 @@ class FakeLiveKitService implements LiveKitService {
   bool get isPublishing => _publishing;
 
   @override
+  Future<void> prepareStage() async {}
+
+  @override
   Future<void> joinStage({
     required String url,
     required String token,
     required String roomName,
+    LiveMediaHints? mediaHints,
   }) async {
+    _mediaHints = mediaHints;
     _publishing = true;
   }
 
@@ -145,9 +164,11 @@ class FakeLiveKitService implements LiveKitService {
     required String token,
     required String roomName,
     String? mockStreamUrl,
+    LiveMediaHints? mediaHints,
   }) async {
     _url = url;
     _token = token;
+    _mediaHints = mediaHints;
     _roomName = roomName;
     _setState(LiveKitConnectionState.connecting);
 
@@ -171,6 +192,7 @@ class FakeLiveKitService implements LiveKitService {
     _streamUrl = null;
     _url = null;
     _token = null;
+    _mediaHints = null;
   }
 
   @override

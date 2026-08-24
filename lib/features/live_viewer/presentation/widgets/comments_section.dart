@@ -299,11 +299,7 @@ class TikTokCommentBubble extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
       child: Container(
         padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.28),
-          borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
+        decoration: const BoxDecoration(color: Colors.transparent),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

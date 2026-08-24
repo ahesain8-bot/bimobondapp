@@ -1,6 +1,7 @@
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_host.dart';
 import '../../domain/entities/live_session.dart';
+import '../../../../core/models/live_media_hints.dart';
 
 /// Maps Nest live / comment JSON (lives/mobile-api.md) into domain entities.
 class LiveSessionMapper {
@@ -31,6 +32,7 @@ class LiveSessionMapper {
     String? liveKitToken,
     String? liveKitUrl,
     String? liveKitRole,
+    LiveMediaHints? mediaHints,
     List<LiveChatMessage> messages = const [],
     int? galleryCurrent,
     int? galleryTotal,
@@ -77,6 +79,7 @@ class LiveSessionMapper {
       liveKitToken: liveKitToken,
       liveKitUrl: liveKitUrl,
       liveKitRole: liveKitRole,
+      mediaHints: mediaHints,
       hourlyRank: hourlyRank,
       totalEarnedCoins: _asInt(live['totalEarnedCoins']) ?? 0,
       isPopular: live['isPopular'] as bool?,

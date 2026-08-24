@@ -569,6 +569,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         token: token,
         useFrontCamera: useFront,
         beforeVideoCapture: releaseLocalCamera,
+        mediaHints: current.session.mediaHints,
       );
       debugPrint('🔍 [BLoC] connectMedia SUCCESS ✅');
     } catch (e) {
@@ -1047,6 +1048,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         url: creds.url,
         token: creds.token,
         useFrontCamera: ready.isFrontCamera,
+        mediaHints: creds.mediaHints,
       );
       if (isClosed) return;
       emit(
@@ -1544,6 +1546,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             url: url,
             token: token,
             useFrontCamera: before.isFrontCamera,
+            mediaHints: refreshed.mediaHints,
           );
           if (isClosed || _sessionTeardownDone) return;
           final ready = _readyOrNull;
@@ -1558,6 +1561,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
               session: ready.session.copyWith(
                 liveKitToken: token,
                 liveKitUrl: url,
+                mediaHints: refreshed.mediaHints,
               ),
               controller: null,
               isCameraInitialized: false,

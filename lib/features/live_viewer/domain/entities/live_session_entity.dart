@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../../core/models/live_media_hints.dart';
 import 'live_entity.dart';
 
 /// Connection lifecycle for a live watch session.
@@ -58,6 +59,7 @@ class JoinLiveResult extends Equatable {
   final String liveKitToken;
   final String liveKitUrl;
   final LiveEntity live;
+  final LiveMediaHints? mediaHints;
 
   const JoinLiveResult({
     required this.liveId,
@@ -65,6 +67,7 @@ class JoinLiveResult extends Equatable {
     required this.liveKitToken,
     required this.liveKitUrl,
     required this.live,
+    this.mediaHints,
   });
 
   @override
@@ -74,6 +77,7 @@ class JoinLiveResult extends Equatable {
     liveKitToken,
     liveKitUrl,
     live,
+    mediaHints,
   ];
 }
 

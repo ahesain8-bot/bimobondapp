@@ -1,5 +1,6 @@
 import 'live_chat_message.dart';
 import 'live_host.dart';
+import '../../../../core/models/live_media_hints.dart';
 
 /// Snapshot of an active live broadcasting session (fields from mobile-api.md §5).
 class LiveSession {
@@ -28,6 +29,7 @@ class LiveSession {
     this.liveKitToken,
     this.liveKitUrl,
     this.liveKitRole,
+    this.mediaHints,
     this.hourlyRank,
     this.totalEarnedCoins = 0,
     this.isPopular,
@@ -72,6 +74,9 @@ class LiveSession {
   /// LiveKit role (`host`, `viewer`, `guest`, `co_host`).
   final String? liveKitRole;
 
+  /// Latest server recommendations for this exact token/role.
+  final LiveMediaHints? mediaHints;
+
   final int? hourlyRank;
   final int totalEarnedCoins;
   final bool? isPopular;
@@ -104,6 +109,7 @@ class LiveSession {
     String? liveKitToken,
     String? liveKitUrl,
     String? liveKitRole,
+    LiveMediaHints? mediaHints,
     int? hourlyRank,
     int? totalEarnedCoins,
     bool? isPopular,
@@ -135,6 +141,7 @@ class LiveSession {
       liveKitToken: liveKitToken ?? this.liveKitToken,
       liveKitUrl: liveKitUrl ?? this.liveKitUrl,
       liveKitRole: liveKitRole ?? this.liveKitRole,
+      mediaHints: mediaHints ?? this.mediaHints,
       hourlyRank: hourlyRank ?? this.hourlyRank,
       totalEarnedCoins: totalEarnedCoins ?? this.totalEarnedCoins,
       isPopular: isPopular ?? this.isPopular,

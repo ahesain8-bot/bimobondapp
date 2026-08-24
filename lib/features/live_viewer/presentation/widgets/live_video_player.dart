@@ -119,18 +119,18 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     final pub = _findVideoPub();
     if (pub == null) return;
     try {
+      final hints = _liveKit?.mediaHints;
+      final capWidth = hints?.subscribeWidth ?? 1280;
+      final capHeight = hints?.subscribeHeight ?? 720;
       final dims = isActive
-          ? const VideoDimensions(1280, 720)
+          ? VideoDimensions(capWidth, capHeight)
           : const VideoDimensions(854, 480);
-      final quality = isActive ? VideoQuality.HIGH : VideoQuality.LOW;
       debugPrint(
         '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
         '  isActive=$isActive'
-        '  → setVideoDimensions(${dims.width}x${dims.height})'
-        ' + setVideoQuality(${quality.name.toUpperCase()})',
+        '  → subscribe cap ${dims.width}x${dims.height}',
       );
       await pub.setVideoDimensions(dims);
-      await pub.setVideoQuality(quality);
 
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final track = _track;
@@ -151,17 +151,15 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
           }
         } catch (_) {}
       }
-      final afterQ = pub.videoQuality;
       final afterDims = pub.videoDimensions;
       debugPrint(
         '[DEBUG-QOS] VIEWER-RENDERER (after-floor):'
         '  liveId=${widget.live.id}'
-        '  pub.videoQualityAfter=${afterQ.name.toUpperCase()}'
         '  pub.videoDimensionsAfter=${afterDims == null ? "null" : "${afterDims.width}x${afterDims.height}"}'
         '  decoderFrameAfter(WxH)=${aftDecW ?? "?"}x${aftDecH ?? "?"}'
         '  decoderCodecAfter=$aftDecMime'
         '  decoderBitrateAfterKbps=$aftDecKbps'
-        '  FLOOR_GUARANTEE(>=854x480)? ${aftDecW == null || aftDecH == null ? "NOT_YET_DECODED" : (aftDecW! >= 854 && aftDecH! >= 480 ? "PASS >=480p" : "BELOW_FLOOR(host may not have published 2 layers yet; no 360/180 layers exist)")}',
+        '  SUBSCRIBE_CAP_RESULT=${aftDecW == null || aftDecH == null ? "NOT_YET_DECODED" : "${aftDecW}x$aftDecH (cap ${dims.width}x${dims.height})"}',
       );
     } catch (e) {
       debugPrint('[VIDEO-FIX] VIEWER-FLOOR apply failed: $e');

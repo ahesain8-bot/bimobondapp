@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
+import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../mappers/live_mapper.dart';
@@ -100,6 +101,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
       live: live.copyWith(
         streamUrl: liveJson['streamUrl']?.toString() ?? live.streamUrl,
       ),
+      mediaHints: LiveMediaHints.fromPayload(payload, fallbackRole: 'viewer'),
     );
   }
 

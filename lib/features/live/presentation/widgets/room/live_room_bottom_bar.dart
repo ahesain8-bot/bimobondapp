@@ -10,7 +10,7 @@ import 'live_room_options_sheet.dart';
 import 'live_room_share_sheet.dart';
 
 /// Host live bottom bar — TikTok LIVE order:
-/// [Say something…] [share] [effects] [more] [guests]
+/// [Say something…] [guests] [effects] [share] [more]
 class LiveRoomBottomBar extends StatelessWidget {
   const LiveRoomBottomBar({super.key});
 
@@ -27,14 +27,8 @@ class LiveRoomBottomBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + bottomInset),
       child: Directionality(
         textDirection: TextDirection.ltr,
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.36),
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          ),
+        child: SizedBox(
+          height: 42,
           child: Row(
             children: [
               Expanded(
@@ -45,8 +39,8 @@ class LiveRoomBottomBar extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     alignment: Alignment.centerLeft,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(18),
+                      color: Colors.black.withValues(alpha: 0.48),
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.1),
                       ),
@@ -63,14 +57,14 @@ class LiveRoomBottomBar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: _actionGap),
               _CircleSvgButton(
-                asset: AppAssets.roomBarShare,
-                iconWidth: 27,
-                iconHeight: 27,
+                asset: AppAssets.roomBarCollab,
+                iconWidth: 32,
+                iconHeight: 29,
                 onTap: () {
-                  bloc.add(const LiveRoomShareTapped());
-                  LiveRoomShareSheet.show(context);
+                  bloc.add(const LiveRoomCollabTapped());
+                  LiveRoomGuestsSheet.show(context);
                 },
               ),
               const SizedBox(width: _actionGap),
@@ -82,22 +76,22 @@ class LiveRoomBottomBar extends StatelessWidget {
               ),
               const SizedBox(width: _actionGap),
               _CircleSvgButton(
+                asset: AppAssets.roomBarShare,
+                iconWidth: 27,
+                iconHeight: 27,
+                onTap: () {
+                  bloc.add(const LiveRoomShareTapped());
+                  LiveRoomShareSheet.show(context);
+                },
+              ),
+              const SizedBox(width: _actionGap),
+              _CircleSvgButton(
                 asset: AppAssets.roomBarMore,
                 iconWidth: 23,
                 iconHeight: 23,
                 onTap: () {
                   bloc.add(const LiveRoomMoreTapped());
                   LiveRoomOptionsSheet.show(context);
-                },
-              ),
-              const SizedBox(width: _actionGap),
-              _CircleSvgButton(
-                asset: AppAssets.roomBarCollab,
-                iconWidth: 32,
-                iconHeight: 29,
-                onTap: () {
-                  bloc.add(const LiveRoomCollabTapped());
-                  LiveRoomGuestsSheet.show(context);
                 },
               ),
             ],

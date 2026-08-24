@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
+import '../../../../core/models/live_media_hints.dart';
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/repositories/guest_repository.dart';
 
@@ -104,6 +105,10 @@ class RealGuestRepository implements GuestRepository {
       token: source['token']?.toString() ?? '',
       url: source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '',
       role: source['role']?.toString() ?? 'GUEST',
+      mediaHints: LiveMediaHints.fromPayload(
+        source,
+        fallbackRole: source['role']?.toString() ?? 'guest',
+      ),
     );
   }
 }

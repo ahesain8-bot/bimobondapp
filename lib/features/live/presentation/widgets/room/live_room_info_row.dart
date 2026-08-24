@@ -34,6 +34,7 @@ class LiveRoomInfoRow extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
+            textDirection: TextDirection.ltr,
             children: [
               _RankingChip(
                 label: session.hourlyRankingLabel,

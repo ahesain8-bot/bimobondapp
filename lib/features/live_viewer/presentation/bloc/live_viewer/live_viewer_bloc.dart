@@ -229,6 +229,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               token: result.liveKitToken,
               roomName: result.liveId,
               mockStreamUrl: result.live.streamUrl,
+              mediaHints: result.mediaHints,
             );
           } catch (_) {
             if (_activeLiveId != live.id) return;
@@ -702,8 +703,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   // ---------- Multi-guest ----------
 
-  /// Ask the host for a seat on stage. Nothing happens locally until they
-  /// accept — the camera only comes on once the server issues publish creds.
+  /// Ask the host for a seat on stage. Permissions are granted before the
+  /// request leaves the device, so acceptance can publish without another UI
+  /// pause. Capture still starts only after server-issued publish credentials.
   Future<void> _onGuestSeatRequested(
     LiveViewerGuestSeatRequested event,
     Emitter<LiveViewerState> emit,
@@ -712,6 +714,19 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (liveId == null || liveId.isEmpty || state.isGuestActionBusy) return;
 
     emit(state.copyWith(isGuestActionBusy: true));
+    try {
+      await liveKitService.prepareStage();
+    } catch (error) {
+      if (!isClosed) {
+        emit(
+          state.copyWith(
+            isGuestActionBusy: false,
+            moderationBanner: error.toString().replaceFirst('Bad state: ', ''),
+          ),
+        );
+      }
+      return;
+    }
     final result = await guestRepository.requestSeat(liveId);
     if (isClosed) return;
     await result.fold(
@@ -964,6 +979,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               url: creds.url,
               token: creds.token,
               roomName: liveId,
+              mediaHints: creds.mediaHints,
             );
           } else {
             final joined = await joinLiveUseCase(liveId);
@@ -977,6 +993,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               token: result.liveKitToken,
               roomName: result.liveId,
               mockStreamUrl: result.live.streamUrl,
+              mediaHints: result.mediaHints,
             );
           }
           if (isClosed || _activeLiveId != liveId) return;
@@ -1456,6 +1473,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         url: credentials.url,
         token: credentials.token,
         roomName: liveId,
+        mediaHints: credentials.mediaHints,
       );
       if (isClosed || _activeLiveId != liveId) return;
       emit(
@@ -1580,6 +1598,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             url: join.liveKitUrl,
             token: join.liveKitToken,
             roomName: opponentId,
+            mediaHints: join.mediaHints,
           );
           if (_activeLiveId != liveId || isClosed) return;
           _battleOpponentLiveId = opponentId;

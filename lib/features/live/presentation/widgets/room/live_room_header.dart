@@ -30,6 +30,7 @@ class LiveRoomHeader extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
+            textDirection: TextDirection.ltr,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Start (right): profile then likes → visual [likes][profile]

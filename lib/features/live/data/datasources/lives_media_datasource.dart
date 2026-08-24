@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/services/live_video_quality_preference.dart';
+import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_capture_profile.dart';
 
 /// Publishes / subscribes LiveKit A/V using **server-issued** `url` + `token` only.
@@ -12,6 +16,7 @@ class LivesMediaDataSource {
   Room? _battleRoom;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
+  LiveMediaHints? _activeHints;
   var _videoPublished = false;
 
   /// The profile the camera actually opened at — not the one we asked for.
@@ -64,23 +69,67 @@ class LivesMediaDataSource {
         VideoParameters(
           dimensions: VideoDimensions(tier.width, tier.height),
           encoding: VideoEncoding(
-            maxBitrate: tier.maxBitrate,
+            maxBitrate: tier == profile
+                ? profile.maxBitrate
+                : math.min(tier.maxBitrate, profile.maxBitrate),
             maxFramerate: tier.maxFps,
           ),
         ),
     ];
   }
 
-  VideoPublishOptions _publishOptionsFor(LiveCaptureProfile profile) {
+  VideoPublishOptions _publishOptionsFor(
+    LiveCaptureProfile profile, {
+    LiveMediaHints? mediaHints,
+  }) {
+    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('host');
     return VideoPublishOptions(
-      simulcast: true,
+      videoCodec: hints.preferredCodec,
+      simulcast: hints.simulcast,
       backupVideoCodec: const BackupVideoCodec(enabled: false),
       videoEncoding: VideoEncoding(
         maxBitrate: profile.maxBitrate,
         maxFramerate: profile.maxFps,
       ),
-      videoSimulcastLayers: _simulcastLayersFor(profile),
+      videoSimulcastLayers: hints.simulcast
+          ? _simulcastLayersFor(profile)
+          : const [],
+      degradationPreference: DegradationPreference.maintainFramerate,
     );
+  }
+
+  LiveCaptureProfile _profileForHints(LiveMediaHints hints) {
+    final preferred = LiveVideoQualityPreference.instance.profile;
+    final server = switch (hints.maxVideoResolution.toLowerCase()) {
+      '1080p' => LiveCaptureProfile.fullHd,
+      '720p' => LiveCaptureProfile.hd,
+      _ => LiveCaptureProfile.sd,
+    };
+    final preferredIndex = LiveCaptureProfile.ladder.indexOf(preferred);
+    final serverIndex = LiveCaptureProfile.ladder.indexOf(server);
+    final base =
+        LiveCaptureProfile.ladder[math.max(preferredIndex, serverIndex)];
+    final bitrate = hints.maxBitrateKbps > 0
+        ? math.min(base.maxBitrate, hints.maxBitrateKbps * 1000)
+        : base.maxBitrate;
+    return LiveCaptureProfile(
+      width: base.width,
+      height: base.height,
+      maxFps: base.maxFps,
+      maxBitrate: bitrate,
+      preset: base.preset,
+      label: base.label,
+    );
+  }
+
+  Future<void> _preferMediaSpeaker() async {
+    try {
+      // TikTok-style live rooms are media playback, not private calls. Keep
+      // Bluetooth/wired devices first, otherwise route to the loudspeaker.
+      await AudioManager.instance.setSpeakerOutputPreferred(true, force: false);
+    } catch (error) {
+      debugPrint('Live audio route selection failed: $error');
+    }
   }
 
   /// Host/guest: connect then publish camera + mic (production.md §3.4).
@@ -90,20 +139,26 @@ class LivesMediaDataSource {
     CameraPosition cameraPosition = CameraPosition.front,
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
+    LiveMediaHints? mediaHints,
   }) async {
     await disconnect();
 
+    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('host');
+    _activeHints = hints;
+    if (!hints.canPublish) {
+      throw StateError('The server did not grant media publishing permission');
+    }
+    final requestedProfile = _profileForHints(hints);
+
     // ── RoomOptions tuned for stable host publishing ──────────────────────
-    // • dynacast FALSE: This is the CRITICAL setting. When dynacast is true,
+    // • dynacast follows the backend mediaHints for this room. When enabled,
     //   the SFU sends SubscribedQualityUpdate signals on every subscriber
     //   join/leave. The handler in room.dart processes `subscribedCodecs`
     //   which calls publishAdditionalCodecForPublication → engine.negotiate()
     //   → full SDP renegotiation. On Xiaomi's slow camera2 pipeline, if SDP
     //   munging fails → NegotiationError → fullReconnectOnNext → camera freeze.
-    //   Setting dynacast:false makes room.dart:383 return early, blocking the
-    //   entire subscribedCodecs path. NOTE: backupVideoCodec.enabled=false
-    //   alone is NOT sufficient — publishAdditionalCodecForPublication does
-    //   NOT check the enabled flag.
+    //   LiveKit can disable unused simulcast layers per subscriber. The server
+    //   can still disable it for devices that need the conservative path.
     // • backupVideoCodec DISABLED: defense in depth — prevents backup codec
     //   from being advertised in simulcastCodecs at publish time.
     // • adaptiveStream TRUE on the HOST (paired with viewer-side TRUE): the
@@ -125,10 +180,22 @@ class LivesMediaDataSource {
     //   profile the camera actually accepted.
     final room = Room(
       roomOptions: RoomOptions(
-        adaptiveStream: true,
-        dynacast: false,
+        adaptiveStream: hints.adaptiveStream,
+        dynacast: hints.dynacast,
+        defaultAudioCaptureOptions: const AudioCaptureOptions(
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          voiceIsolation: true,
+          stopAudioCaptureOnMute: false,
+        ),
+        defaultAudioPublishOptions: const AudioPublishOptions(
+          dtx: true,
+          red: true,
+        ),
         defaultVideoPublishOptions: _publishOptionsFor(
-          LiveVideoQualityPreference.instance.profile,
+          requestedProfile,
+          mediaHints: hints,
         ),
       ),
     );
@@ -165,6 +232,12 @@ class LivesMediaDataSource {
           'room',
           'participant_joined:${event.participant.identity}',
         );
+      })
+      ..on<TrackSubscribedEvent>((event) {
+        if (_room != room) return;
+        if (event.track is RemoteAudioTrack) {
+          unawaited(_preferMediaSpeaker());
+        }
       });
 
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
@@ -181,19 +254,50 @@ class LivesMediaDataSource {
     debugPrint(
       '🔍 [Host] connectAndPublish: room connected, name=${room.name}',
     );
+    await _preferMediaSpeaker();
 
     Object? audioError;
     Object? videoError;
 
-    try {
-      debugPrint('🔍 [Host] connectAndPublish: creating audio track...');
-      _audioTrack = await LocalAudioTrack.create();
-      debugPrint('🔍 [Host] connectAndPublish: publishing audio track...');
-      await room.localParticipant?.publishAudioTrack(_audioTrack!);
-      debugPrint('🔍 [Host] connectAndPublish: audio published OK');
-    } catch (e, st) {
-      audioError = e;
-      debugPrint('🔴 [Host] LiveKit audio publish failed: $e\n$st');
+    for (var attempt = 1; attempt <= 3 && _audioTrack == null; attempt++) {
+      LocalAudioTrack? candidate;
+      try {
+        debugPrint(
+          '🔍 [Host] connectAndPublish: creating audio track '
+          'attempt $attempt/3...',
+        );
+        candidate = await LocalAudioTrack.create(
+          const AudioCaptureOptions(
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            voiceIsolation: true,
+            stopAudioCaptureOnMute: false,
+          ),
+        );
+        final local = room.localParticipant;
+        if (local == null) {
+          throw StateError('LiveKit local participant unavailable');
+        }
+        await local.publishAudioTrack(
+          candidate,
+          publishOptions: const AudioPublishOptions(dtx: true, red: true),
+        );
+        _audioTrack = candidate;
+        audioError = null;
+        debugPrint('🔍 [Host] connectAndPublish: audio published OK');
+      } catch (e, st) {
+        audioError = e;
+        debugPrint(
+          '🔴 [Host] LiveKit audio publish attempt $attempt failed: $e\n$st',
+        );
+        try {
+          await candidate?.dispose();
+        } catch (_) {}
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(milliseconds: 180 * attempt));
+        }
+      }
     }
 
     // Room signalling and microphone setup do not need the camera, so keep the
@@ -211,7 +315,11 @@ class LivesMediaDataSource {
 
     try {
       Object? lastError;
-      final ladder = LiveVideoQualityPreference.instance.profile.fallbacks;
+      final fallbacks = requestedProfile.fallbacks;
+      final ladder = <LiveCaptureProfile>[
+        requestedProfile,
+        ...fallbacks.skip(1),
+      ];
       final attemptCount = maxAttempts.clamp(1, ladder.length);
       for (var attempt = 0; attempt < attemptCount; attempt++) {
         // Try each profile once, highest to lowest. Repeating every failed
@@ -296,9 +404,13 @@ class LivesMediaDataSource {
       // is derived from the profile the camera actually opened at, so we never
       // advertise a layer the sensor refused, and it always bottoms out at
       // 854×480 (M2 requirement: never publish below 480p).
-      await room.localParticipant?.publishVideoTrack(
+      final local = room.localParticipant;
+      if (local == null) {
+        throw StateError('LiveKit local participant unavailable');
+      }
+      await local.publishVideoTrack(
         _videoTrack!,
-        publishOptions: _publishOptionsFor(_activeProfile),
+        publishOptions: _publishOptionsFor(_activeProfile, mediaHints: hints),
       );
       _videoPublished = true;
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
@@ -370,13 +482,13 @@ class LivesMediaDataSource {
       'videoError=$videoError, audioError=$audioError',
     );
 
-    if (!_videoPublished) {
+    if (!_videoPublished || _audioTrack == null) {
       debugPrint(
         '🔴 [Host] connectAndPublish: video NOT published → disconnect + throw',
       );
       await disconnect();
       throw StateError(
-        'LiveKit video publish failed'
+        'LiveKit audio/video publish failed'
         '${videoError != null ? ': $videoError' : ''}'
         '${audioError != null ? ' (audio: $audioError)' : ''}',
       );
@@ -390,22 +502,23 @@ class LivesMediaDataSource {
   Future<void> connectAndSubscribe({
     required String url,
     required String token,
+    LiveMediaHints? mediaHints,
   }) async {
     await disconnect();
-    // Aligned viewer options: adaptiveStream TRUE (so SFU can pick the right
-    // simulcast layer per viewer viewport and network), dynacast FALSE to
-    // avoid renegotiation storms, backup codec disabled (same as publisher).
+    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
+    // Apply the server-issued adaptive-stream and dynacast policy to viewers.
     final room = Room(
-      roomOptions: const RoomOptions(
-        adaptiveStream: true,
-        dynacast: false,
-        defaultVideoPublishOptions: VideoPublishOptions(
+      roomOptions: RoomOptions(
+        adaptiveStream: hints.adaptiveStream,
+        dynacast: hints.dynacast,
+        defaultVideoPublishOptions: const VideoPublishOptions(
           backupVideoCodec: BackupVideoCodec(enabled: false),
         ),
       ),
     );
     await room.connect(url, token);
     _room = room;
+    await _preferMediaSpeaker();
     // Subscribe-only: mark connected without local publish.
     _videoPublished = false;
   }
@@ -418,22 +531,25 @@ class LivesMediaDataSource {
   Future<void> connectBattleAndSubscribe({
     required String url,
     required String token,
+    LiveMediaHints? mediaHints,
   }) async {
     await disconnectBattle();
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
+    final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
     final room = Room(
-      roomOptions: const RoomOptions(
-        adaptiveStream: true,
-        dynacast: false,
-        defaultVideoPublishOptions: VideoPublishOptions(
+      roomOptions: RoomOptions(
+        adaptiveStream: hints.adaptiveStream,
+        dynacast: hints.dynacast,
+        defaultVideoPublishOptions: const VideoPublishOptions(
           backupVideoCodec: BackupVideoCodec(enabled: false),
         ),
       ),
     );
     await room.connect(url, token);
     _battleRoom = room;
+    await _preferMediaSpeaker();
   }
 
   Future<void> disconnectBattle() async {
@@ -490,9 +606,17 @@ class LivesMediaDataSource {
     _videoPublished = false;
 
     final next = await LocalVideoTrack.createCameraTrack(options);
-    await room.localParticipant?.publishVideoTrack(
+    final local = room.localParticipant;
+    if (local == null) {
+      await next.dispose();
+      throw StateError('LiveKit local participant unavailable');
+    }
+    await local.publishVideoTrack(
       next,
-      publishOptions: _publishOptionsFor(_activeProfile),
+      publishOptions: _publishOptionsFor(
+        _activeProfile,
+        mediaHints: _activeHints,
+      ),
     );
     _videoTrack = next;
     _videoPublished = true;
@@ -525,6 +649,7 @@ class LivesMediaDataSource {
     } finally {
       _videoTrack = null;
       _audioTrack = null;
+      _activeHints = null;
       _room = null;
       _videoPublished = false;
     }

@@ -44,6 +44,7 @@ class TikTokLiveTopBar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              textDirection: TextDirection.ltr,
               children: [
                 Flexible(
                   child: _HostPill(live: live, onFollow: onFollow),
@@ -127,17 +128,17 @@ class _HostPill extends StatelessWidget {
         children: [
           ClipOval(
             child: SizedBox(
-                width: TikTokLiveTokens.hostAvatar,
-                height: TikTokLiveTokens.hostAvatar,
+              width: TikTokLiveTokens.hostAvatar,
+              height: TikTokLiveTokens.hostAvatar,
               child: CachedNetworkImage(
                 imageUrl: live.hostAvatar ?? '',
                 fit: BoxFit.cover,
-                placeholder: (_, __) => FallbackAvatar(
+                placeholder: (_, _) => FallbackAvatar(
                   seed: live.hostId,
                   name: live.hostName,
                   radius: TikTokLiveTokens.hostAvatar / 2,
                 ),
-                errorWidget: (_, __, ___) => FallbackAvatar(
+                errorWidget: (_, _, _) => FallbackAvatar(
                   seed: live.hostId,
                   name: live.hostName,
                   radius: TikTokLiveTokens.hostAvatar / 2,
@@ -198,10 +199,10 @@ class _HostPill extends StatelessWidget {
                 color: live.isFollowing
                     ? Colors.white.withValues(alpha: 0.18)
                     : const Color(0xFFFE2C55),
-              borderRadius: BorderRadius.circular(TikTokLiveTokens.followR),
-              border: live.isFollowing
-                  ? Border.all(color: Colors.white.withValues(alpha: 0.24))
-                  : null,
+                borderRadius: BorderRadius.circular(TikTokLiveTokens.followR),
+                border: live.isFollowing
+                    ? Border.all(color: Colors.white.withValues(alpha: 0.24))
+                    : null,
               ),
               child: live.isFollowing
                   ? const Text(
@@ -310,7 +311,7 @@ class _ViewerCountPill extends StatelessWidget {
                                 child: CachedNetworkImage(
                                   imageUrl: shown[i],
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => Container(
+                                  errorWidget: (_, _, _) => Container(
                                     color: const Color(0xFF333333),
                                     child: const Icon(
                                       Icons.person,
@@ -588,11 +589,11 @@ class _Pill extends StatelessWidget {
       height: 20,
       padding: const EdgeInsets.symmetric(horizontal: 7),
       alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.44),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.44),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
       child: child,
     );
   }
@@ -727,7 +728,7 @@ class PkBattleBar extends StatelessWidget {
 }
 
 /// TikTok LIVE viewer bottom bar (LTR):
-/// [treasure?] [Write...] [emoji] [share↓count] [gift] [rose] [multi-guest]
+/// [Write…] [emoji] [multi-guest] [rose] [gift] [share]
 class TikTokLiveBottomBar extends StatelessWidget {
   final VoidCallback onTypeTap;
   final VoidCallback onGiftTap;
@@ -756,10 +757,9 @@ class TikTokLiveBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Raised above home indicator to match reference action-bar position.
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.only(bottom: 16),
+      minimum: const EdgeInsets.only(bottom: 8),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           TikTokLiveTokens.bottomInsetH,
@@ -767,180 +767,169 @@ class TikTokLiveBottomBar extends StatelessWidget {
           TikTokLiveTokens.bottomInsetH,
           TikTokLiveTokens.bottomInsetV,
         ),
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.34),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-          ),
+        child: SizedBox(
+          height: 42,
           child: Row(
+            textDirection: TextDirection.ltr,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (onTreasureTap != null) ...[
-                GestureDetector(
-                  onTap: onTreasureTap,
-                  child: const Icon(
-                    Icons.inventory_2_rounded,
-                    color: Color(0xFFFFB020),
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
               Expanded(
-                child: commentField == null
-                    ? GestureDetector(
-                        onTap: onTypeTap,
-                        child: Container(
-                          height: 36,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          alignment: Alignment.centerLeft,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Text(
-                            'Write...',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.55),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              height: 1.1,
-                            ),
+                child:
+                    commentField ??
+                    GestureDetector(
+                      onTap: onTypeTap,
+                      child: Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        alignment: Alignment.centerLeft,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.48),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
                           ),
                         ),
-                      )
-                    : Align(
-                        alignment: Alignment.bottomCenter,
-                        child: commentField,
+                        child: Text(
+                          'Type...',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.62),
+                            fontSize: 14,
+                          ),
+                        ),
                       ),
+                    ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
+              const SizedBox(width: 6),
+              _BottomAction(
                 onTap: onEmojiTap ?? onTypeTap,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.emoji_emotions_outlined,
-                    color: Color(0xD9FFFFFF),
-                    size: 22,
-                  ),
+                child: const Icon(
+                  Icons.emoji_emotions_rounded,
+                  color: Colors.white,
+                  size: 23,
                 ),
               ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: onShareTap,
-                behavior: HitTestBehavior.opaque,
-                child: SizedBox(
-                  width: 34,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Transform.flip(
-                        flipX: true,
-                        child: const Icon(
-                          Icons.reply_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                      if (shareCount != null && shareCount! > 0)
-                        Text(
-                          shareCount! > 999 ? '999+' : '$shareCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            height: 1,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onGiftTap,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFF2D55),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.card_giftcard_rounded,
-                    color: Colors.white,
-                    size: 23,
-                  ),
-                ),
-              ),
-              if (onRoseTap != null) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: onRoseTap,
-                  child: const Text('🌹', style: TextStyle(fontSize: 28)),
-                ),
-              ],
               if (onMultiGuestTap != null) ...[
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: onMultiGuestTap,
-                  child: SizedBox(
-                    width: 32,
-                    height: 30,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Positioned(
-                          left: 0,
-                          top: 4,
-                          child: Icon(
-                            Icons.person,
-                            color: Color(0xFF25F4EE),
-                            size: 20,
-                          ),
-                        ),
-                        const Positioned(
-                          right: 0,
-                          top: 4,
-                          child: Icon(
-                            Icons.person,
-                            color: Color(0xFFFF2D55),
-                            size: 20,
-                          ),
-                        ),
-                        Positioned(
-                          right: -1,
-                          top: 0,
-                          child: Container(
-                            width: 7,
-                            height: 7,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF3D7EFF),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(width: 5),
+                _BottomAction(
+                  onTap: onMultiGuestTap!,
+                  child: const _GuestActionGlyph(),
                 ),
               ],
+              if (onRoseTap != null) ...[
+                const SizedBox(width: 5),
+                _BottomAction(
+                  onTap: onRoseTap!,
+                  child: const Text('🌹', style: TextStyle(fontSize: 23)),
+                ),
+              ],
+              const SizedBox(width: 5),
+              _BottomAction(
+                onTap: onGiftTap,
+                child: const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Color(0xFFFF5B87),
+                  size: 23,
+                ),
+              ),
+              const SizedBox(width: 5),
+              _BottomAction(
+                onTap: onShareTap,
+                badge: shareCount != null && shareCount! > 0
+                    ? (shareCount! > 999 ? '999+' : '$shareCount')
+                    : null,
+                child: Transform.flip(
+                  flipX: true,
+                  child: const Icon(
+                    Icons.reply_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BottomAction extends StatelessWidget {
+  const _BottomAction({required this.onTap, required this.child, this.badge});
+
+  final VoidCallback onTap;
+  final Widget child;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 38,
+        height: 40,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 1,
+              top: 1,
+              child: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.48),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+                child: child,
+              ),
+            ),
+            if (badge != null)
+              Positioned(
+                right: -2,
+                bottom: -1,
+                child: Text(
+                  badge!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuestActionGlyph extends StatelessWidget {
+  const _GuestActionGlyph();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 27,
+      height: 24,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 1,
+            bottom: 1,
+            child: Icon(Icons.person, color: Color(0xFF25F4EE), size: 20),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 1,
+            child: Icon(Icons.person, color: Color(0xFFFF2D55), size: 20),
+          ),
+        ],
       ),
     );
   }

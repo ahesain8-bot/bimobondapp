@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
+import '../../../../core/models/live_media_hints.dart';
 
 /// LiveKit publish credentials handed out when someone is put on stage
 /// (`POST /lives/:id/guests/accept-invite`), per lives/mobile-api.md §10.
@@ -9,11 +10,13 @@ class GuestStageCredentials {
     required this.token,
     required this.url,
     required this.role,
+    this.mediaHints,
   });
 
   final String token;
   final String url;
   final String role;
+  final LiveMediaHints? mediaHints;
 
   bool get isUsable => token.isNotEmpty && url.isNotEmpty;
   bool get isCoHost => role.toUpperCase() == 'CO_HOST';
