@@ -91,26 +91,6 @@ class MarketplaceHomeSkeleton extends StatelessWidget {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: _MarketplaceSectionHeaderSkeleton()),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: productCarouselHeight + 72,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: MarketplaceProductCardMetrics.horizontalListPadding,
-              ),
-              itemCount: 3,
-              separatorBuilder: (_, _) => const SizedBox(
-                width: MarketplaceProductCardMetrics.horizontalGap,
-              ),
-              itemBuilder: (_, _) => SizedBox(
-                width: productCardWidth,
-                child: const _MarketplaceAuctionCardSkeleton(),
-              ),
-            ),
-          ),
-        ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
@@ -189,47 +169,6 @@ class _MarketplaceProductCardSkeleton extends StatelessWidget {
             ShopSkeletonBox(height: 11, width: double.infinity),
             SizedBox(height: 4),
             ShopSkeletonBox(height: 12, width: 48),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MarketplaceAuctionCardSkeleton extends StatelessWidget {
-  const _MarketplaceAuctionCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: MarketplaceTheme.of(context).cardDecoration(
-        radius: MarketplaceTheme.radiusSm,
-      ),
-      child: const Padding(
-        padding: EdgeInsets.all(MarketplaceProductCardMetrics.cardPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: ShopSkeletonBox(
-                borderRadius: BorderRadius.all(
-                  Radius.circular(MarketplaceTheme.radiusXs),
-                ),
-              ),
-            ),
-            SizedBox(height: 6),
-            ShopSkeletonBox(height: 12, width: 52),
-            SizedBox(height: 4),
-            ShopSkeletonBox(height: 11, width: double.infinity),
-            SizedBox(height: 4),
-            ShopSkeletonBox(height: 10, width: 72),
-            SizedBox(height: 4),
-            ShopSkeletonBox(height: 12, width: 56),
-            SizedBox(height: 2),
-            ShopSkeletonBox(height: 10, width: 40),
-            SizedBox(height: 6),
-            ShopSkeletonBox(height: 30, width: double.infinity),
           ],
         ),
       ),

@@ -1,13 +1,9 @@
-import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
-    as auctions_di;
 import 'package:bimobondapp/app/marketplace/domain/utils/marketplace_category_config.dart';
 import 'package:bimobondapp/app/marketplace/presentation/bloc/marketplace_home_bloc.dart';
 import 'package:bimobondapp/app/marketplace/presentation/bloc/marketplace_home_state.dart';
 import 'package:bimobondapp/app/marketplace/presentation/pages/category_products_screen.dart';
-import 'package:bimobondapp/app/marketplace/presentation/pages/marketplace_auction_details_screen.dart';
 import 'package:bimobondapp/app/marketplace/presentation/theme/marketplace_theme.dart';
 import 'package:bimobondapp/app/marketplace/presentation/widgets/category_card.dart';
-import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_auction_card.dart';
 import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_header.dart';
 import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_hero_banner.dart';
 import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_home_skeleton.dart';
@@ -34,7 +30,6 @@ class MarketplaceHomeScreen extends StatelessWidget {
     return MarketplaceHomeBloc(
       getProductCategoriesUseCase: shop_di.sl(),
       getPlatformShopUseCase: shop_di.sl(),
-      getActiveAuctionsUseCase: auctions_di.sl(),
     )..add(MarketplaceHomeStarted());
   }
 
@@ -219,53 +214,6 @@ class _MarketplaceHomeView extends StatelessWidget {
                             },
                           ),
                   ),
-                ),
-                SliverToBoxAdapter(
-                  child: MarketplaceSectionHeader(
-                    title: l10n.marketplaceEndingSoon,
-                    actionLabel: l10n.shopSeeAll,
-                    onAction: () => context.go('/?tab=1'),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: state.endingSoonAuctions.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(l10n.marketplaceNoAuctions),
-                        )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: MarketplaceProductCardMetrics
-                                .horizontalListPadding,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              for (
-                                var index = 0;
-                                index < state.endingSoonAuctions.length;
-                                index++
-                              ) ...[
-                                if (index > 0)
-                                  const SizedBox(
-                                    width: MarketplaceProductCardMetrics
-                                        .horizontalGap,
-                                  ),
-                                MarketplaceAuctionCard(
-                                  auction: state.endingSoonAuctions[index],
-                                  onTap: () => context.pushNamed(
-                                    MarketplaceAuctionDetailsScreen.routeName,
-                                    pathParameters: {
-                                      'auctionId':
-                                          state.endingSoonAuctions[index].id,
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
