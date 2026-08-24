@@ -234,7 +234,7 @@ class _OpponentVideo extends StatelessWidget {
     if (value == null) return _content();
     return BuildSafeListenableBuilder(
       listenable: value,
-      builder: (_, __) => _content(),
+      builder: (_, _) => _content(),
     );
   }
 }
@@ -295,7 +295,7 @@ class _HostBattleBarState extends State<_HostBattleBar> {
             top: 18,
             child: StreamBuilder<int>(
               stream: _ticks,
-              builder: (_, __) => Container(
+              builder: (_, _) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xDD14202A),

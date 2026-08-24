@@ -1569,8 +1569,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           if (ready == null || ready.session.id != liveId) return;
           final track = _sessionRepository.localPreviewTrack as VideoTrack?;
           final mediaUp = _sessionRepository.isMediaConnected && track != null;
-          if (!mediaUp)
+          if (!mediaUp) {
             throw StateError('Host video track was not republished');
+          }
           emit(
             ready.copyWith(
               session: ready.session.copyWith(

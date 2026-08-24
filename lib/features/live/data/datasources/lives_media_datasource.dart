@@ -136,23 +136,28 @@ class LivesMediaDataSource {
     // ── Room event listeners for connection health ─────────────────────────
     room.events
       ..on<RoomDisconnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint(
           '🔴 [Host] LiveKit room disconnected — reason=${event.reason}',
         );
         onRoomEvent?.call('room', 'disconnected:${event.reason}');
       })
       ..on<ReconnectingEvent>((event) {
+        if (_room != room) return;
         debugPrint('🔄 [Host] LiveKit reconnecting…');
         onRoomEvent?.call('room', 'reconnecting');
       })
       ..on<RoomReconnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint('🟢 [Host] LiveKit reconnected');
         onRoomEvent?.call('room', 'reconnected');
       })
       ..on<RoomConnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint('🟢 [Host] LiveKit connected');
       })
       ..on<ParticipantConnectedEvent>((event) {
+        if (_room != room) return;
         debugPrint(
           '👤 [Host] Participant joined: ${event.participant.identity}',
         );
@@ -163,8 +168,16 @@ class LivesMediaDataSource {
       });
 
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
-    await room.connect(url, token);
     _room = room;
+    try {
+      await room.connect(url, token);
+    } catch (_) {
+      if (_room == room) _room = null;
+      try {
+        await room.dispose();
+      } catch (_) {}
+      rethrow;
+    }
     debugPrint(
       '🔍 [Host] connectAndPublish: room connected, name=${room.name}',
     );
@@ -493,6 +506,10 @@ class LivesMediaDataSource {
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     await disconnectBattle();
+    final room = _room;
+    // Detach ownership first: RoomDisconnectedEvent emitted by this deliberate
+    // teardown must not start the host recovery loop.
+    _room = null;
     try {
       // Fully release the native camera/audio sources. stop() alone can leave
       // flutter_webrtc's capturer cached ("camera already active ... reusing
@@ -501,9 +518,8 @@ class LivesMediaDataSource {
       _videoTrack = null;
       await _audioTrack?.dispose();
       _audioTrack = null;
-      await _room?.disconnect();
-      await _room?.dispose();
-      _room = null;
+      await room?.disconnect();
+      await room?.dispose();
     } catch (e, st) {
       debugPrint('LiveKit disconnect error: $e\n$st');
     } finally {

@@ -122,20 +122,28 @@ class RealLiveKitService implements LiveKitService {
           ),
         ),
       );
+      // Own the room before connect() starts emitting lifecycle callbacks.
+      // Every listener below checks identity so a late disconnect from the
+      // room we just replaced cannot mark the new room disconnected.
+      _room = room;
       room.events
         ..on<RoomDisconnectedEvent>((event) {
+          if (_room != room) return;
           debugPrint('🔴 LiveKit room disconnected: $roomName');
           _setState(LiveKitConnectionState.disconnected);
         })
         ..on<ReconnectingEvent>((event) {
+          if (_room != room) return;
           debugPrint('🔄 LiveKit reconnecting: $roomName');
           _setState(LiveKitConnectionState.reconnecting);
         })
         ..on<RoomReconnectedEvent>((event) {
+          if (_room != room) return;
           debugPrint('🔗 LiveKit reconnected: $roomName');
           _setState(LiveKitConnectionState.connected);
         })
         ..on<RoomConnectedEvent>((event) {
+          if (_room != room) return;
           debugPrint('🔌 LiveKit connected: $roomName');
           _setState(LiveKitConnectionState.connected);
         })
@@ -195,8 +203,6 @@ class RealLiveKitService implements LiveKitService {
         });
 
       await room.connect(url, token);
-      _room = room;
-
       // Viewer: subscribe only — no local publish.
       //
       // NOTE: We intentionally do NOT call setVideoQuality() here anymore.
@@ -215,7 +221,11 @@ class RealLiveKitService implements LiveKitService {
       _setState(LiveKitConnectionState.connected);
     } catch (e, st) {
       debugPrint('❌ LiveKit connect failed: $e\n$st');
+      final failedRoom = _room;
       _room = null;
+      try {
+        await failedRoom?.dispose();
+      } catch (_) {}
       _setState(LiveKitConnectionState.failed);
       rethrow;
     }
