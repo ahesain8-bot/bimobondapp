@@ -22,6 +22,45 @@ class RealLiveKitService implements LiveKitService {
   Room? _room;
   Room? _battleRoom;
 
+  /// LiveKit 2.11 can leave an internal participant-update callback waiting
+  /// for `RoomConnectedEvent` after a room has already been replaced. Ten
+  /// seconds later that callback throws an unhandled TimeoutException from
+  /// the SDK event stream and Android terminates the whole app. Keep every
+  /// Room and its subscriptions inside a guarded zone: normal connect errors
+  /// still reach the caller, while only this stale SDK timeout is absorbed.
+  Future<T> _runWithLiveKitErrorGuard<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    runZonedGuarded(
+      () async {
+        try {
+          final value = await action();
+          if (!completer.isCompleted) completer.complete(value);
+        } catch (error, stack) {
+          if (!completer.isCompleted) {
+            completer.completeError(error, stack);
+          } else {
+            Zone.root.handleUncaughtError(error, stack);
+          }
+        }
+      },
+      (error, stack) {
+        final isStaleSdkTimeout =
+            error.toString().contains('Timeout') &&
+            stack.toString().contains('package:livekit_client/');
+        if (isStaleSdkTimeout) {
+          debugPrint('LiveKit ignored stale room callback timeout: $error');
+          return;
+        }
+        if (!completer.isCompleted) {
+          completer.completeError(error, stack);
+        } else {
+          Zone.root.handleUncaughtError(error, stack);
+        }
+      },
+    );
+    return completer.future;
+  }
+
   @override
   LiveKitConnectionState get state => _state;
 
@@ -52,23 +91,26 @@ class RealLiveKitService implements LiveKitService {
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
-    final room = Room(
-      roomOptions: const RoomOptions(
-        adaptiveStream: true,
-        dynacast: false,
-        defaultVideoPublishOptions: VideoPublishOptions(
-          backupVideoCodec: BackupVideoCodec(enabled: false),
+    final room = await _runWithLiveKitErrorGuard(() async {
+      final guardedRoom = Room(
+        roomOptions: const RoomOptions(
+          adaptiveStream: true,
+          dynacast: false,
+          defaultVideoPublishOptions: VideoPublishOptions(
+            backupVideoCodec: BackupVideoCodec(enabled: false),
+          ),
         ),
-      ),
-    );
-    room.events
-      ..on<ReconnectingEvent>((_) {
-        debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
-      })
-      ..on<RoomReconnectedEvent>((_) {
-        debugPrint('🔗 Battle LiveKit reconnected: $roomName');
-      });
-    await room.connect(url, token);
+      );
+      guardedRoom.events
+        ..on<ReconnectingEvent>((_) {
+          debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
+        })
+        ..on<RoomReconnectedEvent>((_) {
+          debugPrint('🔗 Battle LiveKit reconnected: $roomName');
+        });
+      await guardedRoom.connect(url, token);
+      return guardedRoom;
+    });
     _battleRoom = room;
   }
 
@@ -110,99 +152,101 @@ class RealLiveKitService implements LiveKitService {
     _setState(LiveKitConnectionState.connecting);
 
     try {
-      final room = Room(
-        roomOptions: const RoomOptions(
-          // Let LiveKit select the highest layer that the current viewport and
-          // network can sustain. Disabling this left viewers on the publisher's
-          // initial/default layer and made quality unnecessarily low or unstable.
-          adaptiveStream: true,
-          dynacast: false,
-          defaultVideoPublishOptions: VideoPublishOptions(
-            backupVideoCodec: BackupVideoCodec(enabled: false),
+      await _runWithLiveKitErrorGuard(() async {
+        final room = Room(
+          roomOptions: const RoomOptions(
+            // Let LiveKit select the highest layer that the current viewport and
+            // network can sustain. Disabling this left viewers on the publisher's
+            // initial/default layer and made quality unnecessarily low or unstable.
+            adaptiveStream: true,
+            dynacast: false,
+            defaultVideoPublishOptions: VideoPublishOptions(
+              backupVideoCodec: BackupVideoCodec(enabled: false),
+            ),
           ),
-        ),
-      );
-      // Own the room before connect() starts emitting lifecycle callbacks.
-      // Every listener below checks identity so a late disconnect from the
-      // room we just replaced cannot mark the new room disconnected.
-      _room = room;
-      room.events
-        ..on<RoomDisconnectedEvent>((event) {
-          if (_room != room) return;
-          debugPrint('🔴 LiveKit room disconnected: $roomName');
-          _setState(LiveKitConnectionState.disconnected);
-        })
-        ..on<ReconnectingEvent>((event) {
-          if (_room != room) return;
-          debugPrint('🔄 LiveKit reconnecting: $roomName');
-          _setState(LiveKitConnectionState.reconnecting);
-        })
-        ..on<RoomReconnectedEvent>((event) {
-          if (_room != room) return;
-          debugPrint('🔗 LiveKit reconnected: $roomName');
-          _setState(LiveKitConnectionState.connected);
-        })
-        ..on<RoomConnectedEvent>((event) {
-          if (_room != room) return;
-          debugPrint('🔌 LiveKit connected: $roomName');
-          _setState(LiveKitConnectionState.connected);
-        })
-        // [DEBUG-QOS VIEWER 1/3] Remote track subscribed: print what
-        // simulcast layers the remote publication actually advertises,
-        // which codec is in use, and — critically — what VideoQuality
-        // the viewer is currently scheduled to receive BEFORE any UI
-        // touches it.  This line isolates whether adaptiveStream has
-        // already picked the wrong layer before the widget tree builds.
-        // NOTE: For 2.11.0, remote tracks do NOT expose `options.encodings`;
-        // instead we read: publication.dimensions (from server TrackInfo),
-        // publication.mimeType (direct String getter, no .codec wrapper),
-        // and publication.videoQuality getter which returns the user's
-        // explicit setVideoQuality preference (or HIGH if unset — note
-        // this is NOT the SFU's actual forwarding decision, which is why
-        // the LiveVideoPlayer renderer also probes via getReceiverStats).
-        ..on<TrackSubscribedEvent>((ev) {
-          if (ev.track is! RemoteVideoTrack) return;
-          final p = ev.publication;
-          final part = ev.participant;
-          final vtrack = ev.track as RemoteVideoTrack;
-          final pub = p; // RemoteTrackPublication
-          final dims = pub.dimensions; // server-reported published dims
-          final mime = pub.mimeType; // 2.11.0 direct getter
-          final qualityPref = pub.videoQuality.name.toUpperCase();
-          // Remote tracks don't expose encodings list; actual decoder dims
-          // are queried via getReceiverStats() in the LiveVideoPlayer renderer
-          // probe block (VIEWER-RENDERER DEBUG-QOS).
-          debugPrint(
-            '[DEBUG-QOS] VIEWER-TRACK-SUBSCRIBED:'
-            '  room=$roomName'
-            '  hostId=${part.identity}'
-            '  trackSid=${vtrack.sid}'
-            '  pubSid=${pub.sid}'
-            '  simulcasted=${pub.simulcasted}'
-            '  mime=$mime'
-            '  pubDimensions=${dims?.width}x${dims?.height}'
-            '  videoQualityGetter(preference)=$qualityPref'
-            '  (NOTE: decoder-output dims queried separately in VIEWER-RENDERER probe via getReceiverStats())',
-          );
-        })
-        // [DEBUG-QOS VIEWER 2/3] TrackStreamStateUpdatedEvent fires when the
-        // SFU pauses the track due to bandwidth limits or resumes it.
-        // (Replaces non-existent RemoteVideoTrackEvent listener that would
-        // have caused compile error on livekit_client <2.13.)
-        ..on<TrackStreamStateUpdatedEvent>((ev) {
-          try {
+        );
+        // Own the room before connect() starts emitting lifecycle callbacks.
+        // Every listener below checks identity so a late disconnect from the
+        // room we just replaced cannot mark the new room disconnected.
+        _room = room;
+        room.events
+          ..on<RoomDisconnectedEvent>((event) {
+            if (_room != room) return;
+            debugPrint('🔴 LiveKit room disconnected: $roomName');
+            _setState(LiveKitConnectionState.disconnected);
+          })
+          ..on<ReconnectingEvent>((event) {
+            if (_room != room) return;
+            debugPrint('🔄 LiveKit reconnecting: $roomName');
+            _setState(LiveKitConnectionState.reconnecting);
+          })
+          ..on<RoomReconnectedEvent>((event) {
+            if (_room != room) return;
+            debugPrint('🔗 LiveKit reconnected: $roomName');
+            _setState(LiveKitConnectionState.connected);
+          })
+          ..on<RoomConnectedEvent>((event) {
+            if (_room != room) return;
+            debugPrint('🔌 LiveKit connected: $roomName');
+            _setState(LiveKitConnectionState.connected);
+          })
+          // [DEBUG-QOS VIEWER 1/3] Remote track subscribed: print what
+          // simulcast layers the remote publication actually advertises,
+          // which codec is in use, and — critically — what VideoQuality
+          // the viewer is currently scheduled to receive BEFORE any UI
+          // touches it.  This line isolates whether adaptiveStream has
+          // already picked the wrong layer before the widget tree builds.
+          // NOTE: For 2.11.0, remote tracks do NOT expose `options.encodings`;
+          // instead we read: publication.dimensions (from server TrackInfo),
+          // publication.mimeType (direct String getter, no .codec wrapper),
+          // and publication.videoQuality getter which returns the user's
+          // explicit setVideoQuality preference (or HIGH if unset — note
+          // this is NOT the SFU's actual forwarding decision, which is why
+          // the LiveVideoPlayer renderer also probes via getReceiverStats).
+          ..on<TrackSubscribedEvent>((ev) {
+            if (ev.track is! RemoteVideoTrack) return;
             final p = ev.publication;
+            final part = ev.participant;
+            final vtrack = ev.track as RemoteVideoTrack;
+            final pub = p; // RemoteTrackPublication
+            final dims = pub.dimensions; // server-reported published dims
+            final mime = pub.mimeType; // 2.11.0 direct getter
+            final qualityPref = pub.videoQuality.name.toUpperCase();
+            // Remote tracks don't expose encodings list; actual decoder dims
+            // are queried via getReceiverStats() in the LiveVideoPlayer renderer
+            // probe block (VIEWER-RENDERER DEBUG-QOS).
             debugPrint(
-              '[DEBUG-QOS] VIEWER-TRACK-STREAM-STATE:'
-              '  streamState=${ev.streamState.name.toUpperCase()}'
-              '  pubSid=${p.sid}'
-              '  videoQuality(preference)=${p.videoQuality.name.toUpperCase()}'
-              '  simulcasted=${p.simulcasted}',
+              '[DEBUG-QOS] VIEWER-TRACK-SUBSCRIBED:'
+              '  room=$roomName'
+              '  hostId=${part.identity}'
+              '  trackSid=${vtrack.sid}'
+              '  pubSid=${pub.sid}'
+              '  simulcasted=${pub.simulcasted}'
+              '  mime=$mime'
+              '  pubDimensions=${dims?.width}x${dims?.height}'
+              '  videoQualityGetter(preference)=$qualityPref'
+              '  (NOTE: decoder-output dims queried separately in VIEWER-RENDERER probe via getReceiverStats())',
             );
-          } catch (_) {}
-        });
+          })
+          // [DEBUG-QOS VIEWER 2/3] TrackStreamStateUpdatedEvent fires when the
+          // SFU pauses the track due to bandwidth limits or resumes it.
+          // (Replaces non-existent RemoteVideoTrackEvent listener that would
+          // have caused compile error on livekit_client <2.13.)
+          ..on<TrackStreamStateUpdatedEvent>((ev) {
+            try {
+              final p = ev.publication;
+              debugPrint(
+                '[DEBUG-QOS] VIEWER-TRACK-STREAM-STATE:'
+                '  streamState=${ev.streamState.name.toUpperCase()}'
+                '  pubSid=${p.sid}'
+                '  videoQuality(preference)=${p.videoQuality.name.toUpperCase()}'
+                '  simulcasted=${p.simulcasted}',
+              );
+            } catch (_) {}
+          });
 
-      await room.connect(url, token);
+        await room.connect(url, token);
+      });
       // Viewer: subscribe only — no local publish.
       //
       // NOTE: We intentionally do NOT call setVideoQuality() here anymore.
