@@ -100,9 +100,9 @@ abstract final class TikTokLiveTokens {
   /// PK video top offset below status bar (under badge row; reference match).
   static const double pkVideoTopBelowSafe = 84;
 
-  /// Combined PK split aspect (width / height). Higher = shorter letterboxed band.
-  /// Tuned to TikTok LIVE PK middle-band framing (~middle third of screen).
-  static const double pkVideoAspect = 1.35;
+  /// Combined PK split aspect (width / height). The supplied reference is
+  /// almost 1.15:1; the previous 1.35 value made both hosts visibly too short.
+  static const double pkVideoAspect = 1.15;
 
   /// Extra black gap below PK video before comment band.
   static const double pkVideoBottomGap = 8;

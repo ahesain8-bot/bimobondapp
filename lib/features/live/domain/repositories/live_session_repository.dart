@@ -161,6 +161,17 @@ class LiveHudConnectionEvent extends LiveHudEvent {
   final String? reason;
 }
 
+/// LiveKit media health is intentionally separate from [LiveHudConnectionEvent].
+/// The video can fail while comments remain connected (and vice versa).
+enum LiveMediaConnectionState { reconnecting, reconnected, disconnected }
+
+class LiveMediaConnectionEvent {
+  const LiveMediaConnectionEvent({required this.state, this.reason});
+
+  final LiveMediaConnectionState state;
+  final String? reason;
+}
+
 /// LiveKit publish credentials handed to a guest who joined the stage
 /// (`POST /lives/:id/guests/accept-invite` / `…/:userId/accept`).
 class LiveGuestStageCredentials {
@@ -376,6 +387,10 @@ abstract class LiveSessionRepository {
 
   /// HUD event stream while connected.
   Stream<LiveHudEvent> get hudEvents;
+
+  /// Host LiveKit room lifecycle. A terminal disconnect requires a fresh host
+  /// token from `POST /lives/:id/start`, not only a Socket.IO reconnect.
+  Stream<LiveMediaConnectionEvent> get mediaEvents;
 
   /// Publishes host A/V to LiveKit using token/url from start.
   ///

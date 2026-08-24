@@ -234,6 +234,13 @@ class LivesSocketDataSource {
       _handleGiftPayload(data, fallbackLiveId: liveId);
     });
 
+    // The rapid-gift gateway is deployed with this camelCase name on some
+    // backend versions (lives/logic.md). Keep all aliases behind the same
+    // transaction de-duplicator so the host always sees the animation once.
+    _on(socket, 'liveGiftCombo', (data) {
+      _handleGiftPayload(data, fallbackLiveId: liveId);
+    });
+
     // Some backend deployments still emit `liveGift`. Supporting both names
     // is safe because _handleGiftPayload de-duplicates the transaction before
     // it reaches the host overlay.

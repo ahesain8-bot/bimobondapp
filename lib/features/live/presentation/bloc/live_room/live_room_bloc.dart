@@ -89,6 +89,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomSettingsApplied>(_onSettingsApplied);
     on<LiveRoomModerationRequested>(_onModerationRequested);
     on<LiveRoomHudEventReceived>(_onHudEvent);
+    on<LiveRoomMediaEventReceived>(_onMediaEvent);
     on<LiveRoomClearActionMessage>(_onClearActionMessage);
     on<LiveRoomRemoteEnded>(_onRemoteEnded);
   }
@@ -103,12 +104,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   final LiveSessionRepository _sessionRepository;
 
   StreamSubscription<LiveHudEvent>? _hudSub;
+  StreamSubscription<LiveMediaConnectionEvent>? _mediaSub;
 
   /// Set after a successful `POST /end` or remote `liveEnded`.
   var _sessionTeardownDone = false;
 
   /// Prevents overlapping camera init / flip requests.
   var _cameraOpInFlight = false;
+  var _mediaRecoveryInFlight = false;
+  var _appPaused = false;
+  var _closing = false;
 
   LiveRoomReady? get _readyOrNull =>
       state is LiveRoomReady ? state as LiveRoomReady : null;
@@ -348,6 +353,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       if (!isClosed) {
         add(LiveRoomHudEventReceived(hudEvent));
       }
+    });
+    await _mediaSub?.cancel();
+    _mediaSub = _sessionRepository.mediaEvents.listen((mediaEvent) {
+      if (!isClosed) add(LiveRoomMediaEventReceived(mediaEvent));
     });
 
     // Preview is already on screen (Opening → Ready keeps same controller).
@@ -694,6 +703,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     } catch (_) {}
     await _hudSub?.cancel();
     _hudSub = null;
+    await _mediaSub?.cancel();
+    _mediaSub = null;
 
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
@@ -724,6 +735,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     await _sessionRepository.disconnectMedia();
     await _hudSub?.cancel();
     _hudSub = null;
+    await _mediaSub?.cancel();
+    _mediaSub = null;
     _sessionTeardownDone = true;
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
@@ -735,6 +748,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     LiveRoomAppPaused event,
     Emitter<LiveRoomState> emit,
   ) async {
+    _appPaused = true;
     final current = _readyOrNull;
     if (current == null) return;
     final controller = current.controller;
@@ -751,9 +765,14 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     LiveRoomAppResumed event,
     Emitter<LiveRoomState> emit,
   ) async {
+    _appPaused = false;
     final current = _readyOrNull;
     if (current == null) return;
     if (current.isMediaConnected) return;
+    if (current.session.isLive && !current.isEnding) {
+      await _recoverHostMedia(current.session.id, emit);
+      if (_readyOrNull?.isMediaConnected == true) return;
+    }
     if (current.controller != null && current.isCameraInitialized) return;
 
     final controller = await _initializeCamera(useFront: current.isFrontCamera);
@@ -1458,6 +1477,136 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
   }
 
+  Future<void> _onMediaEvent(
+    LiveRoomMediaEventReceived event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null ||
+        current.isEnding ||
+        _sessionTeardownDone ||
+        _closing) {
+      return;
+    }
+    switch (event.event.state) {
+      case LiveMediaConnectionState.reconnecting:
+        emit(
+          current.copyWith(
+            isMediaConnected: false,
+            actionMessage: 'جاري استعادة اتصال الفيديو…',
+          ),
+        );
+        return;
+      case LiveMediaConnectionState.reconnected:
+        final track = _sessionRepository.localPreviewTrack as VideoTrack?;
+        emit(
+          current.copyWith(
+            isMediaConnected: track != null,
+            localVideoTrack: track,
+            clearActionMessage: true,
+          ),
+        );
+        return;
+      case LiveMediaConnectionState.disconnected:
+        emit(
+          current.copyWith(
+            isMediaConnected: false,
+            localVideoTrack: null,
+            actionMessage: _appPaused
+                ? 'توقف إرسال الفيديو مؤقتاً في الخلفية.'
+                : 'انقطع اتصال الفيديو، جارٍ الاتصال من جديد…',
+          ),
+        );
+        if (!_appPaused) {
+          await _recoverHostMedia(current.session.id, emit);
+        }
+        return;
+    }
+  }
+
+  /// Re-starting an already-LIVE session is the documented host token refresh
+  /// path. Reusing the JWT kept by the old Room makes a hard disconnect remain
+  /// permanent after token expiry or a failed ICE restart.
+  Future<void> _recoverHostMedia(
+    String liveId,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    if (_mediaRecoveryInFlight ||
+        _sessionTeardownDone ||
+        _appPaused ||
+        _closing) {
+      return;
+    }
+    _mediaRecoveryInFlight = true;
+    try {
+      for (var attempt = 1; attempt <= 4; attempt++) {
+        if (isClosed || _sessionTeardownDone || _appPaused) return;
+        final before = _readyOrNull;
+        if (before == null || before.session.id != liveId || before.isEnding) {
+          return;
+        }
+        if (attempt > 1) {
+          await Future<void>.delayed(Duration(seconds: attempt - 1));
+        }
+        if (isClosed || _sessionTeardownDone || _appPaused) return;
+
+        try {
+          final refreshed = await _sessionRepository.reconnectHostSession(
+            liveId,
+          );
+          final token = refreshed.liveKitToken;
+          final url = refreshed.liveKitUrl;
+          if (token == null || token.isEmpty || url == null || url.isEmpty) {
+            throw StateError('LiveKit token/url missing after host reconnect');
+          }
+          await _sessionRepository.connectMedia(
+            url: url,
+            token: token,
+            useFrontCamera: before.isFrontCamera,
+          );
+          if (isClosed || _sessionTeardownDone) return;
+          final ready = _readyOrNull;
+          if (ready == null || ready.session.id != liveId) return;
+          final track = _sessionRepository.localPreviewTrack as VideoTrack?;
+          final mediaUp = _sessionRepository.isMediaConnected && track != null;
+          if (!mediaUp)
+            throw StateError('Host video track was not republished');
+          emit(
+            ready.copyWith(
+              session: ready.session.copyWith(
+                liveKitToken: token,
+                liveKitUrl: url,
+              ),
+              controller: null,
+              isCameraInitialized: false,
+              isMediaConnected: true,
+              localVideoTrack: track,
+              actionMessage: attempt > 1 ? 'تمت استعادة اتصال البث' : null,
+              clearActionMessage: attempt == 1,
+            ),
+          );
+          return;
+        } catch (e) {
+          debugPrint('Host media recovery attempt $attempt failed: $e');
+          final ready = _readyOrNull;
+          if (ready != null && ready.session.id == liveId && !isClosed) {
+            emit(
+              ready.copyWith(
+                isMediaConnected: false,
+                localVideoTrack: null,
+                actionMessage: attempt < 4
+                    ? 'تعذر اتصال الفيديو، إعادة المحاولة ($attempt/4)…'
+                    : 'تعذر استعادة الفيديو. اخرج من البث ثم استأنف البث النشط.',
+              ),
+            );
+          }
+        }
+      }
+    } finally {
+      _mediaRecoveryInFlight = false;
+    }
+  }
+
   void _onEffectsTapped(
     LiveRoomEffectsTapped event,
     Emitter<LiveRoomState> emit,
@@ -1765,6 +1914,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
   @override
   Future<void> close() async {
+    _closing = true;
+    await _mediaSub?.cancel();
+    _mediaSub = null;
     await _hudSub?.cancel();
     _hudSub = null;
     final current = _readyOrNull;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -24,15 +26,43 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required LivesMediaDataSource media,
   }) : _remote = remote,
        _socket = socket,
-       _media = media;
+       _media = media {
+    _media.onRoomEvent = (tag, message) {
+      if (tag != 'room') return;
+      if (message == 'reconnecting') {
+        _mediaEvents.add(
+          const LiveMediaConnectionEvent(
+            state: LiveMediaConnectionState.reconnecting,
+          ),
+        );
+      } else if (message == 'reconnected') {
+        _mediaEvents.add(
+          const LiveMediaConnectionEvent(
+            state: LiveMediaConnectionState.reconnected,
+          ),
+        );
+      } else if (message.startsWith('disconnected')) {
+        _mediaEvents.add(
+          LiveMediaConnectionEvent(
+            state: LiveMediaConnectionState.disconnected,
+            reason: message.split(':').skip(1).join(':'),
+          ),
+        );
+      }
+    };
+  }
 
   final LivesRemoteDataSource _remote;
   final LivesSocketDataSource _socket;
   final LivesMediaDataSource _media;
+  final _mediaEvents = StreamController<LiveMediaConnectionEvent>.broadcast();
   String? _battleOpponentLiveId;
 
   @override
   Stream<LiveHudEvent> get hudEvents => _socket.events;
+
+  @override
+  Stream<LiveMediaConnectionEvent> get mediaEvents => _mediaEvents.stream;
 
   @override
   bool get isMediaConnected => _media.isConnected;

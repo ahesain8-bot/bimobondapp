@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/utils/build_safe_notifier.dart';
-import '../../../../core/widgets/stage_tiles.dart';
 import '../../data/services/fake_livekit_service.dart' show LiveKitService;
 import '../../domain/entities/live_entity.dart';
 import '../../domain/repositories/guest_repository.dart';
@@ -12,9 +11,9 @@ import 'fallback_media.dart';
 
 /// The video area a viewer sees once more than one person is on stage.
 ///
-/// Same split as the host room: equal tiles, host first, at the reference
-/// aspect. Each tile renders that participant's real LiveKit track — the grid
-/// this replaced drew avatars, so a co-host looked like a static picture.
+/// TikTok-style guest panel: the host remains the large background video while
+/// up to three active guests occupy a narrow vertical rail on the right.
+/// Each seat renders that participant's real LiveKit track.
 class ViewerStage extends StatelessWidget {
   const ViewerStage({
     super.key,
@@ -41,36 +40,11 @@ class ViewerStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
-    final height = math.min(size.width / kStageAspect, maxHeight);
-    final width = math.min(size.width, height * kStageAspect);
+    final maxHeight = (size.height - topInset) * 0.66;
+    final height = math.min(size.width / 0.78, maxHeight);
+    final width = size.width;
     final room = liveKit.room;
-
-    final tiles = <Widget>[
-      _StageTile(
-        child: _ParticipantVideo(
-          identity: live.hostId,
-          name: live.hostName,
-          avatarUrl: live.hostAvatar,
-          room: room,
-          isLocal: false,
-        ),
-      ),
-      for (final guest in guests)
-        _StageTile(
-          child: _ParticipantVideo(
-            identity: guest.userId,
-            name: guest.displayName,
-            avatarUrl: guest.avatarUrl,
-            room: room,
-            // Your own camera comes off the local participant, not a
-            // subscription — nobody subscribes to themselves.
-            isLocal: isSelfOnStage && guest.userId == currentUserId,
-            isMuted: guest.mutedByHost,
-            cameraOff: guest.cameraOffByHost,
-          ),
-        ),
-    ];
+    final visibleGuests = guests.take(3).toList(growable: false);
 
     final stage = Align(
       alignment: Alignment.topCenter,
@@ -79,7 +53,73 @@ class ViewerStage extends StatelessWidget {
         child: SizedBox(
           width: width,
           height: height,
-          child: StageTiles(tiles: tiles),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _ParticipantVideo(
+                identity: live.hostId,
+                name: live.hostName,
+                avatarUrl: live.hostAvatar,
+                room: room,
+                isLocal: false,
+              ),
+              Positioned(
+                right: 8,
+                top: height * 0.12,
+                bottom: 8,
+                width: math.max(104, width * 0.29),
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.48),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'الضيوف',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      for (
+                        var index = 0;
+                        index < visibleGuests.length;
+                        index++
+                      ) ...[
+                        Expanded(
+                          child: _StageTile(
+                            highlighted: index == 0,
+                            child: _ParticipantVideo(
+                              identity: visibleGuests[index].userId,
+                              name: visibleGuests[index].displayName,
+                              avatarUrl: visibleGuests[index].avatarUrl,
+                              room: room,
+                              isLocal:
+                                  isSelfOnStage &&
+                                  visibleGuests[index].userId == currentUserId,
+                              isMuted: visibleGuests[index].mutedByHost,
+                              cameraOff: visibleGuests[index].cameraOffByHost,
+                            ),
+                          ),
+                        ),
+                        if (index != visibleGuests.length - 1)
+                          const SizedBox(height: 4),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -96,16 +136,26 @@ class ViewerStage extends StatelessWidget {
 }
 
 class _StageTile extends StatelessWidget {
-  const _StageTile({required this.child});
+  const _StageTile({required this.child, this.highlighted = false});
 
   final Widget child;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(kStageTileRadius),
-      child: ColoredBox(
-        color: const Color(0xFF101012),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF252527),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: highlighted
+              ? const Color(0xFF20D9E8)
+              : Colors.black.withValues(alpha: 0.72),
+          width: highlighted ? 1.5 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
         child: SizedBox.expand(child: child),
       ),
     );

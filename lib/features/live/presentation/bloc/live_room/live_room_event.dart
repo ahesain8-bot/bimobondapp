@@ -84,6 +84,12 @@ class LiveRoomHudEventReceived extends LiveRoomEvent {
   final LiveHudEvent event;
 }
 
+class LiveRoomMediaEventReceived extends LiveRoomEvent {
+  const LiveRoomMediaEventReceived(this.event);
+
+  final LiveMediaConnectionEvent event;
+}
+
 class LiveRoomClearActionMessage extends LiveRoomEvent {
   const LiveRoomClearActionMessage();
 }
