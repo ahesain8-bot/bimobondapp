@@ -900,8 +900,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
         try {
           if (state.isOnStage) {
-            final credentials = await guestRepository
-                .refreshStageCredentials(liveId);
+            final credentials = await guestRepository.refreshStageCredentials(
+              liveId,
+            );
             final creds = credentials.fold<GuestStageCredentials?>(
               (_) => null,
               (value) => value,
@@ -936,9 +937,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                   isLiveKitConnected: true,
                   reconnectAttempt: 0,
                 ),
-                moderationBanner: attempt > 1
-                    ? 'تمت استعادة اتصال البث'
-                    : null,
+                moderationBanner: attempt > 1 ? 'تمت استعادة اتصال البث' : null,
               ),
             );
           }
@@ -1212,8 +1211,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       );
     } else if (event is ReconnectedEvent) {
-      final mediaConnected = liveKitService.state ==
-          LiveKitConnectionState.connected;
+      final mediaConnected =
+          liveKitService.state == LiveKitConnectionState.connected;
       emit(
         state.copyWith(
           session: session.copyWith(
