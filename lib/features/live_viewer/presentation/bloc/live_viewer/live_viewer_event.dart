@@ -177,6 +177,22 @@ class LiveViewerGuestsRefreshed extends LiveViewerEvent {
   const LiveViewerGuestsRefreshed();
 }
 
+/// Internal fallback for a requested seat. The host acceptance event can be
+/// lost while Socket.IO is reconnecting, so the authenticated guest checks
+/// for publish credentials for a short, bounded window.
+class LiveViewerGuestApprovalChecked extends LiveViewerEvent {
+  const LiveViewerGuestApprovalChecked({
+    required this.liveId,
+    this.attempt = 1,
+  });
+
+  final String liveId;
+  final int attempt;
+
+  @override
+  List<Object?> get props => [liveId, attempt];
+}
+
 /// Internal bridge from the LiveKit room lifecycle into the session BLoC.
 /// Socket.IO and LiveKit reconnect independently, so socket recovery must not
 /// be allowed to claim that the video room recovered too.

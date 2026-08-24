@@ -70,6 +70,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveViewerLeftStage>(_onLeftStage);
     on<LiveViewerGuestsRefreshed>(_onGuestsRefreshed);
+    on<LiveViewerGuestApprovalChecked>(_onGuestApprovalChecked);
     on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
 
     _liveKitSub = liveKitService.stateStream.listen((mediaState) {
@@ -103,6 +104,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   String? _currentUserId;
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
+  Timer? _guestApprovalTimer;
   String? _battleOpponentLiveId;
   bool _tearingDown = false;
   bool _recoveringMedia = false;
@@ -730,10 +732,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         }
         emit(
           state.copyWith(
-            isGuestActionBusy: false,
+            isGuestActionBusy: true,
             moderationBanner: 'تم إرسال طلب الانضمام إلى المضيف',
           ),
         );
+        // Keep the request pending while we wait for the host. Socket.IO is
+        // still the fast path; this bounded token poll covers an acceptance
+        // event lost during a reconnect without ever granting publication to
+        // a user the backend has not marked ACTIVE.
+        _scheduleGuestApprovalCheck(liveId);
       },
     );
     add(const LiveViewerGuestsRefreshed());
@@ -822,6 +829,51 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final result = await guestRepository.listGuests(liveId);
     if (isClosed) return;
     result.fold((_) {}, (guests) => emit(state.copyWith(guests: guests)));
+  }
+
+  Future<void> _onGuestApprovalChecked(
+    LiveViewerGuestApprovalChecked event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (_activeLiveId != event.liveId ||
+        state.isOnStage ||
+        !state.isGuestActionBusy) {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      return;
+    }
+
+    final result = await guestRepository.refreshStageCredentials(event.liveId);
+    if (isClosed || _activeLiveId != event.liveId) return;
+
+    final credentials = result.fold<GuestStageCredentials?>(
+      (_) => null,
+      (c) => c,
+    );
+    if (credentials != null && credentials.isUsable) {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      await _joinGuestStage(
+        liveId: event.liveId,
+        credentials: credentials,
+        emit: emit,
+      );
+      return;
+    }
+
+    if (event.attempt >= 15) {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
+      emit(
+        state.copyWith(
+          isGuestActionBusy: false,
+          moderationBanner: 'طلب الانضمام ما زال بانتظار المضيف',
+        ),
+      );
+      return;
+    }
+
+    _scheduleGuestApprovalCheck(event.liveId, attempt: event.attempt + 1);
   }
 
   Future<void> _onLiveKitStateChanged(
@@ -1374,6 +1426,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     return firebaseUid != null && userId == firebaseUid;
   }
 
+  void _scheduleGuestApprovalCheck(String liveId, {int attempt = 1}) {
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = Timer(const Duration(seconds: 2), () {
+      if (!isClosed && _activeLiveId == liveId) {
+        add(LiveViewerGuestApprovalChecked(liveId: liveId, attempt: attempt));
+      }
+    });
+  }
+
   Future<void> _joinGuestStage({
     required String liveId,
     required GuestStageCredentials credentials,
@@ -1389,6 +1450,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       return;
     }
     try {
+      _guestApprovalTimer?.cancel();
+      _guestApprovalTimer = null;
       await liveKitService.joinStage(
         url: credentials.url,
         token: credentials.token,
@@ -1587,6 +1650,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = null;
     await _disconnectBattleOpponent();
     final id = _activeLiveId;
     _activeLiveId = null;
@@ -1621,6 +1686,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = null;
     await _disconnectBattleOpponent();
     final id = _activeLiveId;
     _activeLiveId = null;
