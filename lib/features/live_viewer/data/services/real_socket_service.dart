@@ -33,8 +33,10 @@ class RealSocketService implements SocketService {
 
   io.Socket? _socket;
   String? _liveId;
+  String? _desiredLiveId;
   bool _connected = false;
   Completer<void>? _connectionReady;
+  bool _authRefreshInFlight = false;
   final _controller = StreamController<SocketEvent>.broadcast();
 
   @override
@@ -63,6 +65,7 @@ class RealSocketService implements SocketService {
 
     await disconnect();
 
+    _desiredLiveId = liveId;
     _liveId = liveId;
 
     final fbToken = await _idTokenProvider();
@@ -85,6 +88,7 @@ class RealSocketService implements SocketService {
           .enableReconnection()
           .setReconnectionDelay(500)
           .setReconnectionDelayMax(5000)
+          .setReconnectionAttempts(6)
           .setTimeout(8000)
           .disableAutoConnect()
           .setAuth({'token': authToken})
@@ -148,6 +152,11 @@ class RealSocketService implements SocketService {
       _connected = true;
       _joinRooms(socket, liveId);
       if (!connected.isCompleted) connected.complete();
+    });
+
+    socket.onReconnectFailed((_) {
+      if (_socket != socket || _liveId != liveId) return;
+      unawaited(_rebuildWithFreshAuth(socket, liveId, token));
     });
 
     _on(socket, 'liveComment', (data) {
@@ -232,6 +241,35 @@ class RealSocketService implements SocketService {
     socket.emit('joinUser', {});
   }
 
+  Future<void> _rebuildWithFreshAuth(
+    io.Socket stale,
+    String liveId,
+    String fallbackToken,
+  ) async {
+    if (_authRefreshInFlight || _socket != stale || _liveId != liveId) return;
+    _authRefreshInFlight = true;
+    try {
+      stale.dispose();
+      if (_socket == stale) {
+        _socket = null;
+        _liveId = null;
+        _connected = false;
+        _connectionReady = null;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (_desiredLiveId != liveId ||
+          _socket != null ||
+          (_liveId != null && _liveId != liveId)) {
+        return;
+      }
+      await connect(liveId: liveId, token: fallbackToken);
+    } catch (e) {
+      debugPrint('Live viewer socket fresh-auth reconnect failed: $e');
+    } finally {
+      _authRefreshInFlight = false;
+    }
+  }
+
   /// Registers [handler] so a throw inside it is logged instead of silently
   /// ending delivery for that event.
   void _on(
@@ -254,6 +292,7 @@ class RealSocketService implements SocketService {
     final liveId = _liveId;
     _socket = null;
     _liveId = null;
+    _desiredLiveId = null;
     _connected = false;
     _connectionReady = null;
     if (socket != null) {

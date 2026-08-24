@@ -17,7 +17,9 @@ class LivesSocketDataSource {
 
   io.Socket? _socket;
   String? _liveId;
+  String? _desiredLiveId;
   Completer<void>? _connectionReady;
+  bool _authRefreshInFlight = false;
   final Map<String, DateTime> _recentGiftEvents = {};
   final _controller = StreamController<LiveHudEvent>.broadcast();
 
@@ -41,6 +43,7 @@ class LivesSocketDataSource {
     }
 
     await disconnect();
+    _desiredLiveId = liveId;
     _liveId = liveId;
 
     final token = await _idTokenProvider();
@@ -59,6 +62,7 @@ class LivesSocketDataSource {
           .enableReconnection()
           .setReconnectionDelay(500)
           .setReconnectionDelayMax(5000)
+          .setReconnectionAttempts(6)
           .setTimeout(8000)
           .disableAutoConnect()
           .setAuth({'token': token})
@@ -118,6 +122,16 @@ class LivesSocketDataSource {
           reason: 'reconnecting ($attempt)',
         ),
       );
+    });
+    socket.onReconnectFailed((_) {
+      if (_socket != socket || _liveId != liveId) return;
+      _controller.add(
+        const LiveHudConnectionEvent(
+          connected: false,
+          reason: 'refreshing authentication',
+        ),
+      );
+      unawaited(_rebuildWithFreshAuth(socket, liveId));
     });
 
     _on(socket, 'liveComment', (data) {
@@ -320,6 +334,7 @@ class LivesSocketDataSource {
     final liveId = _liveId;
     _socket = null;
     _liveId = null;
+    _desiredLiveId = null;
     _connectionReady = null;
     _recentGiftEvents.clear();
     if (socket != null) {
@@ -327,6 +342,34 @@ class LivesSocketDataSource {
         socket.emit('leaveLive', {'liveId': liveId});
       }
       socket.dispose();
+    }
+  }
+
+  /// A Socket.IO manager keeps the auth map it was created with. After the
+  /// Firebase JWT expires, infinite reconnects therefore repeat the same 401
+  /// forever. Rebuild the manager after a bounded cycle so the provider can
+  /// supply a fresh token, while still retrying until the host leaves.
+  Future<void> _rebuildWithFreshAuth(io.Socket stale, String liveId) async {
+    if (_authRefreshInFlight || _socket != stale || _liveId != liveId) return;
+    _authRefreshInFlight = true;
+    try {
+      stale.dispose();
+      if (_socket == stale) {
+        _socket = null;
+        _liveId = null;
+        _connectionReady = null;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (_desiredLiveId != liveId ||
+          _socket != null ||
+          (_liveId != null && _liveId != liveId)) {
+        return;
+      }
+      await connectAndJoin(liveId);
+    } catch (e) {
+      debugPrint('Socket.IO fresh-auth reconnect failed: $e');
+    } finally {
+      _authRefreshInFlight = false;
     }
   }
 
