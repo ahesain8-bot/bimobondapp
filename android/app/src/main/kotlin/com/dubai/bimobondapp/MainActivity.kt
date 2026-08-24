@@ -43,13 +43,11 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Load OpenCV early so first beauty apply is fast.
-        beautyExecutor.execute { BeautyFilterProcessor.ensureOpenCv() }
-        // Prefetch CameraX + MediaPipe before the user taps + (cuts open delay),
-        // but only once the first frame is on screen. Run straight from
-        // configureFlutterEngine it competed with startup rendering for the
-        // main thread, which is what "Skipped 209 frames" in the launch log was.
-        window.decorView.post { warmArCameraPipeline() }
+        // OpenCV, CameraX and MediaPipe are intentionally warmed only when the
+        // camera feature invokes the `warmup` method below. Starting all three
+        // while Flutter draws its first frame caused multi-second launch stalls,
+        // high memory pressure and could starve a live room opened immediately
+        // after app launch.
 
         flutterEngine.platformViewsController.registry.registerViewFactory(
             AR_CAMERA_VIEW_TYPE,
