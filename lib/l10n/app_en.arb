@@ -2003,5 +2003,80 @@
   "coverUpdated": "Cover updated",
   "failedToUploadCover": "Failed to upload cover image",
   "failedToLoadHighlightDetails": "Failed to load highlight details",
-  "failedToAddStoryToHighlight": "Failed to add story to highlight"
+  "failedToAddStoryToHighlight": "Failed to add story to highlight",
+  "marketplaceTitle": "Marketplace",
+  "marketplaceLikedProducts": "Liked Products",
+  "marketplaceNoLikedProducts": "No liked products yet",
+  "marketplaceTagline": "Buy. Own. Resell.",
+  "marketplaceSearchHint": "Search products, brands, categories...",
+  "marketplaceHeroTitle": "Buy. Own. Resell.",
+  "marketplaceHeroSubtitle": "Purchase products and resell eligible purchases through Bimo-Bond auctions.",
+  "marketplaceExploreCta": "Explore Marketplace",
+  "marketplaceCategories": "Categories",
+  "marketplaceRecommended": "Recommended for You",
+  "marketplaceEndingSoon": "Ending Soon Auctions",
+  "marketplaceNoAuctions": "No active auctions ending soon",
+  "marketplaceLiveAuction": "LIVE AUCTION",
+  "marketplaceAuctionLabel": "AUCTION",
+  "marketplaceCurrentBid": "Current Bid",
+  "marketplaceBidCount": "{count} Bids",
+  "@marketplaceBidCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "marketplaceViewAuction": "View Auction",
+  "marketplaceFilters": "Filters",
+  "marketplaceFilterPrice": "Price",
+  "marketplaceMin": "Min",
+  "marketplaceMax": "Max",
+  "marketplaceFilterListingType": "Listing type",
+  "marketplaceInStockOnly": "In stock only",
+  "marketplaceClearFilters": "Clear",
+  "marketplaceApplyFilters": "Apply",
+  "marketplaceSortPopular": "Popular",
+  "marketplaceSortEndingSoon": "Ending Soon",
+  "marketplaceProductCount": "{count} Products",
+  "@marketplaceProductCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "marketplaceTabPurchased": "Purchased",
+  "marketplaceTabPending": "Pending Delivery",
+  "marketplaceTabDelivered": "Delivered",
+  "marketplaceTabAuctioned": "Auctioned",
+  "marketplaceTabSold": "Sold",
+  "marketplaceNoProducts": "No products in this tab",
+  "marketplacePurchaseConfirmed": "Purchase Confirmed",
+  "marketplaceDeliveryLabel": "Delivery",
+  "marketplaceDeliveryPending": "Pending",
+  "marketplaceDeliveryShipped": "Shipped",
+  "marketplaceDeliveryDelivered": "Delivered",
+  "marketplaceTrackDelivery": "Track Delivery",
+  "marketplaceSellAtAuction": "Sell at Auction",
+  "marketplacePurchasePrice": "Purchase price",
+  "marketplaceStartingPrice": "Starting Price",
+  "marketplaceReservePrice": "Reserve Price",
+  "marketplaceBuyNowPrice": "Buy Now Price",
+  "marketplaceAuctionDuration": "Auction Duration",
+  "marketplaceDescription": "Description",
+  "marketplaceAuctionPreview": "Auction Preview",
+  "marketplacePublishAuction": "Publish Auction",
+  "marketplaceAuctionPublished": "Auction published",
+  "marketplacePlaceBid": "Place Bid",
+  "marketplaceYourBid": "Your Bid",
+  "marketplaceConfirmBid": "Confirm Bid",
+  "marketplaceEndsIn": "Ends in",
+  "marketplaceBidHistory": "Bid history",
+  "marketplaceNoBidsYet": "No bids yet",
+  "marketplaceSpecifications": "Specifications",
+  "marketplaceVerifiedProduct": "Verified Product",
+  "marketplaceSecurePayment": "Secure Payment",
+  "marketplaceBuyerProtection": "Buyer Protection",
+  "marketplaceDeliveryTracking": "Delivery Tracking"
 }
