@@ -322,7 +322,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
       // 4. Prefer socket sendGift (qty 1); HTTP fallback if socket offline.
       await _ensureAuctionRoomsJoined();
-      final liveId = _liveRoomId;
+      final liveId = _giftLiveId;
       final socket = _auctionSocket;
       GiftSocketSendResult? socketResult;
       if (socket != null &&
@@ -651,13 +651,20 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     await _ensureAuctionRoomsJoined();
   }
 
-  /// Live room id for socket gifts — auction.liveId when known, else post id.
+  /// Socket room id — auction.liveId when known, else post id.
   String? get _liveRoomId {
     final fromAuction = _resolvedLiveId?.trim();
     if (fromAuction != null && fromAuction.isNotEmpty) return fromAuction;
     final postId = widget.post?.id.trim();
     if (postId != null && postId.isNotEmpty) return postId;
     return null;
+  }
+
+  /// Live id for gift sends — never the post id: `/gifts/send` rejects a
+  /// `liveId` that is not a live in `LIVE` status. Null for post auctions.
+  String? get _giftLiveId {
+    final liveId = _resolvedLiveId?.trim();
+    return liveId != null && liveId.isNotEmpty ? liveId : null;
   }
 
   Future<void> _ensureAuctionRoomsJoined() async {
@@ -1925,7 +1932,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       // Prefer nested user.id — feed sometimes omits top-level userId.
       receiverId: _hostUserId ?? post?.userId,
       auctionId: auctionId,
-      liveId: _liveRoomId,
+      liveId: _giftLiveId,
       canSendToHost: _canSendGiftToHost,
       onSmallGiftOptimistic: _showOptimisticSmallGiftCombo,
       onGiftSent: _refreshAfterGift,

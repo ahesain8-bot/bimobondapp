@@ -23,6 +23,7 @@ class RealLiveKitService implements LiveKitService {
   LiveMediaHints? _mediaHints;
   Room? _room;
   Room? _battleRoom;
+  Room? _battleRecoveryRoom;
 
   /// LiveKit 2.11 can leave an internal participant-update callback waiting
   /// for `RoomConnectedEvent` after a room has already been replaced. Ten
@@ -133,6 +134,69 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
+  Future<void> _ensureRemoteTracksSubscribed(Room room) async {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.trackPublications.values) {
+        if (publication.subscribed) continue;
+        try {
+          await publication.subscribe();
+        } catch (error) {
+          debugPrint('Battle LiveKit track restore failed: $error');
+        }
+      }
+    }
+  }
+
+  /// A normal LiveKit reconnect preserves the Room and its tracks. On some
+  /// Android networks the SDK exhausts that reconnect and emits a terminal
+  /// disconnect instead; keeping the dead Room made one PK tile stay blank
+  /// until the battle ended. Re-use the still-valid battle JWT for a few
+  /// bounded reconnect attempts and restore every remote subscription.
+  Future<void> _recoverBattleRoom({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    _battleRecoveryRoom = room;
+    const retryDelays = <Duration>[
+      Duration(milliseconds: 250),
+      Duration(milliseconds: 900),
+      Duration(milliseconds: 1800),
+    ];
+    try {
+      for (var attempt = 0; attempt < retryDelays.length; attempt++) {
+        await Future<void>.delayed(retryDelays[attempt]);
+        if (_battleRoom != room) return;
+        if (room.connectionState == ConnectionState.connected) {
+          await _ensureRemoteTracksSubscribed(room);
+          return;
+        }
+        if (room.connectionState != ConnectionState.disconnected) return;
+        try {
+          debugPrint(
+            '🔄 Battle LiveKit terminal reconnect '
+            '${attempt + 1}/${retryDelays.length}: $roomName',
+          );
+          await _runWithLiveKitErrorGuard(() => room.connect(url, token));
+          if (_battleRoom != room) {
+            await room.disconnect();
+            return;
+          }
+          await _ensureRemoteTracksSubscribed(room);
+          await _preferMediaSpeaker();
+          debugPrint('🔗 Battle LiveKit media restored: $roomName');
+          return;
+        } catch (error) {
+          debugPrint('Battle LiveKit reconnect attempt failed: $error');
+        }
+      }
+    } finally {
+      if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
+    }
+  }
+
   @override
   Future<void> connectBattle({
     required String url,
@@ -148,12 +212,25 @@ class RealLiveKitService implements LiveKitService {
       final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
       final guardedRoom = Room(roomOptions: _roomOptions(hints));
       guardedRoom.events
+        ..on<RoomDisconnectedEvent>((_) {
+          if (_battleRoom != guardedRoom) return;
+          debugPrint('🔴 Battle LiveKit terminal disconnect: $roomName');
+          unawaited(
+            _recoverBattleRoom(
+              room: guardedRoom,
+              url: url,
+              token: token,
+              roomName: roomName,
+            ),
+          );
+        })
         ..on<ReconnectingEvent>((_) {
           debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
         })
         ..on<RoomReconnectedEvent>((_) {
           debugPrint('🔗 Battle LiveKit reconnected: $roomName');
           unawaited(_preferMediaSpeaker());
+          unawaited(_ensureRemoteTracksSubscribed(guardedRoom));
         })
         ..on<TrackSubscribedEvent>((event) {
           if (event.track is RemoteAudioTrack) {
@@ -168,6 +245,7 @@ class RealLiveKitService implements LiveKitService {
       return guardedRoom;
     });
     _battleRoom = room;
+    await _ensureRemoteTracksSubscribed(room);
   }
 
   @override

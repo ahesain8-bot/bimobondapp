@@ -33,13 +33,15 @@ class CameraRepositoryImpl implements CameraRepository {
     if (_cachedCameras != null) {
       return Future.value(_cachedCameras);
     }
-    return _camerasFuture ??= availableCameras().then((cameras) {
-      _cachedCameras = cameras;
-      return cameras;
-    }).catchError((Object e, StackTrace st) {
-      _camerasFuture = null;
-      Error.throwWithStackTrace(e, st);
-    });
+    return _camerasFuture ??= availableCameras()
+        .then((cameras) {
+          _cachedCameras = cameras;
+          return cameras;
+        })
+        .catchError((Object e, StackTrace st) {
+          _camerasFuture = null;
+          Error.throwWithStackTrace(e, st);
+        });
   }
 
   @override
@@ -47,7 +49,9 @@ class CameraRepositoryImpl implements CameraRepository {
     return _serialized(() => _initializeUnlocked(useFront: useFront));
   }
 
-  Future<CameraController?> _initializeUnlocked({required bool useFront}) async {
+  Future<CameraController?> _initializeUnlocked({
+    required bool useFront,
+  }) async {
     try {
       final cameras = await _cameras();
       if (cameras.isEmpty) return null;
@@ -137,6 +141,15 @@ class CameraRepositoryImpl implements CameraRepository {
       await controller.dispose();
     } catch (e) {
       debugPrint('Camera dispose error: $e');
+    }
+    // camera_android_camerax completes CameraController.dispose() while the
+    // native CameraGraph can still be CLOSING. Opening flutter_webrtc during
+    // that interval makes both clients configure the same lens and some
+    // Camera2 HALs return "Unsupported set of inputs/outputs", producing a
+    // published but permanently black track. Give Android's close callback a
+    // short bounded window; this is part of the hand-off, not a UI delay.
+    if (Platform.isAndroid) {
+      await Future<void>.delayed(const Duration(milliseconds: 450));
     }
   }
 }
