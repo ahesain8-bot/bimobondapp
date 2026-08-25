@@ -39,6 +39,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required LikeLiveSession likeLiveSession,
     required UpdateLiveTitle updateLiveTitle,
     required LiveSessionRepository sessionRepository,
+    required AuctionSocketService giftSocketService,
   }) : _startLiveSession = startLiveSession,
        _endLiveSession = endLiveSession,
        _initializeCamera = initializeCamera,
@@ -47,7 +48,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
        _likeLiveSession = likeLiveSession,
        _updateLiveTitle = updateLiveTitle,
        _sessionRepository = sessionRepository,
+       _giftSocketService = giftSocketService,
        super(const LiveRoomInitial()) {
+    _giftComboSub = giftSocketService.onGiftCombo.listen((payload) {
+      if (!isClosed) add(LiveRoomGiftComboReceived(payload));
+    });
     on<LiveRoomStarted>(_onStarted);
     on<LiveRoomRecoverEndAndRestart>(_onRecoverEndAndRestart);
     on<LiveRoomRecoverResumeActive>(_onRecoverResumeActive);
@@ -67,6 +72,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomLikeTapped>(_onLikeTapped);
     on<LiveRoomHeartBurstConsumed>(_onHeartBurstConsumed);
     on<LiveRoomGiftBannerConsumed>(_onGiftBannerConsumed);
+    on<LiveRoomGiftComboReceived>(_onGiftComboReceived);
+    on<LiveRoomGiftComboConsumed>(_onGiftComboConsumed);
     on<LiveRoomTitleSubmitted>(_onTitleSubmitted);
     on<LiveRoomEffectsPanelModeChanged>(_onEffectsPanelModeChanged);
     on<LiveRoomEffectSelected>(_onEffectSelected);
@@ -107,6 +114,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
   StreamSubscription<LiveHudEvent>? _hudSub;
   StreamSubscription<LiveMediaConnectionEvent>? _mediaSub;
+  StreamSubscription<GiftComboPayload>? _giftComboSub;
+  final AuctionSocketService _giftSocketService;
+  String? _giftJoinedLiveId;
 
   /// Set after a successful `POST /end` or remote `liveEnded`.
   var _sessionTeardownDone = false;
@@ -376,6 +386,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         isMediaConnected: false,
       ),
     );
+
+    if (startedOnServer && session.id.isNotEmpty) {
+      _giftJoinedLiveId = session.id;
+      unawaited(
+        _giftSocketService
+            .ensureJoined(liveId: session.id)
+            .catchError((error) {
+              debugPrint('Canonical gift socket join failed: $error');
+            }),
+      );
+    }
 
     // Skipped for the offline fallback below: a `local_live_<ts>` id means
     // POST /lives never succeeded, so there is no room on the server and the
@@ -1618,6 +1639,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                 quantity: quantity,
                 gifterLevel: senderGifterLevel,
               );
+
         emit(
           current.copyWith(
             session: session.copyWith(messages: messages),
@@ -1634,6 +1656,37 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           ),
         );
     }
+  }
+
+  void _onGiftComboReceived(
+    LiveRoomGiftComboReceived event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    // Only teardown blocks a gift. The session status is not checked: the
+    // viewer accepts combos without it, and a host whose status had not yet
+    // flipped to LIVE locally silently dropped gifts the viewer could send.
+    if (current == null || current.isEnding) return;
+
+    final payloadLiveId = event.payload.liveId.trim();
+    if (payloadLiveId.isNotEmpty && payloadLiveId != current.session.id) {
+      return;
+    }
+
+    emit(current.copyWith(latestGiftCombo: event.payload));
+  }
+
+  void _onGiftComboConsumed(
+    LiveRoomGiftComboConsumed event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    // Only the combo that was actually presented is released, so a gift that
+    // arrived while the previous one was playing is still rendered.
+    if (current == null || !identical(current.latestGiftCombo, event.payload)) {
+      return;
+    }
+    emit(current.copyWith(latestGiftCombo: null));
   }
 
   Future<void> _onMediaEvent(
@@ -2060,10 +2113,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   @override
   Future<void> close() async {
     _closing = true;
+    final giftLiveId = _giftJoinedLiveId;
+    _giftJoinedLiveId = null;
+    if (giftLiveId != null && giftLiveId.isNotEmpty) {
+      _giftSocketService.leaveLive(giftLiveId);
+    }
     await _mediaSub?.cancel();
     _mediaSub = null;
     await _hudSub?.cancel();
     _hudSub = null;
+    await _giftComboSub?.cancel();
+    _giftComboSub = null;
     final current = _readyOrNull;
     final controller = current?.controller;
     if (controller != null) {

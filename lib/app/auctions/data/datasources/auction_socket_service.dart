@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:bimobondapp/app/gifts/data/datasources/gift_catalog_hydrator.dart';
 import 'package:bimobondapp/app/posts/data/models/comment_model.dart';
 import 'package:bimobondapp/core/network/api_endpoints.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -135,7 +136,8 @@ class GiftComboPayload {
         ? Map<String, dynamic>.from(map['gift'] as Map)
         : null;
 
-    final giftName = (map['giftName'] ?? giftObj?['name'])?.toString();
+    final giftName = (map['giftName'] ?? map['gift_name'] ?? giftObj?['name'])
+        ?.toString();
     final senderName =
         (map['senderName'] ?? senderObj?['fullName'] ?? senderObj?['username'])
             ?.toString();
@@ -144,12 +146,26 @@ class GiftComboPayload {
     final rawCoins = map['coins'];
     final coins = rawCoins is int ? rawCoins : int.tryParse('$rawCoins');
 
-    // Server auctionGiftCombo is often flat (giftId/giftName/coins) with no nested gift.
-    final resolvedGift =
-        giftObj ??
-        (giftName != null && giftName.isNotEmpty
-            ? <String, dynamic>{'id': giftId, 'name': giftName}
-            : null);
+    // Server auctionGiftCombo is often flat (giftId/giftName/coins) with no
+    // nested gift. Preserve any presentation fields that the server includes
+    // at the top level so the shared renderer can consume the normalized gift.
+    final resolvedGift = <String, dynamic>{'id': giftId};
+    if (giftName != null && giftName.isNotEmpty) {
+      resolvedGift['name'] = giftName;
+    }
+    for (final entry in giftPayloadFlatFields.entries) {
+      final value = map[entry.key];
+      if (value != null && value.toString().trim().isNotEmpty) {
+        resolvedGift[entry.value] = value;
+      }
+    }
+    if (giftObj != null) {
+      for (final entry in giftObj.entries) {
+        if (entry.value != null && entry.value.toString().trim().isNotEmpty) {
+          resolvedGift[entry.key] = entry.value;
+        }
+      }
+    }
 
     return GiftComboPayload(
       liveId: (map['liveId'] ?? map['live_id'])?.toString() ?? '',
@@ -213,6 +229,15 @@ class GiftSocketSendResult {
 }
 
 class AuctionSocketService {
+  AuctionSocketService({GiftCatalogLoader? giftCatalogLoader})
+    : _giftCatalog = giftCatalogLoader == null
+          ? null
+          : GiftCatalogHydrator(giftCatalogLoader);
+
+  /// Fills in the media/size the server omits from flat combo payloads. Shared
+  /// by every listener, so the host and the viewer render the same gift.
+  final GiftCatalogHydrator? _giftCatalog;
+
   io.Socket? _socket;
   String? _joinedAuctionId;
   String? _joinedPostId;
@@ -542,6 +567,23 @@ class AuctionSocketService {
   void _handleGiftCombo(dynamic data) {
     final map = _unwrapPayload(data);
     if (map == null) return;
+
+    unawaited(
+      _emitGiftCombo(map).catchError((Object error) {
+        developer.log(
+          'gift combo dispatch failed: $error',
+          name: 'AuctionSocket',
+        );
+      }),
+    );
+  }
+
+  Future<void> _emitGiftCombo(Map<String, dynamic> map) async {
+    final catalog = _giftCatalog;
+    final giftId = (map['giftId'] ?? map['gift']?['id'])?.toString();
+    if (catalog != null && giftId != null && giftId.isNotEmpty) {
+      await catalog.hydrate(map, giftId);
+    }
 
     final payload = GiftComboPayload.fromMap(map);
     if (payload != null && !_giftComboController.isClosed) {

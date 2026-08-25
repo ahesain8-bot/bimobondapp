@@ -8585,17 +8585,437 @@ abstract class AppLocalizations {
   /// **'New'**
   String get newHighlightButton;
 
+  /// No description provided for @aboutThisStory.
+  ///
+  /// In en, this message translates to:
+  /// **'About this story'**
   String get aboutThisStory;
+
+  /// No description provided for @editHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit highlight'**
   String get editHighlight;
+
+  /// No description provided for @deleteHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Highlight'**
   String get deleteHighlight;
+
+  /// No description provided for @highlightDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight deleted'**
   String get highlightDeleted;
+
+  /// No description provided for @highlightEmptyRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'This highlight is empty and was removed'**
   String get highlightEmptyRemoved;
+
+  /// No description provided for @highlightNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight Name'**
   String get highlightNameLabel;
+
+  /// No description provided for @highlightNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Travel, Memories'**
   String get highlightNameHint;
+
+  /// No description provided for @coverUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover updated'**
   String get coverUpdated;
+
+  /// No description provided for @failedToUploadCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload cover image'**
   String get failedToUploadCover;
+
+  /// No description provided for @failedToLoadHighlightDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load highlight details'**
   String get failedToLoadHighlightDetails;
+
+  /// No description provided for @failedToAddStoryToHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add story to highlight'**
   String get failedToAddStoryToHighlight;
+
+  /// No description provided for @marketplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketplace'**
+  String get marketplaceTitle;
+
+  /// No description provided for @marketplaceLikedProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Liked Products'**
+  String get marketplaceLikedProducts;
+
+  /// No description provided for @marketplaceNoLikedProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No liked products yet'**
+  String get marketplaceNoLikedProducts;
+
+  /// No description provided for @marketplaceTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy. Own. Resell.'**
+  String get marketplaceTagline;
+
+  /// No description provided for @marketplaceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search products, brands, categories...'**
+  String get marketplaceSearchHint;
+
+  /// No description provided for @marketplaceHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy. Own. Resell.'**
+  String get marketplaceHeroTitle;
+
+  /// No description provided for @marketplaceHeroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase products and resell eligible purchases through Bimo-Bond auctions.'**
+  String get marketplaceHeroSubtitle;
+
+  /// No description provided for @marketplaceExploreCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore Marketplace'**
+  String get marketplaceExploreCta;
+
+  /// No description provided for @marketplaceCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get marketplaceCategories;
+
+  /// No description provided for @marketplaceRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended for You'**
+  String get marketplaceRecommended;
+
+  /// No description provided for @marketplaceEndingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending Soon Auctions'**
+  String get marketplaceEndingSoon;
+
+  /// No description provided for @marketplaceNoAuctions.
+  ///
+  /// In en, this message translates to:
+  /// **'No active auctions ending soon'**
+  String get marketplaceNoAuctions;
+
+  /// No description provided for @marketplaceLiveAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE AUCTION'**
+  String get marketplaceLiveAuction;
+
+  /// No description provided for @marketplaceAuctionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AUCTION'**
+  String get marketplaceAuctionLabel;
+
+  /// No description provided for @marketplaceCurrentBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Bid'**
+  String get marketplaceCurrentBid;
+
+  /// No description provided for @marketplaceBidCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Bids'**
+  String marketplaceBidCount(int count);
+
+  /// No description provided for @marketplaceViewAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'View Auction'**
+  String get marketplaceViewAuction;
+
+  /// No description provided for @marketplaceFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get marketplaceFilters;
+
+  /// No description provided for @marketplaceFilterPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get marketplaceFilterPrice;
+
+  /// No description provided for @marketplaceMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Min'**
+  String get marketplaceMin;
+
+  /// No description provided for @marketplaceMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get marketplaceMax;
+
+  /// No description provided for @marketplaceFilterListingType.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing type'**
+  String get marketplaceFilterListingType;
+
+  /// No description provided for @marketplaceInStockOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'In stock only'**
+  String get marketplaceInStockOnly;
+
+  /// No description provided for @marketplaceClearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get marketplaceClearFilters;
+
+  /// No description provided for @marketplaceApplyFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get marketplaceApplyFilters;
+
+  /// No description provided for @marketplaceSortPopular.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get marketplaceSortPopular;
+
+  /// No description provided for @marketplaceSortEndingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending Soon'**
+  String get marketplaceSortEndingSoon;
+
+  /// No description provided for @marketplaceProductCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Products'**
+  String marketplaceProductCount(int count);
+
+  /// No description provided for @marketplaceTabPurchased.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchased'**
+  String get marketplaceTabPurchased;
+
+  /// No description provided for @marketplaceTabPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Delivery'**
+  String get marketplaceTabPending;
+
+  /// No description provided for @marketplaceTabDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get marketplaceTabDelivered;
+
+  /// No description provided for @marketplaceTabAuctioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Auctioned'**
+  String get marketplaceTabAuctioned;
+
+  /// No description provided for @marketplaceTabSold.
+  ///
+  /// In en, this message translates to:
+  /// **'Sold'**
+  String get marketplaceTabSold;
+
+  /// No description provided for @marketplaceNoProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No products in this tab'**
+  String get marketplaceNoProducts;
+
+  /// No description provided for @marketplacePurchaseConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Confirmed'**
+  String get marketplacePurchaseConfirmed;
+
+  /// No description provided for @marketplaceDeliveryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get marketplaceDeliveryLabel;
+
+  /// No description provided for @marketplaceDeliveryPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get marketplaceDeliveryPending;
+
+  /// No description provided for @marketplaceDeliveryShipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipped'**
+  String get marketplaceDeliveryShipped;
+
+  /// No description provided for @marketplaceDeliveryDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get marketplaceDeliveryDelivered;
+
+  /// No description provided for @marketplaceTrackDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Track Delivery'**
+  String get marketplaceTrackDelivery;
+
+  /// No description provided for @marketplaceSellAtAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell at Auction'**
+  String get marketplaceSellAtAuction;
+
+  /// No description provided for @marketplacePurchasePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase price'**
+  String get marketplacePurchasePrice;
+
+  /// No description provided for @marketplaceStartingPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting Price'**
+  String get marketplaceStartingPrice;
+
+  /// No description provided for @marketplaceReservePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserve Price'**
+  String get marketplaceReservePrice;
+
+  /// No description provided for @marketplaceBuyNowPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy Now Price'**
+  String get marketplaceBuyNowPrice;
+
+  /// No description provided for @marketplaceAuctionDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction Duration'**
+  String get marketplaceAuctionDuration;
+
+  /// No description provided for @marketplaceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get marketplaceDescription;
+
+  /// No description provided for @marketplaceAuctionPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction Preview'**
+  String get marketplaceAuctionPreview;
+
+  /// No description provided for @marketplacePublishAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish Auction'**
+  String get marketplacePublishAuction;
+
+  /// No description provided for @marketplaceAuctionPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction published'**
+  String get marketplaceAuctionPublished;
+
+  /// No description provided for @marketplacePlaceBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Place Bid'**
+  String get marketplacePlaceBid;
+
+  /// No description provided for @marketplaceYourBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Bid'**
+  String get marketplaceYourBid;
+
+  /// No description provided for @marketplaceConfirmBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Bid'**
+  String get marketplaceConfirmBid;
+
+  /// No description provided for @marketplaceEndsIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends in'**
+  String get marketplaceEndsIn;
+
+  /// No description provided for @marketplaceBidHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Bid history'**
+  String get marketplaceBidHistory;
+
+  /// No description provided for @marketplaceNoBidsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No bids yet'**
+  String get marketplaceNoBidsYet;
+
+  /// No description provided for @marketplaceSpecifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Specifications'**
+  String get marketplaceSpecifications;
+
+  /// No description provided for @marketplaceVerifiedProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Product'**
+  String get marketplaceVerifiedProduct;
+
+  /// No description provided for @marketplaceSecurePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure Payment'**
+  String get marketplaceSecurePayment;
+
+  /// No description provided for @marketplaceBuyerProtection.
+  ///
+  /// In en, this message translates to:
+  /// **'Buyer Protection'**
+  String get marketplaceBuyerProtection;
+
+  /// No description provided for @marketplaceDeliveryTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Tracking'**
+  String get marketplaceDeliveryTracking;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

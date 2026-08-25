@@ -1,4 +1,7 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
+    as auctions_di;
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -117,6 +120,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           likeLiveSession: LikeLiveSession(_sessionRepository!),
           updateLiveTitle: UpdateLiveTitle(_sessionRepository!),
           sessionRepository: _sessionRepository!,
+          giftSocketService: auctions_di.sl<AuctionSocketService>(),
         )..add(
           LiveRoomStarted(
             title: widget.title,
@@ -471,9 +475,14 @@ class _LiveRoomBody extends StatelessWidget {
                   if (state is! LiveRoomReady) {
                     return const SizedBox.shrink();
                   }
+                  final bloc = context.read<LiveRoomBloc>();
                   return FloatingGiftsLayer(
                     recentGifts: const [],
                     latestCombo: state.latestGiftCombo,
+                    onComboConsumed: (payload) {
+                      if (bloc.isClosed) return;
+                      bloc.add(LiveRoomGiftComboConsumed(payload));
+                    },
                   );
                 },
               ),

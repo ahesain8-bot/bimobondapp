@@ -58,6 +58,11 @@ import 'package:bimobondapp/app/shop/domain/entities/checkout_entity.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/cart_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/checkout_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/ecommerce_home_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/category_products_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/create_auction_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/marketplace_auction_details_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/liked_products_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/my_products_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/order_details_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/orders_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/product_details_screen.dart';
@@ -351,6 +356,55 @@ class AppRouter {
         path: '/shop',
         name: EcommerceHomeScreen.routeName,
         builder: (context, state) => const EcommerceHomeScreen(),
+      ),
+      GoRoute(
+        path: '/shop/category/:categoryId',
+        name: CategoryProductsScreen.routeName,
+        builder: (context, state) {
+          final categoryId = state.pathParameters['categoryId'] ?? 'all';
+          final slug = state.uri.queryParameters['slug'] ?? 'all';
+          final name = state.uri.queryParameters['name'] ?? 'All';
+          return CategoryProductsScreen(
+            categoryId: categoryId,
+            categorySlug: slug,
+            categoryName: name,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/liked',
+        name: LikedProductsScreen.routeName,
+        builder: (context, state) => const LikedProductsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/my-products',
+        name: MyProductsScreen.routeName,
+        builder: (context, state) => const MyProductsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/create-auction',
+        name: CreateAuctionScreen.routeName,
+        builder: (context, state) {
+          final productId = state.uri.queryParameters['productId'] ?? '';
+          final title = state.uri.queryParameters['title'] ?? 'Product';
+          final priceCoins =
+              int.tryParse(state.uri.queryParameters['priceCoins'] ?? '') ?? 0;
+          final imageUrl = state.uri.queryParameters['imageUrl'];
+          return CreateAuctionScreen(
+            productId: productId,
+            title: title,
+            purchasePriceCoins: priceCoins,
+            imageUrl: imageUrl,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/auctions/:auctionId',
+        name: MarketplaceAuctionDetailsScreen.routeName,
+        builder: (context, state) {
+          final auctionId = state.pathParameters['auctionId'] ?? '';
+          return MarketplaceAuctionDetailsScreen(auctionId: auctionId);
+        },
       ),
       GoRoute(
         path: '/shop/search',

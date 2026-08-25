@@ -24,12 +24,18 @@ class FloatingGiftsLayer extends StatefulWidget {
   final GiftComboPayload? latestCombo;
   final VoidCallback? onAnimationComplete;
 
+  /// Reports the combo back once it has been presented, so the owning BLoC can
+  /// release it. Without this the latched combo is replayed the next time this
+  /// layer mounts — on whatever route happens to be on screen by then.
+  final ValueChanged<GiftComboPayload>? onComboConsumed;
+
   const FloatingGiftsLayer({
     super.key,
     required this.recentGifts,
     this.activeGift,
     this.latestCombo,
     this.onAnimationComplete,
+    this.onComboConsumed,
   });
 
   @override
@@ -43,32 +49,46 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
   final _audioSession = AuctionAudioGiftChipSession();
   String? _audioLabel;
   String? _audioColor;
+  GiftComboPayload? _pendingCombo;
 
   @override
   void initState() {
     super.initState();
     final combo = widget.latestCombo;
-    if (combo != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _consumeCombo(combo);
-      });
-    }
+    if (combo != null) _scheduleCombo(combo);
   }
 
   @override
   void didUpdateWidget(covariant FloatingGiftsLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     final combo = widget.latestCombo;
-    if (combo == null && oldWidget.latestCombo != null) {
-      _clearCombos();
-    }
     if (combo != null && combo != oldWidget.latestCombo) {
-      _consumeCombo(combo);
+      _scheduleCombo(combo);
     }
+  }
+
+  /// Presents [payload] at the end of the current frame instead of inline.
+  ///
+  /// [didUpdateWidget] runs inside the build phase, and a medium/large gift is
+  /// presented by inserting an entry into the *root* overlay — a `setState` on
+  /// an ancestor, which Flutter cannot schedule mid-build. The entry then sat
+  /// in the overlay unmounted until something else rebuilt it, which is why the
+  /// broadcaster saw nothing until the room was popped.
+  void _scheduleCombo(GiftComboPayload payload) {
+    if (identical(_pendingCombo, payload)) return;
+    _pendingCombo = payload;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_pendingCombo, payload)) return;
+      _pendingCombo = null;
+      _consumeCombo(payload);
+    });
+    // A post-frame callback only runs if a frame is actually produced.
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
   void dispose() {
+    GiftAnimationOverlay.dismiss(owner: this);
     for (final timer in _comboTimers.values) {
       timer.cancel();
     }
@@ -77,17 +97,18 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     super.dispose();
   }
 
-  void _clearCombos() {
-    for (final timer in _comboTimers.values) {
-      timer.cancel();
-    }
-    _comboTimers.clear();
-    _activeCombos.clear();
-    _playedAnimations.clear();
-    unawaited(_audioSession.clear(onUpdate: _onAudioUpdate));
+  void _consumeCombo(GiftComboPayload payload) {
+    _presentCombo(payload);
+
+    final notify = widget.onComboConsumed;
+    if (notify == null) return;
+    // Deferred so the acknowledgement never emits a new state mid-build, and
+    // deliberately not gated on `mounted`: a layer that is torn down right
+    // after a gift must still release the combo it already presented.
+    scheduleMicrotask(() => notify(payload));
   }
 
-  void _consumeCombo(GiftComboPayload payload) {
+  void _presentCombo(GiftComboPayload payload) {
     final gift = payload.gift ?? const <String, dynamic>{};
     final sender = payload.sender ?? const <String, dynamic>{};
     final giftName = _readString(payload.giftName) ??
@@ -124,11 +145,14 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     }
 
     final mediaUrl = animationUrl ?? thumbnailUrl ?? '';
-    if (mediaUrl.isEmpty) return;
-
     final size = _readString(gift['size'] ?? gift['giftSize']);
     final normalizedSize = size?.toUpperCase();
-    final isSmall = normalizedSize == 'SMALL' ||
+
+    // A payload the catalog could not hydrate still has a sender, a gift name
+    // and a combo count, so announce it as a combo badge. Dropping it here is
+    // what left the host with nothing but the chat line.
+    final isSmall = mediaUrl.isEmpty ||
+        normalizedSize == 'SMALL' ||
         (normalizedSize == null && animationUrl == null);
     final comboKey = payload.overlayKey.isNotEmpty
         ? payload.overlayKey
@@ -168,6 +192,7 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
           senderName: senderName,
           giftName: giftName,
           size: size,
+          owner: this,
         ),
       );
     }

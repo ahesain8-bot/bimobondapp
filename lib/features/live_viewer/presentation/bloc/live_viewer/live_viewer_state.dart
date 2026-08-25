@@ -88,6 +88,7 @@ class LiveViewerState extends Equatable {
     GiftSentEntity? activeGiftAnimation,
     GiftComboPayload? latestGiftCombo,
     bool clearGiftAnimation = false,
+    bool clearGiftCombo = false,
     int? floatingHeartBurst,
     int? coinDelta,
     bool? showJoinSuccess,
@@ -118,7 +119,9 @@ class LiveViewerState extends Equatable {
       activeGiftAnimation: clearGiftAnimation
           ? null
           : (activeGiftAnimation ?? this.activeGiftAnimation),
-      latestGiftCombo: latestGiftCombo ?? this.latestGiftCombo,
+      latestGiftCombo: clearGiftCombo
+          ? null
+          : (latestGiftCombo ?? this.latestGiftCombo),
       floatingHeartBurst: floatingHeartBurst ?? this.floatingHeartBurst,
       coinDelta: coinDelta ?? this.coinDelta,
       showJoinSuccess: showJoinSuccess ?? this.showJoinSuccess,

@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/models/live_battle.dart';
 
 import '../../../domain/entities/live_session.dart';
@@ -70,6 +71,21 @@ class LiveRoomHeartBurstConsumed extends LiveRoomEvent {
 /// The gift banner finished playing; clear it so the next gift can show.
 class LiveRoomGiftBannerConsumed extends LiveRoomEvent {
   const LiveRoomGiftBannerConsumed();
+}
+
+/// Canonical visual gift received from the shared auction/live socket.
+class LiveRoomGiftComboReceived extends LiveRoomEvent {
+  const LiveRoomGiftComboReceived(this.payload);
+
+  final GiftComboPayload payload;
+}
+
+/// The gift layer presented [payload]; release it so remounting the layer
+/// cannot replay an animation the host has already seen.
+class LiveRoomGiftComboConsumed extends LiveRoomEvent {
+  const LiveRoomGiftComboConsumed(this.payload);
+
+  final GiftComboPayload payload;
 }
 
 class LiveRoomTitleSubmitted extends LiveRoomEvent {
