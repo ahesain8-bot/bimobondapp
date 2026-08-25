@@ -4513,4 +4513,191 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get failedToAddStoryToHighlight => 'Failed to add story to highlight';
+
+  @override
+  String get marketplaceTitle => 'Marketplace';
+
+  @override
+  String get marketplaceLikedProducts => 'Liked Products';
+
+  @override
+  String get marketplaceNoLikedProducts => 'No liked products yet';
+
+  @override
+  String get marketplaceTagline => 'Buy. Own. Resell.';
+
+  @override
+  String get marketplaceSearchHint => 'Search products, brands, categories...';
+
+  @override
+  String get marketplaceHeroTitle => 'Buy. Own. Resell.';
+
+  @override
+  String get marketplaceHeroSubtitle => 'Purchase products and resell eligible purchases through Bimo-Bond auctions.';
+
+  @override
+  String get marketplaceExploreCta => 'Explore Marketplace';
+
+  @override
+  String get marketplaceCategories => 'Categories';
+
+  @override
+  String get marketplaceRecommended => 'Recommended for You';
+
+  @override
+  String get marketplaceEndingSoon => 'Ending Soon Auctions';
+
+  @override
+  String get marketplaceNoAuctions => 'No active auctions ending soon';
+
+  @override
+  String get marketplaceLiveAuction => 'LIVE AUCTION';
+
+  @override
+  String get marketplaceAuctionLabel => 'AUCTION';
+
+  @override
+  String get marketplaceCurrentBid => 'Current Bid';
+
+  @override
+  String marketplaceBidCount(int count) {
+    return '$count Bids';
+  }
+
+  @override
+  String get marketplaceViewAuction => 'View Auction';
+
+  @override
+  String get marketplaceFilters => 'Filters';
+
+  @override
+  String get marketplaceFilterPrice => 'Price';
+
+  @override
+  String get marketplaceMin => 'Min';
+
+  @override
+  String get marketplaceMax => 'Max';
+
+  @override
+  String get marketplaceFilterListingType => 'Listing type';
+
+  @override
+  String get marketplaceInStockOnly => 'In stock only';
+
+  @override
+  String get marketplaceClearFilters => 'Clear';
+
+  @override
+  String get marketplaceApplyFilters => 'Apply';
+
+  @override
+  String get marketplaceSortPopular => 'Popular';
+
+  @override
+  String get marketplaceSortEndingSoon => 'Ending Soon';
+
+  @override
+  String marketplaceProductCount(int count) {
+    return '$count Products';
+  }
+
+  @override
+  String get marketplaceTabPurchased => 'Purchased';
+
+  @override
+  String get marketplaceTabPending => 'Pending Delivery';
+
+  @override
+  String get marketplaceTabDelivered => 'Delivered';
+
+  @override
+  String get marketplaceTabAuctioned => 'Auctioned';
+
+  @override
+  String get marketplaceTabSold => 'Sold';
+
+  @override
+  String get marketplaceNoProducts => 'No products in this tab';
+
+  @override
+  String get marketplacePurchaseConfirmed => 'Purchase Confirmed';
+
+  @override
+  String get marketplaceDeliveryLabel => 'Delivery';
+
+  @override
+  String get marketplaceDeliveryPending => 'Pending';
+
+  @override
+  String get marketplaceDeliveryShipped => 'Shipped';
+
+  @override
+  String get marketplaceDeliveryDelivered => 'Delivered';
+
+  @override
+  String get marketplaceTrackDelivery => 'Track Delivery';
+
+  @override
+  String get marketplaceSellAtAuction => 'Sell at Auction';
+
+  @override
+  String get marketplacePurchasePrice => 'Purchase price';
+
+  @override
+  String get marketplaceStartingPrice => 'Starting Price';
+
+  @override
+  String get marketplaceReservePrice => 'Reserve Price';
+
+  @override
+  String get marketplaceBuyNowPrice => 'Buy Now Price';
+
+  @override
+  String get marketplaceAuctionDuration => 'Auction Duration';
+
+  @override
+  String get marketplaceDescription => 'Description';
+
+  @override
+  String get marketplaceAuctionPreview => 'Auction Preview';
+
+  @override
+  String get marketplacePublishAuction => 'Publish Auction';
+
+  @override
+  String get marketplaceAuctionPublished => 'Auction published';
+
+  @override
+  String get marketplacePlaceBid => 'Place Bid';
+
+  @override
+  String get marketplaceYourBid => 'Your Bid';
+
+  @override
+  String get marketplaceConfirmBid => 'Confirm Bid';
+
+  @override
+  String get marketplaceEndsIn => 'Ends in';
+
+  @override
+  String get marketplaceBidHistory => 'Bid history';
+
+  @override
+  String get marketplaceNoBidsYet => 'No bids yet';
+
+  @override
+  String get marketplaceSpecifications => 'Specifications';
+
+  @override
+  String get marketplaceVerifiedProduct => 'Verified Product';
+
+  @override
+  String get marketplaceSecurePayment => 'Secure Payment';
+
+  @override
+  String get marketplaceBuyerProtection => 'Buyer Protection';
+
+  @override
+  String get marketplaceDeliveryTracking => 'Delivery Tracking';
 }

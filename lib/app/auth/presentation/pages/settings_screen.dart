@@ -2,7 +2,7 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_event.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_placeholder_screen.dart';
-import 'package:bimobondapp/app/shop/presentation/pages/orders_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/my_products_screen.dart';
 import 'package:bimobondapp/core/constants/settings_layout_constants.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
@@ -112,10 +112,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsTile(
                 icon: LucideIcons.shoppingBag,
                 title: l10n.settingsMyProducts,
-                onTap: () => context.pushNamed(
-                  OrdersScreen.routeName,
-                  queryParameters: const {'only': 'purchases'},
-                ),
+                onTap: () => context.pushNamed(MyProductsScreen.routeName),
               ),
             ],
           ),
