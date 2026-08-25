@@ -362,13 +362,14 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       stageSize = screenSize.width.clamp(0.0, screenSize.height);
     }
 
-    Widget stage = _withEdgeFade(
-      SizedBox(
-        width: stageSize,
-        height: stageSize,
-        child: _buildMedia(),
-      ),
+    final media = SizedBox(
+      width: stageSize,
+      height: stageSize,
+      child: _buildMedia(),
     );
+    final stage = _kind == _GiftMediaKind.video
+        ? RepaintBoundary(child: media)
+        : _withEdgeFade(media);
 
     Widget animatedStage;
     if (isLarge) {
@@ -502,7 +503,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         if (_videoFailed) return _fallbackVisual();
         final controller = _videoController;
         if (controller == null || !controller.value.isInitialized) {
-          return _loadingVisual();
+          // Same rule as the Lottie branch: nothing stands in while
+          // `initialize()` opens the stream and decodes the first frame.
+          return const SizedBox.expand();
         }
         // Parent stage is 1:1 (1080×1080); cover the square.
         return FittedBox(
@@ -532,13 +535,5 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     return const Center(
       child: Icon(Icons.card_giftcard, size: 120, color: Colors.white),
     );
-  }
-
-  Widget _loadingVisual() {
-    final thumbnail = widget.thumbnailUrl?.trim();
-    if (thumbnail != null && thumbnail.isNotEmpty) {
-      return _fallbackVisual();
-    }
-    return const Center(child: CircularProgressIndicator(color: Colors.white));
   }
 }
