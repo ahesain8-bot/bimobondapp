@@ -99,15 +99,35 @@ class LiveKitCallService {
       await _room!.connect(url, token);
       debugPrint('LiveKitCallService: connected to room ${_room?.name}');
 
-      // Configure media devices
+      // Configure media devices safely
       _isMuted = false;
       _isCameraOff = !isVideo;
+      _isSpeakerPhoneOn = isVideo;
 
-      await _room!.localParticipant?.setMicrophoneEnabled(true);
+      // Try enabling microphone; if mic fails or permission denied, continue call with mic muted so audio playback works
+      try {
+        await _room!.localParticipant?.setMicrophoneEnabled(true);
+      } catch (e) {
+        debugPrint(
+            'LiveKitCallService: microphone enable error (continuing without mic): $e');
+        _isMuted = true;
+      }
+
       if (isVideo) {
-        await _room!.localParticipant?.setCameraEnabled(true);
+        try {
+          await _room!.localParticipant?.setCameraEnabled(true);
+        } catch (e) {
+          debugPrint('LiveKitCallService: camera enable error: $e');
+          _isCameraOff = true;
+        }
       } else {
         await _room!.localParticipant?.setCameraEnabled(false);
+      }
+
+      try {
+        await AudioManager.instance.setSpeakerOutputPreferred(_isSpeakerPhoneOn);
+      } catch (e) {
+        debugPrint('LiveKitCallService initial speakerphone set error: $e');
       }
 
       _updateState();
@@ -150,8 +170,22 @@ class LiveKitCallService {
 
   Future<void> toggleMute() async {
     if (_room == null || _room!.localParticipant == null) return;
-    _isMuted = !_isMuted;
-    await _room!.localParticipant?.setMicrophoneEnabled(!_isMuted);
+    final nextMutedState = !_isMuted;
+    try {
+      if (!nextMutedState) {
+        // Request microphone permission when unmuting
+        try {
+          await Permission.microphone.request();
+        } catch (e) {
+          debugPrint('LiveKitCallService mic permission request error: $e');
+        }
+      }
+      await _room!.localParticipant?.setMicrophoneEnabled(!nextMutedState);
+      _isMuted = nextMutedState;
+    } catch (e) {
+      debugPrint('LiveKitCallService toggleMute error: $e');
+      _isMuted = true; // Fallback to muted if microphone operation fails
+    }
     _updateState();
   }
 
@@ -164,10 +198,16 @@ class LiveKitCallService {
       } catch (e) {
         debugPrint('LiveKitCallService camera request error: $e');
       }
-      // Ensure microphone is active when video is enabled
-      await _room!.localParticipant?.setMicrophoneEnabled(!_isMuted);
+      try {
+        await _room!.localParticipant?.setMicrophoneEnabled(!_isMuted);
+      } catch (_) {}
     }
-    await _room!.localParticipant?.setCameraEnabled(!_isCameraOff);
+    try {
+      await _room!.localParticipant?.setCameraEnabled(!_isCameraOff);
+    } catch (e) {
+      debugPrint('LiveKitCallService setCameraEnabled error: $e');
+      _isCameraOff = true;
+    }
     _updateState();
   }
 
@@ -187,6 +227,11 @@ class LiveKitCallService {
 
   Future<void> toggleSpeaker() async {
     _isSpeakerPhoneOn = !_isSpeakerPhoneOn;
+    try {
+      await AudioManager.instance.setSpeakerOutputPreferred(_isSpeakerPhoneOn);
+    } catch (e) {
+      debugPrint('LiveKitCallService toggleSpeaker error: $e');
+    }
     _updateState();
   }
 

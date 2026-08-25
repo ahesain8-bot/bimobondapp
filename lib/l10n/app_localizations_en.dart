@@ -605,7 +605,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeProfilePhoto => 'Change profile photo';
 
   @override
-  String get takePhoto => 'Take a photo';
+  String get takePhoto => 'Take Photo';
 
   @override
   String get importFromLibrary => 'Import';
@@ -2263,6 +2263,109 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatWallpaperMaze => 'Maze';
+
+  @override
+  String get chatWallpaperChooseFromPhotos => 'Choose from Photos';
+
+  @override
+  String get chatWallpaperUploadDeviceSubtitle => 'Upload personal photo from device';
+
+  @override
+  String get chatWallpaperDefault => 'Default (No Wallpaper)';
+
+  @override
+  String get chatWallpaperCatalog => 'Wallpapers Catalog';
+
+  @override
+  String get chatWallpaperUpdated => 'Personal background updated';
+
+  @override
+  String get chatSettingsTitle => 'Details';
+
+  @override
+  String get chatSettingsProfile => 'Profile';
+
+  @override
+  String get chatSettingsMute => 'Mute';
+
+  @override
+  String get chatSettingsMuted => 'Muted';
+
+  @override
+  String get chatSettingsReport => 'Report';
+
+  @override
+  String get chatSettingsMuteNotifications => 'Mute notifications';
+
+  @override
+  String get chatSettingsPinToTop => 'Pin to top';
+
+  @override
+  String get chatSettingsWallpaperSubtitle => 'Custom theme background';
+
+  @override
+  String get chatSettingsSearch => 'Search in conversation';
+
+  @override
+  String chatSettingsBlock(String username) {
+    return 'Block @$username';
+  }
+
+  @override
+  String get chatSettingsBlocked => 'Blocked';
+
+  @override
+  String get unblock => 'Unblock';
+
+  @override
+  String get chatYouBlockedUser => 'You blocked this user. Unblock to send a message.';
+
+  @override
+  String get userNotFound => 'User not found';
+
+  @override
+  String get chatSettingsDeleteHistory => 'Delete chat history';
+
+  @override
+  String get chatSettingsSearchHint => 'Type keyword...';
+
+  @override
+  String chatSettingsSearching(String query) {
+    return 'Searching for \"$query\"...';
+  }
+
+  @override
+  String chatSettingsReportTitle(String username) {
+    return 'Report @$username';
+  }
+
+  @override
+  String get chatSettingsReportSpam => 'Spam or Scam';
+
+  @override
+  String get chatSettingsReportHarassment => 'Harassment or Bullying';
+
+  @override
+  String get chatSettingsReportInappropriate => 'Inappropriate Content';
+
+  @override
+  String chatSettingsReportSubmitted(String reason) {
+    return 'Report submitted: $reason';
+  }
+
+  @override
+  String chatSettingsBlockTitle(String username) {
+    return 'Block @$username?';
+  }
+
+  @override
+  String get chatSettingsBlockMessage => 'They won\'t be able to message you or view your profile.';
+
+  @override
+  String get chatSettingsDeleteTitle => 'Delete chat history?';
+
+  @override
+  String get chatSettingsDeleteMessage => 'This will remove the chat history for you. This action cannot be undone.';
 
   @override
   String get messagesTitle => 'Messages';
@@ -4296,4 +4399,305 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaStudioTemplates => 'Templates';
+
+  @override
+  String get pinToTop => 'Pin to top';
+
+  @override
+  String get unpin => 'Unpin';
+
+  @override
+  String get pinnedToTopSuccess => 'Pinned to top of profile';
+
+  @override
+  String get unpinnedSuccess => 'Unpinned from profile';
+
+  @override
+  String get closeFriendsTab => 'Close Friends';
+
+  @override
+  String get addCloseFriendsTitle => 'Add Close Friends';
+
+  @override
+  String get addCloseFriendsSubtitle => 'Choose friends to add to your close friends list';
+
+  @override
+  String get searchCloseFriendsHint => 'Search close friends...';
+
+  @override
+  String get noCloseFriendsYet => 'No close friends added yet.';
+
+  @override
+  String get profileLinksTitle => 'Links';
+
+  @override
+  String get noLinksAddedYet => 'No links added yet.';
+
+  @override
+  String get accountTypePersonal => 'Personal';
+
+  @override
+  String get accountTypeCreator => 'Creator';
+
+  @override
+  String get accountTypeBusiness => 'Business';
+
+  @override
+  String get badgeOfficial => 'Official';
+
+  @override
+  String get badgeCreator => 'Creator';
+
+  @override
+  String get addToHighlights => 'Add to highlights';
+
+  @override
+  String get newHighlight => 'New highlight';
+
+  @override
+  String get editCover => 'Edit cover';
+
+  @override
+  String get highlightsTitle => 'Highlights';
+
+  @override
+  String get noStoriesInArchive => 'No stories found in archive';
+
+  @override
+  String get removeFromHighlight => 'Remove from Highlight';
+
+  @override
+  String get highlightCreated => 'Highlight created';
+
+  @override
+  String get highlightUpdated => 'Highlight updated';
+
+  @override
+  String get chooseFromGallery => 'Choose from Gallery';
+
+  @override
+  String get pasteImageUrl => 'Paste Image URL';
+
+  @override
+  String get newHighlightButton => 'New';
+
+  @override
+  String get aboutThisStory => 'About this story';
+
+  @override
+  String get editHighlight => 'Edit highlight';
+
+  @override
+  String get deleteHighlight => 'Delete Highlight';
+
+  @override
+  String get highlightDeleted => 'Highlight deleted';
+
+  @override
+  String get highlightEmptyRemoved => 'This highlight is empty and was removed';
+
+  @override
+  String get highlightNameLabel => 'Highlight Name';
+
+  @override
+  String get highlightNameHint => 'e.g. Travel, Memories';
+
+  @override
+  String get coverUpdated => 'Cover updated';
+
+  @override
+  String get failedToUploadCover => 'Failed to upload cover image';
+
+  @override
+  String get failedToLoadHighlightDetails => 'Failed to load highlight details';
+
+  @override
+  String get failedToAddStoryToHighlight => 'Failed to add story to highlight';
+
+  @override
+  String get marketplaceTitle => 'Marketplace';
+
+  @override
+  String get marketplaceLikedProducts => 'Liked Products';
+
+  @override
+  String get marketplaceNoLikedProducts => 'No liked products yet';
+
+  @override
+  String get marketplaceTagline => 'Buy. Own. Resell.';
+
+  @override
+  String get marketplaceSearchHint => 'Search products, brands, categories...';
+
+  @override
+  String get marketplaceHeroTitle => 'Buy. Own. Resell.';
+
+  @override
+  String get marketplaceHeroSubtitle => 'Purchase products and resell eligible purchases through Bimo-Bond auctions.';
+
+  @override
+  String get marketplaceExploreCta => 'Explore Marketplace';
+
+  @override
+  String get marketplaceCategories => 'Categories';
+
+  @override
+  String get marketplaceRecommended => 'Recommended for You';
+
+  @override
+  String get marketplaceEndingSoon => 'Ending Soon Auctions';
+
+  @override
+  String get marketplaceNoAuctions => 'No active auctions ending soon';
+
+  @override
+  String get marketplaceLiveAuction => 'LIVE AUCTION';
+
+  @override
+  String get marketplaceAuctionLabel => 'AUCTION';
+
+  @override
+  String get marketplaceCurrentBid => 'Current Bid';
+
+  @override
+  String marketplaceBidCount(int count) {
+    return '$count Bids';
+  }
+
+  @override
+  String get marketplaceViewAuction => 'View Auction';
+
+  @override
+  String get marketplaceFilters => 'Filters';
+
+  @override
+  String get marketplaceFilterPrice => 'Price';
+
+  @override
+  String get marketplaceMin => 'Min';
+
+  @override
+  String get marketplaceMax => 'Max';
+
+  @override
+  String get marketplaceFilterListingType => 'Listing type';
+
+  @override
+  String get marketplaceInStockOnly => 'In stock only';
+
+  @override
+  String get marketplaceClearFilters => 'Clear';
+
+  @override
+  String get marketplaceApplyFilters => 'Apply';
+
+  @override
+  String get marketplaceSortPopular => 'Popular';
+
+  @override
+  String get marketplaceSortEndingSoon => 'Ending Soon';
+
+  @override
+  String marketplaceProductCount(int count) {
+    return '$count Products';
+  }
+
+  @override
+  String get marketplaceTabPurchased => 'Purchased';
+
+  @override
+  String get marketplaceTabPending => 'Pending Delivery';
+
+  @override
+  String get marketplaceTabDelivered => 'Delivered';
+
+  @override
+  String get marketplaceTabAuctioned => 'Auctioned';
+
+  @override
+  String get marketplaceTabSold => 'Sold';
+
+  @override
+  String get marketplaceNoProducts => 'No products in this tab';
+
+  @override
+  String get marketplacePurchaseConfirmed => 'Purchase Confirmed';
+
+  @override
+  String get marketplaceDeliveryLabel => 'Delivery';
+
+  @override
+  String get marketplaceDeliveryPending => 'Pending';
+
+  @override
+  String get marketplaceDeliveryShipped => 'Shipped';
+
+  @override
+  String get marketplaceDeliveryDelivered => 'Delivered';
+
+  @override
+  String get marketplaceTrackDelivery => 'Track Delivery';
+
+  @override
+  String get marketplaceSellAtAuction => 'Sell at Auction';
+
+  @override
+  String get marketplacePurchasePrice => 'Purchase price';
+
+  @override
+  String get marketplaceStartingPrice => 'Starting Price';
+
+  @override
+  String get marketplaceReservePrice => 'Reserve Price';
+
+  @override
+  String get marketplaceBuyNowPrice => 'Buy Now Price';
+
+  @override
+  String get marketplaceAuctionDuration => 'Auction Duration';
+
+  @override
+  String get marketplaceDescription => 'Description';
+
+  @override
+  String get marketplaceAuctionPreview => 'Auction Preview';
+
+  @override
+  String get marketplacePublishAuction => 'Publish Auction';
+
+  @override
+  String get marketplaceAuctionPublished => 'Auction published';
+
+  @override
+  String get marketplacePlaceBid => 'Place Bid';
+
+  @override
+  String get marketplaceYourBid => 'Your Bid';
+
+  @override
+  String get marketplaceConfirmBid => 'Confirm Bid';
+
+  @override
+  String get marketplaceEndsIn => 'Ends in';
+
+  @override
+  String get marketplaceBidHistory => 'Bid history';
+
+  @override
+  String get marketplaceNoBidsYet => 'No bids yet';
+
+  @override
+  String get marketplaceSpecifications => 'Specifications';
+
+  @override
+  String get marketplaceVerifiedProduct => 'Verified Product';
+
+  @override
+  String get marketplaceSecurePayment => 'Secure Payment';
+
+  @override
+  String get marketplaceBuyerProtection => 'Buyer Protection';
+
+  @override
+  String get marketplaceDeliveryTracking => 'Delivery Tracking';
 }

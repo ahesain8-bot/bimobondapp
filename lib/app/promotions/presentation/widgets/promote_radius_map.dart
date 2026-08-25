@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/utils/google_maps_bootstrap.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -63,10 +64,17 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     super.initState();
     _syncCenterFromWidget(fallbackToUser: false);
     _center ??= _fallbackCenter;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _mountMap = true);
-    });
+    // The renderer warmup no longer blocks app start, so this is the screen
+    // that has to wait for it — building a GoogleMap before it finishes is
+    // what the boot-time await used to guarantee against.
+    unawaited(_mountWhenMapsReady());
     unawaited(_bootstrap());
+  }
+
+  Future<void> _mountWhenMapsReady() async {
+    await configureGoogleMaps();
+    if (!mounted) return;
+    setState(() => _mountMap = true);
   }
 
   void _syncCenterFromWidget({required bool fallbackToUser}) {
@@ -271,9 +279,7 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
     );
 
     try {
-      await controller.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 28),
-      );
+      await controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 28));
     } catch (_) {}
   }
 
@@ -481,7 +487,10 @@ class _PromoteRadiusMapPreviewState extends State<PromoteRadiusMapPreview> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 child: Text(
                   l10n.chatLocationPermissionDenied,
                   textAlign: TextAlign.center,

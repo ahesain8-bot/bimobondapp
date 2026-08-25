@@ -38,6 +38,13 @@ abstract class CallsRemoteDataSource {
     required String callId,
     required List<String> inviteeIds,
   });
+
+  Future<Map<String, dynamic>> getCallHistory({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? type,
+  });
 }
 
 class CallsRemoteDataSourceImpl implements CallsRemoteDataSource {
@@ -190,6 +197,52 @@ class CallsRemoteDataSourceImpl implements CallsRemoteDataSource {
       );
       if (response.data is Map) {
         return CallModel.fromJson(Map<String, dynamic>.from(response.data));
+      }
+      throw ServerException(message: 'Invalid response format');
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getCallHistory({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? type,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+      if (status != null && status.isNotEmpty) queryParams['status'] = status;
+      if (type != null && type.isNotEmpty) queryParams['type'] = type;
+
+      final response = await apiClient.dio.get(
+        '/calls',
+        queryParameters: queryParams,
+      );
+
+      if (response.data is Map) {
+        final dataMap = Map<String, dynamic>.from(response.data);
+        final rawCalls = dataMap['calls'];
+        final callsList = <CallModel>[];
+        if (rawCalls is List) {
+          for (final item in rawCalls) {
+            if (item is Map) {
+              callsList.add(CallModel.fromJson(Map<String, dynamic>.from(item)));
+            }
+          }
+        }
+        return {
+          'calls': callsList,
+          'total': dataMap['total'] ?? callsList.length,
+          'page': dataMap['page'] ?? page,
+          'limit': dataMap['limit'] ?? limit,
+          'totalPages': dataMap['totalPages'] ?? 1,
+        };
       }
       throw ServerException(message: 'Invalid response format');
     } catch (e) {

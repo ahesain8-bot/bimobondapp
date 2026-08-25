@@ -1,4 +1,3 @@
-import 'package:bimobondapp/core/utils/google_maps_bootstrap.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -55,13 +54,21 @@ import 'package:bimobondapp/app/calls/presentation/widgets/global_call_listener.
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/di/live_viewer_injector.dart'
+    as live_viewer_di;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bimobondapp/firebase_options.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await configureGoogleMaps();
+  // Google Maps and the camera/beauty stack are deliberately lazy. Native
+  // warm-up work still competes for the Android platform thread even when its
+  // Dart Future is not awaited, which previously kept the native splash on
+  // screen for ~30 seconds on a cold start. The map screen and camera screen
+  // initialise their own dependencies immediately before first use.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -86,7 +93,8 @@ void main() async {
   await chats_di.initChats();
   await notifications_di.initNotifications();
   await calls_di.initCalls();
-  runApp(const MyApp());
+  await live_viewer_di.initLiveViewer();
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -103,12 +111,8 @@ class MyApp extends StatelessWidget {
         BlocProvider<ChatWallpaperCubit>(
           create: (_) => ChatWallpaperCubit(auth_di.sl()),
         ),
-        BlocProvider<ShopCartCubit>(
-          create: (_) => shop_di.sl<ShopCartCubit>(),
-        ),
-        BlocProvider<CallBloc>(
-          create: (_) => calls_di.sl<CallBloc>(),
-        ),
+        BlocProvider<ShopCartCubit>(create: (_) => shop_di.sl<ShopCartCubit>()),
+        BlocProvider<CallBloc>(create: (_) => calls_di.sl<CallBloc>()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {

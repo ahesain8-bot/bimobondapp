@@ -1,10 +1,9 @@
 import 'package:bimobondapp/app/calls/domain/entities/call_entity.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
-import 'package:bimobondapp/app/calls/presentation/pages/active_call_screen.dart';
 import 'package:bimobondapp/app/calls/services/livekit_call_service.dart';
-import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -15,6 +14,7 @@ class FloatingCallWidget extends StatefulWidget {
   final LiveKitCallService livekitService;
   final String timerText;
   final bool isMuted;
+  final VoidCallback onMaximize;
 
   const FloatingCallWidget({
     super.key,
@@ -22,6 +22,7 @@ class FloatingCallWidget extends StatefulWidget {
     required this.livekitService,
     required this.timerText,
     required this.isMuted,
+    required this.onMaximize,
   });
 
   @override
@@ -31,27 +32,14 @@ class FloatingCallWidget extends StatefulWidget {
 class _FloatingCallWidgetState extends State<FloatingCallWidget> {
   Offset _position = const Offset(20, 100);
 
-  void _onMaximizeCall(BuildContext context) {
-    final nav = AppRouter.rootNavigatorKey.currentState;
-    if (nav != null) {
-      nav.push(
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (routeContext) => BlocProvider.value(
-            value: context.read<CallBloc>(),
-            child: const ActiveCallScreen(),
-          ),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final caller = widget.call.initiatedBy;
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final caller = widget.call.getDisplayUser(currentUserId);
+    final displayName = caller.displayName;
     final isVideo = widget.call.isVideo;
 
     return Positioned(
@@ -63,7 +51,7 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
             _position += details.delta;
           });
         },
-        onTap: () => _onMaximizeCall(context),
+        onTap: widget.onMaximize,
         child: Material(
           elevation: 12,
           borderRadius: BorderRadius.circular(24),
@@ -71,17 +59,21 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(24),
+              color: isDark
+                  ? const Color(0xFF0F172A).withValues(alpha: 0.95)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.4),
-                width: 1.5,
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
+                width: 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -115,14 +107,16 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                     Container(
                       width: 42,
                       height: 42,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Color(0xFF1E293B),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFE2E8F0),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: showRemoteVideo
                           ? VideoTrackRenderer(
-                              track as VideoTrack,
+                              track,
                               fit: VideoViewFit.cover,
                             )
                           : SafeNetworkAvatar(
@@ -138,13 +132,35 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                width: 14,
+                                height: 14,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                  'assets/images/app_icon.png',
+                                  width: 14,
+                                  height: 14,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              displayName,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Row(
@@ -159,9 +175,9 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              widget.timerText,
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              '${widget.timerText} • Bimo-Bond',
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : Colors.black54,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -183,11 +199,15 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                           shape: BoxShape.circle,
                           color: widget.isMuted
                               ? const Color(0xFFEF4444)
-                              : Colors.white.withValues(alpha: 0.12),
+                              : (isDark
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : Colors.black.withValues(alpha: 0.06)),
                         ),
                         child: Icon(
                           widget.isMuted ? LucideIcons.micOff : LucideIcons.mic,
-                          color: Colors.white,
+                          color: widget.isMuted
+                              ? Colors.white
+                              : (isDark ? Colors.white : Colors.black87),
                           size: 14,
                         ),
                       ),
@@ -201,9 +221,9 @@ class _FloatingCallWidgetState extends State<FloatingCallWidget> {
                         shape: BoxShape.circle,
                         color: const Color(0xFF6366F1).withValues(alpha: 0.25),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         LucideIcons.maximize2,
-                        color: Colors.white,
+                        color: isDark ? Colors.white : const Color(0xFF4F46E5),
                         size: 14,
                       ),
                     ),

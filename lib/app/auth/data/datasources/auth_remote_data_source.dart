@@ -293,13 +293,37 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> getUserById(String userId) => _execute(() async {
+    try {
+      final relRes = await apiClient.dio.get(
+        ApiConstants.userRelationship(userId),
+        options: Options(headers: await _profileAuthHeaders()),
+      );
+      if (relRes.statusCode == 200 && relRes.data is Map) {
+        final rData = Map<String, dynamic>.from(relRes.data as Map);
+        final isBlocked = rData['isBlocked'] == true ||
+            rData['isBlockedByYou'] == true ||
+            rData['isBlockedByThem'] == true;
+        if (isBlocked) {
+          throw ServerException(message: 'User not found');
+        }
+      }
+    } catch (e) {
+      if (e is ServerException) rethrow;
+    }
+
     final response = await apiClient.dio.get(
       ApiConstants.userById(userId),
       options: Options(headers: await _profileAuthHeaders()),
     );
 
     if (response.statusCode == 200) {
-      return UserModel.fromJson(_parseUserPayload(response.data));
+      final userPayload = _parseUserPayload(response.data);
+      if (userPayload['isBlocked'] == true ||
+          userPayload['is_blocked'] == true ||
+          userPayload['blocked'] == true) {
+        throw ServerException(message: 'User not found');
+      }
+      return UserModel.fromJson(userPayload);
     } else {
       throw ServerException(message: 'Fetch user failed');
     }

@@ -45,6 +45,7 @@ Future<void> initChats() async {
       getChatsUseCase: sl(),
       getSuggestionsUseCase: sl(),
       deleteChatUseCase: sl(),
+      socketService: sl(),
     ),
   );
 

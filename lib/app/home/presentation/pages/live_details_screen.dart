@@ -62,6 +62,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_deta
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_media_background.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_mock_chat_area.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/live_post_comments_area.dart';
+import 'package:bimobondapp/app/home/presentation/utils/live_gift_route_policy.dart';
 import 'package:bimobondapp/core/utils/comment_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/media_page_indicator.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
@@ -759,7 +760,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     String? colorHex,
     bool isAudio = false,
   }) {
-    if (!mounted) return;
+    // The active live-room route owns visual gifts while it is on top. A
+    // covered LiveDetailsScreen may still receive the shared socket event, but
+    // it must drop the visual work instead of replaying it after the room ends.
+    if (!mounted || !isRealtimeGiftRouteCurrent(context)) return;
 
     // Normalize id so comment / auctionUpdated / auctionGiftCombo share one card.
     var resolvedGiftId = giftId.trim();
@@ -1021,11 +1025,10 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       return;
     }
 
-    // Wait until any open bottom sheet or dialog has completely closed.
-    while (mounted && ModalRoute.of(context)?.isCurrent != true) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    if (!mounted) return;
+    // Do not queue a gift while this route is covered. The route that is
+    // currently visible (for example, the broadcaster's LiveRoomPage) owns the
+    // animation and will render the event through its own HUD pipeline.
+    if (!mounted || !isRealtimeGiftRouteCurrent(context)) return;
 
     final dedupeKey = '${giftName ?? ''}|${senderName ?? ''}';
     final now = DateTime.now();
@@ -1052,6 +1055,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         senderName: senderName,
         giftName: giftName,
         size: size,
+        owner: this,
       ),
     );
   }
@@ -1510,6 +1514,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
   @override
   void dispose() {
+    GiftAnimationOverlay.dismiss(owner: this);
     _flushPostView();
     _viewEligibleTimer?.cancel();
     _stopAuctionRealtime();

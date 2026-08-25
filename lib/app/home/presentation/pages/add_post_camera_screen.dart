@@ -41,6 +41,7 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/video_templ
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
+import 'package:bimobondapp/features/live_source/presentation/pages/live_start_page.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/foundation.dart';
@@ -84,15 +85,23 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   final GlobalKey _arPreviewKey = GlobalKey(debugLabel: 'ar-camera-preview');
   bool _pendingVideoStart = false;
   bool _returnToPhotoAfterVideo = false;
+
+  /// True while the go-live screen owns the camera. The CamerAwesome branch
+  /// unmounts for the duration — the live page runs its own capture session
+  /// and iOS will not hand the same device to both at once. The native AR
+  /// branch does not need this; it releases through ArCameraBridge instead.
+  bool _liveHandoffActive = false;
   bool _showFilters = false;
   bool _showPhotoEditor = false;
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
   MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.smooth;
+
   /// Retouch (Magic) On by default when the camera opens.
   bool _photoEditorMagicOn = true;
 
   /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
   static const double _kMagicAutoSmooth = 0.50;
+
   /// Face color sliders (label = value×100) applied on live camera even when
   /// Retouch/Magic is Off.
   /// Live color defaults (empty-frame / Retouch-Off baseline).
@@ -105,6 +114,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     MediaPhotoEditorTool.highlights: 0.08, // +8
     MediaPhotoEditorTool.shadows: 0.10, // +10
   };
+
   /// Front-camera live color defaults — must match the front-camera target
   /// values in FaceWarpRenderer.bindRetouchUniforms (the "frontTarget"
   /// argument of each fieldMix call). Kept in sync manually: previously this
@@ -443,15 +453,13 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           if ((edited.videoTemplateId ?? _videoTemplateId) != null)
             'videoTemplateId': edited.videoTemplateId ?? _videoTemplateId,
           if ((edited.videoTemplateName ?? _videoTemplateName) != null)
-            'videoTemplateName':
-                edited.videoTemplateName ?? _videoTemplateName,
+            'videoTemplateName': edited.videoTemplateName ?? _videoTemplateName,
           if ((edited.videoTemplateSlotCount ?? _videoTemplateSlotCount) !=
               null)
             'videoTemplateSlotCount':
                 edited.videoTemplateSlotCount ?? _videoTemplateSlotCount,
           if ((edited.templateProjectId ?? _templateProjectId) != null)
-            'templateProjectId':
-                edited.templateProjectId ?? _templateProjectId,
+            'templateProjectId': edited.templateProjectId ?? _templateProjectId,
           if (edited.templateRenderedVideo != null)
             'templateRenderedVideo': edited.templateRenderedVideo,
           if (edited.templateSlotFiles != null &&
@@ -610,30 +618,6 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       }
     } else {
       unawaited(_applyBeauty(next));
-    }
-  }
-
-  /// Kept for filter / reset paths that still need to re-sync beauty params
-  /// while preserving Magic On smooth.
-  void _applyMagicSmoothOnly() {
-    if (_photoEditorMagicOn) {
-      final strength =
-          (_photoAdjustments[MediaPhotoEditorTool.smooth] ?? _kMagicAutoSmooth)
-              .clamp(0.0, 1.0);
-      ArCameraBridge.setMagicEnabled(true, strength: strength);
-      return;
-    }
-    ArCameraBridge.setMagicEnabled(false);
-    final id = ArFilterCatalog.items[_arFilterIndex].id;
-    final params = ArFilterCatalog.colorFilterById(id)?.params;
-    if (params != null) {
-      final intensity = ArFilterCatalog.isColorFilter(id)
-          ? _arFilterIntensity
-          : 1.0;
-      _pushBeautyParams(params, intensity);
-    } else {
-      ArCameraBridge.clearBeautyFilter();
-      _syncRetouchToNative();
     }
   }
 
@@ -827,14 +811,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         if ((edited.videoTemplateId ?? _videoTemplateId) != null)
           'videoTemplateId': edited.videoTemplateId ?? _videoTemplateId,
         if ((edited.videoTemplateName ?? _videoTemplateName) != null)
-          'videoTemplateName':
-              edited.videoTemplateName ?? _videoTemplateName,
+          'videoTemplateName': edited.videoTemplateName ?? _videoTemplateName,
         if ((edited.videoTemplateSlotCount ?? _videoTemplateSlotCount) != null)
           'videoTemplateSlotCount':
               edited.videoTemplateSlotCount ?? _videoTemplateSlotCount,
         if ((edited.templateProjectId ?? _templateProjectId) != null)
-          'templateProjectId':
-              edited.templateProjectId ?? _templateProjectId,
+          'templateProjectId': edited.templateProjectId ?? _templateProjectId,
         if (edited.templateRenderedVideo != null)
           'templateRenderedVideo': edited.templateRenderedVideo,
         if (edited.templateSlotFiles != null &&
@@ -1847,6 +1829,49 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(_beginVideoRecording());
   }
 
+  /// Opens the LiveStartPage from lib/features/live_source/.
+  Future<void> _handleGoLiveTap() async {
+    if (_isRecording || _isBusy || _isProcessingCapture) return;
+    try {
+      // Remove the preview from the widget tree for BOTH camera engines. On
+      // Android, calling stopCamera() while leaving the platform view mounted
+      // lets its visibility callbacks bind CameraX again during the next route
+      // transition. That races the Flutter/LiveKit cameras and is the source of
+      // the several-second freeze seen at the start of a live.
+      setState(() => _liveHandoffActive = true);
+      if (_useNativeArFilters) {
+        await ArCameraBridge.stopCamera();
+      }
+      // Let AndroidView/CameraX (or CamerAwesome on iOS) finish unmounting
+      // before the live start page asks the operating system for the lens.
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+      if (!mounted) return;
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const LiveStartPage()));
+    } catch (_) {
+      // Never leave a frozen preview.
+    } finally {
+      if (mounted) setState(() => _liveHandoffActive = false);
+      // Back from the live start page: bring the camera preview back.
+      if (_useNativeArFilters && mounted) {
+        // The AndroidView is created asynchronously after setState. Give its
+        // platform controller one frame to attach before asking it to start.
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        if (mounted) {
+          await ArCameraBridge.startCamera();
+          if (mounted) {
+            _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
+            if (_photoEditorMagicOn) {
+              ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+            }
+            _syncRetouchToNative();
+          }
+        }
+      }
+    }
+  }
+
   Future<void> _applyFilter(CameraFilterPreset preset) async {
     setState(() => _selectedFilter = preset.filter);
     _appliedFilterId = null;
@@ -2345,7 +2370,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         _pickedSoundSegmentId = picked.soundSegmentId;
       }
     });
-    final need = _videoTemplateSlotCount ?? VideoTemplateSlotFiller.minPhotoDumpSlots;
+    final need =
+        _videoTemplateSlotCount ?? VideoTemplateSlotFiller.minPhotoDumpSlots;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -2562,7 +2588,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (_useNativeArFilters)
+            if (_liveHandoffActive)
+              const ColoredBox(color: Colors.black)
+            else if (_useNativeArFilters)
               _buildNativeArCameraBody(l10n, filters)
             else
               _buildCamerAwesomeBody(l10n, filters),
@@ -2748,8 +2776,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             chooseMediaType: true,
             onPicked: _importFromGallery,
           ),
-          onGoLiveTap: () =>
-              CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+          onGoLiveTap: _handleGoLiveTap,
           onRecordTap: _onRecordTap,
           onFlip: _flipCamera,
           onFlash: _toggleFlash,
@@ -2927,8 +2954,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                   chooseMediaType: true,
                   onPicked: _importFromGallery,
                 ),
-                onGoLiveTap: () =>
-                    CameraStudioSheets.showLiveSetup(context, l10n: l10n),
+                onGoLiveTap: _handleGoLiveTap,
                 onRecordTap: _onRecordTap,
                 onFlip: _flipCamera,
                 onFlash: _toggleFlash,

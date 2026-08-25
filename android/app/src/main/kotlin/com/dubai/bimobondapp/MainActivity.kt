@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         const val AR_CAMERA_CHANNEL = "com.dubai.bimobondapp/ar_camera"
         const val AR_CAMERA_VIEW_TYPE = "ar-camera-preview"
+        const val KEYGUARD_CHANNEL = "com.dubai.bimobondapp/keyguard"
     }
 
     private var arCameraChannel: MethodChannel? = null
@@ -42,10 +43,11 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Load OpenCV early so first beauty apply is fast.
-        beautyExecutor.execute { BeautyFilterProcessor.ensureOpenCv() }
-        // Prefetch CameraX + MediaPipe before the user taps + (cuts open delay).
-        warmArCameraPipeline()
+        // OpenCV, CameraX and MediaPipe are intentionally warmed only when the
+        // camera feature invokes the `warmup` method below. Starting all three
+        // while Flutter draws its first frame caused multi-second launch stalls,
+        // high memory pressure and could starve a live room opened immediately
+        // after app launch.
 
         flutterEngine.platformViewsController.registry.registerViewFactory(
             AR_CAMERA_VIEW_TYPE,
@@ -56,6 +58,44 @@ class MainActivity : FlutterActivity() {
         NativeCameraPlugin.register(flutterEngine, this)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KEYGUARD_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setShowWhenLocked" -> {
+                        val show = call.argument<Boolean>("show") ?: false
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                            setShowWhenLocked(show)
+                            setTurnScreenOn(show)
+                        } else {
+                            if (show) {
+                                window.addFlags(
+                                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                                    android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                                )
+                            } else {
+                                window.clearFlags(
+                                    android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                                    android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                                )
+                            }
+                        }
+                        result.success(null)
+                    }
+                    "requestDismissKeyguard" -> {
+                        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            km.requestDismissKeyguard(this, null)
+                        }
+                        result.success(null)
+                    }
+                    "isKeyguardLocked" -> {
+                        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+                        result.success(km.isKeyguardLocked)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AR_CAMERA_CHANNEL)
             .also { arCameraChannel = it }
@@ -353,6 +393,32 @@ class MainActivity : FlutterActivity() {
                         ArCameraController.resumePreview()
                         result.success(null)
                     }
+                    // Fully tears the native camera down (camera unbound). Used
+                    // before pushing a route that opens its own camera (live
+                    // room) so the lens is never held twice at once.
+                    "stopCamera" -> {
+                        ArCameraController.stop()
+                        result.success(null)
+                    }
+                    // Re-initialises the native camera after [stopCamera] when
+                    // the camera screen becomes visible again.
+                    "startCamera" -> {
+                        val activity = ArCameraBridge.hostActivity
+                        val lifecycleOwner = ArCameraBridge.lifecycleOwner
+                        val previewView = ArCameraBridge.previewView
+                        val faceOverlay = ArCameraBridge.faceOverlay
+                        if (activity != null && lifecycleOwner != null &&
+                            previewView != null && faceOverlay != null
+                        ) {
+                            ArCameraController.start(
+                                activity,
+                                lifecycleOwner,
+                                previewView,
+                                faceOverlay,
+                            )
+                        }
+                        result.success(null)
+                    }
                     "setPreviewLetterbox" -> {
                         val top = call.argument<Int>("topPx") ?: 0
                         val bottom = call.argument<Int>("bottomPx") ?: 0
@@ -476,9 +542,19 @@ class MainActivity : FlutterActivity() {
     private fun warmArCameraPipeline() {
         if (!arPipelineWarmupStarted.compareAndSet(false, true)) return
         FaceLandmarkerHolder.warmup(this)
-        try {
-            ProcessCameraProvider.getInstance(this)
-        } catch (_: Throwable) {
+        // Off the main thread: getInstance() loads the camera provider, reads
+        // every camera's metadata and builds the CameraPipe — tens of
+        // milliseconds of blocking work, per the launch log.
+        val cameraWarm = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "ar-camerax-warm").apply { isDaemon = true }
+        }
+        cameraWarm.execute {
+            try {
+                ProcessCameraProvider.getInstance(applicationContext)
+            } catch (_: Throwable) {
+            } finally {
+                cameraWarm.shutdown()
+            }
         }
         // Warm H.264 encoder so the first record tap isn't cold.
         val executor = Executors.newSingleThreadExecutor { r ->

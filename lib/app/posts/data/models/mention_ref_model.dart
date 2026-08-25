@@ -4,11 +4,13 @@ class MentionRefModel extends MentionRefEntity {
   const MentionRefModel({
     required super.userId,
     super.username,
+    super.fullName,
   });
 
   factory MentionRefModel.fromJson(Map<String, dynamic> json) {
     final user = json['user'];
     String? username;
+    String? fullName;
     var userId = json['userId']?.toString() ?? '';
     if (user is Map) {
       final userMap = Map<String, dynamic>.from(user);
@@ -16,14 +18,26 @@ class MentionRefModel extends MentionRefEntity {
           ? userId
           : userMap['id']?.toString() ?? '';
       username = userMap['username']?.toString();
+      fullName = userMap['fullName']?.toString() ??
+          userMap['name']?.toString() ??
+          userMap['displayName']?.toString();
     }
     username ??= json['username']?.toString();
-    return MentionRefModel(userId: userId, username: username);
+    fullName ??= json['fullName']?.toString() ??
+        json['name']?.toString() ??
+        json['displayName']?.toString();
+
+    return MentionRefModel(
+      userId: userId,
+      username: username,
+      fullName: fullName,
+    );
   }
 
   Map<String, dynamic> toJson() => {
         'userId': userId,
         if (username != null) 'username': username,
+        if (fullName != null) 'fullName': fullName,
       };
 
   static List<MentionRefModel> listFromJson(dynamic raw) {

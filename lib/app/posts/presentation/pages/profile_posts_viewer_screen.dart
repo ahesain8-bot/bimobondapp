@@ -12,6 +12,7 @@ import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post_w
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_sort.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_posts_viewer_chrome.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_tab_posts_state.dart';
+import 'package:bimobondapp/app/posts/domain/entities/feed_auction_query.dart';
 import 'package:bimobondapp/app/posts/domain/entities/feed_item_entity.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
@@ -123,7 +124,21 @@ class _ProfilePostsViewerScreenState extends State<ProfilePostsViewerScreen> {
             limit: ProfileTabPostsState.pageSize,
             userId: widget.args.userId ?? currentUserId,
             sort: ProfileLayoutConstants.postsSortNewestFirst,
+            auctionQuery: const FeedAuctionQuery(isAuctionable: false),
             contentType: FeedContentType.all,
+            isStory: false,
+            profileLoadKey: loadKey,
+          ),
+        );
+        return;
+      case ProfilePostsViewerSource.ownAuctions:
+        context.read<PostsBloc>().add(
+          FetchFeedRequestedEvent(
+            page: nextPage,
+            limit: ProfileTabPostsState.pageSize,
+            userId: widget.args.userId ?? currentUserId,
+            sort: ProfileLayoutConstants.postsSortNewestFirst,
+            auctionQuery: const FeedAuctionQuery(isAuctionable: true),
             isStory: false,
             profileLoadKey: loadKey,
           ),

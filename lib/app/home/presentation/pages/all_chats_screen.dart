@@ -132,18 +132,37 @@ class _AllChatsBodyState extends State<_AllChatsBody> {
           if (state is InboxLoadSuccess) {
             setState(() {
               _cachedInboxItems = state.chats
-                  .map((c) => inboxChatItemFromEntity(c, userId, l10n))
+                  .map((c) => inboxChatItemFromEntity(
+                        c,
+                        userId,
+                        l10n,
+                        isTyping: state.typingChatIds[c.id] == true,
+                      ))
                   .toList();
             });
           }
         },
         child: BlocBuilder<InboxBloc, InboxState>(
           builder: (context, state) {
-            final inboxItems = _cachedInboxItems;
+            final List<InboxChatItem> inboxItems;
+            if (state is InboxLoadSuccess) {
+              inboxItems = state.chats
+                  .map((c) => inboxChatItemFromEntity(
+                        c,
+                        userId,
+                        l10n,
+                        isTyping: state.typingChatIds[c.id] == true,
+                      ))
+                  .toList();
+            } else {
+              inboxItems = _cachedInboxItems;
+            }
             final filtered = filterInboxChats(inboxItems, _searchQuery);
             final isLoadingChats =
                 (state is InboxLoading || state is InboxInitial) &&
-                !_inboxLoadFinished;
+                !_inboxLoadFinished &&
+                _cachedInboxItems.isEmpty &&
+                (state is! InboxLoadSuccess);
 
             return Column(
               children: [

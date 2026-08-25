@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/notifications/data/datasources/notification_socket_service.dart';
 import 'package:bimobondapp/app/notifications/domain/usecases/notifications_usecases.dart';
+import 'package:bimobondapp/core/utils/build_safe_notifier.dart';
 import 'package:flutter/foundation.dart';
 
-class NotificationUnreadBadge extends ChangeNotifier {
+/// Driven by a socket push and by API refreshes, so a change can land at any
+/// point in a frame — [BuildSafeNotifier] keeps that from tearing down a
+/// [ListenableBuilder] mid-build.
+class NotificationUnreadBadge extends ChangeNotifier with BuildSafeNotifier {
   NotificationUnreadBadge({
     required this.getUnreadCountUseCase,
     required this.socketService,
@@ -24,7 +28,7 @@ class NotificationUnreadBadge extends ChangeNotifier {
     _socketSub ??= socketService.onUnreadCount.listen((count) {
       if (_count == count) return;
       _count = count;
-      notifyListeners();
+      notifySafely();
     });
   }
 
@@ -33,7 +37,7 @@ class NotificationUnreadBadge extends ChangeNotifier {
     _socketSub = null;
     if (_count == 0) return;
     _count = 0;
-    notifyListeners();
+    notifySafely();
   }
 
   Future<void> refresh() async {
@@ -41,13 +45,13 @@ class NotificationUnreadBadge extends ChangeNotifier {
     result.fold((_) {}, (count) {
       if (_count == count) return;
       _count = count;
-      notifyListeners();
+      notifySafely();
     });
   }
 
   void setCount(int count) {
     if (_count == count) return;
     _count = count;
-    notifyListeners();
+    notifySafely();
   }
 }

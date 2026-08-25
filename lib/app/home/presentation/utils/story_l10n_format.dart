@@ -16,7 +16,7 @@ String formatTimeAgo(DateTime dateTime, AppLocalizations l10n) {
   return DateFormat.MMMd(l10n.localeName).format(local);
 }
 
-String formatStoryTimeAgo(PostEntity post, AppLocalizations l10n) {
-  if (!isStoryStillActive(post)) return l10n.storyExpired;
+String formatStoryTimeAgo(PostEntity post, AppLocalizations l10n, {bool isHighlight = false}) {
+  if (!isHighlight && !isStoryStillActive(post)) return l10n.storyExpired;
   return formatTimeAgo(post.createdAt, l10n);
 }

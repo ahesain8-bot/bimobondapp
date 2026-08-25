@@ -1250,7 +1250,7 @@ abstract class AppLocalizations {
   /// No description provided for @takePhoto.
   ///
   /// In en, this message translates to:
-  /// **'Take a photo'**
+  /// **'Take Photo'**
   String get takePhoto;
 
   /// No description provided for @importFromLibrary.
@@ -4402,6 +4402,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Maze'**
   String get chatWallpaperMaze;
+
+  /// No description provided for @chatWallpaperChooseFromPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from Photos'**
+  String get chatWallpaperChooseFromPhotos;
+
+  /// No description provided for @chatWallpaperUploadDeviceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload personal photo from device'**
+  String get chatWallpaperUploadDeviceSubtitle;
+
+  /// No description provided for @chatWallpaperDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default (No Wallpaper)'**
+  String get chatWallpaperDefault;
+
+  /// No description provided for @chatWallpaperCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallpapers Catalog'**
+  String get chatWallpaperCatalog;
+
+  /// No description provided for @chatWallpaperUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal background updated'**
+  String get chatWallpaperUpdated;
+
+  /// No description provided for @chatSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get chatSettingsTitle;
+
+  /// No description provided for @chatSettingsProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get chatSettingsProfile;
+
+  /// No description provided for @chatSettingsMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get chatSettingsMute;
+
+  /// No description provided for @chatSettingsMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted'**
+  String get chatSettingsMuted;
+
+  /// No description provided for @chatSettingsReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get chatSettingsReport;
+
+  /// No description provided for @chatSettingsMuteNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute notifications'**
+  String get chatSettingsMuteNotifications;
+
+  /// No description provided for @chatSettingsPinToTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to top'**
+  String get chatSettingsPinToTop;
+
+  /// No description provided for @chatSettingsWallpaperSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom theme background'**
+  String get chatSettingsWallpaperSubtitle;
+
+  /// No description provided for @chatSettingsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in conversation'**
+  String get chatSettingsSearch;
+
+  /// No description provided for @chatSettingsBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block @{username}'**
+  String chatSettingsBlock(String username);
+
+  /// No description provided for @chatSettingsBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get chatSettingsBlocked;
+
+  /// No description provided for @unblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get unblock;
+
+  /// No description provided for @chatYouBlockedUser.
+  ///
+  /// In en, this message translates to:
+  /// **'You blocked this user. Unblock to send a message.'**
+  String get chatYouBlockedUser;
+
+  /// No description provided for @userNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found'**
+  String get userNotFound;
+
+  /// No description provided for @chatSettingsDeleteHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat history'**
+  String get chatSettingsDeleteHistory;
+
+  /// No description provided for @chatSettingsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type keyword...'**
+  String get chatSettingsSearchHint;
+
+  /// No description provided for @chatSettingsSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for \"{query}\"...'**
+  String chatSettingsSearching(String query);
+
+  /// No description provided for @chatSettingsReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report @{username}'**
+  String chatSettingsReportTitle(String username);
+
+  /// No description provided for @chatSettingsReportSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam or Scam'**
+  String get chatSettingsReportSpam;
+
+  /// No description provided for @chatSettingsReportHarassment.
+  ///
+  /// In en, this message translates to:
+  /// **'Harassment or Bullying'**
+  String get chatSettingsReportHarassment;
+
+  /// No description provided for @chatSettingsReportInappropriate.
+  ///
+  /// In en, this message translates to:
+  /// **'Inappropriate Content'**
+  String get chatSettingsReportInappropriate;
+
+  /// No description provided for @chatSettingsReportSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Report submitted: {reason}'**
+  String chatSettingsReportSubmitted(String reason);
+
+  /// No description provided for @chatSettingsBlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Block @{username}?'**
+  String chatSettingsBlockTitle(String username);
+
+  /// No description provided for @chatSettingsBlockMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'They won\'t be able to message you or view your profile.'**
+  String get chatSettingsBlockMessage;
+
+  /// No description provided for @chatSettingsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat history?'**
+  String get chatSettingsDeleteTitle;
+
+  /// No description provided for @chatSettingsDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove the chat history for you. This action cannot be undone.'**
+  String get chatSettingsDeleteMessage;
 
   /// No description provided for @messagesTitle.
   ///
@@ -8236,6 +8422,600 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Templates'**
   String get mediaStudioTemplates;
+
+  /// No description provided for @pinToTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to top'**
+  String get pinToTop;
+
+  /// No description provided for @unpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpin;
+
+  /// No description provided for @pinnedToTopSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned to top of profile'**
+  String get pinnedToTopSuccess;
+
+  /// No description provided for @unpinnedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned from profile'**
+  String get unpinnedSuccess;
+
+  /// No description provided for @closeFriendsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Friends'**
+  String get closeFriendsTab;
+
+  /// No description provided for @addCloseFriendsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Close Friends'**
+  String get addCloseFriendsTitle;
+
+  /// No description provided for @addCloseFriendsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose friends to add to your close friends list'**
+  String get addCloseFriendsSubtitle;
+
+  /// No description provided for @searchCloseFriendsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search close friends...'**
+  String get searchCloseFriendsHint;
+
+  /// No description provided for @noCloseFriendsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No close friends added yet.'**
+  String get noCloseFriendsYet;
+
+  /// No description provided for @profileLinksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Links'**
+  String get profileLinksTitle;
+
+  /// No description provided for @noLinksAddedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No links added yet.'**
+  String get noLinksAddedYet;
+
+  /// No description provided for @accountTypePersonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal'**
+  String get accountTypePersonal;
+
+  /// No description provided for @accountTypeCreator.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator'**
+  String get accountTypeCreator;
+
+  /// No description provided for @accountTypeBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Business'**
+  String get accountTypeBusiness;
+
+  /// No description provided for @badgeOfficial.
+  ///
+  /// In en, this message translates to:
+  /// **'Official'**
+  String get badgeOfficial;
+
+  /// No description provided for @badgeCreator.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator'**
+  String get badgeCreator;
+
+  /// No description provided for @addToHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to highlights'**
+  String get addToHighlights;
+
+  /// No description provided for @newHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'New highlight'**
+  String get newHighlight;
+
+  /// No description provided for @editCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit cover'**
+  String get editCover;
+
+  /// No description provided for @highlightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get highlightsTitle;
+
+  /// No description provided for @noStoriesInArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'No stories found in archive'**
+  String get noStoriesInArchive;
+
+  /// No description provided for @removeFromHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Highlight'**
+  String get removeFromHighlight;
+
+  /// No description provided for @highlightCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight created'**
+  String get highlightCreated;
+
+  /// No description provided for @highlightUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight updated'**
+  String get highlightUpdated;
+
+  /// No description provided for @chooseFromGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from Gallery'**
+  String get chooseFromGallery;
+
+  /// No description provided for @pasteImageUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste Image URL'**
+  String get pasteImageUrl;
+
+  /// No description provided for @newHighlightButton.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get newHighlightButton;
+
+  /// No description provided for @aboutThisStory.
+  ///
+  /// In en, this message translates to:
+  /// **'About this story'**
+  String get aboutThisStory;
+
+  /// No description provided for @editHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit highlight'**
+  String get editHighlight;
+
+  /// No description provided for @deleteHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Highlight'**
+  String get deleteHighlight;
+
+  /// No description provided for @highlightDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight deleted'**
+  String get highlightDeleted;
+
+  /// No description provided for @highlightEmptyRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'This highlight is empty and was removed'**
+  String get highlightEmptyRemoved;
+
+  /// No description provided for @highlightNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight Name'**
+  String get highlightNameLabel;
+
+  /// No description provided for @highlightNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Travel, Memories'**
+  String get highlightNameHint;
+
+  /// No description provided for @coverUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover updated'**
+  String get coverUpdated;
+
+  /// No description provided for @failedToUploadCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload cover image'**
+  String get failedToUploadCover;
+
+  /// No description provided for @failedToLoadHighlightDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load highlight details'**
+  String get failedToLoadHighlightDetails;
+
+  /// No description provided for @failedToAddStoryToHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add story to highlight'**
+  String get failedToAddStoryToHighlight;
+
+  /// No description provided for @marketplaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketplace'**
+  String get marketplaceTitle;
+
+  /// No description provided for @marketplaceLikedProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Liked Products'**
+  String get marketplaceLikedProducts;
+
+  /// No description provided for @marketplaceNoLikedProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No liked products yet'**
+  String get marketplaceNoLikedProducts;
+
+  /// No description provided for @marketplaceTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy. Own. Resell.'**
+  String get marketplaceTagline;
+
+  /// No description provided for @marketplaceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search products, brands, categories...'**
+  String get marketplaceSearchHint;
+
+  /// No description provided for @marketplaceHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy. Own. Resell.'**
+  String get marketplaceHeroTitle;
+
+  /// No description provided for @marketplaceHeroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase products and resell eligible purchases through Bimo-Bond auctions.'**
+  String get marketplaceHeroSubtitle;
+
+  /// No description provided for @marketplaceExploreCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore Marketplace'**
+  String get marketplaceExploreCta;
+
+  /// No description provided for @marketplaceCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get marketplaceCategories;
+
+  /// No description provided for @marketplaceRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended for You'**
+  String get marketplaceRecommended;
+
+  /// No description provided for @marketplaceEndingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending Soon Auctions'**
+  String get marketplaceEndingSoon;
+
+  /// No description provided for @marketplaceNoAuctions.
+  ///
+  /// In en, this message translates to:
+  /// **'No active auctions ending soon'**
+  String get marketplaceNoAuctions;
+
+  /// No description provided for @marketplaceLiveAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE AUCTION'**
+  String get marketplaceLiveAuction;
+
+  /// No description provided for @marketplaceAuctionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AUCTION'**
+  String get marketplaceAuctionLabel;
+
+  /// No description provided for @marketplaceCurrentBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Bid'**
+  String get marketplaceCurrentBid;
+
+  /// No description provided for @marketplaceBidCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Bids'**
+  String marketplaceBidCount(int count);
+
+  /// No description provided for @marketplaceViewAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'View Auction'**
+  String get marketplaceViewAuction;
+
+  /// No description provided for @marketplaceFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get marketplaceFilters;
+
+  /// No description provided for @marketplaceFilterPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get marketplaceFilterPrice;
+
+  /// No description provided for @marketplaceMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Min'**
+  String get marketplaceMin;
+
+  /// No description provided for @marketplaceMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get marketplaceMax;
+
+  /// No description provided for @marketplaceFilterListingType.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing type'**
+  String get marketplaceFilterListingType;
+
+  /// No description provided for @marketplaceInStockOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'In stock only'**
+  String get marketplaceInStockOnly;
+
+  /// No description provided for @marketplaceClearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get marketplaceClearFilters;
+
+  /// No description provided for @marketplaceApplyFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get marketplaceApplyFilters;
+
+  /// No description provided for @marketplaceSortPopular.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get marketplaceSortPopular;
+
+  /// No description provided for @marketplaceSortEndingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending Soon'**
+  String get marketplaceSortEndingSoon;
+
+  /// No description provided for @marketplaceProductCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Products'**
+  String marketplaceProductCount(int count);
+
+  /// No description provided for @marketplaceTabPurchased.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchased'**
+  String get marketplaceTabPurchased;
+
+  /// No description provided for @marketplaceTabPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Delivery'**
+  String get marketplaceTabPending;
+
+  /// No description provided for @marketplaceTabDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get marketplaceTabDelivered;
+
+  /// No description provided for @marketplaceTabAuctioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Auctioned'**
+  String get marketplaceTabAuctioned;
+
+  /// No description provided for @marketplaceTabSold.
+  ///
+  /// In en, this message translates to:
+  /// **'Sold'**
+  String get marketplaceTabSold;
+
+  /// No description provided for @marketplaceNoProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'No products in this tab'**
+  String get marketplaceNoProducts;
+
+  /// No description provided for @marketplacePurchaseConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Confirmed'**
+  String get marketplacePurchaseConfirmed;
+
+  /// No description provided for @marketplaceDeliveryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get marketplaceDeliveryLabel;
+
+  /// No description provided for @marketplaceDeliveryPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get marketplaceDeliveryPending;
+
+  /// No description provided for @marketplaceDeliveryShipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipped'**
+  String get marketplaceDeliveryShipped;
+
+  /// No description provided for @marketplaceDeliveryDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get marketplaceDeliveryDelivered;
+
+  /// No description provided for @marketplaceTrackDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Track Delivery'**
+  String get marketplaceTrackDelivery;
+
+  /// No description provided for @marketplaceSellAtAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell at Auction'**
+  String get marketplaceSellAtAuction;
+
+  /// No description provided for @marketplacePurchasePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase price'**
+  String get marketplacePurchasePrice;
+
+  /// No description provided for @marketplaceStartingPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting Price'**
+  String get marketplaceStartingPrice;
+
+  /// No description provided for @marketplaceReservePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserve Price'**
+  String get marketplaceReservePrice;
+
+  /// No description provided for @marketplaceBuyNowPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy Now Price'**
+  String get marketplaceBuyNowPrice;
+
+  /// No description provided for @marketplaceAuctionDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction Duration'**
+  String get marketplaceAuctionDuration;
+
+  /// No description provided for @marketplaceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get marketplaceDescription;
+
+  /// No description provided for @marketplaceAuctionPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction Preview'**
+  String get marketplaceAuctionPreview;
+
+  /// No description provided for @marketplacePublishAuction.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish Auction'**
+  String get marketplacePublishAuction;
+
+  /// No description provided for @marketplaceAuctionPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Auction published'**
+  String get marketplaceAuctionPublished;
+
+  /// No description provided for @marketplacePlaceBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Place Bid'**
+  String get marketplacePlaceBid;
+
+  /// No description provided for @marketplaceYourBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Bid'**
+  String get marketplaceYourBid;
+
+  /// No description provided for @marketplaceConfirmBid.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Bid'**
+  String get marketplaceConfirmBid;
+
+  /// No description provided for @marketplaceEndsIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends in'**
+  String get marketplaceEndsIn;
+
+  /// No description provided for @marketplaceBidHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Bid history'**
+  String get marketplaceBidHistory;
+
+  /// No description provided for @marketplaceNoBidsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No bids yet'**
+  String get marketplaceNoBidsYet;
+
+  /// No description provided for @marketplaceSpecifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Specifications'**
+  String get marketplaceSpecifications;
+
+  /// No description provided for @marketplaceVerifiedProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Product'**
+  String get marketplaceVerifiedProduct;
+
+  /// No description provided for @marketplaceSecurePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure Payment'**
+  String get marketplaceSecurePayment;
+
+  /// No description provided for @marketplaceBuyerProtection.
+  ///
+  /// In en, this message translates to:
+  /// **'Buyer Protection'**
+  String get marketplaceBuyerProtection;
+
+  /// No description provided for @marketplaceDeliveryTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Tracking'**
+  String get marketplaceDeliveryTracking;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

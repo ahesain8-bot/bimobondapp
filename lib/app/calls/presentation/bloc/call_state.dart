@@ -24,15 +24,24 @@ class CallIncomingState extends CallState {
 
 class CallOutgoingRingingState extends CallState {
   final CallEntity call;
-  final CallSessionEntity session;
+  final CallSessionEntity? session;
 
   const CallOutgoingRingingState({
     required this.call,
-    required this.session,
+    this.session,
   });
 
   @override
   List<Object?> get props => [call, session];
+}
+
+class CallConnectingState extends CallState {
+  final CallEntity call;
+
+  const CallConnectingState({required this.call});
+
+  @override
+  List<Object?> get props => [call];
 }
 
 class CallActiveState extends CallState {
@@ -103,4 +112,30 @@ class CallErrorState extends CallState {
 
   @override
   List<Object?> get props => [message];
+}
+
+class CallReconnectingState extends CallState {
+  final CallEntity call;
+  final String message;
+
+  const CallReconnectingState({
+    required this.call,
+    this.message = 'Reconnecting...',
+  });
+
+  @override
+  List<Object?> get props => [call, message];
+}
+
+class CallTimedOutState extends CallState {
+  final CallEntity? call;
+  final String reason;
+
+  const CallTimedOutState({
+    this.call,
+    this.reason = 'No answer',
+  });
+
+  @override
+  List<Object?> get props => [call, reason];
 }

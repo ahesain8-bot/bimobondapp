@@ -73,42 +73,200 @@ class ChatSheets {
     required BuildContext context,
     required VoidCallback onReply,
     required VoidCallback onReact,
+    required void Function(String emoji) onEmojiSelected,
+    VoidCallback? onTranslate,
+    bool isTranslated = false,
+    bool isTranslating = false,
     VoidCallback? onDelete,
   }) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final cardColor = theme.cardColor;
+    final onSurface = theme.colorScheme.onSurface;
 
-    GlassBottomSheet.showActions<void>(
-      context,
-      children: [
-        GlassBottomSheetActionTile(
-          icon: LucideIcons.reply,
-          label: l10n.chatActionReply,
-          showChevron: false,
-          onTap: () {
-            Navigator.pop(context);
-            onReply();
-          },
-        ),
-        GlassBottomSheetActionTile(
-          icon: LucideIcons.smile,
-          label: l10n.chatActionReact,
-          showChevron: false,
-          onTap: () {
-            Navigator.pop(context);
-            onReact();
-          },
-        ),
-        if (onDelete != null)
-          GlassBottomSheetListTile(
-            label: l10n.chatActionDelete,
-            destructive: true,
-            icon: LucideIcons.trash2,
-            onTap: () {
-              Navigator.pop(context);
-              onDelete();
-            },
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      isScrollControlled: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Top Quick Reaction Emoji Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.grey.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: ChatLayoutConstants.reactionEmojis.map((emoji) {
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.pop(sheetCtx);
+                              onEmojiSelected(emoji);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                emoji,
+                                style: const TextStyle(fontSize: 26),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+                Divider(
+                  height: 1,
+                  color: theme.dividerColor.withValues(alpha: 0.5),
+                ),
+
+                // Action List Tiles
+                ListTile(
+                  leading: Icon(
+                    LucideIcons.reply,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: Text(
+                    l10n.chatActionReply,
+                    style: TextStyle(
+                      color: onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    onReply();
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    LucideIcons.smile,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: Text(
+                    l10n.chatActionReact,
+                    style: TextStyle(
+                      color: onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    onReact();
+                  },
+                ),
+                if (onTranslate != null)
+                  ListTile(
+                    leading: isTranslating
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        : Icon(
+                            LucideIcons.languages,
+                            color: theme.colorScheme.primary,
+                          ),
+                    title: Text(
+                      isTranslating
+                          ? (l10n.localeName.startsWith('ar')
+                              ? 'جاري الترجمة...'
+                              : 'Translating...')
+                          : isTranslated
+                              ? (l10n.localeName.startsWith('ar')
+                                  ? 'عرض النص الأصلي'
+                                  : 'Show original')
+                              : (l10n.localeName.startsWith('ar')
+                                  ? 'ترجمة الرسالة'
+                                  : 'Translate message'),
+                      style: TextStyle(
+                        color: onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: isTranslating
+                        ? null
+                        : () {
+                            Navigator.pop(sheetCtx);
+                            onTranslate();
+                          },
+                  ),
+                if (onDelete != null) ...[
+                  Divider(
+                    height: 1,
+                    color: theme.dividerColor.withValues(alpha: 0.5),
+                  ),
+                  ListTile(
+                    leading: const Icon(LucideIcons.trash2, color: Colors.red),
+                    title: Text(
+                      l10n.chatActionDelete,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      onDelete();
+                    },
+                  ),
+                ],
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
-      ],
+        ),
+      ),
     );
   }
 
@@ -117,33 +275,46 @@ class ChatSheets {
     required Map<String, dynamic> msg,
     required void Function(String emoji) onEmojiSelected,
   }) {
-    GlassBottomSheet.open<void>(
-      context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(ChatLayoutConstants.reactionPickerMargin),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(
-            ChatLayoutConstants.reactionPickerRadius,
-          ),
-          child: GlassBottomSheetFrame(
-            showHandle: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: ChatLayoutConstants.reactionPickerVerticalPadding,
-                horizontal: ChatLayoutConstants.reactionPickerHorizontalPadding,
-              ),
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 10,
+            ),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: ChatLayoutConstants.reactionEmojis.map((emoji) {
+                mainAxisSize: MainAxisSize.min,
+                children: ChatLayoutConstants.pickerEmojis.map((emoji) {
                   return GestureDetector(
                     onTap: () {
                       onEmojiSelected(emoji);
                       Navigator.pop(ctx);
                     },
-                    child: Text(
-                      emoji,
-                      style: const TextStyle(
-                        fontSize: ChatLayoutConstants.reactionEmojiSize,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 28),
                       ),
                     ),
                   );

@@ -7,11 +7,14 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
   late int commentCount;
   late bool isSaved;
   late int saveCount;
+  late int shareCount;
   late bool isReposted;
   late int repostCount;
   late List<RepostUserEntity> recentReposters;
   String? repostQuote;
   bool pendingRepostToggle = false;
+  bool pendingLikeToggle = false;
+  bool pendingSaveToggle = false;
   bool isFollowing = false;
   bool isFollowLoading = false;
   bool followStatusResolved = false;
@@ -27,6 +30,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     commentCount = widget.post.commentCount;
     isSaved = widget.post.isSaved;
     saveCount = widget.post.saveCount;
+    shareCount = widget.post.shareCount;
     isReposted = widget.post.isReposted;
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
@@ -40,6 +44,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     commentCount = widget.post.commentCount;
     isSaved = widget.post.isSaved;
     saveCount = widget.post.saveCount;
+    shareCount = widget.post.shareCount;
     isReposted = widget.post.isReposted;
     repostCount = widget.post.repostCount;
     recentReposters = List<RepostUserEntity>.from(widget.post.recentReposters);
@@ -324,6 +329,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     setState(() {
       isLiked = nextLiked;
       likeCount = nextCount;
+      pendingLikeToggle = true;
     });
     widget.onFeedPostPatch?.call(
       widget.post.id,
@@ -342,6 +348,7 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     setState(() {
       isSaved = nextSaved;
       saveCount = nextCount;
+      pendingSaveToggle = true;
     });
     widget.onFeedPostPatch?.call(
       widget.post.id,
@@ -449,6 +456,40 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
     );
     context.read<PostsBloc>().add(
       ToggleRepostPostRequestedEvent(widget.post.id, quote: quote),
+    );
+  }
+
+  /// The server refused the like (private account, rate limit, offline). Put
+  /// the heart back where it was so the feed stops claiming something the
+  /// server never recorded.
+  void rollbackLikeToggle() {
+    if (!pendingLikeToggle) return;
+    final revertedLiked = !isLiked;
+    final revertedCount = revertedLiked ? likeCount + 1 : likeCount - 1;
+    setState(() {
+      isLiked = revertedLiked;
+      likeCount = revertedCount;
+      pendingLikeToggle = false;
+    });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(isLiked: revertedLiked, likeCount: revertedCount),
+    );
+  }
+
+  /// Same for the bookmark.
+  void rollbackSaveToggle() {
+    if (!pendingSaveToggle) return;
+    final revertedSaved = !isSaved;
+    final revertedCount = revertedSaved ? saveCount + 1 : saveCount - 1;
+    setState(() {
+      isSaved = revertedSaved;
+      saveCount = revertedCount;
+      pendingSaveToggle = false;
+    });
+    widget.onFeedPostPatch?.call(
+      widget.post.id,
+      (post) => post.copyWith(isSaved: revertedSaved, saveCount: revertedCount),
     );
   }
 
@@ -664,6 +705,12 @@ mixin VideoPostEngagementMixin on State<VideoPostWidget> {
           : null,
       onDelete: isPostOwner() ? confirmDeletePost : null,
       onRepost: isPostOwner() ? null : handleRepostTap,
+      onPinToggle: () {
+        widget.onFeedPostPatch?.call(
+          widget.post.id,
+          (p) => p.copyWith(isPinned: !p.isPinned),
+        );
+      },
       isReposted: isReposted,
     );
   }

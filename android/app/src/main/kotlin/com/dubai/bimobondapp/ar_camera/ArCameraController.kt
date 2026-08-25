@@ -852,7 +852,35 @@ object ArCameraController {
         lastCaptureBitmap = null
         resetOesPhotoReady()
         ArCameraBridge.faceOverlay?.clearUnderlay()
-        unbindCamera()
+        // Non-blocking unbind: the synchronous [unbindCamera] (via `.get()`)
+        // runs on the main thread while the app is actively rendering and was
+        // observed to freeze the whole UI during the live-room handoff.
+        unbindCameraAsync()
+    }
+
+    /**
+     * Non-blocking variant of [unbindCamera] for the full-teardown path
+     * ([stop], invoked from the "stopCamera" channel when the live room takes
+     * over the lens). The synchronous version blocks the calling (main) thread
+     * with `ProcessCameraProvider.getInstance(...).get()`. Using
+     * [ListenableFuture.addListener] the callback only runs once the provider
+     * is ready, so `get()` inside it returns immediately.
+     */
+    private fun unbindCameraAsync() {
+        val activity = ArCameraBridge.hostActivity ?: return
+        try {
+            val provider = ProcessCameraProvider.getInstance(activity)
+            provider.addListener(
+                {
+                    try {
+                        provider.get().unbindAll()
+                    } catch (_: Exception) {
+                    }
+                },
+                ContextCompat.getMainExecutor(activity),
+            )
+        } catch (_: Exception) {
+        }
     }
 
     fun abortCapture() {

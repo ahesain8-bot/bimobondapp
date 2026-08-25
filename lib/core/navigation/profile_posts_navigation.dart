@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 enum ProfilePostsViewerSource {
   ownPosts,
+  ownAuctions,
   ownReposts,
   ownOnlyMe,
   ownLiked,
@@ -23,6 +24,7 @@ extension ProfilePostsViewerSourceX on ProfilePostsViewerSource {
       case ProfilePostsViewerSource.ownReposts:
         return TrafficSource.repost;
       case ProfilePostsViewerSource.ownPosts:
+      case ProfilePostsViewerSource.ownAuctions:
       case ProfilePostsViewerSource.ownOnlyMe:
       case ProfilePostsViewerSource.userPosts:
         return TrafficSource.profile;
@@ -32,6 +34,8 @@ extension ProfilePostsViewerSourceX on ProfilePostsViewerSource {
 
 ProfilePostsViewerSource profilePostsSourceForTab(int tabIndex) {
   switch (tabIndex) {
+    case ProfileLayoutConstants.auctionsTabIndex:
+      return ProfilePostsViewerSource.ownAuctions;
     case ProfileLayoutConstants.repostsTabIndex:
       return ProfilePostsViewerSource.ownReposts;
     case ProfileLayoutConstants.onlyMeTabIndex:
@@ -74,7 +78,7 @@ ProfilePostsOpenArgs? profilePostsOpenArgsFromExtra(Object? extra) {
   return extra is ProfilePostsOpenArgs ? extra : null;
 }
 
-void openProfilePosts(
+Future<T?> openProfilePosts<T>(
   BuildContext context, {
   required List<PostEntity> posts,
   required int initialIndex,
@@ -84,10 +88,10 @@ void openProfilePosts(
   String? userId,
 }) {
   if (posts.isEmpty || initialIndex < 0 || initialIndex >= posts.length) {
-    return;
+    return Future.value(null);
   }
 
-  context.pushNamed(
+  return context.pushNamed<T>(
     'profile_posts_viewer',
     extra: ProfilePostsOpenArgs(
       posts: posts,

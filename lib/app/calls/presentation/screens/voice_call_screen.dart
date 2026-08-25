@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/calls/domain/entities/call_entity.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/call_controls.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/call_status.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -90,13 +91,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final caller = widget.call.initiatedBy;
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final caller = widget.call.getDisplayUser(
+      currentUserId,
+      isOutgoing: widget.isOutgoingRinging,
+    );
+    final displayName = caller.displayName;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
@@ -113,8 +116,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                             const Color(0xFF0F172A),
                           ]
                         : [
-                            const Color(0x256366F1),
-                            const Color(0xFFF1F5F9),
+                            const Color(0x186366F1),
+                            Colors.white,
                           ],
                   ),
                 ),
@@ -149,15 +152,54 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                           ),
                         ),
                       ),
-
-                      // Status Badge Indicator
-                      CallStatusBadge(
-                        status: widget.statusState,
-                        timerText: widget.timerText,
-                        isDark: isDark,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                width: 16,
+                                height: 16,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                  'assets/images/app_icon.png',
+                                  width: 16,
+                                  height: 16,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Bimo-Bond Call',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : Colors.black87,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-
-                      const SizedBox(width: 44), // Alignment spacer
+                      const SizedBox(width: 44),
                     ],
                   ),
                 ),
@@ -226,6 +268,26 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                               : Colors.black54,
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Timer Text directly under User Name
+                      Text(
+                        widget.statusState == CallUiStatusState.connected
+                            ? widget.timerText
+                            : (widget.statusState == CallUiStatusState.calling
+                                ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الاتصال...' : 'Calling...')
+                                : (widget.statusState == CallUiStatusState.ringing
+                                    ? (Localizations.localeOf(context).languageCode == 'ar' ? 'يرن...' : 'Ringing...')
+                                    : widget.timerText)),
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF818CF8)
+                              : const Color(0xFF4F46E5),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],

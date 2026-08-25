@@ -9,6 +9,7 @@ class ChatSocketEvent {
   ChatSocketEvent._();
 
   static const newMessage = 'newMessage';
+  static const newChat = 'newChat';
   static const messageRead = 'messageRead';
   static const messageReacted = 'messageReacted';
   static const messageDeleted = 'messageDeleted';
@@ -22,6 +23,8 @@ class ChatSocketEvent {
 class ChatSocketService {
   io.Socket? _socket;
   final _messageController = StreamController<ChatMessageModel>.broadcast();
+  final _newChatController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _messageReadController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _messageReactedController =
@@ -33,6 +36,7 @@ class ChatSocketService {
   final _connectionController = StreamController<bool>.broadcast();
 
   Stream<ChatMessageModel> get onNewMessage => _messageController.stream;
+  Stream<Map<String, dynamic>> get onNewChat => _newChatController.stream;
   Stream<Map<String, dynamic>> get onMessageRead => _messageReadController.stream;
   Stream<Map<String, dynamic>> get onMessageReacted =>
       _messageReactedController.stream;
@@ -43,7 +47,7 @@ class ChatSocketService {
 
   bool get isConnected => _socket?.connected ?? false;
 
-  Future<void> connect() async {
+  Future<void> _ensureConnected() async {
     if (_socket?.connected == true) return;
 
     final user = FirebaseAuth.instance.currentUser;
@@ -53,45 +57,105 @@ class ChatSocketService {
     _socket = io.io(
       ApiConstants.baseUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
-          .disableAutoConnect()
+          .setTransports(['websocket', 'polling'])
+          .enableAutoConnect()
+          .enableReconnection()
+          .setExtraHeaders({
+            if (token != null) 'Authorization': 'Bearer $token',
+            'x-api-key': ApiConstants.apiKey,
+          })
           .setAuth({'token': token})
           .build(),
     );
 
-    _socket!
-      ..onConnect((_) => _connectionController.add(true))
-      ..onDisconnect((_) => _connectionController.add(false))
-      ..on(
-        ChatSocketEvent.newMessage,
-        (data) => _handleNewMessage(data),
-      )
-      ..on(
-        ChatSocketEvent.messageRead,
-        (data) => _emitMap(_messageReadController, data),
-      )
-      ..on(
-        ChatSocketEvent.messageReacted,
-        (data) => _emitMap(_messageReactedController, data),
-      )
-      ..on(
-        ChatSocketEvent.messageDeleted,
-        (data) => _emitMap(_messageDeletedController, data),
-      )
-      ..on(
-        ChatSocketEvent.userTyping,
-        (data) => _emitMap(_userTypingController, data),
-      );
+    final socket = _socket!;
 
-    _socket!.connect();
+    socket
+      ..onConnect((_) {
+        _connectionController.add(true);
+      })
+      ..onDisconnect((_) => _connectionController.add(false));
+
+    final chatEvents = [
+      ChatSocketEvent.newChat,
+      'new_chat',
+      'chatCreated',
+      'chat_created',
+      'newChatCreated',
+      'new_chat_created',
+      'chat',
+    ];
+    for (final event in chatEvents) {
+      socket.on(event, (data) => _emitMap(_newChatController, data));
+    }
+
+    final messageEvents = [
+      ChatSocketEvent.newMessage,
+      'new_message',
+      'message',
+      'chat_message',
+    ];
+    for (final event in messageEvents) {
+      socket.on(event, (data) => _handleNewMessage(data));
+    }
+
+    final readEvents = [
+      ChatSocketEvent.messageRead,
+      'message_read',
+      'read_message',
+      'messages_read',
+    ];
+    for (final event in readEvents) {
+      socket.on(event, (data) => _emitMap(_messageReadController, data));
+    }
+
+    final reactedEvents = [
+      ChatSocketEvent.messageReacted,
+      'message_reacted',
+      'reaction_added',
+      'message_reaction',
+    ];
+    for (final event in reactedEvents) {
+      socket.on(event, (data) => _emitMap(_messageReactedController, data));
+    }
+
+    final deletedEvents = [
+      ChatSocketEvent.messageDeleted,
+      'message_deleted',
+      'delete_message',
+    ];
+    for (final event in deletedEvents) {
+      socket.on(event, (data) => _emitMap(_messageDeletedController, data));
+    }
+
+    final typingEvents = [
+      ChatSocketEvent.userTyping,
+      'user_typing',
+      'typing_status',
+      'typing',
+    ];
+    for (final event in typingEvents) {
+      socket.on(event, (data) => _emitMap(_userTypingController, data));
+    }
+
+    socket.connect();
+  }
+
+  Future<void> connect() async {
+    await _ensureConnected();
   }
 
   void _handleNewMessage(dynamic data) {
     if (data is! Map) return;
     try {
-      final message = ChatMessageModel.fromJson(
-        Map<String, dynamic>.from(data),
-      );
+      final messageMap = Map<String, dynamic>.from(data);
+      final payload = messageMap['message'] is Map
+          ? Map<String, dynamic>.from(messageMap['message'] as Map)
+          : (messageMap['data'] is Map
+              ? Map<String, dynamic>.from(messageMap['data'] as Map)
+              : messageMap);
+
+      final message = ChatMessageModel.fromJson(payload);
       _messageController.add(message);
     } catch (_) {
       // Ignore malformed payloads.
@@ -103,19 +167,32 @@ class ChatSocketService {
     dynamic data,
   ) {
     if (data is Map) {
-      controller.add(Map<String, dynamic>.from(data));
+      final mapData = Map<String, dynamic>.from(data);
+      final payload = mapData['data'] is Map
+          ? Map<String, dynamic>.from(mapData['data'] as Map)
+          : mapData;
+      controller.add(payload);
     }
   }
 
   void joinChat(String chatId, {required String userId}) {
-    _socket?.emit(ChatSocketEvent.joinChat, {
+    _ensureConnected();
+    final payload = {
       'chatId': chatId,
+      'chat_id': chatId,
       'userId': userId,
-    });
+      'user_id': userId,
+    };
+    _socket?.emit(ChatSocketEvent.joinChat, payload);
+    _socket?.emit('join_chat', payload);
+    _socket?.emit('join', payload);
   }
 
   void leaveChat(String chatId) {
-    _socket?.emit(ChatSocketEvent.leaveChat, {'chatId': chatId});
+    final payload = {'chatId': chatId, 'chat_id': chatId};
+    _socket?.emit(ChatSocketEvent.leaveChat, payload);
+    _socket?.emit('leave_chat', payload);
+    _socket?.emit('leave', payload);
   }
 
   void sendTyping({
@@ -123,11 +200,18 @@ class ChatSocketService {
     required String userId,
     required bool isTyping,
   }) {
-    _socket?.emit(ChatSocketEvent.typing, {
+    _ensureConnected();
+    final payload = {
       'chatId': chatId,
+      'chat_id': chatId,
       'userId': userId,
+      'user_id': userId,
       'isTyping': isTyping,
-    });
+      'is_typing': isTyping,
+    };
+    _socket?.emit(ChatSocketEvent.typing, payload);
+    _socket?.emit('typing', payload);
+    _socket?.emit('user_typing', payload);
   }
 
   void disconnect() {
@@ -140,6 +224,7 @@ class ChatSocketService {
   void dispose() {
     disconnect();
     _messageController.close();
+    _newChatController.close();
     _messageReadController.close();
     _messageReactedController.close();
     _messageDeletedController.close();

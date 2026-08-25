@@ -57,9 +57,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   void initState() {
     super.initState();
     _inboxBloc = chats_di.sl<InboxBloc>();
-    if (widget.isTabActive) {
-      _loadTabData();
-    }
+    _loadTabData();
   }
 
   @override
@@ -116,11 +114,9 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
     _viewedStoriesStore = auth_di.sl<ViewedStoriesStore>();
     _viewedStoriesStore.addListener(_onViewedStoriesChanged);
     _bindViewedStoriesUser();
-    if (widget.isTabActive) {
-      _loadRecentMentions();
-      _loadLastFollower();
-      _loadStories();
-    }
+    _loadRecentMentions();
+    _loadLastFollower();
+    _loadStories();
   }
 
   void _onViewedStoriesChanged() {
@@ -365,7 +361,12 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                 if (state is InboxLoadSuccess) {
                   setState(() {
                     _cachedInboxItems = state.chats
-                        .map((c) => inboxChatItemFromEntity(c, userId, l10n))
+                        .map((c) => inboxChatItemFromEntity(
+                              c,
+                              userId,
+                              l10n,
+                              isTyping: state.typingChatIds[c.id] == true,
+                            ))
                         .toList();
                   });
                 }
@@ -374,10 +375,25 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
           ],
           child: BlocBuilder<InboxBloc, InboxState>(
             builder: (context, state) {
-              final inboxItems = _cachedInboxItems;
+              final List<InboxChatItem> inboxItems;
+              if (state is InboxLoadSuccess) {
+                inboxItems = state.chats
+                    .map((c) => inboxChatItemFromEntity(
+                          c,
+                          userId,
+                          l10n,
+                          isTyping: state.typingChatIds[c.id] == true,
+                        ))
+                    .toList();
+              } else {
+                inboxItems = _cachedInboxItems;
+              }
+
               final isInitialLoading =
                   (state is InboxLoading || state is InboxInitial) &&
-                  !_inboxLoadFinished;
+                  !_inboxLoadFinished &&
+                  _cachedInboxItems.isEmpty &&
+                  (state is! InboxLoadSuccess);
               final showInboxSkeleton = isInitialLoading || _isRefreshing;
               return RefreshIndicator(
                 onRefresh: _onRefresh,
@@ -416,6 +432,7 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                         builder: (context, _) {
                           final badge = notifications_di
                               .sl<NotificationUnreadBadge>();
+                          final isAr = Localizations.localeOf(context).languageCode == 'ar';
                           return Column(
                             children: [
                               MessagesInboxActionTile(
@@ -447,6 +464,16 @@ class _MessagesScreenBodyState extends State<_MessagesScreenBody> {
                                   context.pushNamed('activity').then(
                                     (_) => badge.refresh(),
                                   );
+                                },
+                              ),
+                              MessagesInboxActionTile(
+                                icon: LucideIcons.phoneCall,
+                                iconBackground: const Color(0xFF6366F1),
+                                title: isAr ? 'المكالمات' : 'Calls',
+                                subtitle: isAr ? 'سجل المكالمات الصوتية والفيديو' : 'Recent audio & video calls',
+                                showChevron: true,
+                                onTap: () {
+                                  context.pushNamed('call_history');
                                 },
                               ),
                             ],

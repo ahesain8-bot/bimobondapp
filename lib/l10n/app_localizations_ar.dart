@@ -2265,6 +2265,109 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatWallpaperMaze => 'متاهة';
 
   @override
+  String get chatWallpaperChooseFromPhotos => 'اختر من الصور';
+
+  @override
+  String get chatWallpaperUploadDeviceSubtitle => 'رفع صورة شخصية من الجهاز';
+
+  @override
+  String get chatWallpaperDefault => 'الافتراضي (بدون خلفية)';
+
+  @override
+  String get chatWallpaperCatalog => 'كتالوج الخلفيات';
+
+  @override
+  String get chatWallpaperUpdated => 'تم تحديث الخلفية الشخصية';
+
+  @override
+  String get chatSettingsTitle => 'التفاصيل';
+
+  @override
+  String get chatSettingsProfile => 'الملف الشخصي';
+
+  @override
+  String get chatSettingsMute => 'كتم';
+
+  @override
+  String get chatSettingsMuted => 'مكتوم';
+
+  @override
+  String get chatSettingsReport => 'إبلاغ';
+
+  @override
+  String get chatSettingsMuteNotifications => 'كتم الإشعارات';
+
+  @override
+  String get chatSettingsPinToTop => 'تثبيت في الأعلى';
+
+  @override
+  String get chatSettingsWallpaperSubtitle => 'خلفية نمط مخصصة';
+
+  @override
+  String get chatSettingsSearch => 'بحث في المحادثة';
+
+  @override
+  String chatSettingsBlock(String username) {
+    return 'حظر @$username';
+  }
+
+  @override
+  String get chatSettingsBlocked => 'محظور';
+
+  @override
+  String get unblock => 'إلغاء الحظر';
+
+  @override
+  String get chatYouBlockedUser => 'لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر لتتمكن من مراسلته.';
+
+  @override
+  String get userNotFound => 'المستخدم غير موجود';
+
+  @override
+  String get chatSettingsDeleteHistory => 'مسح سجل المحادثة';
+
+  @override
+  String get chatSettingsSearchHint => 'اكتب كلمة للبحث...';
+
+  @override
+  String chatSettingsSearching(String query) {
+    return 'جاري البحث عن \"$query\"...';
+  }
+
+  @override
+  String chatSettingsReportTitle(String username) {
+    return 'الإبلاغ عن @$username';
+  }
+
+  @override
+  String get chatSettingsReportSpam => 'احتيال أو إزعاج';
+
+  @override
+  String get chatSettingsReportHarassment => 'مضايقة أو تنمر';
+
+  @override
+  String get chatSettingsReportInappropriate => 'محتوى غير لائق';
+
+  @override
+  String chatSettingsReportSubmitted(String reason) {
+    return 'تم إرسال البلاغ: $reason';
+  }
+
+  @override
+  String chatSettingsBlockTitle(String username) {
+    return 'حظر @$username؟';
+  }
+
+  @override
+  String get chatSettingsBlockMessage => 'لن يتمكن من مراسلتك أو رؤية ملفك الشخصي.';
+
+  @override
+  String get chatSettingsDeleteTitle => 'مسح سجل المحادثة؟';
+
+  @override
+  String get chatSettingsDeleteMessage => 'سيؤدي هذا إلى إزالة سجل المحادثة بالنسبة لك. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
   String get messagesTitle => 'الرسائل';
 
   @override
@@ -4296,4 +4399,305 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mediaStudioTemplates => 'القوالب';
+
+  @override
+  String get pinToTop => 'تثبيت في الأعلى';
+
+  @override
+  String get unpin => 'إلغاء التثبيت';
+
+  @override
+  String get pinnedToTopSuccess => 'تم التثبيت في أعلى الملف الشخصي';
+
+  @override
+  String get unpinnedSuccess => 'تم إلغاء التثبيت من الملف الشخصي';
+
+  @override
+  String get closeFriendsTab => 'الأصدقاء المقربون';
+
+  @override
+  String get addCloseFriendsTitle => 'إضافة أصدقاء مقربين';
+
+  @override
+  String get addCloseFriendsSubtitle => 'اختر أصدقاء لإضافتهم إلى قائمة الأصدقاء المقربين';
+
+  @override
+  String get searchCloseFriendsHint => 'البحث عن أصدقاء مقربين...';
+
+  @override
+  String get noCloseFriendsYet => 'لم يتم إضافة أصدقاء مقربين بعد.';
+
+  @override
+  String get profileLinksTitle => 'الروابط';
+
+  @override
+  String get noLinksAddedYet => 'لم يتم إضافة روابط بعد.';
+
+  @override
+  String get accountTypePersonal => 'شخصي';
+
+  @override
+  String get accountTypeCreator => 'منشئ محتوى';
+
+  @override
+  String get accountTypeBusiness => 'أعمال';
+
+  @override
+  String get badgeOfficial => 'رسمي';
+
+  @override
+  String get badgeCreator => 'منشئ محتوى';
+
+  @override
+  String get addToHighlights => 'إضافة إلى الأبرز';
+
+  @override
+  String get newHighlight => 'هايلايت جديد';
+
+  @override
+  String get editCover => 'تعديل الغلاف';
+
+  @override
+  String get highlightsTitle => 'الأبرز';
+
+  @override
+  String get noStoriesInArchive => 'لا توجد قصص في الأرشيف';
+
+  @override
+  String get removeFromHighlight => 'إزالة من الأبرز';
+
+  @override
+  String get highlightCreated => 'تم إنشاء الهايلايت';
+
+  @override
+  String get highlightUpdated => 'تم تحديث الهايلايت';
+
+  @override
+  String get chooseFromGallery => 'اختيار من المعرض';
+
+  @override
+  String get pasteImageUrl => 'لصق رابط الصورة';
+
+  @override
+  String get newHighlightButton => 'جديد';
+
+  @override
+  String get aboutThisStory => 'عن هذه القصة';
+
+  @override
+  String get editHighlight => 'تعديل الهايلايت';
+
+  @override
+  String get deleteHighlight => 'حذف الهايلايت';
+
+  @override
+  String get highlightDeleted => 'تم حذف الهايلايت';
+
+  @override
+  String get highlightEmptyRemoved => 'هذا الهايلايت فارغ وتم إزالته';
+
+  @override
+  String get highlightNameLabel => 'اسم الهايلايت';
+
+  @override
+  String get highlightNameHint => 'مثل: سفر، ذكريات';
+
+  @override
+  String get coverUpdated => 'تم تحديث الغلاف';
+
+  @override
+  String get failedToUploadCover => 'فشل تحميل صورة الغلاف';
+
+  @override
+  String get failedToLoadHighlightDetails => 'فشل تحميل تفاصيل الهايلايت';
+
+  @override
+  String get failedToAddStoryToHighlight => 'فشل إضافة القصة إلى الهايلايت';
+
+  @override
+  String get marketplaceTitle => 'السوق';
+
+  @override
+  String get marketplaceLikedProducts => 'المنتجات المفضلة';
+
+  @override
+  String get marketplaceNoLikedProducts => 'لا توجد منتجات مفضلة بعد';
+
+  @override
+  String get marketplaceTagline => 'اشترِ. امتلك. أعد البيع.';
+
+  @override
+  String get marketplaceSearchHint => 'ابحث عن منتجات، علامات تجارية، فئات...';
+
+  @override
+  String get marketplaceHeroTitle => 'اشترِ. امتلك. أعد البيع.';
+
+  @override
+  String get marketplaceHeroSubtitle => 'اشترِ المنتجات وأعد بيع المشتريات المؤهلة عبر مزادات Bimo-Bond.';
+
+  @override
+  String get marketplaceExploreCta => 'استكشف السوق';
+
+  @override
+  String get marketplaceCategories => 'الفئات';
+
+  @override
+  String get marketplaceRecommended => 'موصى به لك';
+
+  @override
+  String get marketplaceEndingSoon => 'مزادات تنتهي قريباً';
+
+  @override
+  String get marketplaceNoAuctions => 'لا توجد مزادات نشطة تنتهي قريباً';
+
+  @override
+  String get marketplaceLiveAuction => 'مزاد مباشر';
+
+  @override
+  String get marketplaceAuctionLabel => 'مزاد';
+
+  @override
+  String get marketplaceCurrentBid => 'المزايدة الحالية';
+
+  @override
+  String marketplaceBidCount(int count) {
+    return '$count مزايدة';
+  }
+
+  @override
+  String get marketplaceViewAuction => 'عرض المزاد';
+
+  @override
+  String get marketplaceFilters => 'الفلاتر';
+
+  @override
+  String get marketplaceFilterPrice => 'السعر';
+
+  @override
+  String get marketplaceMin => 'الحد الأدنى';
+
+  @override
+  String get marketplaceMax => 'الحد الأقصى';
+
+  @override
+  String get marketplaceFilterListingType => 'نوع العرض';
+
+  @override
+  String get marketplaceInStockOnly => 'متوفر فقط';
+
+  @override
+  String get marketplaceClearFilters => 'مسح';
+
+  @override
+  String get marketplaceApplyFilters => 'تطبيق';
+
+  @override
+  String get marketplaceSortPopular => 'الأكثر شعبية';
+
+  @override
+  String get marketplaceSortEndingSoon => 'ينتهي قريباً';
+
+  @override
+  String marketplaceProductCount(int count) {
+    return '$count منتج';
+  }
+
+  @override
+  String get marketplaceTabPurchased => 'مشتريات';
+
+  @override
+  String get marketplaceTabPending => 'قيد التوصيل';
+
+  @override
+  String get marketplaceTabDelivered => 'تم التسليم';
+
+  @override
+  String get marketplaceTabAuctioned => 'في المزاد';
+
+  @override
+  String get marketplaceTabSold => 'مباع';
+
+  @override
+  String get marketplaceNoProducts => 'لا توجد منتجات في هذا القسم';
+
+  @override
+  String get marketplacePurchaseConfirmed => 'تم تأكيد الشراء';
+
+  @override
+  String get marketplaceDeliveryLabel => 'التوصيل';
+
+  @override
+  String get marketplaceDeliveryPending => 'قيد الانتظار';
+
+  @override
+  String get marketplaceDeliveryShipped => 'تم الشحن';
+
+  @override
+  String get marketplaceDeliveryDelivered => 'تم التسليم';
+
+  @override
+  String get marketplaceTrackDelivery => 'تتبع التوصيل';
+
+  @override
+  String get marketplaceSellAtAuction => 'بيع في المزاد';
+
+  @override
+  String get marketplacePurchasePrice => 'سعر الشراء';
+
+  @override
+  String get marketplaceStartingPrice => 'سعر البداية';
+
+  @override
+  String get marketplaceReservePrice => 'سعر احتياطي';
+
+  @override
+  String get marketplaceBuyNowPrice => 'سعر الشراء الفوري';
+
+  @override
+  String get marketplaceAuctionDuration => 'مدة المزاد';
+
+  @override
+  String get marketplaceDescription => 'الوصف';
+
+  @override
+  String get marketplaceAuctionPreview => 'معاينة المزاد';
+
+  @override
+  String get marketplacePublishAuction => 'نشر المزاد';
+
+  @override
+  String get marketplaceAuctionPublished => 'تم نشر المزاد';
+
+  @override
+  String get marketplacePlaceBid => 'قدّم مزايدة';
+
+  @override
+  String get marketplaceYourBid => 'مزايدتك';
+
+  @override
+  String get marketplaceConfirmBid => 'تأكيد المزايدة';
+
+  @override
+  String get marketplaceEndsIn => 'ينتهي خلال';
+
+  @override
+  String get marketplaceBidHistory => 'سجل المزايدات';
+
+  @override
+  String get marketplaceNoBidsYet => 'لا توجد مزايدات بعد';
+
+  @override
+  String get marketplaceSpecifications => 'المواصفات';
+
+  @override
+  String get marketplaceVerifiedProduct => 'منتج موثّق';
+
+  @override
+  String get marketplaceSecurePayment => 'دفع آمن';
+
+  @override
+  String get marketplaceBuyerProtection => 'حماية المشتري';
+
+  @override
+  String get marketplaceDeliveryTracking => 'تتبع التوصيل';
 }

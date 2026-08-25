@@ -78,19 +78,6 @@ class CameraModeDurationBar extends StatelessWidget {
         selected: studioMode == CameraStudioMode.photo,
         onTap: onPhotoSelected,
       ),
-      if (showText)
-        _ModeDurationItem(
-          label: textLabel,
-          selected: false,
-          onTap: onTextSelected,
-        ),
-      if (showLive)
-        _ModeDurationItem(
-          label: liveLabel,
-          selected: studioMode == CameraStudioMode.live,
-          isLive: true,
-          onTap: onLiveSelected,
-        ),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -115,13 +102,11 @@ class _ModeDurationItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.isLive = false,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final bool isLive;
 
   @override
   Widget build(BuildContext context) {
@@ -139,14 +124,9 @@ class _ModeDurationItem extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected
-                ? (isLive
-                      ? LiveDetailsLayoutConstants.liveBadgeColor
-                      : Colors.black)
-                : Colors.white,
+            color: selected ? Colors.black : Colors.white,
             fontSize: selected ? 14 : 13,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
-            letterSpacing: isLive && selected ? 0.5 : 0,
             shadows: selected
                 ? null
                 : const [
@@ -170,12 +150,19 @@ class CameraWorkspaceTabs extends StatelessWidget {
     required this.creativeLabel,
     required this.selectedIndex,
     required this.onSelected,
+    this.liveLabel,
+    this.onLiveTap,
   });
 
   final String postLabel;
   final String creativeLabel;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+
+  /// When provided, a "start live" tab is shown right next to the
+  /// creative tab, using the exact same style as the other tabs.
+  final String? liveLabel;
+  final VoidCallback? onLiveTap;
 
   @override
   Widget build(BuildContext context) {
@@ -189,6 +176,7 @@ class CameraWorkspaceTabs extends StatelessWidget {
       selected: selectedIndex == 1,
       onTap: () => onSelected(1),
     );
+    final hasLive = liveLabel != null && onLiveTap != null;
 
     // Stack + directional align so RTL doesn't flip Create under the upload
     // button (Row would reverse and collide with gallery on the start edge).
@@ -209,7 +197,20 @@ class CameraWorkspaceTabs extends StatelessWidget {
                 alignment: AlignmentDirectional.centerStart,
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 36),
-                  child: createTab,
+                  child: hasLive
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            createTab,
+                            const SizedBox(width: 6),
+                            _WorkspaceTab(
+                              label: liveLabel!,
+                              selected: false,
+                              onTap: onLiveTap!,
+                            ),
+                          ],
+                        )
+                      : createTab,
                 ),
               ),
             ),
@@ -518,11 +519,11 @@ class CameraCaptureControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The "start live" action moved to a compact pill next to the
+    // "الإبداع" workspace tab; live mode no longer shows a full-width
+    // button here.
     if (isLiveMode) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: CameraGoLiveButton(label: goLiveLabel, onTap: onGoLiveTap),
-      );
+      return const SizedBox.shrink();
     }
 
     final hasEffect = selectedEffect != null && !selectedEffect!.isNone;

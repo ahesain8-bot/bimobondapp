@@ -146,9 +146,9 @@ class _TaggedTextState extends State<TaggedText> {
 
     final baseStyle = widget.style ?? DefaultTextStyle.of(context).style;
     final mentionColor =
-        widget.mentionStyle?.color ?? Theme.of(context).colorScheme.primary;
+        widget.mentionStyle?.color ?? const Color(0xFF2196F3);
     final hashtagColor =
-        widget.hashtagStyle?.color ?? Theme.of(context).colorScheme.secondary;
+        widget.hashtagStyle?.color ?? const Color(0xFF2196F3);
 
     final spans = <InlineSpan>[];
     var index = 0;
@@ -187,6 +187,14 @@ class _TaggedTextState extends State<TaggedText> {
       if (match.start < index) continue;
       addPlain(widget.text.substring(index, match.start));
       if (match.isMention) {
+        final displayName = MentionUserIdResolver.displayNameForUsernameSync(
+          match.name,
+          post: widget.post,
+        );
+        final label = displayName.trim().isNotEmpty
+            ? displayName.trim()
+            : match.name;
+
         final recognizer = TapGestureRecognizer()
           ..onTap = () => _onMentionTap(match.name);
         _recognizers.add(recognizer);
@@ -194,12 +202,11 @@ class _TaggedTextState extends State<TaggedText> {
         final mentionBase = widget.mentionStyle ?? baseStyle;
         spans.add(
           TextSpan(
-            text: match.raw,
+            text: label,
             style: mentionBase.copyWith(
               color: mentionColor,
               fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-              decorationColor: mentionColor.withValues(alpha: 0.85),
+              decoration: TextDecoration.none,
             ),
             recognizer: recognizer,
           ),
@@ -215,8 +222,7 @@ class _TaggedTextState extends State<TaggedText> {
             style: (widget.hashtagStyle ?? baseStyle).copyWith(
               color: hashtagColor,
               fontWeight: FontWeight.w600,
-              decoration: TextDecoration.underline,
-              decorationColor: hashtagColor.withValues(alpha: 0.75),
+              decoration: TextDecoration.none,
             ),
             recognizer: recognizer,
           ),

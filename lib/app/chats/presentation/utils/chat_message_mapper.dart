@@ -63,6 +63,8 @@ String _typeToUi(ChatMessageType type) {
       return 'gift';
     case ChatMessageType.poll:
       return 'poll';
+    case ChatMessageType.call:
+      return 'call';
     case ChatMessageType.share:
       return 'share';
     case ChatMessageType.unknown:
@@ -75,7 +77,11 @@ Map<String, dynamic> chatMessageToUiMap(
   String currentUserId,
 ) {
   final isMe = message.senderId == currentUserId;
-  final readByMe = message.isReadBy(currentUserId);
+  final isReadByPeer =
+      message.readByUserIds.any((id) => id.isNotEmpty && id != currentUserId) ||
+      message.payload?['isRead'] == true ||
+      message.payload?['read'] == true ||
+      message.payload?['is_read'] == true;
   final reactions = <String>[];
   final seenEmojis = <String>{};
   for (final reaction in message.reactions) {
@@ -181,10 +187,19 @@ Map<String, dynamic> chatMessageToUiMap(
           'hasEnded': false,
         },
     },
+    if (message.type == ChatMessageType.call && !message.isDeleted) ...{
+      'callId': message.payload?['callId'],
+      'callType': message.payload?['callType'] ?? 'AUDIO',
+      'callStatus': message.payload?['status'] ?? 'ENDED',
+      'durationSeconds': message.payload?['durationSeconds'],
+      'startedAt': message.payload?['startedAt'],
+      'endedAt': message.payload?['endedAt'],
+      'initiatorId': message.payload?['initiatorId'],
+    },
     'isMe': isMe,
     'time': formatChatMessageTime(message.createdAt),
     'reactions': reactions,
-    'status': isMe ? (readByMe ? 'read' : 'sent') : 'read',
+    'status': isMe ? (isReadByPeer ? 'read' : 'sent') : 'read',
     if (replyTo != null) 'replyTo': replyTo,
     if (message.sharedPostId != null && message.sharedPostId!.isNotEmpty)
       'sharedPostId': message.sharedPostId,

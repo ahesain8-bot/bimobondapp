@@ -35,88 +35,94 @@ class CallControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkTheme = isDark || Theme.of(context).brightness == Brightness.dark;
 
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    final labelUnmute = isArabic ? 'إلغاء الكتم' : 'Unmute';
+    final labelMute = isArabic ? 'كتم' : 'Mute';
+    final labelCamOff = isArabic ? 'إيقاف' : 'Cam Off';
+    final labelCamOn = isArabic ? 'تشغيل' : 'Cam On';
+    final labelFlip = isArabic ? 'قلب' : 'Flip';
+    final labelSpeaker = isArabic ? 'مكبر الصوت' : 'Speaker';
+    final labelNormalSound = isArabic ? 'صوت عادي' : 'Normal';
+    final labelEnd = isArabic ? 'إنهاء' : 'End';
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(36),
+        color: isDarkTheme
+            ? const Color(0xFF1E293B).withValues(alpha: 0.88)
+            : Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDarkTheme
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.06),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.08),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Mic Mute / Unmute
+            // 1. Mic Mute / Unmute
             _AnimatedControlButton(
               icon: isMuted ? LucideIcons.micOff : LucideIcons.mic,
-              label: isMuted ? 'Unmute' : 'Mute',
+              label: isMuted ? labelUnmute : labelMute,
               isActive: isMuted,
               activeBgColor: const Color(0xFFEF4444),
               isDarkTheme: isDarkTheme,
               onTap: onToggleMute,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
 
-            // Camera On / Off
-            _AnimatedControlButton(
-              icon: isCameraOff ? LucideIcons.videoOff : LucideIcons.video,
-              label: isCameraOff ? 'Cam Off' : 'Cam On',
-              isActive: isCameraOff,
-              activeBgColor: const Color(0xFFEF4444),
-              isDarkTheme: isDarkTheme,
-              onTap: onToggleCamera,
-            ),
-            const SizedBox(width: 12),
-
-            // Switch Camera (Front/Back)
-            if (isVideoCall && !isCameraOff && onSwitchCamera != null) ...[
-              _AnimatedControlButton(
-                icon: LucideIcons.switchCamera,
-                label: 'Flip',
-                isDarkTheme: isDarkTheme,
-                onTap: onSwitchCamera!,
-              ),
-              const SizedBox(width: 12),
-            ],
-
-            // Speakerphone Toggle
+            // 2. Speaker / Sound Output Toggle
             _AnimatedControlButton(
               icon: isSpeakerOn ? LucideIcons.volume2 : LucideIcons.volumeX,
-              label: isSpeakerOn ? 'Speaker' : 'Earpiece',
-              isActive: !isSpeakerOn,
-              activeBgColor: Colors.blueGrey,
+              label: isSpeakerOn ? labelSpeaker : labelNormalSound,
+              isActive: isSpeakerOn,
+              activeBgColor: const Color(0xFF6366F1),
               isDarkTheme: isDarkTheme,
               onTap: onToggleSpeaker,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
 
-            // Switch between Voice / Video
-            if (onToggleCallType != null) ...[
+            // 3. Camera Open / Off (Only for Video Calls)
+            if (isVideoCall) ...[
               _AnimatedControlButton(
-                icon: isVideoCall ? LucideIcons.phone : LucideIcons.video,
-                label: isVideoCall ? 'To Audio' : 'To Video',
+                icon: isCameraOff ? LucideIcons.videoOff : LucideIcons.video,
+                label: isCameraOff ? labelCamOff : labelCamOn,
+                isActive: isCameraOff,
+                activeBgColor: const Color(0xFFEF4444),
                 isDarkTheme: isDarkTheme,
-                onTap: onToggleCallType!,
+                onTap: onToggleCamera,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
             ],
 
-            // Add Participant
-            if (onAddParticipant != null) ...[
+            // 4. Switch Camera (Front/Back) (Only for Video Calls)
+            if (isVideoCall && onSwitchCamera != null) ...[
               _AnimatedControlButton(
-                icon: LucideIcons.userPlus,
-                label: 'Add',
+                icon: LucideIcons.switchCamera,
+                label: labelFlip,
                 isDarkTheme: isDarkTheme,
-                onTap: onAddParticipant!,
+                onTap: onSwitchCamera!,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
             ],
 
-            // Visually Prominent End Call Button
+            // 5. Red End Call Button (Allows both Caller and Receiver to end call)
             _AnimatedControlButton(
               icon: LucideIcons.phoneOff,
-              label: 'End',
+              label: labelEnd,
               isEndCall: true,
               isDarkTheme: isDarkTheme,
               onTap: onEndCall,
@@ -201,8 +207,10 @@ class _AnimatedControlButtonState extends State<_AnimatedControlButton>
       bgColor = widget.activeBgColor;
       iconColor = Colors.white;
     } else {
-      bgColor = Colors.white.withValues(alpha: 0.18);
-      iconColor = Colors.white;
+      bgColor = widget.isDarkTheme
+          ? Colors.white.withValues(alpha: 0.18)
+          : Colors.black.withValues(alpha: 0.06);
+      iconColor = widget.isDarkTheme ? Colors.white : Colors.black87;
     }
 
     return GestureDetector(

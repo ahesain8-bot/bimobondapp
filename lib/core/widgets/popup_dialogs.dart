@@ -39,11 +39,7 @@ class PopupDialogs {
     Object error, {
     String? title,
   }) {
-    showErrorDialog(
-      context,
-      ErrorMessageResolver.resolve(error),
-      title: title,
-    );
+    showErrorDialog(context, ErrorMessageResolver.resolve(error), title: title);
   }
 
   static void _showTopNotification(
@@ -74,7 +70,11 @@ class PopupDialogs {
       useRootNavigator: true,
       builder: (context) => PopScope(
         canPop: false,
-        child: CustomLoadingWidget(isFullScreen: true, message: message),
+        child: CustomLoadingWidget(
+          isFullScreen: true,
+          message: message,
+          size: 48,
+        ),
       ),
     );
   }

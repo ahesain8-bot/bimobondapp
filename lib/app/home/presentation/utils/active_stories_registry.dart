@@ -13,6 +13,30 @@ class ActiveStoriesRegistry extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addStory(PostEntity story) {
+    if (story.userId.isEmpty) return;
+    final existingGroup = _groupsByUserId[story.userId];
+    final existingStories = existingGroup?.stories ?? [];
+    final updatedStories = [
+      story,
+      ...existingStories.where((s) => s.id != story.id),
+    ];
+    final allStories = <PostEntity>[];
+    for (final entry in _groupsByUserId.entries) {
+      if (entry.key == story.userId) {
+        allStories.addAll(updatedStories);
+      } else {
+        allStories.addAll(entry.value.stories);
+      }
+    }
+    if (!_groupsByUserId.containsKey(story.userId)) {
+      allStories.addAll(updatedStories);
+    }
+    final groups = groupStoriesByUser(allStories);
+    _groupsByUserId = {for (final g in groups) g.userId: g};
+    notifyListeners();
+  }
+
   StoryUserGroup? groupFor(String userId) => _groupsByUserId[userId];
 
   List<PostEntity> activeStoriesFor(String userId) {

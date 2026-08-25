@@ -13,6 +13,16 @@ class CallUserEntity extends Equatable {
     this.avatarUrl,
   });
 
+  String get displayName {
+    if (fullName != null && fullName!.trim().isNotEmpty && fullName != 'null') {
+      return fullName!.trim();
+    }
+    if (username.trim().isNotEmpty && username != 'null') {
+      return username.trim();
+    }
+    return 'User';
+  }
+
   @override
   List<Object?> get props => [id, username, fullName, avatarUrl];
 }
@@ -113,6 +123,61 @@ class CallEntity extends Equatable {
       status.toUpperCase() == 'MISSED' ||
       status.toUpperCase() == 'REJECTED' ||
       status.toUpperCase() == 'CANCELLED';
+
+  CallUserEntity getDisplayUser(String currentUserId, {bool isOutgoing = false}) {
+    if (isOutgoing || (currentUserId.isNotEmpty && initiatedBy.id == currentUserId)) {
+      for (final p in participants) {
+        if (p.role.toUpperCase() == 'CALLEE' && p.user != null) {
+          return p.user!;
+        }
+      }
+      for (final p in participants) {
+        if (p.userId != currentUserId && p.userId != initiatedBy.id && p.user != null) {
+          return p.user!;
+        }
+      }
+      for (final p in participants) {
+        if (p.userId != currentUserId && p.user != null) {
+          return p.user!;
+        }
+      }
+      for (final p in participants) {
+        if (p.role.toUpperCase() == 'CALLEE' && p.userId.isNotEmpty) {
+          return CallUserEntity(id: p.userId, username: 'User');
+        }
+      }
+      for (final p in participants) {
+        if (p.userId != currentUserId && p.userId.isNotEmpty) {
+          return CallUserEntity(id: p.userId, username: 'User');
+        }
+      }
+    }
+
+    if (initiatedBy.id.isNotEmpty && initiatedBy.id != currentUserId) {
+      return initiatedBy;
+    }
+
+    for (final p in participants) {
+      if (p.userId != currentUserId && p.user != null) {
+        return p.user!;
+      }
+    }
+
+    return initiatedBy;
+  }
+
+  Map<String, dynamic> toCallkitData() {
+    final displayUser = getDisplayUser('');
+    final callerName = displayUser.displayName;
+    return {
+      'callId': id,
+      'chatId': chatId,
+      'type': type,
+      'isVideo': isVideo,
+      'callerName': callerName,
+      'callerAvatar': displayUser.avatarUrl ?? initiatedBy.avatarUrl,
+    };
+  }
 
   CallEntity copyWith({
     String? id,

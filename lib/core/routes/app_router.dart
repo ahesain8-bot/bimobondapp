@@ -37,6 +37,7 @@ import 'package:bimobondapp/app/video_templates/presentation/pages/video_templat
 import 'package:bimobondapp/app/home/presentation/pages/media_studio_editor_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/stories_viewer_screen.dart';
 import 'package:bimobondapp/app/calls/presentation/pages/active_call_screen.dart';
+import 'package:bimobondapp/app/calls/presentation/pages/call_history_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/all_chats_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/new_chat_screen.dart';
@@ -51,11 +52,17 @@ import 'package:bimobondapp/app/wallets/presentation/pages/balance_transactions_
 import 'package:bimobondapp/app/wallets/presentation/pages/balance_transaction_detail_screen.dart';
 import 'package:bimobondapp/app/wallets/presentation/pages/add_payout_method_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
-import 'package:bimobondapp/app/home/presentation/pages/lives_screen.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/live_viewer.dart';
+import 'package:bimobondapp/features/live/presentation/pages/live_room_page.dart' as host_live;
 import 'package:bimobondapp/app/shop/domain/entities/checkout_entity.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/cart_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/checkout_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/ecommerce_home_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/category_products_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/create_auction_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/marketplace_auction_details_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/liked_products_screen.dart';
+import 'package:bimobondapp/app/marketplace/presentation/pages/my_products_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/order_details_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/orders_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/product_details_screen.dart';
@@ -338,12 +345,66 @@ class AppRouter {
       GoRoute(
         path: '/lives',
         name: 'lives',
-        builder: (context, state) => const LivesScreen(),
+        builder: (context, state) => const LiveViewerEntry(),
+      ),
+      GoRoute(
+        path: '/create-live',
+        name: 'create_live',
+        builder: (context, state) => const host_live.LiveRoomPage(),
       ),
       GoRoute(
         path: '/shop',
         name: EcommerceHomeScreen.routeName,
         builder: (context, state) => const EcommerceHomeScreen(),
+      ),
+      GoRoute(
+        path: '/shop/category/:categoryId',
+        name: CategoryProductsScreen.routeName,
+        builder: (context, state) {
+          final categoryId = state.pathParameters['categoryId'] ?? 'all';
+          final slug = state.uri.queryParameters['slug'] ?? 'all';
+          final name = state.uri.queryParameters['name'] ?? 'All';
+          return CategoryProductsScreen(
+            categoryId: categoryId,
+            categorySlug: slug,
+            categoryName: name,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/liked',
+        name: LikedProductsScreen.routeName,
+        builder: (context, state) => const LikedProductsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/my-products',
+        name: MyProductsScreen.routeName,
+        builder: (context, state) => const MyProductsScreen(),
+      ),
+      GoRoute(
+        path: '/shop/create-auction',
+        name: CreateAuctionScreen.routeName,
+        builder: (context, state) {
+          final productId = state.uri.queryParameters['productId'] ?? '';
+          final title = state.uri.queryParameters['title'] ?? 'Product';
+          final priceCoins =
+              int.tryParse(state.uri.queryParameters['priceCoins'] ?? '') ?? 0;
+          final imageUrl = state.uri.queryParameters['imageUrl'];
+          return CreateAuctionScreen(
+            productId: productId,
+            title: title,
+            purchasePriceCoins: priceCoins,
+            imageUrl: imageUrl,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/shop/auctions/:auctionId',
+        name: MarketplaceAuctionDetailsScreen.routeName,
+        builder: (context, state) {
+          final auctionId = state.pathParameters['auctionId'] ?? '';
+          return MarketplaceAuctionDetailsScreen(auctionId: auctionId);
+        },
       ),
       GoRoute(
         path: '/shop/search',
@@ -467,6 +528,11 @@ class AppRouter {
         builder: (context, state) => const ActiveCallScreen(),
       ),
       GoRoute(
+        path: '/call-history',
+        name: 'call_history',
+        builder: (context, state) => const CallHistoryScreen(),
+      ),
+      GoRoute(
         path: '/chat',
         name: 'chat',
         builder: (context, state) {
@@ -477,6 +543,8 @@ class AppRouter {
             imageUrl: extra?['imageUrl'] as String? ?? '',
             peerUserId: extra?['peerUserId'] as String?,
             openCamera: extra?['openCamera'] as bool? ?? false,
+            isPinned: extra?['isPinned'] as bool? ?? false,
+            isMuted: extra?['isMuted'] as bool? ?? false,
           );
         },
       ),
@@ -558,9 +626,13 @@ class AppRouter {
             final stories = extra['stories'];
             final initialIndex = extra['initialIndex'] as int? ?? 0;
             if (stories is List<PostEntity>) {
+              final highlightId = extra['highlightId'] as String?;
+              final highlightTitle = extra['highlightTitle'] as String?;
               return StoriesViewerScreen(
                 stories: stories,
                 initialIndex: initialIndex,
+                highlightId: highlightId,
+                highlightTitle: highlightTitle,
               );
             }
           }

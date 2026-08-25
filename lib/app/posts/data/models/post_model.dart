@@ -49,6 +49,7 @@ class PostModel extends PostEntity {
     super.filterName,
     super.filterCategory,
     super.filter,
+    super.isPinned = false,
     super.taggedProductIds = const [],
   });
 
@@ -401,6 +402,7 @@ class PostModel extends PostEntity {
       filterName: _parseFilterName(json),
       filterCategory: _parseFilterCategory(json),
       filter: _parseFilter(json),
+      isPinned: PostModel._parseBoolField(json['isPinned'] ?? json['pinned']),
       taggedProductIds: _parseTaggedProductIds(json),
     );
   }
@@ -410,6 +412,7 @@ class PostModel extends PostEntity {
     int? commentCount,
     int? likeCount,
     int? saveCount,
+    int? shareCount,
     int? repostCount,
     bool? isLiked,
     bool? isSaved,
@@ -418,6 +421,8 @@ class PostModel extends PostEntity {
     String? description,
     String? privacyStatus,
     PostSoundEntity? sound,
+    String? filterName,
+    bool? isPinned,
   }) {
     return PostModel(
       id: id,
@@ -433,7 +438,7 @@ class PostModel extends PostEntity {
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
       saveCount: saveCount ?? this.saveCount,
-      shareCount: shareCount,
+      shareCount: shareCount ?? this.shareCount,
       repostCount: repostCount ?? this.repostCount,
       isLiked: isLiked ?? this.isLiked,
       isSaved: isSaved ?? this.isSaved,
@@ -441,7 +446,7 @@ class PostModel extends PostEntity {
       recentReposters: recentReposters ?? this.recentReposters,
       createdAt: createdAt,
       user: user as PostUserModel?,
-      media: media.cast<PostMediaModel>(),
+      media: media as List<PostMediaModel>,
       hashtags: hashtags,
       mentions: mentions,
       isAuctionable: isAuctionable,
@@ -452,9 +457,10 @@ class PostModel extends PostEntity {
       promotion: promotion,
       location: location,
       sound: sound ?? this.sound,
-      filterName: filterName,
+      filterName: filterName ?? this.filterName,
       filterCategory: filterCategory,
       filter: filter,
+      isPinned: isPinned ?? this.isPinned,
       taggedProductIds: taggedProductIds,
     );
   }

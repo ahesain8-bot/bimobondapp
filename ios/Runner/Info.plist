@@ -24,31 +24,28 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyC4CoGuenT6EzeS__F-ibMR8o56dB4xVb8</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
-		<key>UISceneConfigurations</key>
-		<dict>
-			<key>UIWindowSceneSessionRoleApplication</key>
-			<array>
-				<dict>
-					<key>UISceneClassName</key>
-					<string>UIWindowScene</string>
-					<key>UISceneConfigurationName</key>
-					<string>flutter</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-					<key>UISceneStoryboardFile</key>
-					<string>Main</string>
-				</dict>
-			</array>
-		</dict>
-	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to record posts, stories, and chat media.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>This app needs contacts access to share contacts in chat.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app uses your location to personalize your experience and improve nearby features.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access to record voice messages in chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to send images and videos in chat.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>voip</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -66,18 +63,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs microphone access to record voice messages in chat.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app uses your location to personalize your experience and improve nearby features.</string>
-	<key>GMSApiKey</key>
-	<string>AIzaSyC4CoGuenT6EzeS__F-ibMR8o56dB4xVb8</string>
-	<key>NSContactsUsageDescription</key>
-	<string>This app needs contacts access to share contacts in chat.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs photo library access to send images and videos in chat.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to record posts, stories, and chat media.</string>
 </dict>
 </plist>

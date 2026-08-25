@@ -1,5 +1,6 @@
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/auth/domain/entities/gifter_level_info.dart';
+import 'package:bimobondapp/app/auth/domain/entities/profile_enums.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -15,6 +16,8 @@ class UserModel extends UserEntity {
     super.avatarUrl,
     super.dateOfBirth,
     super.isVerified,
+    super.verificationBadge,
+    super.profileLinks,
     super.roles,
     super.fcmToken,
     super.instagramUrl,
@@ -185,6 +188,11 @@ class UserModel extends UserEntity {
       avatarUrl: avatarUrl,
       dateOfBirth: json['dateOfBirth'],
       isVerified: _parseOptionalBool(json['isVerified']) ?? false,
+      verificationBadge: json['verificationBadge']?.toString(),
+      profileLinks: (json['profileLinks'] as List<dynamic>?)
+          ?.whereType<Map>()
+          .map((m) => ProfileLinkEntity.fromJson(Map<String, dynamic>.from(m)))
+          .toList(),
       roles: (json['roles'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),
@@ -279,6 +287,8 @@ class UserModel extends UserEntity {
       'avatarUrl': avatarUrl,
       'dateOfBirth': dateOfBirth,
       'isVerified': isVerified,
+      'verificationBadge': verificationBadge,
+      'profileLinks': profileLinks?.map((l) => l.toJson()).toList(),
       'roles': roles,
       'fcmToken': fcmToken,
       'instagramUrl': instagramUrl,

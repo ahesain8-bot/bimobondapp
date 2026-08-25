@@ -22,6 +22,24 @@ subprojects {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
+
+            // External Native Build (CMake/ndk-build) defaults its .cxx
+            // intermediate dir to <module-root>/.cxx/...  For Flutter plugins
+            // that sit under Pub Cache (<LOCALAPPDATA>\Pub\Cache\hosted\...)
+            // writes there are denied.  Redirect to the module's redirected
+            // Gradle build dir (which is inside the project and writable).
+            try {
+                externalNativeBuild.cmake.buildStagingDirectory =
+                    project.layout.buildDirectory.dir("cxx").get().asFile
+            } catch (_: Throwable) {
+                // Module has no cmake block configured; nothing to redirect.
+            }
+            try {
+                externalNativeBuild.ndkBuild.buildStagingDirectory =
+                    project.layout.buildDirectory.dir("cxx-ndkbuild").get().asFile
+            } catch (_: Throwable) {
+                // Module has no ndkBuild block configured; nothing to redirect.
+            }
         }
     }
 

@@ -27,6 +27,11 @@ import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
+import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
+import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -54,11 +59,15 @@ class StoriesViewerScreen extends StatefulWidget {
   const StoriesViewerScreen({
     required this.stories,
     this.initialIndex = 0,
+    this.highlightId,
+    this.highlightTitle,
     super.key,
   });
 
   final List<PostEntity> stories;
   final int initialIndex;
+  final String? highlightId;
+  final String? highlightTitle;
 
   @override
   State<StoriesViewerScreen> createState() => _StoriesViewerScreenState();
@@ -74,11 +83,17 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
   int _currentIndex = 0;
   bool _paused = true;
   bool _isMediaReady = false;
+  bool _isLoadingHighlight = false;
 
   @override
   void initState() {
     super.initState();
-    _stories = onlyStoryPosts(widget.stories);
+    _stories = widget.highlightId != null
+        ? List<PostEntity>.from(widget.stories)
+        : onlyStoryPosts(widget.stories);
+    if (widget.highlightId != null && _stories.isEmpty) {
+      _isLoadingHighlight = true;
+    }
     _engagement = {
       for (final s in _stories)
         s.id: _StoryLocalEngagement(
@@ -88,7 +103,9 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
           viewCount: s.viewCount,
         ),
     };
-    _currentIndex = widget.initialIndex.clamp(0, _stories.length - 1);
+    _currentIndex = _stories.isEmpty
+        ? 0
+        : widget.initialIndex.clamp(0, _stories.length - 1);
     _pageController = PageController(initialPage: _currentIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -96,10 +113,51 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
       if (authState is AuthSuccess) {
         auth_di.sl<ViewedStoriesStore>().bindUser(authState.user.id);
       }
-      if (_stories.isNotEmpty) {
+      if (widget.highlightId != null) {
+        _fetchHighlightStories(widget.highlightId!);
+      } else if (_stories.isNotEmpty) {
         _onStoryActivated(_currentIndex);
       }
     });
+  }
+
+  Future<void> _fetchHighlightStories(String highlightId) async {
+    if (_stories.isEmpty) {
+      setState(() => _isLoadingHighlight = true);
+    }
+    try {
+      final ds = ProfileRemoteDataSourceImpl();
+      final highlight = await ds.getHighlightById(highlightId);
+      final fetched = highlight.stories.map((s) => s.toPostEntity()).toList();
+      if (!mounted) return;
+      if (fetched.isNotEmpty) {
+        setState(() {
+          _stories = fetched;
+          _engagement.clear();
+          for (final s in _stories) {
+            _engagement[s.id] = _StoryLocalEngagement(
+              isLiked: s.isLiked,
+              likeCount: s.likeCount,
+              commentCount: s.commentCount,
+              viewCount: s.viewCount,
+            );
+          }
+          _currentIndex = widget.initialIndex.clamp(0, _stories.length - 1);
+        });
+        _onStoryActivated(_currentIndex);
+      } else if (_stories.isNotEmpty) {
+        _onStoryActivated(_currentIndex);
+      }
+    } catch (e) {
+      debugPrint('[StoriesViewerScreen] _fetchHighlightStories error: $e');
+      if (_stories.isNotEmpty) {
+        _onStoryActivated(_currentIndex);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingHighlight = false);
+      }
+    }
   }
 
   @override
@@ -223,7 +281,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     });
 
     final post = _stories[index];
-    if (!isStoryStillActive(post)) {
+    if (widget.highlightId == null && !isStoryStillActive(post)) {
       _removeStoryAt(index);
       return;
     }
@@ -376,25 +434,362 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
   void _showStoryOptions(PostEntity post) {
     _pauseProgress();
     final l10n = AppLocalizations.of(context)!;
-    var openedConfirm = false;
+    var openedModal = false;
 
     GlassBottomSheet.showActions<void>(
       context,
       children: [
-        GlassBottomSheetListTile(
-          label: l10n.deletePost,
-          destructive: true,
-          icon: LucideIcons.trash2,
-          onTap: () {
-            openedConfirm = true;
-            Navigator.pop(context);
-            _confirmDelete(post);
-          },
-        ),
+        if (_isOwner(post)) ...[
+          if (widget.highlightId != null) ...[
+            GlassBottomSheetListTile(
+              label: l10n.removeFromHighlight,
+              destructive: true,
+              icon: LucideIcons.starOff,
+              onTap: () {
+                openedModal = true;
+                Navigator.pop(context);
+                _removeFromHighlight(post);
+              },
+            ),
+          ],
+          GlassBottomSheetListTile(
+            label: l10n.addToHighlights,
+            icon: LucideIcons.star,
+            onTap: () {
+              openedModal = true;
+              Navigator.pop(context);
+              _showAddToHighlightPicker(post);
+            },
+          ),
+          GlassBottomSheetListTile(
+            label: l10n.deletePost,
+            destructive: true,
+            icon: LucideIcons.trash2,
+            onTap: () {
+              openedModal = true;
+              Navigator.pop(context);
+              _confirmDelete(post);
+            },
+          ),
+        ],
       ],
     ).whenComplete(() {
-      if (mounted && !openedConfirm) _resumeProgress();
+      if (mounted && !openedModal) _resumeProgress();
     });
+  }
+
+  Future<void> _removeFromHighlight(PostEntity post) async {
+    if (widget.highlightId == null) return;
+    _pauseProgress();
+    PopupDialogs.showLoadingDialog(context);
+    try {
+      final ds = ProfileRemoteDataSourceImpl();
+      await ds.removeStoryFromHighlight(widget.highlightId!, post.id);
+      if (mounted) {
+        PopupDialogs.hideLoadingDialog(context);
+        PopupDialogs.showSuccessDialog(context, 'Removed from highlight');
+        _removeStoryAt(_currentIndex);
+      }
+    } catch (e) {
+      if (mounted) {
+        PopupDialogs.hideLoadingDialog(context);
+        PopupDialogs.showErrorDialog(
+          context,
+          'Failed to remove from highlight: $e',
+        );
+        _resumeProgress();
+      }
+    }
+  }
+
+  Future<void> _showAddToHighlightPicker(PostEntity post) async {
+    _pauseProgress();
+    final ds = ProfileRemoteDataSourceImpl();
+    List<HighlightEntity> highlights = [];
+    try {
+      highlights = await ds.getHighlights('me', isMe: true);
+    } catch (e) {
+      debugPrint('[StoriesViewerScreen] Error fetching highlights: $e');
+    }
+
+    if (!mounted) return;
+
+    final storyCover =
+        storyDisplayMediaUrl(post) ?? post.thumbnailUrl ?? post.videoUrl;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white30,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Add to Highlights',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 105,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _createNewHighlightAndAdd(post);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 68,
+                                height: 68,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white54,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.add_rounded,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'New',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      ...highlights.map((h) {
+                        String? cover = h.coverUrl;
+                        if ((cover == null || cover.isEmpty) &&
+                            h.stories.isNotEmpty) {
+                          cover = h.stories.first.thumbnailUrl ??
+                              h.stories.first.videoUrl;
+                        }
+                        cover ??= storyCover;
+
+                        return GestureDetector(
+                          onTap: () async {
+                            Navigator.pop(ctx);
+                            await _addStoryToHighlight(h.id, post.id, h.title);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 68,
+                                  height: 68,
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.35),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: cover != null && cover.isNotEmpty
+                                        ? Image.network(
+                                            MediaUtils.resolveAbsoluteUrl(
+                                              cover,
+                                            ),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (ctx, err, stack) =>
+                                                Container(
+                                              color: Colors.grey[850],
+                                              child: const Icon(
+                                                Icons.star_rounded,
+                                                color: Colors.amber,
+                                              ),
+                                            ),
+                                          )
+                                        : Container(
+                                            color: Colors.grey[850],
+                                            child: const Icon(
+                                              Icons.star_rounded,
+                                              color: Colors.amber,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: 68,
+                                  child: Text(
+                                    h.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (mounted) _resumeProgress();
+  }
+
+  Future<void> _createNewHighlightAndAdd(PostEntity post) async {
+    final titleCtrl = TextEditingController();
+    final storyCover =
+        storyDisplayMediaUrl(post) ?? post.thumbnailUrl ?? post.videoUrl;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2C2C2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Name Highlight',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: TextField(
+          controller: titleCtrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Highlight Name',
+            hintStyle: const TextStyle(color: Colors.white38),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.3),
+              ),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.blueAccent),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final title = titleCtrl.text.trim();
+              if (title.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                final ds = ProfileRemoteDataSourceImpl();
+                final highlight =
+                    await ds.createHighlight(title, storyCover, 0);
+                await _addStoryToHighlight(highlight.id, post.id, title);
+              } catch (e) {
+                if (mounted) {
+                  PopupDialogs.showErrorDialog(
+                    context,
+                    'Failed to create highlight: $e',
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Add',
+              style: TextStyle(
+                color: Colors.blueAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addStoryToHighlight(
+    String highlightId,
+    String storyId,
+    String highlightTitle,
+  ) async {
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    try {
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: ApiConstants.baseUrl,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ApiConstants.apiKey,
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      await dio.post(
+        '/stories/highlights/$highlightId/stories',
+        data: {'storyId': storyId, 'sortOrder': 0},
+      );
+      if (mounted) {
+        PopupDialogs.showSuccessDialog(context, 'Added to $highlightTitle');
+      }
+    } catch (e) {
+      debugPrint('[StoriesViewerScreen] addStoryToHighlight error: $e');
+      if (mounted) {
+        PopupDialogs.showErrorDialog(
+          context,
+          'Failed to add story to highlight',
+        );
+      }
+    }
   }
 
   void _confirmDelete(PostEntity post) {
@@ -445,10 +840,15 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      l10n.storyExpired,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
+                    if (_isLoadingHighlight) ...[
+                      const CustomLoadingWidget(size: 48),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      Text(
+                        l10n.storyExpired,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
                     IconButton(
                       icon: const Icon(
                         Icons.close_rounded,
@@ -476,7 +876,7 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                       );
                     },
                   ),
-                  if (!_isMediaReady)
+                  if (!_isMediaReady || _isLoadingHighlight)
                     const Positioned.fill(
                       child: ColoredBox(
                         color: Colors.black,
@@ -637,7 +1037,11 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            formatStoryTimeAgo(post, l10n),
+                            formatStoryTimeAgo(
+                              post,
+                              l10n,
+                              isHighlight: widget.highlightId != null,
+                            ),
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.75),
                               fontSize: 11,
@@ -682,6 +1086,10 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
     final e = _engagementFor(post);
     final isOwner = _isOwner(post);
 
+    final isOlderThan24Hours =
+        DateTime.now().difference(post.createdAt).inHours >= 24;
+    final hideActions = isOlderThan24Hours || widget.highlightId != null;
+
     return Positioned(
       left: AppSizes.p16,
       right: AppSizes.p16,
@@ -691,10 +1099,50 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isOwner) ...[
-            StoryViewerViewersChip(
-              viewCount: e.viewCount,
-              label: l10n.viewsLabel.toLowerCase(),
-              onTap: () => _openStoryViewers(post),
+            Row(
+              children: [
+                StoryViewerViewersChip(
+                  viewCount: e.viewCount,
+                  label: l10n.viewsLabel.toLowerCase(),
+                  onTap: () => _openStoryViewers(post),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _showAddToHighlightPicker(post),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.p12,
+                      vertical: AppSizes.p6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.favorite_border_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Highlight',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppSizes.p10),
           ],
@@ -702,12 +1150,13 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
             Center(child: StoryCaptionDisplay(caption: caption)),
             const SizedBox(height: AppSizes.p12),
           ],
-          StoryViewerBottomActions(
-            isLiked: e.isLiked,
-            onLike: () => _handleLike(post),
-            onMessage: isOwner ? null : () => _openStoryMessage(post),
-            messageHint: l10n.storySendMessageHint,
-          ),
+          if (!hideActions)
+            StoryViewerBottomActions(
+              isLiked: e.isLiked,
+              onLike: () => _handleLike(post),
+              onMessage: isOwner ? null : () => _openStoryMessage(post),
+              messageHint: l10n.storySendMessageHint,
+            ),
         ],
       ),
     );

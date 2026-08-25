@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:bimobondapp/app/auth/domain/entities/gifter_level_info.dart';
+import 'package:bimobondapp/app/auth/domain/entities/profile_enums.dart';
 
 class UserEntity extends Equatable {
   final String id;
@@ -12,6 +13,8 @@ class UserEntity extends Equatable {
   final String? avatarUrl;
   final String? dateOfBirth;
   final bool? isVerified;
+  final String? verificationBadge;
+  final List<ProfileLinkEntity>? profileLinks;
   final List<String>? roles;
   final String? fcmToken;
   final String? instagramUrl;
@@ -85,6 +88,8 @@ class UserEntity extends Equatable {
     this.avatarUrl,
     this.dateOfBirth,
     this.isVerified,
+    this.verificationBadge,
+    this.profileLinks,
     this.roles,
     this.fcmToken,
     this.instagramUrl,

@@ -12,6 +12,8 @@ import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
+import 'package:bimobondapp/app/auth/data/datasources/profile_remote_data_source.dart';
+import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -30,6 +32,7 @@ class PostOptionsSheet {
     VoidCallback? onDelete,
     VoidCallback? onCancelAuction,
     VoidCallback? onRepost,
+    VoidCallback? onPinToggle,
     bool isReposted = false,
   }) {
     final sheetTheme = Theme.of(context);
@@ -49,6 +52,7 @@ class PostOptionsSheet {
           onDelete: onDelete,
           onCancelAuction: onCancelAuction,
           onRepost: onRepost,
+          onPinToggle: onPinToggle,
           isReposted: isReposted,
         ),
       ),
@@ -66,6 +70,7 @@ class _PostOptionsSheetContent extends StatefulWidget {
     this.onDelete,
     this.onCancelAuction,
     this.onRepost,
+    this.onPinToggle,
     this.isReposted = false,
   });
 
@@ -77,6 +82,7 @@ class _PostOptionsSheetContent extends StatefulWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onCancelAuction;
   final VoidCallback? onRepost;
+  final VoidCallback? onPinToggle;
   final bool isReposted;
 
   @override
@@ -338,6 +344,45 @@ class _PostOptionsSheetContentState extends State<_PostOptionsSheetContent> {
           actions.addToStory();
         },
       ),
+      if (widget.isOwner)
+        _CircleAction(
+          label: widget.post.isPinned ? l10n.unpin : l10n.pinToTop,
+          background: mutedBg,
+          icon: LucideIcons.pin,
+          iconColor: widget.post.isPinned ? cs.primary : onMuted,
+          onTap: () async {
+            Navigator.pop(context);
+            final rootCtx = widget.hostContext ?? context;
+            PopupDialogs.showLoadingDialog(rootCtx);
+            try {
+              final ds = ProfileRemoteDataSourceImpl();
+              final isPinned = widget.post.isPinned;
+              if (isPinned) {
+                await ds.unpinPost(widget.post.id);
+              } else {
+                await ds.pinPost(widget.post.id, 0);
+              }
+              
+              widget.onPinToggle?.call();
+
+              if (rootCtx.mounted) {
+                PopupDialogs.hideLoadingDialog(rootCtx);
+                PopupDialogs.showSuccessDialog(
+                  rootCtx,
+                  isPinned ? l10n.unpinnedSuccess : l10n.pinnedToTopSuccess,
+                );
+                if (Navigator.canPop(rootCtx)) {
+                  Navigator.pop(rootCtx, true);
+                }
+              }
+            } catch (e) {
+              if (rootCtx.mounted) {
+                PopupDialogs.hideLoadingDialog(rootCtx);
+                PopupDialogs.showErrorDialog(rootCtx, 'Failed to update pin: $e');
+              }
+            }
+          },
+        ),
       if (widget.isOwner &&
           widget.onPromote != null &&
           widget.post.canBePromoted)

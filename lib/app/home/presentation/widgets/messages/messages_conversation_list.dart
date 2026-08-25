@@ -88,11 +88,7 @@ class MessagesConversationList extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(
-                  Icons.delete_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                const Icon(Icons.delete_rounded, color: Colors.white, size: 24),
               ],
             ),
           ),
@@ -108,10 +104,12 @@ class MessagesConversationList extends StatelessWidget {
             return false;
           },
           onDismissed: (direction) {
-            context.read<InboxBloc>().add(InboxChatDismissed(
-              chatId: chat.chatId,
-              deleteForEveryone: deleteForEveryone,
-            ));
+            context.read<InboxBloc>().add(
+              InboxChatDismissed(
+                chatId: chat.chatId,
+                deleteForEveryone: deleteForEveryone,
+              ),
+            );
           },
           child: _ConversationTile(chat: chat),
         );
@@ -126,28 +124,26 @@ class _ConversationTile extends StatelessWidget {
   final InboxChatItem chat;
 
   Map<String, dynamic> get _chatExtra => {
-        'chatId': chat.chatId,
-        'username': chat.name,
-        if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
-          'imageUrl': chat.imageUrl,
-        if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
-      };
+    'chatId': chat.chatId,
+    'username': chat.name,
+    if (chat.imageUrl != null && chat.imageUrl!.isNotEmpty)
+      'imageUrl': chat.imageUrl,
+    if (chat.peerUserId != null) 'peerUserId': chat.peerUserId,
+    'isPinned': chat.isPinned,
+    'isMuted': chat.isMuted,
+  };
 
   Future<void> _openChat(
     BuildContext context, {
     bool openCamera = false,
   }) async {
+    context.read<InboxBloc>().add(InboxChatOpened(chat.chatId));
     await context.pushNamed(
       'chat',
-      extra: {
-        ..._chatExtra,
-        if (openCamera) 'openCamera': true,
-      },
+      extra: {..._chatExtra, if (openCamera) 'openCamera': true},
     );
     if (context.mounted) {
-      context.read<InboxBloc>().add(
-        const InboxLoadRequested(refresh: true),
-      );
+      context.read<InboxBloc>().add(const InboxLoadRequested(refresh: true));
     }
   }
 
@@ -155,16 +151,17 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: chat.unread
-            ? theme.colorScheme.primary.withValues(
-                alpha: MessagesLayoutConstants.conversationUnreadAlpha,
-              )
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(
-          MessagesLayoutConstants.conversationTileRadius,
-        ),
+    // ListTile paints its ink on the nearest Material. A decorated Container
+    // here hid that ink and triggers a framework assertion once per visible
+    // conversation on current Flutter versions.
+    return Material(
+      color: chat.unread
+          ? theme.colorScheme.primary.withValues(
+              alpha: MessagesLayoutConstants.conversationUnreadAlpha,
+            )
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(
+        MessagesLayoutConstants.conversationTileRadius,
       ),
       child: ListTile(
         onTap: () => _openChat(context),
@@ -175,6 +172,7 @@ class _ConversationTile extends StatelessWidget {
           ),
         ),
         leading: Stack(
+          clipBehavior: Clip.none,
           children: [
             Container(
               padding: chat.unread ? const EdgeInsets.all(2) : EdgeInsets.zero,
@@ -184,40 +182,30 @@ class _ConversationTile extends StatelessWidget {
                     ? Border.all(color: theme.colorScheme.primary, width: 2)
                     : null,
               ),
-              child: ClipOval(
-                child: StoryProfileAvatar(
-                  userId: chat.peerUserId,
-                  imageUrl: chat.imageUrl,
-                  radius: MessagesLayoutConstants.conversationAvatarRadius,
-                  fallbackText: chat.name,
-                  username: chat.name,
-                  fullName: chat.name,
-                ),
+              child: StoryProfileAvatar(
+                userId: chat.peerUserId,
+                imageUrl: chat.imageUrl,
+                radius: MessagesLayoutConstants.conversationAvatarRadius,
+                fallbackText: chat.name,
+                username: chat.name,
+                fullName: chat.name,
+                isOnline: chat.active,
               ),
             ),
-            if (chat.active)
-              PositionedDirectional(
-                end: 4,
-                bottom: 4,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: MessagesLayoutConstants.activeDotColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: theme.scaffoldBackgroundColor,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
         title: Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             children: [
+              if (chat.isPinned) ...[
+                Icon(
+                  LucideIcons.pin,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+              ],
               Expanded(
                 child: Text(
                   chat.name,
@@ -246,22 +234,51 @@ class _ConversationTile extends StatelessWidget {
         ),
         subtitle: Row(
           children: [
+            if (chat.isLastFromMe && !chat.isTyping) ...[
+              Icon(
+                chat.isLastReadByPeer
+                    ? LucideIcons.checkCheck
+                    : LucideIcons.check,
+                size: 16,
+                color: chat.isLastReadByPeer
+                    ? const Color(0xFF34B7F1)
+                    : theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.4),
+              ),
+              const SizedBox(width: 4),
+            ],
             Expanded(
               child: Text(
                 chat.preview,
                 style: TextStyle(
-                  color: chat.unread
-                      ? theme.textTheme.bodyLarge?.color
-                      : theme.textTheme.bodyMedium?.color?.withValues(
-                          alpha: 0.5,
-                        ),
-                  fontWeight: chat.unread ? FontWeight.w600 : FontWeight.w400,
+                  color: chat.isTyping
+                      ? theme.colorScheme.primary
+                      : (chat.unread
+                            ? theme.textTheme.bodyLarge?.color
+                            : theme.textTheme.bodyMedium?.color?.withValues(
+                                alpha: 0.5,
+                              )),
+                  fontWeight: chat.isTyping || chat.unread
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  fontStyle: chat.isTyping
+                      ? FontStyle.italic
+                      : FontStyle.normal,
                   fontSize: 14,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (chat.isMuted) ...[
+              const SizedBox(width: 6),
+              Icon(
+                LucideIcons.bellOff,
+                size: 14,
+                color: theme.textTheme.bodyMedium?.color?.withValues(
+                  alpha: 0.4,
+                ),
+              ),
+            ],
             if (chat.unread) ...[
               const SizedBox(width: 8),
               Container(

@@ -77,7 +77,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     _deletedSub?.cancel();
 
     _messageSub = socketService.onNewMessage.listen((message) {
-      if (message.chatId != _chatId) return;
+      if (message.chatId.isNotEmpty && message.chatId != _chatId) return;
       add(
         ChatSocketMessageReceived(
           chatMessageToUiMap(message, event.currentUserId),
@@ -86,12 +86,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     });
 
     _typingSub = socketService.onUserTyping.listen((payload) {
-      final chatId = payload['chatId']?.toString();
-      if (chatId != _chatId) return;
+      final chatId = payload['chatId']?.toString() ?? payload['chat_id']?.toString();
+      if (chatId != null && chatId.isNotEmpty && chatId != _chatId) return;
+      final typingUserId = payload['userId']?.toString() ?? payload['user_id']?.toString() ?? '';
+      if (typingUserId == event.currentUserId) return;
       add(
         ChatSocketUserTyping(
-          userId: payload['userId']?.toString() ?? '',
-          isTyping: payload['isTyping'] == true,
+          userId: typingUserId,
+          isTyping: payload['isTyping'] == true || payload['is_typing'] == true,
         ),
       );
     });
@@ -525,12 +527,18 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) {
     if (state is! ChatLoadSuccess) return;
     final messageId = _messageIdFromPayload(event.payload);
-    if (messageId == null) return;
+    final payloadChatId = event.payload['chatId']?.toString() ??
+        event.payload['chat_id']?.toString();
 
     final current = state as ChatLoadSuccess;
     final updated = current.messages.map((m) {
-      if (m['id'] == messageId && m['isMe'] == true) {
-        return {...m, 'status': 'read'};
+      if (m['isMe'] == true) {
+        if (messageId == null ||
+            messageId.isEmpty ||
+            m['id'] == messageId ||
+            payloadChatId == _chatId) {
+          return {...m, 'status': 'read'};
+        }
       }
       return m;
     }).toList();

@@ -1066,6 +1066,62 @@
   "chatWallpaperPlus": "Plus",
   "chatWallpaperSquares": "Squares",
   "chatWallpaperMaze": "Maze",
+  "chatWallpaperChooseFromPhotos": "Choose from Photos",
+  "chatWallpaperUploadDeviceSubtitle": "Upload personal photo from device",
+  "chatWallpaperDefault": "Default (No Wallpaper)",
+  "chatWallpaperCatalog": "Wallpapers Catalog",
+  "chatWallpaperUpdated": "Personal background updated",
+  "chatSettingsTitle": "Details",
+  "chatSettingsProfile": "Profile",
+  "chatSettingsMute": "Mute",
+  "chatSettingsMuted": "Muted",
+  "chatSettingsReport": "Report",
+  "chatSettingsMuteNotifications": "Mute notifications",
+  "chatSettingsPinToTop": "Pin to top",
+  "chatSettingsWallpaperSubtitle": "Custom theme background",
+  "chatSettingsSearch": "Search in conversation",
+  "chatSettingsBlock": "Block @{username}",
+  "@chatSettingsBlock": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsBlocked": "Blocked",
+  "unblock": "Unblock",
+  "chatYouBlockedUser": "You blocked this user. Unblock to send a message.",
+  "userNotFound": "User not found",
+  "chatSettingsDeleteHistory": "Delete chat history",
+  "chatSettingsSearchHint": "Type keyword...",
+  "chatSettingsSearching": "Searching for \"{query}\"...",
+  "@chatSettingsSearching": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "chatSettingsReportTitle": "Report @{username}",
+  "@chatSettingsReportTitle": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsReportSpam": "Spam or Scam",
+  "chatSettingsReportHarassment": "Harassment or Bullying",
+  "chatSettingsReportInappropriate": "Inappropriate Content",
+  "chatSettingsReportSubmitted": "Report submitted: {reason}",
+  "@chatSettingsReportSubmitted": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "chatSettingsBlockTitle": "Block @{username}?",
+  "@chatSettingsBlockTitle": {
+    "placeholders": {
+      "username": { "type": "String" }
+    }
+  },
+  "chatSettingsBlockMessage": "They won't be able to message you or view your profile.",
+  "chatSettingsDeleteTitle": "Delete chat history?",
+  "chatSettingsDeleteMessage": "This will remove the chat history for you. This action cannot be undone.",
   "messagesTitle": "Messages",
   "messagesInboxTitle": "Inbox",
   "messagesNewChatTitle": "New chat",
@@ -1908,5 +1964,119 @@
   "templateApplying": "Applying template…",
   "templateAddMediaToPreview": "Add media to preview",
   "templateNeedMediaFirst": "Take or add a photo/video first",
-  "mediaStudioTemplates": "Templates"
+  "mediaStudioTemplates": "Templates",
+  "pinToTop": "Pin to top",
+  "unpin": "Unpin",
+  "pinnedToTopSuccess": "Pinned to top of profile",
+  "unpinnedSuccess": "Unpinned from profile",
+  "closeFriendsTab": "Close Friends",
+  "addCloseFriendsTitle": "Add Close Friends",
+  "addCloseFriendsSubtitle": "Choose friends to add to your close friends list",
+  "searchCloseFriendsHint": "Search close friends...",
+  "noCloseFriendsYet": "No close friends added yet.",
+  "profileLinksTitle": "Links",
+  "noLinksAddedYet": "No links added yet.",
+  "accountTypePersonal": "Personal",
+  "accountTypeCreator": "Creator",
+  "accountTypeBusiness": "Business",
+  "badgeOfficial": "Official",
+  "badgeCreator": "Creator",
+  "addToHighlights": "Add to highlights",
+  "newHighlight": "New highlight",
+  "editCover": "Edit cover",
+  "highlightsTitle": "Highlights",
+  "noStoriesInArchive": "No stories found in archive",
+  "removeFromHighlight": "Remove from Highlight",
+  "highlightCreated": "Highlight created",
+  "highlightUpdated": "Highlight updated",
+  "chooseFromGallery": "Choose from Gallery",
+  "takePhoto": "Take Photo",
+  "pasteImageUrl": "Paste Image URL",
+  "newHighlightButton": "New",
+  "aboutThisStory": "About this story",
+  "editHighlight": "Edit highlight",
+  "deleteHighlight": "Delete Highlight",
+  "highlightDeleted": "Highlight deleted",
+  "highlightEmptyRemoved": "This highlight is empty and was removed",
+  "highlightNameLabel": "Highlight Name",
+  "highlightNameHint": "e.g. Travel, Memories",
+  "coverUpdated": "Cover updated",
+  "failedToUploadCover": "Failed to upload cover image",
+  "failedToLoadHighlightDetails": "Failed to load highlight details",
+  "failedToAddStoryToHighlight": "Failed to add story to highlight",
+  "marketplaceTitle": "Marketplace",
+  "marketplaceLikedProducts": "Liked Products",
+  "marketplaceNoLikedProducts": "No liked products yet",
+  "marketplaceTagline": "Buy. Own. Resell.",
+  "marketplaceSearchHint": "Search products, brands, categories...",
+  "marketplaceHeroTitle": "Buy. Own. Resell.",
+  "marketplaceHeroSubtitle": "Purchase products and resell eligible purchases through Bimo-Bond auctions.",
+  "marketplaceExploreCta": "Explore Marketplace",
+  "marketplaceCategories": "Categories",
+  "marketplaceRecommended": "Recommended for You",
+  "marketplaceEndingSoon": "Ending Soon Auctions",
+  "marketplaceNoAuctions": "No active auctions ending soon",
+  "marketplaceLiveAuction": "LIVE AUCTION",
+  "marketplaceAuctionLabel": "AUCTION",
+  "marketplaceCurrentBid": "Current Bid",
+  "marketplaceBidCount": "{count} Bids",
+  "@marketplaceBidCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "marketplaceViewAuction": "View Auction",
+  "marketplaceFilters": "Filters",
+  "marketplaceFilterPrice": "Price",
+  "marketplaceMin": "Min",
+  "marketplaceMax": "Max",
+  "marketplaceFilterListingType": "Listing type",
+  "marketplaceInStockOnly": "In stock only",
+  "marketplaceClearFilters": "Clear",
+  "marketplaceApplyFilters": "Apply",
+  "marketplaceSortPopular": "Popular",
+  "marketplaceSortEndingSoon": "Ending Soon",
+  "marketplaceProductCount": "{count} Products",
+  "@marketplaceProductCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "marketplaceTabPurchased": "Purchased",
+  "marketplaceTabPending": "Pending Delivery",
+  "marketplaceTabDelivered": "Delivered",
+  "marketplaceTabAuctioned": "Auctioned",
+  "marketplaceTabSold": "Sold",
+  "marketplaceNoProducts": "No products in this tab",
+  "marketplacePurchaseConfirmed": "Purchase Confirmed",
+  "marketplaceDeliveryLabel": "Delivery",
+  "marketplaceDeliveryPending": "Pending",
+  "marketplaceDeliveryShipped": "Shipped",
+  "marketplaceDeliveryDelivered": "Delivered",
+  "marketplaceTrackDelivery": "Track Delivery",
+  "marketplaceSellAtAuction": "Sell at Auction",
+  "marketplacePurchasePrice": "Purchase price",
+  "marketplaceStartingPrice": "Starting Price",
+  "marketplaceReservePrice": "Reserve Price",
+  "marketplaceBuyNowPrice": "Buy Now Price",
+  "marketplaceAuctionDuration": "Auction Duration",
+  "marketplaceDescription": "Description",
+  "marketplaceAuctionPreview": "Auction Preview",
+  "marketplacePublishAuction": "Publish Auction",
+  "marketplaceAuctionPublished": "Auction published",
+  "marketplacePlaceBid": "Place Bid",
+  "marketplaceYourBid": "Your Bid",
+  "marketplaceConfirmBid": "Confirm Bid",
+  "marketplaceEndsIn": "Ends in",
+  "marketplaceBidHistory": "Bid history",
+  "marketplaceNoBidsYet": "No bids yet",
+  "marketplaceSpecifications": "Specifications",
+  "marketplaceVerifiedProduct": "Verified Product",
+  "marketplaceSecurePayment": "Secure Payment",
+  "marketplaceBuyerProtection": "Buyer Protection",
+  "marketplaceDeliveryTracking": "Delivery Tracking"
 }

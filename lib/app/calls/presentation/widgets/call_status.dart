@@ -150,7 +150,7 @@ class CallStatusBadge extends StatelessWidget {
       case CallUiStatusState.callEnded:
       case CallUiStatusState.userDeclined:
       case CallUiStatusState.userUnavailable:
-        return LucideIcons.phoneOff;
+        return LucideIcons.phone;
     }
   }
 

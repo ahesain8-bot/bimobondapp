@@ -34,22 +34,28 @@ class StoryUserEntity extends Equatable {
   }
 
   PostUserEntity toPostUser() => PostUserEntity(
-        id: id,
-        username: username,
-        fullName: fullName,
-        avatarUrl: avatarUrl,
-      );
+    id: id,
+    username: username,
+    fullName: fullName,
+    avatarUrl: avatarUrl,
+  );
 
   SocialUserEntity toSocialUser() => SocialUserEntity(
-        id: id,
-        username: username,
-        fullName: fullName,
-        avatarUrl: avatarUrl,
-      );
+    id: id,
+    username: username,
+    fullName: fullName,
+    avatarUrl: avatarUrl,
+  );
 
   @override
-  List<Object?> get props =>
-      [id, username, fullName, avatarUrl, isVerified, isPrivate];
+  List<Object?> get props => [
+    id,
+    username,
+    fullName,
+    avatarUrl,
+    isVerified,
+    isPrivate,
+  ];
 }
 
 class StoryMediaEntity extends Equatable {
@@ -76,11 +82,8 @@ class StoryMediaEntity extends Equatable {
     );
   }
 
-  PostMediaEntity toPostMedia() => PostMediaEntity(
-        url: url,
-        mediaType: mediaType,
-        order: order,
-      );
+  PostMediaEntity toPostMedia() =>
+      PostMediaEntity(url: url, mediaType: mediaType, order: order);
 
   @override
   List<Object?> get props => [id, url, mediaType, order];
@@ -174,18 +177,37 @@ class StoryEntity extends Equatable {
     }
 
     return StoryEntity(
-      id: data['id']?.toString() ?? '',
-      userId: data['userId']?.toString() ??
+      id:
+          data['id']?.toString() ??
+          data['_id']?.toString() ??
+          data['storyId']?.toString() ??
+          '',
+      userId:
+          data['userId']?.toString() ??
+          data['authorId']?.toString() ??
           (userRaw is Map ? userRaw['id']?.toString() : null) ??
           '',
-      type: data['type']?.toString() ?? 'VIDEO',
+      type:
+          data['type']?.toString() ??
+          (data['videoUrl'] != null || data['video'] != null
+              ? 'VIDEO'
+              : 'IMAGE'),
       status: data['status']?.toString() ?? 'PUBLISHED',
       privacyStatus: data['privacyStatus']?.toString() ?? 'PUBLIC',
-      videoUrl: data['videoUrl']?.toString(),
+      videoUrl:
+          data['videoUrl']?.toString() ??
+          data['video']?.toString() ??
+          data['url']?.toString() ??
+          data['mediaUrl']?.toString(),
       hlsUrl: data['hlsUrl']?.toString(),
-      thumbnailUrl: data['thumbnailUrl']?.toString(),
+      thumbnailUrl:
+          data['thumbnailUrl']?.toString() ??
+          data['coverUrl']?.toString() ??
+          data['thumbnail']?.toString() ??
+          data['cover']?.toString(),
       animatedCoverUrl: data['animatedCoverUrl']?.toString(),
-      description: data['description']?.toString(),
+      description:
+          data['description']?.toString() ?? data['caption']?.toString(),
       ttlHours: data['ttlHours'] is int
           ? data['ttlHours'] as int
           : int.tryParse(data['ttlHours']?.toString() ?? '') ?? 24,
@@ -202,21 +224,30 @@ class StoryEntity extends Equatable {
       beautyEnabled: data['beautyEnabled'] is bool
           ? data['beautyEnabled'] as bool
           : null,
-      media: mediaRaw is List
+      media: mediaRaw is List && mediaRaw.isNotEmpty
           ? mediaRaw
-              .whereType<Map>()
-              .map((e) => StoryMediaEntity.fromJson(Map<String, dynamic>.from(e)))
-              .where((m) => m.url.isNotEmpty)
-              .toList()
-          : const [],
+                .whereType<Map>()
+                .map(
+                  (e) =>
+                      StoryMediaEntity.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .where((m) => m.url.isNotEmpty)
+                .toList()
+          : ((data['url'] != null || data['mediaUrl'] != null)
+                ? [
+                    StoryMediaEntity(
+                      id: data['id']?.toString() ?? '1',
+                      url: (data['url'] ?? data['mediaUrl'])!.toString(),
+                      mediaType: data['type']?.toString() ?? 'IMAGE',
+                    ),
+                  ]
+                : const []),
       hashtags: hashtags,
       user: userRaw is Map
           ? StoryUserEntity.fromJson(Map<String, dynamic>.from(userRaw))
           : null,
       location: locationRaw is Map
-          ? PostLocationEntity.fromJson(
-              Map<String, dynamic>.from(locationRaw),
-            )
+          ? PostLocationEntity.fromJson(Map<String, dynamic>.from(locationRaw))
           : null,
       createdAt: parseDate(data['createdAt']) ?? DateTime.now().toUtc(),
     );
@@ -224,6 +255,22 @@ class StoryEntity extends Equatable {
 
   /// Adapter so existing story UI (built on [PostEntity]) keeps working.
   PostEntity toPostEntity() {
+    final mediaList = media.isNotEmpty
+        ? media.map((m) => m.toPostMedia()).toList()
+        : ((videoUrl != null || thumbnailUrl != null)
+              ? [
+                  PostMediaEntity(
+                    // id: id.isNotEmpty ? id : '1',
+                    url:
+                        (type == 'VIDEO'
+                            ? videoUrl
+                            : (thumbnailUrl ?? videoUrl)) ??
+                        '',
+                    mediaType: type,
+                  ),
+                ]
+              : <PostMediaEntity>[]);
+
     return PostEntity(
       id: id,
       userId: userId,
@@ -244,7 +291,7 @@ class StoryEntity extends Equatable {
       isReposted: false,
       createdAt: createdAt,
       user: user?.toPostUser(),
-      media: media.map((m) => m.toPostMedia()).toList(),
+      media: mediaList,
       hashtags: hashtags,
       mentions: const [],
       isStory: true,
@@ -255,24 +302,24 @@ class StoryEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        userId,
-        type,
-        status,
-        privacyStatus,
-        videoUrl,
-        thumbnailUrl,
-        description,
-        ttlHours,
-        expiresAt,
-        viewCount,
-        isExpired,
-        hasViewed,
-        media,
-        hashtags,
-        user,
-        createdAt,
-      ];
+    id,
+    userId,
+    type,
+    status,
+    privacyStatus,
+    videoUrl,
+    thumbnailUrl,
+    description,
+    ttlHours,
+    expiresAt,
+    viewCount,
+    isExpired,
+    hasViewed,
+    media,
+    hashtags,
+    user,
+    createdAt,
+  ];
 }
 
 class StoryRingEntity extends Equatable {
@@ -294,29 +341,34 @@ class StoryRingEntity extends Equatable {
         : const StoryUserEntity(id: '', username: '');
     final stories = storiesRaw is List
         ? storiesRaw
-            .whereType<Map>()
-            .map((e) {
-              final map = Map<String, dynamic>.from(e);
-              map.putIfAbsent('userId', () => user.id);
-              map.putIfAbsent('user', () => {
+              .whereType<Map>()
+              .map((e) {
+                final map = Map<String, dynamic>.from(e);
+                map.putIfAbsent('userId', () => user.id);
+                map.putIfAbsent(
+                  'user',
+                  () => {
                     'id': user.id,
                     'username': user.username,
                     'fullName': user.fullName,
                     'avatarUrl': user.avatarUrl,
                     'isVerified': user.isVerified,
                     'isPrivate': user.isPrivate,
-                  });
-              map.putIfAbsent('type', () => 'IMAGE');
-              map.putIfAbsent('status', () => 'PUBLISHED');
-              map.putIfAbsent('privacyStatus', () => 'PUBLIC');
-              map.putIfAbsent(
-                'createdAt',
-                () => map['expiresAt'] ?? DateTime.now().toUtc().toIso8601String(),
-              );
-              return StoryEntity.fromJson(map);
-            })
-            .where((s) => s.id.isNotEmpty && s.isActive)
-            .toList()
+                  },
+                );
+                map.putIfAbsent('type', () => 'IMAGE');
+                map.putIfAbsent('status', () => 'PUBLISHED');
+                map.putIfAbsent('privacyStatus', () => 'PUBLIC');
+                map.putIfAbsent(
+                  'createdAt',
+                  () =>
+                      map['expiresAt'] ??
+                      DateTime.now().toUtc().toIso8601String(),
+                );
+                return StoryEntity.fromJson(map);
+              })
+              .where((s) => s.id.isNotEmpty && s.isActive)
+              .toList()
         : <StoryEntity>[];
 
     return StoryRingEntity(
@@ -331,10 +383,7 @@ class StoryRingEntity extends Equatable {
 }
 
 class StoryViewRecordResult extends Equatable {
-  const StoryViewRecordResult({
-    required this.recorded,
-    this.reason,
-  });
+  const StoryViewRecordResult({required this.recorded, this.reason});
 
   final bool recorded;
   final String? reason;
@@ -366,11 +415,11 @@ class StoryViewersPageEntity extends Equatable {
   bool get hasReachedMax => page >= lastPage;
 
   PostViewsPageEntity toPostViewsPage() => PostViewsPageEntity(
-        views: views,
-        page: page,
-        lastPage: lastPage,
-        total: total,
-      );
+    views: views,
+    page: page,
+    lastPage: lastPage,
+    total: total,
+  );
 
   factory StoryViewersPageEntity.fromJson(Map<String, dynamic> json) {
     final data = json['data'];
@@ -389,7 +438,7 @@ class StoryViewersPageEntity extends Equatable {
     final totalPages = meta['totalPages'] is int
         ? meta['totalPages'] as int
         : int.tryParse(meta['totalPages']?.toString() ?? '') ??
-            (limit == 0 ? 1 : (total / limit).ceil().clamp(1, 999999));
+              (limit == 0 ? 1 : (total / limit).ceil().clamp(1, 999999));
 
     final views = <PostViewEntity>[];
     if (data is List) {
@@ -495,63 +544,63 @@ class CreateStoryInput extends Equatable {
   final bool? beautyEnabled;
 
   Map<String, dynamic> toJson() => {
-        if (type != null) 'type': type,
-        if (videoUrl != null) 'videoUrl': videoUrl,
-        if (hlsUrl != null) 'hlsUrl': hlsUrl,
-        if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
-        if (animatedCoverUrl != null) 'animatedCoverUrl': animatedCoverUrl,
-        if (description != null) 'description': description,
-        if (status != null) 'status': status,
-        if (privacyStatus != null) 'privacyStatus': privacyStatus,
-        if (allowReplies != null) 'allowReplies': allowReplies,
-        if (allowSharing != null) 'allowSharing': allowSharing,
-        if (allowReactions != null) 'allowReactions': allowReactions,
-        if (ttlHours != null) 'ttlHours': ttlHours,
-        if (duration != null) 'duration': duration,
-        if (videoWidth != null) 'videoWidth': videoWidth,
-        if (videoHeight != null) 'videoHeight': videoHeight,
-        if (categoryId != null) 'categoryId': categoryId,
-        if (locationId != null) 'locationId': locationId,
-        if (location != null) 'location': location!.toJson(),
-        if (soundSegmentId != null) 'soundSegmentId': soundSegmentId,
-        if (soundId != null && soundSegmentId == null) 'soundId': soundId,
-        if (soundId != null &&
-            soundSegmentId == null &&
-            startMs != null &&
-            endMs != null) ...{
-          'startMs': startMs,
-          'endMs': endMs,
-        },
-        if (newSound != null && soundSegmentId == null && soundId == null)
-          'newSound': newSound,
-        if (media != null && media!.isNotEmpty)
-          'media': media!
-              .map(
-                (m) => {
-                  'url': m.url,
-                  'mediaType': m.mediaType,
-                  if (m.order != null) 'order': m.order,
-                },
-              )
-              .toList(),
-        if (filterName != null) 'filterName': filterName,
-        if (filterCategory != null) 'filterCategory': filterCategory,
-        if (effectSlug != null) 'effectSlug': effectSlug,
-        if (beautyEnabled != null) 'beautyEnabled': beautyEnabled,
-      };
+    if (type != null) 'type': type,
+    if (videoUrl != null) 'videoUrl': videoUrl,
+    if (hlsUrl != null) 'hlsUrl': hlsUrl,
+    if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+    if (animatedCoverUrl != null) 'animatedCoverUrl': animatedCoverUrl,
+    if (description != null) 'description': description,
+    if (status != null) 'status': status,
+    if (privacyStatus != null) 'privacyStatus': privacyStatus,
+    if (allowReplies != null) 'allowReplies': allowReplies,
+    if (allowSharing != null) 'allowSharing': allowSharing,
+    if (allowReactions != null) 'allowReactions': allowReactions,
+    if (ttlHours != null) 'ttlHours': ttlHours,
+    if (duration != null) 'duration': duration,
+    if (videoWidth != null) 'videoWidth': videoWidth,
+    if (videoHeight != null) 'videoHeight': videoHeight,
+    if (categoryId != null) 'categoryId': categoryId,
+    if (locationId != null) 'locationId': locationId,
+    if (location != null) 'location': location!.toJson(),
+    if (soundSegmentId != null) 'soundSegmentId': soundSegmentId,
+    if (soundId != null && soundSegmentId == null) 'soundId': soundId,
+    if (soundId != null &&
+        soundSegmentId == null &&
+        startMs != null &&
+        endMs != null) ...{
+      'startMs': startMs,
+      'endMs': endMs,
+    },
+    if (newSound != null && soundSegmentId == null && soundId == null)
+      'newSound': newSound,
+    if (media != null && media!.isNotEmpty)
+      'media': media!
+          .map(
+            (m) => {
+              'url': m.url,
+              'mediaType': m.mediaType,
+              if (m.order != null) 'order': m.order,
+            },
+          )
+          .toList(),
+    if (filterName != null) 'filterName': filterName,
+    if (filterCategory != null) 'filterCategory': filterCategory,
+    if (effectSlug != null) 'effectSlug': effectSlug,
+    if (beautyEnabled != null) 'beautyEnabled': beautyEnabled,
+  };
 
   @override
   List<Object?> get props => [
-        type,
-        videoUrl,
-        thumbnailUrl,
-        description,
-        privacyStatus,
-        ttlHours,
-        media,
-        soundId,
-        soundSegmentId,
-      ];
+    type,
+    videoUrl,
+    thumbnailUrl,
+    description,
+    privacyStatus,
+    ttlHours,
+    media,
+    soundId,
+    soundSegmentId,
+  ];
 }
 
 class StoryListPageEntity extends Equatable {
@@ -586,14 +635,14 @@ class StoryListPageEntity extends Equatable {
     final totalPages = meta['totalPages'] is int
         ? meta['totalPages'] as int
         : int.tryParse(meta['totalPages']?.toString() ?? '') ??
-            (limit == 0 ? 1 : (total / limit).ceil().clamp(1, 999999));
+              (limit == 0 ? 1 : (total / limit).ceil().clamp(1, 999999));
 
     final stories = data is List
         ? data
-            .whereType<Map>()
-            .map((e) => StoryEntity.fromJson(Map<String, dynamic>.from(e)))
-            .where((s) => s.id.isNotEmpty)
-            .toList()
+              .whereType<Map>()
+              .map((e) => StoryEntity.fromJson(Map<String, dynamic>.from(e)))
+              .where((s) => s.id.isNotEmpty)
+              .toList()
         : <StoryEntity>[];
 
     return StoryListPageEntity(

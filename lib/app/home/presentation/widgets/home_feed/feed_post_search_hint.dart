@@ -6,15 +6,46 @@ import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// Search pill text: post description, else author display name.
+/// Search pill text algorithm:
+/// 1. If post contains hashtags (#tag), recommend hashtags ONLY (excluding @mentions).
+/// 2. If no hashtags, recommend clean text with @mentions stripped out.
+/// 3. If no text or hashtags, recommend the full name of the post owner.
 String feedPostSearchRecommendation(PostEntity post) {
-  final desc = post.description?.trim();
-  if (desc != null && desc.isNotEmpty) {
-    final collapsed = desc.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (collapsed.length > 72) return collapsed.substring(0, 72);
-    return collapsed;
+  final desc = post.description?.trim() ?? '';
+
+  // 1. Extract hashtags (#tag)
+  final hashtagRegex = RegExp(
+    r'(?<![#\w])#([\w\u0600-\u06FF\u0590-\u05FF]+)',
+    unicode: true,
+  );
+  final hashtags = hashtagRegex
+      .allMatches(desc)
+      .map((m) => m.group(0)!)
+      .where((h) => h.isNotEmpty)
+      .toList();
+
+  if (hashtags.isNotEmpty) {
+    final lastHashtag = hashtags.last;
+    if (lastHashtag.length > 72) return lastHashtag.substring(0, 72);
+    return lastHashtag;
   }
 
+  // 2. No hashtags: strip @mentions and check remaining clean text
+  final mentionRegex = RegExp(
+    r'(?<![@\w])@([\w\u0600-\u06FF\u0590-\u05FF\._-]+)',
+    unicode: true,
+  );
+  final textWithoutMentions =
+      desc.replaceAll(mentionRegex, '').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  if (textWithoutMentions.isNotEmpty) {
+    if (textWithoutMentions.length > 72) {
+      return textWithoutMentions.substring(0, 72);
+    }
+    return textWithoutMentions;
+  }
+
+  // 3. No text or hashtags: recommend full name of the post owner
   final user = post.user;
   final fullName = user?.fullName?.trim();
   if (fullName != null && fullName.isNotEmpty) return fullName;

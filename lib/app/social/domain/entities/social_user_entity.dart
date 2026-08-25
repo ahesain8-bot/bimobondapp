@@ -11,6 +11,7 @@ class SocialUserEntity extends Equatable {
     this.isActive,
     this.isFollowing = false,
     this.isFollowedBy = false,
+    this.isCloseFriend = false,
     this.likedAt,
   });
 
@@ -21,6 +22,7 @@ class SocialUserEntity extends Equatable {
   final bool? isActive;
   final bool isFollowing;
   final bool isFollowedBy;
+  final bool isCloseFriend;
 
   /// When this user liked a post (post likes / story insights only).
   final DateTime? likedAt;
@@ -43,6 +45,7 @@ class SocialUserEntity extends Equatable {
     bool? isActive,
     bool? isFollowing,
     bool? isFollowedBy,
+    bool? isCloseFriend,
     DateTime? likedAt,
   }) {
     return SocialUserEntity(
@@ -53,6 +56,7 @@ class SocialUserEntity extends Equatable {
       isActive: isActive ?? this.isActive,
       isFollowing: isFollowing ?? this.isFollowing,
       isFollowedBy: isFollowedBy ?? this.isFollowedBy,
+      isCloseFriend: isCloseFriend ?? this.isCloseFriend,
       likedAt: likedAt ?? this.likedAt,
     );
   }

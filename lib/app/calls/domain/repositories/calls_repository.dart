@@ -37,4 +37,11 @@ abstract class CallsRepository {
     required String callId,
     required List<String> inviteeIds,
   });
+
+  Future<Either<Failure, Map<String, dynamic>>> getCallHistory({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? type,
+  });
 }

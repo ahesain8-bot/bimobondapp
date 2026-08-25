@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/calls/services/livekit_call_service.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/call_controls.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/call_status.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/video_views.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -89,10 +90,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final caller = widget.call.initiatedBy;
-    final displayName = caller.fullName?.isNotEmpty == true
-        ? caller.fullName!
-        : caller.username;
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final caller = widget.call.getDisplayUser(
+      currentUserId,
+      isOutgoing: widget.statusState == CallUiStatusState.calling ||
+          widget.statusState == CallUiStatusState.ringing,
+    );
+    final displayName = caller.displayName;
 
     return StreamBuilder<List<Participant>>(
       stream: widget.livekitService.onParticipantsChanged,
@@ -178,10 +182,56 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                               ),
                             ),
                           ),
-                          CallStatusBadge(
-                            status: widget.statusState,
-                            timerText: widget.timerText,
-                            isDark: true,
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.asset(
+                                      'assets/images/logo.png',
+                                      width: 16,
+                                      height: 16,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Image.asset(
+                                        'assets/images/app_icon.png',
+                                        width: 16,
+                                        height: 16,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.statusState == CallUiStatusState.connected
+                                    ? widget.timerText
+                                    : (widget.statusState == CallUiStatusState.calling
+                                        ? (Localizations.localeOf(context).languageCode == 'ar' ? 'جاري الاتصال...' : 'Calling...')
+                                        : (widget.statusState == CallUiStatusState.ringing
+                                            ? (Localizations.localeOf(context).languageCode == 'ar' ? 'يرن...' : 'Ringing...')
+                                            : widget.timerText)),
+                                style: const TextStyle(
+                                  color: Color(0xFFA5B4FC),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(width: 44),
                         ],
@@ -200,19 +250,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
                     opacity: _showControls ? 1.0 : 0.0,
-                    child: CallControls(
-                      isMuted: widget.isMuted,
-                      isCameraOff: widget.isCameraOff,
-                      isSpeakerOn: widget.isSpeakerOn,
-                      isVideoCall: true,
-                      onToggleMute: widget.onToggleMute,
-                      onToggleCamera: widget.onToggleCamera,
-                      onSwitchCamera: widget.onSwitchCamera,
-                      onToggleSpeaker: widget.onToggleSpeaker,
-                      onAddParticipant: widget.onAddParticipant,
-                      onToggleCallType: widget.onSwitchToVoice,
-                      onEndCall: widget.onEndCall,
-                      isDark: true,
+                    child: Center(
+                      child: CallControls(
+                        isMuted: widget.isMuted,
+                        isCameraOff: widget.isCameraOff,
+                        isSpeakerOn: widget.isSpeakerOn,
+                        isVideoCall: true,
+                        onToggleMute: widget.onToggleMute,
+                        onToggleCamera: widget.onToggleCamera,
+                        onSwitchCamera: widget.onSwitchCamera,
+                        onToggleSpeaker: widget.onToggleSpeaker,
+                        onAddParticipant: widget.onAddParticipant,
+                        onToggleCallType: widget.onSwitchToVoice,
+                        onEndCall: widget.onEndCall,
+                        isDark: true,
+                      ),
                     ),
                   ),
                 ),

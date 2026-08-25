@@ -102,12 +102,17 @@ class LiquidGlassBottomNav extends StatelessWidget {
   final Widget? center;
   final int centerInsertAfter;
 
-  /// Gradient add button used in the logged-in nav center slot.
   static Widget addButton({
     required BuildContext context,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
+    const double edge = 3.5;
+    const radius = BorderRadius.all(
+      Radius.circular(HomeLayoutConstants.addButtonRadius),
+    );
+    final cs = Theme.of(context).colorScheme;
+    final primaryColor = cs.primary;
+    final secondaryColor = cs.secondary;
 
     return GestureDetector(
       onTap: onTap,
@@ -115,33 +120,64 @@ class LiquidGlassBottomNav extends StatelessWidget {
         padding: const EdgeInsets.only(
           bottom: HomeLayoutConstants.navItemBottomPadding,
         ),
-        child: Container(
+        child: SizedBox(
           width: HomeLayoutConstants.addButtonWidth,
           height: HomeLayoutConstants.addButtonHeight,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(
-              HomeLayoutConstants.addButtonRadius,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                blurRadius: HomeLayoutConstants.addButtonShadowBlur,
-                offset: const Offset(
-                  0,
-                  HomeLayoutConstants.addButtonShadowOffsetY,
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: HomeLayoutConstants.addButtonWidth - edge,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: radius,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: HomeLayoutConstants.addButtonWidth - edge,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: secondaryColor,
+                    borderRadius: radius,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: edge,
+                right: edge,
+                top: 0,
+                bottom: 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primaryColor, secondaryColor],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: radius,
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.35),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Colors.white,
+                    size: HomeLayoutConstants.addButtonIconSize,
+                  ),
                 ),
               ),
             ],
-          ),
-          child: Icon(
-            Icons.add,
-            color: theme.colorScheme.onPrimary,
-            size: HomeLayoutConstants.addButtonIconSize,
           ),
         ),
       ),
@@ -157,9 +193,15 @@ class LiquidGlassBottomNav extends StatelessWidget {
         ? feedOverlay.overlayForegroundMuted
         : theme.colorScheme.onSurface.withValues(alpha: 0.45);
 
-    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.85, maxScale: 1.15);
-    final topPadding = (HomeLayoutConstants.bottomNavTopPadding * heightScale).clamp(4.0, 12.0);
-    final safeExtra = (HomeLayoutConstants.bottomNavSafeExtra * heightScale).clamp(4.0, 12.0);
+    final heightScale = HomeLayoutConstants.heightScale(
+      context,
+      minScale: 0.85,
+      maxScale: 1.15,
+    );
+    final topPadding = (HomeLayoutConstants.bottomNavTopPadding * heightScale)
+        .clamp(4.0, 12.0);
+    final safeExtra = (HomeLayoutConstants.bottomNavSafeExtra * heightScale)
+        .clamp(4.0, 12.0);
 
     Widget navBar = Container(
       decoration: BoxDecoration(
@@ -173,9 +215,7 @@ class LiquidGlassBottomNav extends StatelessWidget {
               ),
       ),
       padding: EdgeInsets.only(
-        bottom:
-            MediaQuery.viewPaddingOf(context).bottom +
-            safeExtra,
+        bottom: MediaQuery.viewPaddingOf(context).bottom + safeExtra,
         top: topPadding,
       ),
       child: Row(
@@ -257,10 +297,21 @@ class _LiquidGlassBottomNavTile extends StatelessWidget {
     final theme = Theme.of(context);
     final color = isSelected ? selectedColor : unselectedColor;
 
-    final heightScale = HomeLayoutConstants.heightScale(context, minScale: 0.85, maxScale: 1.15);
-    final size = (HomeLayoutConstants.navIconSize * heightScale).clamp(22.0, 32.0);
-    final fontSize = (HomeLayoutConstants.navLabelFontSize * heightScale).clamp(8.0, 11.0);
-    final iconLabelGap = (HomeLayoutConstants.navIconLabelGap * heightScale).clamp(1.0, 4.0);
+    final heightScale = HomeLayoutConstants.heightScale(
+      context,
+      minScale: 0.85,
+      maxScale: 1.15,
+    );
+    final size = (HomeLayoutConstants.navIconSize * heightScale).clamp(
+      22.0,
+      32.0,
+    );
+    final fontSize = (HomeLayoutConstants.navLabelFontSize * heightScale).clamp(
+      8.0,
+      11.0,
+    );
+    final iconLabelGap = (HomeLayoutConstants.navIconLabelGap * heightScale)
+        .clamp(1.0, 4.0);
 
     final resolvedAsset = isSelected
         ? (selectedAssetPath ?? assetPath)
