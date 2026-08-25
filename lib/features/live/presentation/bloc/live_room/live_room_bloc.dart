@@ -8,6 +8,7 @@ import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service
 
 import '../../../../../core/network/api_exceptions.dart';
 import '../../../../../core/models/live_battle.dart';
+import '../../../../../core/models/live_competition_request.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_chat_feed_merge.dart';
@@ -85,6 +86,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomCommentsResyncRequested>(_onCommentsResync);
     on<LiveRoomGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveRoomGuestRequestAnswered>(_onGuestRequestAnswered);
+    on<LiveRoomCompetitionRequestAnswered>(_onCompetitionRequestAnswered);
     on<LiveRoomGalleryChanged>(_onGalleryChanged);
     on<LiveRoomSettingsApplied>(_onSettingsApplied);
     on<LiveRoomModerationRequested>(_onModerationRequested);
@@ -948,7 +950,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     final battle = event.battle?.withTimingFrom(current.battle);
-    emit(current.copyWith(battle: battle));
+    emit(
+      current.copyWith(
+        battle: battle,
+        pendingCompetitionRequest: battle?.isActive == true
+            ? null
+            : current.pendingCompetitionRequest,
+        isCompetitionActionBusy: false,
+      ),
+    );
     if (battle?.isActive != true) {
       await _sessionRepository.disconnectBattleOpponentMedia();
       return;
@@ -991,14 +1001,155 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       if (isClosed) return;
       final ready = _readyOrNull;
       if (ready == null || ready.session.id != liveId) return;
+      final merged = mergeLiveChatMessages(history, ready.session.messages);
+      LiveCompetitionRequest? pending = ready.pendingCompetitionRequest;
+      for (final message in merged.reversed) {
+        final request = _competitionRequestFrom(ready, message);
+        if (request != null) {
+          pending = request;
+          break;
+        }
+      }
       emit(
         ready.copyWith(
           session: ready.session.copyWith(
-            messages: mergeLiveChatMessages(history, ready.session.messages),
+            messages: merged
+                .where((message) => !isLiveCompetitionRequest(message.body))
+                .toList(growable: false),
           ),
+          pendingCompetitionRequest: ready.isBattleActive ? null : pending,
         ),
       );
     } catch (_) {}
+  }
+
+  LiveCompetitionRequest? _competitionRequestFrom(
+    LiveRoomReady current,
+    LiveChatMessage message,
+  ) {
+    if (!isLiveCompetitionRequest(message.body)) return null;
+    final userId = message.userId;
+    if (userId == null || userId.isEmpty || userId == current.session.host.id) {
+      return null;
+    }
+    // Do not require the roster to have refreshed yet here. The guest can tap
+    // immediately after joining while the host's GET /guests is still in
+    // flight. Acceptance validates the ACTIVE roster again before it calls
+    // the battle API, so an ordinary viewer cannot start a match by typing
+    // the same sentence.
+    final displayName = message.username?.trim();
+    return LiveCompetitionRequest(
+      commentId: message.id,
+      userId: userId,
+      displayName: displayName?.isNotEmpty == true ? displayName! : 'ضيف',
+      avatarUrl: message.avatarUrl,
+    );
+  }
+
+  Future<void> _onCompetitionRequestAnswered(
+    LiveRoomCompetitionRequestAnswered event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    final request = current?.pendingCompetitionRequest;
+    if (current == null ||
+        request == null ||
+        request.commentId != event.commentId ||
+        current.isCompetitionActionBusy) {
+      return;
+    }
+
+    if (!event.accepted) {
+      emit(current.copyWith(pendingCompetitionRequest: null));
+      try {
+        await _sessionRepository.deleteComment(
+          liveId: current.session.id,
+          commentId: request.commentId,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    if (current.isBattleActive) {
+      emit(
+        current.copyWith(
+          pendingCompetitionRequest: null,
+          actionMessage: 'هناك جولة منافسة نشطة بالفعل',
+        ),
+      );
+      return;
+    }
+
+    final guestStillActive = current.activeGuests.any(
+      (guest) => guest.userId == request.userId,
+    );
+    if (!guestStillActive) {
+      emit(
+        current.copyWith(
+          pendingCompetitionRequest: null,
+          actionMessage: 'غادر الضيف المسرح قبل بدء المنافسة',
+        ),
+      );
+      return;
+    }
+
+    emit(
+      current.copyWith(isCompetitionActionBusy: true, clearActionMessage: true),
+    );
+    try {
+      // Battle creation is owner-only. Auto-match is the documented one-tap
+      // endpoint and returns the ACTIVE snapshot that drives both screens.
+      final battle = await _sessionRepository.matchBattle(current.session.id);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null || ready.session.id != current.session.id) return;
+      if (!battle.isActive) {
+        emit(
+          ready.copyWith(
+            isCompetitionActionBusy: false,
+            actionMessage: 'لم يبدأ الخادم جولة المنافسة، حاول مرة أخرى',
+          ),
+        );
+        return;
+      }
+      try {
+        await _sessionRepository.deleteComment(
+          liveId: current.session.id,
+          commentId: request.commentId,
+        );
+      } catch (_) {}
+      if (isClosed) return;
+      final latest = _readyOrNull;
+      if (latest == null) return;
+      emit(
+        latest.copyWith(
+          pendingCompetitionRequest: null,
+          isCompetitionActionBusy: false,
+          actionMessage: 'بدأت جولة المنافسة',
+        ),
+      );
+      add(LiveRoomBattleChanged(battle));
+    } on ApiException catch (e) {
+      final ready = _readyOrNull;
+      if (ready != null) {
+        emit(
+          ready.copyWith(
+            isCompetitionActionBusy: false,
+            actionMessage: 'تعذر بدء المنافسة: ${e.message}',
+          ),
+        );
+      }
+    } catch (e) {
+      final ready = _readyOrNull;
+      if (ready != null) {
+        emit(
+          ready.copyWith(
+            isCompetitionActionBusy: false,
+            actionMessage: 'تعذر بدء المنافسة: $e',
+          ),
+        );
+      }
+    }
   }
 
   /// This user accepting or declining an invite onto someone else's stage.
@@ -1299,6 +1450,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         // a red banner/SnackBar; Socket.IO keeps retrying in the background.
         emit(current.copyWith(isRealtimeConnected: false));
       case LiveHudCommentEvent(:final message):
+        final competitionRequest = _competitionRequestFrom(current, message);
+        if (competitionRequest != null) {
+          emit(
+            current.copyWith(
+              pendingCompetitionRequest: current.isBattleActive
+                  ? null
+                  : competitionRequest,
+            ),
+          );
+          return;
+        }
         if (current.session.messages.any((m) => m.id == message.id)) {
           return;
         }

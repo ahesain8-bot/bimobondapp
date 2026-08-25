@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
 import '../../../../../core/models/live_battle.dart';
+import '../../../../../core/models/live_competition_request.dart';
 import '../../../data/services/fake_livekit_service.dart';
 import '../../../data/services/fake_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
@@ -847,7 +848,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     emit(state.copyWith(isGuestActionBusy: true));
     final result = await commentRepository.sendComment(
       liveId: liveId,
-      content: '⚔️ أطلب بدء جولة منافسة',
+      content: liveCompetitionRequestContent,
     );
     if (isClosed || _activeLiveId != liveId) return;
     await result.fold(

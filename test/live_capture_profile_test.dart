@@ -56,10 +56,10 @@ void main() {
       LiveVideoQualityPreference.instance.select(LiveCaptureProfile.preferred);
     });
 
-    test('defaults to the 1080p ceiling', () {
+    test('defaults to the stable 720p profile', () {
       expect(
         LiveVideoQualityPreference.instance.profile,
-        LiveCaptureProfile.fullHd,
+        LiveCaptureProfile.hd,
       );
     });
 
@@ -69,12 +69,12 @@ void main() {
       void listener() => notifications++;
 
       preference.addListener(listener);
-      preference.select(LiveCaptureProfile.hd);
-      preference.select(LiveCaptureProfile.hd);
+      preference.select(LiveCaptureProfile.fullHd);
+      preference.select(LiveCaptureProfile.fullHd);
       preference.removeListener(listener);
 
       expect(notifications, 1);
-      expect(preference.profile, LiveCaptureProfile.hd);
+      expect(preference.profile, LiveCaptureProfile.fullHd);
     });
   });
 }

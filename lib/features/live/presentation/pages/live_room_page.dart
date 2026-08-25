@@ -31,6 +31,7 @@ import '../widgets/room/live_room_bottom_bar.dart';
 import '../widgets/room/live_room_camera_layer.dart';
 import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
+import '../widgets/room/live_room_competition_request_prompt.dart';
 import '../widgets/room/live_room_guest_invite_prompt.dart';
 import '../widgets/room/live_room_guest_request_prompt.dart';
 import '../widgets/room/live_room_stage.dart';
@@ -451,6 +452,7 @@ class _LiveRoomBody extends StatelessWidget {
                       ],
                     ),
                   ),
+                  LiveRoomCompetitionRequestPrompt(),
                   LiveRoomGuestRequestPrompt(),
                   LiveRoomGuestInvitePrompt(),
                   LiveRoomChatComposer(),

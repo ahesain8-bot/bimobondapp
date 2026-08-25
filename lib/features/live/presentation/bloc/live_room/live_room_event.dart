@@ -272,6 +272,17 @@ class LiveRoomGuestRequestAnswered extends LiveRoomEvent {
   final bool accepted;
 }
 
+/// Host answers an accepted guest's request to start a PK round.
+class LiveRoomCompetitionRequestAnswered extends LiveRoomEvent {
+  const LiveRoomCompetitionRequestAnswered({
+    required this.commentId,
+    required this.accepted,
+  });
+
+  final String commentId;
+  final bool accepted;
+}
+
 /// Guest list changed — refresh pending invite badge.
 class LiveRoomGuestsChanged extends LiveRoomEvent {
   const LiveRoomGuestsChanged();
