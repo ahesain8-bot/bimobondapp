@@ -4513,4 +4513,191 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get failedToAddStoryToHighlight => 'فشل إضافة القصة إلى الهايلايت';
+
+  @override
+  String get marketplaceTitle => 'السوق';
+
+  @override
+  String get marketplaceLikedProducts => 'المنتجات المفضلة';
+
+  @override
+  String get marketplaceNoLikedProducts => 'لا توجد منتجات مفضلة بعد';
+
+  @override
+  String get marketplaceTagline => 'اشترِ. امتلك. أعد البيع.';
+
+  @override
+  String get marketplaceSearchHint => 'ابحث عن منتجات، علامات تجارية، فئات...';
+
+  @override
+  String get marketplaceHeroTitle => 'اشترِ. امتلك. أعد البيع.';
+
+  @override
+  String get marketplaceHeroSubtitle => 'اشترِ المنتجات وأعد بيع المشتريات المؤهلة عبر مزادات Bimo-Bond.';
+
+  @override
+  String get marketplaceExploreCta => 'استكشف السوق';
+
+  @override
+  String get marketplaceCategories => 'الفئات';
+
+  @override
+  String get marketplaceRecommended => 'موصى به لك';
+
+  @override
+  String get marketplaceEndingSoon => 'مزادات تنتهي قريباً';
+
+  @override
+  String get marketplaceNoAuctions => 'لا توجد مزادات نشطة تنتهي قريباً';
+
+  @override
+  String get marketplaceLiveAuction => 'مزاد مباشر';
+
+  @override
+  String get marketplaceAuctionLabel => 'مزاد';
+
+  @override
+  String get marketplaceCurrentBid => 'المزايدة الحالية';
+
+  @override
+  String marketplaceBidCount(int count) {
+    return '$count مزايدة';
+  }
+
+  @override
+  String get marketplaceViewAuction => 'عرض المزاد';
+
+  @override
+  String get marketplaceFilters => 'الفلاتر';
+
+  @override
+  String get marketplaceFilterPrice => 'السعر';
+
+  @override
+  String get marketplaceMin => 'الحد الأدنى';
+
+  @override
+  String get marketplaceMax => 'الحد الأقصى';
+
+  @override
+  String get marketplaceFilterListingType => 'نوع العرض';
+
+  @override
+  String get marketplaceInStockOnly => 'متوفر فقط';
+
+  @override
+  String get marketplaceClearFilters => 'مسح';
+
+  @override
+  String get marketplaceApplyFilters => 'تطبيق';
+
+  @override
+  String get marketplaceSortPopular => 'الأكثر شعبية';
+
+  @override
+  String get marketplaceSortEndingSoon => 'ينتهي قريباً';
+
+  @override
+  String marketplaceProductCount(int count) {
+    return '$count منتج';
+  }
+
+  @override
+  String get marketplaceTabPurchased => 'مشتريات';
+
+  @override
+  String get marketplaceTabPending => 'قيد التوصيل';
+
+  @override
+  String get marketplaceTabDelivered => 'تم التسليم';
+
+  @override
+  String get marketplaceTabAuctioned => 'في المزاد';
+
+  @override
+  String get marketplaceTabSold => 'مباع';
+
+  @override
+  String get marketplaceNoProducts => 'لا توجد منتجات في هذا القسم';
+
+  @override
+  String get marketplacePurchaseConfirmed => 'تم تأكيد الشراء';
+
+  @override
+  String get marketplaceDeliveryLabel => 'التوصيل';
+
+  @override
+  String get marketplaceDeliveryPending => 'قيد الانتظار';
+
+  @override
+  String get marketplaceDeliveryShipped => 'تم الشحن';
+
+  @override
+  String get marketplaceDeliveryDelivered => 'تم التسليم';
+
+  @override
+  String get marketplaceTrackDelivery => 'تتبع التوصيل';
+
+  @override
+  String get marketplaceSellAtAuction => 'بيع في المزاد';
+
+  @override
+  String get marketplacePurchasePrice => 'سعر الشراء';
+
+  @override
+  String get marketplaceStartingPrice => 'سعر البداية';
+
+  @override
+  String get marketplaceReservePrice => 'سعر احتياطي';
+
+  @override
+  String get marketplaceBuyNowPrice => 'سعر الشراء الفوري';
+
+  @override
+  String get marketplaceAuctionDuration => 'مدة المزاد';
+
+  @override
+  String get marketplaceDescription => 'الوصف';
+
+  @override
+  String get marketplaceAuctionPreview => 'معاينة المزاد';
+
+  @override
+  String get marketplacePublishAuction => 'نشر المزاد';
+
+  @override
+  String get marketplaceAuctionPublished => 'تم نشر المزاد';
+
+  @override
+  String get marketplacePlaceBid => 'قدّم مزايدة';
+
+  @override
+  String get marketplaceYourBid => 'مزايدتك';
+
+  @override
+  String get marketplaceConfirmBid => 'تأكيد المزايدة';
+
+  @override
+  String get marketplaceEndsIn => 'ينتهي خلال';
+
+  @override
+  String get marketplaceBidHistory => 'سجل المزايدات';
+
+  @override
+  String get marketplaceNoBidsYet => 'لا توجد مزايدات بعد';
+
+  @override
+  String get marketplaceSpecifications => 'المواصفات';
+
+  @override
+  String get marketplaceVerifiedProduct => 'منتج موثّق';
+
+  @override
+  String get marketplaceSecurePayment => 'دفع آمن';
+
+  @override
+  String get marketplaceBuyerProtection => 'حماية المشتري';
+
+  @override
+  String get marketplaceDeliveryTracking => 'تتبع التوصيل';
 }

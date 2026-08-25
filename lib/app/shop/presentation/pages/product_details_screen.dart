@@ -8,6 +8,8 @@ import 'package:bimobondapp/app/shop/presentation/di/shop_injector.dart'
     as shop_di;
 import 'package:bimobondapp/app/shop/presentation/pages/checkout_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/theme/shop_theme.dart';
+import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_product_details_widgets.dart';
+import 'package:bimobondapp/app/marketplace/presentation/widgets/rating_widget.dart';
 import 'package:bimobondapp/app/shop/presentation/widgets/product_image_gallery.dart';
 import 'package:bimobondapp/app/shop/presentation/widgets/product_price.dart';
 import 'package:bimobondapp/app/shop/presentation/widgets/product_skeleton.dart';
@@ -251,15 +253,14 @@ class _ProductDetailsViewState extends State<_ProductDetailsView> {
                               ),
                               if (product.seller != null) ...[
                                 const SizedBox(height: AppSizes.p10),
-                                Text(
-                                  product.seller!.username,
-                                  style: TextStyle(
-                                    color: theme.mutedText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                                SellerCard(seller: product.seller!),
                               ],
+                              const SizedBox(height: AppSizes.p12),
+                              const RatingWidget(rating: 4.8, reviewCount: 128),
+                              const SizedBox(height: AppSizes.p16),
+                              const MarketplaceTrustSection(),
+                              const SizedBox(height: AppSizes.p16),
+                              ProductSpecificationSection(product: product),
                               if (description.isNotEmpty) ...[
                                 const SizedBox(height: AppSizes.p16),
                                 Text.rich(
