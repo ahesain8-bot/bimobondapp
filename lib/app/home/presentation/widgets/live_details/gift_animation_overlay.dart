@@ -495,7 +495,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           );
         }
         if (_lottieFailed) return _fallbackVisual();
-        return _loadingVisual();
+        // Thumbnail is a failure fallback only — drawing it while the
+        // composition loads reads as a static gift, then a late animation.
+        return const SizedBox.expand();
       case _GiftMediaKind.video:
         if (_videoFailed) return _fallbackVisual();
         final controller = _videoController;
