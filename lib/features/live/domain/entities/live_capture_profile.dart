@@ -64,9 +64,13 @@ class LiveCaptureProfile {
   /// so a weak handset degrades honestly instead of failing to open.
   static const List<LiveCaptureProfile> ladder = [fullHd, hd, sd];
 
-  /// Default host target. Devices that cannot sustain it fall back down
-  /// [ladder] on their own.
-  static const LiveCaptureProfile preferred = fullHd;
+  /// Stable default for live publishing.
+  ///
+  /// 1080p stays available in the quality picker, but it must be an explicit
+  /// choice. A number of Android Camera2 implementations report 1080p as
+  /// supported and then fail asynchronously while configuring the capture
+  /// session, leaving a valid-looking LiveKit track that produces no frames.
+  static const LiveCaptureProfile preferred = hd;
 
   /// The profiles at or below [this], highest first.
   ///

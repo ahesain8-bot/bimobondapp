@@ -118,7 +118,7 @@ class LiveSessionMapper {
       body: content,
       avatarUrl: user?['avatarUrl']?.toString() ?? user?['avatar']?.toString(),
       showBadge: (gifterLevel ?? 0) > 0,
-      userId: user?['id']?.toString(),
+      userId: user?['id']?.toString() ?? source['userId']?.toString(),
       username: username,
       gifterLevel: gifterLevel,
       isPinned: source['isPinned'] == true || source['pinned'] == true,

@@ -1,12 +1,29 @@
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/video_post/video_post_gradient_overlay.dart';
 import 'package:bimobondapp/core/utils/app_assets.dart';
+import 'package:bimobondapp/features/live/domain/repositories/camera_repository.dart';
+import 'package:bimobondapp/features/live/domain/usecases/dispose_camera.dart';
+import 'package:bimobondapp/features/live/domain/usecases/initialize_camera.dart';
 import 'package:bimobondapp/features/live/presentation/widgets/start_live/tool_button.dart';
+import 'package:bimobondapp/features/live_source/presentation/bloc/start_live/live_bloc.dart'
+    as source;
+import 'package:bimobondapp/features/live_source/presentation/widgets/start_live/tools_row.dart'
+    as source;
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The narrowest phone the app ships on, and the width the device in the bug
 /// report reports (`w360dp`).
 const double _phoneWidth = 360;
+
+class _NoopCameraRepository implements CameraRepository {
+  @override
+  Future<CameraController?> initialize({required bool useFront}) async => null;
+
+  @override
+  Future<void> dispose(CameraController controller) async {}
+}
 
 Widget toolsBlock() => FittedBox(
   fit: BoxFit.scaleDown,
@@ -107,6 +124,42 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the real go-live tools are responsive from 280dp to tablet', (
+    tester,
+  ) async {
+    final camera = _NoopCameraRepository();
+    final bloc = source.LiveBloc(
+      initializeCamera: InitializeCamera(camera),
+      disposeCamera: DisposeCamera(camera),
+    );
+    addTearDown(bloc.close);
+    addTearDown(tester.view.reset);
+
+    for (final width in <double>[280, 320, 360, 412, 720]) {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider<source.LiveBloc>.value(
+            value: bloc,
+            child: const Scaffold(body: source.ToolsRow()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'go-live tools overflowed at ${width}dp',
+      );
+      expect(
+        tester.getRect(find.byType(source.ToolsRow)).right,
+        lessThanOrEqualTo(width),
+      );
+    }
   });
 
   testWidgets('the feed gradient overlay does not fight its own Positioned', (

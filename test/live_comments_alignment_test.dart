@@ -16,6 +16,7 @@ Future<void> pumpFeed(
   WidgetTester tester, {
   required TextDirection direction,
   required List<CommentEntity> comments,
+  bool highContrast = false,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -23,7 +24,11 @@ Future<void> pumpFeed(
         textDirection: direction,
         child: Scaffold(
           backgroundColor: Colors.black,
-          body: CommentsSection(comments: comments, height: 200),
+          body: CommentsSection(
+            comments: comments,
+            height: 200,
+            highContrast: highContrast,
+          ),
         ),
       ),
     ),
@@ -128,5 +133,23 @@ void main() {
 
     expect(find.byType(TikTokCommentBubble), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('battle comments use an opaque dark contrast surface', (
+    tester,
+  ) async {
+    await pumpFeed(
+      tester,
+      direction: TextDirection.rtl,
+      comments: [comment('1', 'تعليق المنافسة')],
+      highContrast: true,
+    );
+
+    final bubble = tester.widget<Container>(
+      find.byKey(const ValueKey('comment-bubble-1')),
+    );
+    final decoration = bubble.decoration! as BoxDecoration;
+    expect(decoration.color, const Color(0xD90B0B0D));
+    expect(find.text('تعليق المنافسة'), findsOneWidget);
   });
 }
