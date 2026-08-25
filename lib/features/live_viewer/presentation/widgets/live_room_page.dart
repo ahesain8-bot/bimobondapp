@@ -152,22 +152,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openRanking(LiveEntity live) {
-    final entries = List.generate(8, (i) {
-      return RankingEntry(
-        rank: i + 1,
-        userId: 'rank_$i',
-        username: i == 2 ? live.hostName : 'Creator ${i + 1}',
-        subtitle: i.isEven ? '#FanClub' : 'Rising star',
-        avatarUrl: 'https://i.pravatar.cc/150?u=rank_${live.id}_$i',
-        score: 900000 - i * 87000,
-        isLive: i == 2 || i == 4 || i == 5,
-      );
-    });
     showHourlyRankingSheet(
       context,
+      liveId: live.id,
       hostName: live.hostName,
       hostAvatar: live.hostAvatar,
-      entries: entries,
       onJoinFanClub: () {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
