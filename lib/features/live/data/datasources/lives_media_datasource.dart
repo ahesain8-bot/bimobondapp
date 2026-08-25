@@ -14,6 +14,7 @@ import '../../domain/entities/live_capture_profile.dart';
 class LivesMediaDataSource {
   Room? _room;
   Room? _battleRoom;
+  Room? _battleRecoveryRoom;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
@@ -36,6 +37,10 @@ class LivesMediaDataSource {
 
   /// Subscribe-only room for the other host during a PK battle.
   Room? get battleRoom => _battleRoom;
+
+  bool get isBattleRoomUsable =>
+      _battleRoom != null &&
+      _battleRoom!.connectionState != ConnectionState.disconnected;
 
   /// Local camera track for [VideoTrackRenderer] preview (host/guest).
   LocalVideoTrack? get localVideoTrack => _videoTrack;
@@ -563,9 +568,112 @@ class LivesMediaDataSource {
         ),
       ),
     );
+    room.events
+      ..on<RoomDisconnectedEvent>((_) {
+        if (_battleRoom != room) return;
+        debugPrint('🔴 [Host] opponent battle room disconnected');
+        onRoomEvent?.call('battle', 'disconnected');
+        unawaited(_recoverBattleRoom(room: room, url: url, token: token));
+      })
+      ..on<ReconnectingEvent>((_) {
+        if (_battleRoom != room) return;
+        onRoomEvent?.call('battle', 'reconnecting');
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        if (_battleRoom != room) return;
+        onRoomEvent?.call('battle', 'reconnected');
+        unawaited(_ensureBattleSubscriptions(room));
+        unawaited(_preferMediaSpeaker());
+      })
+      ..on<TrackSubscriptionExceptionEvent>((event) {
+        unawaited(_retryBattleSubscription(room, event));
+      })
+      ..on<TrackSubscribedEvent>((event) {
+        if (_battleRoom != room) return;
+        if (event.track is RemoteAudioTrack) {
+          unawaited(_preferMediaSpeaker());
+        }
+      });
     await room.connect(url, token);
     _battleRoom = room;
+    await _ensureBattleSubscriptions(room);
     await _preferMediaSpeaker();
+  }
+
+  Future<void> _retryBattleSubscription(
+    Room room,
+    TrackSubscriptionExceptionEvent event,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (_battleRoom != room) return;
+    final participant = event.participant;
+    if (participant == null) return;
+    final publication = participant.trackPublications[event.sid];
+    if (publication is! RemoteTrackPublication || publication.subscribed) {
+      return;
+    }
+    try {
+      await publication.subscribe();
+    } catch (error) {
+      debugPrint('[Host] opponent track resubscribe failed: $error');
+    }
+  }
+
+  Future<void> _ensureBattleSubscriptions(Room room) async {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.trackPublications.values) {
+        if (publication.subscribed) continue;
+        try {
+          await publication.subscribe();
+        } catch (error) {
+          debugPrint('[Host] opponent track restore failed: $error');
+        }
+      }
+    }
+  }
+
+  Future<void> _recoverBattleRoom({
+    required Room room,
+    required String url,
+    required String token,
+  }) async {
+    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    _battleRecoveryRoom = room;
+    const retryDelays = <Duration>[
+      Duration(milliseconds: 250),
+      Duration(milliseconds: 900),
+      Duration(milliseconds: 1800),
+    ];
+    try {
+      for (var attempt = 0; attempt < retryDelays.length; attempt++) {
+        await Future<void>.delayed(retryDelays[attempt]);
+        if (_battleRoom != room) return;
+        if (room.connectionState == ConnectionState.connected) {
+          await _ensureBattleSubscriptions(room);
+          return;
+        }
+        if (room.connectionState != ConnectionState.disconnected) return;
+        try {
+          debugPrint(
+            '🔄 [Host] opponent terminal reconnect '
+            '${attempt + 1}/${retryDelays.length}',
+          );
+          await room.connect(url, token);
+          if (_battleRoom != room) {
+            await room.disconnect();
+            return;
+          }
+          await _ensureBattleSubscriptions(room);
+          await _preferMediaSpeaker();
+          onRoomEvent?.call('battle', 'reconnected');
+          return;
+        } catch (error) {
+          debugPrint('[Host] opponent reconnect attempt failed: $error');
+        }
+      }
+    } finally {
+      if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
+    }
   }
 
   Future<void> disconnectBattle() async {

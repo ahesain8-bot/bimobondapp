@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:livekit_client/livekit_client.dart' show ConnectionState;
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
@@ -1586,6 +1587,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     } catch (_) {}
     return fb.FirebaseAuth.instance.currentUser?.uid;
   }
+
   Future<void> _refreshBattle(
     String liveId,
     Emitter<LiveViewerState> emit,
@@ -1613,6 +1615,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       // fail because this optional enrichment endpoint is unavailable.
     }
   }
+
   Future<void> _applyBattle(
     LiveBattle battle,
     Emitter<LiveViewerState> emit,
@@ -1633,8 +1636,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     }
     final opponentId = battle.opponentLiveId(liveId);
     if (opponentId.isEmpty || opponentId == liveId) return;
+    final battleRoom = liveKitService.battleRoom;
     if (_battleOpponentLiveId == opponentId &&
-        liveKitService.battleRoom != null) {
+        battleRoom != null &&
+        battleRoom.connectionState != ConnectionState.disconnected) {
       return;
     }
     await _disconnectBattleOpponent();
@@ -1670,6 +1675,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       },
     );
   }
+
   Future<void> _disconnectBattleOpponent() async {
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
@@ -1682,6 +1688,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       } catch (_) {}
     }
   }
+
   CommentEntity? _pinnedFromLiveMetadata(LiveEntity live) {
     final raw = live.metadata?['pinnedComment'];
     if (raw is! Map) return null;
@@ -1710,6 +1717,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       isPinned: true,
     );
   }
+
   Future<void> _teardown({
     required bool silent,
     required Emitter<LiveViewerState> emit,
@@ -1745,6 +1753,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(const LiveViewerState());
     }
   }
+
   @override
   Future<void> close() async {
     _tearingDown = true;

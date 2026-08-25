@@ -24,7 +24,8 @@ class LiveRoomChatFeed extends StatelessWidget {
       buildWhen: (previous, current) =>
           current is LiveRoomReady &&
           (previous is! LiveRoomReady ||
-              previous.session.messages != current.session.messages),
+              previous.session.messages != current.session.messages ||
+              previous.isBattleActive != current.isBattleActive),
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();
@@ -91,7 +92,10 @@ class LiveRoomChatFeed extends StatelessWidget {
                               itemBuilder: (context, index) {
                                 final message =
                                     messages[messages.length - 1 - index];
-                                return _ChatMessageTile(message: message);
+                                return _ChatMessageTile(
+                                  message: message,
+                                  highContrast: state.isBattleActive,
+                                );
                               },
                             ),
                           ),
@@ -110,9 +114,10 @@ class LiveRoomChatFeed extends StatelessWidget {
 }
 
 class _ChatMessageTile extends StatelessWidget {
-  const _ChatMessageTile({required this.message});
+  const _ChatMessageTile({required this.message, required this.highContrast});
 
   final LiveChatMessage message;
+  final bool highContrast;
 
   Future<void> _showModeration(BuildContext context) async {
     final action = await showModalBottomSheet<LiveRoomModerationAction>(
@@ -227,7 +232,13 @@ class _ChatMessageTile extends StatelessWidget {
       onLongPress: () => _showModeration(context),
       child: Container(
         padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
-        decoration: const BoxDecoration(color: Colors.transparent),
+        decoration: BoxDecoration(
+          color: highContrast ? const Color(0xD90B0B0D) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: highContrast
+              ? Border.all(color: const Color(0x24FFFFFF), width: 0.5)
+              : null,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -16,6 +16,10 @@ class CommentsSection extends StatefulWidget {
   /// When true, comments sit at the top of the feed (multi-grid under tiles).
   final bool alignTop;
 
+  /// PK video can contain bright walls or clothing behind the feed. Give each
+  /// message an opaque dark surface so white text never blends into a tile.
+  final bool highContrast;
+
   final String? currentUserId;
   final String? hostId;
   final List<String> moderatorIds;
@@ -35,6 +39,7 @@ class CommentsSection extends StatefulWidget {
     required this.comments,
     this.height = TikTokLiveTokens.commentFeedH,
     this.alignTop = false,
+    this.highContrast = false,
     this.currentUserId,
     this.hostId,
     this.moderatorIds = const [],
@@ -124,6 +129,7 @@ class _CommentsSectionState extends State<CommentsSection> {
                 final isBanned = widget.bannedUserIds.contains(comment.userId);
                 return TikTokCommentBubble(
                       comment: comment,
+                      highContrast: widget.highContrast,
                       showModerationMenu:
                           isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
                       isMuted: isMuted,
@@ -175,6 +181,7 @@ class _CommentsSectionState extends State<CommentsSection> {
 
 class TikTokCommentBubble extends StatelessWidget {
   final CommentEntity comment;
+  final bool highContrast;
   final bool showModerationMenu;
   final bool isMuted;
   final bool isBanned;
@@ -187,6 +194,7 @@ class TikTokCommentBubble extends StatelessWidget {
   const TikTokCommentBubble({
     super.key,
     required this.comment,
+    this.highContrast = false,
     this.showModerationMenu = false,
     this.isMuted = false,
     this.isBanned = false,
@@ -205,22 +213,31 @@ class TikTokCommentBubble extends StatelessWidget {
     if (_isJoin) {
       return Padding(
         padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
-        child: RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: comment.username,
-                style: TikTokLiveTokens.joinUser,
-              ),
-              TextSpan(
-                text: ' joined',
-                style: TikTokLiveTokens.commentBody.copyWith(
-                  color: const Color(0xD9FFFFFF),
-                  shadows: const [],
+        child: Container(
+          padding: highContrast
+              ? const EdgeInsets.symmetric(horizontal: 7, vertical: 4)
+              : EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: highContrast ? const Color(0xD90B0B0D) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: comment.username,
+                  style: TikTokLiveTokens.joinUser,
                 ),
-              ),
-              const TextSpan(text: ' 👋', style: TextStyle(fontSize: 12)),
-            ],
+                TextSpan(
+                  text: ' joined',
+                  style: TikTokLiveTokens.commentBody.copyWith(
+                    color: Colors.white,
+                    shadows: const [],
+                  ),
+                ),
+                const TextSpan(text: ' 👋', style: TextStyle(fontSize: 12)),
+              ],
+            ),
           ),
         ),
       );
@@ -235,7 +252,9 @@ class TikTokCommentBubble extends StatelessWidget {
             height: 30,
             padding: const EdgeInsets.fromLTRB(4, 0, 8, 0),
             decoration: BoxDecoration(
-              color: TikTokLiveTokens.frost(0.35),
+              color: highContrast
+                  ? const Color(0xD90B0B0D)
+                  : TikTokLiveTokens.frost(0.35),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Row(
@@ -248,7 +267,7 @@ class TikTokCommentBubble extends StatelessWidget {
                     child: CachedNetworkImage(
                       imageUrl: comment.userAvatar ?? '',
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => FallbackAvatar(
+                      errorWidget: (_, _, _) => FallbackAvatar(
                         seed: comment.userId,
                         name: comment.username,
                         radius: 10,
@@ -298,8 +317,15 @@ class TikTokCommentBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
       child: Container(
+        key: ValueKey('comment-bubble-${comment.id}'),
         padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
-        decoration: const BoxDecoration(color: Colors.transparent),
+        decoration: BoxDecoration(
+          color: highContrast ? const Color(0xD90B0B0D) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: highContrast
+              ? Border.all(color: const Color(0x24FFFFFF), width: 0.5)
+              : null,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,12 +336,12 @@ class TikTokCommentBubble extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: comment.userAvatar ?? '',
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => FallbackAvatar(
+                  errorWidget: (_, _, _) => FallbackAvatar(
                     seed: comment.userId,
                     name: comment.username,
                     radius: 12,
                   ),
-                  placeholder: (_, __) => FallbackAvatar(
+                  placeholder: (_, _) => FallbackAvatar(
                     seed: comment.userId,
                     name: comment.username,
                     radius: 12,

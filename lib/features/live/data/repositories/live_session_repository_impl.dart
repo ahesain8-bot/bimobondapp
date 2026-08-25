@@ -537,7 +537,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
 
   @override
   Future<void> connectBattleOpponentMedia(String opponentLiveId) async {
-    if (_battleOpponentLiveId == opponentLiveId && _media.battleRoom != null) {
+    if (_battleOpponentLiveId == opponentLiveId && _media.isBattleRoomUsable) {
       return;
     }
     await disconnectBattleOpponentMedia();

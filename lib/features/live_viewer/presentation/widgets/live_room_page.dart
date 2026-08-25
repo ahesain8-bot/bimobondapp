@@ -247,6 +247,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     required LiveEntity live,
     required double height,
     bool alignTop = false,
+    bool highContrast = false,
   }) {
     final moderators = _moderatorIdsFrom(live);
     final bloc = context.read<LiveViewerBloc>();
@@ -254,6 +255,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       comments: state.comments,
       height: height,
       alignTop: alignTop,
+      highContrast: highContrast,
       currentUserId: state.currentUserId,
       hostId: live.hostId,
       moderatorIds: moderators,
@@ -553,6 +555,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                                 constraints.maxHeight,
                                               ),
                                           alignTop: false,
+                                          highContrast: true,
                                         ),
                                       ],
                                     );
