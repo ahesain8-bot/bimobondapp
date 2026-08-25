@@ -61,6 +61,11 @@ class TemplateCompositionEngine {
     return timelineEngine.build(
       recipe: session.recipe,
       fills: session.fills,
+      slotFilterOverrides: session.slotFilterOverrides,
+      slotEffectOverrides: session.slotEffectOverrides,
+      userTexts: session.userTexts,
+      userStickers: session.userStickers,
+      userAudioTiming: session.userAudioTiming,
     );
   }
 

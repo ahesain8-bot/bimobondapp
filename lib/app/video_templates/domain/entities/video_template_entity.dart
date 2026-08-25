@@ -464,7 +464,7 @@ class VideoTemplateSlotEntity extends Equatable {
     final d = resolvedDurationSeconds;
     if (d > 0) return d;
     if (minDuration != null && minDuration! > 0) return minDuration!;
-    return 2;
+    return 5;
   }
 
   factory VideoTemplateSlotEntity.fromJson(Map<String, dynamic> json) {
@@ -1536,6 +1536,7 @@ class VideoTemplateProjectEntity extends Equatable {
     this.status = UserTemplateProjectStatuses.editing,
     this.duration,
     this.slots = const [],
+    this.editable,
     this.createdAt,
     this.updatedAt,
   });
@@ -1548,6 +1549,7 @@ class VideoTemplateProjectEntity extends Equatable {
   final String status;
   final double? duration;
   final List<VideoTemplateProjectSlotEntity> slots;
+  final TemplateEditableFlags? editable;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -1574,6 +1576,11 @@ class VideoTemplateProjectEntity extends Equatable {
       status: UserTemplateProjectStatuses.normalize(json['status']?.toString()),
       duration: _asDoubleOrNull(json['duration']),
       slots: slots,
+      editable: json['editable'] is Map
+          ? TemplateEditableFlags.fromJson(
+              Map<String, dynamic>.from(json['editable'] as Map),
+            )
+          : null,
       createdAt: _asDateTime(json['createdAt']),
       updatedAt: _asDateTime(json['updatedAt']),
     );
@@ -1588,6 +1595,7 @@ class VideoTemplateProjectEntity extends Equatable {
         status,
         duration,
         slots,
+        editable,
         createdAt,
         updatedAt,
       ];

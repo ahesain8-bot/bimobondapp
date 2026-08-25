@@ -72,6 +72,7 @@ class CompositionPreviewController extends ChangeNotifier {
   }
 
   bool get activeSlotIsVideo {
+    if (_video != null && _video!.value.isInitialized) return true;
     final id = _activeSlotId;
     if (id != null) {
       final fill = session.fills[id];
@@ -188,6 +189,15 @@ class CompositionPreviewController extends ChangeNotifier {
     _safeNotify();
   }
 
+  /// Rebuild timeline sampling after overlay timing edits (keeps playhead).
+  void reloadTimeline() {
+    if (_disposed) return;
+    _preview = engine.preview(session);
+    _preview!.seek(_sampleTime);
+    _lastLookSig = null;
+    _safeNotify();
+  }
+
   void replay() {
     seek(0).then((_) {
       if (!_disposed) play();
@@ -221,7 +231,7 @@ class CompositionPreviewController extends ChangeNotifier {
     // (static still + no timed overlays/effects).
     final sample = _preview?.sample(_sampleTime);
     final sig = _lookSignature(sample, prevSlot);
-    if (sig != _lastLookSig) {
+    if (_playing || sig != _lastLookSig) {
       _lastLookSig = sig;
       _safeNotify();
     }
@@ -233,13 +243,14 @@ class CompositionPreviewController extends ChangeNotifier {
     final fx = sample.effects
         .map((e) => '${e.effectType}:${e.progress.toStringAsFixed(1)}')
         .join(',');
+    final fl = sample.filters.map((f) => f.filterName).join(',');
     final tr = sample.transitions
         .map((t) => '${t.type}:${t.progress.toStringAsFixed(1)}')
         .join(',');
     final overlays = sample.texts.length +
         sample.stickers.length +
         sample.overlays.length;
-    return '$slot|fx=$fx|tr=$tr|ov=$overlays';
+    return '$slot|fx=$fx|fl=$fl|tr=$tr|ov=$overlays';
   }
 
   Future<void> _syncSurface({bool force = false}) async {
@@ -384,6 +395,8 @@ class CompositionPreviewController extends ChangeNotifier {
       await c.setVolume(0);
       if (_playing) await c.play();
       _video = c;
+      c.addListener(_onVideoControllerUpdate);
+      _safeNotify();
     } catch (e, st) {
       debugPrint('CompositionPreviewController surface: $e\n$st');
       // Signal studio hybrid to take over — do not leave a blank surface.
@@ -392,6 +405,11 @@ class CompositionPreviewController extends ChangeNotifier {
       _mediaDetached = true;
       _safeNotify();
     }
+  }
+
+  void _onVideoControllerUpdate() {
+    if (_disposed) return;
+    _safeNotify();
   }
 
   void _setDecodedClone(ui.Image? src) {
@@ -415,6 +433,7 @@ class CompositionPreviewController extends ChangeNotifier {
     _video = null;
     if (c != null) {
       try {
+        c.removeListener(_onVideoControllerUpdate);
         await c.pause();
         await c.dispose();
       } catch (_) {}

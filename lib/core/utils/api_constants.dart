@@ -12,8 +12,10 @@ class ApiConstants {
   static const String forgotPassword = '/auth/forgot-password';
   static const String resetPassword = '/auth/reset-password';
   static const String updateProfile = '/users/me';
-  static String deleteCloseFriend(String memberId) => '/users/me/close-friends/$memberId';
-  static String userProfileLinks(String userId) => '/users/$userId/profile-links';
+  static String deleteCloseFriend(String memberId) =>
+      '/users/me/close-friends/$memberId';
+  static String userProfileLinks(String userId) =>
+      '/users/$userId/profile-links';
   static const String updateUserLocation = '/users/me/location';
   static const String userLocationHistory = '/users/me/locations/history';
   static const String userLocationMovements = '/users/me/locations/movements';
@@ -161,6 +163,26 @@ class ApiConstants {
     String projectId,
     String exportId,
   ) => '/video-templates/projects/$projectId/exports/$exportId/stream';
+
+  static const String videoTemplatePresets = '/video-templates/presets';
+  static const String videoTemplatePresetsCategories =
+      '/video-templates/presets/categories';
+  static String videoTemplateProjectPresets(String projectId) =>
+      '/video-templates/projects/$projectId/presets';
+  static String videoTemplateProjectSlotFilters(
+    String projectId,
+    String slotId,
+  ) => '/video-templates/projects/$projectId/slots/$slotId/filters';
+  static String videoTemplateProjectSlotEffects(
+    String projectId,
+    String slotId,
+  ) => '/video-templates/projects/$projectId/slots/$slotId/effects';
+  static String videoTemplateProjectTexts(String projectId) =>
+      '/video-templates/projects/$projectId/texts';
+  static String videoTemplateProjectStickers(String projectId) =>
+      '/video-templates/projects/$projectId/stickers';
+  static String videoTemplateProjectRecipe(String projectId) =>
+      '/video-templates/projects/$projectId/recipe';
 
   static String get cameraStudioCatalogUrl => '$baseUrl$cameraStudioCatalog';
 

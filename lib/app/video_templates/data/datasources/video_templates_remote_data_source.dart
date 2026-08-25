@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -85,12 +86,53 @@ abstract class VideoTemplatesRemoteDataSource {
     required String exportId,
   });
 
-  /// SSE progress stream. Returns final snapshot or null if stream unavailable.
   Future<VideoTemplateExportEntity?> listenExportStream({
     required String projectId,
     required String exportId,
     void Function(VideoTemplateExportEntity snap)? onUpdate,
     Duration timeout = const Duration(minutes: 8),
+  });
+
+  Future<List<TemplatePresetItem>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  });
+
+  Future<void> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+  });
+
+  Future<void> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+  });
+
+  Future<void> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+  });
+
+  Future<void> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
   });
 }
 
@@ -637,6 +679,165 @@ class VideoTemplatesRemoteDataSourceImpl
       return VideoTemplateExportEntity.fromJson(body);
     } catch (_) {
       return null;
+    }
+  }
+
+  TemplatePresetKind _presetKindFrom(String kind) {
+    switch (kind.toUpperCase()) {
+      case 'EFFECT':
+        return TemplatePresetKind.effect;
+      case 'STICKER':
+        return TemplatePresetKind.sticker;
+      default:
+        return TemplatePresetKind.filter;
+    }
+  }
+
+  List<TemplatePresetItem> _parsePresetList(dynamic body, String kind) {
+    List<dynamic>? raw;
+    if (body is List) {
+      raw = body;
+    } else if (body is Map) {
+      final map = Map<String, dynamic>.from(body);
+      final data = map['data'] ?? map['items'] ?? map['presets'];
+      if (data is List) raw = data;
+    }
+    if (raw == null) return const [];
+    final presetKind = _presetKindFrom(kind);
+    return raw
+        .whereType<Map>()
+        .map(
+          (e) => TemplatePresetItem.fromJson(
+            Map<String, dynamic>.from(e),
+            kind: presetKind,
+          ),
+        )
+        .where((e) => e.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<TemplatePresetItem>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  }) async {
+    try {
+      final path = projectId != null
+          ? ApiConstants.videoTemplateProjectPresets(projectId)
+          : ApiConstants.videoTemplatePresets;
+      final response = await apiClient.dio.get(
+        path,
+        queryParameters: {
+          'kind': kind,
+          if (category != null && category.isNotEmpty) 'category': category,
+          'limit': limit,
+        },
+      );
+      if (response.statusCode == 200) {
+        return _parsePresetList(response.data, kind);
+      }
+      return const [];
+    } on DioException catch (e) {
+      debugPrint('listPresets: ${e.message}');
+      return const [];
+    }
+  }
+
+  @override
+  Future<void> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotFilters(projectId, slotId),
+        data: {
+          if (presetId == null) 'presetId': null else 'presetId': presetId,
+          'intensity': intensity,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotEffects(projectId, slotId),
+        data: {
+          if (presetId == null) 'presetId': null else 'presetId': presetId,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+  }) async {
+    try {
+      await apiClient.dio.post(
+        ApiConstants.videoTemplateProjectTexts(projectId),
+        data: {
+          'text': text,
+          'fontSize': fontSize,
+          'color': color,
+          'positionY': positionY,
+          'startTime': startTime,
+          'endTime': endTime,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
+  }) async {
+    try {
+      await apiClient.dio.post(
+        ApiConstants.videoTemplateProjectStickers(projectId),
+        data: {
+          if (presetId != null) 'presetId': presetId,
+          if (assetUrl != null) 'assetUrl': assetUrl,
+          'positionX': positionX,
+          'positionY': positionY,
+          'scale': scale,
+          'opacity': opacity,
+          'startTime': startTime,
+          if (endTime != null) 'endTime': endTime,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
     }
   }
 }

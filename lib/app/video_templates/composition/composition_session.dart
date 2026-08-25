@@ -7,6 +7,8 @@ import 'package:bimobondapp/app/video_templates/domain/entities/video_template_e
 import 'package:bimobondapp/app/video_templates/engine/slot/slot_engine.dart';
 import 'package:bimobondapp/app/video_templates/engine/timeline/timeline_engine.dart';
 import 'package:bimobondapp/app/video_templates/engine/validation/template_validator.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
+import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter/foundation.dart';
 
 /// Mutable editor session: recipe is immutable; only fills / sources change.
@@ -23,6 +25,13 @@ class CompositionSession {
   Map<String, SlotFillEntry> fills;
   String? projectId;
 
+  /// User overrides — replace admin slot FX in merged preview (guide §5).
+  Map<String, UserSlotFilterOverride> slotFilterOverrides = {};
+  Map<String, UserSlotEffectOverride> slotEffectOverrides = {};
+  List<UserEditorTextOverlay> userTexts = [];
+  List<UserEditorStickerOverlay> userStickers = [];
+  UserEditorAudioTiming? userAudioTiming;
+
   final Map<String, MediaSource> _sources = {};
   final List<CompositionSession> _undo = [];
   final List<CompositionSession> _redo = [];
@@ -32,8 +41,15 @@ class CompositionSession {
   List<VideoTemplateSlotEntity> get slots => slotEngine.slots;
 
   TemplateTimeline get timeline {
-    return _cachedTimeline ??=
-        const TimelineEngine().build(recipe: recipe, fills: fills);
+    return _cachedTimeline ??= const TimelineEngine().build(
+      recipe: recipe,
+      fills: fills,
+      slotFilterOverrides: slotFilterOverrides,
+      slotEffectOverrides: slotEffectOverrides,
+      userTexts: userTexts,
+      userStickers: userStickers,
+      userAudioTiming: userAudioTiming,
+    );
   }
 
   void _invalidateTimeline() => _cachedTimeline = null;
@@ -51,7 +67,114 @@ class CompositionSession {
         fills.map((k, v) => MapEntry(k, v)),
       ),
       projectId: projectId,
+    )
+      ..slotFilterOverrides =
+          Map<String, UserSlotFilterOverride>.from(slotFilterOverrides)
+      ..slotEffectOverrides =
+          Map<String, UserSlotEffectOverride>.from(slotEffectOverrides)
+      ..userTexts = List<UserEditorTextOverlay>.from(userTexts)
+      ..userStickers = List<UserEditorStickerOverlay>.from(userStickers)
+      ..userAudioTiming = userAudioTiming;
+  }
+
+  void setSlotFilter(String slotId, UserSlotFilterOverride? override) {
+    _pushUndo();
+    if (override == null || override.filterName == 'none') {
+      slotFilterOverrides.remove(slotId);
+    } else {
+      slotFilterOverrides[slotId] = override;
+    }
+    _invalidateTimeline();
+  }
+
+  void setSlotEffect(String slotId, UserSlotEffectOverride? override) {
+    _pushUndo();
+    if (override == null || override.effectType == 'none') {
+      slotEffectOverrides.remove(slotId);
+    } else {
+      slotEffectOverrides[slotId] = override;
+    }
+    _invalidateTimeline();
+  }
+
+  void setUserTexts(List<UserEditorTextOverlay> texts) {
+    _pushUndo();
+    userTexts = List<UserEditorTextOverlay>.from(texts);
+    _invalidateTimeline();
+  }
+
+  void setUserStickers(List<UserEditorStickerOverlay> stickers) {
+    _pushUndo();
+    userStickers = List<UserEditorStickerOverlay>.from(stickers);
+    _invalidateTimeline();
+  }
+
+  /// Live timing tweak (no undo) — used while dragging overlay handles.
+  void patchSlotFilterTiming(
+    String slotId, {
+    required double startTime,
+    required double endTime,
+  }) {
+    final current = slotFilterOverrides[slotId];
+    if (current == null) return;
+    slotFilterOverrides[slotId] = current.copyWith(
+      startTime: startTime,
+      endTime: endTime,
     );
+    _invalidateTimeline();
+  }
+
+  void patchSlotEffectTiming(
+    String slotId, {
+    required double startTime,
+    required double endTime,
+  }) {
+    final current = slotEffectOverrides[slotId];
+    if (current == null) return;
+    slotEffectOverrides[slotId] = current.copyWith(
+      startTime: startTime,
+      endTime: endTime,
+    );
+    _invalidateTimeline();
+  }
+
+  void patchUserTextTiming(
+    String id, {
+    required double startTime,
+    required double endTime,
+  }) {
+    final i = userTexts.indexWhere((t) => t.id == id);
+    if (i < 0) return;
+    userTexts[i] = userTexts[i].copyWith(
+      startTime: startTime,
+      endTime: endTime,
+    );
+    _invalidateTimeline();
+  }
+
+  void patchUserStickerTiming(
+    String id, {
+    required double startTime,
+    required double endTime,
+  }) {
+    final i = userStickers.indexWhere((s) => s.id == id);
+    if (i < 0) return;
+    userStickers[i] = userStickers[i].copyWith(
+      startTime: startTime,
+      endTime: endTime,
+    );
+    _invalidateTimeline();
+  }
+
+  void patchUserAudioTiming({
+    required double startTime,
+    required double endTime,
+  }) {
+    userAudioTiming = UserEditorAudioTiming(
+      startTime: startTime,
+      endTime: endTime,
+    );
+    _invalidateTimeline();
   }
 
   void _pushUndo() {
@@ -65,23 +188,36 @@ class CompositionSession {
 
   void undo() {
     if (_undo.isEmpty) return;
-    _redo.add(_cloneFills());
-    final prev = _undo.removeLast();
-    fills = prev.fills;
-    _invalidateTimeline();
-    _rebuildSourcesSync();
+    _redo.add(_snapshot());
+    _restore(_undo.removeLast());
   }
 
   void redo() {
     if (_redo.isEmpty) return;
-    _undo.add(_cloneFills());
-    final next = _redo.removeLast();
-    fills = next.fills;
+    _undo.add(_snapshot());
+    _restore(_redo.removeLast());
+  }
+
+  CompositionSession _snapshot() => _cloneFills();
+
+  void _restore(CompositionSession snap) {
+    fills = snap.fills;
+    slotFilterOverrides =
+        Map<String, UserSlotFilterOverride>.from(snap.slotFilterOverrides);
+    slotEffectOverrides =
+        Map<String, UserSlotEffectOverride>.from(snap.slotEffectOverrides);
+    userTexts = List<UserEditorTextOverlay>.from(snap.userTexts);
+    userStickers = List<UserEditorStickerOverlay>.from(snap.userStickers);
+    userAudioTiming = snap.userAudioTiming;
     _invalidateTimeline();
     _rebuildSourcesSync();
   }
 
-  Future<void> assignFile(String slotId, File file) async {
+  Future<void> assignFile(
+    String slotId,
+    File file, {
+    String? mediaKind,
+  }) async {
     VideoTemplateSlotEntity? slot;
     for (final s in slots) {
       if (s.id == slotId) {
@@ -92,10 +228,13 @@ class CompositionSession {
     if (slot == null) return;
     _pushUndo();
     final prev = fills[slotId];
+    final kind = mediaKind?.trim().toUpperCase() ??
+        (VideoThumbnailUtils.isVideoFile(file) ? 'VIDEO' : 'IMAGE');
     fills[slotId] = SlotFillEntry(
       slotId: slotId,
       slotIndex: slot.slotIndex,
       localFile: file,
+      mediaKind: kind,
       userAssetUrl: prev?.userAssetUrl,
       trimStart: prev?.trimStart,
       trimEnd: prev?.trimEnd,

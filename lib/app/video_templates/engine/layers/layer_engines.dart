@@ -52,7 +52,7 @@ class EffectEngine {
     final out = <ResolvedEffect>[];
     for (final item in timeline.activeAt(time)) {
       final type = item.effectType;
-      if (type == null || type.isEmpty) continue;
+      if (type == null || type.isEmpty || type == 'none') continue;
       out.add(
         ResolvedEffect(
           effectType: type,

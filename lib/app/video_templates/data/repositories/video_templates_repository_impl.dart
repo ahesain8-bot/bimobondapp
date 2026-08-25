@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/video_templates/data/datasources/video_template_
 import 'package:bimobondapp/app/video_templates/data/datasources/video_templates_local_cache.dart';
 import 'package:bimobondapp/app/video_templates/data/datasources/video_templates_remote_data_source.dart';
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/domain/repositories/video_templates_repository.dart';
 import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
@@ -445,5 +446,120 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
       onUpdate: onUpdate,
       timeout: timeout,
     );
+  }
+
+  @override
+  Future<Either<Failure, List<TemplatePresetItem>>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  }) async {
+    try {
+      return Right(
+        await remoteDataSource.listPresets(
+          kind: kind,
+          projectId: projectId,
+          category: category,
+          limit: limit,
+        ),
+      );
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+  }) async {
+    try {
+      await remoteDataSource.putSlotFilter(
+        projectId: projectId,
+        slotId: slotId,
+        presetId: presetId,
+        intensity: intensity,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+  }) async {
+    try {
+      await remoteDataSource.putSlotEffect(
+        projectId: projectId,
+        slotId: slotId,
+        presetId: presetId,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+  }) async {
+    try {
+      await remoteDataSource.createProjectText(
+        projectId: projectId,
+        text: text,
+        fontSize: fontSize,
+        color: color,
+        positionY: positionY,
+        startTime: startTime,
+        endTime: endTime,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
+  }) async {
+    try {
+      await remoteDataSource.createProjectSticker(
+        projectId: projectId,
+        presetId: presetId,
+        assetUrl: assetUrl,
+        positionX: positionX,
+        positionY: positionY,
+        scale: scale,
+        opacity: opacity,
+        startTime: startTime,
+        endTime: endTime,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
   }
 }

@@ -292,6 +292,15 @@ class TemplateEffectVisual {
           final punch = (1 - p).clamp(0.0, 1.0);
           scale *= 1 + (peak - 1) * punch * punch;
           break;
+        case 'zoom_in':
+          scale *= 1 + 0.28 * p;
+          break;
+        case 'zoom_out':
+          scale *= 1.28 - 0.28 * p;
+          break;
+        case 'pulse':
+          scale *= 1 + 0.1 * math.sin(p * math.pi * 2);
+          break;
         case 'ken_burns':
           final endScale = _d(
             params['zoom'] ?? params['scale'],

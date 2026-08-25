@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/video_templates/data/datasources/video_template_asset_loader.dart';
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -135,6 +136,48 @@ abstract class VideoTemplatesRepository {
   Future<Either<Failure, VideoTemplateExportEntity>> getExport({
     required String projectId,
     required String exportId,
+  });
+
+  Future<Either<Failure, List<TemplatePresetItem>>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  });
+
+  Future<Either<Failure, void>> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+  });
+
+  Future<Either<Failure, void>> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+  });
+
+  Future<Either<Failure, void>> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+  });
+
+  Future<Either<Failure, void>> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
   });
 }
 

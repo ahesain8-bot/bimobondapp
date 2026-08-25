@@ -361,13 +361,28 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     }
     // Never mount one VideoPlayerController in more than one pane.
     final vc = videoController;
-    if (vc != null && vc.value.isInitialized && paneKey == 'main') {
-      return FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: vc.value.size.width,
-          height: vc.value.size.height,
-          child: VideoPlayer(vc),
+    if (vc != null && paneKey == 'main') {
+      if (vc.value.isInitialized) {
+        return FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: vc.value.size.width,
+            height: vc.value.size.height,
+            child: VideoPlayer(vc),
+          ),
+        );
+      }
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white54,
+            ),
+          ),
         ),
       );
     }

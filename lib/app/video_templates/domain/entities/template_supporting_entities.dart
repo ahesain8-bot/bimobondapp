@@ -328,7 +328,6 @@ DateTime? _asDateTime(dynamic value) {
     return DateTime.tryParse(value);
   }
   if (value is int) {
-    // Heuristic: ms vs seconds.
     if (value > 100000000000) {
       return DateTime.fromMillisecondsSinceEpoch(value);
     }
@@ -338,4 +337,45 @@ DateTime? _asDateTime(dynamic value) {
     return DateTime.fromMillisecondsSinceEpoch(value * 1000);
   }
   return null;
+}
+
+/// Feature gates from backend `UserTemplateProject.editable`.
+class TemplateEditableFlags extends Equatable {
+  const TemplateEditableFlags({
+    this.music = true,
+    this.text = true,
+    this.stickers = true,
+    this.effects = true,
+    this.filters = true,
+    this.reorder = false,
+  });
+
+  final bool music;
+  final bool text;
+  final bool stickers;
+  final bool effects;
+  final bool filters;
+  final bool reorder;
+
+  factory TemplateEditableFlags.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const TemplateEditableFlags();
+    bool flag(String key, {bool fallback = true}) {
+      final v = json[key];
+      if (v is bool) return v;
+      return fallback;
+    }
+
+    return TemplateEditableFlags(
+      music: flag('music'),
+      text: flag('text'),
+      stickers: flag('stickers'),
+      effects: flag('effects'),
+      filters: flag('filters'),
+      reorder: flag('reorder', fallback: false),
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [music, text, stickers, effects, filters, reorder];
 }
