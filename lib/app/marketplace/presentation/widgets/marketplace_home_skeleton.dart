@@ -86,13 +86,38 @@ class MarketplaceHomeSkeleton extends StatelessWidget {
               ),
               itemBuilder: (_, _) => SizedBox(
                 width: productCardWidth,
-                child: const _MarketplaceProductCardSkeleton(),
+                child: const MarketplaceProductCardSkeleton(),
               ),
             ),
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
+    );
+  }
+}
+
+/// Grid skeleton matching [MarketplaceProductCard] grid layout.
+class MarketplaceProductGridSkeleton extends StatelessWidget {
+  const MarketplaceProductGridSkeleton({this.itemCount = 6, super.key});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(MarketplaceProductCardMetrics.gridPadding),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount:
+            MarketplaceProductCardMetrics.gridCrossAxisCount(context),
+        mainAxisSpacing: MarketplaceProductCardMetrics.gridSpacing,
+        crossAxisSpacing: MarketplaceProductCardMetrics.gridSpacing,
+        childAspectRatio:
+            MarketplaceProductCardMetrics.gridChildAspectRatio(context),
+      ),
+      itemCount: itemCount,
+      itemBuilder: (_, _) => const MarketplaceProductCardSkeleton(),
     );
   }
 }
@@ -145,8 +170,8 @@ class _CategoryGridItemSkeleton extends StatelessWidget {
   }
 }
 
-class _MarketplaceProductCardSkeleton extends StatelessWidget {
-  const _MarketplaceProductCardSkeleton();
+class MarketplaceProductCardSkeleton extends StatelessWidget {
+  const MarketplaceProductCardSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {

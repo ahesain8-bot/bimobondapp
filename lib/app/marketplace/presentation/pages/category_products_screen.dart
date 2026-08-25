@@ -2,6 +2,7 @@ import 'package:bimobondapp/app/marketplace/domain/entities/marketplace_filters.
 import 'package:bimobondapp/app/marketplace/domain/utils/marketplace_category_config.dart';
 import 'package:bimobondapp/app/marketplace/presentation/theme/marketplace_theme.dart';
 import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_filter_sheets.dart';
+import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_home_skeleton.dart';
 import 'package:bimobondapp/app/marketplace/presentation/widgets/marketplace_product_card.dart';
 import 'package:bimobondapp/app/shop/domain/entities/product_entity.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -10,7 +11,6 @@ import 'package:bimobondapp/app/shop/domain/repositories/shop_repository.dart';
 import 'package:bimobondapp/app/shop/domain/usecases/shop_usecases.dart';
 import 'package:bimobondapp/app/shop/presentation/di/shop_injector.dart' as shop_di;
 import 'package:bimobondapp/app/shop/presentation/pages/product_details_screen.dart';
-import 'package:bimobondapp/app/shop/presentation/widgets/product_skeleton.dart';
 import 'package:bimobondapp/app/shop/presentation/widgets/shop_back_button.dart';
 import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
@@ -264,13 +264,14 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
             ),
             Expanded(
               child: _loading
-                  ? const ProductSkeletonGrid()
+                  ? const MarketplaceProductGridSkeleton()
                   : _error != null
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(_error!),
+                              const SizedBox(height: 12),
                               FilledButton(
                                 onPressed: () => _load(refresh: true),
                                 child: Text(l10n.shopRetry),
@@ -289,25 +290,26 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount:
-                                      MarketplaceProductCardMetrics.gridCrossAxisCount(
-                                    context,
-                                  ),
+                                      MarketplaceProductCardMetrics
+                                          .gridCrossAxisCount(context),
                                   mainAxisSpacing:
                                       MarketplaceProductCardMetrics.gridSpacing,
                                   crossAxisSpacing:
                                       MarketplaceProductCardMetrics.gridSpacing,
                                   childAspectRatio:
-                                      MarketplaceProductCardMetrics.gridChildAspectRatio(
-                                    context,
-                                  ),
+                                      MarketplaceProductCardMetrics
+                                          .gridChildAspectRatio(context),
                                 ),
                                 itemCount:
                                     _products.length + (_hasMore ? 1 : 0),
                                 itemBuilder: (context, index) {
                                   if (index >= _products.length) {
                                     _load();
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
+                                    return const Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
                                     );
                                   }
                                   final product = _products[index];
