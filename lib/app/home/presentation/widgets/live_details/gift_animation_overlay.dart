@@ -33,11 +33,18 @@ class GiftAnimationOverlay extends StatefulWidget {
   final VoidCallback? onCompleted;
 
   static OverlayEntry? _activeEntry;
+  static Object? _activeOwner;
+  static VoidCallback? _activeDismiss;
 
   /// Inserts above every route layer (root overlay, after gift sheet closes).
+  ///
+  /// [owner] is mandatory: the entry lives in the *root* overlay, so without a
+  /// known owner nothing can take it back down and the animation outlives the
+  /// screen that asked for it.
   static Future<void> show(
     BuildContext context, {
     required String animationUrl,
+    required Object owner,
     String? thumbnailUrl,
     String? senderName,
     String? giftName,
@@ -56,24 +63,37 @@ class GiftAnimationOverlay extends StatefulWidget {
         Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return Future.value();
 
+    // The entry lives in the root overlay, so it outlives its route unless the
+    // route is still there to take it down. A gift landing while the room is
+    // being popped would otherwise play on the screen the pop reveals.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isActive) return Future.value();
+
     // Only one gift animation at a time — avoids dual VideoPlayers / crash.
     _dismissActive();
 
     final completer = Completer<void>();
     late OverlayEntry entry;
+    var removed = false;
 
     void remove() {
       if (identical(_activeEntry, entry)) {
         _activeEntry = null;
+        _activeOwner = null;
+        _activeDismiss = null;
       }
+      if (removed) return;
+      removed = true;
       SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (entry.mounted) {
-          try {
-            entry.remove();
-          } catch (_) {}
-        }
+        // Deliberately not gated on `entry.mounted`: an entry inserted while
+        // the overlay could not rebuild itself is never mounted, and skipping
+        // it here left it in the overlay to play on the next route.
+        try {
+          entry.remove();
+        } catch (_) {}
         if (!completer.isCompleted) completer.complete();
       });
+      SchedulerBinding.instance.ensureVisualUpdate();
     }
 
     entry = OverlayEntry(
@@ -92,19 +112,42 @@ class GiftAnimationOverlay extends StatefulWidget {
     );
 
     _activeEntry = entry;
+    _activeOwner = owner;
+    _activeDismiss = remove;
     overlay.insert(entry);
+
+    // Second safety net behind the owner's own dismiss: tie the entry to the
+    // route that requested it. A gift that arrives while the host is leaving
+    // must not survive the pop and play on the screen underneath.
+    if (route != null) {
+      unawaited(route.popped.then((_) => dismiss(owner: owner)));
+    }
+
     return completer.future;
   }
 
+  /// Removes the active animation owned by [owner], so one live room cannot
+  /// tear down another room's animation during navigation.
+  static void dismiss({required Object owner}) {
+    if (!identical(_activeOwner, owner)) return;
+    _dismissActive();
+  }
+
   static void _dismissActive() {
+    final dismiss = _activeDismiss;
+    if (dismiss != null) {
+      dismiss();
+      return;
+    }
+
     final active = _activeEntry;
     _activeEntry = null;
+    _activeOwner = null;
     if (active == null) return;
-    if (active.mounted) {
-      try {
-        active.remove();
-      } catch (_) {}
-    }
+    // Unmounted entries are removed too — see `remove()` above.
+    try {
+      active.remove();
+    } catch (_) {}
   }
 
   @override
@@ -122,6 +165,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   bool _finished = false;
   bool _lottieFailed = false;
   bool _videoFailed = false;
+  Timer? _finishTimer;
   late final _GiftMediaKind _kind;
   late final bool _isWebp;
 
@@ -152,7 +196,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         final hold = _isWebp
             ? const Duration(milliseconds: 2800)
             : const Duration(milliseconds: 1600);
-        Future<void>.delayed(hold, _finish);
+        _scheduleFinish(hold);
         break;
     }
   }
@@ -177,14 +221,14 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   }
 
   Future<void> _playLottie() async {
-    final composition = await GiftLottieCache.instance.load(
-      widget.animationUrl,
-    );
+    final composition = await GiftLottieCache.instance
+        .load(widget.animationUrl)
+        .timeout(const Duration(seconds: 8), onTimeout: () => null);
     if (!mounted) return;
 
     if (composition == null) {
       setState(() => _lottieFailed = true);
-      Future<void>.delayed(const Duration(milliseconds: 1600), _finish);
+      _scheduleFinish(const Duration(milliseconds: 1600));
       return;
     }
 
@@ -209,7 +253,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
       _videoController = controller;
-      await controller.initialize();
+      await controller.initialize().timeout(const Duration(seconds: 8));
       if (!mounted) {
         await controller.dispose();
         _videoController = null;
@@ -233,10 +277,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       controller.addListener(onTick);
       final d = controller.value.duration;
       final timeout = d > Duration.zero ? d : const Duration(seconds: 3);
-      Future<void>.delayed(
-        timeout + const Duration(milliseconds: 400),
-        _finish,
-      );
+      _scheduleFinish(timeout + const Duration(milliseconds: 400));
     } catch (_) {
       try {
         await controller?.dispose();
@@ -244,13 +285,20 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       _videoController = null;
       if (!mounted) return;
       setState(() => _videoFailed = true);
-      Future<void>.delayed(const Duration(milliseconds: 1600), _finish);
+      _scheduleFinish(const Duration(milliseconds: 1600));
     }
+  }
+
+  void _scheduleFinish(Duration delay) {
+    _finishTimer?.cancel();
+    _finishTimer = Timer(delay, _finish);
   }
 
   void _finish() {
     if (_finished) return;
     _finished = true;
+    _finishTimer?.cancel();
+    _finishTimer = null;
 
     // Tear down video texture before removing the overlay entry.
     final video = _videoController;
@@ -273,6 +321,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
   @override
   void dispose() {
+    _finishTimer?.cancel();
+    _finishTimer = null;
     _lottieController?.dispose();
     final video = _videoController;
     _videoController = null;
@@ -445,12 +495,12 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           );
         }
         if (_lottieFailed) return _fallbackVisual();
-        return const SizedBox.shrink();
+        return _loadingVisual();
       case _GiftMediaKind.video:
         if (_videoFailed) return _fallbackVisual();
         final controller = _videoController;
         if (controller == null || !controller.value.isInitialized) {
-          return const SizedBox.shrink();
+          return _loadingVisual();
         }
         // Parent stage is 1:1 (1080×1080); cover the square.
         return FittedBox(
@@ -480,5 +530,13 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     return const Center(
       child: Icon(Icons.card_giftcard, size: 120, color: Colors.white),
     );
+  }
+
+  Widget _loadingVisual() {
+    final thumbnail = widget.thumbnailUrl?.trim();
+    if (thumbnail != null && thumbnail.isNotEmpty) {
+      return _fallbackVisual();
+    }
+    return const Center(child: CircularProgressIndicator(color: Colors.white));
   }
 }
