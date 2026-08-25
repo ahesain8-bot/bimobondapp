@@ -1,4 +1,6 @@
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/features/live/data/datasources/lives_socket_datasource.dart';
 import 'package:bimobondapp/features/live/data/mappers/live_session_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/data/mappers/socket_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/socket_event.dart';
@@ -6,6 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('host gift combo payload', () {
+    test('broadcaster listens to the auctionGiftCombo event alias', () {
+      expect(
+        LivesSocketDataSource.giftEventNames,
+        contains('auctionGiftCombo'),
+      );
+    });
+
     test('accepts the legacy liveGift user alias and nested gift', () {
       final payload = GiftComboPayload.fromMap({
         'liveId': 'l1',
@@ -28,6 +37,100 @@ void main() {
       expect(payload.senderId, 'u1');
       expect(payload.senderName, 'Maya');
       expect(payload.giftName, 'Rose');
+      expect(payload.gift?['imageUrl'], 'https://example.com/rose.png');
+    });
+
+    test('normalizes flat large-gift presentation fields', () {
+      final payload = GiftComboPayload.fromMap({
+        'liveId': 'l1',
+        'giftId': 'dragon',
+        'giftName': 'Dragon',
+        'senderId': 'u1',
+        'combo': 2,
+        'coins': 500,
+        'animationUrl': 'https://example.com/dragon.webm',
+        'thumbnailUrl': 'https://example.com/dragon.png',
+        'size': 'LARGE',
+        'type': 'IMAGE',
+      });
+
+      expect(payload, isNotNull);
+      expect(payload!.gift?['animationUrl'], 'https://example.com/dragon.webm');
+      expect(payload.gift?['thumbnailUrl'], 'https://example.com/dragon.png');
+      expect(payload.gift?['size'], 'LARGE');
+      expect(payload.combo, 2);
+    });
+
+    test('hydrates a flat payload from the existing gift catalog', () {
+      final normalized = LivesSocketDataSource.enrichGiftPayloadWithCatalog(
+        {
+          'liveId': 'l1',
+          'giftId': 'dragon',
+          'giftName': 'Dragon',
+          'senderId': 'u1',
+          'combo': 1,
+          'coins': 500,
+        },
+        const GiftEntity(
+          id: 'dragon',
+          name: 'Dragon',
+          icon: 'assets/icons/dragon.png',
+          priceCoins: 500,
+          animationUrl: 'https://example.com/dragon.webm',
+          thumbnailUrl: 'https://example.com/dragon.png',
+          size: GiftCatalogSize.large,
+        ),
+      );
+      final payload = GiftComboPayload.fromMap(normalized);
+
+      expect(payload, isNotNull);
+      expect(payload!.gift?['animationUrl'], 'https://example.com/dragon.webm');
+      expect(payload.gift?['thumbnailUrl'], 'https://example.com/dragon.png');
+      expect(payload.gift?['size'], 'LARGE');
+      expect(payload.gift?['type'], 'IMAGE');
+    });
+
+    test('preserves nested medium gift animation metadata', () {
+      final payload = GiftComboPayload.fromMap({
+        'liveId': 'l1',
+        'giftId': 'star',
+        'senderId': 'u1',
+        'combo': 1,
+        'gift': {
+          'id': 'star',
+          'name': 'Star',
+          'animationUrl': 'https://example.com/star.json',
+          'thumbnailUrl': 'https://example.com/star.png',
+          'size': 'MEDIUM',
+          'type': 'IMAGE',
+        },
+      });
+
+      expect(payload, isNotNull);
+      expect(payload!.gift?['animationUrl'], 'https://example.com/star.json');
+      expect(payload.gift?['size'], 'MEDIUM');
+    });
+
+    test('normalizes an audio gift through catalog metadata', () {
+      final normalized = LivesSocketDataSource.enrichGiftPayloadWithCatalog(
+        {'liveId': 'l1', 'giftId': 'sound', 'senderId': 'u1', 'combo': 1},
+        const GiftEntity(
+          id: 'sound',
+          name: 'Sound',
+          icon: 'assets/icons/sound.png',
+          priceCoins: 100,
+          audioUrl: 'https://example.com/sound.mp3',
+          color: '#4C8DFF',
+          type: GiftCatalogType.audio,
+          size: GiftCatalogSize.small,
+        ),
+      );
+      final payload = GiftComboPayload.fromMap(normalized);
+
+      expect(payload, isNotNull);
+      expect(payload!.gift?['type'], 'AUDIO');
+      expect(payload.gift?['audioUrl'], 'https://example.com/sound.mp3');
+      expect(payload.gift?['color'], '#4C8DFF');
     });
   });
 
