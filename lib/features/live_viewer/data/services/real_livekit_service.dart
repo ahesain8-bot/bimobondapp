@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/models/live_media_hints.dart';
+import '../../../../core/services/live_audio_session.dart';
 import 'fake_livekit_service.dart' show LiveKitConnectionState, LiveKitService;
 
 /// Real LiveKit implementation of [LiveKitService] using `livekit_client`.
@@ -24,6 +25,11 @@ class RealLiveKitService implements LiveKitService {
   Room? _room;
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
+
+  /// Whether this service currently holds [LiveAudioSession]. The battle room
+  /// coming and going must never touch it — only entering and leaving the live
+  /// does, which is what keeps a PK teardown from silencing the primary room.
+  bool _holdsAudioSession = false;
 
   /// LiveKit 2.11 can leave an internal participant-update callback waiting
   /// for `RoomConnectedEvent` after a room has already been replaced. Ten
@@ -86,6 +92,18 @@ class RealLiveKitService implements LiveKitService {
 
   @override
   Room? get battleRoom => _battleRoom;
+
+  Future<void> _acquireAudioSession() async {
+    if (_holdsAudioSession) return;
+    _holdsAudioSession = true;
+    await LiveAudioSession.instance.acquire();
+  }
+
+  Future<void> _releaseAudioSession() async {
+    if (!_holdsAudioSession) return;
+    _holdsAudioSession = false;
+    await LiveAudioSession.instance.release();
+  }
 
   Future<void> _preferMediaSpeaker() async {
     try {
@@ -280,10 +298,14 @@ class RealLiveKitService implements LiveKitService {
     // room and produces "room unavailable after joining the stage". Retire
     // the old primary room silently; only a real user/network disconnect is
     // exposed through [disconnect] or the Room lifecycle callbacks.
+    // Taken before the old room is disposed: a guest upgrade replaces the
+    // primary room mid-live, and that teardown must not drop the session.
+    await _acquireAudioSession();
     await disconnectBattle();
     await _disposePrimaryRoom(notify: false);
 
     if (url.isEmpty || token.isEmpty) {
+      await _releaseAudioSession();
       _setState(LiveKitConnectionState.failed);
       throw StateError('LiveKit url/token missing — re-join the live');
     }
@@ -411,6 +433,7 @@ class RealLiveKitService implements LiveKitService {
       debugPrint('❌ LiveKit connect failed: $e\n$st');
       final failedRoom = _room;
       _room = null;
+      await _releaseAudioSession();
       try {
         await failedRoom?.dispose();
       } catch (_) {}
@@ -576,7 +599,11 @@ class RealLiveKitService implements LiveKitService {
 
   @override
   Future<void> disconnect() async {
+    // The battle room closes while we still own the session; only after that
+    // is management handed back, so the primary room's own teardown below is
+    // what actually frees it.
     await disconnectBattle();
+    await _releaseAudioSession();
     await _disposePrimaryRoom(notify: true);
   }
 

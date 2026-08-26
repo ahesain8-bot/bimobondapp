@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../../core/services/live_audio_session.dart';
 import '../../../../core/services/live_video_quality_preference.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_capture_profile.dart';
@@ -15,6 +16,10 @@ class LivesMediaDataSource {
   Room? _room;
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
+
+  /// Whether this datasource currently holds [LiveAudioSession]. Keeps the
+  /// acquire/release pair balanced no matter which connect path ran.
+  var _holdsAudioSession = false;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
@@ -118,6 +123,18 @@ class LivesMediaDataSource {
       preset: base.preset,
       label: base.label,
     );
+  }
+
+  Future<void> _acquireAudioSession() async {
+    if (_holdsAudioSession) return;
+    _holdsAudioSession = true;
+    await LiveAudioSession.instance.acquire();
+  }
+
+  Future<void> _releaseAudioSession() async {
+    if (!_holdsAudioSession) return;
+    _holdsAudioSession = false;
+    await LiveAudioSession.instance.release();
   }
 
   Future<void> _preferMediaSpeaker() async {
@@ -271,11 +288,15 @@ class LivesMediaDataSource {
       });
 
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
+    // Own the Android audio session for the whole broadcast: the PK battle
+    // room disconnecting would otherwise tear it down for this room too.
+    await _acquireAudioSession();
     _room = room;
     try {
       await room.connect(url, token);
     } catch (_) {
       if (_room == room) _room = null;
+      await _releaseAudioSession();
       try {
         await room.dispose();
       } catch (_) {}
@@ -538,7 +559,13 @@ class LivesMediaDataSource {
         ),
       ),
     );
-    await room.connect(url, token);
+    await _acquireAudioSession();
+    try {
+      await room.connect(url, token);
+    } catch (_) {
+      await _releaseAudioSession();
+      rethrow;
+    }
     _room = room;
     await _preferMediaSpeaker();
     // Subscribe-only: mark connected without local publish.
@@ -787,6 +814,11 @@ class LivesMediaDataSource {
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     await disconnectBattle();
+    // Back to LiveKit's automatic management *before* the primary room goes
+    // down, so that room's own teardown is what finally frees the session.
+    // Note the ordering against disconnectBattle() above: the battle room is
+    // closed while we still own the session, which is the whole point.
+    await _releaseAudioSession();
     final room = _room;
     // Detach ownership first: RoomDisconnectedEvent emitted by this deliberate
     // teardown must not start the host recovery loop.
