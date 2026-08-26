@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../domain/entities/live_session.dart';
+import '../../../../../core/utils/app_colors.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
-import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_host_sheet_chrome.dart';
+import 'live_room_multi_guest_settings_sheet.dart';
 
-/// Live guest-policy settings (`PATCH /lives/:id/settings`).
+/// Host stream settings. Guest policy lives one level deeper, in
+/// [LiveRoomMultiGuestSettingsSheet], so a single screen owns
+/// `PATCH /lives/:id/settings`.
 class LiveRoomSettingsSheet {
   const LiveRoomSettingsSheet._();
 
@@ -24,72 +26,15 @@ class LiveRoomSettingsSheet {
         value: bloc,
         child: RepositoryProvider.value(
           value: repo,
-          child: _LiveRoomSettingsSheetBody(session: state.session),
+          child: const _LiveRoomSettingsSheetBody(),
         ),
       ),
     );
   }
 }
 
-class _LiveRoomSettingsSheetBody extends StatefulWidget {
-  const _LiveRoomSettingsSheetBody({required this.session});
-
-  final LiveSession session;
-
-  @override
-  State<_LiveRoomSettingsSheetBody> createState() =>
-      _LiveRoomSettingsSheetBodyState();
-}
-
-class _LiveRoomSettingsSheetBodyState extends State<_LiveRoomSettingsSheetBody>
-    with LiveRoomHostSheetMixin {
-  late bool _guestsEnabled;
-  late String _guestRequestMode;
-  late int _maxGuests;
-  late String _layout;
-  late bool _allowGuestCamera;
-  late bool _moderatorsCanManageGuests;
-  var _saving = false;
-
-  @override
-  LiveSessionRepository get repository => context.read<LiveSessionRepository>();
-
-  @override
-  void initState() {
-    super.initState();
-    final s = widget.session;
-    _guestsEnabled = s.guestsEnabled ?? true;
-    _guestRequestMode = s.guestRequestMode ?? 'EVERYONE';
-    _maxGuests = (s.maxGuests ?? 8).clamp(1, 8);
-    _layout = s.layout ?? 'GRID';
-    _allowGuestCamera = s.allowGuestCamera ?? true;
-    _moderatorsCanManageGuests = s.moderatorsCanManageGuests ?? true;
-  }
-
-  Future<void> _save() async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    try {
-      final updated = await repository.updateSettings(
-        liveId: widget.session.id,
-        guestsEnabled: _guestsEnabled,
-        guestRequestMode: _guestRequestMode,
-        maxGuests: _maxGuests,
-        layout: _layout,
-        allowGuestCamera: _allowGuestCamera,
-        moderatorsCanManageGuests: _moderatorsCanManageGuests,
-      );
-      if (!mounted) return;
-      context.read<LiveRoomBloc>().add(LiveRoomSettingsApplied(updated));
-      snack('تم حفظ الإعدادات');
-      Navigator.of(context).maybePop();
-    } catch (e) {
-      if (!mounted) return;
-      snack(errorMessage(e));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
+class _LiveRoomSettingsSheetBody extends StatelessWidget {
+  const _LiveRoomSettingsSheetBody();
 
   @override
   Widget build(BuildContext context) {
@@ -98,103 +43,79 @@ class _LiveRoomSettingsSheetBodyState extends State<_LiveRoomSettingsSheetBody>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          SwitchListTile(
-            value: _guestsEnabled,
-            onChanged: _saving
-                ? null
-                : (v) => setState(() => _guestsEnabled = v),
-            title: const Text('تفعيل الضيوف', style: TextStyle(color: Colors.white)),
-            activeThumbColor: const Color(0xFF26D3B4),
-          ),
-          const SizedBox(height: 8),
-          const Text('من يمكنه الطلب', style: TextStyle(color: Colors.white70)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final mode in const ['EVERYONE', 'FOLLOWERS', 'OFF'])
-                ChoiceChip(
-                  label: Text(_modeLabel(mode)),
-                  selected: _guestRequestMode == mode,
-                  onSelected: _saving
-                      ? null
-                      : (_) => setState(() => _guestRequestMode = mode),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'الحد الأقصى للضيوف: $_maxGuests',
-            style: const TextStyle(color: Colors.white70),
-          ),
-          Slider(
-            value: _maxGuests.toDouble(),
-            min: 1,
-            max: 8,
-            divisions: 7,
-            label: '$_maxGuests',
-            onChanged: _saving
-                ? null
-                : (v) => setState(() => _maxGuests = v.round()),
-          ),
-          const SizedBox(height: 8),
-          const Text('تخطيط المسرح', style: TextStyle(color: Colors.white70)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final layout in const ['GRID', 'PANEL'])
-                ChoiceChip(
-                  label: Text(layout == 'GRID' ? 'شبكة' : 'لوحة'),
-                  selected: _layout == layout,
-                  onSelected: _saving
-                      ? null
-                      : (_) => setState(() => _layout = layout),
-                ),
-            ],
-          ),
-          SwitchListTile(
-            value: _allowGuestCamera,
-            onChanged: _saving
-                ? null
-                : (v) => setState(() => _allowGuestCamera = v),
-            title: const Text(
-              'السماح بكاميرا الضيف',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-          SwitchListTile(
-            value: _moderatorsCanManageGuests,
-            onChanged: _saving
-                ? null
-                : (v) => setState(() => _moderatorsCanManageGuests = v),
-            title: const Text(
-              'المشرفون يديرون الضيوف',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('حفظ'),
+          _SettingsNavRow(
+            icon: Icons.groups_outlined,
+            title: 'إعدادات وضع تعدد الضيوف',
+            subtitle: 'التخطيط وأذونات الانضمام إلى المسرح.',
+            onTap: () => LiveRoomMultiGuestSettingsSheet.show(context),
           ),
         ],
       ),
     );
   }
+}
 
-  String _modeLabel(String mode) {
-    return switch (mode) {
-      'EVERYONE' => 'الجميع',
-      'FOLLOWERS' => 'المتابعون',
-      'OFF' => 'إيقاف',
-      _ => mode,
-    };
+class _SettingsNavRow extends StatelessWidget {
+  const _SettingsNavRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Chevron points toward the row's end in either direction.
+    final chevron = Directionality.of(context) == TextDirection.rtl
+        ? Icons.chevron_left
+        : Icons.chevron_right;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.optionsSubtitle,
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(chevron, color: Colors.white54, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

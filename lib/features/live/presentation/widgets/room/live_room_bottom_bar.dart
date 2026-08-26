@@ -14,87 +14,87 @@ import 'live_room_share_sheet.dart';
 class LiveRoomBottomBar extends StatelessWidget {
   const LiveRoomBottomBar({super.key});
 
-  static const double _buttonSize = 40;
-  static const double _actionGap = 6;
-  static const Color _buttonFill = Color(0x70202024);
+  static const double _buttonSize = 36;
+  static const double _actionGap = 4;
+  static const Color _buttonFill = Color(0x85202024);
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
     final bloc = context.read<LiveRoomBloc>();
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + bottomInset),
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: SizedBox(
-          height: 42,
-          child: Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => bloc.add(const LiveRoomChatTapped()),
-                  child: Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.centerLeft,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.48),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.1),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: SizedBox(
+            height: 42,
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => bloc.add(const LiveRoomChatTapped()),
+                    child: Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.centerLeft,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.48),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                    ),
-                    child: Text(
-                      'اكتب تعليقاً…',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w400,
-                        height: 1.1,
+                      child: Text(
+                        'اكتب تعليقاً…',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          height: 1.1,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: _actionGap),
-              _CircleSvgButton(
-                asset: AppAssets.roomBarCollab,
-                iconWidth: 32,
-                iconHeight: 29,
-                onTap: () {
-                  bloc.add(const LiveRoomCollabTapped());
-                  LiveRoomGuestsSheet.show(context);
-                },
-              ),
-              const SizedBox(width: _actionGap),
-              _CircleSvgButton(
-                asset: AppAssets.roomBarEffects,
-                iconWidth: 27,
-                iconHeight: 27,
-                onTap: () => bloc.add(const LiveRoomEffectsTapped()),
-              ),
-              const SizedBox(width: _actionGap),
-              _CircleSvgButton(
-                asset: AppAssets.roomBarShare,
-                iconWidth: 27,
-                iconHeight: 27,
-                onTap: () {
-                  bloc.add(const LiveRoomShareTapped());
-                  LiveRoomShareSheet.show(context);
-                },
-              ),
-              const SizedBox(width: _actionGap),
-              _CircleSvgButton(
-                asset: AppAssets.roomBarMore,
-                iconWidth: 23,
-                iconHeight: 23,
-                onTap: () {
-                  bloc.add(const LiveRoomMoreTapped());
-                  LiveRoomOptionsSheet.show(context);
-                },
-              ),
-            ],
+                const SizedBox(width: _actionGap),
+                _CircleSvgButton(
+                  asset: AppAssets.roomBarCollab,
+                  iconWidth: 28,
+                  iconHeight: 25,
+                  onTap: () {
+                    bloc.add(const LiveRoomCollabTapped());
+                    LiveRoomGuestsSheet.show(context);
+                  },
+                ),
+                const SizedBox(width: _actionGap),
+                _CircleSvgButton(
+                  asset: AppAssets.roomBarEffects,
+                  iconWidth: 25,
+                  iconHeight: 25,
+                  onTap: () => bloc.add(const LiveRoomEffectsTapped()),
+                ),
+                const SizedBox(width: _actionGap),
+                _CircleSvgButton(
+                  asset: AppAssets.roomBarShare,
+                  iconWidth: 25,
+                  iconHeight: 25,
+                  onTap: () {
+                    bloc.add(const LiveRoomShareTapped());
+                    LiveRoomShareSheet.show(context);
+                  },
+                ),
+                const SizedBox(width: _actionGap),
+                _CircleSvgButton(
+                  asset: AppAssets.roomBarMore,
+                  iconWidth: 22,
+                  iconHeight: 22,
+                  onTap: () {
+                    bloc.add(const LiveRoomMoreTapped());
+                    LiveRoomOptionsSheet.show(context);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

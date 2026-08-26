@@ -393,8 +393,14 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             live.metadata?['showGiftGoal'] == true &&
             giftGoalTarget > 0;
         final bottomPad = MediaQuery.paddingOf(context).bottom;
+        final viewBottomPad = MediaQuery.viewPaddingOf(context).bottom;
+        final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
         final guests = _guestsFrom(live, stageGuests);
+        // The visible bar can lose navigation padding while the keyboard is
+        // open, but the canvas/stage reservation must remain constant.
         final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
+        final canvasBarTotalH =
+            42 + 8 + (viewBottomPad < 16 ? 16.0 : viewBottomPad);
         final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
         final screenW = MediaQuery.sizeOf(context).width;
         final screenH = MediaQuery.sizeOf(context).height;
@@ -406,7 +412,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             MediaQuery.paddingOf(context).top +
             TikTokLiveTokens.topChromeBodyH +
             chromeGap;
-        final contentBottom = barTotalH + giftGoalH + 8;
+        final contentBottom = canvasBarTotalH + giftGoalH + 8;
 
         return GestureDetector(
           onDoubleTap: () {
@@ -822,7 +828,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         name: live.hostName,
                         avatarUrl: live.hostAvatar,
                         isHost: true,
-                        level: 12,
                       ),
                       ...guests,
                     ],
@@ -832,7 +837,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               if (isPk && isThisRoom)
                 Positioned(
                   right: 10,
-                  bottom: barTotalH + 72,
+                  bottom: barTotalH + keyboardInset + 72,
                   child: Column(
                     children: [
                       _SideAction(icon: Icons.back_hand_outlined, onTap: () {}),
@@ -856,7 +861,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 Positioned(
                   right: 0,
                   top: headerBottom,
-                  bottom: barTotalH + 48,
+                  bottom: barTotalH + keyboardInset + 48,
                   width: 64,
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
@@ -872,7 +877,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 Positioned(
                   left: TikTokLiveTokens.commentLeft,
                   right: isMultiGuest ? 68 : 56,
-                  bottom: barTotalH + 8 + giftGoalH,
+                  bottom: barTotalH + keyboardInset + 8 + giftGoalH,
                   child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
                     buildWhen: (prev, curr) =>
                         prev.comments != curr.comments ||
@@ -899,6 +904,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               (MediaQuery.sizeOf(context).height -
                                       headerBottom -
                                       barTotalH -
+                                      keyboardInset -
                                       giftGoalH -
                                       (pinned == null ? 0 : 58) -
                                       24)
@@ -914,7 +920,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 Positioned(
                   left: 10,
                   right: 10,
-                  bottom: barTotalH + 6,
+                  bottom: barTotalH + keyboardInset + 6,
                   child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
                     buildWhen: (prev, curr) {
                       final pm = prev.live?.metadata;
@@ -1038,19 +1044,19 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: barTotalH + 6,
+                  bottom: barTotalH + keyboardInset + 6,
                   child: const GuestStagePrompt(),
                 ),
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 0,
+                bottom: keyboardInset,
                 child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) {
                     final pm = prev.live?.metadata;
                     final cm = curr.live?.metadata;
-                    final pShare = pm?['shareCount'] as int? ?? 111;
-                    final cShare = cm?['shareCount'] as int? ?? 111;
+                    final pShare = pm?['shareCount'] as int?;
+                    final cShare = cm?['shareCount'] as int?;
                     return prev.session?.coinBalance !=
                             curr.session?.coinBalance ||
                         prev.chatMuted != curr.chatMuted ||
@@ -1062,9 +1068,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     final isCommentSending = isThisRoom
                         ? state.isCommentSending
                         : false;
+                    // No stand-in count: the share glyph stays bare until the
+                    // room actually reports one.
                     final shareCount = isThisRoom
-                        ? (state.live?.metadata?['shareCount'] as int? ?? 111)
-                        : (live.metadata?['shareCount'] as int? ?? 111);
+                        ? (state.live?.metadata?['shareCount'] as int?)
+                        : (live.metadata?['shareCount'] as int?);
                     return TikTokLiveBottomBar(
                       onTypeTap: () {
                         if (chatMuted) {
@@ -1189,6 +1197,9 @@ class _PkVideoLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final guestName = live.metadata?['guestName'] as String? ?? 'Guest';
     final guestAvatar = live.metadata?['guestAvatar'] as String?;
+    // Only the host's own tier is known here; the opponent's side stays bare
+    // rather than showing a placeholder league.
+    final hostTier = (live.metadata?['hostLeagueTier'] as String?)?.trim();
     const badgeTop = 38.0;
 
     return ClipRect(
@@ -1204,11 +1215,12 @@ class _PkVideoLayout extends StatelessWidget {
                   isActive: isActive,
                   fit: BoxFit.fitWidth,
                 ),
-                const Positioned(
-                  left: 8,
-                  top: badgeTop,
-                  child: _PkCornerBadge(label: 'B2'),
-                ),
+                if (hostTier != null && hostTier.isNotEmpty)
+                  Positioned(
+                    left: 8,
+                    top: badgeTop,
+                    child: _PkCornerBadge(label: hostTier),
+                  ),
               ],
             ),
           ),
@@ -1223,11 +1235,6 @@ class _PkVideoLayout extends StatelessWidget {
                   guestAvatar: guestAvatar,
                   room: battleRoom,
                   fit: BoxFit.fitWidth,
-                ),
-                const Positioned(
-                  right: 8,
-                  top: badgeTop,
-                  child: _PkCornerBadge(label: 'B1'),
                 ),
                 Positioned(
                   right: 8,
@@ -1292,8 +1299,29 @@ class _PkGuestFeed extends StatelessWidget {
   }
 
   Widget _fallback() {
-    final url =
-        guestAvatar ?? 'https://i.pravatar.cc/600?u=${liveId.hashCode + 99}';
+    // Waiting-for-track state. Without a real opponent avatar this stays a
+    // neutral placeholder rather than borrowing a stock portrait.
+    final placeholder = Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF2A2A31), Color(0xFF121216)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: ClipOval(
+        child: SizedBox(
+          width: 72,
+          height: 72,
+          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
+        ),
+      ),
+    );
+
+    final url = guestAvatar?.trim();
+    if (url == null || url.isEmpty) return placeholder;
+
     return ColoredBox(
       color: Colors.black,
       child: CachedNetworkImage(
@@ -1302,29 +1330,8 @@ class _PkGuestFeed extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.center,
-        placeholder: (_, _) => const ColoredBox(color: Color(0xFF2A1A3A)),
-        errorWidget: (_, _, _) => Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF5A2A6A), Color(0xFF2A4A7A)],
-            ),
-          ),
-          alignment: Alignment.center,
-          child: ClipOval(
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                errorWidget: (_, _, _) =>
-                    FallbackAvatar(seed: liveId, name: guestName, radius: 36),
-              ),
-            ),
-          ),
-        ),
+        placeholder: (_, _) => placeholder,
+        errorWidget: (_, _, _) => placeholder,
       ),
     );
   }
