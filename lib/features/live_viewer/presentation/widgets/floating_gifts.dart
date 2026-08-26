@@ -121,8 +121,11 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     final senderAvatar = _readString(payload.senderAvatarUrl) ??
         _readString(sender['avatarUrl']) ??
         _readString(sender['avatar']);
+    // `imageUrl` is a static asset, so it belongs in the thumbnail slot only.
+    // Accepting it as an animation put a frozen gift image on the fullscreen
+    // stage until the hydrated duplicate event arrived with the real animation.
     final animationUrl = _readString(
-      gift['animationUrl'] ?? gift['animation_url'] ?? gift['imageUrl'],
+      gift['animationUrl'] ?? gift['animation_url'],
     );
     final thumbnailUrl = _readString(
       gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'],
@@ -151,9 +154,7 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     // A payload the catalog could not hydrate still has a sender, a gift name
     // and a combo count, so announce it as a combo badge. Dropping it here is
     // what left the host with nothing but the chat line.
-    final isSmall = mediaUrl.isEmpty ||
-        normalizedSize == 'SMALL' ||
-        (normalizedSize == null && animationUrl == null);
+    final isSmall = animationUrl == null || normalizedSize == 'SMALL';
     final comboKey = payload.overlayKey.isNotEmpty
         ? payload.overlayKey
         : '${payload.senderId}_${payload.giftId}';
@@ -193,6 +194,10 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
           giftName: giftName,
           size: size,
           owner: this,
+          // The viewer stack already tracks `_playedAnimations`, but the
+          // overlay is a process-wide singleton shared with the auction stack:
+          // key it so neither can restart the other's running animation.
+          dedupeKey: comboKey,
         ),
       );
     }
