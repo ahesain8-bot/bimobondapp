@@ -44,6 +44,7 @@ class VideoTemplateEditorScreen extends StatefulWidget {
     this.initialFills,
     this.projectId,
     this.editable,
+
     /// Catalog shelf UUID only — omit for gallery / free edit (media[] flow).
     this.catalogTemplateId,
   });
@@ -75,6 +76,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
   int _selectedSlotIndex = 0;
   TemplateEditorPanel? _activePanel;
   String? _serverProjectId;
+
   /// Maps recipe slot id → server `slots[].slotId` for PATCH / filters / effects.
   final Map<String, String> _serverSlotIdsByRecipeSlot = {};
 
@@ -624,8 +626,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     final target = seekForEffect
         ? (slotStart + slotDur * 0.45).clamp(0.0, total)
         : _playheadInsideSlot(slotId, preview.playhead)
-            ? preview.playhead
-            : (slotStart + 0.01).clamp(0.0, total);
+        ? preview.playhead
+        : (slotStart + 0.01).clamp(0.0, total);
     unawaited(
       preview.applyLookPreview(slotId: slotId, targetTime: target).then((_) {
         if (mounted) setState(() {});
@@ -1311,11 +1313,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       case TemplateEditorOverlayKind.sticker:
         _session.patchUserStickerTiming(id, startTime: start, endTime: end);
       case TemplateEditorOverlayKind.audio:
-        _session.patchUserAudioTiming(
-          id: id,
-          startTime: start,
-          endTime: end,
-        );
+        _session.patchUserAudioTiming(id: id, startTime: start, endTime: end);
     }
     _preview?.reloadTimeline();
     if (kind == TemplateEditorOverlayKind.filter ||
@@ -1323,12 +1321,11 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       final preview = _preview;
       if (preview != null) {
         unawaited(
-          preview.applyLookPreview(
-            slotId: id,
-            targetTime: preview.playhead,
-          ).then((_) {
-            if (mounted) setState(() {});
-          }),
+          preview
+              .applyLookPreview(slotId: id, targetTime: preview.playhead)
+              .then((_) {
+                if (mounted) setState(() {});
+              }),
         );
       }
     } else {
