@@ -5,9 +5,11 @@ import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
+import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import 'live_room_battle_opponents_sheet.dart';
 import 'live_room_option_tile.dart';
 import 'live_room_settings_sheet.dart';
 
@@ -159,6 +161,31 @@ class _OptionsContent extends StatelessWidget {
                 context,
                 LiveRoomMenuDestination.liveGifts,
               ),
+            ),
+            // Direct way into a PK round. Before this the only trigger was
+            // accepting a guest's chat request, which then blind-auto-matched
+            // a stranger; the host could never simply pick who to face.
+            LiveRoomOptionTile(
+              icon: Icons.sports_mma_outlined,
+              title: 'بدء منافسة',
+              subtitle: 'اختر بثاً مباشراً آخر لتتنافس معه.',
+              trailing: LiveRoomOptionTrailing.chevron,
+              onTap: () {
+                // Captured before the pop: this sheet's context stops
+                // resolving providers the moment its route goes away.
+                final bloc = context.read<LiveRoomBloc>();
+                final repository = context.read<LiveSessionRepository>();
+                final rootContext = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
+                Navigator.of(context).maybePop();
+                LiveRoomBattleOpponentsSheet.showWith(
+                  context: rootContext,
+                  bloc: bloc,
+                  repository: repository,
+                );
+              },
             ),
             LiveRoomOptionTile(
               icon: Icons.movie_filter_outlined,
