@@ -2024,6 +2024,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       case LiveRoomMenuDestination.comments:
         emit(current.copyWith(isChatComposerVisible: true));
       case LiveRoomMenuDestination.settings:
+      case LiveRoomMenuDestination.startBattle:
         // Sheet opened from presentation layer.
         return;
       case LiveRoomMenuDestination.liveGifts:

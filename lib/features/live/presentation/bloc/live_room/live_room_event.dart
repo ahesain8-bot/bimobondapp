@@ -213,6 +213,7 @@ class LiveRoomPauseLiveTapped extends LiveRoomEvent {
 enum LiveRoomMenuDestination {
   liveGifts,
   liveHighlights,
+  startBattle,
   settings,
   comments,
   aboutMe,
