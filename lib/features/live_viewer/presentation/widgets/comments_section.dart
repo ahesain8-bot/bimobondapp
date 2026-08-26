@@ -130,6 +130,12 @@ class _CommentsSectionState extends State<CommentsSection> {
                 return TikTokCommentBubble(
                       comment: comment,
                       highContrast: widget.highContrast,
+                      isFromHost:
+                          widget.hostId != null &&
+                          comment.userId == widget.hostId,
+                      isFromModerator: widget.moderatorIds.contains(
+                        comment.userId,
+                      ),
                       showModerationMenu:
                           isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
                       isMuted: isMuted,
@@ -182,6 +188,13 @@ class _CommentsSectionState extends State<CommentsSection> {
 class TikTokCommentBubble extends StatelessWidget {
   final CommentEntity comment;
   final bool highContrast;
+
+  /// Author is the room's host — tagged the way the reference feed marks them.
+  final bool isFromHost;
+
+  /// Author is one of the room's moderators.
+  final bool isFromModerator;
+
   final bool showModerationMenu;
   final bool isMuted;
   final bool isBanned;
@@ -195,6 +208,8 @@ class TikTokCommentBubble extends StatelessWidget {
     super.key,
     required this.comment,
     this.highContrast = false,
+    this.isFromHost = false,
+    this.isFromModerator = false,
     this.showModerationMenu = false,
     this.isMuted = false,
     this.isBanned = false,
@@ -356,6 +371,19 @@ class TikTokCommentBubble extends StatelessWidget {
                 children: [
                   Row(
                     children: [
+                      if (isFromHost) ...[
+                        const _CommentRoleTag(
+                          label: 'Host',
+                          color: TikTokLiveTokens.hostTagOrange,
+                        ),
+                        const SizedBox(width: 4),
+                      ] else if (isFromModerator) ...[
+                        const _CommentRoleTag(
+                          label: 'Mod',
+                          color: Color(0xFF3D7EFF),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       if (level > 0) ...[
                         GifterLevelBadge(level: level, compact: true),
                         const SizedBox(width: 4),
@@ -381,16 +409,16 @@ class TikTokCommentBubble extends StatelessWidget {
                           comment.username,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TikTokLiveTokens.commentUser.copyWith(
-                            color: isYou
-                                ? TikTokLiveTokens.liveCyan
-                                : const Color(0xE6FFFFFF),
-                          ),
+                          style: isYou
+                              ? TikTokLiveTokens.commentUser.copyWith(
+                                  color: TikTokLiveTokens.liveCyan,
+                                )
+                              : TikTokLiveTokens.commentUser,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text(comment.content, style: TikTokLiveTokens.commentBody),
                 ],
               ),
@@ -410,6 +438,26 @@ class TikTokCommentBubble extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Role chip in front of a comment name (host / moderator).
+class _CommentRoleTag extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _CommentRoleTag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label, style: TikTokLiveTokens.commentTag),
     );
   }
 }

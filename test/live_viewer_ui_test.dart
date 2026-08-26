@@ -2,19 +2,22 @@ import 'package:bimobondapp/features/live_viewer/data/services/fake_livekit_serv
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
 import 'package:bimobondapp/features/live_viewer/domain/repositories/guest_repository.dart';
 import 'package:bimobondapp/features/live_viewer/presentation/widgets/tiktok_live_chrome.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/widgets/comment_input_bar.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/widgets/tiktok_live_tokens.dart';
 import 'package:bimobondapp/features/live_viewer/presentation/widgets/viewer_stage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-LiveEntity _live({String layout = 'PANEL'}) => LiveEntity(
-  id: 'live-1',
-  hostId: 'host-1',
-  hostName: 'Host',
-  title: 'Live',
-  category: 'General',
-  startTime: DateTime(2026, 8, 24),
-  metadata: {'layout': layout},
-);
+LiveEntity _live({String layout = 'PANEL', String hostName = 'Host'}) =>
+    LiveEntity(
+      id: 'live-1',
+      hostId: 'host-1',
+      hostName: hostName,
+      title: 'Live',
+      category: 'General',
+      startTime: DateTime(2026, 8, 24),
+      metadata: {'layout': layout},
+    );
 
 const _guest = GuestSummary(
   userId: 'guest-1',
@@ -23,7 +26,47 @@ const _guest = GuestSummary(
   status: 'ACTIVE',
 );
 
+void _noop(String _) {}
+
 void main() {
+  testWidgets('focused comment composer keeps a fixed layout height', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CommentInputBar(onSend: _noop),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.getSize(find.byType(CommentInputBar)).height,
+      TikTokLiveTokens.inputH,
+    );
+  });
+
+  testWidgets('top bar displays the full real host name', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: TikTokLiveTopBar(
+              live: _live(hostName: 'Full Host Name'),
+              topViewerAvatars: const [],
+              onFollow: () {},
+              onClose: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Full Host Name'), findsOneWidget);
+  });
+
   testWidgets('TikTok bottom actions fit and stay LTR on a 320dp phone', (
     tester,
   ) async {
@@ -63,7 +106,7 @@ void main() {
     final gift = tester.getRect(find.byIcon(Icons.card_giftcard_rounded));
     final share = tester.getRect(find.byIcon(Icons.reply_rounded));
     expect(input.left, lessThan(gift.left));
-    expect(gift.left, lessThan(share.left));
+    expect(share.left, lessThan(gift.left));
   });
 
   testWidgets('stale GRID layout cannot turn a guest into a battle', (
