@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/home/presentation/utils/live_gift_route_policy.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/gift_animation_overlay.dart';
@@ -125,6 +127,127 @@ void main() {
       await tester.pump();
 
       expect(find.byType(GiftAnimationOverlay), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a duplicate socket event does not restart the gift already on screen',
+    (tester) async {
+      // One send reaches the room as a gift comment, an `auctionGiftCombo` and
+      // an `auctionUpdated.lastGift`. Those payloads disagree about the
+      // sender's display name, so the later ones used to tear down the running
+      // animation and start it over — visible as a gift that plays for about a
+      // second and vanishes.
+      late BuildContext ctx;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final owner = Object();
+      Future<void> send(String senderName) => GiftAnimationOverlay.show(
+            ctx,
+            animationUrl: 'https://example.com/car-gold.png',
+            thumbnailUrl: 'https://example.com/car-gold.png',
+            senderName: senderName,
+            giftName: 'CAR GOLD',
+            size: 'LARGE',
+            owner: owner,
+            dedupeKey: 'car-gold|sender-1',
+          );
+
+      unawaited(send('Rashee'));
+      await tester.pump();
+      final first = tester.widget<GiftAnimationOverlay>(
+        find.byType(GiftAnimationOverlay),
+      );
+
+      // Same gift, same sender, different display name — the duplicate.
+      unawaited(send('User'));
+      await tester.pump();
+
+      expect(find.byType(GiftAnimationOverlay), findsOneWidget);
+      expect(
+        identical(
+          tester.widget<GiftAnimationOverlay>(
+            find.byType(GiftAnimationOverlay),
+          ),
+          first,
+        ),
+        isTrue,
+        reason: 'the duplicate must not replace the running overlay',
+      );
+
+      GiftAnimationOverlay.dismiss(owner: owner);
+      await tester.pump();
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'a different gift still replaces the one on screen',
+    (tester) async {
+      late BuildContext ctx;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final owner = Object();
+      unawaited(
+        GiftAnimationOverlay.show(
+          ctx,
+          animationUrl: 'https://example.com/car-gold.png',
+          giftName: 'CAR GOLD',
+          size: 'LARGE',
+          owner: owner,
+          dedupeKey: 'car-gold|sender-1',
+        ),
+      );
+      await tester.pump();
+      final first = tester.widget<GiftAnimationOverlay>(
+        find.byType(GiftAnimationOverlay),
+      );
+
+      unawaited(
+        GiftAnimationOverlay.show(
+          ctx,
+          animationUrl: 'https://example.com/lolo.png',
+          giftName: 'LOLO',
+          size: 'LARGE',
+          owner: owner,
+          dedupeKey: 'lolo|sender-2',
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(GiftAnimationOverlay), findsOneWidget);
+      expect(
+        identical(
+          tester.widget<GiftAnimationOverlay>(
+            find.byType(GiftAnimationOverlay),
+          ),
+          first,
+        ),
+        isFalse,
+      );
+
+      GiftAnimationOverlay.dismiss(owner: owner);
+      await tester.pump();
+      await tester.pump();
     },
   );
 

@@ -1012,6 +1012,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final url = animationUrl?.trim();
     if (url == null || url.isEmpty || !mounted) return;
 
+    final gName = giftName ?? 'Gift';
+    final gId = (giftId != null && giftId.isNotEmpty) ? giftId : gName;
+    final sName = senderName ?? 'User';
+    final sId = (senderId != null && senderId.isNotEmpty) ? senderId : sName;
+
     final isSmall =
         size == GiftCatalogSize.small ||
         size?.toString().toUpperCase() == 'SMALL';
@@ -1037,7 +1042,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     // animation and will render the event through its own HUD pipeline.
     if (!mounted || !isRealtimeGiftRouteCurrent(context)) return;
 
-    final dedupeKey = '${giftName ?? ''}|${senderName ?? ''}';
+    // Key on identity, not on what is displayed. The same send arrives from
+    // the gift comment, `auctionGiftCombo` and `auctionUpdated.lastGift`, and
+    // those payloads disagree about the sender's display name — one carries the
+    // profile name, another falls back to 'User'. A name-based key therefore
+    // read the duplicates as different gifts and replayed them.
+    final dedupeKey = '$gId|$sId';
     final now = DateTime.now();
     final lastAt = _lastGiftPlayedAt;
     // Ignore socket+local doubles even when URLs differ slightly.
@@ -1063,6 +1073,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         giftName: giftName,
         size: size,
         owner: this,
+        // Second line of defence: a late duplicate that clears the 3s window
+        // above must still not restart an animation that is on screen.
+        dedupeKey: dedupeKey,
       ),
     );
   }
