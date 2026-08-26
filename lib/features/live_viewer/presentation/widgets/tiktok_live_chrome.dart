@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/utils/extensions.dart';
 import '../../domain/entities/live_entity.dart';
@@ -599,134 +598,166 @@ class _Pill extends StatelessWidget {
   }
 }
 
-/// PK battle score bar — tip capsule overlays the center of the bar.
+/// PK battle score bar — TikTok layout.
+///
+/// Reference (TikTok LIVE battle): one full-width split bar, each side's score
+/// sitting at its own outer edge in white, and the seam marker riding the split
+/// rather than parked at an edge. The centre of the bar is left empty on
+/// purpose: TikTok puts the round countdown there, and the previous
+/// "Win to get 2x points" capsule was occupying that slot and colliding with
+/// the timer the room already renders just below.
 class PkBattleBar extends StatelessWidget {
   final int scoreLeft;
   final int scoreRight;
+
+  /// Marker that rides the seam between the two sides.
+  final String seamMarker;
 
   const PkBattleBar({
     super.key,
     required this.scoreLeft,
     required this.scoreRight,
+    this.seamMarker = '😘',
   });
+
+  static const double _barHeight = 22;
+
+  /// Neither side's colour is ever fully squeezed out, so the bar still reads
+  /// as a contest when one room is running away with it (TikTok keeps a sliver).
+  static const double _minShare = 0.06;
+
+  static String _fmt(int n) {
+    if (n < 1000) return '$n';
+    return n.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final total = (scoreLeft + scoreRight).clamp(1, 1 << 30);
-    final leftRatio = scoreLeft / total;
+    final target = (scoreLeft / total).clamp(_minShare, 1 - _minShare);
 
     return SizedBox(
-      height: 36,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            height: 16,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      flex: (leftRatio * 1000).round().clamp(50, 950),
-                      child: Container(
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.only(left: 10),
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
+      height: _barHeight,
+      // A score arriving as a socket event should slide the seam, not snap it.
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: target, end: target),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        builder: (context, ratio, _) {
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final seamX = constraints.maxWidth * ratio;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: (ratio * 1000).round(),
+                        child: _Side(
+                          score: scoreLeft,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 10),
+                          gradient: const LinearGradient(
                             colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
                           ),
                         ),
-                        child: Text(
-                          _fmt(scoreLeft),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            height: 1,
-                          ),
-                        ),
                       ),
-                    ),
-                    Expanded(
-                      flex: ((1 - leftRatio) * 1000).round().clamp(50, 950),
-                      child: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 22),
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
+                      Expanded(
+                        flex: ((1 - ratio) * 1000).round(),
+                        child: _Side(
+                          score: scoreRight,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 10),
+                          gradient: const LinearGradient(
                             colors: [Color(0xFF20E0F0), Color(0xFF25F4EE)],
                           ),
                         ),
-                        child: Text(
-                          _fmt(scoreRight),
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            height: 1,
-                          ),
+                      ),
+                    ],
+                  ),
+                  // Soft joint glow, the way the two colours meet on TikTok.
+                  Positioned(
+                    left: seamX - 9,
+                    top: 0,
+                    bottom: 0,
+                    width: 18,
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0x00FFFFFF),
+                            Color(0x66FFFFFF),
+                            Color(0x00FFFFFF),
+                          ],
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const Positioned(
-                  right: 2,
-                  top: -3,
-                  child: Text('😘', style: TextStyle(fontSize: 16)),
-                ),
-              ],
-            ),
-          ),
-          Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xE60A2430),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.diamond, color: Color(0xFF7EC8FF), size: 11),
-                    SizedBox(width: 4),
-                    Text(
-                      'Win to get 2x points ›',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        height: 1.1,
-                      ),
+                  ),
+                  Positioned(
+                    left: seamX - 10,
+                    top: -4,
+                    width: 20,
+                    child: Text(
+                      seamMarker,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16),
                     ),
-                  ],
-                ),
-              )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .fade(begin: 0.85, end: 1, duration: 900.ms),
-        ],
+                  ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
+}
 
-  static String _fmt(int n) {
-    if (n >= 1000) {
-      return n.toString().replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]},',
-      );
-    }
-    return '$n';
+class _Side extends StatelessWidget {
+  const _Side({
+    required this.score,
+    required this.alignment,
+    required this.padding,
+    required this.gradient,
+  });
+
+  final int score;
+  final Alignment alignment;
+  final EdgeInsets padding;
+  final Gradient gradient;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: alignment,
+      padding: padding,
+      decoration: BoxDecoration(gradient: gradient),
+      child: Text(
+        PkBattleBar._fmt(score),
+        maxLines: 1,
+        overflow: TextOverflow.clip,
+        // Both sides are white on TikTok. The cyan side used to be black87,
+        // which read as a disabled score next to the pink one.
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 14,
+          height: 1,
+          shadows: [
+            Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
+
+/// TikTok LIVE viewer bottom bar (LTR):
 /// TikTok LIVE viewer bottom bar (LTR):
 /// [Write…] [emoji] [multi-guest] [rose] [gift] [share]
 class TikTokLiveBottomBar extends StatelessWidget {

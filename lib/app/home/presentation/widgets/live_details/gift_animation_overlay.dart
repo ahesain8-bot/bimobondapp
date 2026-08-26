@@ -35,6 +35,7 @@ class GiftAnimationOverlay extends StatefulWidget {
   static OverlayEntry? _activeEntry;
   static Object? _activeOwner;
   static VoidCallback? _activeDismiss;
+  static String? _activeKey;
 
   /// Inserts above every route layer (root overlay, after gift sheet closes).
   ///
@@ -45,6 +46,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     BuildContext context, {
     required String animationUrl,
     required Object owner,
+    String? dedupeKey,
     String? thumbnailUrl,
     String? senderName,
     String? giftName,
@@ -69,6 +71,19 @@ class GiftAnimationOverlay extends StatefulWidget {
     final route = ModalRoute.of(context);
     if (route != null && !route.isActive) return Future.value();
 
+    // One physical send reaches the room as up to three socket events (the
+    // gift comment, `auctionGiftCombo`, and `auctionUpdated.lastGift`). They
+    // arrive seconds apart, so a duplicate used to dismiss the animation that
+    // was still playing and start it over — the occasion gifts are 15s MP4s,
+    // and that is what cut them off after about a second and churned an
+    // ExoPlayer texture over the live feed. A duplicate is now a no-op.
+    if (dedupeKey != null &&
+        dedupeKey.isNotEmpty &&
+        dedupeKey == _activeKey &&
+        _activeEntry != null) {
+      return Future.value();
+    }
+
     // Only one gift animation at a time — avoids dual VideoPlayers / crash.
     _dismissActive();
 
@@ -81,6 +96,7 @@ class GiftAnimationOverlay extends StatefulWidget {
         _activeEntry = null;
         _activeOwner = null;
         _activeDismiss = null;
+        _activeKey = null;
       }
       if (removed) return;
       removed = true;
@@ -114,6 +130,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     _activeEntry = entry;
     _activeOwner = owner;
     _activeDismiss = remove;
+    _activeKey = dedupeKey;
     overlay.insert(entry);
 
     // Second safety net behind the owner's own dismiss: tie the entry to the
@@ -143,6 +160,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     final active = _activeEntry;
     _activeEntry = null;
     _activeOwner = null;
+    _activeKey = null;
     if (active == null) return;
     // Unmounted entries are removed too — see `remove()` above.
     try {
@@ -156,6 +174,14 @@ class GiftAnimationOverlay extends StatefulWidget {
 
 enum _GiftMediaKind { lottie, video, image }
 
+/// How often the video watchdog samples the playback position.
+const Duration _kVideoWatchdogTick = Duration(milliseconds: 500);
+
+/// How long the position may stand still before the gift is treated as over.
+/// Occasion gifts stream from the same host as the live feed, so a second or
+/// two of rebuffering mid-animation is normal and must not end the overlay.
+const Duration _kVideoMaxStall = Duration(seconds: 6);
+
 class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     with TickerProviderStateMixin {
   late final AnimationController _entranceController;
@@ -166,6 +192,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   bool _lottieFailed = false;
   bool _videoFailed = false;
   Timer? _finishTimer;
+  Timer? _stallTimer;
   late final _GiftMediaKind _kind;
   late final bool _isWebp;
 
@@ -275,9 +302,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       }
 
       controller.addListener(onTick);
-      final d = controller.value.duration;
-      final timeout = d > Duration.zero ? d : const Duration(seconds: 3);
-      _scheduleFinish(timeout + const Duration(milliseconds: 400));
+      _armStallWatchdog(controller);
     } catch (_) {
       try {
         await controller?.dispose();
@@ -287,6 +312,41 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       setState(() => _videoFailed = true);
       _scheduleFinish(const Duration(milliseconds: 1600));
     }
+  }
+
+  /// Ends the overlay when playback stops making progress — not on a clock.
+  ///
+  /// This used to be a single timer armed at `play()` for `duration + 400ms`.
+  /// A 15s occasion MP4 that spends three seconds buffering therefore lost
+  /// three seconds off its own animation, and a slow start cut it off outright.
+  /// Sampling the position instead means a stream that is still advancing is
+  /// still playing, however long the network takes to feed it.
+  void _armStallWatchdog(VideoPlayerController controller) {
+    _stallTimer?.cancel();
+    var lastPosition = controller.value.position;
+    var stalledFor = Duration.zero;
+    _stallTimer = Timer.periodic(_kVideoWatchdogTick, (timer) {
+      if (!mounted || _finished) {
+        timer.cancel();
+        return;
+      }
+      final value = controller.value;
+      if (!value.isInitialized) {
+        timer.cancel();
+        _finish();
+        return;
+      }
+      if (value.position > lastPosition) {
+        lastPosition = value.position;
+        stalledFor = Duration.zero;
+        return;
+      }
+      stalledFor += _kVideoWatchdogTick;
+      if (stalledFor >= _kVideoMaxStall) {
+        timer.cancel();
+        _finish();
+      }
+    });
   }
 
   void _scheduleFinish(Duration delay) {
@@ -299,6 +359,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     _finished = true;
     _finishTimer?.cancel();
     _finishTimer = null;
+    _stallTimer?.cancel();
+    _stallTimer = null;
 
     // Tear down video texture before removing the overlay entry.
     final video = _videoController;
@@ -323,6 +385,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   void dispose() {
     _finishTimer?.cancel();
     _finishTimer = null;
+    _stallTimer?.cancel();
+    _stallTimer = null;
     _lottieController?.dispose();
     final video = _videoController;
     _videoController = null;
@@ -353,22 +417,35 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     final isLarge = !isSmall && !isMedium;
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
-    final double stageSize;
+
+    // A LARGE video gift is authored full-bleed portrait (the occasion MP4s are
+    // 496x864 with the composition running edge to edge), so it gets the whole
+    // screen the way TikTok plays its fullscreen gifts. Cover-cropping one into
+    // a square at the bottom threw away roughly 40% of every frame.
+    final isFullscreenVideo = isLarge && _kind == _GiftMediaKind.video;
+
+    final double stageWidth;
+    final double stageHeight;
     if (isSmall) {
-      stageSize = (screenSize.width * 0.28).clamp(80.0, 120.0);
+      stageWidth = stageHeight = (screenSize.width * 0.28).clamp(80.0, 120.0);
     } else if (isMedium) {
-      stageSize = (screenSize.width * 0.72).clamp(240.0, 340.0);
+      stageWidth = stageHeight = (screenSize.width * 0.72).clamp(240.0, 340.0);
+    } else if (isFullscreenVideo) {
+      stageWidth = screenSize.width;
+      stageHeight = screenSize.height;
     } else {
-      stageSize = screenSize.width.clamp(0.0, screenSize.height);
+      // Lottie stages stay 1:1 — those compositions are authored square.
+      stageWidth = stageHeight = screenSize.width.clamp(0.0, screenSize.height);
     }
 
-    Widget stage = _withEdgeFade(
-      SizedBox(
-        width: stageSize,
-        height: stageSize,
-        child: _buildMedia(),
-      ),
+    final media = SizedBox(
+      width: stageWidth,
+      height: stageHeight,
+      child: _buildMedia(),
     );
+    final stage = _kind == _GiftMediaKind.video
+        ? RepaintBoundary(child: media)
+        : _withEdgeFade(media);
 
     Widget animatedStage;
     if (isLarge) {
@@ -419,43 +496,54 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
     if (isSmall) {
       topPosition = null;
-      bottomPosition = 350.0; // Positioned on top of comments area and on top of highest price card
+      // Sits above the comment feed and the highest-price card. A flat 350
+      // pushed the badge past the middle of a short screen, so it scales and
+      // is then clamped to the range that keeps it clear of both on a phone.
+      bottomPosition = (screenSize.height * 0.41).clamp(200.0, 380.0);
       leftPosition = isRtl ? null : 16.0;
       rightPosition = isRtl ? 16.0 : null;
     } else if (isMedium) {
-      topPosition = (screenSize.height - stageSize) / 2;
+      topPosition = (screenSize.height - stageHeight) / 2;
       bottomPosition = null;
-      leftPosition = (screenSize.width - stageSize) / 2;
+      leftPosition = (screenSize.width - stageWidth) / 2;
+      rightPosition = null;
+    } else if (isFullscreenVideo) {
+      topPosition = 0;
+      bottomPosition = null;
+      leftPosition = 0;
       rightPosition = null;
     } else {
       topPosition = null;
       bottomPosition = 0;
-      leftPosition = (screenSize.width - stageSize) / 2;
+      leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
 
-    return Material(
-      type: MaterialType.transparency,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _finish,
-              behavior: HitTestBehavior.opaque,
-              child: const SizedBox.expand(),
+    // The entry sits in the *root* overlay, on top of the live room and of any
+    // sheet. It must therefore never take a pointer: this used to be a
+    // full-screen `HitTestBehavior.opaque` GestureDetector wired to `_finish`,
+    // which swallowed every tap in the room for the whole animation *and*
+    // ended the gift on the first one. In a live people tap constantly (hearts,
+    // the comment field, the gift button), so a 15s occasion gift died about a
+    // second in. TikTok's fullscreen gifts are pure decoration — taps go
+    // straight through to the UI underneath.
+    return IgnorePointer(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              left: leftPosition,
+              right: rightPosition,
+              top: topPosition,
+              bottom: bottomPosition,
+              width: stageWidth,
+              height: stageHeight,
+              child: animatedStage,
             ),
-          ),
-          Positioned(
-            left: leftPosition,
-            right: rightPosition,
-            top: topPosition,
-            bottom: bottomPosition,
-            width: stageSize,
-            height: stageSize,
-            child: animatedStage,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -502,9 +590,12 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         if (_videoFailed) return _fallbackVisual();
         final controller = _videoController;
         if (controller == null || !controller.value.isInitialized) {
-          return _loadingVisual();
+          // Same rule as the Lottie branch: nothing stands in while
+          // `initialize()` opens the stream and decodes the first frame.
+          return const SizedBox.expand();
         }
-        // Parent stage is 1:1 (1080×1080); cover the square.
+        // Cover whatever stage this kind was given — a fullscreen rect for a
+        // LARGE gift, a square for MEDIUM/SMALL.
         return FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
@@ -532,13 +623,5 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     return const Center(
       child: Icon(Icons.card_giftcard, size: 120, color: Colors.white),
     );
-  }
-
-  Widget _loadingVisual() {
-    final thumbnail = widget.thumbnailUrl?.trim();
-    if (thumbnail != null && thumbnail.isNotEmpty) {
-      return _fallbackVisual();
-    }
-    return const Center(child: CircularProgressIndicator(color: Colors.white));
   }
 }

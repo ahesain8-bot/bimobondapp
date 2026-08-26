@@ -38,26 +38,41 @@ class GuestRequestPanel extends StatelessWidget {
     this.maxSlots = 8,
   });
 
-  static const double _tile = 58;
   static const double _gap = 3;
   static const double _radius = 10;
 
+  /// TikTok's rail tile is about a fifth of the screen; 58 was a fixed value
+  /// that read as a thumbnail strip next to the reference.
+  static const double _tileFactor = 0.20;
+  static const double _tileMin = 56;
+  static const double _tileMax = 92;
+
   @override
   Widget build(BuildContext context) {
-    final items = List<GuestSlotData>.generate(
-      maxSlots,
-      (i) => i < slots.length ? slots[i] : const GuestSlotData(),
-    );
+    final tile = (MediaQuery.sizeOf(context).width * _tileFactor)
+        .clamp(_tileMin, _tileMax);
+
+    // Occupied seats, then a single join affordance — never a column of empty
+    // boxes. Padding the rail out to `maxSlots` put six "Request" tiles down
+    // the side of the video; TikTok's rail shows the seats that are taken plus
+    // one place to ask for the next one. The fixed grid of placeholders is the
+    // *grid* layout's behaviour (see MultiGuestGrid), not the rail's.
+    final taken = slots.where((s) => !s.isEmpty).toList();
+    final items = <GuestSlotData>[
+      ...taken,
+      if (taken.length < maxSlots) const GuestSlotData(),
+    ];
 
     return SizedBox(
-      width: _tile + 4,
+      width: tile + 4,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(height: _gap),
             _GuestSlotTile(
               slot: items[i],
-              size: _tile,
+              size: tile,
               radius: _radius,
               onRequestTap: onRequestTap,
               showHostTag: i == 0 && items[i].isHost,

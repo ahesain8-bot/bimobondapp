@@ -729,19 +729,55 @@ class LivesMediaDataSource {
     _videoTrack = null;
     _videoPublished = false;
 
-    final next = await LocalVideoTrack.createCameraTrack(options);
     final local = room.localParticipant;
     if (local == null) {
-      await next.dispose();
       throw StateError('LiveKit local participant unavailable');
     }
-    await local.publishVideoTrack(
-      next,
-      publishOptions: _publishOptionsFor(_activeProfile),
-    );
-    _videoTrack = next;
-    _videoPublished = true;
-    return next;
+
+    // The old track is already unpublished and stopped by this point, so a
+    // failure here leaves the host broadcasting a black frame — which reads as
+    // the live having dropped. Android in particular refuses to open the
+    // camera for a moment after the previous capturer is released, so retry
+    // the flip and then fall back to the side we came from: staying on the
+    // original camera is always better than going dark mid-broadcast.
+    Future<LocalVideoTrack?> publishAt(CameraPosition at) async {
+      LocalVideoTrack? track;
+      try {
+        track = await LocalVideoTrack.createCameraTrack(
+          _captureOptionsFor(_activeProfile, at),
+        );
+        await local.publishVideoTrack(
+          track,
+          publishOptions: _publishOptionsFor(_activeProfile),
+        );
+        _videoTrack = track;
+        _videoPublished = true;
+        return track;
+      } catch (e, st) {
+        debugPrint('LiveKit camera publish at $at failed: $e\n$st');
+        try {
+          await track?.dispose();
+        } catch (_) {}
+        return null;
+      }
+    }
+
+    final flipped = await publishAt(position) ??
+        await Future<LocalVideoTrack?>.delayed(
+          const Duration(milliseconds: 350),
+          () => publishAt(position),
+        );
+    if (flipped != null) return flipped;
+
+    final fallbackPosition =
+        useFront ? CameraPosition.back : CameraPosition.front;
+    final recovered = await publishAt(fallbackPosition);
+    if (recovered != null) {
+      throw StateError(
+        'Camera flip failed; kept broadcasting on the previous camera',
+      );
+    }
+    throw StateError('LiveKit camera flip failed and could not be recovered');
   }
 
   Future<void> disconnect() async {

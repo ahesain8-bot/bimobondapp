@@ -460,6 +460,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                               curr.pkScoreRight ||
                                           prev.battle != curr.battle,
                                       builder: (context, state) {
+                                        final battle = state.battle;
+                                        final winner = battle?.winnerLiveId;
+                                        final decided =
+                                            battle != null &&
+                                            winner != null &&
+                                            winner.isNotEmpty;
+                                        final leftWon =
+                                            decided && winner == live.id;
+
                                         return Stack(
                                           alignment: Alignment.topCenter,
                                           clipBehavior: Clip.none,
@@ -468,13 +477,31 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                               scoreLeft: state.pkScoreLeft,
                                               scoreRight: state.pkScoreRight,
                                             ),
+                                            // TikTok calls the round on the
+                                            // panels themselves, not only in
+                                            // the score numbers.
+                                            if (decided) ...[
+                                              Positioned(
+                                                top: 28,
+                                                left: 8,
+                                                child: _PkResultBadge(
+                                                  won: leftWon,
+                                                ),
+                                              ),
+                                              Positioned(
+                                                top: 28,
+                                                right: 8,
+                                                child: _PkResultBadge(
+                                                  won: !leftWon,
+                                                ),
+                                              ),
+                                            ],
                                             Positioned(
-                                              top: 22,
+                                              top: 26,
                                               child: _PkBattleTimer(
-                                                endTime: state.battle?.endTime,
+                                                endTime: battle?.endTime,
                                                 multiplier:
-                                                    state.battle?.multiplier ??
-                                                    1,
+                                                    battle?.multiplier ?? 1,
                                               ),
                                             ),
                                           ],
@@ -1324,22 +1351,90 @@ class _PkBattleTimer extends StatelessWidget {
         final time =
             '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
             '${(seconds % 60).toString().padLeft(2, '0')}';
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0xE60A2430),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Text(
-            '${multiplier > 1 ? '×${multiplier.toStringAsFixed(1)}  ' : ''}$time',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+        // TikTok's round clock: a dark capsule under the seam, the time in
+        // tabular figures so the digits do not jitter every second, and the
+        // speed-boost multiplier as its own pink chip beside it rather than
+        // crammed into the same string.
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (multiplier > 1) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 7,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
+                  ),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Text(
+                  '×${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xE60A2430),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Text(
+                time,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// WIN / LOSE capsule shown on a panel once the round has a winner.
+class _PkResultBadge extends StatelessWidget {
+  const _PkResultBadge({required this.won});
+
+  final bool won;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        gradient: won
+            ? const LinearGradient(
+                colors: [Color(0xFFFFC93C), Color(0xFFFFA000)],
+              )
+            : null,
+        color: won ? null : const Color(0xCC4A4A4A),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        won ? 'WIN' : 'LOSE',
+        style: TextStyle(
+          color: won ? const Color(0xFF4A2800) : Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          height: 1.1,
+          letterSpacing: 0.4,
+        ),
+      ),
     );
   }
 }
