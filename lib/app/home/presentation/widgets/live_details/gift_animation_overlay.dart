@@ -496,7 +496,10 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
     if (isSmall) {
       topPosition = null;
-      bottomPosition = 350.0; // Positioned on top of comments area and on top of highest price card
+      // Sits above the comment feed and the highest-price card. A flat 350
+      // pushed the badge past the middle of a short screen, so it scales and
+      // is then clamped to the range that keeps it clear of both on a phone.
+      bottomPosition = (screenSize.height * 0.41).clamp(200.0, 380.0);
       leftPosition = isRtl ? null : 16.0;
       rightPosition = isRtl ? 16.0 : null;
     } else if (isMedium) {
