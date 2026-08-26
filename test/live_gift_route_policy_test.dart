@@ -252,6 +252,61 @@ void main() {
   );
 
   testWidgets(
+    'the gift overlay never takes a tap away from the live room',
+    (tester) async {
+      // The overlay lives in the root overlay, above the room and any sheet.
+      // A full-screen opaque GestureDetector there swallowed every tap for the
+      // whole animation and ended the gift on the first one, so a 15s occasion
+      // gift died about a second in as soon as the viewer touched anything.
+      var tapsReachingTheRoom = 0;
+      late BuildContext ctx;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              ctx = context;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => tapsReachingTheRoom++,
+                child: const SizedBox.expand(),
+              );
+            },
+          ),
+        ),
+      );
+
+      final owner = Object();
+      unawaited(
+        GiftAnimationOverlay.show(
+          ctx,
+          animationUrl: 'https://example.com/car-gold.png',
+          giftName: 'CAR GOLD',
+          size: 'LARGE',
+          owner: owner,
+          dedupeKey: 'car-gold|sender-1',
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(GiftAnimationOverlay), findsOneWidget);
+
+      await tester.tapAt(const Offset(200, 300));
+      await tester.pump();
+
+      expect(tapsReachingTheRoom, 1, reason: 'the tap must pass through');
+      expect(
+        find.byType(GiftAnimationOverlay),
+        findsOneWidget,
+        reason: 'and it must not end the gift',
+      );
+
+      GiftAnimationOverlay.dismiss(owner: owner);
+      await tester.pump();
+      await tester.pump();
+    },
+  );
+
+  testWidgets(
     'shows a thumbnail while asynchronous gift media is initializing',
     (tester) async {
       await tester.pumpWidget(

@@ -417,18 +417,30 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     final isLarge = !isSmall && !isMedium;
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
-    final double stageSize;
+
+    // A LARGE video gift is authored full-bleed portrait (the occasion MP4s are
+    // 496x864 with the composition running edge to edge), so it gets the whole
+    // screen the way TikTok plays its fullscreen gifts. Cover-cropping one into
+    // a square at the bottom threw away roughly 40% of every frame.
+    final isFullscreenVideo = isLarge && _kind == _GiftMediaKind.video;
+
+    final double stageWidth;
+    final double stageHeight;
     if (isSmall) {
-      stageSize = (screenSize.width * 0.28).clamp(80.0, 120.0);
+      stageWidth = stageHeight = (screenSize.width * 0.28).clamp(80.0, 120.0);
     } else if (isMedium) {
-      stageSize = (screenSize.width * 0.72).clamp(240.0, 340.0);
+      stageWidth = stageHeight = (screenSize.width * 0.72).clamp(240.0, 340.0);
+    } else if (isFullscreenVideo) {
+      stageWidth = screenSize.width;
+      stageHeight = screenSize.height;
     } else {
-      stageSize = screenSize.width.clamp(0.0, screenSize.height);
+      // Lottie stages stay 1:1 — those compositions are authored square.
+      stageWidth = stageHeight = screenSize.width.clamp(0.0, screenSize.height);
     }
 
     final media = SizedBox(
-      width: stageSize,
-      height: stageSize,
+      width: stageWidth,
+      height: stageHeight,
       child: _buildMedia(),
     );
     final stage = _kind == _GiftMediaKind.video
@@ -488,39 +500,47 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       leftPosition = isRtl ? null : 16.0;
       rightPosition = isRtl ? 16.0 : null;
     } else if (isMedium) {
-      topPosition = (screenSize.height - stageSize) / 2;
+      topPosition = (screenSize.height - stageHeight) / 2;
       bottomPosition = null;
-      leftPosition = (screenSize.width - stageSize) / 2;
+      leftPosition = (screenSize.width - stageWidth) / 2;
+      rightPosition = null;
+    } else if (isFullscreenVideo) {
+      topPosition = 0;
+      bottomPosition = null;
+      leftPosition = 0;
       rightPosition = null;
     } else {
       topPosition = null;
       bottomPosition = 0;
-      leftPosition = (screenSize.width - stageSize) / 2;
+      leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
 
-    return Material(
-      type: MaterialType.transparency,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _finish,
-              behavior: HitTestBehavior.opaque,
-              child: const SizedBox.expand(),
+    // The entry sits in the *root* overlay, on top of the live room and of any
+    // sheet. It must therefore never take a pointer: this used to be a
+    // full-screen `HitTestBehavior.opaque` GestureDetector wired to `_finish`,
+    // which swallowed every tap in the room for the whole animation *and*
+    // ended the gift on the first one. In a live people tap constantly (hearts,
+    // the comment field, the gift button), so a 15s occasion gift died about a
+    // second in. TikTok's fullscreen gifts are pure decoration — taps go
+    // straight through to the UI underneath.
+    return IgnorePointer(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              left: leftPosition,
+              right: rightPosition,
+              top: topPosition,
+              bottom: bottomPosition,
+              width: stageWidth,
+              height: stageHeight,
+              child: animatedStage,
             ),
-          ),
-          Positioned(
-            left: leftPosition,
-            right: rightPosition,
-            top: topPosition,
-            bottom: bottomPosition,
-            width: stageSize,
-            height: stageSize,
-            child: animatedStage,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -571,7 +591,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           // `initialize()` opens the stream and decodes the first frame.
           return const SizedBox.expand();
         }
-        // Parent stage is 1:1 (1080×1080); cover the square.
+        // Cover whatever stage this kind was given — a fullscreen rect for a
+        // LARGE gift, a square for MEDIUM/SMALL.
         return FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
