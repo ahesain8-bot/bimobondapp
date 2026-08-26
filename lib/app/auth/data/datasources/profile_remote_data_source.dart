@@ -109,35 +109,45 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     final opts = await _authOptions();
     final bool useMe = isMe || userId == 'me';
 
+    // Prefer stories API. Do not fall through on empty 200 — that caused
+    // spurious GET /users/me/highlights → 404 "User not found".
     final endpoints = useMe
-        ? ['/stories/highlights/me', '/users/me/highlights']
+        ? const ['/stories/highlights/me']
         : [
-            '/users/$userId/highlights',
             '/stories/highlights/user/$userId',
             '/stories/highlights/$userId',
+            '/users/$userId/highlights',
           ];
 
     for (final endpoint in endpoints) {
       try {
         final res = await dio.get(endpoint, options: opts);
         final list = _extractList(res.data, ['highlights', 'data', 'items']);
-        if (list.isNotEmpty) {
-          final items = list
-              .whereType<Map>()
-              .map(
-                (m) => HighlightEntity.fromJson(Map<String, dynamic>.from(m)),
-              )
-              .toList();
-          items.sort((a, b) {
-            final aDate = a.createdAt;
-            final bDate = b.createdAt;
-            if (aDate != null && bDate != null) {
-              return bDate.compareTo(aDate);
-            }
-            return 0;
-          });
-          return items;
+        final items = list
+            .whereType<Map>()
+            .map(
+              (m) => HighlightEntity.fromJson(Map<String, dynamic>.from(m)),
+            )
+            .toList();
+        items.sort((a, b) {
+          final aDate = a.createdAt;
+          final bDate = b.createdAt;
+          if (aDate != null && bDate != null) {
+            return bDate.compareTo(aDate);
+          }
+          return 0;
+        });
+        // Successful response (even empty) — stop trying fallbacks.
+        return items;
+      } on DioException catch (e) {
+        final code = e.response?.statusCode;
+        // 404 on this path: try next candidate; other errors stop.
+        if (code == 404) {
+          debugPrint('[ProfileRemoteDS] GET $endpoint → 404, trying next');
+          continue;
         }
+        debugPrint('[ProfileRemoteDS] GET $endpoint failed: $e');
+        return [];
       } catch (e) {
         debugPrint('[ProfileRemoteDS] GET $endpoint failed: $e');
       }

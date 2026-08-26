@@ -787,6 +787,7 @@ class TemplateTextEntity extends Equatable {
     required this.text,
     this.fontAssetId,
     this.fontAsset,
+    this.fontAssetUrl,
     this.fontSize,
     this.color,
     this.alignment,
@@ -804,6 +805,8 @@ class TemplateTextEntity extends Equatable {
   final String text;
   final String? fontAssetId;
   final TemplateAssetEntity? fontAsset;
+  /// Resolved CDN path from recipe (`fontAssetUrl`).
+  final String? fontAssetUrl;
   final double? fontSize;
   final String? color;
   final String? alignment;
@@ -833,6 +836,7 @@ class TemplateTextEntity extends Equatable {
       text: json['text']?.toString() ?? '',
       fontAssetId: json['fontAssetId']?.toString() ?? font?.id,
       fontAsset: font,
+      fontAssetUrl: (json['fontAssetUrl'] ?? font?.url)?.toString(),
       fontSize: _asDoubleOrNull(json['fontSize']),
       color: json['color']?.toString(),
       alignment: json['alignment']?.toString(),
@@ -853,6 +857,7 @@ class TemplateTextEntity extends Equatable {
         text,
         fontAssetId,
         fontAsset,
+        fontAssetUrl,
         fontSize,
         color,
         alignment,
@@ -1047,11 +1052,11 @@ class VideoTemplateRenderHintsEntity extends Equatable {
       complexity.trim().toLowerCase() == 'medium';
   bool get isLowComplexity =>
       complexity.trim().toLowerCase() == 'low';
-  /// Forced mobile policy: all template exports go through the server.
-  /// Always server FFmpeg — IMAGE/VIDEO templates never encode on device.
-  bool get shouldUseServerExport => true;
-  /// Always false — on-device / GPU encode is disabled.
-  bool get shouldUseClientExport => false;
+  /// Prefer server when hints say so or complexity is high (guide §1).
+  bool get shouldUseServerExport =>
+      prefersServerPath || isHighComplexity || !prefersClientPath;
+  /// On-device compose for low-complexity / preferredPath=client.
+  bool get shouldUseClientExport => prefersClientPath && !isHighComplexity;
 
   factory VideoTemplateRenderHintsEntity.fromJson(dynamic raw) {
     final map = _renderHintsMap(raw);
@@ -1526,6 +1531,26 @@ class VideoTemplateRecipeEntity extends Equatable {
       ];
 }
 
+/// One media item for `POST /video-templates/projects/from-media` (Flow B).
+class ProjectFromMediaInput extends Equatable {
+  const ProjectFromMediaInput({
+    required this.url,
+    required this.type,
+  });
+
+  final String url;
+  /// `IMAGE` | `VIDEO`
+  final String type;
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'type': type.toUpperCase(),
+      };
+
+  @override
+  List<Object?> get props => [url, type];
+}
+
 /// Prisma `UserTemplateProject`.
 class VideoTemplateProjectEntity extends Equatable {
   const VideoTemplateProjectEntity({
@@ -1629,11 +1654,32 @@ class VideoTemplateProjectSlotEntity extends Equatable {
 
   int get index => slotIndex;
 
+  /// Id for `PATCH …/slots/{slotId}` — prefer template slot UUID from response.
+  String get patchSlotId {
+    final templateSlot = slotId?.trim();
+    if (templateSlot != null &&
+        templateSlot.isNotEmpty &&
+        VideoTemplateProjectIds.isServerId(templateSlot)) {
+      return templateSlot;
+    }
+    final rowId = id.trim();
+    if (rowId.isNotEmpty && VideoTemplateProjectIds.isServerId(rowId)) {
+      return rowId;
+    }
+    return templateSlot ?? rowId;
+  }
+
   factory VideoTemplateProjectSlotEntity.fromJson(Map<String, dynamic> json) {
+    final slotRaw = json['slot'];
+    var slotIndex = _asInt(json['slotIndex'] ?? json['index']);
+    if (slotRaw is Map) {
+      final nested = Map<String, dynamic>.from(slotRaw);
+      slotIndex = _asInt(nested['slotIndex'] ?? nested['index'] ?? slotIndex);
+    }
     return VideoTemplateProjectSlotEntity(
       id: json['id']?.toString() ?? '',
       slotId: (json['slotId'] ?? json['templateSlotId'])?.toString(),
-      slotIndex: _asInt(json['slotIndex'] ?? json['index']),
+      slotIndex: slotIndex,
       userAssetUrl: json['userAssetUrl']?.toString(),
       trimStart: _asDoubleOrNull(json['trimStart']),
       trimEnd: _asDoubleOrNull(json['trimEnd']),
@@ -1735,6 +1781,74 @@ class VideoTemplateExportEntity extends Equatable {
         stageLabel,
         createdAt,
         updatedAt,
+      ];
+}
+
+/// Immediate response from `POST /video-templates/render` (one-shot export).
+class VideoTemplateRenderJobEntity extends Equatable {
+  const VideoTemplateRenderJobEntity({
+    required this.projectId,
+    required this.exportId,
+    this.status = TemplateExportStatuses.queued,
+    this.progress = 0,
+    this.exportUrl,
+    this.resolution,
+    this.fps,
+    this.pollPath,
+    this.streamPath,
+  });
+
+  final String projectId;
+  final String exportId;
+  final String status;
+  final double progress;
+  final String? exportUrl;
+  final String? resolution;
+  final double? fps;
+  final String? pollPath;
+  final String? streamPath;
+
+  bool get isComplete =>
+      status.toUpperCase() == TemplateExportStatuses.completed;
+  bool get isFailed => status.toUpperCase() == TemplateExportStatuses.failed;
+
+  VideoTemplateExportEntity toExportEntity() {
+    return VideoTemplateExportEntity(
+      id: exportId,
+      projectId: projectId,
+      status: status,
+      progress: progress,
+      exportUrl: exportUrl,
+      resolution: resolution,
+      fps: fps,
+    );
+  }
+
+  factory VideoTemplateRenderJobEntity.fromJson(Map<String, dynamic> json) {
+    return VideoTemplateRenderJobEntity(
+      projectId: json['projectId']?.toString() ?? '',
+      exportId: (json['exportId'] ?? json['id'])?.toString() ?? '',
+      status: TemplateExportStatuses.normalize(json['status']?.toString()),
+      progress: _asDouble(json['progress']),
+      exportUrl: (json['exportUrl'] ?? json['url'])?.toString(),
+      resolution: json['resolution']?.toString(),
+      fps: _asDoubleOrNull(json['fps']),
+      pollPath: json['pollPath']?.toString(),
+      streamPath: json['streamPath']?.toString(),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        projectId,
+        exportId,
+        status,
+        progress,
+        exportUrl,
+        resolution,
+        fps,
+        pollPath,
+        streamPath,
       ];
 }
 

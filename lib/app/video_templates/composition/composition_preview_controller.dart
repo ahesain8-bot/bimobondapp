@@ -7,7 +7,9 @@ import 'package:bimobondapp/app/video_templates/composition/image_media_source.d
 import 'package:bimobondapp/app/video_templates/composition/template_composition_engine.dart';
 import 'package:bimobondapp/app/video_templates/composition/video_media_source.dart';
 import 'package:bimobondapp/app/video_templates/engine/render/render_engine.dart';
+import 'package:bimobondapp/app/video_templates/engine/slot/slot_engine.dart';
 import 'package:bimobondapp/app/video_templates/engine/timeline/timeline_engine.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/preview/media_texture_cache.dart';
 import 'package:bimobondapp/app/video_templates/preview/template_preview_perf.dart';
 import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
@@ -43,6 +45,9 @@ class CompositionPreviewController extends ChangeNotifier {
   String? _lastLookSig;
   /// When true, studio supplies the video surface; we only advance overlay frames.
   bool _mediaDetached = false;
+  File? _videoLookStill;
+  int _videoLookStillGen = 0;
+  int _lastVideoStillRefreshMs = 0;
 
   double get playhead => _playhead;
   double get duration => _preview?.duration ?? session.timeline.totalDuration;
@@ -85,10 +90,95 @@ class CompositionPreviewController extends ChangeNotifier {
   bool get hasPreviewSurface {
     if (hasVideoSurface) return true;
     if (_decodedImage != null) return true;
+    if (_videoLookStill != null) return true;
     final image = _imageFile;
     // A video path set as imageFile is not a real preview surface.
     if (image != null && !VideoThumbnailUtils.isVideoFile(image)) return true;
     return false;
+  }
+
+  /// JPEG frame for video slots — [ColorFiltered] does not affect live
+  /// [VideoPlayer] textures reliably on mobile; still + matrix does.
+  File? get videoLookStill => _videoLookStill;
+
+  bool get useVideoLookStill =>
+      activeSlotIsVideo && _lookActiveAtPlayhead(_activeSlotId);
+
+  (double start, double duration)? _slotWindow(String slotId) {
+    var cursor = 0.0;
+    for (final slot in session.slots) {
+      final dur = UserProjectSlotMapper.resolveSlotDuration(
+        slot,
+        session.fills[slot.id],
+      );
+      if (slot.id == slotId) return (cursor, dur);
+      cursor += dur;
+    }
+    return null;
+  }
+
+  double? _slotLocalTime(String? slotId) {
+    if (slotId == null) return null;
+    final window = _slotWindow(slotId);
+    if (window == null) return null;
+    final local = _playhead - window.$1;
+    if (local < 0 || local >= window.$2) return null;
+    return local;
+  }
+
+  bool _lookActiveAtPlayhead(String? slotId) {
+    if (slotId == null) return false;
+    final window = _slotWindow(slotId);
+    final local = _slotLocalTime(slotId);
+    if (window == null || local == null) return false;
+
+    final filter = session.slotFilterOverrides[slotId];
+    if (filter != null &&
+        filter.filterName.isNotEmpty &&
+        filter.filterName != 'none' &&
+        SlotLocalTiming.containsLocalTime(
+          slotDuration: window.$2,
+          localTime: local,
+          startTime: filter.startTime,
+          endTime: filter.endTime,
+        )) {
+      return true;
+    }
+
+    final effect = session.slotEffectOverrides[slotId];
+    if (effect != null &&
+        effect.effectType.isNotEmpty &&
+        effect.effectType != 'none' &&
+        SlotLocalTiming.containsLocalTime(
+          slotDuration: window.$2,
+          localTime: local,
+          startTime: effect.startTime,
+          endTime: effect.endTime,
+        )) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Pause, seek, rebuild timeline, and refresh the video still for look edits.
+  Future<void> applyLookPreview({
+    required String slotId,
+    required double targetTime,
+  }) async {
+    if (_disposed) return;
+    pause();
+    _playhead = targetTime.clamp(0.0, duration);
+    _preview?.seek(_sampleTime);
+    await _syncSurface(force: true);
+    _preview = engine.preview(session);
+    _preview!.seek(_sampleTime);
+    _lastLookSig = null;
+    if (useVideoLookStill) {
+      await refreshVideoLookStill();
+    } else {
+      _clearVideoLookStill();
+    }
+    _safeNotify();
   }
 
   /// Drop decode surfaces but keep timeline sampling for overlay frames.
@@ -186,6 +276,9 @@ class CompositionPreviewController extends ChangeNotifier {
     _playhead = seconds.clamp(0.0, duration);
     _preview?.seek(_sampleTime);
     await _syncSurface(force: true);
+    if (useVideoLookStill) {
+      await refreshVideoLookStill();
+    }
     _safeNotify();
   }
 
@@ -195,7 +288,50 @@ class CompositionPreviewController extends ChangeNotifier {
     _preview = engine.preview(session);
     _preview!.seek(_sampleTime);
     _lastLookSig = null;
+    if (useVideoLookStill) {
+      unawaited(refreshVideoLookStill());
+    } else {
+      _clearVideoLookStill();
+    }
     _safeNotify();
+  }
+
+  /// Grab the current video frame so filters/effects can composite on mobile.
+  Future<void> refreshVideoLookStill() async {
+    if (_disposed || !_lookActiveAtPlayhead(_activeSlotId)) {
+      _clearVideoLookStill();
+      return;
+    }
+    final file = activeSlotFile;
+    if (file == null || !VideoThumbnailUtils.isVideoFile(file)) {
+      _clearVideoLookStill();
+      return;
+    }
+    final gen = ++_videoLookStillGen;
+    final ms = (_sampleTime * 1000).round().clamp(0, 360000000);
+    final thumb = await VideoThumbnailUtils.generateThumbnailFile(
+      file,
+      timeMs: ms,
+      maxHeight: 720,
+    );
+    if (_disposed || gen != _videoLookStillGen) {
+      await VideoThumbnailUtils.deleteIfExists(thumb);
+      return;
+    }
+    final prev = _videoLookStill;
+    _videoLookStill = thumb;
+    await VideoThumbnailUtils.deleteIfExists(prev);
+    _lastLookSig = null;
+    _safeNotify();
+  }
+
+  void _clearVideoLookStill() {
+    _videoLookStillGen++;
+    final prev = _videoLookStill;
+    _videoLookStill = null;
+    if (prev != null) {
+      unawaited(VideoThumbnailUtils.deleteIfExists(prev));
+    }
   }
 
   void replay() {
@@ -231,7 +367,17 @@ class CompositionPreviewController extends ChangeNotifier {
     // (static still + no timed overlays/effects).
     final sample = _preview?.sample(_sampleTime);
     final sig = _lookSignature(sample, prevSlot);
-    if (_playing || sig != _lastLookSig) {
+    final wantStill = useVideoLookStill;
+    if (_playing && wantStill) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - _lastVideoStillRefreshMs > 450) {
+        _lastVideoStillRefreshMs = now;
+        unawaited(refreshVideoLookStill());
+      }
+    } else if (!wantStill && _videoLookStill != null) {
+      _clearVideoLookStill();
+    }
+    if (_playing || sig != _lastLookSig || wantStill != (_videoLookStill != null)) {
       _lastLookSig = sig;
       _safeNotify();
     }
@@ -247,10 +393,23 @@ class CompositionPreviewController extends ChangeNotifier {
     final tr = sample.transitions
         .map((t) => '${t.type}:${t.progress.toStringAsFixed(1)}')
         .join(',');
-    final overlays = sample.texts.length +
-        sample.stickers.length +
-        sample.overlays.length;
-    return '$slot|fx=$fx|fl=$fl|tr=$tr|ov=$overlays';
+    final textSig = sample.texts
+        .map(
+          (t) =>
+              '${t.text}|${t.fontSize}|${t.color}|${t.positionX.toStringAsFixed(0)}|${t.positionY.toStringAsFixed(0)}|${t.parameters['fontAssetId']}',
+        )
+        .join(';');
+    final stickerSig = sample.stickers
+        .map(
+          (s) =>
+              '${s.assetUrl}|${s.scale.toStringAsFixed(2)}|'
+              '${s.positionX.toStringAsFixed(0)}|'
+              '${s.positionY.toStringAsFixed(0)}|'
+              '${s.parameters['label']}',
+        )
+        .join(';');
+    final overlays = sample.overlays.length;
+    return '$slot|fx=$fx|fl=$fl|tr=$tr|tx=$textSig|stk=$stickerSig|ov=$overlays';
   }
 
   Future<void> _syncSurface({bool force = false}) async {
@@ -351,6 +510,7 @@ class CompositionPreviewController extends ChangeNotifier {
 
     if (!asVideo) {
       await _clearVideo();
+      _clearVideoLookStill();
       if (_disposed) return;
       _imageFile = file;
       final src =
@@ -396,6 +556,9 @@ class CompositionPreviewController extends ChangeNotifier {
       if (_playing) await c.play();
       _video = c;
       c.addListener(_onVideoControllerUpdate);
+      if (useVideoLookStill) {
+        unawaited(refreshVideoLookStill());
+      }
       _safeNotify();
     } catch (e, st) {
       debugPrint('CompositionPreviewController surface: $e\n$st');
@@ -453,6 +616,7 @@ class CompositionPreviewController extends ChangeNotifier {
     _ticker = null;
     _playing = false;
     _clearDecoded();
+    _clearVideoLookStill();
     // Fire-and-forget video teardown — do not await in dispose.
     unawaited(_clearVideo());
     _preview = null;

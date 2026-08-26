@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/video_templates/composition/image_media_source.dart';
 import 'package:bimobondapp/app/video_templates/composition/media_source.dart';
 import 'package:bimobondapp/app/video_templates/composition/video_media_source.dart';
@@ -30,7 +31,15 @@ class CompositionSession {
   Map<String, UserSlotEffectOverride> slotEffectOverrides = {};
   List<UserEditorTextOverlay> userTexts = [];
   List<UserEditorStickerOverlay> userStickers = [];
+  List<UserEditorAudioTrack> userAudios = [];
+
+  /// Legacy single-track fields — kept in sync with [userAudios.first] for older paths.
   UserEditorAudioTiming? userAudioTiming;
+  SoundEntity? userSound;
+  bool userSoundCleared = false;
+  String? userSoundSegmentId;
+  int? userSoundSegmentStartMs;
+  int? userSoundSegmentEndMs;
 
   final Map<String, MediaSource> _sources = {};
   final List<CompositionSession> _undo = [];
@@ -40,6 +49,64 @@ class CompositionSession {
 
   List<VideoTemplateSlotEntity> get slots => slotEngine.slots;
 
+  /// Sound used for timeline / export preview (user picks → recipe fallback).
+  SoundEntity? get effectiveSound {
+    if (userSoundCleared) return null;
+    if (userAudios.isNotEmpty) return userAudios.first.sound;
+    return userSound ?? recipe.effectivePreviewSound;
+  }
+
+  String? get effectiveAudioLabel {
+    if (userAudios.isNotEmpty) {
+      return userAudios.first.name;
+    }
+    final sound = effectiveSound;
+    if (sound == null) return null;
+    final name = sound.name.trim();
+    if (name.isNotEmpty) return name;
+    return recipe.music?.title;
+  }
+
+  /// Tracks for preview + one-shot export (user layers, else recipe default).
+  List<UserEditorAudioTrack> get resolvedAudioTracks {
+    if (userSoundCleared) return const [];
+    if (userAudios.isNotEmpty) return List.unmodifiable(userAudios);
+    final sound = recipe.effectivePreviewSound;
+    if (sound == null) return const [];
+    final dur = timeline.totalDuration;
+    return [
+      UserEditorAudioTrack(
+        id: 'audio_recipe',
+        sound: sound,
+        soundSegmentId: recipe.soundSegmentId,
+        segmentStartMs: recipe.soundSegmentStartMs ?? 0,
+        segmentEndMs: recipe.soundSegmentEndMs,
+        startTime: userAudioTiming?.startTime ?? 0,
+        endTime: userAudioTiming?.endTime ?? dur,
+      ),
+    ];
+  }
+
+  void _syncLegacyAudioFields() {
+    if (userAudios.isEmpty) {
+      userSound = null;
+      userSoundSegmentId = null;
+      userSoundSegmentStartMs = null;
+      userSoundSegmentEndMs = null;
+      userAudioTiming = null;
+      return;
+    }
+    final first = userAudios.first;
+    userSound = first.sound;
+    userSoundSegmentId = first.soundSegmentId;
+    userSoundSegmentStartMs = first.segmentStartMs;
+    userSoundSegmentEndMs = first.segmentEndMs;
+    userAudioTiming = UserEditorAudioTiming(
+      startTime: first.startTime,
+      endTime: first.endTime,
+    );
+  }
+
   TemplateTimeline get timeline {
     return _cachedTimeline ??= const TimelineEngine().build(
       recipe: recipe,
@@ -48,7 +115,12 @@ class CompositionSession {
       slotEffectOverrides: slotEffectOverrides,
       userTexts: userTexts,
       userStickers: userStickers,
+      userAudios: userAudios,
       userAudioTiming: userAudioTiming,
+      userSound: userSoundCleared ? null : userSound,
+      clearRecipeSound: userSoundCleared,
+      userSoundSegmentStartMs: userSoundSegmentStartMs,
+      userSoundSegmentEndMs: userSoundSegmentEndMs,
     );
   }
 
@@ -61,20 +133,119 @@ class CompositionSession {
   /// Snapshot for undo (fills only — MediaSources rebuilt on restore).
   CompositionSession _cloneFills() {
     return CompositionSession(
-      recipe: recipe,
-      slotEngine: slotEngine,
-      fills: Map<String, SlotFillEntry>.from(
-        fills.map((k, v) => MapEntry(k, v)),
-      ),
-      projectId: projectId,
-    )
-      ..slotFilterOverrides =
-          Map<String, UserSlotFilterOverride>.from(slotFilterOverrides)
-      ..slotEffectOverrides =
-          Map<String, UserSlotEffectOverride>.from(slotEffectOverrides)
+        recipe: recipe,
+        slotEngine: slotEngine,
+        fills: Map<String, SlotFillEntry>.from(
+          fills.map((k, v) => MapEntry(k, v)),
+        ),
+        projectId: projectId,
+      )
+      ..slotFilterOverrides = Map<String, UserSlotFilterOverride>.from(
+        slotFilterOverrides,
+      )
+      ..slotEffectOverrides = Map<String, UserSlotEffectOverride>.from(
+        slotEffectOverrides,
+      )
       ..userTexts = List<UserEditorTextOverlay>.from(userTexts)
       ..userStickers = List<UserEditorStickerOverlay>.from(userStickers)
-      ..userAudioTiming = userAudioTiming;
+      ..userAudios = List<UserEditorAudioTrack>.from(userAudios)
+      ..userAudioTiming = userAudioTiming
+      ..userSound = userSound
+      ..userSoundCleared = userSoundCleared
+      ..userSoundSegmentId = userSoundSegmentId
+      ..userSoundSegmentStartMs = userSoundSegmentStartMs
+      ..userSoundSegmentEndMs = userSoundSegmentEndMs;
+  }
+
+  void addUserAudio(UserEditorAudioTrack track) {
+    _pushUndo();
+    userSoundCleared = false;
+    userAudios = [...userAudios, track];
+    _syncLegacyAudioFields();
+    _invalidateTimeline();
+  }
+
+  void removeUserAudio(String id) {
+    final i = userAudios.indexWhere((a) => a.id == id);
+    if (i < 0) return;
+    _pushUndo();
+    userAudios = List<UserEditorAudioTrack>.from(userAudios)..removeAt(i);
+    if (userAudios.isEmpty) {
+      userSoundCleared = false;
+    }
+    _syncLegacyAudioFields();
+    _invalidateTimeline();
+  }
+
+  void clearUserAudios() {
+    _pushUndo();
+    userAudios = [];
+    userSoundCleared = true;
+    userSound = null;
+    userSoundSegmentId = null;
+    userSoundSegmentStartMs = null;
+    userSoundSegmentEndMs = null;
+    userAudioTiming = null;
+    _invalidateTimeline();
+  }
+
+  void setUserSound(
+    SoundEntity? sound, {
+    String? soundSegmentId,
+    int? segmentStartMs,
+    int? segmentEndMs,
+    double? timelineStart,
+    double? timelineEnd,
+  }) {
+    if (sound == null) {
+      clearUserAudios();
+      return;
+    }
+    addUserAudio(
+      UserEditorAudioTrack(
+        id: 'audio_${DateTime.now().microsecondsSinceEpoch}',
+        sound: sound,
+        soundSegmentId: soundSegmentId,
+        segmentStartMs: segmentStartMs ?? 0,
+        segmentEndMs: segmentEndMs,
+        startTime: timelineStart ?? 0,
+        endTime: timelineEnd,
+      ),
+    );
+  }
+
+  void patchUserAudioTiming({
+    required String id,
+    required double startTime,
+    required double endTime,
+  }) {
+    final i = userAudios.indexWhere((a) => a.id == id);
+    if (i < 0) {
+      // Legacy single-track bar (`audio_main`) before any explicit add.
+      userAudioTiming = UserEditorAudioTiming(
+        startTime: startTime,
+        endTime: endTime,
+      );
+      _invalidateTimeline();
+      return;
+    }
+    userAudios[i] = userAudios[i].copyWith(
+      startTime: startTime,
+      endTime: endTime,
+    );
+    _syncLegacyAudioFields();
+    _invalidateTimeline();
+  }
+
+  void patchUserAudioTimingLegacy({
+    required double startTime,
+    required double endTime,
+  }) {
+    patchUserAudioTiming(
+      id: userAudios.isNotEmpty ? userAudios.first.id : 'audio_main',
+      startTime: startTime,
+      endTime: endTime,
+    );
   }
 
   void setSlotFilter(String slotId, UserSlotFilterOverride? override) {
@@ -152,6 +323,23 @@ class CompositionSession {
     _invalidateTimeline();
   }
 
+  /// Live layout tweak while dragging / pinching captions (no undo).
+  void patchUserTextLayout(
+    String id, {
+    double? positionX,
+    double? positionY,
+    double? fontSize,
+  }) {
+    final i = userTexts.indexWhere((t) => t.id == id);
+    if (i < 0) return;
+    userTexts[i] = userTexts[i].copyWith(
+      positionX: positionX,
+      positionY: positionY,
+      fontSize: fontSize,
+    );
+    _invalidateTimeline();
+  }
+
   void patchUserStickerTiming(
     String id, {
     required double startTime,
@@ -166,13 +354,19 @@ class CompositionSession {
     _invalidateTimeline();
   }
 
-  void patchUserAudioTiming({
-    required double startTime,
-    required double endTime,
+  /// Live layout tweak while dragging / pinching stickers (no undo).
+  void patchUserStickerLayout(
+    String id, {
+    double? positionX,
+    double? positionY,
+    double? scale,
   }) {
-    userAudioTiming = UserEditorAudioTiming(
-      startTime: startTime,
-      endTime: endTime,
+    final i = userStickers.indexWhere((s) => s.id == id);
+    if (i < 0) return;
+    userStickers[i] = userStickers[i].copyWith(
+      positionX: positionX,
+      positionY: positionY,
+      scale: scale,
     );
     _invalidateTimeline();
   }
@@ -202,22 +396,26 @@ class CompositionSession {
 
   void _restore(CompositionSession snap) {
     fills = snap.fills;
-    slotFilterOverrides =
-        Map<String, UserSlotFilterOverride>.from(snap.slotFilterOverrides);
-    slotEffectOverrides =
-        Map<String, UserSlotEffectOverride>.from(snap.slotEffectOverrides);
+    slotFilterOverrides = Map<String, UserSlotFilterOverride>.from(
+      snap.slotFilterOverrides,
+    );
+    slotEffectOverrides = Map<String, UserSlotEffectOverride>.from(
+      snap.slotEffectOverrides,
+    );
     userTexts = List<UserEditorTextOverlay>.from(snap.userTexts);
     userStickers = List<UserEditorStickerOverlay>.from(snap.userStickers);
+    userAudios = List<UserEditorAudioTrack>.from(snap.userAudios);
     userAudioTiming = snap.userAudioTiming;
+    userSound = snap.userSound;
+    userSoundCleared = snap.userSoundCleared;
+    userSoundSegmentId = snap.userSoundSegmentId;
+    userSoundSegmentStartMs = snap.userSoundSegmentStartMs;
+    userSoundSegmentEndMs = snap.userSoundSegmentEndMs;
     _invalidateTimeline();
     _rebuildSourcesSync();
   }
 
-  Future<void> assignFile(
-    String slotId,
-    File file, {
-    String? mediaKind,
-  }) async {
+  Future<void> assignFile(String slotId, File file, {String? mediaKind}) async {
     VideoTemplateSlotEntity? slot;
     for (final s in slots) {
       if (s.id == slotId) {
@@ -228,7 +426,8 @@ class CompositionSession {
     if (slot == null) return;
     _pushUndo();
     final prev = fills[slotId];
-    final kind = mediaKind?.trim().toUpperCase() ??
+    final kind =
+        mediaKind?.trim().toUpperCase() ??
         (VideoThumbnailUtils.isVideoFile(file) ? 'VIDEO' : 'IMAGE');
     fills[slotId] = SlotFillEntry(
       slotId: slotId,
@@ -328,8 +527,10 @@ class CompositionSession {
       final path = file.absolute.path;
       final cached = preparedByPath[path];
       if (cached is ImageMediaSource && cached.isPrepared) {
-        final holdSeconds =
-            UserProjectSlotMapper.resolveSlotDuration(slot, fill);
+        final holdSeconds = UserProjectSlotMapper.resolveSlotDuration(
+          slot,
+          fill,
+        );
         final shared = await ImageMediaSource.sharePrepared(
           cached,
           id: slot.id,

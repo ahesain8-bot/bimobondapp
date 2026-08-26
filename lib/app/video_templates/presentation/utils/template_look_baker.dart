@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/video_templates/domain/entities/video_template_e
 import 'package:bimobondapp/app/video_templates/engine/layers/layer_engines.dart';
 import 'package:bimobondapp/app/video_templates/engine/render/render_engine.dart';
 import 'package:bimobondapp/app/video_templates/engine/slot/slot_engine.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_font_cache.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_preview_look.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
@@ -457,10 +458,24 @@ class TemplateLookBaker {
       // Texts (canvas alignment).
       const textEngine = TextEngine();
       for (final item in frame.texts) {
+        final fontId = item.parameters['fontAssetId']?.toString();
+        final fontUrl = item.assetUrl;
+        if (fontId != null &&
+            fontId.isNotEmpty &&
+            fontUrl != null &&
+            fontUrl.isNotEmpty) {
+          await TemplateFontCache.load(fontAssetId: fontId, url: fontUrl);
+        }
+      }
+      for (final item in frame.texts) {
         final text = item.text?.trim() ?? '';
         if (text.isEmpty) continue;
         final color = textEngine.parseColor(item.color) ?? const ui.Color(0xFFFFFFFF);
         final fontSize = ((item.fontSize ?? 42).toDouble()).clamp(12.0, 120.0);
+        final fontId = item.parameters['fontAssetId']?.toString();
+        final family = fontId != null && TemplateFontCache.isLoaded(fontId)
+            ? TemplateFontCache.familyFor(fontId)
+            : null;
         final builder = ui.ParagraphBuilder(
           ui.ParagraphStyle(textAlign: ui.TextAlign.center, maxLines: 4),
         )
@@ -468,7 +483,10 @@ class TemplateLookBaker {
             ui.TextStyle(
               color: color,
               fontSize: fontSize,
-              fontWeight: ui.FontWeight.w800,
+              fontFamily: family,
+              fontWeight: family == null
+                  ? ui.FontWeight.w800
+                  : ui.FontWeight.normal,
             ),
           )
           ..addText(text);

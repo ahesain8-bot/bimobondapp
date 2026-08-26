@@ -140,6 +140,9 @@ class ApiConstants {
   static const String videoTemplatesCategories = '/video-templates/categories';
   static const String videoTemplatesSearch = '/video-templates/search';
   static const String videoTemplateProjects = '/video-templates/projects';
+  static const String videoTemplateProjectsFromMedia =
+      '/video-templates/projects/from-media';
+  static const String videoTemplateRender = '/video-templates/render';
   static String videoTemplateById(String id) => '/video-templates/$id';
   static String videoTemplateRecipe(String id) => '/video-templates/$id/recipe';
   static String videoTemplateUse(String id) => '/video-templates/$id/use';
@@ -183,6 +186,9 @@ class ApiConstants {
       '/video-templates/projects/$projectId/stickers';
   static String videoTemplateProjectRecipe(String projectId) =>
       '/video-templates/projects/$projectId/recipe';
+
+  /// Public font catalog for caption picker (`GET /video-templates/fonts`).
+  static const String videoTemplateFonts = '/video-templates/fonts';
 
   static String get cameraStudioCatalogUrl => '$baseUrl$cameraStudioCatalog';
 

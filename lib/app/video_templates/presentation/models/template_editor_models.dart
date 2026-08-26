@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
+import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:equatable/equatable.dart';
 
 /// Bottom toolbar / edit sheet panels (TikTok-style).
@@ -45,6 +49,69 @@ class TemplatePresetItem extends Equatable {
 
   bool get isClear => id.isEmpty || id == 'none';
 
+  /// Key for [TemplateFilterMatrices] / local preview (not the display name).
+  String get previewFilterKey => normalizeFilterPreviewKey(
+        filterName ?? name,
+      );
+
+  /// Key for [TemplateEffectVisual] / local preview (not the display name).
+  String get previewEffectKey => normalizeEffectPreviewKey(
+        effectType ?? name,
+      );
+
+  /// Maps API / display names to local preview matrix keys.
+  static String normalizeFilterPreviewKey(String? raw) {
+    var key = _slugKey(raw);
+    if (key.isEmpty || key == 'none') return 'none';
+    key = switch (key) {
+      'black_white' || 'blackandwhite' || 'grayscale' || 'mono' => 'bw',
+      'black_and_white' => 'bw',
+      'highcontrast' => 'high_contrast',
+      'softglow' => 'soft_glow',
+      'tealandorange' || 'teal_and_orange' => 'teal_orange',
+      _ => key,
+    };
+    const known = {
+      'cinematic',
+      'warm',
+      'cool',
+      'vintage',
+      'vivid',
+      'fade',
+      'bw',
+      'sepia',
+      'high_contrast',
+      'soft_glow',
+      'teal_orange',
+      'duotone',
+    };
+    return known.contains(key) ? key : key;
+  }
+
+  /// Maps API / display names to local effect visual keys.
+  static String normalizeEffectPreviewKey(String? raw) {
+    var key = _slugKey(raw);
+    if (key.isEmpty || key == 'none') return 'none';
+    key = switch (key) {
+      'zoomin' || 'zoom_in_effect' => 'zoom_in',
+      'zoomout' || 'zoom_out_effect' => 'zoom_out',
+      'kenburns' || 'ken_burns' || 'ken_burn' => 'ken_burns',
+      'slowzoom' || 'slow_zoom' => 'zoom_in',
+      'punch' || 'zoom_punch' => 'zoom_punch',
+      _ => key,
+    };
+    return key;
+  }
+
+  static String _slugKey(String? raw) {
+    final s = raw?.trim().toLowerCase() ?? '';
+    if (s.isEmpty) return '';
+    return s
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+
   factory TemplatePresetItem.fromJson(
     Map<String, dynamic> json, {
     required TemplatePresetKind kind,
@@ -52,16 +119,32 @@ class TemplatePresetItem extends Equatable {
     final id = json['id']?.toString() ?? '';
     final name = (json['name'] ?? json['label'] ?? json['title'])?.toString() ??
         'Preset';
+    final rawFilter = (json['filterName'] ??
+            json['filterType'] ??
+            json['slug'] ??
+            json['key'] ??
+            json['code'] ??
+            json['presetKey'])
+        ?.toString();
+    final rawEffect = (json['effectType'] ??
+            json['effectName'] ??
+            json['slug'] ??
+            json['key'] ??
+            json['code'] ??
+            json['presetKey'])
+        ?.toString();
     return TemplatePresetItem(
       id: id,
       name: name,
       kind: kind,
       thumbnailUrl: (json['thumbnailUrl'] ?? json['coverUrl'] ?? json['previewUrl'])
           ?.toString(),
-      filterName: (json['filterName'] ?? json['filterType'] ?? json['slug'])
-          ?.toString(),
-      effectType: (json['effectType'] ?? json['effectName'] ?? json['slug'])
-          ?.toString(),
+      filterName: kind == TemplatePresetKind.filter
+          ? normalizeFilterPreviewKey(rawFilter ?? name)
+          : (rawFilter != null ? normalizeFilterPreviewKey(rawFilter) : null),
+      effectType: kind == TemplatePresetKind.effect
+          ? normalizeEffectPreviewKey(rawEffect ?? name)
+          : (rawEffect != null ? normalizeEffectPreviewKey(rawEffect) : null),
       assetUrl: (json['assetUrl'] ?? json['url'])?.toString(),
       category: json['category']?.toString(),
     );
@@ -154,6 +237,42 @@ class UserSlotEffectOverride extends Equatable {
       [presetId, effectType, parameters, startTime, endTime];
 }
 
+/// Clip-local effect/filter window (seconds from slot start).
+///
+/// See server timing guide: minimum 0.05s, `endTime` clamped to slot duration.
+class SlotLocalTiming {
+  const SlotLocalTiming({required this.start, required this.end});
+
+  final double start;
+  final double end;
+
+  static SlotLocalTiming normalize({
+    required double slotDuration,
+    double startTime = 0,
+    double? endTime,
+  }) {
+    final dur = slotDuration > 0 ? slotDuration : 0.05;
+    final start = startTime.clamp(0.0, dur);
+    final end = (endTime ?? dur).clamp(start + 0.05, dur);
+    return SlotLocalTiming(start: start, end: end);
+  }
+
+  /// Whether [localTime] (seconds from slot start) falls inside the window.
+  static bool containsLocalTime({
+    required double slotDuration,
+    required double localTime,
+    double startTime = 0,
+    double? endTime,
+  }) {
+    final window = normalize(
+      slotDuration: slotDuration,
+      startTime: startTime,
+      endTime: endTime,
+    );
+    return localTime >= window.start && localTime < window.end;
+  }
+}
+
 /// Caption added in the editor (maps to POST …/texts).
 class UserEditorTextOverlay extends Equatable {
   const UserEditorTextOverlay({
@@ -161,44 +280,62 @@ class UserEditorTextOverlay extends Equatable {
     required this.text,
     this.fontSize = 48,
     this.color = '#FFFFFF',
+    this.positionX = 0,
     this.positionY = 120,
     this.startTime = 0,
     this.endTime = 5,
     this.animationIn,
     this.animationOut,
+    this.fontAssetId,
+    this.fontAssetUrl,
+    this.fontLabel,
   });
 
   final String id;
   final String text;
   final double fontSize;
   final String color;
+  /// Canvas offset in 1080×1920 space (0,0 = center).
+  final double positionX;
   final double positionY;
   final double startTime;
   final double endTime;
   final String? animationIn;
   final String? animationOut;
+  final String? fontAssetId;
+  final String? fontAssetUrl;
+  final String? fontLabel;
 
   UserEditorTextOverlay copyWith({
     String? id,
     String? text,
     double? fontSize,
     String? color,
+    double? positionX,
     double? positionY,
     double? startTime,
     double? endTime,
     String? animationIn,
     String? animationOut,
+    String? fontAssetId,
+    String? fontAssetUrl,
+    String? fontLabel,
+    bool clearFont = false,
   }) {
     return UserEditorTextOverlay(
       id: id ?? this.id,
       text: text ?? this.text,
       fontSize: fontSize ?? this.fontSize,
       color: color ?? this.color,
+      positionX: positionX ?? this.positionX,
       positionY: positionY ?? this.positionY,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       animationIn: animationIn ?? this.animationIn,
       animationOut: animationOut ?? this.animationOut,
+      fontAssetId: clearFont ? null : (fontAssetId ?? this.fontAssetId),
+      fontAssetUrl: clearFont ? null : (fontAssetUrl ?? this.fontAssetUrl),
+      fontLabel: clearFont ? null : (fontLabel ?? this.fontLabel),
     );
   }
 
@@ -208,12 +345,83 @@ class UserEditorTextOverlay extends Equatable {
         text,
         fontSize,
         color,
+        positionX,
         positionY,
         startTime,
         endTime,
         animationIn,
         animationOut,
+        fontAssetId,
+        fontAssetUrl,
+        fontLabel,
       ];
+}
+
+/// Font catalog item from `GET /video-templates/fonts`.
+class TemplateFontItem extends Equatable {
+  const TemplateFontItem({
+    required this.id,
+    required this.label,
+    required this.url,
+    this.thumbnailUrl,
+    this.sizeBytes,
+  });
+
+  final String id;
+  final String label;
+  final String url;
+  final String? thumbnailUrl;
+  final int? sizeBytes;
+
+  /// Flutter [TextStyle.fontFamily] key after [TemplateFontCache.load].
+  String get familyName => 'tpl_font_$id';
+
+  factory TemplateFontItem.fromJson(Map<String, dynamic> json) {
+    final id = json['id']?.toString() ?? '';
+    final url = (json['url'] ?? json['assetUrl'] ?? '').toString();
+    var label = (json['label'] ?? json['name'] ?? '').toString().trim();
+    if (label.isEmpty && url.isNotEmpty) {
+      final file = url.split('/').last;
+      label = file.contains('.')
+          ? file.substring(0, file.lastIndexOf('.'))
+          : file;
+      label = label.replaceAll(RegExp(r'[-_]+'), ' ').trim();
+      if (label.isEmpty) label = 'Font';
+    }
+    if (label.isEmpty) label = 'Font';
+    return TemplateFontItem(
+      id: id,
+      label: label,
+      url: url,
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      sizeBytes: json['sizeBytes'] is int
+          ? json['sizeBytes'] as int
+          : int.tryParse('${json['sizeBytes'] ?? ''}'),
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, label, url, thumbnailUrl, sizeBytes];
+}
+
+/// Returned when the user finishes Edit (top Apply) — render then continue to Next.
+class VideoTemplateEditorFinishResult extends Equatable {
+  const VideoTemplateEditorFinishResult({
+    required this.selection,
+    this.renderedFile,
+    this.serverExportUrl,
+    this.proceedToNext = false,
+  });
+
+  final VideoTemplateSelection selection;
+  final File? renderedFile;
+  final String? serverExportUrl;
+  /// When true, studio runs the Next / post handoff with the rendered media.
+  final bool proceedToNext;
+
+  @override
+  List<Object?> get props =>
+      [selection, renderedFile, serverExportUrl, proceedToNext];
 }
 
 /// When template / original sound plays on the edit timeline (seconds).
@@ -240,14 +448,94 @@ class UserEditorAudioTiming extends Equatable {
   List<Object?> get props => [startTime, endTime];
 }
 
+/// One background music layer on the global timeline (maps to `audios[]` on render).
+class UserEditorAudioTrack extends Equatable {
+  const UserEditorAudioTrack({
+    required this.id,
+    required this.sound,
+    this.soundSegmentId,
+    this.segmentStartMs = 0,
+    this.segmentEndMs,
+    this.startTime = 0,
+    this.endTime,
+  });
+
+  final String id;
+  final SoundEntity sound;
+  final String? soundSegmentId;
+
+  /// Trim in-point on the source sound file (milliseconds).
+  final int segmentStartMs;
+
+  /// Trim out-point on the source sound file (milliseconds).
+  final int? segmentEndMs;
+
+  /// When this track plays on the exported video (seconds, global timeline).
+  final double startTime;
+
+  /// When this track stops on the exported video (seconds, global timeline).
+  final double? endTime;
+
+  String get name {
+    final n = sound.name.trim();
+    return n.isNotEmpty ? n : 'Audio';
+  }
+
+  /// Timeline bar label — sound name + visible period as text.
+  String timelineLabel({required double totalDuration}) {
+    final end = endTime ?? totalDuration;
+    return '$name · ${formatEditorSeconds(startTime)}–${formatEditorSeconds(end)}';
+  }
+
+  UserEditorAudioTrack copyWith({
+    String? id,
+    SoundEntity? sound,
+    String? soundSegmentId,
+    int? segmentStartMs,
+    int? segmentEndMs,
+    double? startTime,
+    double? endTime,
+  }) {
+    return UserEditorAudioTrack(
+      id: id ?? this.id,
+      sound: sound ?? this.sound,
+      soundSegmentId: soundSegmentId ?? this.soundSegmentId,
+      segmentStartMs: segmentStartMs ?? this.segmentStartMs,
+      segmentEndMs: segmentEndMs ?? this.segmentEndMs,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        sound,
+        soundSegmentId,
+        segmentStartMs,
+        segmentEndMs,
+        startTime,
+        endTime,
+      ];
+}
+
+/// `0:02` / `1:05` for editor timeline labels.
+String formatEditorSeconds(double seconds) {
+  final s = seconds.clamp(0, 86400).floor();
+  final m = s ~/ 60;
+  final r = s % 60;
+  return '$m:${r.toString().padLeft(2, '0')}';
+}
+
 /// Sticker placed in the editor (maps to POST …/stickers).
 class UserEditorStickerOverlay extends Equatable {
   const UserEditorStickerOverlay({
     required this.id,
     this.presetId,
     this.assetUrl,
+    this.label,
     this.positionX = 0,
-    this.positionY = -200,
+    this.positionY = 0,
     this.scale = 1,
     this.opacity = 1,
     this.startTime = 0,
@@ -257,6 +545,8 @@ class UserEditorStickerOverlay extends Equatable {
   final String id;
   final String? presetId;
   final String? assetUrl;
+  /// Emoji or short label when [assetUrl] is missing (built-in presets).
+  final String? label;
   final double positionX;
   final double positionY;
   final double scale;
@@ -268,6 +558,7 @@ class UserEditorStickerOverlay extends Equatable {
     String? id,
     String? presetId,
     String? assetUrl,
+    String? label,
     double? positionX,
     double? positionY,
     double? scale,
@@ -279,6 +570,7 @@ class UserEditorStickerOverlay extends Equatable {
       id: id ?? this.id,
       presetId: presetId ?? this.presetId,
       assetUrl: assetUrl ?? this.assetUrl,
+      label: label ?? this.label,
       positionX: positionX ?? this.positionX,
       positionY: positionY ?? this.positionY,
       scale: scale ?? this.scale,
@@ -293,6 +585,7 @@ class UserEditorStickerOverlay extends Equatable {
         id,
         presetId,
         assetUrl,
+        label,
         positionX,
         positionY,
         scale,

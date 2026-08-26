@@ -70,13 +70,43 @@ class TemplateEditorTimeline extends StatelessWidget {
   final ValueChanged<double>? onSeek;
   final TemplateEditorOverlayRangeChanged? onOverlayRangeChanged;
 
-  static const double pxPerSecond = 56;
+  static const double _maxPxPerSecond = 56;
+  static const double _horizontalPadding = 12;
   static const double _mediaRowHeight = 56;
   static const double _trackHeight = 28;
   static const double _trackGap = 4;
   static const double _leftGutter = 52;
 
   static const double _slotGap = 4;
+  static const double _contentTrailingPad = 8;
+
+  /// Timeline track width so the full clip period fits on screen (with padding).
+  double _resolveTimelineWidth(double maxWidth, double duration) {
+    final safeDuration = math.max(duration, 0.01);
+    final available = math.max(
+      100.0,
+      maxWidth - _horizontalPadding * 2 - _leftGutter - _contentTrailingPad,
+    );
+    // Cap px/sec for short clips so the bar is not too tiny; long clips shrink.
+    final minWidth = math.min(available, safeDuration * _maxPxPerSecond);
+    return minWidth.clamp(100.0, available);
+  }
+
+  double _pxPerSecond(double timelineWidth, double duration) {
+    return timelineWidth / math.max(duration, 0.01);
+  }
+
+  /// Seconds between ruler labels — widens when the track is compressed.
+  int _timeLabelStep(double duration, double pxPerSecond) {
+    const minSpacing = 40.0;
+    const candidates = [1, 2, 5, 10, 15, 30, 60];
+    for (final step in candidates) {
+      if (step * pxPerSecond >= minSpacing || step >= duration) {
+        return step;
+      }
+    }
+    return duration.ceil().clamp(1, 999);
+  }
 
   List<double> _layoutSlotWidths(double timelineWidth) {
     if (slots.isEmpty) return const [];
@@ -102,125 +132,131 @@ class TemplateEditorTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = math.max(totalDuration, 0.01);
-    final timelineWidth =
-        (duration * pxPerSecond).clamp(280.0, 4000.0).toDouble();
-    final slotWidths = _layoutSlotWidths(timelineWidth);
-    final playheadX =
-        (playhead / duration * timelineWidth).clamp(0.0, timelineWidth);
-    final trackCount = overlaySegments.length;
-    final tracksHeight = trackCount == 0
-        ? 0.0
-        : trackCount * (_trackHeight + _trackGap) + 4;
-    final bodyHeight = _mediaRowHeight + tracksHeight + 8;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final duration = math.max(totalDuration, 0.01);
+        final contentWidth = constraints.maxWidth - _horizontalPadding * 2;
+        final timelineWidth = _resolveTimelineWidth(constraints.maxWidth, duration);
+        final pxPerSecond = _pxPerSecond(timelineWidth, duration);
+        final labelStep = _timeLabelStep(duration, pxPerSecond);
+        final slotWidths = _layoutSlotWidths(timelineWidth);
+        final playheadX =
+            (playhead / duration * timelineWidth).clamp(0.0, timelineWidth);
+        final trackCount = overlaySegments.length;
+        final tracksHeight = trackCount == 0
+            ? 0.0
+            : trackCount * (_trackHeight + _trackGap) + 4;
+        final bodyHeight = _mediaRowHeight + tracksHeight + 8;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 18,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: SizedBox(
-              width: _leftGutter + timelineWidth,
-              child: Stack(
-                children: [
-                  for (var s = 0; s <= duration.ceil(); s += 2)
-                    Positioned(
-                      left: _leftGutter + s * pxPerSecond,
-                      top: 0,
-                      child: Text(
-                        TemplateEditorTheme.formatTime(s.toDouble()),
-                        style: const TextStyle(
-                          color: TemplateEditorTheme.textMuted,
-                          fontSize: 9,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: _horizontalPadding,
+              ),
+              child: SizedBox(
+                width: contentWidth,
+                height: 18,
+                child: Stack(
+                  children: [
+                    for (var s = 0; s <= duration.ceil(); s += labelStep)
+                      Positioned(
+                        left: _leftGutter + s * pxPerSecond,
+                        top: 0,
+                        child: Text(
+                          TemplateEditorTheme.formatTime(s.toDouble()),
+                          style: const TextStyle(
+                            color: TemplateEditorTheme.textMuted,
+                            fontSize: 9,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: bodyHeight.clamp(72.0, 260.0),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: SizedBox(
-              width: _leftGutter + timelineWidth + 8,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  if (onAddMedia != null)
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: _horizontalPadding,
+              ),
+              child: SizedBox(
+                width: contentWidth,
+                height: bodyHeight.clamp(72.0, 260.0),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (onAddMedia != null)
+                      Positioned(
+                        left: 4,
+                        top: 0,
+                        height: _mediaRowHeight,
+                        child: _AddMediaButton(onTap: onAddMedia!),
+                      ),
                     Positioned(
-                      left: 4,
+                      left: _leftGutter,
                       top: 0,
+                      width: timelineWidth,
                       height: _mediaRowHeight,
-                      child: _AddMediaButton(onTap: onAddMedia!),
-                    ),
-                  Positioned(
-                    left: _leftGutter,
-                    top: 0,
-                    width: timelineWidth,
-                    height: _mediaRowHeight,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (var i = 0; i < slots.length; i++)
-                              _SlotClipTile(
-                                slot: slots[i],
-                                fill: fills[slots[i].id],
-                                width: slotWidths[i],
-                                selected: i == selectedSlotIndex,
-                                isLast: i == slots.length - 1,
-                                onTap: onSlotTap == null
-                                    ? null
-                                    : () => onSlotTap!(i),
-                              ),
-                          ],
-                        ),
-                        if (onSeek != null)
-                          Positioned.fill(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onTapDown: (d) {
-                                final t = (d.localPosition.dx / timelineWidth *
-                                        duration)
-                                    .clamp(0.0, duration);
-                                onSeek!(t);
-                              },
-                              onHorizontalDragUpdate: (d) {
-                                final t = (d.localPosition.dx / timelineWidth *
-                                        duration)
-                                    .clamp(0.0, duration);
-                                onSeek!(t);
-                              },
-                            ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = 0; i < slots.length; i++)
+                                _SlotClipTile(
+                                  slot: slots[i],
+                                  fill: fills[slots[i].id],
+                                  width: slotWidths[i],
+                                  selected: i == selectedSlotIndex,
+                                  isLast: i == slots.length - 1,
+                                  onTap: onSlotTap == null
+                                      ? null
+                                      : () => onSlotTap!(i),
+                                ),
+                            ],
                           ),
-                      ],
+                          if (onSeek != null)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTapDown: (d) {
+                                  final t = (d.localPosition.dx /
+                                              timelineWidth *
+                                              duration)
+                                      .clamp(0.0, duration);
+                                  onSeek!(t);
+                                },
+                                onHorizontalDragUpdate: (d) {
+                                  final t = (d.localPosition.dx /
+                                              timelineWidth *
+                                              duration)
+                                      .clamp(0.0, duration);
+                                  onSeek!(t);
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  ..._buildOverlayTracks(timelineWidth, duration),
-                  Positioned(
-                    left: _leftGutter + playheadX,
-                    top: 0,
-                    bottom: 0,
-                    child: IgnorePointer(
-                      child: Container(width: 2, color: Colors.white),
+                    ..._buildOverlayTracks(timelineWidth, duration),
+                    Positioned(
+                      left: _leftGutter + playheadX,
+                      top: 0,
+                      bottom: 0,
+                      child: IgnorePointer(
+                        child: Container(width: 2, color: Colors.white),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:bimobondapp/app/sounds/domain/entities/sound_entity.dart';
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:bimobondapp/app/video_templates/engine/slot/slot_engine.dart';
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
@@ -95,35 +96,45 @@ class TimelineItem extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        kind,
-        startTime,
-        endTime,
-        layerOrder,
-        slotId,
-        clipId,
-        trackId,
-        speed,
-        volume,
-        rotation,
-        scale,
-        positionX,
-        positionY,
-        opacity,
-        blendMode,
-        effectType,
-        filterName,
-        filterIntensity,
-        lutAssetId,
-        transitionType,
-        text,
-        assetUrl,
-        userMediaPath,
-        trimStart,
-        trimEnd,
-        parameters,
-        keyframes,
-      ];
+    id,
+    kind,
+    startTime,
+    endTime,
+    layerOrder,
+    slotId,
+    clipId,
+    trackId,
+    speed,
+    volume,
+    rotation,
+    scale,
+    positionX,
+    positionY,
+    opacity,
+    blendMode,
+    effectType,
+    filterName,
+    filterIntensity,
+    lutAssetId,
+    transitionType,
+    text,
+    fontSize,
+    color,
+    alignment,
+    animationIn,
+    animationOut,
+    positionX,
+    positionY,
+    opacity,
+    scale,
+    rotation,
+    assetUrl,
+    userMediaPath,
+    trimStart,
+    trimEnd,
+    parameters,
+    keyframes,
+  ];
 }
 
 /// Full deterministic composition plan.
@@ -165,16 +176,16 @@ class TemplateTimeline extends Equatable {
 
   @override
   List<Object?> get props => [
-        items,
-        totalDuration,
-        width,
-        height,
-        fps,
-        audioUrl,
-        audioStartMs,
-        audioEndMs,
-        beatMap,
-      ];
+    items,
+    totalDuration,
+    width,
+    height,
+    fps,
+    audioUrl,
+    audioStartMs,
+    audioEndMs,
+    beatMap,
+  ];
 }
 
 /// Phase 5 — builds a deterministic timeline from recipe + user fills.
@@ -188,7 +199,12 @@ class TimelineEngine {
     Map<String, UserSlotEffectOverride> slotEffectOverrides = const {},
     List<UserEditorTextOverlay> userTexts = const [],
     List<UserEditorStickerOverlay> userStickers = const [],
+    List<UserEditorAudioTrack> userAudios = const [],
     UserEditorAudioTiming? userAudioTiming,
+    SoundEntity? userSound,
+    bool clearRecipeSound = false,
+    int? userSoundSegmentStartMs,
+    int? userSoundSegmentEndMs,
   }) {
     final slotEngine = SlotEngine(recipe: recipe);
     final slots = slotEngine.slots;
@@ -203,7 +219,8 @@ class TimelineEngine {
       final start = cursor;
       final end = start + dur;
 
-      final fileIsVideo = fill?.isLocalVideo == true ||
+      final fileIsVideo =
+          fill?.isLocalVideo == true ||
           (fill?.localFile != null &&
               VideoThumbnailUtils.isVideoFile(fill!.localFile!));
       final kind = (fileIsVideo || slot.isVideo)
@@ -233,7 +250,9 @@ class TimelineEngine {
       final userFx = slotEffectOverrides[slot.id];
       if (userFx != null && userFx.effectType.isNotEmpty) {
         final fxStart = start + userFx.startTime.clamp(0.0, dur);
-        final fxEnd = start + (userFx.endTime ?? dur).clamp(0.0, dur);
+        final fxEndRel = (userFx.endTime ?? dur).clamp(0.0, dur);
+        // Extend through slot end — [containsTime] uses an exclusive upper bound.
+        final fxEnd = fxEndRel >= dur - 0.001 ? end + 0.001 : start + fxEndRel;
         items.add(
           TimelineItem(
             id: 'user_fx_${slot.id}',
@@ -269,7 +288,11 @@ class TimelineEngine {
       final userFilter = slotFilterOverrides[slot.id];
       if (userFilter != null && userFilter.filterName.isNotEmpty) {
         final filterStart = start + userFilter.startTime.clamp(0.0, dur);
-        final filterEnd = start + (userFilter.endTime ?? dur).clamp(0.0, dur);
+        final filterEndRel = (userFilter.endTime ?? dur).clamp(0.0, dur);
+        // Extend through slot end — [containsTime] uses an exclusive upper bound.
+        final filterEnd = filterEndRel >= dur - 0.001
+            ? end + 0.001
+            : start + filterEndRel;
         items.add(
           TimelineItem(
             id: 'user_filter_${slot.id}',
@@ -407,7 +430,8 @@ class TimelineEngine {
           animationOut: t.animationOut,
           positionX: t.positionX,
           positionY: t.positionY,
-          assetUrl: t.fontAsset?.url,
+          assetUrl: t.fontAssetUrl ?? t.fontAsset?.url,
+          parameters: {if (t.fontAssetId != null) 'fontAssetId': t.fontAssetId},
         ),
       );
       if (t.endTime > total) total = t.endTime;
@@ -428,7 +452,13 @@ class TimelineEngine {
           color: t.color,
           animationIn: t.animationIn,
           animationOut: t.animationOut,
+          positionX: t.positionX,
           positionY: t.positionY,
+          assetUrl: t.fontAssetUrl,
+          parameters: {
+            if (t.fontAssetId != null) 'fontAssetId': t.fontAssetId,
+            if (t.fontLabel != null) 'fontLabel': t.fontLabel,
+          },
         ),
       );
       if (end > total) total = end;
@@ -469,6 +499,10 @@ class TimelineEngine {
           scale: s.scale,
           opacity: s.opacity,
           assetUrl: s.assetUrl,
+          parameters: {
+            if (s.label != null && s.label!.isNotEmpty) 'label': s.label,
+            if (s.presetId != null) 'presetId': s.presetId,
+          },
         ),
       );
       if (end > total) total = end;
@@ -491,10 +525,38 @@ class TimelineEngine {
       if (o.endTime > total) total = o.endTime;
     }
 
-    final audioUrl =
-        recipe.sound?.resolvedAudioUrl ?? recipe.music?.audioUrl;
+    final audioUrl = clearRecipeSound
+        ? null
+        : (userAudios.isNotEmpty
+              ? userAudios.first.sound.resolvedAudioUrl
+              : (userSound?.resolvedAudioUrl ??
+                    recipe.sound?.resolvedAudioUrl ??
+                    recipe.music?.audioUrl));
 
-    if (audioUrl != null && audioUrl.isNotEmpty) {
+    if (userAudios.isNotEmpty) {
+      for (var i = 0; i < userAudios.length; i++) {
+        final track = userAudios[i];
+        final url = track.sound.resolvedAudioUrl;
+        if (url.isEmpty) continue;
+        final audioStart = track.startTime.clamp(0.0, total);
+        final audioEnd = (track.endTime ?? total).clamp(
+          audioStart + 0.05,
+          total,
+        );
+        items.add(
+          TimelineItem(
+            id: 'audio_${track.id}',
+            kind: TimelineLayerKind.audio,
+            startTime: audioStart,
+            endTime: audioEnd,
+            layerOrder: -100 - i,
+            assetUrl: url,
+            volume: 1,
+          ),
+        );
+        if (audioEnd > total) total = audioEnd;
+      }
+    } else if (audioUrl != null && audioUrl.isNotEmpty) {
       final audioStart = userAudioTiming?.startTime ?? 0.0;
       final audioEnd = userAudioTiming?.endTime ?? total;
       items.add(
@@ -525,8 +587,8 @@ class TimelineEngine {
       height: recipe.height > 0 ? recipe.height : 1920,
       fps: recipe.fps > 0 ? recipe.fps : 30,
       audioUrl: audioUrl,
-      audioStartMs: recipe.soundSegmentStartMs,
-      audioEndMs: recipe.soundSegmentEndMs,
+      audioStartMs: userSoundSegmentStartMs ?? recipe.soundSegmentStartMs,
+      audioEndMs: userSoundSegmentEndMs ?? recipe.soundSegmentEndMs,
       beatMap: recipe.beatMap,
     );
   }

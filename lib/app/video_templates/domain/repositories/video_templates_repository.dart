@@ -102,6 +102,12 @@ abstract class VideoTemplatesRepository {
     String? title,
   });
 
+  /// Gallery / free edit — no catalog `templateId` (Flow B).
+  Future<Either<Failure, VideoTemplateProjectEntity>> createProjectFromMedia({
+    required List<ProjectFromMediaInput> media,
+    String? title,
+  });
+
   Future<Either<Failure, VideoTemplateProjectEntity>> getProject(
     String projectId,
   );
@@ -120,9 +126,15 @@ abstract class VideoTemplatesRepository {
 
   Future<Either<Failure, void>> completeProject(String projectId);
 
+  Future<Either<Failure, VideoTemplateRenderJobEntity>> renderOneShot(
+    Map<String, dynamic> body,
+  );
+
   Future<Either<Failure, VideoTemplateExportEntity>> queueExport({
     required String projectId,
     String quality = 'standard',
+    String? resolution,
+    double? fps,
   });
 
   /// SSE export progress. Null = stream unavailable (caller should poll).
@@ -145,17 +157,23 @@ abstract class VideoTemplatesRepository {
     int limit = 50,
   });
 
+  Future<Either<Failure, List<TemplateFontItem>>> listFonts();
+
   Future<Either<Failure, void>> putSlotFilter({
     required String projectId,
     required String slotId,
     String? presetId,
     double intensity = 1,
+    double? startTime,
+    double? endTime,
   });
 
   Future<Either<Failure, void>> putSlotEffect({
     required String projectId,
     required String slotId,
     String? presetId,
+    double? startTime,
+    double? endTime,
   });
 
   Future<Either<Failure, void>> createProjectText({
@@ -163,9 +181,11 @@ abstract class VideoTemplatesRepository {
     required String text,
     double fontSize = 48,
     String color = '#FFFFFF',
+    double positionX = 0,
     double positionY = 120,
     double startTime = 0,
     required double endTime,
+    String? fontAssetId,
   });
 
   Future<Either<Failure, void>> createProjectSticker({

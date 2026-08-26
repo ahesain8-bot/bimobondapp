@@ -132,8 +132,7 @@ class TemplateEditorPresetSheet extends StatelessWidget {
                 separatorBuilder: (_, __) => const SizedBox(width: 10),
                 itemBuilder: (context, i) {
                   final preset = presets[i];
-                  final selected = preset.id == selectedId ||
-                      (selectedId == null && preset.isClear);
+                  final selected = _presetSelected(preset, selectedId);
                   return _PresetTile(
                     preset: preset,
                     selected: selected,
@@ -146,6 +145,19 @@ class TemplateEditorPresetSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+bool _presetSelected(TemplatePresetItem preset, String? selectedId) {
+  if (selectedId == null) return preset.isClear;
+  if (preset.id == selectedId) return true;
+  switch (preset.kind) {
+    case TemplatePresetKind.filter:
+      return preset.previewFilterKey == selectedId;
+    case TemplatePresetKind.effect:
+      return preset.previewEffectKey == selectedId;
+    case TemplatePresetKind.sticker:
+      return false;
   }
 }
 

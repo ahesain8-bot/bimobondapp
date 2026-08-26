@@ -9,6 +9,7 @@ import 'package:bimobondapp/app/video_templates/domain/repositories/video_templa
 import 'package:bimobondapp/core/error/failure_mapper.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 
 class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
   VideoTemplatesRepositoryImpl({
@@ -335,10 +336,43 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
     required String templateId,
     String? title,
   }) async {
+    final id = VideoTemplateProjectIds.normalizeServerId(templateId);
+    if (id == null) {
+      debugPrint(
+        'createProject blocked — templateId must be a UUID '
+        '(got "$templateId")',
+      );
+      return Left(
+        ServerFailure(
+          'templateId must be a UUID — use the template id from '
+          'GET /video-templates/:id (not name or slug)',
+        ),
+      );
+    }
     try {
       return Right(
         await remoteDataSource.createProject(
-          templateId: templateId,
+          templateId: id,
+          title: title,
+        ),
+      );
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, VideoTemplateProjectEntity>> createProjectFromMedia({
+    required List<ProjectFromMediaInput> media,
+    String? title,
+  }) async {
+    if (media.isEmpty) {
+      return Left(ServerFailure('media is required for from-media project'));
+    }
+    try {
+      return Right(
+        await remoteDataSource.createProjectFromMedia(
+          media: media,
           title: title,
         ),
       );
@@ -400,15 +434,30 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
   }
 
   @override
+  Future<Either<Failure, VideoTemplateRenderJobEntity>> renderOneShot(
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      return Right(await remoteDataSource.renderOneShot(body));
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, VideoTemplateExportEntity>> queueExport({
     required String projectId,
     String quality = 'standard',
+    String? resolution,
+    double? fps,
   }) async {
     try {
       return Right(
         await remoteDataSource.queueExport(
           projectId: projectId,
           quality: quality,
+          resolution: resolution,
+          fps: fps,
         ),
       );
     } catch (e) {
@@ -470,11 +519,22 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
   }
 
   @override
+  Future<Either<Failure, List<TemplateFontItem>>> listFonts() async {
+    try {
+      return Right(await remoteDataSource.listFonts());
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> putSlotFilter({
     required String projectId,
     required String slotId,
     String? presetId,
     double intensity = 1,
+    double? startTime,
+    double? endTime,
   }) async {
     try {
       await remoteDataSource.putSlotFilter(
@@ -482,6 +542,8 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
         slotId: slotId,
         presetId: presetId,
         intensity: intensity,
+        startTime: startTime,
+        endTime: endTime,
       );
       return const Right(null);
     } catch (e) {
@@ -494,12 +556,16 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
     required String projectId,
     required String slotId,
     String? presetId,
+    double? startTime,
+    double? endTime,
   }) async {
     try {
       await remoteDataSource.putSlotEffect(
         projectId: projectId,
         slotId: slotId,
         presetId: presetId,
+        startTime: startTime,
+        endTime: endTime,
       );
       return const Right(null);
     } catch (e) {
@@ -513,9 +579,11 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
     required String text,
     double fontSize = 48,
     String color = '#FFFFFF',
+    double positionX = 0,
     double positionY = 120,
     double startTime = 0,
     required double endTime,
+    String? fontAssetId,
   }) async {
     try {
       await remoteDataSource.createProjectText(
@@ -523,9 +591,11 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
         text: text,
         fontSize: fontSize,
         color: color,
+        positionX: positionX,
         positionY: positionY,
         startTime: startTime,
         endTime: endTime,
+        fontAssetId: fontAssetId,
       );
       return const Right(null);
     } catch (e) {
