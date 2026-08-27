@@ -893,9 +893,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       senderId: payload.senderId,
       giftName: giftName,
       animationUrl:
-          (giftMap?['animationUrl'] ??
-                  giftMap?['animation_url'] ??
-                  giftMap?['imageUrl'])
+          (giftMap?['animationUrl'] ?? giftMap?['animation_url'])
               ?.toString(),
       thumbnailUrl:
           (giftMap?['thumbnailUrl'] ??
@@ -1192,7 +1190,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
           (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
               ?.toString();
       final animationUrl =
-          (gift['animationUrl'] ?? gift['animation_url'] ?? thumb)?.toString();
+          (gift['animationUrl'] ?? gift['animation_url'])?.toString();
       final audioUrl = (gift['audioUrl'] ?? gift['audio_url'])?.toString();
       final giftId =
           (gift['giftId'] ?? gift['id'] ?? parsedLastGift?.id)?.toString() ??

@@ -182,11 +182,6 @@ const Duration _kVideoWatchdogTick = Duration(milliseconds: 500);
 /// two of rebuffering mid-animation is normal and must not end the overlay.
 const Duration _kVideoMaxStall = Duration(seconds: 6);
 
-// The auction input is 8px top padding + 40px control row + 16px bottom
-// padding. Use that shared bottom-control envelope for LARGE gift placement,
-// with only a small visual gap above it.
-const double _kLargeGiftBottomControlsClearance = 68.0;
-
 class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     with TickerProviderStateMixin {
   late final AnimationController _entranceController;
@@ -299,8 +294,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       void onTick() {
         final value = controller!.value;
         if (!value.isInitialized || value.duration == Duration.zero) return;
-        if (value.position >=
-            value.duration - const Duration(milliseconds: 80)) {
+        if (value.isCompleted || value.position >= value.duration) {
           controller.removeListener(onTick);
           _finish();
         }
@@ -337,8 +331,25 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       }
       final value = controller.value;
       if (!value.isInitialized) {
+        return;
+      }
+      if (value.hasError) {
         timer.cancel();
         _finish();
+        return;
+      }
+      if (value.isCompleted ||
+          (value.duration > Duration.zero &&
+              value.position >= value.duration)) {
+        timer.cancel();
+        return;
+      }
+      // A player can report a stable position while it is opening the stream,
+      // waiting for buffered data, or briefly transitioning its play state.
+      // None of those states means the animation has ended.
+      if (value.isBuffering || !value.isPlaying) {
+        lastPosition = value.position;
+        stalledFor = Duration.zero;
         return;
       }
       if (value.position > lastPosition) {
@@ -417,7 +428,6 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
-    final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
     final isSmall = _isSmall;
     final isMedium = _isMedium;
     final isLarge = !isSmall && !isMedium;
@@ -441,20 +451,10 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       height: stageHeight,
       child: _buildMedia(),
     );
-    final Widget stage;
-    if (isLarge) {
-      // A LARGE gift covers most of the frame, so a straight top edge reads as
-      // a rectangle laid over the live feed. Masking the stage's alpha
-      // dissolves that edge into the video underneath. Video is masked here
-      // too: unlike the [BlendMode.screen] case in the class note, `dstIn`
-      // only multiplies the gift layer's own alpha and never samples the live
-      // feed texture, so no two textures are blended together.
-      stage = _withTopBlend(media);
-    } else if (_kind == _GiftMediaKind.video) {
-      stage = RepaintBoundary(child: media);
-    } else {
-      stage = _withEdgeFade(media);
-    }
+    // This is the shared main-branch composition for every media kind. The
+    // stage stays square, while BoxFit.cover lets each asset fill that stage
+    // using its own aspect ratio without changing the overlay geometry.
+    final stage = _withEdgeFade(media);
 
     Widget animatedStage;
     if (isLarge) {
@@ -497,7 +497,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     // Position calculation:
     // - SMALL: very small, left-aligned above comments and highest price card (bottom: 230px, left/right: 16px)
     // - MEDIUM: center of screen
-    // - LARGE: bottom-anchored above the bottom controls
+    // - LARGE: lower-edge anchored through the bottom controls
     final double? topPosition;
     final double? bottomPosition;
     final double? leftPosition;
@@ -517,40 +517,41 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     } else {
-      // Keep the existing bounded stage size, but place LARGE gifts in the
-      // lower part of the live view, directly above the bottom controls.
+      // Match the known-good main-branch composition: the shared stage ends
+      // at the viewport edge, and the root overlay places it above the route's
+      // bottom controls rather than reserving space above them.
       topPosition = null;
-      bottomPosition =
-          bottomSafeArea + _kLargeGiftBottomControlsClearance;
+      bottomPosition = 0;
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
 
-    // The entry sits in the *root* overlay, on top of the live room and of any
-    // sheet. It must therefore never take a pointer: this used to be a
-    // full-screen `HitTestBehavior.opaque` GestureDetector wired to `_finish`,
-    // which swallowed every tap in the room for the whole animation *and*
-    // ended the gift on the first one. In a live people tap constantly (hearts,
-    // the comment field, the gift button), so a 15s occasion gift died about a
-    // second in. TikTok's fullscreen gifts are pure decoration — taps go
-    // straight through to the UI underneath.
-    return IgnorePointer(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned(
-              left: leftPosition,
-              right: rightPosition,
-              top: topPosition,
-              bottom: bottomPosition,
-              width: stageWidth,
-              height: stageHeight,
-              child: animatedStage,
+    // The root overlay must also preserve the established tap-to-dismiss
+    // behavior. Translucent hit testing lets the route controls underneath
+    // continue to receive their normal interactions while this entry calls
+    // `_finish` for the existing gift-dismiss gesture.
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _finish,
+              behavior: HitTestBehavior.translucent,
+              child: const SizedBox.expand(),
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            left: leftPosition,
+            right: rightPosition,
+            top: topPosition,
+            bottom: bottomPosition,
+            width: stageWidth,
+            height: stageHeight,
+            child: animatedStage,
+          ),
+        ],
       ),
     );
   }
@@ -602,11 +603,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
   }
 
-  BoxFit get _mediaFit => _isSmall || _isMedium ? BoxFit.cover : BoxFit.contain;
+  BoxFit get _mediaFit => BoxFit.cover;
 
   Widget _buildMedia() {
-    // LARGE media stays inside the transparent stage so its authored bounds
-    // remain visible. SMALL/MEDIUM retain their existing cover behavior.
     switch (_kind) {
       case _GiftMediaKind.lottie:
         final composition = _composition;
@@ -636,6 +635,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         // authored aspect ratio.
         return FittedBox(
           fit: _mediaFit,
+          alignment: Alignment.center,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
             width: controller.value.size.width,
@@ -656,10 +656,14 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         width: double.infinity,
         height: double.infinity,
         fit: _mediaFit,
+        alignment: Alignment.center,
+        transparentPlaceholder: _isLarge,
       );
     }
     return const Center(
       child: Icon(Icons.card_giftcard, size: 120, color: Colors.white),
     );
   }
+
+  bool get _isLarge => !_isSmall && !_isMedium;
 }

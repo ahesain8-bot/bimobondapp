@@ -268,10 +268,9 @@ packages:
   countrify:
     dependency: "direct main"
     description:
-      name: countrify
-      sha256: "694a0c40ea19576fbd29590cfe7ce9038cf06a1db1260c42ca6544db69fd5fd4"
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/countrify"
+      relative: true
+    source: path
     version: "2.5.0"
   crop_your_image:
     dependency: "direct main"
