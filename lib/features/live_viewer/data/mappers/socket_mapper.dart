@@ -303,6 +303,21 @@ class SocketMapper {
     );
   }
 
+  static LiveTopGiftersUpdatedEvent? topGiftersEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final liveId = map['liveId']?.toString() ?? fallbackLiveId ?? '';
+    if (liveId.isEmpty) return null;
+    return LiveTopGiftersUpdatedEvent(
+      liveId: liveId,
+      avatarUrls: avatarUrlsFrom(map['data'] ?? map['gifters']),
+      timestamp: DateTime.now(),
+    );
+  }
+
   /// Avatar URLs from `topViewers` / `users` / a viewers list, if present.
   static List<String> avatarUrlsFrom(dynamic raw) {
     if (raw is! List) return const [];

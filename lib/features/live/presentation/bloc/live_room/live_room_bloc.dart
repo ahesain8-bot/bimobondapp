@@ -94,6 +94,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveRoomGuestRequestAnswered>(_onGuestRequestAnswered);
     on<LiveRoomCompetitionRequestAnswered>(_onCompetitionRequestAnswered);
+    on<LiveRoomSupportersRefreshRequested>(_onSupportersRefreshRequested);
     on<LiveRoomGalleryChanged>(_onGalleryChanged);
     on<LiveRoomSettingsApplied>(_onSettingsApplied);
     on<LiveRoomModerationRequested>(_onModerationRequested);
@@ -120,6 +121,22 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
   /// Set after a successful `POST /end` or remote `liveEnded`.
   var _sessionTeardownDone = false;
+
+  /// When the host's media last came up, so a drop can be reported with the
+  /// broadcast's age rather than as a bare stack trace.
+  DateTime? _mediaConnectedAt;
+
+  String _broadcastUptime() {
+    final since = _mediaConnectedAt;
+    if (since == null) return 'unknown uptime';
+    final elapsed = DateTime.now().difference(since);
+    return '${elapsed.inMinutes}m ${elapsed.inSeconds % 60}s';
+  }
+
+  /// Coalesces supporter re-reads: a gift burst produces one leaderboard
+  /// round-trip, not one per gift.
+  Timer? _supportersRefreshTimer;
+  DateTime? _supportersRefreshedAt;
 
   /// Prevents overlapping camera init / flip requests.
   var _cameraOpInFlight = false;
@@ -519,6 +536,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (effectiveBattle?.isActive == true) {
       add(LiveRoomBattleChanged(effectiveBattle));
     }
+    // First read of the supporter ring. Later updates arrive on
+    // `liveTopGiftersUpdated`, with a debounced re-read behind every gift for
+    // backends that do not push it.
+    add(const LiveRoomSupportersRefreshRequested());
   }
 
   Future<LiveBattle?> _loadBattleSafely(String liveId) async {
@@ -639,6 +660,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final liveTrack = _sessionRepository.localPreviewTrack as VideoTrack?;
     final mediaUp = _sessionRepository.isMediaConnected;
     final swapToLiveKit = liveTrack != null && mediaUp;
+    if (mediaUp) _mediaConnectedAt ??= DateTime.now();
     emit(
       ready.copyWith(
         controller: swapToLiveKit ? null : ready.controller,
@@ -844,7 +866,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       final exists = ready.session.messages.any((m) => m.id == message.id);
       final messages = exists
           ? ready.session.messages
-          : [...ready.session.messages, message];
+          : capLiveChatMessages([...ready.session.messages, message]);
       emit(
         ready.copyWith(
           session: ready.session.copyWith(messages: messages),
@@ -964,6 +986,85 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     } catch (_) {}
   }
 
+  /// Reads the supporter strip for this live, and for the opponent while a
+  /// battle is on. Enrichment only: a failure leaves the last known avatars in
+  /// place rather than blanking the ring mid-broadcast.
+  Future<void> _onSupportersRefreshRequested(
+    LiveRoomSupportersRefreshRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null || current.isEnding || _sessionTeardownDone) return;
+    final liveId = current.session.id;
+    if (liveId.isEmpty) return;
+    _supportersRefreshedAt = DateTime.now();
+
+    final battle = current.battle;
+    final opponentId = battle?.isActive == true
+        ? battle!.opponentLiveId(liveId)
+        : '';
+    final results = await Future.wait<List<String>?>([
+      _loadSupporterAvatars(liveId),
+      if (opponentId.isNotEmpty && opponentId != liveId)
+        _loadSupporterAvatars(opponentId),
+    ]);
+    if (isClosed) return;
+    final ready = _readyOrNull;
+    if (ready == null || ready.session.id != liveId) return;
+
+    emit(
+      ready.copyWith(
+        topGifterAvatars: results.first ?? ready.topGifterAvatars,
+        opponentTopGifterAvatars: results.length > 1
+            ? (results[1] ?? ready.opponentTopGifterAvatars)
+            : ready.opponentTopGifterAvatars,
+      ),
+    );
+  }
+
+  /// Debounced, but with a ceiling.
+  ///
+  /// A plain trailing debounce never fires while gifts keep arriving — each one
+  /// pushed the timer out again — so the ring froze during exactly the burst it
+  /// exists to show. Past [_supportersRefreshMaxWait] since the last read, the
+  /// next gift refreshes immediately instead of waiting for a lull.
+  static const Duration _supportersRefreshMaxWait = Duration(seconds: 4);
+
+  void _scheduleSupportersRefresh() {
+    final last = _supportersRefreshedAt;
+    if (last != null &&
+        DateTime.now().difference(last) >= _supportersRefreshMaxWait) {
+      _supportersRefreshTimer?.cancel();
+      _supportersRefreshTimer = null;
+      if (isClosed || _sessionTeardownDone) return;
+      add(const LiveRoomSupportersRefreshRequested());
+      return;
+    }
+    _supportersRefreshTimer?.cancel();
+    _supportersRefreshTimer = Timer(const Duration(milliseconds: 700), () {
+      if (isClosed || _sessionTeardownDone) return;
+      add(const LiveRoomSupportersRefreshRequested());
+    });
+  }
+
+  Future<List<String>?> _loadSupporterAvatars(String liveId) async {
+    try {
+      final entries = await _sessionRepository.loadGiftersLeaderboard(
+        liveId,
+        window: 'session',
+      );
+      return entries
+          .map((entry) => entry.avatarUrl?.trim())
+          .whereType<String>()
+          .where((url) => url.isNotEmpty)
+          .take(3)
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('Supporter leaderboard unavailable for $liveId: $e');
+      return null;
+    }
+  }
+
   Future<void> _onBattleChanged(
     LiveRoomBattleChanged event,
     Emitter<LiveRoomState> emit,
@@ -982,10 +1083,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     );
     if (battle?.isActive != true) {
       await _sessionRepository.disconnectBattleOpponentMedia();
+      final ended = _readyOrNull;
+      if (ended != null && ended.opponentTopGifterAvatars.isNotEmpty) {
+        emit(ended.copyWith(opponentTopGifterAvatars: const []));
+      }
       return;
     }
     final opponentId = battle!.opponentLiveId(current.session.id);
     if (opponentId.isEmpty || opponentId == current.session.id) return;
+    // Both rings are re-read now that the opponent is known.
+    _scheduleSupportersRefresh();
     try {
       await _sessionRepository.connectBattleOpponentMedia(opponentId);
       if (isClosed) return;
@@ -1578,9 +1685,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             : (senderName == null || senderName.isEmpty)
             ? null
             : '$senderName أرسل هدية';
+        // Capped like every other append. Uncapped, a busy room's gift lines
+        // grew for the whole broadcast and each new gift re-copied the entire
+        // list — the host's room got heavier by the minute and eventually
+        // stopped responding.
         final messages = giftText == null
             ? session.messages
-            : [
+            : capLiveChatMessages([
                 ...session.messages,
                 LiveChatMessage(
                   id: 'gift-${DateTime.now().millisecondsSinceEpoch}',
@@ -1589,7 +1700,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                   username: senderName,
                   gifterLevel: senderGifterLevel,
                 ),
-              ];
+              ]);
         // The chat line stays as the permanent record; the banner is the
         // celebration on top of the video, the way TikTok plays one.
         final banner = (senderName == null || senderName.isEmpty)
@@ -1611,6 +1722,18 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             giftBanner: banner,
           ),
         );
+        _scheduleSupportersRefresh();
+      case LiveHudTopGiftersEvent(:final liveId, :final avatarUrls):
+        final top = avatarUrls.take(3).toList(growable: false);
+        if (liveId == current.session.id) {
+          emit(current.copyWith(topGifterAvatars: top));
+          return;
+        }
+        final battle = current.battle;
+        if (battle?.isActive == true &&
+            battle!.opponentLiveId(current.session.id) == liveId) {
+          emit(current.copyWith(opponentTopGifterAvatars: top));
+        }
       case LiveHudHourlyRankEvent(:final hourlyRank, :final label):
         emit(
           current.copyWith(
@@ -1667,10 +1790,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
     switch (event.event.state) {
       case LiveMediaConnectionState.reconnecting:
+        debugPrint('[Host] media reconnecting after ${_broadcastUptime()}');
         emit(current.copyWith(isMediaConnected: false));
         return;
       case LiveMediaConnectionState.reconnected:
         final track = _sessionRepository.localPreviewTrack as VideoTrack?;
+        _mediaConnectedAt ??= DateTime.now();
         emit(
           current.copyWith(
             isMediaConnected: track != null,
@@ -1679,6 +1804,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         );
         return;
       case LiveMediaConnectionState.disconnected:
+        // The one line that tells a "my stream cut after five minutes" report
+        // apart: which path dropped it, and how long the room had been up.
+        debugPrint(
+          '[Host] media DISCONNECTED after ${_broadcastUptime()} — '
+          'reason: ${event.event.reason ?? "livekit terminal disconnect"}',
+        );
+        _mediaConnectedAt = null;
         emit(current.copyWith(isMediaConnected: false, localVideoTrack: null));
         if (!_appPaused) {
           await _recoverHostMedia(current.session.id, emit);
@@ -1750,6 +1882,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
               clearActionMessage: true,
             ),
           );
+          _mediaConnectedAt = DateTime.now();
+          debugPrint('[Host] media recovered on attempt $attempt');
           return;
         } catch (e) {
           debugPrint('Host media recovery attempt $attempt failed: $e');
@@ -2079,6 +2213,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   @override
   Future<void> close() async {
     _closing = true;
+    _supportersRefreshTimer?.cancel();
+    _supportersRefreshTimer = null;
     final giftLiveId = _giftJoinedLiveId;
     _giftJoinedLiveId = null;
     if (giftLiveId != null && giftLiveId.isNotEmpty) {
