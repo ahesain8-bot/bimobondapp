@@ -1821,15 +1821,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final result = await joinLiveUseCase(opponentId);
     if (_activeLiveId != liveId || isClosed) return;
     await result.fold(
-      (failure) async => emit(
-        state.copyWith(
-          moderationBanner:
-              'بدأت المعركة لكن تعذر فتح فيديو الخصم: ${failure.message}',
-        ),
-      ),
+      (failure) async {
+        emit(
+          state.copyWith(moderationBanner: 'تعذر فتح فيديو الخصم'),
+        );
+        _scheduleBannerClear();
+      },
       (join) async {
         final supportersFuture = _loadTopGifterAvatars(opponentId);
         emit(state.copyWith(battleOpponentLive: join.live));
+        var videoUp = true;
         try {
           await liveKitService.connectBattle(
             url: join.liveKitUrl,
@@ -1839,25 +1840,30 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           );
           if (_activeLiveId != liveId || isClosed) return;
           _battleOpponentLiveId = opponentId;
-          final opponentSupporters = await supportersFuture;
-          if (_activeLiveId != liveId || isClosed) return;
-          // A new state instance makes the PK renderer read battleRoom now;
-          // track changes after that are driven by the Room notifier itself.
-          emit(
-            state.copyWith(
-              battle: battle,
-              battleOpponentLive: join.live,
-              opponentTopGifterAvatars:
-                  opponentSupporters ?? state.opponentTopGifterAvatars,
-            ),
-          );
-        } catch (e) {
-          if (!isClosed) {
-            emit(
-              state.copyWith(moderationBanner: 'تعذر توصيل فيديو الخصم: $e'),
-            );
-          }
+        } catch (_) {
+          // The opponent's video is one part of their side of the stage. Their
+          // name, avatar and supporter ring are already fetched and must still
+          // land: bailing here left the right-hand side of a battle blank even
+          // though everything except the video had arrived.
+          videoUp = false;
         }
+        final opponentSupporters = await supportersFuture;
+        if (_activeLiveId != liveId || isClosed) return;
+        // A new state instance makes the PK renderer read battleRoom now;
+        // track changes after that are driven by the Room notifier itself.
+        emit(
+          state.copyWith(
+            battle: battle,
+            battleOpponentLive: join.live,
+            opponentTopGifterAvatars:
+                opponentSupporters ?? state.opponentTopGifterAvatars,
+            // Short and human. This used to interpolate the raw exception,
+            // which put a wrapped SocketException — host, URI, query string
+            // and all — across the middle of the live.
+            moderationBanner: videoUp ? null : 'تعذر عرض فيديو الخصم',
+          ),
+        );
+        if (!videoUp) _scheduleBannerClear();
       },
     );
   }
