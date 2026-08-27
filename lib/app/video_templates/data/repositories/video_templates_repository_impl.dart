@@ -574,6 +574,42 @@ class VideoTemplatesRepositoryImpl implements VideoTemplatesRepository {
   }
 
   @override
+  Future<Either<Failure, void>> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await remoteDataSource.putSlotFilterItems(
+        projectId: projectId,
+        slotId: slotId,
+        items: items,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await remoteDataSource.putSlotEffectItems(
+        projectId: projectId,
+        slotId: slotId,
+        items: items,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(FailureMapper.from(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> createProjectText({
     required String projectId,
     required String text,

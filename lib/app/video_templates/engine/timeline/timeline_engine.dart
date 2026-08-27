@@ -195,8 +195,8 @@ class TimelineEngine {
   TemplateTimeline build({
     required VideoTemplateRecipeEntity recipe,
     required Map<String, SlotFillEntry> fills,
-    Map<String, UserSlotFilterOverride> slotFilterOverrides = const {},
-    Map<String, UserSlotEffectOverride> slotEffectOverrides = const {},
+    List<UserEditorFilterTrack> userFilters = const [],
+    List<UserEditorEffectTrack> userEffects = const [],
     List<UserEditorTextOverlay> userTexts = const [],
     List<UserEditorStickerOverlay> userStickers = const [],
     List<UserEditorAudioTrack> userAudios = const [],
@@ -205,6 +205,10 @@ class TimelineEngine {
     bool clearRecipeSound = false,
     int? userSoundSegmentStartMs,
     int? userSoundSegmentEndMs,
+    Set<String> userOwnedFilterSlots = const {},
+    Set<String> userOwnedEffectSlots = const {},
+    bool userTextsLayerOwned = false,
+    bool userStickersLayerOwned = false,
   }) {
     final slotEngine = SlotEngine(recipe: recipe);
     final slots = slotEngine.slots;
@@ -246,25 +250,30 @@ class TimelineEngine {
         ),
       );
 
-      // Slot-level effects / filters — user overrides replace admin slot FX.
-      final userFx = slotEffectOverrides[slot.id];
-      if (userFx != null && userFx.effectType.isNotEmpty) {
-        final fxStart = start + userFx.startTime.clamp(0.0, dur);
-        final fxEndRel = (userFx.endTime ?? dur).clamp(0.0, dur);
-        // Extend through slot end — [containsTime] uses an exclusive upper bound.
-        final fxEnd = fxEndRel >= dur - 0.001 ? end + 0.001 : start + fxEndRel;
-        items.add(
-          TimelineItem(
-            id: 'user_fx_${slot.id}',
-            kind: TimelineLayerKind.videoClip,
-            startTime: fxStart,
-            endTime: fxEnd > fxStart ? fxEnd : fxStart + 0.05,
-            layerOrder: 1000,
-            slotId: slot.id,
-            effectType: userFx.effectType,
-            parameters: userFx.parameters,
-          ),
-        );
+      // Slot-level effects / filters — user layers replace admin slot FX.
+      final slotUserEffects = userEffects.where((e) => e.slotId == slot.id).toList();
+      final useUserEffects =
+          userOwnedEffectSlots.contains(slot.id) || slotUserEffects.isNotEmpty;
+      if (useUserEffects) {
+        for (var e = 0; e < slotUserEffects.length; e++) {
+          final userFx = slotUserEffects[e];
+          if (userFx.effectType.isEmpty || userFx.effectType == 'none') continue;
+          final fxStart = start + userFx.startTime.clamp(0.0, dur);
+          final fxEndRel = (userFx.endTime ?? dur).clamp(0.0, dur);
+          final fxEnd = fxEndRel >= dur - 0.001 ? end + 0.001 : start + fxEndRel;
+          items.add(
+            TimelineItem(
+              id: 'user_fx_${userFx.id}',
+              kind: TimelineLayerKind.videoClip,
+              startTime: fxStart,
+              endTime: fxEnd > fxStart ? fxEnd : fxStart + 0.05,
+              layerOrder: 1000 + e,
+              slotId: slot.id,
+              effectType: userFx.effectType,
+              parameters: userFx.parameters,
+            ),
+          );
+        }
       } else {
         for (var e = 0; e < slot.effects.length; e++) {
           final fx = slot.effects[e];
@@ -285,26 +294,35 @@ class TimelineEngine {
         }
       }
 
-      final userFilter = slotFilterOverrides[slot.id];
-      if (userFilter != null && userFilter.filterName.isNotEmpty) {
-        final filterStart = start + userFilter.startTime.clamp(0.0, dur);
-        final filterEndRel = (userFilter.endTime ?? dur).clamp(0.0, dur);
-        // Extend through slot end — [containsTime] uses an exclusive upper bound.
-        final filterEnd = filterEndRel >= dur - 0.001
-            ? end + 0.001
-            : start + filterEndRel;
-        items.add(
-          TimelineItem(
-            id: 'user_filter_${slot.id}',
-            kind: TimelineLayerKind.videoClip,
-            startTime: filterStart,
-            endTime: filterEnd > filterStart ? filterEnd : filterStart + 0.05,
-            layerOrder: 900,
-            slotId: slot.id,
-            filterName: userFilter.filterName,
-            filterIntensity: userFilter.intensity,
-          ),
-        );
+      final slotUserFilters =
+          userFilters.where((f) => f.slotId == slot.id).toList();
+      final useUserFilters =
+          userOwnedFilterSlots.contains(slot.id) || slotUserFilters.isNotEmpty;
+      if (useUserFilters) {
+        for (var f = 0; f < slotUserFilters.length; f++) {
+          final userFilter = slotUserFilters[f];
+          if (userFilter.filterName.isEmpty ||
+              userFilter.filterName == 'none') {
+            continue;
+          }
+          final filterStart = start + userFilter.startTime.clamp(0.0, dur);
+          final filterEndRel = (userFilter.endTime ?? dur).clamp(0.0, dur);
+          final filterEnd = filterEndRel >= dur - 0.001
+              ? end + 0.001
+              : start + filterEndRel;
+          items.add(
+            TimelineItem(
+              id: 'user_filter_${userFilter.id}',
+              kind: TimelineLayerKind.videoClip,
+              startTime: filterStart,
+              endTime: filterEnd > filterStart ? filterEnd : filterStart + 0.05,
+              layerOrder: 900 + f,
+              slotId: slot.id,
+              filterName: userFilter.filterName,
+              filterIntensity: userFilter.intensity,
+            ),
+          );
+        }
       } else {
         for (var f = 0; f < slot.filters.length; f++) {
           final filter = slot.filters[f];
@@ -413,28 +431,30 @@ class TimelineEngine {
       if (end > total) total = end;
     }
 
-    for (final t in recipe.texts) {
-      items.add(
-        TimelineItem(
-          id: 'text_${t.id}',
-          kind: TimelineLayerKind.text,
-          startTime: t.startTime,
-          endTime: t.endTime > t.startTime ? t.endTime : t.startTime + 1,
-          layerOrder: 3000,
-          trackId: t.trackId,
-          text: t.text,
-          fontSize: t.fontSize,
-          color: t.color,
-          alignment: t.alignment,
-          animationIn: t.animationIn,
-          animationOut: t.animationOut,
-          positionX: t.positionX,
-          positionY: t.positionY,
-          assetUrl: t.fontAssetUrl ?? t.fontAsset?.url,
-          parameters: {if (t.fontAssetId != null) 'fontAssetId': t.fontAssetId},
-        ),
-      );
-      if (t.endTime > total) total = t.endTime;
+    if (!userTextsLayerOwned) {
+      for (final t in recipe.texts) {
+        items.add(
+          TimelineItem(
+            id: 'text_${t.id}',
+            kind: TimelineLayerKind.text,
+            startTime: t.startTime,
+            endTime: t.endTime > t.startTime ? t.endTime : t.startTime + 1,
+            layerOrder: 3000,
+            trackId: t.trackId,
+            text: t.text,
+            fontSize: t.fontSize,
+            color: t.color,
+            alignment: t.alignment,
+            animationIn: t.animationIn,
+            animationOut: t.animationOut,
+            positionX: t.positionX,
+            positionY: t.positionY,
+            assetUrl: t.fontAssetUrl ?? t.fontAsset?.url,
+            parameters: {if (t.fontAssetId != null) 'fontAssetId': t.fontAssetId},
+          ),
+        );
+        if (t.endTime > total) total = t.endTime;
+      }
     }
 
     for (var i = 0; i < userTexts.length; i++) {
@@ -464,24 +484,26 @@ class TimelineEngine {
       if (end > total) total = end;
     }
 
-    for (final s in recipe.stickers) {
-      items.add(
-        TimelineItem(
-          id: 'sticker_${s.id}',
-          kind: TimelineLayerKind.sticker,
-          startTime: s.startTime,
-          endTime: s.endTime > s.startTime ? s.endTime : s.startTime + 1,
-          layerOrder: 3100,
-          trackId: s.trackId,
-          positionX: s.positionX,
-          positionY: s.positionY,
-          scale: s.scale,
-          rotation: s.rotation,
-          opacity: s.opacity,
-          assetUrl: s.assetUrl ?? s.asset?.url,
-        ),
-      );
-      if (s.endTime > total) total = s.endTime;
+    if (!userStickersLayerOwned) {
+      for (final s in recipe.stickers) {
+        items.add(
+          TimelineItem(
+            id: 'sticker_${s.id}',
+            kind: TimelineLayerKind.sticker,
+            startTime: s.startTime,
+            endTime: s.endTime > s.startTime ? s.endTime : s.startTime + 1,
+            layerOrder: 3100,
+            trackId: s.trackId,
+            positionX: s.positionX,
+            positionY: s.positionY,
+            scale: s.scale,
+            rotation: s.rotation,
+            opacity: s.opacity,
+            assetUrl: s.assetUrl ?? s.asset?.url,
+          ),
+        );
+        if (s.endTime > total) total = s.endTime;
+      }
     }
 
     for (var i = 0; i < userStickers.length; i++) {

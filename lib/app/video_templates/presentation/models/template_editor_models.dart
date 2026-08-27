@@ -63,6 +63,9 @@ class TemplatePresetItem extends Equatable {
   static String normalizeFilterPreviewKey(String? raw) {
     var key = _slugKey(raw);
     if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('filter_')) {
+      key = key.substring('filter_'.length);
+    }
     key = switch (key) {
       'black_white' || 'blackandwhite' || 'grayscale' || 'mono' => 'bw',
       'black_and_white' => 'bw',
@@ -92,6 +95,9 @@ class TemplatePresetItem extends Equatable {
   static String normalizeEffectPreviewKey(String? raw) {
     var key = _slugKey(raw);
     if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('effect_')) {
+      key = key.substring('effect_'.length);
+    }
     key = switch (key) {
       'zoomin' || 'zoom_in_effect' => 'zoom_in',
       'zoomout' || 'zoom_out_effect' => 'zoom_out',
@@ -119,8 +125,10 @@ class TemplatePresetItem extends Equatable {
     final id = json['id']?.toString() ?? '';
     final name = (json['name'] ?? json['label'] ?? json['title'])?.toString() ??
         'Preset';
+    final engineType = json['engineType']?.toString();
     final rawFilter = (json['filterName'] ??
             json['filterType'] ??
+            engineType ??
             json['slug'] ??
             json['key'] ??
             json['code'] ??
@@ -128,6 +136,7 @@ class TemplatePresetItem extends Equatable {
         ?.toString();
     final rawEffect = (json['effectType'] ??
             json['effectName'] ??
+            engineType ??
             json['slug'] ??
             json['key'] ??
             json['code'] ??
@@ -237,6 +246,133 @@ class UserSlotEffectOverride extends Equatable {
       [presetId, effectType, parameters, startTime, endTime];
 }
 
+const kMaxFiltersPerSlot = 8;
+const kMaxEffectsPerSlot = 8;
+
+/// One filter layer on a slot (stack up to [kMaxFiltersPerSlot]).
+class UserEditorFilterTrack extends Equatable {
+  const UserEditorFilterTrack({
+    required this.id,
+    required this.slotId,
+    this.presetId,
+    required this.filterName,
+    this.label,
+    this.intensity = 1,
+    this.startTime = 0,
+    this.endTime,
+  });
+
+  final String id;
+  final String slotId;
+  final String? presetId;
+  final String filterName;
+  final String? label;
+  final double intensity;
+  final double startTime;
+  final double? endTime;
+
+  String get displayName {
+    final l = label?.trim();
+    if (l != null && l.isNotEmpty) return l;
+    return filterName;
+  }
+
+  UserEditorFilterTrack copyWith({
+    String? id,
+    String? slotId,
+    String? presetId,
+    String? filterName,
+    String? label,
+    double? intensity,
+    double? startTime,
+    double? endTime,
+  }) {
+    return UserEditorFilterTrack(
+      id: id ?? this.id,
+      slotId: slotId ?? this.slotId,
+      presetId: presetId ?? this.presetId,
+      filterName: filterName ?? this.filterName,
+      label: label ?? this.label,
+      intensity: intensity ?? this.intensity,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, slotId, presetId, filterName, label, intensity, startTime, endTime];
+}
+
+/// One effect layer on a slot (stack up to [kMaxEffectsPerSlot]).
+class UserEditorEffectTrack extends Equatable {
+  const UserEditorEffectTrack({
+    required this.id,
+    required this.slotId,
+    this.presetId,
+    required this.effectType,
+    this.label,
+    this.parameters = const {},
+    this.startTime = 0,
+    this.endTime,
+  });
+
+  final String id;
+  final String slotId;
+  final String? presetId;
+  final String effectType;
+  final String? label;
+  final Map<String, dynamic> parameters;
+  final double startTime;
+  final double? endTime;
+
+  String get displayName {
+    final l = label?.trim();
+    if (l != null && l.isNotEmpty) return l;
+    return effectType;
+  }
+
+  UserEditorEffectTrack copyWith({
+    String? id,
+    String? slotId,
+    String? presetId,
+    String? effectType,
+    String? label,
+    Map<String, dynamic>? parameters,
+    double? startTime,
+    double? endTime,
+  }) {
+    return UserEditorEffectTrack(
+      id: id ?? this.id,
+      slotId: slotId ?? this.slotId,
+      presetId: presetId ?? this.presetId,
+      effectType: effectType ?? this.effectType,
+      label: label ?? this.label,
+      parameters: parameters ?? this.parameters,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        slotId,
+        presetId,
+        effectType,
+        label,
+        parameters,
+        startTime,
+        endTime,
+      ];
+}
+
+/// Avoids [ArgumentError] when [min] > [max] (short clips / timeline edges).
+double safeEditorClamp(double value, double min, double max) {
+  if (min > max) return max;
+  return value.clamp(min, max);
+}
+
 /// Clip-local effect/filter window (seconds from slot start).
 ///
 /// See server timing guide: minimum 0.05s, `endTime` clamped to slot duration.
@@ -253,7 +389,7 @@ class SlotLocalTiming {
   }) {
     final dur = slotDuration > 0 ? slotDuration : 0.05;
     final start = startTime.clamp(0.0, dur);
-    final end = (endTime ?? dur).clamp(start + 0.05, dur);
+    final end = safeEditorClamp(endTime ?? dur, start + 0.05, dur);
     return SlotLocalTiming(start: start, end: end);
   }
 
@@ -271,6 +407,39 @@ class SlotLocalTiming {
     );
     return localTime >= window.start && localTime < window.end;
   }
+}
+
+/// Normalize template / API coordinates to center-origin canvas pixels (1080×1920).
+///
+/// Handles normalized (-1…1), top-left absolute, and center-origin offsets.
+({double x, double y}) normalizeEditorCanvasPosition({
+  required double positionX,
+  required double positionY,
+  int canvasWidth = 1080,
+  int canvasHeight = 1920,
+}) {
+  final cw = canvasWidth > 0 ? canvasWidth : 1080;
+  final ch = canvasHeight > 0 ? canvasHeight : 1920;
+  final halfW = cw / 2.0;
+  final halfH = ch / 2.0;
+
+  var x = positionX;
+  var y = positionY;
+
+  // Normalized alignment-style (-1…1).
+  if (x.abs() <= 1.05 && y.abs() <= 1.05) {
+    return (x: x * halfW, y: y * halfH);
+  }
+
+  // Top-left absolute pixels → center origin.
+  if (x >= 0 && x <= cw && y >= 0 && y <= ch) {
+    return (x: x - halfW, y: y - halfH);
+  }
+
+  return (
+    x: x.clamp(-halfW + 8, halfW - 8),
+    y: y.clamp(-halfH + 8, halfH - 8),
+  );
 }
 
 /// Caption added in the editor (maps to POST …/texts).

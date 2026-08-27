@@ -19,9 +19,11 @@ class TemplateEditorOverlaySegment {
     required this.end,
     required this.label,
     required this.color,
+    this.slotId,
     this.icon,
     this.editable = true,
     this.showVolumeIcon = false,
+    this.selected = false,
   });
 
   final String id;
@@ -30,10 +32,17 @@ class TemplateEditorOverlaySegment {
   final double end;
   final String label;
   final Color color;
+  final String? slotId;
   final IconData? icon;
   final bool editable;
   final bool showVolumeIcon;
+  final bool selected;
 }
+
+typedef TemplateEditorOverlayTap = void Function(
+  TemplateEditorOverlayKind kind,
+  String id,
+);
 
 typedef TemplateEditorOverlayRangeChanged = void Function(
   TemplateEditorOverlayKind kind,
@@ -42,7 +51,110 @@ typedef TemplateEditorOverlayRangeChanged = void Function(
   double end,
 );
 
-class TemplateEditorTimeline extends StatelessWidget {
+/// Responsive sizing for the TikTok-style editor timeline.
+class _EditorTimelineLayout {
+  _EditorTimelineLayout._({
+    required this.maxWidth,
+    required this.screenWidth,
+    required this.textScaler,
+    required this.scale,
+    this.verticalScale = 1.0,
+  });
+
+  factory _EditorTimelineLayout.of(BuildContext context, double maxWidth) {
+    return _EditorTimelineLayout._(
+      maxWidth: maxWidth,
+      screenWidth: MediaQuery.sizeOf(context).width,
+      textScaler: MediaQuery.textScalerOf(context),
+      scale: (MediaQuery.sizeOf(context).width / 390).clamp(0.78, 1.12),
+    );
+  }
+
+  _EditorTimelineLayout withVerticalScale(double scale) {
+    return _EditorTimelineLayout._(
+      maxWidth: maxWidth,
+      screenWidth: screenWidth,
+      textScaler: textScaler,
+      scale: this.scale,
+      verticalScale: scale.clamp(0.72, 1.0),
+    );
+  }
+
+  /// Reference duration that fills the scrollable track area (full width).
+  static const double fullWidthReferenceSeconds = 5.0;
+
+  /// Ruler / grid hint spacing (seconds between minor ticks when space allows).
+  static const double secondsPerGridUnit = 2.0;
+
+  final double maxWidth;
+  final double screenWidth;
+  final TextScaler textScaler;
+  final double scale;
+  final double verticalScale;
+
+  double _d(double design) => design * scale;
+  double _v(double design) => _d(design) * verticalScale;
+
+  double get horizontalPadding => _d(12).clamp(8, 16);
+  double get leftGutter => _d(52).clamp(42, 58);
+  double get contentTrailingPad => _d(8).clamp(6, 10);
+  double get slotGap => _d(4).clamp(3, 5);
+  double get mediaRowHeight => _v(52).clamp(38, 58);
+  double get trackHeight => _v(24).clamp(18, 30);
+  double get trackGap => _v(3).clamp(2, 5);
+  double get rulerHeight => _v(16).clamp(13, 20);
+  double get sectionGap => _v(4).clamp(3, 5);
+  double get bodyBottomPad => _v(8).clamp(4, 10);
+  double get addButtonWidth => _d(40).clamp(34, 46);
+  double get minBarWidth => _d(8).clamp(6, 12);
+  double get handleWidth => _d(14).clamp(11, 18);
+  double get handlePillHeight => _v(14).clamp(10, 16);
+  double get barRadius => _d(8).clamp(6, 10);
+  double get iconSizeSm => _d(12).clamp(10, 14);
+  double get iconSizeMd => _d(16).clamp(14, 18);
+  double get iconSizeLg => _d(22).clamp(18, 24);
+  double get gapSm => _d(4).clamp(2, 5);
+
+  double sp(double size) =>
+      textScaler.scale(size * scale.clamp(0.85, 1.1) * verticalScale);
+
+  /// Bars narrower than ~2s on the timeline hide trim handles (icon-only).
+  double get compactBarWidth =>
+      trackAreaWidth *
+      (secondsPerGridUnit / fullWidthReferenceSeconds) *
+      0.85;
+
+  /// Scrollable track area (viewport minus padding and fixed left rail).
+  double get trackAreaWidth => math.max(
+        100.0,
+        maxWidth - horizontalPadding * 2 - leftGutter,
+      );
+
+  /// 5s spans the full track area; longer clips scale out and scroll.
+  double get pxPerSecond => trackAreaWidth / fullWidthReferenceSeconds;
+
+  double resolveTimelineWidth(double duration) {
+    final safeDuration = math.max(duration, 0.01);
+    final scaled = safeDuration * pxPerSecond;
+    if (safeDuration <= fullWidthReferenceSeconds) {
+      return trackAreaWidth;
+    }
+    return scaled;
+  }
+
+  /// Width of the horizontally scrollable track content.
+  double scrollContentWidth(double timelineWidth) {
+    if (timelineWidth > trackAreaWidth) {
+      return timelineWidth + contentTrailingPad;
+    }
+    return trackAreaWidth;
+  }
+
+  bool needsHorizontalScroll(double timelineWidth) =>
+      timelineWidth > trackAreaWidth + 0.5;
+}
+
+class TemplateEditorTimeline extends StatefulWidget {
   const TemplateEditorTimeline({
     super.key,
     required this.slots,
@@ -56,6 +168,8 @@ class TemplateEditorTimeline extends StatelessWidget {
     this.onAddMedia,
     this.onSeek,
     this.onOverlayRangeChanged,
+    this.onOverlayTap,
+    this.selectedOverlayId,
   });
 
   final List<VideoTemplateSlotEntity> slots;
@@ -69,36 +183,173 @@ class TemplateEditorTimeline extends StatelessWidget {
   final VoidCallback? onAddMedia;
   final ValueChanged<double>? onSeek;
   final TemplateEditorOverlayRangeChanged? onOverlayRangeChanged;
+  final TemplateEditorOverlayTap? onOverlayTap;
+  final String? selectedOverlayId;
 
-  static const double _maxPxPerSecond = 56;
-  static const double _horizontalPadding = 12;
-  static const double _mediaRowHeight = 56;
-  static const double _trackHeight = 28;
-  static const double _trackGap = 4;
-  static const double _leftGutter = 52;
+  @override
+  State<TemplateEditorTimeline> createState() => _TemplateEditorTimelineState();
+}
 
-  static const double _slotGap = 4;
-  static const double _contentTrailingPad = 8;
+class _TemplateEditorTimelineState extends State<TemplateEditorTimeline> {
+  final ScrollController _horizontalScroll = ScrollController();
+  double? _lastAutoScrollPlayhead;
 
-  /// Timeline track width so the full clip period fits on screen (with padding).
-  double _resolveTimelineWidth(double maxWidth, double duration) {
-    final safeDuration = math.max(duration, 0.01);
-    final available = math.max(
-      100.0,
-      maxWidth - _horizontalPadding * 2 - _leftGutter - _contentTrailingPad,
+  @override
+  void dispose() {
+    _horizontalScroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant TemplateEditorTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playhead != oldWidget.playhead) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _autoScrollToPlayhead();
+      });
+    }
+  }
+
+  void _autoScrollToPlayhead() {
+    if (!_horizontalScroll.hasClients) return;
+    final position = _horizontalScroll.position;
+    if (position.maxScrollExtent <= 0) return;
+
+    final layout = _EditorTimelineLayout.of(
+      context,
+      MediaQuery.sizeOf(context).width,
     );
-    // Cap px/sec for short clips so the bar is not too tiny; long clips shrink.
-    final minWidth = math.min(available, safeDuration * _maxPxPerSecond);
-    return minWidth.clamp(100.0, available);
+    final duration = math.max(widget.totalDuration, 0.01);
+    final timelineWidth = layout.resolveTimelineWidth(duration);
+    if (!layout.needsHorizontalScroll(timelineWidth)) return;
+
+    final playheadX =
+        (widget.playhead / duration * timelineWidth).clamp(0.0, timelineWidth);
+    if (_lastAutoScrollPlayhead != null &&
+        (playheadX - _lastAutoScrollPlayhead!).abs() < 0.05) {
+      return;
+    }
+    _lastAutoScrollPlayhead = playheadX;
+
+    final viewport = position.viewportDimension;
+    final current = position.pixels;
+    const edgePad = 48.0;
+    if (playheadX < current + edgePad) {
+      position.jumpTo((playheadX - edgePad).clamp(0.0, position.maxScrollExtent));
+    } else if (playheadX > current + viewport - edgePad) {
+      position.jumpTo(
+        (playheadX - viewport + edgePad).clamp(0.0, position.maxScrollExtent),
+      );
+    }
   }
 
-  double _pxPerSecond(double timelineWidth, double duration) {
-    return timelineWidth / math.max(duration, 0.01);
+  double _overlayTracksHeight(_EditorTimelineLayout layout) {
+    final byKind = _segmentsByKind();
+    var height = 0.0;
+    for (final kind in _laneOrder) {
+      final segments = byKind[kind];
+      if (segments == null || segments.isEmpty) continue;
+      final subLanes = _maxOverlapLanes(segments);
+      height += layout.trackHeight * subLanes + layout.trackGap;
+    }
+    return height > 0 ? height + layout.sectionGap : 0;
   }
 
-  /// Seconds between ruler labels — widens when the track is compressed.
-  int _timeLabelStep(double duration, double pxPerSecond) {
-    const minSpacing = 40.0;
+  double _timelineBodyHeight(_EditorTimelineLayout layout) {
+    return layout.mediaRowHeight +
+        _overlayTracksHeight(layout) +
+        layout.bodyBottomPad;
+  }
+
+  double _timelineTotalHeight(_EditorTimelineLayout layout) {
+    return layout.rulerHeight + layout.sectionGap + _timelineBodyHeight(layout);
+  }
+
+  _EditorTimelineLayout _layoutFittedToHeight(
+    _EditorTimelineLayout layout,
+    double maxHeight,
+  ) {
+    if (!maxHeight.isFinite || maxHeight <= 0) return layout;
+    var fitted = layout;
+    var total = _timelineTotalHeight(fitted);
+
+    for (var pass = 0; pass < 6 && total > maxHeight + 0.01; pass++) {
+      if (fitted.verticalScale <= 0.72) break;
+      final nextScale = (fitted.verticalScale * (maxHeight / total))
+          .clamp(0.72, 1.0);
+      if ((nextScale - fitted.verticalScale).abs() < 0.001) break;
+      fitted = fitted.withVerticalScale(nextScale);
+      total = _timelineTotalHeight(fitted);
+    }
+    return fitted;
+  }
+
+  Map<TemplateEditorOverlayKind, List<TemplateEditorOverlaySegment>>
+      _segmentsByKind() {
+    final byKind =
+        <TemplateEditorOverlayKind, List<TemplateEditorOverlaySegment>>{};
+    for (final segment in widget.overlaySegments) {
+      (byKind[segment.kind] ??= []).add(segment);
+    }
+    return byKind;
+  }
+
+  static int _maxOverlapLanes(List<TemplateEditorOverlaySegment> segments) {
+    if (segments.length <= 1) return 1;
+    final laneEnds = <double>[];
+    for (final segment in segments) {
+      final start = math.min(segment.start, segment.end);
+      final end = math.max(segment.start, segment.end);
+      var lane = 0;
+      for (; lane < laneEnds.length; lane++) {
+        if (start >= laneEnds[lane] - 0.001) break;
+      }
+      if (lane == laneEnds.length) {
+        laneEnds.add(end);
+      } else {
+        laneEnds[lane] = end;
+      }
+    }
+    return math.max(1, laneEnds.length);
+  }
+
+  static Map<String, int> _assignOverlapLanes(
+    List<TemplateEditorOverlaySegment> segments,
+  ) {
+    final laneEnds = <double>[];
+    final out = <String, int>{};
+    for (final segment in segments) {
+      final start = math.min(segment.start, segment.end);
+      final end = math.max(segment.start, segment.end);
+      var lane = 0;
+      for (; lane < laneEnds.length; lane++) {
+        if (start >= laneEnds[lane] - 0.001) break;
+      }
+      if (lane == laneEnds.length) {
+        laneEnds.add(end);
+      } else {
+        laneEnds[lane] = end;
+      }
+      out[segment.id] = lane;
+    }
+    return out;
+  }
+
+  /// One horizontal lane per overlay kind (TikTok-style).
+  static const _laneOrder = <TemplateEditorOverlayKind>[
+    TemplateEditorOverlayKind.audio,
+    TemplateEditorOverlayKind.filter,
+    TemplateEditorOverlayKind.effect,
+    TemplateEditorOverlayKind.text,
+    TemplateEditorOverlayKind.sticker,
+  ];
+
+  /// Ruler ticks every 2s when the fixed grid fits; otherwise widen.
+  int _timeLabelStep(double duration, double pxPerSecond, double scale) {
+    const gridStep = 2;
+    if (gridStep * pxPerSecond >= 28) return gridStep;
+    final minSpacing = 40.0 * scale.clamp(0.85, 1.1);
     const candidates = [1, 2, 5, 10, 15, 30, 60];
     for (final step in candidates) {
       if (step * pxPerSecond >= minSpacing || step >= duration) {
@@ -108,25 +359,226 @@ class TemplateEditorTimeline extends StatelessWidget {
     return duration.ceil().clamp(1, 999);
   }
 
-  List<double> _layoutSlotWidths(double timelineWidth) {
-    if (slots.isEmpty) return const [];
-    final gapTotal = math.max(0, slots.length - 1) * _slotGap;
+  List<({TemplateEditorOverlayKind kind, double top, double height})>
+      _overlayLaneMetrics(_EditorTimelineLayout layout) {
+    final byKind = _segmentsByKind();
+    final metrics =
+        <({TemplateEditorOverlayKind kind, double top, double height})>[];
+    var top = layout.mediaRowHeight + layout.sectionGap;
+
+    for (final kind in _laneOrder) {
+      final segments = byKind[kind];
+      if (segments == null || segments.isEmpty) continue;
+
+      final subLanes = _maxOverlapLanes(segments);
+      final laneHeight =
+          layout.trackHeight * subLanes + layout.trackGap * (subLanes - 1);
+      metrics.add((kind: kind, top: top, height: laneHeight));
+      top += laneHeight + layout.trackGap;
+    }
+    return metrics;
+  }
+
+  Widget _buildFixedLeftRail(
+    _EditorTimelineLayout layout,
+    List<({TemplateEditorOverlayKind kind, double top, double height})> lanes,
+  ) {
+    return SizedBox(
+      width: layout.leftGutter,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (widget.onAddMedia != null)
+            Positioned(
+              left: 4,
+              top: layout.rulerHeight + layout.sectionGap,
+              height: layout.mediaRowHeight,
+              child: _AddMediaButton(
+                onTap: widget.onAddMedia!,
+                width: layout.addButtonWidth,
+                height: layout.mediaRowHeight,
+                iconSize: layout.iconSizeLg,
+              ),
+            ),
+          for (final lane in lanes)
+            Positioned(
+              left: layout.leftGutter - layout.iconSizeMd - 6,
+              top: layout.rulerHeight + layout.sectionGap + lane.top +
+                  (lane.height - layout.iconSizeMd) / 2,
+              child: Icon(
+                _laneIcon(lane.kind),
+                color: TemplateEditorTheme.textMuted,
+                size: layout.iconSizeMd,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollableTracks({
+    required _EditorTimelineLayout layout,
+    required double timelineWidth,
+    required double scrollWidth,
+    required double duration,
+    required double pxPerSecond,
+    required int labelStep,
+    required double playheadX,
+    required double bodyHeight,
+    required List<({TemplateEditorOverlayKind kind, double top, double height})>
+        lanes,
+  }) {
+    return SingleChildScrollView(
+      controller: _horizontalScroll,
+      scrollDirection: Axis.horizontal,
+      physics: layout.needsHorizontalScroll(timelineWidth)
+          ? const ClampingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
+      child: SizedBox(
+        width: scrollWidth,
+        height: layout.rulerHeight + layout.sectionGap + bodyHeight,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: layout.rulerHeight,
+              child: Stack(
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  for (var s = 0; s <= duration.ceil(); s += labelStep)
+                    Positioned(
+                      left: s * pxPerSecond,
+                      top: 0,
+                      bottom: 0,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          TemplateEditorTheme.formatTime(s.toDouble()),
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: TextStyle(
+                            color: TemplateEditorTheme.textMuted,
+                            fontSize: layout.sp(9),
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            SizedBox(height: layout.sectionGap),
+            Expanded(
+              child: Stack(
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    width: timelineWidth,
+                    height: layout.mediaRowHeight,
+                    child: _buildMediaRow(
+                      layout: layout,
+                      timelineWidth: timelineWidth,
+                      duration: duration,
+                      slotWidths: _layoutSlotWidths(
+                        timelineWidth,
+                        duration,
+                        layout,
+                      ),
+                    ),
+                  ),
+                  ..._buildOverlayTrackRows(
+                    layout: layout,
+                    lanes: lanes,
+                    timelineWidth: timelineWidth,
+                    duration: duration,
+                  ),
+                  Positioned(
+                    left: playheadX,
+                    top: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      child: Container(width: 2, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaRow({
+    required _EditorTimelineLayout layout,
+    required double timelineWidth,
+    required double duration,
+    required List<double> slotWidths,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < widget.slots.length; i++)
+              _SlotClipTile(
+                slot: widget.slots[i],
+                fill: widget.fills[widget.slots[i].id],
+                width: slotWidths[i],
+                selected: i == widget.selectedSlotIndex,
+                isLast: i == widget.slots.length - 1,
+                slotGap: layout.slotGap,
+                barRadius: layout.barRadius,
+                labelFontSize: layout.sp(9),
+                iconSize: layout.iconSizeLg,
+                onTap: widget.onSlotTap == null
+                    ? null
+                    : () => widget.onSlotTap!(i),
+              ),
+          ],
+        ),
+        if (widget.onSeek != null)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapDown: (d) {
+                final t = (d.localPosition.dx / timelineWidth * duration)
+                    .clamp(0.0, duration);
+                widget.onSeek!(t);
+              },
+              onHorizontalDragUpdate: (d) {
+                final t = (d.localPosition.dx / timelineWidth * duration)
+                    .clamp(0.0, duration);
+                widget.onSeek!(t);
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  List<double> _layoutSlotWidths(
+    double timelineWidth,
+    double totalDuration,
+    _EditorTimelineLayout layout,
+  ) {
+    if (widget.slots.isEmpty) return const [];
+    final gapTotal = math.max(0, widget.slots.length - 1) * layout.slotGap;
     final available = math.max(0, timelineWidth - gapTotal);
-    final durations = slots
+    final safeTotal = math.max(totalDuration, 0.01);
+    final durations = widget.slots
         .map(
           (s) => UserProjectSlotMapper.resolveSlotDuration(
             s,
-            fills[s.id],
+            widget.fills[s.id],
           ),
         )
         .toList();
-    final total = durations.fold<double>(0, (sum, d) => sum + d);
-    if (total <= 0) {
-      final even = available / slots.length;
-      return List<double>.filled(slots.length, even);
-    }
     return [
-      for (final d in durations) d / total * available,
+      for (final d in durations) d / safeTotal * available,
     ];
   }
 
@@ -134,182 +586,150 @@ class TemplateEditorTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final duration = math.max(totalDuration, 0.01);
-        final contentWidth = constraints.maxWidth - _horizontalPadding * 2;
-        final timelineWidth = _resolveTimelineWidth(constraints.maxWidth, duration);
-        final pxPerSecond = _pxPerSecond(timelineWidth, duration);
-        final labelStep = _timeLabelStep(duration, pxPerSecond);
-        final slotWidths = _layoutSlotWidths(timelineWidth);
-        final playheadX =
-            (playhead / duration * timelineWidth).clamp(0.0, timelineWidth);
-        final trackCount = overlaySegments.length;
-        final tracksHeight = trackCount == 0
-            ? 0.0
-            : trackCount * (_trackHeight + _trackGap) + 4;
-        final bodyHeight = _mediaRowHeight + tracksHeight + 8;
+        final baseLayout =
+            _EditorTimelineLayout.of(context, constraints.maxWidth);
+        final layout = _layoutFittedToHeight(baseLayout, constraints.maxHeight);
+        final duration = math.max(widget.totalDuration, 0.01);
+        final timelineWidth = layout.resolveTimelineWidth(duration);
+        final pxPerSecond = layout.pxPerSecond;
+        final labelStep = _timeLabelStep(duration, pxPerSecond, layout.scale);
+        final playheadX = (widget.playhead / duration * timelineWidth)
+            .clamp(0.0, timelineWidth);
+        final bodyHeight = _timelineBodyHeight(layout);
+        final scrollWidth = layout.scrollContentWidth(timelineWidth);
+        final lanes = _overlayLaneMetrics(layout);
+        final totalHeight = _timelineTotalHeight(layout);
+        final maxHeight = constraints.maxHeight;
+        final needsVerticalScroll =
+            maxHeight.isFinite && totalHeight > maxHeight + 0.01;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: _horizontalPadding,
-              ),
-              child: SizedBox(
-                width: contentWidth,
-                height: 18,
-                child: Stack(
-                  children: [
-                    for (var s = 0; s <= duration.ceil(); s += labelStep)
-                      Positioned(
-                        left: _leftGutter + s * pxPerSecond,
-                        top: 0,
-                        child: Text(
-                          TemplateEditorTheme.formatTime(s.toDouble()),
-                          style: const TextStyle(
-                            color: TemplateEditorTheme.textMuted,
-                            fontSize: 9,
-                          ),
-                        ),
-                      ),
-                  ],
+        final timeline = Padding(
+          padding: EdgeInsets.symmetric(horizontal: layout.horizontalPadding),
+          child: SizedBox(
+            height: totalHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildFixedLeftRail(layout, lanes),
+                Expanded(
+                  child: _buildScrollableTracks(
+                    layout: layout,
+                    timelineWidth: timelineWidth,
+                    scrollWidth: scrollWidth,
+                    duration: duration,
+                    pxPerSecond: pxPerSecond,
+                    labelStep: labelStep,
+                    playheadX: playheadX,
+                    bodyHeight: bodyHeight,
+                    lanes: lanes,
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: _horizontalPadding,
-              ),
-              child: SizedBox(
-                width: contentWidth,
-                height: bodyHeight.clamp(72.0, 260.0),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (onAddMedia != null)
-                      Positioned(
-                        left: 4,
-                        top: 0,
-                        height: _mediaRowHeight,
-                        child: _AddMediaButton(onTap: onAddMedia!),
-                      ),
-                    Positioned(
-                      left: _leftGutter,
-                      top: 0,
-                      width: timelineWidth,
-                      height: _mediaRowHeight,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (var i = 0; i < slots.length; i++)
-                                _SlotClipTile(
-                                  slot: slots[i],
-                                  fill: fills[slots[i].id],
-                                  width: slotWidths[i],
-                                  selected: i == selectedSlotIndex,
-                                  isLast: i == slots.length - 1,
-                                  onTap: onSlotTap == null
-                                      ? null
-                                      : () => onSlotTap!(i),
-                                ),
-                            ],
-                          ),
-                          if (onSeek != null)
-                            Positioned.fill(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.translucent,
-                                onTapDown: (d) {
-                                  final t = (d.localPosition.dx /
-                                              timelineWidth *
-                                              duration)
-                                      .clamp(0.0, duration);
-                                  onSeek!(t);
-                                },
-                                onHorizontalDragUpdate: (d) {
-                                  final t = (d.localPosition.dx /
-                                              timelineWidth *
-                                              duration)
-                                      .clamp(0.0, duration);
-                                  onSeek!(t);
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    ..._buildOverlayTracks(timelineWidth, duration),
-                    Positioned(
-                      left: _leftGutter + playheadX,
-                      top: 0,
-                      bottom: 0,
-                      child: IgnorePointer(
-                        child: Container(width: 2, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          ),
+        );
+
+        if (needsVerticalScroll) {
+          return SizedBox(
+            height: maxHeight,
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: timeline,
             ),
-          ],
+          );
+        }
+
+        return SizedBox(
+          height: maxHeight.isFinite ? math.min(totalHeight, maxHeight) : totalHeight,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: timeline,
+          ),
         );
       },
     );
   }
 
-  List<Widget> _buildOverlayTracks(
-    double timelineWidth,
-    double duration,
-  ) {
+  List<Widget> _buildOverlayTrackRows({
+    required _EditorTimelineLayout layout,
+    required List<({TemplateEditorOverlayKind kind, double top, double height})>
+        lanes,
+    required double timelineWidth,
+    required double duration,
+  }) {
+    final byKind = _segmentsByKind();
     final widgets = <Widget>[];
-    var top = _mediaRowHeight + 4.0;
 
-    for (final segment in overlaySegments) {
-      if (segment.showVolumeIcon) {
-        widgets.add(
-          Positioned(
-            left: 0,
-            top: top + (_trackHeight - 16) / 2,
-            child: const Icon(
-              LucideIcons.volume2,
-              color: TemplateEditorTheme.textMuted,
-              size: 16,
-            ),
-          ),
-        );
-      }
+    for (final lane in lanes) {
+      final segments = byKind[lane.kind];
+      if (segments == null || segments.isEmpty) continue;
+
+      final laneAssignments = _assignOverlapLanes(segments);
+
       widgets.add(
         Positioned(
-          left: _leftGutter,
-          top: top,
+          left: 0,
+          top: lane.top,
           width: timelineWidth,
-          height: _trackHeight,
-          child: _TimedTrackBar(
-            start: segment.start,
-            end: segment.end,
-            totalDuration: duration,
-            timelineWidth: timelineWidth,
-            label: segment.label,
-            color: segment.color,
-            icon: segment.icon,
-            editable: segment.editable && onOverlayRangeChanged != null,
-            onRangeChanged: segment.editable && onOverlayRangeChanged != null
-                ? (start, end) => onOverlayRangeChanged!(
-                      segment.kind,
-                      segment.id,
-                      start,
-                      end,
-                    )
-                : null,
+          height: lane.height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(layout.barRadius),
+                  ),
+                ),
+              ),
+              for (final segment in segments)
+                _TimedTrackBar(
+                  layout: layout,
+                  barTop: (laneAssignments[segment.id] ?? 0) *
+                      (layout.trackHeight + layout.trackGap),
+                  barHeight: layout.trackHeight,
+                  start: segment.start,
+                  end: segment.end,
+                  totalDuration: duration,
+                  timelineWidth: timelineWidth,
+                  label: segment.label,
+                  color: segment.color,
+                  icon: segment.icon,
+                  selected: segment.selected ||
+                      (widget.selectedOverlayId != null &&
+                          widget.selectedOverlayId == segment.id),
+                  editable:
+                      segment.editable && widget.onOverlayRangeChanged != null,
+                  onTap: widget.onOverlayTap == null
+                      ? null
+                      : () => widget.onOverlayTap!(segment.kind, segment.id),
+                  onRangeChanged:
+                      segment.editable && widget.onOverlayRangeChanged != null
+                      ? (start, end) => widget.onOverlayRangeChanged!(
+                            segment.kind,
+                            segment.id,
+                            start,
+                            end,
+                          )
+                      : null,
+                ),
+            ],
           ),
         ),
       );
-      top += _trackHeight + _trackGap;
     }
     return widgets;
+  }
+
+  static IconData _laneIcon(TemplateEditorOverlayKind kind) {
+    return switch (kind) {
+      TemplateEditorOverlayKind.audio => LucideIcons.volume2,
+      TemplateEditorOverlayKind.filter => LucideIcons.blend,
+      TemplateEditorOverlayKind.effect => LucideIcons.sparkles,
+      TemplateEditorOverlayKind.text => LucideIcons.type,
+      TemplateEditorOverlayKind.sticker => LucideIcons.sticker,
+    };
   }
 }
 
@@ -317,6 +737,9 @@ enum _Handle { start, end, move }
 
 class _TimedTrackBar extends StatefulWidget {
   const _TimedTrackBar({
+    required this.layout,
+    required this.barTop,
+    required this.barHeight,
     required this.start,
     required this.end,
     required this.totalDuration,
@@ -324,10 +747,15 @@ class _TimedTrackBar extends StatefulWidget {
     required this.label,
     required this.color,
     this.icon,
+    this.selected = false,
     this.editable = false,
+    this.onTap,
     this.onRangeChanged,
   });
 
+  final _EditorTimelineLayout layout;
+  final double barTop;
+  final double barHeight;
   final double start;
   final double end;
   final double totalDuration;
@@ -335,7 +763,9 @@ class _TimedTrackBar extends StatefulWidget {
   final String label;
   final Color color;
   final IconData? icon;
+  final bool selected;
   final bool editable;
+  final VoidCallback? onTap;
   final void Function(double start, double end)? onRangeChanged;
 
   @override
@@ -344,7 +774,6 @@ class _TimedTrackBar extends StatefulWidget {
 
 class _TimedTrackBarState extends State<_TimedTrackBar> {
   static const _minDuration = 0.2;
-  static const _handleWidth = 14.0;
 
   double? _dragStart;
   double? _dragEnd;
@@ -352,6 +781,42 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
 
   double get _start => _dragStart ?? widget.start;
   double get _end => _dragEnd ?? widget.end;
+
+  static double _safeClamp(double value, double min, double max) {
+    if (min > max) return max;
+    return value.clamp(min, max);
+  }
+
+  ({double left, double width}) _barGeometry() {
+    final layout = widget.layout;
+    final safeTotal = math.max(widget.totalDuration, 0.01);
+    final maxWidth = math.max(layout.minBarWidth, widget.timelineWidth);
+
+    final start = _safeClamp(_start, 0.0, safeTotal);
+    final end = _safeClamp(_end, start + 0.05, safeTotal);
+
+    var left = _safeClamp(
+      start / safeTotal * widget.timelineWidth,
+      0.0,
+      maxWidth - layout.minBarWidth,
+    );
+    var right = _safeClamp(
+      end / safeTotal * widget.timelineWidth,
+      left + layout.minBarWidth,
+      maxWidth,
+    );
+
+    if (right <= left) {
+      right = math.min(maxWidth, left + layout.minBarWidth);
+      left = math.max(0.0, right - layout.minBarWidth);
+    }
+
+    final width = math.max(
+      layout.minBarWidth,
+      math.min(right - left, maxWidth - left),
+    );
+    return (left: left, width: width);
+  }
 
   @override
   void didUpdateWidget(covariant _TimedTrackBar oldWidget) {
@@ -379,12 +844,12 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
 
     switch (_handle!) {
       case _Handle.start:
-        start = (start + deltaSeconds).clamp(0.0, end - _minDuration);
+        start = _safeClamp(start + deltaSeconds, 0.0, end - _minDuration);
       case _Handle.end:
-        end = (end + deltaSeconds).clamp(start + _minDuration, total);
+        end = _safeClamp(end + deltaSeconds, start + _minDuration, total);
       case _Handle.move:
         final len = end - start;
-        start = (start + deltaSeconds).clamp(0.0, total - len);
+        start = _safeClamp(start + deltaSeconds, 0.0, total - len);
         end = start + len;
     }
 
@@ -405,92 +870,113 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
 
   @override
   Widget build(BuildContext context) {
+    final layout = widget.layout;
     final safeTotal = math.max(widget.totalDuration, 0.01);
-    final left =
-        (_start / safeTotal * widget.timelineWidth).clamp(0.0, widget.timelineWidth);
-    final right = (_end / safeTotal * widget.timelineWidth)
-        .clamp(left + 8, widget.timelineWidth);
-    final width = math.max(8.0, right - left);
+    final geometry = _barGeometry();
+    final left = geometry.left;
+    final width = geometry.width;
+    final compact = width < layout.compactBarWidth;
+    final showHandles =
+        widget.editable && !compact && widget.onRangeChanged != null;
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          left: left,
-          width: width,
-          top: 0,
-          bottom: 0,
-          child: Container(
-            decoration: BoxDecoration(
-              color: widget.color.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: widget.color.withValues(alpha: 0.75)),
-            ),
-            child: Row(
-              children: [
-                if (widget.editable)
-                  _DragHandle(
-                    width: _handleWidth,
-                    onDragStart: () => _beginDrag(_Handle.start),
-                    onDragUpdate: (dx) {
-                      final dt = dx / widget.timelineWidth * safeTotal;
-                      _updateDrag(dt);
-                    },
-                    onDragEnd: _endDrag,
-                  ),
-                if (widget.icon != null) ...[
-                  Icon(widget.icon, color: Colors.white, size: 12),
-                  const SizedBox(width: 4),
-                ],
-                Expanded(
-                  child: widget.editable
-                      ? GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onHorizontalDragStart: (_) =>
-                              _beginDrag(_Handle.move),
-                          onHorizontalDragUpdate: (d) {
-                            final dt =
-                                d.delta.dx / widget.timelineWidth * safeTotal;
-                            _updateDrag(dt);
-                          },
-                          onHorizontalDragEnd: (_) => _endDrag(),
-                          child: Text(
-                            widget.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        )
-                      : Text(
-                          widget.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-                if (widget.editable)
-                  _DragHandle(
-                    width: _handleWidth,
-                    onDragStart: () => _beginDrag(_Handle.end),
-                    onDragUpdate: (dx) {
-                      final dt = dx / widget.timelineWidth * safeTotal;
-                      _updateDrag(dt);
-                    },
-                    onDragEnd: _endDrag,
-                  ),
-              ],
+    return Positioned(
+      left: left,
+      top: widget.barTop,
+      width: width,
+      height: widget.barHeight,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: widget.selected ? 0.62 : 0.48),
+            borderRadius: BorderRadius.circular(layout.barRadius),
+            border: Border.all(
+              color: widget.selected
+                  ? Colors.white
+                  : widget.color.withValues(alpha: 0.85),
+              width: widget.selected ? 2 : 1,
             ),
           ),
+          clipBehavior: Clip.hardEdge,
+          child: compact
+              ? Center(
+                  child: Icon(
+                    widget.icon ?? LucideIcons.minus,
+                    color: Colors.white,
+                    size: layout.iconSizeSm,
+                  ),
+                )
+              : Row(
+                  children: [
+                    if (showHandles)
+                      _DragHandle(
+                        width: layout.handleWidth,
+                        pillHeight: layout.handlePillHeight,
+                        onDragStart: () => _beginDrag(_Handle.start),
+                        onDragUpdate: (dx) {
+                          final dt = dx / widget.timelineWidth * safeTotal;
+                          _updateDrag(dt);
+                        },
+                        onDragEnd: _endDrag,
+                      ),
+                    if (widget.icon != null) ...[
+                      Icon(
+                        widget.icon,
+                        color: Colors.white,
+                        size: layout.iconSizeSm,
+                      ),
+                      SizedBox(width: layout.gapSm),
+                    ],
+                    Expanded(
+                      child: showHandles
+                          ? GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onHorizontalDragStart: (_) =>
+                                  _beginDrag(_Handle.move),
+                              onHorizontalDragUpdate: (d) {
+                                final dt = d.delta.dx /
+                                    widget.timelineWidth *
+                                    safeTotal;
+                                _updateDrag(dt);
+                              },
+                              onHorizontalDragEnd: (_) => _endDrag(),
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: layout.sp(10),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              widget.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: layout.sp(10),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                    if (showHandles)
+                      _DragHandle(
+                        width: layout.handleWidth,
+                        pillHeight: layout.handlePillHeight,
+                        onDragStart: () => _beginDrag(_Handle.end),
+                        onDragUpdate: (dx) {
+                          final dt = dx / widget.timelineWidth * safeTotal;
+                          _updateDrag(dt);
+                        },
+                        onDragEnd: _endDrag,
+                      ),
+                  ],
+                ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -498,12 +984,14 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
 class _DragHandle extends StatelessWidget {
   const _DragHandle({
     required this.width,
+    required this.pillHeight,
     required this.onDragStart,
     required this.onDragUpdate,
     required this.onDragEnd,
   });
 
   final double width;
+  final double pillHeight;
   final VoidCallback onDragStart;
   final ValueChanged<double> onDragUpdate;
   final VoidCallback onDragEnd;
@@ -520,7 +1008,7 @@ class _DragHandle extends StatelessWidget {
         child: Center(
           child: Container(
             width: 3,
-            height: 14,
+            height: pillHeight,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(2),
@@ -533,9 +1021,17 @@ class _DragHandle extends StatelessWidget {
 }
 
 class _AddMediaButton extends StatelessWidget {
-  const _AddMediaButton({required this.onTap});
+  const _AddMediaButton({
+    required this.onTap,
+    required this.width,
+    required this.height,
+    required this.iconSize,
+  });
 
   final VoidCallback onTap;
+  final double width;
+  final double height;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -545,10 +1041,10 @@ class _AddMediaButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        child: const SizedBox(
-          width: 44,
-          height: 56,
-          child: Icon(LucideIcons.plus, color: Colors.black, size: 22),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Icon(LucideIcons.plus, color: Colors.black, size: iconSize),
         ),
       ),
     );
@@ -561,6 +1057,10 @@ class _SlotClipTile extends StatelessWidget {
     required this.fill,
     required this.width,
     required this.selected,
+    required this.slotGap,
+    required this.barRadius,
+    required this.labelFontSize,
+    required this.iconSize,
     this.isLast = false,
     this.onTap,
   });
@@ -570,6 +1070,10 @@ class _SlotClipTile extends StatelessWidget {
   final double width;
   final bool selected;
   final bool isLast;
+  final double slotGap;
+  final double barRadius;
+  final double labelFontSize;
+  final double iconSize;
   final VoidCallback? onTap;
 
   @override
@@ -579,17 +1083,17 @@ class _SlotClipTile extends StatelessWidget {
     final file = fill?.localFile;
 
     return Padding(
-      padding: EdgeInsets.only(right: isLast ? 0 : TemplateEditorTimeline._slotGap),
+      padding: EdgeInsets.only(right: isLast ? 0 : slotGap),
       child: Material(
         color: TemplateEditorTheme.panel,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(barRadius),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(barRadius),
           child: Container(
             width: width,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(barRadius),
               border: Border.all(
                 color: selected
                     ? TemplateEditorTheme.slotSelectedBorder
@@ -604,11 +1108,11 @@ class _SlotClipTile extends StatelessWidget {
                 if (file != null && hasMedia)
                   _SlotThumbnail(file: file, isVideo: fill!.isLocalVideo)
                 else
-                  const Center(
+                  Center(
                     child: Icon(
                       LucideIcons.imagePlus,
                       color: TemplateEditorTheme.textMuted,
-                      size: 22,
+                      size: iconSize,
                     ),
                   ),
                 Positioned(
@@ -623,9 +1127,9 @@ class _SlotClipTile extends StatelessWidget {
                     ),
                     child: Text(
                       '${dur.toStringAsFixed(1)}s',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 9,
+                        fontSize: labelFontSize,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

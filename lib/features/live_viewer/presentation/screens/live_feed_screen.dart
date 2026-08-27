@@ -6,20 +6,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/services/live_feed_refresh_bus.dart';
-import '../../../../core/theme/cubit/theme_cubit.dart';
 import '../../../live/presentation/utils/live_screen_wakelock.dart';
 import '../bloc/live_feed/live_feed_bloc.dart';
 import '../bloc/live_feed/live_feed_event.dart';
 import '../bloc/live_feed/live_feed_state.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
 import '../bloc/live_viewer/live_viewer_event.dart';
-import '../bloc/live_viewer/live_viewer_state.dart';
 import '../di/live_viewer_injector.dart' as di;
 import '../widgets/live_room_page.dart';
+import '../../domain/entities/live_entity.dart';
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../domain/entities/live_entity.dart';
 
 /// TikTok LIVE home: full-screen vertical swipe between running lives.
 ///
@@ -77,6 +75,11 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       LiveScreenWakelock.enable();
+      final lives = _feedBloc.state.lives;
+      if (lives.isNotEmpty) {
+        final index = _currentIndex.clamp(0, lives.length - 1);
+        _viewerBloc.add(LiveViewerActivated(lives[index]));
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _viewerBloc.add(const LiveViewerDeactivated());
@@ -134,10 +137,8 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
       }
 
       final current = lives[index];
-      if (_viewerBloc.activeLiveId != null &&
-          _viewerBloc.activeLiveId != current.id) {
-        _viewerBloc.add(const LiveViewerDeactivated());
-      }
+      // Activation tears down the old room as one serialized operation. A
+      // separate Deactivated event can race it and disconnect the new page.
       _viewerBloc.add(LiveViewerActivated(current));
     });
   }
@@ -172,13 +173,8 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
             },
             listener: (context, next) {
               if (next.lives.isEmpty) return;
-              final idx = _currentIndex.clamp(0, next.lives.length - 1);
-              final prevLivesCount = 0;
-              if (next.lives.length != prevLivesCount &&
-                  (_viewerBloc.activeLiveId == null ||
-                      !next.lives.any(
-                        (l) => l.id == _viewerBloc.activeLiveId,
-                      ))) {
+              if (_viewerBloc.activeLiveId == null ||
+                  !next.lives.any((l) => l.id == _viewerBloc.activeLiveId)) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted) return;
                   final lives = _feedBloc.state.lives;
@@ -196,7 +192,23 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
         ],
         child: Scaffold(
           backgroundColor: isDark ? Colors.black : Colors.white,
+          // The live canvas remains full-screen while the composer handles
+          // its own keyboard inset. Resizing this scaffold moves the video,
+          // chrome, comments, and every bottom-anchored overlay together.
+          resizeToAvoidBottomInset: false,
           body: BlocBuilder<LiveFeedBloc, LiveFeedState>(
+            // The silent refresh runs every 8 seconds and comes back with new
+            // viewer counts almost every time. Without this the whole PageView
+            // — every room page, its video surface and its overlays — was
+            // rebuilt on that timer for the entire watch session. Only the set
+            // of rooms and the load/error state change what this widget draws;
+            // each room renders its own live counters from LiveViewerBloc.
+            buildWhen: (prev, next) =>
+                prev.isLoading != next.isLoading ||
+                prev.isLoadingMore != next.isLoadingMore ||
+                prev.hasMore != next.hasMore ||
+                prev.error != next.error ||
+                !_sameRooms(prev.lives, next.lives),
             builder: (context, feed) {
               return _buildBody(feed);
             },
@@ -204,6 +216,17 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
         ),
       ),
     );
+  }
+
+  /// Same rooms in the same order. Identity only: a changed viewer count is
+  /// not a reason to rebuild the feed.
+  static bool _sameRooms(List<LiveEntity> a, List<LiveEntity> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
   }
 
   Widget _buildBody(LiveFeedState feed) {

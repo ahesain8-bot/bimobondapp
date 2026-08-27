@@ -60,22 +60,7 @@ class TemplateCompositionEngine {
     );
   }
 
-  TemplateTimeline buildTimeline(CompositionSession session) {
-    return timelineEngine.build(
-      recipe: session.recipe,
-      fills: session.fills,
-      slotFilterOverrides: session.slotFilterOverrides,
-      slotEffectOverrides: session.slotEffectOverrides,
-      userTexts: session.userTexts,
-      userStickers: session.userStickers,
-      userAudios: session.userAudios,
-      userAudioTiming: session.userAudioTiming,
-      userSound: session.userSoundCleared ? null : session.userSound,
-      clearRecipeSound: session.userSoundCleared,
-      userSoundSegmentStartMs: session.userSoundSegmentStartMs,
-      userSoundSegmentEndMs: session.userSoundSegmentEndMs,
-    );
-  }
+  TemplateTimeline buildTimeline(CompositionSession session) => session.timeline;
 
   PreviewEngine preview(CompositionSession session) {
     final timeline = buildTimeline(session);

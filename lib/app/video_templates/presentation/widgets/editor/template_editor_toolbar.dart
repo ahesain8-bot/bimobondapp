@@ -29,7 +29,7 @@ class TemplateEditorToolbar extends StatelessWidget {
         _ToolItem(
           panel: TemplateEditorPanel.audio,
           icon: LucideIcons.music,
-          label: 'Audio',
+          label: 'Sound',
           enabled: true,
         ),
       if (editable.text)

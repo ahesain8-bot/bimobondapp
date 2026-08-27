@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-/// Floating "Join my Fan Club" CTA — yellow glow border + heart (screenshot).
+/// Floating "Join my Fan Club" CTA — compact frosted header chip.
 class FanClubJoinButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -15,43 +15,34 @@ class FanClubJoinButton extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                height: 28,
-                padding: const EdgeInsets.fromLTRB(8, 0, 10, 0),
+                height: 20,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE11D48),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFFFD54F),
-                    width: 1.8,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFD54F).withValues(alpha: 0.45),
-                      blurRadius: 8,
-                      spreadRadius: 0.5,
+                  color: Colors.black.withValues(alpha: 0.42),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: const Row(
+                  textDirection: TextDirection.ltr,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.favorite_rounded,
+                      color: Color(0xFFFFCC33),
+                      size: 12,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Join my Fan Club',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1,
+                      ),
                     ),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'Join my Fan Club',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-              ),
-              const Positioned(
-                right: -10,
-                top: -14,
-                child: Text('💖', style: TextStyle(fontSize: 22)),
-              ),
-              const Positioned(
-                right: 8,
-                top: -10,
-                child: Text('🌹', style: TextStyle(fontSize: 14)),
               ),
             ],
           ),

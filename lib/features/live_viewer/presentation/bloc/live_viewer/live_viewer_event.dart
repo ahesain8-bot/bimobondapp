@@ -85,6 +85,15 @@ class LiveViewerModerationBannerConsumed extends LiveViewerEvent {
   const LiveViewerModerationBannerConsumed();
 }
 
+class LiveViewerJoinSuccessConsumed extends LiveViewerEvent {
+  const LiveViewerJoinSuccessConsumed();
+}
+
+/// Debounced REST refresh for both sides of an active PK battle.
+class LiveViewerBattleSupportersRefreshRequested extends LiveViewerEvent {
+  const LiveViewerBattleSupportersRefreshRequested();
+}
+
 class LiveViewerSocketEventReceived extends LiveViewerEvent {
   final dynamic event;
 

@@ -74,7 +74,8 @@ class GiftAnimationOverlay extends StatefulWidget {
     }
 
     // Prefer the root navigator overlay so gifts sit above sheets/dialogs.
-    final overlay = Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
+    final overlay =
+        Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
         Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return Future.value();
 
@@ -471,6 +472,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     return false;
   }
 
+  /// LARGE gifts stay prominent without obscuring the host, battle, and chat.
+  bool get _isLargeStage => !_isSmall && !_isMedium;
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
@@ -493,6 +497,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     }
 
     final media = SizedBox(
+      key: const ValueKey('gift-animation-stage'),
       width: stageWidth,
       height: stageHeight,
       child: _buildMedia(),
@@ -505,15 +510,13 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     Widget animatedStage;
     if (isLarge) {
       animatedStage = SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: _entranceController,
-            curve: Curves.easeOutCubic,
-          ),
-        ),
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(
+              CurvedAnimation(
+                parent: _entranceController,
+                curve: Curves.easeOutCubic,
+              ),
+            ),
         child: FadeTransition(
           opacity: CurvedAnimation(
             parent: _entranceController,
@@ -567,7 +570,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       // at the viewport edge, and the root overlay places it above the route's
       // bottom controls rather than reserving space above them.
       topPosition = null;
-      bottomPosition = 0;
+      bottomPosition = (screenSize.height * 0.14).clamp(92.0, 150.0);
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
