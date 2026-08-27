@@ -20,6 +20,7 @@ enum SocketEventType {
   liveGuestUpdate,
   liveBattle,
   liveHourlyRank,
+  liveTopGifters,
   reconnecting,
   reconnected,
   networkLost,
@@ -262,6 +263,22 @@ class LiveHourlyRankEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, rank];
+}
+
+/// `liveTopGiftersUpdated` — the real top supporters for this stream session.
+/// The header only needs the first three avatars; the full leaderboard remains
+/// available from `GET /lives/:id/leaderboard/gifters` for the ranking sheet.
+class LiveTopGiftersUpdatedEvent extends SocketEvent {
+  final List<String> avatarUrls;
+
+  const LiveTopGiftersUpdatedEvent({
+    required super.liveId,
+    required this.avatarUrls,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveTopGifters);
+
+  @override
+  List<Object?> get props => [...super.props, avatarUrls];
 }
 
 class NetworkLostEvent extends SocketEvent {

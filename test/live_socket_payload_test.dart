@@ -284,4 +284,45 @@ void main() {
       expect(SocketMapper.guestUpdateEvent({'liveId': 'l9'}, null), isNull);
     });
   });
+
+  group('viewer top supporters socket event', () {
+    test('maps the first three real gifter avatars in rank order', () {
+      final event = SocketMapper.topGiftersEvent({
+        'liveId': 'live-1',
+        'window': 'session',
+        'data': [
+          {
+            'rank': 1,
+            'user': {'id': 'u1', 'avatarUrl': 'https://cdn.test/one.jpg'},
+          },
+          {
+            'rank': 2,
+            'user': {'id': 'u2', 'avatarUrl': 'https://cdn.test/two.jpg'},
+          },
+          {
+            'rank': 3,
+            'user': {'id': 'u3', 'avatarUrl': 'https://cdn.test/three.jpg'},
+          },
+          {
+            'rank': 4,
+            'user': {'id': 'u4', 'avatarUrl': 'https://cdn.test/four.jpg'},
+          },
+        ],
+      }, null);
+
+      expect(event, isA<LiveTopGiftersUpdatedEvent>());
+      expect(event!.avatarUrls, [
+        'https://cdn.test/one.jpg',
+        'https://cdn.test/two.jpg',
+        'https://cdn.test/three.jpg',
+      ]);
+    });
+
+    test('uses the joined live when the event omits liveId', () {
+      final event = SocketMapper.topGiftersEvent({'data': const []}, 'live-2');
+
+      expect(event!.liveId, 'live-2');
+      expect(event.avatarUrls, isEmpty);
+    });
+  });
 }

@@ -134,7 +134,7 @@ class RealGiftRepository implements GiftRepository {
     try {
       final payload = await _api.get(
         ApiEndpoints.liveGiftersLeaderboard(liveId),
-        query: {'window': 'session'},
+        query: {'window': 'session', 'limit': '$limit'},
       );
 
       final data = payload['data'];

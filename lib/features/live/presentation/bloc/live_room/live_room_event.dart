@@ -312,6 +312,12 @@ class LiveRoomBattleChanged extends LiveRoomEvent {
   final LiveBattle? battle;
 }
 
+/// Re-reads the supporter leaderboards this room draws — this live's, and the
+/// opponent's while a battle is active.
+class LiveRoomSupportersRefreshRequested extends LiveRoomEvent {
+  const LiveRoomSupportersRefreshRequested();
+}
+
 /// Gallery list changed — refresh gallery counts chip.
 class LiveRoomGalleryChanged extends LiveRoomEvent {
   const LiveRoomGalleryChanged();

@@ -21,7 +21,7 @@ import 'fake_socket_service.dart' show SocketService;
 /// Server → client (`live_{id}`): liveComment, liveCommentDeleted,
 /// liveCommentPinned, liveCommentUnpinned, liveModeration, liveGift,
 /// liveLike, liveViewers, liveEnded, userJoined, liveHourlyRankUpdated,
-/// livePopularStatus + reconnect lifecycle.
+/// liveTopGiftersUpdated, livePopularStatus + reconnect lifecycle.
 class RealSocketService implements SocketService {
   RealSocketService({Future<String?> Function()? idTokenProvider})
     : _idTokenProvider = idTokenProvider ?? _defaultTokenProvider;
@@ -237,6 +237,11 @@ class RealSocketService implements SocketService {
     // sheet must not be frozen at whatever it was when the sheet opened.
     _on(socket, 'liveHourlyRankUpdated', (data) {
       final event = SocketMapper.hourlyRankEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveTopGiftersUpdated', (data) {
+      final event = SocketMapper.topGiftersEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 
