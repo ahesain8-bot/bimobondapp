@@ -182,6 +182,11 @@ const Duration _kVideoWatchdogTick = Duration(milliseconds: 500);
 /// two of rebuffering mid-animation is normal and must not end the overlay.
 const Duration _kVideoMaxStall = Duration(seconds: 6);
 
+// The auction input is 8px top padding + 40px control row + 16px bottom
+// padding. Use that shared bottom-control envelope for LARGE gift placement,
+// with only a small visual gap above it.
+const double _kLargeGiftBottomControlsClearance = 68.0;
+
 class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     with TickerProviderStateMixin {
   late final AnimationController _entranceController;
@@ -412,17 +417,12 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
+    final bottomSafeArea = MediaQuery.paddingOf(context).bottom;
     final isSmall = _isSmall;
     final isMedium = _isMedium;
     final isLarge = !isSmall && !isMedium;
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
-
-    // A LARGE video gift is authored full-bleed portrait (the occasion MP4s are
-    // 496x864 with the composition running edge to edge), so it gets the whole
-    // screen the way TikTok plays its fullscreen gifts. Cover-cropping one into
-    // a square at the bottom threw away roughly 40% of every frame.
-    final isFullscreenVideo = isLarge && _kind == _GiftMediaKind.video;
 
     final double stageWidth;
     final double stageHeight;
@@ -430,11 +430,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       stageWidth = stageHeight = (screenSize.width * 0.28).clamp(80.0, 120.0);
     } else if (isMedium) {
       stageWidth = stageHeight = (screenSize.width * 0.72).clamp(240.0, 340.0);
-    } else if (isFullscreenVideo) {
-      stageWidth = screenSize.width;
-      stageHeight = screenSize.height;
     } else {
-      // Lottie stages stay 1:1 — those compositions are authored square.
+      // LARGE gifts keep the existing bounded square stage. The media widget
+      // fits its source into this stage without changing the source itself.
       stageWidth = stageHeight = screenSize.width.clamp(0.0, screenSize.height);
     }
 
@@ -443,9 +441,20 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       height: stageHeight,
       child: _buildMedia(),
     );
-    final stage = _kind == _GiftMediaKind.video
-        ? RepaintBoundary(child: media)
-        : _withEdgeFade(media);
+    final Widget stage;
+    if (isLarge) {
+      // A LARGE gift covers most of the frame, so a straight top edge reads as
+      // a rectangle laid over the live feed. Masking the stage's alpha
+      // dissolves that edge into the video underneath. Video is masked here
+      // too: unlike the [BlendMode.screen] case in the class note, `dstIn`
+      // only multiplies the gift layer's own alpha and never samples the live
+      // feed texture, so no two textures are blended together.
+      stage = _withTopBlend(media);
+    } else if (_kind == _GiftMediaKind.video) {
+      stage = RepaintBoundary(child: media);
+    } else {
+      stage = _withEdgeFade(media);
+    }
 
     Widget animatedStage;
     if (isLarge) {
@@ -488,7 +497,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     // Position calculation:
     // - SMALL: very small, left-aligned above comments and highest price card (bottom: 230px, left/right: 16px)
     // - MEDIUM: center of screen
-    // - LARGE: bottom of screen
+    // - LARGE: bottom-anchored above the bottom controls
     final double? topPosition;
     final double? bottomPosition;
     final double? leftPosition;
@@ -507,14 +516,12 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       bottomPosition = null;
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
-    } else if (isFullscreenVideo) {
-      topPosition = 0;
-      bottomPosition = null;
-      leftPosition = 0;
-      rightPosition = null;
     } else {
+      // Keep the existing bounded stage size, but place LARGE gifts in the
+      // lower part of the live view, directly above the bottom controls.
       topPosition = null;
-      bottomPosition = 0;
+      bottomPosition =
+          bottomSafeArea + _kLargeGiftBottomControlsClearance;
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
@@ -548,6 +555,33 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
   }
 
+  /// Dissolves the upper part of a LARGE gift into the live video behind it.
+  ///
+  /// [BlendMode.dstIn] multiplies the gift's own alpha by the gradient's, so an
+  /// asset that is already transparent keeps its transparency and the body of
+  /// the animation stays fully opaque — a mask, not an opacity change. Only the
+  /// gradient's alpha is read; its colour channels are irrelevant.
+  Widget _withTopBlend(Widget child) {
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        // Eased ramp rather than one linear step: a straight ramp leaves a
+        // visible seam where the gradient meets the opaque body.
+        colors: [
+          Color(0x00000000),
+          Color(0x26000000),
+          Color(0x8C000000),
+          Color(0xFF000000),
+          Color(0xFF000000),
+        ],
+        stops: [0.0, 0.12, 0.22, 0.34, 1.0],
+      ).createShader(bounds),
+      child: RepaintBoundary(child: child),
+    );
+  }
+
   /// Fades the top 20%; softens the bottom slightly while keeping it more opaque.
   Widget _withEdgeFade(Widget child) {
     return ShaderMask(
@@ -568,7 +602,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
   }
 
+  BoxFit get _mediaFit => _isSmall || _isMedium ? BoxFit.cover : BoxFit.contain;
+
   Widget _buildMedia() {
+    // LARGE media stays inside the transparent stage so its authored bounds
+    // remain visible. SMALL/MEDIUM retain their existing cover behavior.
     switch (_kind) {
       case _GiftMediaKind.lottie:
         final composition = _composition;
@@ -577,7 +615,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           return Lottie(
             composition: composition,
             controller: controller,
-            fit: BoxFit.cover,
+            fit: _mediaFit,
             alignment: Alignment.center,
             addRepaintBoundary: true,
           );
@@ -594,10 +632,10 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           // `initialize()` opens the stream and decodes the first frame.
           return const SizedBox.expand();
         }
-        // Cover whatever stage this kind was given — a fullscreen rect for a
-        // LARGE gift, a square for MEDIUM/SMALL.
+        // Fit the media into the bounded stage while preserving its full
+        // authored aspect ratio.
         return FittedBox(
-          fit: BoxFit.cover,
+          fit: _mediaFit,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
             width: controller.value.size.width,
@@ -617,7 +655,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         imageUrl: thumb,
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: _mediaFit,
       );
     }
     return const Center(
