@@ -36,6 +36,19 @@ class GiftAnimationOverlay extends StatefulWidget {
   static Object? _activeOwner;
   static VoidCallback? _activeDismiss;
   static String? _activeKey;
+  static String? _activeUrl;
+  static bool _activeIsLarge = false;
+
+  /// LARGE is the default size: only an explicit SMALL/MEDIUM opts out.
+  ///
+  /// Needed before a [State] exists, because a LARGE gift stays on screen
+  /// until it is tapped and therefore has to survive the events that follow.
+  static bool _isLargeSize(dynamic size) {
+    final raw = size is String ? size.trim().toUpperCase() : size;
+    if (raw == GiftCatalogSize.small || raw == 'SMALL') return false;
+    if (raw == GiftCatalogSize.medium || raw == 'MEDIUM') return false;
+    return true;
+  }
 
   /// Inserts above every route layer (root overlay, after gift sheet closes).
   ///
@@ -61,7 +74,8 @@ class GiftAnimationOverlay extends StatefulWidget {
     }
 
     // Prefer the root navigator overlay so gifts sit above sheets/dialogs.
-    final overlay = Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
+    final overlay =
+        Navigator.maybeOf(context, rootNavigator: true)?.overlay ??
         Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return Future.value();
 
@@ -77,10 +91,15 @@ class GiftAnimationOverlay extends StatefulWidget {
     // was still playing and start it over — the occasion gifts are 15s MP4s,
     // and that is what cut them off after about a second and churned an
     // ExoPlayer texture over the live feed. A duplicate is now a no-op.
-    if (dedupeKey != null &&
-        dedupeKey.isNotEmpty &&
-        dedupeKey == _activeKey &&
-        _activeEntry != null) {
+    final duplicateKey =
+        dedupeKey != null && dedupeKey.isNotEmpty && dedupeKey == _activeKey;
+    // A LARGE gift now waits for the viewer's tap, so it stays on screen far
+    // longer than those events take to arrive — and their keys disagree when
+    // one payload carries the profile name and another falls back to 'User',
+    // which let a duplicate through to tear the animation down and restart it.
+    // The media URL is the one identity all three events agree on.
+    final duplicateLargeMedia = _activeIsLarge && resolved == _activeUrl;
+    if (_activeEntry != null && (duplicateKey || duplicateLargeMedia)) {
       return Future.value();
     }
 
@@ -97,6 +116,8 @@ class GiftAnimationOverlay extends StatefulWidget {
         _activeOwner = null;
         _activeDismiss = null;
         _activeKey = null;
+        _activeUrl = null;
+        _activeIsLarge = false;
       }
       if (removed) return;
       removed = true;
@@ -131,6 +152,8 @@ class GiftAnimationOverlay extends StatefulWidget {
     _activeOwner = owner;
     _activeDismiss = remove;
     _activeKey = dedupeKey;
+    _activeUrl = resolved;
+    _activeIsLarge = _isLargeSize(size);
     overlay.insert(entry);
 
     // Second safety net behind the owner's own dismiss: tie the entry to the
@@ -161,6 +184,8 @@ class GiftAnimationOverlay extends StatefulWidget {
     _activeEntry = null;
     _activeOwner = null;
     _activeKey = null;
+    _activeUrl = null;
+    _activeIsLarge = false;
     if (active == null) return;
     // Unmounted entries are removed too — see `remove()` above.
     try {
@@ -219,11 +244,16 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         unawaited(_initVideo());
         break;
       case _GiftMediaKind.image:
-        // Animated WebP often needs a bit longer on screen.
-        final hold = _isWebp
-            ? const Duration(milliseconds: 2800)
-            : const Duration(milliseconds: 1600);
-        _scheduleFinish(hold);
+        // A LARGE gift is ended by the viewer's tap, never by a clock. This
+        // hold is what took a LARGE gift off screen after ~1.6s whenever its
+        // media resolved to a still (no `animationUrl`, so the thumbnail).
+        if (!_isLarge) {
+          // Animated WebP often needs a bit longer on screen.
+          final hold = _isWebp
+              ? const Duration(milliseconds: 2800)
+              : const Duration(milliseconds: 1600);
+          _scheduleFinish(hold);
+        }
         break;
     }
   }
@@ -255,7 +285,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
     if (composition == null) {
       setState(() => _lottieFailed = true);
-      _scheduleFinish(const Duration(milliseconds: 1600));
+      if (!_isLarge) _scheduleFinish(const Duration(milliseconds: 1600));
       return;
     }
 
@@ -265,6 +295,13 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
     _lottieController = controller;
     setState(() => _composition = composition);
+
+    if (_isLarge) {
+      // Loops instead of ending: reaching the last frame is not a reason to
+      // take a LARGE gift down, and a frozen final frame reads as a bug.
+      unawaited(controller.repeat());
+      return;
+    }
 
     await controller.forward();
     if (!mounted) return;
@@ -286,16 +323,23 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         _videoController = null;
         return;
       }
-      await controller.setLooping(false);
+      // A LARGE gift loops until it is tapped, so it neither ends on its own
+      // nor freezes on the last frame.
+      await controller.setLooping(_isLarge);
       await controller.setVolume(1);
       setState(() {});
       await controller.play();
 
+      if (_isLarge) {
+        // Deliberately no completion listener and no stall watchdog: both end
+        // the overlay, and for a LARGE gift only the viewer's tap may.
+        return;
+      }
+
       void onTick() {
         final value = controller!.value;
         if (!value.isInitialized || value.duration == Duration.zero) return;
-        if (value.position >=
-            value.duration - const Duration(milliseconds: 80)) {
+        if (value.isCompleted || value.position >= value.duration) {
           controller.removeListener(onTick);
           _finish();
         }
@@ -310,7 +354,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       _videoController = null;
       if (!mounted) return;
       setState(() => _videoFailed = true);
-      _scheduleFinish(const Duration(milliseconds: 1600));
+      // A failed LARGE gift still shows its fallback until tapped, rather than
+      // flashing it for 1.6s and vanishing.
+      if (!_isLarge) _scheduleFinish(const Duration(milliseconds: 1600));
     }
   }
 
@@ -332,8 +378,25 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       }
       final value = controller.value;
       if (!value.isInitialized) {
+        return;
+      }
+      if (value.hasError) {
         timer.cancel();
         _finish();
+        return;
+      }
+      if (value.isCompleted ||
+          (value.duration > Duration.zero &&
+              value.position >= value.duration)) {
+        timer.cancel();
+        return;
+      }
+      // A player can report a stable position while it is opening the stream,
+      // waiting for buffered data, or briefly transitioning its play state.
+      // None of those states means the animation has ended.
+      if (value.isBuffering || !value.isPlaying) {
+        lastPosition = value.position;
+        stalledFor = Duration.zero;
         return;
       }
       if (value.position > lastPosition) {
@@ -428,12 +491,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     } else if (isMedium) {
       stageWidth = stageHeight = (screenSize.width * 0.72).clamp(240.0, 340.0);
     } else {
-      // Large gifts used to be a screen-sized portrait video with BoxFit.cover,
-      // which hid the stream for the full animation. Keep the premium effect
-      // large, but reserve more than half of the live room for the people and
-      // controls underneath it.
-      stageWidth = screenSize.width * 0.88;
-      stageHeight = screenSize.height * 0.48;
+      // LARGE gifts keep the existing bounded square stage. The media widget
+      // fits its source into this stage without changing the source itself.
+      stageWidth = stageHeight = screenSize.width.clamp(0.0, screenSize.height);
     }
 
     final media = SizedBox(
@@ -442,22 +502,21 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       height: stageHeight,
       child: _buildMedia(),
     );
-    final stage = _kind == _GiftMediaKind.video || isLarge
-        ? RepaintBoundary(child: media)
-        : _withEdgeFade(media);
+    // This is the shared main-branch composition for every media kind. The
+    // stage stays square, while BoxFit.cover lets each asset fill that stage
+    // using its own aspect ratio without changing the overlay geometry.
+    final stage = _withEdgeFade(media);
 
     Widget animatedStage;
     if (isLarge) {
       animatedStage = SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: _entranceController,
-            curve: Curves.easeOutCubic,
-          ),
-        ),
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(
+              CurvedAnimation(
+                parent: _entranceController,
+                curve: Curves.easeOutCubic,
+              ),
+            ),
         child: FadeTransition(
           opacity: CurvedAnimation(
             parent: _entranceController,
@@ -487,7 +546,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     // Position calculation:
     // - SMALL: very small, left-aligned above comments and highest price card (bottom: 230px, left/right: 16px)
     // - MEDIUM: center of screen
-    // - LARGE: bottom of screen
+    // - LARGE: lower-edge anchored through the bottom controls
     final double? topPosition;
     final double? bottomPosition;
     final double? leftPosition;
@@ -507,40 +566,69 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     } else {
-      // Centre the bounded stage slightly below the middle, clear of both the
-      // top host chrome and the bottom composer/gift controls.
+      // Match the known-good main-branch composition: the shared stage ends
+      // at the viewport edge, and the root overlay places it above the route's
+      // bottom controls rather than reserving space above them.
       topPosition = null;
       bottomPosition = (screenSize.height * 0.14).clamp(92.0, 150.0);
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
 
-    // The entry sits in the *root* overlay, on top of the live room and of any
-    // sheet. It must therefore never take a pointer: this used to be a
-    // full-screen `HitTestBehavior.opaque` GestureDetector wired to `_finish`,
-    // which swallowed every tap in the room for the whole animation *and*
-    // ended the gift on the first one. In a live people tap constantly (hearts,
-    // the comment field, the gift button), so a 15s occasion gift died about a
-    // second in. TikTok's fullscreen gifts are pure decoration — taps go
-    // straight through to the UI underneath.
-    return IgnorePointer(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned(
-              left: leftPosition,
-              right: rightPosition,
-              top: topPosition,
-              bottom: bottomPosition,
-              width: stageWidth,
-              height: stageHeight,
-              child: animatedStage,
+    // The root overlay must also preserve the established tap-to-dismiss
+    // behavior. Translucent hit testing lets the route controls underneath
+    // continue to receive their normal interactions while this entry calls
+    // `_finish` for the existing gift-dismiss gesture.
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _finish,
+              behavior: HitTestBehavior.translucent,
+              child: const SizedBox.expand(),
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            left: leftPosition,
+            right: rightPosition,
+            top: topPosition,
+            bottom: bottomPosition,
+            width: stageWidth,
+            height: stageHeight,
+            child: animatedStage,
+          ),
+        ],
       ),
+    );
+  }
+
+  /// Dissolves the upper part of a LARGE gift into the live video behind it.
+  ///
+  /// [BlendMode.dstIn] multiplies the gift's own alpha by the gradient's, so an
+  /// asset that is already transparent keeps its transparency and the body of
+  /// the animation stays fully opaque — a mask, not an opacity change. Only the
+  /// gradient's alpha is read; its colour channels are irrelevant.
+  Widget _withTopBlend(Widget child) {
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        // Eased ramp rather than one linear step: a straight ramp leaves a
+        // visible seam where the gradient meets the opaque body.
+        colors: [
+          Color(0x00000000),
+          Color(0x26000000),
+          Color(0x8C000000),
+          Color(0xFF000000),
+          Color(0xFF000000),
+        ],
+        stops: [0.0, 0.12, 0.22, 0.34, 1.0],
+      ).createShader(bounds),
+      child: RepaintBoundary(child: child),
     );
   }
 
@@ -564,6 +652,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
   }
 
+  BoxFit get _mediaFit => BoxFit.cover;
+
   Widget _buildMedia() {
     switch (_kind) {
       case _GiftMediaKind.lottie:
@@ -573,9 +663,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           return Lottie(
             composition: composition,
             controller: controller,
-            // A large stage is rectangular; containing the artwork prevents
-            // its most important edges from being cropped.
-            fit: _isLargeStage ? BoxFit.contain : BoxFit.cover,
+            fit: _mediaFit,
             alignment: Alignment.center,
             addRepaintBoundary: true,
           );
@@ -592,10 +680,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           // `initialize()` opens the stream and decodes the first frame.
           return const SizedBox.expand();
         }
-        // Large portrait occasion videos must be contained in their bounded
-        // stage. SMALL/MEDIUM assets remain full-bleed inside their square.
+        // Fit the media into the bounded stage while preserving its full
+        // authored aspect ratio.
         return FittedBox(
-          fit: _isLargeStage ? BoxFit.contain : BoxFit.cover,
+          fit: _mediaFit,
+          alignment: Alignment.center,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
             width: controller.value.size.width,
@@ -615,11 +704,15 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         imageUrl: thumb,
         width: double.infinity,
         height: double.infinity,
-        fit: _isLargeStage ? BoxFit.contain : BoxFit.cover,
+        fit: _mediaFit,
+        alignment: Alignment.center,
+        transparentPlaceholder: _isLarge,
       );
     }
     return const Center(
       child: Icon(Icons.card_giftcard, size: 120, color: Colors.white),
     );
   }
+
+  bool get _isLarge => !_isSmall && !_isMedium;
 }
