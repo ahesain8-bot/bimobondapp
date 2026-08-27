@@ -8,6 +8,7 @@ import '../../../../../core/utils/build_safe_notifier.dart';
 import '../../../../../core/utils/livekit_participant_match.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/widgets/stage_tiles.dart';
+import '../../../../../core/widgets/safe_network_image.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
@@ -33,7 +34,10 @@ class LiveRoomStage extends StatelessWidget {
           (current is LiveRoomReady &&
               (previous is! LiveRoomReady ||
                   previous.guests != current.guests ||
-                  previous.battle != current.battle)),
+                  previous.battle != current.battle ||
+                  previous.topGifterAvatars != current.topGifterAvatars ||
+                  previous.opponentTopGifterAvatars !=
+                      current.opponentTopGifterAvatars)),
       builder: (context, state) {
         final guests = state is LiveRoomReady
             ? state.activeGuests
@@ -44,6 +48,8 @@ class LiveRoomStage extends StatelessWidget {
             battle: state.battle!,
             currentLiveId: state.session.id,
             topInset: topInset,
+            supporters: state.topGifterAvatars,
+            opponentSupporters: state.opponentTopGifterAvatars,
           );
         }
 
@@ -136,11 +142,18 @@ class _BattleStage extends StatelessWidget {
     required this.battle,
     required this.currentLiveId,
     required this.topInset,
+    required this.supporters,
+    required this.opponentSupporters,
   });
 
   final LiveBattle battle;
   final String currentLiveId;
   final double topInset;
+
+  /// Top-gifter avatars for this host's side and the opponent's, newest
+  /// snapshot first. Empty until the leaderboard answers.
+  final List<String> supporters;
+  final List<String> opponentSupporters;
 
   @override
   Widget build(BuildContext context) {
@@ -153,39 +166,199 @@ class _BattleStage extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: Stack(
+        // Same local override [StageTiles] makes: this host holds the first
+        // tile on the LEFT. Left to itself the Row mirrors in Arabic, so the
+        // host and the opponent swapped sides — and so did the score bar and
+        // the supporter rings that have to line up under them.
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Expanded(
-                    child: _StageTile(child: LiveRoomCameraLayer()),
-                  ),
-                  const SizedBox(width: kStageTileGap),
-                  Expanded(
-                    child: _StageTile(
-                      child: _OpponentVideo(room: room is Room ? room : null),
+              SizedBox(
+                width: width,
+                height: height,
+                child: Stack(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Expanded(
+                          child: _StageTile(child: LiveRoomCameraLayer()),
+                        ),
+                        const SizedBox(width: kStageTileGap),
+                        Expanded(
+                          child: _StageTile(
+                            child: _OpponentVideo(
+                              room: room is Room ? room : null,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      child: _HostBattleBar(
+                        leftScore: battle.scoreFor(currentLiveId),
+                        rightScore: battle.opponentScoreFor(currentLiveId),
+                        endTime: battle.endTime,
+                        multiplier: battle.multiplier,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: _HostBattleBar(
-                  leftScore: battle.scoreFor(currentLiveId),
-                  rightScore: battle.opponentScoreFor(currentLiveId),
-                  endTime: battle.endTime,
-                  multiplier: battle.multiplier,
+              // Under the tiles rather than over them: the supporter ring is
+              // what TikTok shows there, and drawing it inside the video would
+              // cover the two faces the battle is about.
+              SizedBox(
+                width: width,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _BattleSupporters(
+                          avatars: supporters,
+                          isOwnSide: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: _BattleSupporters(
+                          avatars: opponentSupporters,
+                          isOwnSide: false,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The top-three supporter ring under one side of a PK battle.
+///
+/// Rank 1 sits nearest the centre line on both sides, so the two leaders face
+/// each other across the split — that is the arrangement TikTok uses, and it
+/// survives an RTL locale because the order is expressed against the row's
+/// own start/end rather than against screen left/right.
+class _BattleSupporters extends StatelessWidget {
+  const _BattleSupporters({required this.avatars, required this.isOwnSide});
+
+  final List<String> avatars;
+
+  /// This host's own side. Picks the ring colour and which end rank 1 takes.
+  final bool isOwnSide;
+
+  static const double _diameter = 30;
+
+  @override
+  Widget build(BuildContext context) {
+    final ranked = avatars
+        .take(3)
+        .indexed
+        .map((item) => (url: item.$2, rank: item.$1 + 1))
+        .toList(growable: false);
+    // Reserve the strip's height even when empty, so the stage does not jump
+    // the moment the first gift lands.
+    if (ranked.isEmpty) return const SizedBox(height: _diameter + 4);
+
+    final ordered = isOwnSide
+        ? ranked.reversed.toList(growable: false)
+        : ranked;
+    final ring = isOwnSide ? const Color(0xFFFF5A8A) : const Color(0xFF25F4EE);
+
+    return Row(
+      mainAxisAlignment: isOwnSide
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.end,
+      children: [
+        for (var i = 0; i < ordered.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          _SupporterAvatar(
+            url: ordered[i].url,
+            rank: ordered[i].rank,
+            ring: ring,
+            diameter: _diameter,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SupporterAvatar extends StatelessWidget {
+  const _SupporterAvatar({
+    required this.url,
+    required this.rank,
+    required this.ring,
+    required this.diameter,
+  });
+
+  final String url;
+  final int rank;
+  final Color ring;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: diameter,
+      height: diameter + 4,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: diameter,
+            height: diameter,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: ring, width: 1.6),
+            ),
+            child: ClipOval(
+              child: SafeNetworkImage(
+                imageUrl: url,
+                width: diameter,
+                height: diameter,
+                blankOnError: true,
+                showLoadingIndicator: false,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 14,
+                height: 14,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: ring,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black, width: 1),
+                ),
+                child: Text(
+                  '$rank',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -115,6 +115,15 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   final String? label;
 }
 
+/// `liveTopGiftersUpdated` — the supporters strip under each PK tile, and the
+/// avatar row in the header of a plain live. Carries the whole ordered list;
+/// the stage takes the first three (mobile-api.md §19).
+class LiveHudTopGiftersEvent extends LiveHudEvent {
+  const LiveHudTopGiftersEvent({required this.liveId, required this.avatarUrls});
+  final String liveId;
+  final List<String> avatarUrls;
+}
+
 /// Someone invited you onto their stage. Arrives on the personal `user_*`
 /// room rather than the live room, so it can land while you are anywhere.
 class LiveHudGuestInviteEvent extends LiveHudEvent {

@@ -323,4 +323,28 @@ void main() {
       expect(find.byType(SafeNetworkImage), findsOneWidget);
     },
   );
+
+  testWidgets('large gifts keep the live room visible', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: GiftAnimationOverlay(
+          animationUrl: 'https://example.com/large-gift.png',
+          size: 'LARGE',
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final stage = tester.getSize(
+      find.byKey(const ValueKey('gift-animation-stage')),
+    );
+    expect(stage.width, closeTo(352, 0.1));
+    expect(stage.height, closeTo(384, 0.1));
+    expect(stage.width, lessThan(400));
+    expect(stage.height, lessThan(800 * 0.5));
+  });
 }

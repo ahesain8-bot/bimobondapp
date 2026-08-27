@@ -639,79 +639,85 @@ class PkBattleBar extends StatelessWidget {
     final total = (scoreLeft + scoreRight).clamp(1, 1 << 30);
     final target = (scoreLeft / total).clamp(_minShare, 1 - _minShare);
 
-    return SizedBox(
-      height: _barHeight,
-      // A score arriving as a socket event should slide the seam, not snap it.
-      child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: target, end: target),
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOutCubic,
-        builder: (context, ratio, _) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final seamX = constraints.maxWidth * ratio;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: (ratio * 1000).round(),
-                        child: _Side(
-                          score: scoreLeft,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.only(left: 10),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
+    // `seamX` is measured from the left edge, so the two sides must be laid
+    // out from the left edge too. Under Arabic the Row mirrored while the
+    // seam glow did not, and the bar came apart.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: SizedBox(
+        height: _barHeight,
+        // A score arriving as a socket event should slide the seam, not snap it.
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: target, end: target),
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutCubic,
+          builder: (context, ratio, _) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final seamX = constraints.maxWidth * ratio;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: (ratio * 1000).round(),
+                          child: _Side(
+                            score: scoreLeft,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 10),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: ((1 - ratio) * 1000).round(),
+                          child: _Side(
+                            score: scoreRight,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 10),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF20E0F0), Color(0xFF25F4EE)],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Soft joint glow, the way the two colours meet on TikTok.
+                    Positioned(
+                      left: seamX - 9,
+                      top: 0,
+                      bottom: 0,
+                      width: 18,
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0x00FFFFFF),
+                              Color(0x66FFFFFF),
+                              Color(0x00FFFFFF),
+                            ],
                           ),
                         ),
                       ),
-                      Expanded(
-                        flex: ((1 - ratio) * 1000).round(),
-                        child: _Side(
-                          score: scoreRight,
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 10),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF20E0F0), Color(0xFF25F4EE)],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Soft joint glow, the way the two colours meet on TikTok.
-                  Positioned(
-                    left: seamX - 9,
-                    top: 0,
-                    bottom: 0,
-                    width: 18,
-                    child: const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0x00FFFFFF),
-                            Color(0x66FFFFFF),
-                            Color(0x00FFFFFF),
-                          ],
-                        ),
+                    ),
+                    Positioned(
+                      left: seamX - 10,
+                      top: -4,
+                      width: 20,
+                      child: Text(
+                        seamMarker,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: seamX - 10,
-                    top: -4,
-                    width: 20,
-                    child: Text(
-                      seamMarker,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -748,14 +754,17 @@ class _Side extends StatelessWidget {
           fontSize: 14,
           height: 1,
           shadows: [
-            Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
+            Shadow(
+              color: Color(0x66000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
 
 /// TikTok LIVE viewer bottom bar (LTR):
 /// TikTok LIVE viewer bottom bar (LTR):
