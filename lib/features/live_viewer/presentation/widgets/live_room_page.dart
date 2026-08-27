@@ -1343,8 +1343,12 @@ class _PkGuestFeed extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.center,
-        placeholder: (_, _) => placeholder,
-        errorWidget: (_, _, _) => placeholder,
+        placeholder: (_, _) => Center(
+          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
+        ),
+        errorWidget: (_, _, _) => Center(
+          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
+        ),
       ),
     );
   }

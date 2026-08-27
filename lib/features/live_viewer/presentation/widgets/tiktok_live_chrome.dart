@@ -598,10 +598,10 @@ class PkBattleBar extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: SizedBox(
-        height: _barHeight,
+        height: _height,
         // A score arriving as a socket event should slide the seam, not snap it.
         child: TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: target, end: target),
+          tween: Tween<double>(end: ratio),
           duration: const Duration(milliseconds: 420),
           curve: Curves.easeOutCubic,
           builder: (context, ratio, _) {
@@ -675,6 +675,16 @@ class PkBattleBar extends StatelessWidget {
     );
   }
 
+  static String _fmt(int value) {
+    if (value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}K';
+    }
+    return '$value';
+  }
+
   static const TextStyle _scoreStyle = TextStyle(
     color: Colors.white,
     fontWeight: FontWeight.w800,
@@ -684,11 +694,20 @@ class PkBattleBar extends StatelessWidget {
       Shadow(color: Color(0x73000000), blurRadius: 2, offset: Offset(0, 0.5)),
     ],
   );
+}
 
+class _Side extends StatelessWidget {
   final int score;
   final Alignment alignment;
   final EdgeInsets padding;
   final Gradient gradient;
+
+  const _Side({
+    required this.score,
+    required this.alignment,
+    required this.padding,
+    required this.gradient,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -700,21 +719,7 @@ class PkBattleBar extends StatelessWidget {
         PkBattleBar._fmt(score),
         maxLines: 1,
         overflow: TextOverflow.clip,
-        // Both sides are white on TikTok. The cyan side used to be black87,
-        // which read as a disabled score next to the pink one.
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 14,
-          height: 1,
-          shadows: [
-            Shadow(
-              color: Color(0x66000000),
-              blurRadius: 2,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
+        style: PkBattleBar._scoreStyle,
       ),
     );
   }
