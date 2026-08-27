@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:bimobondapp/app/sounds/presentation/utils/sound_audio_preview.dart';
 import 'package:bimobondapp/app/video_templates/composition/composition_session.dart';
 import 'package:bimobondapp/app/video_templates/composition/image_media_source.dart';
 import 'package:bimobondapp/app/video_templates/composition/template_composition_engine.dart';
@@ -48,6 +49,7 @@ class CompositionPreviewController extends ChangeNotifier {
   File? _videoLookStill;
   int _videoLookStillGen = 0;
   int _lastVideoStillRefreshMs = 0;
+  String? _audioBedKey;
 
   double get playhead => _playhead;
   double get duration => _preview?.duration ?? session.timeline.totalDuration;
@@ -132,30 +134,30 @@ class CompositionPreviewController extends ChangeNotifier {
     final local = _slotLocalTime(slotId);
     if (window == null || local == null) return false;
 
-    final filter = session.slotFilterOverrides[slotId];
-    if (filter != null &&
-        filter.filterName.isNotEmpty &&
-        filter.filterName != 'none' &&
-        SlotLocalTiming.containsLocalTime(
-          slotDuration: window.$2,
-          localTime: local,
-          startTime: filter.startTime,
-          endTime: filter.endTime,
-        )) {
-      return true;
+    final slotFilters = session.userFilters.where((f) => f.slotId == slotId);
+    for (final filter in slotFilters) {
+      if (filter.filterName.isEmpty || filter.filterName == 'none') continue;
+      if (SlotLocalTiming.containsLocalTime(
+        slotDuration: window.$2,
+        localTime: local,
+        startTime: filter.startTime,
+        endTime: filter.endTime,
+      )) {
+        return true;
+      }
     }
 
-    final effect = session.slotEffectOverrides[slotId];
-    if (effect != null &&
-        effect.effectType.isNotEmpty &&
-        effect.effectType != 'none' &&
-        SlotLocalTiming.containsLocalTime(
-          slotDuration: window.$2,
-          localTime: local,
-          startTime: effect.startTime,
-          endTime: effect.endTime,
-        )) {
-      return true;
+    final slotEffects = session.userEffects.where((e) => e.slotId == slotId);
+    for (final effect in slotEffects) {
+      if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
+      if (SlotLocalTiming.containsLocalTime(
+        slotDuration: window.$2,
+        localTime: local,
+        startTime: effect.startTime,
+        endTime: effect.endTime,
+      )) {
+        return true;
+      }
     }
     return false;
   }
@@ -260,6 +262,7 @@ class CompositionPreviewController extends ChangeNotifier {
       _tick();
     });
     if (!_mediaDetached) _video?.play();
+    unawaited(_syncPreviewAudio(force: true));
     _safeNotify();
   }
 
@@ -268,6 +271,8 @@ class CompositionPreviewController extends ChangeNotifier {
     _ticker?.cancel();
     _ticker = null;
     _video?.pause();
+    unawaited(SoundAudioPreview.pause());
+    _audioBedKey = null;
     _safeNotify();
   }
 
@@ -278,6 +283,9 @@ class CompositionPreviewController extends ChangeNotifier {
     await _syncSurface(force: true);
     if (useVideoLookStill) {
       await refreshVideoLookStill();
+    }
+    if (_playing) {
+      unawaited(_syncPreviewAudio(force: true));
     }
     _safeNotify();
   }
@@ -293,7 +301,70 @@ class CompositionPreviewController extends ChangeNotifier {
     } else {
       _clearVideoLookStill();
     }
+    if (_playing) {
+      unawaited(_syncPreviewAudio(force: true));
+    }
     _safeNotify();
+  }
+
+  /// Start / pause the selected sound bed under the template preview.
+  Future<void> _syncPreviewAudio({bool force = false}) async {
+    if (_disposed || !_playing) return;
+
+    if (session.userSoundCleared) {
+      await SoundAudioPreview.stop();
+      _audioBedKey = null;
+      return;
+    }
+
+    final tracks = session.resolvedAudioTracks;
+    if (tracks.isEmpty) {
+      await SoundAudioPreview.stop();
+      _audioBedKey = null;
+      return;
+    }
+
+    final track = tracks.first;
+    final sound = track.sound;
+    final url = sound.resolvedAudioUrl.trim();
+    if (url.isEmpty) {
+      await SoundAudioPreview.stop();
+      _audioBedKey = null;
+      return;
+    }
+
+    final ph = _playhead;
+    final trackEnd = track.endTime ?? duration;
+    if (ph < track.startTime || ph >= trackEnd) {
+      await SoundAudioPreview.pause();
+      _audioBedKey = null;
+      return;
+    }
+
+    final bedKey =
+        '${sound.id}|${track.segmentStartMs}|${track.segmentEndMs}|'
+        '${track.startTime}|$trackEnd';
+    if (!force &&
+        _audioBedKey == bedKey &&
+        SoundAudioPreview.isPlaying(sound.id)) {
+      return;
+    }
+    _audioBedKey = bedKey;
+
+    final elapsedSec = (ph - track.startTime).clamp(0.0, trackEnd);
+    final startMs = track.segmentStartMs + (elapsedSec * 1000).round();
+    final segEndMs = track.segmentEndMs;
+    final windowMs = segEndMs != null
+        ? (segEndMs - startMs).clamp(500, 3600000)
+        : ((trackEnd - ph) * 1000).round().clamp(500, 3600000);
+
+    await SoundAudioPreview.playAt(
+      sound.id,
+      url,
+      startOffset: Duration(milliseconds: startMs.clamp(0, 3600000)),
+      window: Duration(milliseconds: windowMs),
+      loop: true,
+    );
   }
 
   /// Grab the current video frame so filters/effects can composite on mobile.
@@ -353,7 +424,10 @@ class CompositionPreviewController extends ChangeNotifier {
       next = 0;
       _playhead = 0;
       _preview?.seek(0);
+      _audioBedKey = null;
       unawaited(_syncSurface(force: true));
+      unawaited(SoundAudioPreview.restartFromStart());
+      unawaited(_syncPreviewAudio(force: true));
       _lastLookSig = null;
       _safeNotify();
       return;
@@ -379,13 +453,18 @@ class CompositionPreviewController extends ChangeNotifier {
     }
     if (_playing || sig != _lastLookSig || wantStill != (_videoLookStill != null)) {
       _lastLookSig = sig;
+      if (_playing) {
+        unawaited(_syncPreviewAudio());
+      }
       _safeNotify();
     }
   }
 
   String _lookSignature(PreviewFrame? sample, String? prevSlot) {
     final slot = _activeSlotId ?? prevSlot ?? '';
-    if (sample == null) return '$slot|empty';
+    if (sample == null) {
+      return '$slot|empty|t=${_playhead.toStringAsFixed(2)}';
+    }
     final fx = sample.effects
         .map((e) => '${e.effectType}:${e.progress.toStringAsFixed(1)}')
         .join(',');
@@ -409,7 +488,7 @@ class CompositionPreviewController extends ChangeNotifier {
         )
         .join(';');
     final overlays = sample.overlays.length;
-    return '$slot|fx=$fx|fl=$fl|tr=$tr|tx=$textSig|stk=$stickerSig|ov=$overlays';
+    return '$slot|t=${_playhead.toStringAsFixed(2)}|fx=$fx|fl=$fl|tr=$tr|tx=$textSig|stk=$stickerSig|ov=$overlays';
   }
 
   Future<void> _syncSurface({bool force = false}) async {
@@ -615,6 +694,8 @@ class CompositionPreviewController extends ChangeNotifier {
     _ticker?.cancel();
     _ticker = null;
     _playing = false;
+    _audioBedKey = null;
+    unawaited(SoundAudioPreview.stop());
     _clearDecoded();
     _clearVideoLookStill();
     // Fire-and-forget video teardown — do not await in dispose.

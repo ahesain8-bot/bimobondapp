@@ -41,6 +41,7 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     this.useVideoLookStill = false,
     this.fallbackFilterName,
     this.fallbackFilterIntensity = 1,
+    this.fallbackFilterStack = const [],
   });
 
   final PreviewFrame? frame;
@@ -57,6 +58,7 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   /// Session filter when timeline sample has not caught up yet.
   final String? fallbackFilterName;
   final double fallbackFilterIntensity;
+  final List<({String name, double intensity})> fallbackFilterStack;
 
   /// Single media surface (images / one video without multi-pane layout).
   final Widget? mediaOverride;
@@ -90,17 +92,33 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     }
 
     final f = frame;
-    final sampledFilter = f?.filters.isNotEmpty == true
-        ? f!.filters.first
-        : null;
-    final filterName =
-        sampledFilter?.filterName ??
-        ((fallbackFilterName != null &&
-                fallbackFilterName!.isNotEmpty &&
-                fallbackFilterName != 'none')
-            ? fallbackFilterName
-            : null);
-    final filterIntensity = sampledFilter?.intensity ?? fallbackFilterIntensity;
+    final frameFilters = (f?.filters ?? const <ResolvedFilter>[])
+        .map((rf) => (name: rf.filterName, intensity: rf.intensity))
+        .toList(growable: false);
+
+    List<({String name, double intensity})> activeStack;
+    if (fallbackFilterStack.isNotEmpty) {
+      final names = fallbackFilterStack.map((e) => e.name).toSet();
+      activeStack = [
+        ...fallbackFilterStack,
+        for (final ff in frameFilters)
+          if (!names.contains(ff.name)) ff,
+      ];
+    } else if (frameFilters.isNotEmpty) {
+      activeStack = frameFilters;
+    } else if (fallbackFilterName != null &&
+        fallbackFilterName!.isNotEmpty &&
+        fallbackFilterName != 'none') {
+      activeStack = [
+        (name: fallbackFilterName!, intensity: fallbackFilterIntensity),
+      ];
+    } else {
+      activeStack = const [];
+    }
+
+    final primaryFilter = activeStack.isNotEmpty ? activeStack.first : null;
+    final filterName = primaryFilter?.name;
+    final filterIntensity = primaryFilter?.intensity ?? fallbackFilterIntensity;
     final matrix = TemplateFilterMatrices.forName(
       filterName,
       intensity: filterIntensity,
@@ -123,11 +141,26 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     final lookKey = _lookKey(filterName, f?.effects);
 
     Widget colorGrade(Widget child) {
-      var w = ColorFiltered(
-        key: ValueKey('grade-$lookKey'),
-        colorFilter: ColorFilter.matrix(matrix),
-        child: child,
-      );
+      var w = child;
+      for (var i = 0; i < activeStack.length; i++) {
+        final layer = activeStack[i];
+        final layerMatrix = TemplateFilterMatrices.forName(
+          layer.name,
+          intensity: layer.intensity,
+        );
+        w = ColorFiltered(
+          key: ValueKey('grade-$lookKey-$i-${layer.name}'),
+          colorFilter: ColorFilter.matrix(layerMatrix),
+          child: w,
+        );
+      }
+      if (activeStack.isEmpty) {
+        w = ColorFiltered(
+          key: ValueKey('grade-$lookKey'),
+          colorFilter: ColorFilter.matrix(matrix),
+          child: w,
+        );
+      }
       if (duotoneMatrix != null) {
         w = ColorFiltered(
           key: ValueKey('duotone-$lookKey'),

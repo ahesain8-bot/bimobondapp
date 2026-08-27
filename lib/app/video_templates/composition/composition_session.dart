@@ -26,9 +26,9 @@ class CompositionSession {
   Map<String, SlotFillEntry> fills;
   String? projectId;
 
-  /// User overrides — replace admin slot FX in merged preview (guide §5).
-  Map<String, UserSlotFilterOverride> slotFilterOverrides = {};
-  Map<String, UserSlotEffectOverride> slotEffectOverrides = {};
+  /// User filter/effect layers — replace admin slot FX in merged preview (guide §5).
+  List<UserEditorFilterTrack> userFilters = [];
+  List<UserEditorEffectTrack> userEffects = [];
   List<UserEditorTextOverlay> userTexts = [];
   List<UserEditorStickerOverlay> userStickers = [];
   List<UserEditorAudioTrack> userAudios = [];
@@ -111,8 +111,8 @@ class CompositionSession {
     return _cachedTimeline ??= const TimelineEngine().build(
       recipe: recipe,
       fills: fills,
-      slotFilterOverrides: slotFilterOverrides,
-      slotEffectOverrides: slotEffectOverrides,
+      userFilters: userFilters,
+      userEffects: userEffects,
       userTexts: userTexts,
       userStickers: userStickers,
       userAudios: userAudios,
@@ -140,12 +140,8 @@ class CompositionSession {
         ),
         projectId: projectId,
       )
-      ..slotFilterOverrides = Map<String, UserSlotFilterOverride>.from(
-        slotFilterOverrides,
-      )
-      ..slotEffectOverrides = Map<String, UserSlotEffectOverride>.from(
-        slotEffectOverrides,
-      )
+      ..userFilters = List<UserEditorFilterTrack>.from(userFilters)
+      ..userEffects = List<UserEditorEffectTrack>.from(userEffects)
       ..userTexts = List<UserEditorTextOverlay>.from(userTexts)
       ..userStickers = List<UserEditorStickerOverlay>.from(userStickers)
       ..userAudios = List<UserEditorAudioTrack>.from(userAudios)
@@ -160,7 +156,7 @@ class CompositionSession {
   void addUserAudio(UserEditorAudioTrack track) {
     _pushUndo();
     userSoundCleared = false;
-    userAudios = [...userAudios, track];
+    userAudios = [track];
     _syncLegacyAudioFields();
     _invalidateTimeline();
   }
@@ -248,23 +244,127 @@ class CompositionSession {
     );
   }
 
-  void setSlotFilter(String slotId, UserSlotFilterOverride? override) {
+  List<UserEditorFilterTrack> filtersForSlot(String slotId) =>
+      userFilters.where((f) => f.slotId == slotId).toList(growable: false);
+
+  List<UserEditorEffectTrack> effectsForSlot(String slotId) =>
+      userEffects.where((e) => e.slotId == slotId).toList(growable: false);
+
+  void addUserFilter(UserEditorFilterTrack track) {
+    if (filtersForSlot(track.slotId).length >= kMaxFiltersPerSlot) return;
     _pushUndo();
-    if (override == null || override.filterName == 'none') {
-      slotFilterOverrides.remove(slotId);
-    } else {
-      slotFilterOverrides[slotId] = override;
-    }
+    userFilters = [...userFilters, track];
     _invalidateTimeline();
   }
 
-  void setSlotEffect(String slotId, UserSlotEffectOverride? override) {
+  void removeUserFilter(String id) {
+    final i = userFilters.indexWhere((f) => f.id == id);
+    if (i < 0) return;
     _pushUndo();
-    if (override == null || override.effectType == 'none') {
-      slotEffectOverrides.remove(slotId);
-    } else {
-      slotEffectOverrides[slotId] = override;
-    }
+    userFilters = List<UserEditorFilterTrack>.from(userFilters)..removeAt(i);
+    _invalidateTimeline();
+  }
+
+  void clearUserFiltersForSlot(String slotId) {
+    if (filtersForSlot(slotId).isEmpty) return;
+    _pushUndo();
+    userFilters = userFilters.where((f) => f.slotId != slotId).toList();
+    _invalidateTimeline();
+  }
+
+  void replaceUserFilter(String id, UserEditorFilterTrack replacement) {
+    final i = userFilters.indexWhere((f) => f.id == id);
+    if (i < 0) return;
+    _pushUndo();
+    userFilters = List<UserEditorFilterTrack>.from(userFilters)
+      ..[i] = replacement.copyWith(id: id);
+    _invalidateTimeline();
+  }
+
+  UserEditorFilterTrack? duplicateUserFilter(String id) {
+    final i = userFilters.indexWhere((f) => f.id == id);
+    if (i < 0) return null;
+    final src = userFilters[i];
+    if (filtersForSlot(src.slotId).length >= kMaxFiltersPerSlot) return null;
+    final copy = src.copyWith(
+      id: 'flt_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    _pushUndo();
+    userFilters = [...userFilters, copy];
+    _invalidateTimeline();
+    return copy;
+  }
+
+  void addUserEffect(UserEditorEffectTrack track) {
+    if (effectsForSlot(track.slotId).length >= kMaxEffectsPerSlot) return;
+    _pushUndo();
+    userEffects = [...userEffects, track];
+    _invalidateTimeline();
+  }
+
+  void removeUserEffect(String id) {
+    final i = userEffects.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    _pushUndo();
+    userEffects = List<UserEditorEffectTrack>.from(userEffects)..removeAt(i);
+    _invalidateTimeline();
+  }
+
+  void clearUserEffectsForSlot(String slotId) {
+    if (effectsForSlot(slotId).isEmpty) return;
+    _pushUndo();
+    userEffects = userEffects.where((e) => e.slotId != slotId).toList();
+    _invalidateTimeline();
+  }
+
+  void replaceUserEffect(String id, UserEditorEffectTrack replacement) {
+    final i = userEffects.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    _pushUndo();
+    userEffects = List<UserEditorEffectTrack>.from(userEffects)
+      ..[i] = replacement.copyWith(id: id);
+    _invalidateTimeline();
+  }
+
+  UserEditorEffectTrack? duplicateUserEffect(String id) {
+    final i = userEffects.indexWhere((e) => e.id == id);
+    if (i < 0) return null;
+    final src = userEffects[i];
+    if (effectsForSlot(src.slotId).length >= kMaxEffectsPerSlot) return null;
+    final copy = src.copyWith(
+      id: 'fx_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    _pushUndo();
+    userEffects = [...userEffects, copy];
+    _invalidateTimeline();
+    return copy;
+  }
+
+  void patchUserFilterTiming(
+    String id, {
+    required double startTime,
+    required double endTime,
+  }) {
+    final i = userFilters.indexWhere((f) => f.id == id);
+    if (i < 0) return;
+    userFilters[i] = userFilters[i].copyWith(
+      startTime: startTime,
+      endTime: endTime,
+    );
+    _invalidateTimeline();
+  }
+
+  void patchUserEffectTiming(
+    String id, {
+    required double startTime,
+    required double endTime,
+  }) {
+    final i = userEffects.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    userEffects[i] = userEffects[i].copyWith(
+      startTime: startTime,
+      endTime: endTime,
+    );
     _invalidateTimeline();
   }
 
@@ -281,34 +381,6 @@ class CompositionSession {
   }
 
   /// Live timing tweak (no undo) — used while dragging overlay handles.
-  void patchSlotFilterTiming(
-    String slotId, {
-    required double startTime,
-    required double endTime,
-  }) {
-    final current = slotFilterOverrides[slotId];
-    if (current == null) return;
-    slotFilterOverrides[slotId] = current.copyWith(
-      startTime: startTime,
-      endTime: endTime,
-    );
-    _invalidateTimeline();
-  }
-
-  void patchSlotEffectTiming(
-    String slotId, {
-    required double startTime,
-    required double endTime,
-  }) {
-    final current = slotEffectOverrides[slotId];
-    if (current == null) return;
-    slotEffectOverrides[slotId] = current.copyWith(
-      startTime: startTime,
-      endTime: endTime,
-    );
-    _invalidateTimeline();
-  }
-
   void patchUserTextTiming(
     String id, {
     required double startTime,
@@ -396,12 +468,8 @@ class CompositionSession {
 
   void _restore(CompositionSession snap) {
     fills = snap.fills;
-    slotFilterOverrides = Map<String, UserSlotFilterOverride>.from(
-      snap.slotFilterOverrides,
-    );
-    slotEffectOverrides = Map<String, UserSlotEffectOverride>.from(
-      snap.slotEffectOverrides,
-    );
+    userFilters = List<UserEditorFilterTrack>.from(snap.userFilters);
+    userEffects = List<UserEditorEffectTrack>.from(snap.userEffects);
     userTexts = List<UserEditorTextOverlay>.from(snap.userTexts);
     userStickers = List<UserEditorStickerOverlay>.from(snap.userStickers);
     userAudios = List<UserEditorAudioTrack>.from(snap.userAudios);

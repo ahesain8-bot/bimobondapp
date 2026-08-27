@@ -18,6 +18,7 @@ import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_
     as vt_di;
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_font_cache.dart';
+import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_layer_toolbar.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_playback_bar.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_preset_sheet.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_sticker_placer_sheet.dart';
@@ -75,6 +76,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
   String _exportLabel = 'Rendering…';
   int _selectedSlotIndex = 0;
   TemplateEditorPanel? _activePanel;
+  TemplateEditorOverlayKind? _selectedOverlayKind;
+  String? _selectedOverlayId;
+  String? _replaceOverlayId;
   String? _serverProjectId;
 
   /// Maps recipe slot id → server `slots[].slotId` for PATCH / filters / effects.
@@ -313,6 +317,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
 
     await _refreshPreview();
+    if (_preview?.isPlaying == true) {
+      unawaited(_preview!.seek(_preview!.playhead));
+    }
     setState(() => _activePanel = null);
   }
 
@@ -405,58 +412,72 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
   }
 
   String? get _selectedFilterId {
-    final override = _session.slotFilterOverrides[_selectedSlot.id];
-    return override?.presetId ?? override?.filterName;
+    if (_replaceOverlayId != null) {
+      final track = _session.userFilters
+          .where((f) => f.id == _replaceOverlayId)
+          .firstOrNull;
+      return track?.presetId ?? track?.filterName;
+    }
+    return null;
   }
 
   String? get _selectedEffectId {
-    final override = _session.slotEffectOverrides[_selectedSlot.id];
-    return override?.presetId ?? override?.effectType;
+    if (_replaceOverlayId != null) {
+      final track = _session.userEffects
+          .where((e) => e.id == _replaceOverlayId)
+          .firstOrNull;
+      return track?.presetId ?? track?.effectType;
+    }
+    return null;
   }
 
-  UserSlotFilterOverride? _filterOverrideForPreview(
+  List<({String name, double intensity})> _activeFilterStackAtPlayhead(
     CompositionPreviewController preview,
+    String slotId,
   ) {
-    final slotId = preview.activeSlotId ?? _selectedSlot.id;
-    return _session.slotFilterOverrides[slotId];
+    final local = preview.playhead - _slotStartOnTimeline(slotId);
+    final slotDur = _slotDuration(slotId);
+    final out = <({String name, double intensity})>[];
+    for (final filter in _session.filtersForSlot(slotId)) {
+      if (filter.filterName.isEmpty || filter.filterName == 'none') continue;
+      if (!SlotLocalTiming.containsLocalTime(
+        slotDuration: slotDur,
+        localTime: local,
+        startTime: filter.startTime,
+        endTime: filter.endTime,
+      )) {
+        continue;
+      }
+      out.add((name: filter.filterName, intensity: filter.intensity));
+    }
+    return out;
   }
 
   bool _isFilterActiveAtPlayhead(
     CompositionPreviewController preview,
     String slotId,
   ) {
-    final filter = _session.slotFilterOverrides[slotId];
-    if (filter == null ||
-        filter.filterName.isEmpty ||
-        filter.filterName == 'none') {
-      return false;
-    }
-    final local = preview.playhead - _slotStartOnTimeline(slotId);
-    return SlotLocalTiming.containsLocalTime(
-      slotDuration: _slotDuration(slotId),
-      localTime: local,
-      startTime: filter.startTime,
-      endTime: filter.endTime,
-    );
+    return _activeFilterStackAtPlayhead(preview, slotId).isNotEmpty;
   }
 
   bool _isEffectActiveAtPlayhead(
     CompositionPreviewController preview,
     String slotId,
   ) {
-    final effect = _session.slotEffectOverrides[slotId];
-    if (effect == null ||
-        effect.effectType.isEmpty ||
-        effect.effectType == 'none') {
-      return false;
-    }
     final local = preview.playhead - _slotStartOnTimeline(slotId);
-    return SlotLocalTiming.containsLocalTime(
-      slotDuration: _slotDuration(slotId),
-      localTime: local,
-      startTime: effect.startTime,
-      endTime: effect.endTime,
-    );
+    final slotDur = _slotDuration(slotId);
+    for (final effect in _session.effectsForSlot(slotId)) {
+      if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
+      if (SlotLocalTiming.containsLocalTime(
+        slotDuration: slotDur,
+        localTime: local,
+        startTime: effect.startTime,
+        endTime: effect.endTime,
+      )) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Widget _buildComposedPreview({
@@ -466,9 +487,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     bool showTexts = true,
   }) {
     final slotId = preview.activeSlotId ?? _selectedSlot.id;
-    final filterOverride = _filterOverrideForPreview(preview);
-    final filterActive =
-        filterOverride != null && _isFilterActiveAtPlayhead(preview, slotId);
+    final filterStack = _activeFilterStackAtPlayhead(preview, slotId);
+    final filterActive = filterStack.isNotEmpty;
+    final primaryFilter = filterActive ? filterStack.first : null;
     return VideoTemplateComposedPreview(
       canvasWidth: canvasW.round(),
       canvasHeight: canvasH.round(),
@@ -479,8 +500,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       isVideoMedia: preview.activeSlotIsVideo || preview.hasVideoSurface,
       videoLookStill: preview.videoLookStill,
       useVideoLookStill: _shouldUseVideoLookStill(preview),
-      fallbackFilterName: filterActive ? filterOverride!.filterName : null,
-      fallbackFilterIntensity: filterOverride?.intensity ?? 1,
+      fallbackFilterName: primaryFilter?.name,
+      fallbackFilterIntensity: primaryFilter?.intensity ?? 1,
+      fallbackFilterStack: filterStack,
       showTexts: showTexts,
     );
   }
@@ -577,42 +599,113 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
 
   Future<void> _applyFilter(TemplatePresetItem preset) async {
     final slot = _selectedSlot;
+    final replaceId = _replaceOverlayId;
     if (preset.isClear) {
-      _session.setSlotFilter(slot.id, null);
+      _session.clearUserFiltersForSlot(slot.id);
+      _clearOverlaySelection();
+    } else if (replaceId != null) {
+      final existing = _session.userFilters
+          .where((f) => f.id == replaceId)
+          .firstOrNull;
+      if (existing != null) {
+        _session.replaceUserFilter(
+          replaceId,
+          existing.copyWith(
+            presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
+            filterName: preset.previewFilterKey,
+            label: preset.name,
+          ),
+        );
+        _selectedOverlayId = replaceId;
+        _selectedOverlayKind = TemplateEditorOverlayKind.filter;
+      }
+      _replaceOverlayId = null;
     } else {
+      if (_session.filtersForSlot(slot.id).length >= kMaxFiltersPerSlot) {
+        _showSnack('Max $kMaxFiltersPerSlot filters per clip');
+        return;
+      }
       final slotDur = _slotDuration(slot.id);
-      _session.setSlotFilter(
-        slot.id,
-        UserSlotFilterOverride(
-          presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
-          filterName: preset.previewFilterKey,
-          startTime: 0,
-          endTime: slotDur,
-        ),
+      final local = ((_preview?.playhead ?? 0) - _slotStartOnTimeline(slot.id))
+          .clamp(0.0, slotDur);
+      final track = UserEditorFilterTrack(
+        id: 'flt_${DateTime.now().microsecondsSinceEpoch}',
+        slotId: slot.id,
+        presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
+        filterName: preset.previewFilterKey,
+        label: preset.name,
+        startTime: local,
+        endTime: slotDur,
       );
+      _session.addUserFilter(track);
+      _selectedOverlayId = track.id;
+      _selectedOverlayKind = TemplateEditorOverlayKind.filter;
     }
     _commitLookPreview(slot.id, seekForEffect: false);
-    unawaited(_syncFilter(slot.id, preset));
+    unawaited(_syncSlotFilters(slot.id));
+    setState(() => _activePanel = null);
   }
 
   Future<void> _applyEffect(TemplatePresetItem preset) async {
     final slot = _selectedSlot;
+    final replaceId = _replaceOverlayId;
     if (preset.isClear) {
-      _session.setSlotEffect(slot.id, null);
+      _session.clearUserEffectsForSlot(slot.id);
+      _clearOverlaySelection();
+    } else if (replaceId != null) {
+      final existing = _session.userEffects
+          .where((e) => e.id == replaceId)
+          .firstOrNull;
+      if (existing != null) {
+        _session.replaceUserEffect(
+          replaceId,
+          existing.copyWith(
+            presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
+            effectType: preset.previewEffectKey,
+            label: preset.name,
+          ),
+        );
+        _selectedOverlayId = replaceId;
+        _selectedOverlayKind = TemplateEditorOverlayKind.effect;
+      }
+      _replaceOverlayId = null;
     } else {
+      if (_session.effectsForSlot(slot.id).length >= kMaxEffectsPerSlot) {
+        _showSnack('Max $kMaxEffectsPerSlot effects per clip');
+        return;
+      }
       final slotDur = _slotDuration(slot.id);
-      _session.setSlotEffect(
-        slot.id,
-        UserSlotEffectOverride(
-          presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
-          effectType: preset.previewEffectKey,
-          startTime: 0,
-          endTime: slotDur,
-        ),
+      final local = ((_preview?.playhead ?? 0) - _slotStartOnTimeline(slot.id))
+          .clamp(0.0, slotDur);
+      final track = UserEditorEffectTrack(
+        id: 'fx_${DateTime.now().microsecondsSinceEpoch}',
+        slotId: slot.id,
+        presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
+        effectType: preset.previewEffectKey,
+        label: preset.name,
+        startTime: local,
+        endTime: slotDur,
       );
+      _session.addUserEffect(track);
+      _selectedOverlayId = track.id;
+      _selectedOverlayKind = TemplateEditorOverlayKind.effect;
     }
     _commitLookPreview(slot.id, seekForEffect: !preset.isClear);
-    unawaited(_syncEffect(slot.id, preset));
+    unawaited(_syncSlotEffects(slot.id));
+    setState(() => _activePanel = null);
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  void _clearOverlaySelection() {
+    _selectedOverlayId = null;
+    _selectedOverlayKind = null;
+    _replaceOverlayId = null;
   }
 
   /// Instant local preview after filter/effect pick (no server round-trip).
@@ -642,133 +735,85 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     return playhead >= slotStart && playhead < slotEnd;
   }
 
-  Future<void> _syncFilter(String slotId, TemplatePresetItem preset) async {
+  Future<void> _syncSlotFilters(String slotId) async {
     final projectId = _serverProjectId;
     final serverSlotId = _serverSlotIdFor(slotId);
     if (projectId == null || serverSlotId == null) return;
-    final presetId = VideoTemplateProjectIds.normalizeServerId(preset.id);
     final slotDur = _slotDuration(slotId);
-    final override = _session.slotFilterOverrides[slotId];
-    if (preset.isClear) {
-      await _repository.putSlotFilter(
-        projectId: projectId,
-        slotId: serverSlotId,
-        presetId: null,
-        intensity: 1,
+    final items = <Map<String, dynamic>>[];
+    for (final filter in _session.filtersForSlot(slotId)) {
+      final presetId = VideoTemplateProjectIds.normalizeServerId(filter.presetId);
+      if (presetId == null) continue;
+      final window = SlotLocalTiming.normalize(
+        slotDuration: slotDur,
+        startTime: filter.startTime,
+        endTime: filter.endTime,
       );
-      return;
+      items.add({
+        'presetId': presetId,
+        'intensity': filter.intensity.clamp(0.0, 1.0),
+        'startTime': window.start,
+        'endTime': window.end,
+      });
     }
-    if (presetId == null) return;
-    final window = SlotLocalTiming.normalize(
-      slotDuration: slotDur,
-      startTime: override?.startTime ?? 0,
-      endTime: override?.endTime,
-    );
-    await _repository.putSlotFilter(
+    await _repository.putSlotFilterItems(
       projectId: projectId,
       slotId: serverSlotId,
-      presetId: presetId,
-      intensity: (override?.intensity ?? 1).clamp(0.0, 1.0),
-      startTime: window.start,
-      endTime: window.end,
+      items: items,
     );
   }
 
-  Future<void> _syncEffect(String slotId, TemplatePresetItem preset) async {
+  Future<void> _syncSlotEffects(String slotId) async {
     final projectId = _serverProjectId;
     final serverSlotId = _serverSlotIdFor(slotId);
     if (projectId == null || serverSlotId == null) return;
-    final presetId = VideoTemplateProjectIds.normalizeServerId(preset.id);
     final slotDur = _slotDuration(slotId);
-    final override = _session.slotEffectOverrides[slotId];
-    if (preset.isClear) {
-      await _repository.putSlotEffect(
-        projectId: projectId,
-        slotId: serverSlotId,
-        presetId: null,
+    final items = <Map<String, dynamic>>[];
+    for (final effect in _session.effectsForSlot(slotId)) {
+      final presetId = VideoTemplateProjectIds.normalizeServerId(effect.presetId);
+      if (presetId == null) continue;
+      final window = SlotLocalTiming.normalize(
+        slotDuration: slotDur,
+        startTime: effect.startTime,
+        endTime: effect.endTime,
       );
-      return;
+      items.add({
+        'presetId': presetId,
+        'startTime': window.start,
+        'endTime': window.end,
+      });
     }
-    if (presetId == null) return;
-    final window = SlotLocalTiming.normalize(
-      slotDuration: slotDur,
-      startTime: override?.startTime ?? 0,
-      endTime: override?.endTime,
-    );
-    await _repository.putSlotEffect(
+    await _repository.putSlotEffectItems(
       projectId: projectId,
       slotId: serverSlotId,
-      presetId: presetId,
-      startTime: window.start,
-      endTime: window.end,
+      items: items,
     );
   }
 
-  void _debounceLookTimingSync(TemplateEditorOverlayKind kind, String slotId) {
+  void _debounceLookTimingSync(TemplateEditorOverlayKind kind, String trackId) {
     _lookTimingSyncTimer?.cancel();
     _lookTimingSyncTimer = Timer(const Duration(milliseconds: 450), () {
-      unawaited(_syncSlotLookTiming(kind, slotId));
+      unawaited(_syncOverlayLookTiming(kind, trackId));
     });
   }
 
-  /// Push dragged filter/effect window to server (clip-local seconds).
-  Future<void> _syncSlotLookTiming(
+  Future<void> _syncOverlayLookTiming(
     TemplateEditorOverlayKind kind,
-    String slotId,
+    String trackId,
   ) async {
-    final projectId = _serverProjectId;
-    final serverSlotId = _serverSlotIdFor(slotId);
-    if (projectId == null || serverSlotId == null) return;
-    final slotDur = _slotDuration(slotId);
-
     switch (kind) {
       case TemplateEditorOverlayKind.filter:
-        final override = _session.slotFilterOverrides[slotId];
-        if (override == null ||
-            override.filterName.isEmpty ||
-            override.filterName == 'none') {
-          return;
-        }
-        final presetId = VideoTemplateProjectIds.normalizeServerId(
-          override.presetId,
-        );
-        if (presetId == null) return;
-        final window = SlotLocalTiming.normalize(
-          slotDuration: slotDur,
-          startTime: override.startTime,
-          endTime: override.endTime,
-        );
-        await _repository.putSlotFilter(
-          projectId: projectId,
-          slotId: serverSlotId,
-          presetId: presetId,
-          intensity: override.intensity.clamp(0.0, 1.0),
-          startTime: window.start,
-          endTime: window.end,
-        );
+        final track = _session.userFilters
+            .where((f) => f.id == trackId)
+            .firstOrNull;
+        if (track == null) return;
+        await _syncSlotFilters(track.slotId);
       case TemplateEditorOverlayKind.effect:
-        final override = _session.slotEffectOverrides[slotId];
-        if (override == null ||
-            override.effectType.isEmpty ||
-            override.effectType == 'none') {
-          return;
-        }
-        final presetId = VideoTemplateProjectIds.normalizeServerId(
-          override.presetId,
-        );
-        if (presetId == null) return;
-        final window = SlotLocalTiming.normalize(
-          slotDuration: slotDur,
-          startTime: override.startTime,
-          endTime: override.endTime,
-        );
-        await _repository.putSlotEffect(
-          projectId: projectId,
-          slotId: serverSlotId,
-          presetId: presetId,
-          startTime: window.start,
-          endTime: window.end,
-        );
+        final track = _session.userEffects
+            .where((e) => e.id == trackId)
+            .firstOrNull;
+        if (track == null) return;
+        await _syncSlotEffects(track.slotId);
       case TemplateEditorOverlayKind.text:
       case TemplateEditorOverlayKind.sticker:
       case TemplateEditorOverlayKind.audio:
@@ -1054,7 +1099,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
       }
 
-      if (!mounted) return;
+    if (!mounted) return;
 
       final outFile = rendered;
       final hasFile = outFile != null && await outFile.exists();
@@ -1136,12 +1181,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         _session.fills[slot.id],
       );
       final slotStart = cursor;
-      final slotEnd = cursor + dur;
 
-      final filter = _session.slotFilterOverrides[slot.id];
-      if (filter != null &&
-          filter.filterName.isNotEmpty &&
-          filter.filterName != 'none') {
+      for (final filter in _session.filtersForSlot(slot.id)) {
+        if (filter.filterName.isEmpty || filter.filterName == 'none') continue;
         final window = SlotLocalTiming.normalize(
           slotDuration: dur,
           startTime: filter.startTime,
@@ -1149,21 +1191,21 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
         segments.add(
           TemplateEditorOverlaySegment(
-            id: slot.id,
+            id: filter.id,
+            slotId: slot.id,
             kind: TemplateEditorOverlayKind.filter,
             start: slotStart + window.start,
             end: slotStart + window.end,
-            label: filter.filterName,
+            label: filter.displayName,
             color: TemplateEditorTheme.filterTrack,
             icon: LucideIcons.blend,
+            selected: _selectedOverlayId == filter.id,
           ),
         );
       }
 
-      final effect = _session.slotEffectOverrides[slot.id];
-      if (effect != null &&
-          effect.effectType.isNotEmpty &&
-          effect.effectType != 'none') {
+      for (final effect in _session.effectsForSlot(slot.id)) {
+        if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
         final window = SlotLocalTiming.normalize(
           slotDuration: dur,
           startTime: effect.startTime,
@@ -1171,18 +1213,20 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
         segments.add(
           TemplateEditorOverlaySegment(
-            id: slot.id,
+            id: effect.id,
+            slotId: slot.id,
             kind: TemplateEditorOverlayKind.effect,
             start: slotStart + window.start,
             end: slotStart + window.end,
-            label: effect.effectType,
+            label: effect.displayName,
             color: TemplateEditorTheme.effectTrack,
             icon: LucideIcons.sparkles,
+            selected: _selectedOverlayId == effect.id,
           ),
         );
       }
 
-      cursor = slotEnd;
+      cursor = slotStart + dur;
     }
 
     for (final t in _session.userTexts) {
@@ -1219,12 +1263,12 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
 
     final audioTracks = _session.resolvedAudioTracks;
-    final audioSegments = <TemplateEditorOverlaySegment>[];
-    for (var i = 0; i < audioTracks.length; i++) {
-      final track = audioTracks[i];
+    if (audioTracks.isNotEmpty) {
+      final track = audioTracks.first;
       final start = track.startTime.clamp(0.0, total);
       final end = (track.endTime ?? total).clamp(start + 0.2, total);
-      audioSegments.add(
+      segments.insert(
+        0,
         TemplateEditorOverlaySegment(
           id: track.id,
           kind: TemplateEditorOverlayKind.audio,
@@ -1233,16 +1277,244 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           label: track.timelineLabel(totalDuration: total),
           color: TemplateEditorTheme.audioTrack,
           icon: LucideIcons.music,
-          showVolumeIcon: i == 0,
+          showVolumeIcon: true,
           editable: true,
+          selected: _selectedOverlayId == track.id,
         ),
       );
     }
-    if (audioSegments.isNotEmpty) {
-      segments.insertAll(0, audioSegments);
-    }
 
     return segments;
+  }
+
+  void _onOverlayTap(TemplateEditorOverlayKind kind, String id) {
+    setState(() {
+      _selectedOverlayKind = kind;
+      _selectedOverlayId = id;
+      _replaceOverlayId = null;
+      if (kind == TemplateEditorOverlayKind.filter ||
+          kind == TemplateEditorOverlayKind.effect) {
+        final slotId = kind == TemplateEditorOverlayKind.filter
+            ? _session.userFilters
+                .where((f) => f.id == id)
+                .map((f) => f.slotId)
+                .firstOrNull
+            : _session.userEffects
+                .where((e) => e.id == id)
+                .map((e) => e.slotId)
+                .firstOrNull;
+        if (slotId != null) {
+          final idx = _session.slots.indexWhere((s) => s.id == slotId);
+          if (idx >= 0) _selectedSlotIndex = idx;
+        }
+      }
+    });
+  }
+
+  Widget? _buildLayerToolbar() {
+    final kind = _selectedOverlayKind;
+    final id = _selectedOverlayId;
+    if (kind == null || id == null) return null;
+
+    switch (kind) {
+      case TemplateEditorOverlayKind.filter:
+        return TemplateEditorLayerToolbar(
+          replaceLabel: 'Replace filter',
+          onDismiss: () => setState(_clearOverlaySelection),
+          onReplace: () {
+            _replaceOverlayId = id;
+            setState(() => _activePanel = TemplateEditorPanel.filters);
+          },
+          onCopy: () {
+            final copy = _session.duplicateUserFilter(id);
+            if (copy == null) {
+              _showSnack('Max $kMaxFiltersPerSlot filters per clip');
+              return;
+            }
+            setState(() {
+              _selectedOverlayId = copy.id;
+              _selectedOverlayKind = TemplateEditorOverlayKind.filter;
+            });
+            unawaited(_syncSlotFilters(copy.slotId));
+          },
+          onDelete: () {
+            final track = _session.userFilters
+                .where((f) => f.id == id)
+                .firstOrNull;
+            _session.removeUserFilter(id);
+            _clearOverlaySelection();
+            if (track != null) unawaited(_syncSlotFilters(track.slotId));
+            setState(() {});
+          },
+          onLayers: () => _showFxLayersSheet(isFilter: true),
+          layersEnabled: _session.userFilters.length > 1,
+          copyEnabled: _session.filtersForSlot(
+                _session.userFilters
+                        .where((f) => f.id == id)
+                        .map((f) => f.slotId)
+                        .firstOrNull ??
+                    '',
+              ).length <
+              kMaxFiltersPerSlot,
+        );
+      case TemplateEditorOverlayKind.effect:
+        return TemplateEditorLayerToolbar(
+          replaceLabel: 'Replace effect',
+          onDismiss: () => setState(_clearOverlaySelection),
+          onReplace: () {
+            _replaceOverlayId = id;
+            setState(() => _activePanel = TemplateEditorPanel.effects);
+          },
+          onCopy: () {
+            final copy = _session.duplicateUserEffect(id);
+            if (copy == null) {
+              _showSnack('Max $kMaxEffectsPerSlot effects per clip');
+              return;
+            }
+            setState(() {
+              _selectedOverlayId = copy.id;
+              _selectedOverlayKind = TemplateEditorOverlayKind.effect;
+            });
+            unawaited(_syncSlotEffects(copy.slotId));
+          },
+          onDelete: () {
+            final track = _session.userEffects
+                .where((e) => e.id == id)
+                .firstOrNull;
+            _session.removeUserEffect(id);
+            _clearOverlaySelection();
+            if (track != null) unawaited(_syncSlotEffects(track.slotId));
+            setState(() {});
+          },
+          onLayers: () => _showFxLayersSheet(isFilter: false),
+          layersEnabled: _session.userEffects.length > 1,
+          copyEnabled: _session.effectsForSlot(
+                _session.userEffects
+                        .where((e) => e.id == id)
+                        .map((e) => e.slotId)
+                        .firstOrNull ??
+                    '',
+              ).length <
+              kMaxEffectsPerSlot,
+        );
+      case TemplateEditorOverlayKind.audio:
+        return TemplateEditorLayerToolbar(
+          replaceLabel: 'Replace',
+          onDismiss: () => setState(_clearOverlaySelection),
+          onReplace: () => unawaited(_pickAudio()),
+          onCopy: () {},
+          onDelete: () {
+            _session.clearUserAudios();
+            _clearOverlaySelection();
+            unawaited(_refreshPreview());
+            setState(() {});
+          },
+          copyEnabled: false,
+        );
+      case TemplateEditorOverlayKind.text:
+      case TemplateEditorOverlayKind.sticker:
+        return null;
+    }
+  }
+
+  Future<void> _showFxLayersSheet({required bool isFilter}) async {
+    final slot = _selectedSlot;
+    if (isFilter) {
+      final layers = _session.filtersForSlot(slot.id);
+      if (layers.isEmpty) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: TemplateEditorTheme.panel,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Filter layers',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                for (final layer in layers)
+                  ListTile(
+                    title: Text(
+                      layer.displayName,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    trailing: _selectedOverlayId == layer.id
+                        ? const Icon(LucideIcons.check, color: Colors.white)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _selectedOverlayId = layer.id;
+                        _selectedOverlayKind = TemplateEditorOverlayKind.filter;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          );
+        },
+      );
+      return;
+    }
+
+    final effectLayers = _session.effectsForSlot(slot.id);
+    if (effectLayers.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TemplateEditorTheme.panel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Effect layers',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              for (final layer in effectLayers)
+                ListTile(
+                  title: Text(
+                    layer.displayName,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  trailing: _selectedOverlayId == layer.id
+                      ? const Icon(LucideIcons.check, color: Colors.white)
+                      : null,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _selectedOverlayId = layer.id;
+                      _selectedOverlayKind = TemplateEditorOverlayKind.effect;
+                    });
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   double _slotStartOnTimeline(String slotId) {
@@ -1281,28 +1553,36 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
 
     switch (kind) {
       case TemplateEditorOverlayKind.filter:
-        final slotStart = _slotStartOnTimeline(id);
-        final slotDur = _slotDuration(id);
+        final track = _session.userFilters
+            .where((f) => f.id == id)
+            .firstOrNull;
+        if (track == null) return;
+        final slotStart = _slotStartOnTimeline(track.slotId);
+        final slotDur = _slotDuration(track.slotId);
         final window = SlotLocalTiming.normalize(
           slotDuration: slotDur,
           startTime: (start - slotStart).clamp(0.0, slotDur),
           endTime: (end - slotStart).clamp(0.05, slotDur),
         );
-        _session.patchSlotFilterTiming(
+        _session.patchUserFilterTiming(
           id,
           startTime: window.start,
           endTime: window.end,
         );
         _debounceLookTimingSync(kind, id);
       case TemplateEditorOverlayKind.effect:
-        final slotStart = _slotStartOnTimeline(id);
-        final slotDur = _slotDuration(id);
+        final track = _session.userEffects
+            .where((e) => e.id == id)
+            .firstOrNull;
+        if (track == null) return;
+        final slotStart = _slotStartOnTimeline(track.slotId);
+        final slotDur = _slotDuration(track.slotId);
         final window = SlotLocalTiming.normalize(
           slotDuration: slotDur,
           startTime: (start - slotStart).clamp(0.0, slotDur),
           endTime: (end - slotStart).clamp(0.05, slotDur),
         );
-        _session.patchSlotEffectTiming(
+        _session.patchUserEffectTiming(
           id,
           startTime: window.start,
           endTime: window.end,
@@ -1320,13 +1600,24 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         kind == TemplateEditorOverlayKind.effect) {
       final preview = _preview;
       if (preview != null) {
-        unawaited(
-          preview
-              .applyLookPreview(slotId: id, targetTime: preview.playhead)
-              .then((_) {
-                if (mounted) setState(() {});
-              }),
-        );
+        final slotId = kind == TemplateEditorOverlayKind.filter
+            ? _session.userFilters
+                .where((f) => f.id == id)
+                .map((f) => f.slotId)
+                .firstOrNull
+            : _session.userEffects
+                .where((e) => e.id == id)
+                .map((e) => e.slotId)
+                .firstOrNull;
+        if (slotId != null) {
+          unawaited(
+            preview
+                .applyLookPreview(slotId: slotId, targetTime: preview.playhead)
+                .then((_) {
+                  if (mounted) setState(() {});
+                }),
+          );
+        }
       }
     } else {
       unawaited(_refreshPreview());
@@ -1462,21 +1753,31 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     switch (_activePanel) {
       case TemplateEditorPanel.filters:
         return TemplateEditorPresetSheet(
-          title: 'Filters · clip ${_selectedSlotIndex + 1}',
+          title: _replaceOverlayId != null
+              ? 'Replace filter'
+              : 'Add filter · clip ${_selectedSlotIndex + 1}',
           presets: _filterPresets,
           selectedId: _selectedFilterId,
           onSelected: _applyFilter,
           onClear: () => _applyFilter(kFallbackFilterPresets.first),
-          onClose: () => setState(() => _activePanel = null),
+          onClose: () => setState(() {
+            _activePanel = null;
+            _replaceOverlayId = null;
+          }),
         );
       case TemplateEditorPanel.effects:
         return TemplateEditorPresetSheet(
-          title: 'Effects · clip ${_selectedSlotIndex + 1}',
+          title: _replaceOverlayId != null
+              ? 'Replace effect'
+              : 'Add effect · clip ${_selectedSlotIndex + 1}',
           presets: _effectPresets,
           selectedId: _selectedEffectId,
           onSelected: _applyEffect,
           onClear: () => _applyEffect(kFallbackEffectPresets.first),
-          onClose: () => setState(() => _activePanel = null),
+          onClose: () => setState(() {
+            _activePanel = null;
+            _replaceOverlayId = null;
+          }),
         );
       case TemplateEditorPanel.stickers:
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1517,28 +1818,28 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       backgroundColor: TemplateEditorTheme.background,
       body: SafeArea(
         child: Column(
-          children: [
+        children: [
             _buildTopBar(),
-            if (_busy)
-              LinearProgressIndicator(
-                value: _exportProgress <= 0 ? null : _exportProgress,
-                backgroundColor: Colors.white12,
-                color: Colors.white,
-              ),
-            if (_error != null)
-              Padding(
+          if (_busy)
+            LinearProgressIndicator(
+              value: _exportProgress <= 0 ? null : _exportProgress,
+              backgroundColor: Colors.white12,
+              color: Colors.white,
+            ),
+          if (_error != null)
+            Padding(
                 padding: const EdgeInsets.all(8),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.redAccent),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.redAccent),
                   textAlign: TextAlign.center,
                 ),
               ),
             Expanded(child: _buildPreview()),
             if (!_showRenderedPreview && preview != null)
               ListenableBuilder(
-                listenable: preview,
-                builder: (context, _) {
+                    listenable: preview,
+                    builder: (context, _) {
                   final total = max(preview.duration, 0.01);
                   return Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1580,6 +1881,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                         onOverlayRangeChanged: _busy
                             ? null
                             : _onOverlayRangeChanged,
+                        onOverlayTap: _busy ? null : _onOverlayTap,
+                        selectedOverlayId: _selectedOverlayId,
                       ),
                     ],
                   );
@@ -1601,12 +1904,19 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                     : () => _pickMediaForSlot(_selectedSlotIndex),
               ),
             if (!_showRenderedPreview)
-              TemplateEditorToolbar(
+              _buildLayerToolbar() ??
+                  TemplateEditorToolbar(
                 editable: _editable,
                 activePanel: _activePanel,
                 onPanelSelected: (panel) {
+                  if (_busy) return;
+                  _clearOverlaySelection();
                   if (panel == TemplateEditorPanel.edit) {
                     unawaited(_pickMediaForSlot(_selectedSlotIndex));
+                    return;
+                  }
+                  if (panel == TemplateEditorPanel.audio) {
+                    unawaited(_pickAudio());
                     return;
                   }
                   _togglePanel(panel);
@@ -1645,10 +1955,10 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                           ),
                         ),
                       ],
-                    );
-                  },
-                ),
-              ),
+                );
+              },
+            ),
+          ),
             if (activeSheet != null && !_showRenderedPreview) activeSheet,
           ],
         ),

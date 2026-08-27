@@ -195,8 +195,8 @@ class TimelineEngine {
   TemplateTimeline build({
     required VideoTemplateRecipeEntity recipe,
     required Map<String, SlotFillEntry> fills,
-    Map<String, UserSlotFilterOverride> slotFilterOverrides = const {},
-    Map<String, UserSlotEffectOverride> slotEffectOverrides = const {},
+    List<UserEditorFilterTrack> userFilters = const [],
+    List<UserEditorEffectTrack> userEffects = const [],
     List<UserEditorTextOverlay> userTexts = const [],
     List<UserEditorStickerOverlay> userStickers = const [],
     List<UserEditorAudioTrack> userAudios = const [],
@@ -246,25 +246,28 @@ class TimelineEngine {
         ),
       );
 
-      // Slot-level effects / filters — user overrides replace admin slot FX.
-      final userFx = slotEffectOverrides[slot.id];
-      if (userFx != null && userFx.effectType.isNotEmpty) {
-        final fxStart = start + userFx.startTime.clamp(0.0, dur);
-        final fxEndRel = (userFx.endTime ?? dur).clamp(0.0, dur);
-        // Extend through slot end — [containsTime] uses an exclusive upper bound.
-        final fxEnd = fxEndRel >= dur - 0.001 ? end + 0.001 : start + fxEndRel;
-        items.add(
-          TimelineItem(
-            id: 'user_fx_${slot.id}',
-            kind: TimelineLayerKind.videoClip,
-            startTime: fxStart,
-            endTime: fxEnd > fxStart ? fxEnd : fxStart + 0.05,
-            layerOrder: 1000,
-            slotId: slot.id,
-            effectType: userFx.effectType,
-            parameters: userFx.parameters,
-          ),
-        );
+      // Slot-level effects / filters — user layers replace admin slot FX.
+      final slotUserEffects = userEffects.where((e) => e.slotId == slot.id).toList();
+      if (slotUserEffects.isNotEmpty) {
+        for (var e = 0; e < slotUserEffects.length; e++) {
+          final userFx = slotUserEffects[e];
+          if (userFx.effectType.isEmpty || userFx.effectType == 'none') continue;
+          final fxStart = start + userFx.startTime.clamp(0.0, dur);
+          final fxEndRel = (userFx.endTime ?? dur).clamp(0.0, dur);
+          final fxEnd = fxEndRel >= dur - 0.001 ? end + 0.001 : start + fxEndRel;
+          items.add(
+            TimelineItem(
+              id: 'user_fx_${userFx.id}',
+              kind: TimelineLayerKind.videoClip,
+              startTime: fxStart,
+              endTime: fxEnd > fxStart ? fxEnd : fxStart + 0.05,
+              layerOrder: 1000 + e,
+              slotId: slot.id,
+              effectType: userFx.effectType,
+              parameters: userFx.parameters,
+            ),
+          );
+        }
       } else {
         for (var e = 0; e < slot.effects.length; e++) {
           final fx = slot.effects[e];
@@ -285,26 +288,33 @@ class TimelineEngine {
         }
       }
 
-      final userFilter = slotFilterOverrides[slot.id];
-      if (userFilter != null && userFilter.filterName.isNotEmpty) {
-        final filterStart = start + userFilter.startTime.clamp(0.0, dur);
-        final filterEndRel = (userFilter.endTime ?? dur).clamp(0.0, dur);
-        // Extend through slot end — [containsTime] uses an exclusive upper bound.
-        final filterEnd = filterEndRel >= dur - 0.001
-            ? end + 0.001
-            : start + filterEndRel;
-        items.add(
-          TimelineItem(
-            id: 'user_filter_${slot.id}',
-            kind: TimelineLayerKind.videoClip,
-            startTime: filterStart,
-            endTime: filterEnd > filterStart ? filterEnd : filterStart + 0.05,
-            layerOrder: 900,
-            slotId: slot.id,
-            filterName: userFilter.filterName,
-            filterIntensity: userFilter.intensity,
-          ),
-        );
+      final slotUserFilters =
+          userFilters.where((f) => f.slotId == slot.id).toList();
+      if (slotUserFilters.isNotEmpty) {
+        for (var f = 0; f < slotUserFilters.length; f++) {
+          final userFilter = slotUserFilters[f];
+          if (userFilter.filterName.isEmpty ||
+              userFilter.filterName == 'none') {
+            continue;
+          }
+          final filterStart = start + userFilter.startTime.clamp(0.0, dur);
+          final filterEndRel = (userFilter.endTime ?? dur).clamp(0.0, dur);
+          final filterEnd = filterEndRel >= dur - 0.001
+              ? end + 0.001
+              : start + filterEndRel;
+          items.add(
+            TimelineItem(
+              id: 'user_filter_${userFilter.id}',
+              kind: TimelineLayerKind.videoClip,
+              startTime: filterStart,
+              endTime: filterEnd > filterStart ? filterEnd : filterStart + 0.05,
+              layerOrder: 900 + f,
+              slotId: slot.id,
+              filterName: userFilter.filterName,
+              filterIntensity: userFilter.intensity,
+            ),
+          );
+        }
       } else {
         for (var f = 0; f < slot.filters.length; f++) {
           final filter = slot.filters[f];

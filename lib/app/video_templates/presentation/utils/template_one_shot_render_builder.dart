@@ -47,12 +47,14 @@ abstract final class TemplateOneShotRenderBuilder {
         'type': _mediaType(slot: slot, fill: fill, url: url),
       });
 
+      final slotFilters = session.userFilters.where((f) => f.slotId == slot.id).toList();
+      final slotEffects = session.userEffects.where((e) => e.slotId == slot.id).toList();
       final slotPatch = _buildSlotPatch(
         slotIndex: slot.slotIndex >= 0 ? slot.slotIndex : i,
         fill: fill,
         slot: slot,
-        filter: session.slotFilterOverrides[slot.id],
-        effect: session.slotEffectOverrides[slot.id],
+        filters: slotFilters,
+        effects: slotEffects,
       );
       if (slotPatch != null) slots.add(slotPatch);
     }
@@ -80,10 +82,9 @@ abstract final class TemplateOneShotRenderBuilder {
 
     final audioTracks = session.resolvedAudioTracks;
     if (audioTracks.isNotEmpty) {
-      body['audios'] = audioTracks
-          .map(_buildAudioTrack)
-          .toList(growable: false);
-      _applyLegacySoundFields(body, audioTracks.first);
+      final primaryAudio = audioTracks.first;
+      body['audios'] = [_buildAudioTrack(primaryAudio)];
+      _applyLegacySoundFields(body, primaryAudio);
     } else if (!session.userSoundCleared) {
       final soundSegmentId = VideoTemplateProjectIds.normalizeServerId(
         session.userSoundSegmentId ?? recipe.soundSegmentId,
@@ -187,8 +188,8 @@ abstract final class TemplateOneShotRenderBuilder {
     required int slotIndex,
     required SlotFillEntry? fill,
     required VideoTemplateSlotEntity slot,
-    UserSlotFilterOverride? filter,
-    UserSlotEffectOverride? effect,
+    List<UserEditorFilterTrack> filters = const [],
+    List<UserEditorEffectTrack> effects = const [],
   }) {
     final map = <String, dynamic>{'slotIndex': slotIndex};
     var hasOverride = false;
@@ -223,50 +224,66 @@ abstract final class TemplateOneShotRenderBuilder {
       }
     }
 
-    final filterPresetId = VideoTemplateProjectIds.normalizeServerId(
-      filter?.presetId,
-    );
-    if (filterPresetId != null) {
-      map['filterPresetId'] = filterPresetId;
-      map['filterIntensity'] = filter!.intensity.clamp(0.0, 1.0);
+    final exportFilters = <Map<String, dynamic>>[];
+    for (final filter in filters) {
+      if (filter.filterName.isEmpty || filter.filterName == 'none') continue;
+      final presetId = VideoTemplateProjectIds.normalizeServerId(filter.presetId);
+      if (presetId == null) {
+        debugPrint(
+          'OneShotRender: skip non-UUID filter preset '
+          '"${filter.presetId}" (${filter.filterName})',
+        );
+        continue;
+      }
       final window = SlotLocalTiming.normalize(
         slotDuration: slotDur,
         startTime: filter.startTime,
         endTime: filter.endTime,
       );
-      map['filterStartTime'] = window.start;
-      map['filterEndTime'] = window.end;
+      exportFilters.add({
+        'presetId': presetId,
+        'intensity': filter.intensity.clamp(0.0, 1.0),
+        'startTime': window.start,
+        'endTime': window.end,
+      });
+    }
+    if (exportFilters.isNotEmpty) {
+      map['filters'] = exportFilters;
+      map['filterPresetId'] = exportFilters.first['presetId'];
+      map['filterIntensity'] = exportFilters.first['intensity'];
+      map['filterStartTime'] = exportFilters.first['startTime'];
+      map['filterEndTime'] = exportFilters.first['endTime'];
       hasOverride = true;
-    } else if (filter != null &&
-        filter.filterName.isNotEmpty &&
-        filter.filterName != 'none') {
-      // Local fallback presets — preview only; server needs UUID catalog ids.
-      debugPrint(
-        'OneShotRender: skip non-UUID filter preset '
-        '"${filter.presetId}" (${filter.filterName})',
-      );
     }
 
-    final effectPresetId = VideoTemplateProjectIds.normalizeServerId(
-      effect?.presetId,
-    );
-    if (effectPresetId != null) {
-      map['effectPresetId'] = effectPresetId;
+    final exportEffects = <Map<String, dynamic>>[];
+    for (final effect in effects) {
+      if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
+      final presetId = VideoTemplateProjectIds.normalizeServerId(effect.presetId);
+      if (presetId == null) {
+        debugPrint(
+          'OneShotRender: skip non-UUID effect preset '
+          '"${effect.presetId}" (${effect.effectType})',
+        );
+        continue;
+      }
       final window = SlotLocalTiming.normalize(
         slotDuration: slotDur,
-        startTime: effect!.startTime,
+        startTime: effect.startTime,
         endTime: effect.endTime,
       );
-      map['effectStartTime'] = window.start;
-      map['effectEndTime'] = window.end;
+      exportEffects.add({
+        'presetId': presetId,
+        'startTime': window.start,
+        'endTime': window.end,
+      });
+    }
+    if (exportEffects.isNotEmpty) {
+      map['effects'] = exportEffects;
+      map['effectPresetId'] = exportEffects.first['presetId'];
+      map['effectStartTime'] = exportEffects.first['startTime'];
+      map['effectEndTime'] = exportEffects.first['endTime'];
       hasOverride = true;
-    } else if (effect != null &&
-        effect.effectType.isNotEmpty &&
-        effect.effectType != 'none') {
-      debugPrint(
-        'OneShotRender: skip non-UUID effect preset '
-        '"${effect.presetId}" (${effect.effectType})',
-      );
     }
 
     return hasOverride ? map : null;
@@ -334,10 +351,9 @@ abstract final class TemplateOneShotRenderBuilder {
       final slotDur = UserProjectSlotMapper.resolveSlotDuration(slot, fill);
       final slotStart = cursor;
 
-      final filter = session.slotFilterOverrides[slot.id];
-      if (filter != null &&
-          filter.filterName.isNotEmpty &&
-          filter.filterName != 'none') {
+      final slotFilters = session.userFilters.where((f) => f.slotId == slot.id);
+      for (final filter in slotFilters) {
+        if (filter.filterName.isEmpty || filter.filterName == 'none') continue;
         final window = SlotLocalTiming.normalize(
           slotDuration: slotDur,
           startTime: filter.startTime,
@@ -348,7 +364,7 @@ abstract final class TemplateOneShotRenderBuilder {
         out.add(
           _scheduleAsText(
             label:
-                '${filter.filterName} · ${formatEditorSeconds(globalStart)}–${formatEditorSeconds(globalEnd)}',
+                '${filter.displayName} · ${formatEditorSeconds(globalStart)}–${formatEditorSeconds(globalEnd)}',
             startTime: globalStart,
             endTime: globalEnd,
             kind: 'filter',
@@ -356,10 +372,9 @@ abstract final class TemplateOneShotRenderBuilder {
         );
       }
 
-      final effect = session.slotEffectOverrides[slot.id];
-      if (effect != null &&
-          effect.effectType.isNotEmpty &&
-          effect.effectType != 'none') {
+      final slotEffects = session.userEffects.where((e) => e.slotId == slot.id);
+      for (final effect in slotEffects) {
+        if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
         final window = SlotLocalTiming.normalize(
           slotDuration: slotDur,
           startTime: effect.startTime,
@@ -370,7 +385,7 @@ abstract final class TemplateOneShotRenderBuilder {
         out.add(
           _scheduleAsText(
             label:
-                '${effect.effectType} · ${formatEditorSeconds(globalStart)}–${formatEditorSeconds(globalEnd)}',
+                '${effect.displayName} · ${formatEditorSeconds(globalStart)}–${formatEditorSeconds(globalEnd)}',
             startTime: globalStart,
             endTime: globalEnd,
             kind: 'effect',

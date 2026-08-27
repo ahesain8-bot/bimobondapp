@@ -19,9 +19,11 @@ class TemplateEditorOverlaySegment {
     required this.end,
     required this.label,
     required this.color,
+    this.slotId,
     this.icon,
     this.editable = true,
     this.showVolumeIcon = false,
+    this.selected = false,
   });
 
   final String id;
@@ -30,10 +32,17 @@ class TemplateEditorOverlaySegment {
   final double end;
   final String label;
   final Color color;
+  final String? slotId;
   final IconData? icon;
   final bool editable;
   final bool showVolumeIcon;
+  final bool selected;
 }
+
+typedef TemplateEditorOverlayTap = void Function(
+  TemplateEditorOverlayKind kind,
+  String id,
+);
 
 typedef TemplateEditorOverlayRangeChanged = void Function(
   TemplateEditorOverlayKind kind,
@@ -56,6 +65,8 @@ class TemplateEditorTimeline extends StatelessWidget {
     this.onAddMedia,
     this.onSeek,
     this.onOverlayRangeChanged,
+    this.onOverlayTap,
+    this.selectedOverlayId,
   });
 
   final List<VideoTemplateSlotEntity> slots;
@@ -69,6 +80,8 @@ class TemplateEditorTimeline extends StatelessWidget {
   final VoidCallback? onAddMedia;
   final ValueChanged<double>? onSeek;
   final TemplateEditorOverlayRangeChanged? onOverlayRangeChanged;
+  final TemplateEditorOverlayTap? onOverlayTap;
+  final String? selectedOverlayId;
 
   static const double _maxPxPerSecond = 56;
   static const double _horizontalPadding = 12;
@@ -295,7 +308,12 @@ class TemplateEditorTimeline extends StatelessWidget {
             label: segment.label,
             color: segment.color,
             icon: segment.icon,
+            selected: segment.selected ||
+                (selectedOverlayId != null && selectedOverlayId == segment.id),
             editable: segment.editable && onOverlayRangeChanged != null,
+            onTap: onOverlayTap == null
+                ? null
+                : () => onOverlayTap!(segment.kind, segment.id),
             onRangeChanged: segment.editable && onOverlayRangeChanged != null
                 ? (start, end) => onOverlayRangeChanged!(
                       segment.kind,
@@ -324,7 +342,9 @@ class _TimedTrackBar extends StatefulWidget {
     required this.label,
     required this.color,
     this.icon,
+    this.selected = false,
     this.editable = false,
+    this.onTap,
     this.onRangeChanged,
   });
 
@@ -335,7 +355,9 @@ class _TimedTrackBar extends StatefulWidget {
   final String label;
   final Color color;
   final IconData? icon;
+  final bool selected;
   final bool editable;
+  final VoidCallback? onTap;
   final void Function(double start, double end)? onRangeChanged;
 
   @override
@@ -420,11 +442,18 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
           width: width,
           top: 0,
           bottom: 0,
-          child: Container(
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: Container(
             decoration: BoxDecoration(
-              color: widget.color.withValues(alpha: 0.4),
+              color: widget.color.withValues(alpha: widget.selected ? 0.55 : 0.4),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: widget.color.withValues(alpha: 0.75)),
+              border: Border.all(
+                color: widget.selected
+                    ? Colors.white
+                    : widget.color.withValues(alpha: 0.75),
+                width: widget.selected ? 2 : 1,
+              ),
             ),
             child: Row(
               children: [
@@ -487,6 +516,7 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
                     onDragEnd: _endDrag,
                   ),
               ],
+            ),
             ),
           ),
         ),

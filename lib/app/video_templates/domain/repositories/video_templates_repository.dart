@@ -176,6 +176,18 @@ abstract class VideoTemplatesRepository {
     double? endTime,
   });
 
+  Future<Either<Failure, void>> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<Either<Failure, void>> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
   Future<Either<Failure, void>> createProjectText({
     required String projectId,
     required String text,

@@ -131,6 +131,18 @@ abstract class VideoTemplatesRemoteDataSource {
     double? endTime,
   });
 
+  Future<void> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<void> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
   Future<void> createProjectText({
     required String projectId,
     required String text,
@@ -889,6 +901,38 @@ class VideoTemplatesRemoteDataSourceImpl
           if (startTime != null) 'effectStartTime': startTime,
           if (endTime != null) 'effectEndTime': endTime,
         },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotFilters(projectId, slotId),
+        data: {'items': items},
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotEffects(projectId, slotId),
+        data: {'items': items},
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);
