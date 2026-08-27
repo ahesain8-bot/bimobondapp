@@ -409,6 +409,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     return false;
   }
 
+  /// LARGE gifts stay prominent without obscuring the host, battle, and chat.
+  bool get _isLargeStage => !_isSmall && !_isMedium;
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
@@ -418,32 +421,28 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    // A LARGE video gift is authored full-bleed portrait (the occasion MP4s are
-    // 496x864 with the composition running edge to edge), so it gets the whole
-    // screen the way TikTok plays its fullscreen gifts. Cover-cropping one into
-    // a square at the bottom threw away roughly 40% of every frame.
-    final isFullscreenVideo = isLarge && _kind == _GiftMediaKind.video;
-
     final double stageWidth;
     final double stageHeight;
     if (isSmall) {
       stageWidth = stageHeight = (screenSize.width * 0.28).clamp(80.0, 120.0);
     } else if (isMedium) {
       stageWidth = stageHeight = (screenSize.width * 0.72).clamp(240.0, 340.0);
-    } else if (isFullscreenVideo) {
-      stageWidth = screenSize.width;
-      stageHeight = screenSize.height;
     } else {
-      // Lottie stages stay 1:1 — those compositions are authored square.
-      stageWidth = stageHeight = screenSize.width.clamp(0.0, screenSize.height);
+      // Large gifts used to be a screen-sized portrait video with BoxFit.cover,
+      // which hid the stream for the full animation. Keep the premium effect
+      // large, but reserve more than half of the live room for the people and
+      // controls underneath it.
+      stageWidth = screenSize.width * 0.88;
+      stageHeight = screenSize.height * 0.48;
     }
 
     final media = SizedBox(
+      key: const ValueKey('gift-animation-stage'),
       width: stageWidth,
       height: stageHeight,
       child: _buildMedia(),
     );
-    final stage = _kind == _GiftMediaKind.video
+    final stage = _kind == _GiftMediaKind.video || isLarge
         ? RepaintBoundary(child: media)
         : _withEdgeFade(media);
 
@@ -507,14 +506,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       bottomPosition = null;
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
-    } else if (isFullscreenVideo) {
-      topPosition = 0;
-      bottomPosition = null;
-      leftPosition = 0;
-      rightPosition = null;
     } else {
+      // Centre the bounded stage slightly below the middle, clear of both the
+      // top host chrome and the bottom composer/gift controls.
       topPosition = null;
-      bottomPosition = 0;
+      bottomPosition = (screenSize.height * 0.14).clamp(92.0, 150.0);
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
@@ -577,7 +573,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           return Lottie(
             composition: composition,
             controller: controller,
-            fit: BoxFit.cover,
+            // A large stage is rectangular; containing the artwork prevents
+            // its most important edges from being cropped.
+            fit: _isLargeStage ? BoxFit.contain : BoxFit.cover,
             alignment: Alignment.center,
             addRepaintBoundary: true,
           );
@@ -594,10 +592,10 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           // `initialize()` opens the stream and decodes the first frame.
           return const SizedBox.expand();
         }
-        // Cover whatever stage this kind was given — a fullscreen rect for a
-        // LARGE gift, a square for MEDIUM/SMALL.
+        // Large portrait occasion videos must be contained in their bounded
+        // stage. SMALL/MEDIUM assets remain full-bleed inside their square.
         return FittedBox(
-          fit: BoxFit.cover,
+          fit: _isLargeStage ? BoxFit.contain : BoxFit.cover,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
             width: controller.value.size.width,
@@ -617,7 +615,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         imageUrl: thumb,
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: _isLargeStage ? BoxFit.contain : BoxFit.cover,
       );
     }
     return const Center(

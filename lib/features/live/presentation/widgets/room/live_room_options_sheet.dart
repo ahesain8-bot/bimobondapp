@@ -5,9 +5,11 @@ import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
+import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import 'live_room_battle_opponents_sheet.dart';
 import 'live_room_option_tile.dart';
 import 'live_room_settings_sheet.dart';
 
@@ -17,6 +19,12 @@ class LiveRoomOptionsSheet {
 
   static Future<void> show(BuildContext context) async {
     final bloc = context.read<LiveRoomBloc>();
+    // A modal route's subtree hangs off the root navigator, not off the live
+    // room page, so anything the sheet needs has to be re-provided here. The
+    // repository is what the "بدء منافسة" tile reads to open the opponent
+    // picker; without it that tile threw ProviderNotFound on every tap and
+    // the row simply did nothing.
+    final repository = context.read<LiveSessionRepository>();
 
     final destination = await showModalBottomSheet<LiveRoomMenuDestination>(
       context: context,
@@ -27,13 +35,19 @@ class LiveRoomOptionsSheet {
       builder: (sheetContext) {
         return BlocProvider.value(
           value: bloc,
-          child: const _LiveRoomOptionsSheetBody(),
+          child: RepositoryProvider.value(
+            value: repository,
+            child: const _LiveRoomOptionsSheetBody(),
+          ),
         );
       },
     );
 
     if (destination == LiveRoomMenuDestination.settings && context.mounted) {
       await LiveRoomSettingsSheet.show(context);
+    }
+    if (destination == LiveRoomMenuDestination.startBattle && context.mounted) {
+      await LiveRoomBattleOpponentsSheet.show(context);
     }
   }
 }
@@ -126,7 +140,11 @@ class _OptionsContent extends StatelessWidget {
         .read<LiveRoomBloc>()
         .add(LiveRoomMenuDestinationRequested(destination));
     if (!closeSheet) return;
-    if (destination == LiveRoomMenuDestination.settings) {
+    if (destination == LiveRoomMenuDestination.settings ||
+        destination == LiveRoomMenuDestination.startBattle) {
+      // Hand the destination back to `show`, which reopens from the page's
+      // own context once this sheet is really gone. Popping here and pushing
+      // in the same frame left the options sheet stacked underneath.
       Navigator.of(context).pop(destination);
       return;
     }
@@ -158,6 +176,19 @@ class _OptionsContent extends StatelessWidget {
               onTap: () => _navigate(
                 context,
                 LiveRoomMenuDestination.liveGifts,
+              ),
+            ),
+            // Direct way into a PK round. Before this the only trigger was
+            // accepting a guest's chat request, which then blind-auto-matched
+            // a stranger; the host could never simply pick who to face.
+            LiveRoomOptionTile(
+              icon: Icons.sports_mma_outlined,
+              title: 'بدء منافسة',
+              subtitle: 'اختر بثاً مباشراً آخر لتتنافس معه.',
+              trailing: LiveRoomOptionTrailing.chevron,
+              onTap: () => _navigate(
+                context,
+                LiveRoomMenuDestination.startBattle,
               ),
             ),
             LiveRoomOptionTile(

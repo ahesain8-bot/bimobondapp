@@ -213,6 +213,7 @@ class LiveRoomPauseLiveTapped extends LiveRoomEvent {
 enum LiveRoomMenuDestination {
   liveGifts,
   liveHighlights,
+  startBattle,
   settings,
   comments,
   aboutMe,
@@ -309,6 +310,12 @@ class LiveRoomBattleChanged extends LiveRoomEvent {
   const LiveRoomBattleChanged(this.battle);
 
   final LiveBattle? battle;
+}
+
+/// Re-reads the supporter leaderboards this room draws — this live's, and the
+/// opponent's while a battle is active.
+class LiveRoomSupportersRefreshRequested extends LiveRoomEvent {
+  const LiveRoomSupportersRefreshRequested();
 }
 
 /// Gallery list changed — refresh gallery counts chip.

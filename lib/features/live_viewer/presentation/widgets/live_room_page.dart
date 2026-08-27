@@ -66,12 +66,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   void didUpdateWidget(covariant LiveRoomPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.live.id != widget.live.id) {
-      _deactivateIfThis();
       _scheduleActivate();
     } else if (widget.isActive && !oldWidget.isActive) {
       _scheduleActivate();
-    } else if (!widget.isActive && oldWidget.isActive) {
-      _deactivateIfThis();
     }
   }
 
@@ -89,8 +86,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _scheduleActivate() {
+    // PageView keeps neighbouring TikTok-style pages mounted. An off-screen
+    // page must never replace the one LiveKit room owned by the visible page.
+    if (!widget.isActive) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || !widget.isActive) return;
       context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
     });
   }
@@ -336,6 +336,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             prev.guests != curr.guests ||
             prev.isOnStage != curr.isOnStage ||
             prev.battle != curr.battle ||
+            prev.battleOpponentLive != curr.battleOpponentLive ||
+            prev.topViewerAvatars != curr.topViewerAvatars ||
+            prev.opponentTopGifterAvatars != curr.opponentTopGifterAvatars ||
             prevInfo != currInfo;
       },
       builder: (context, state) {
@@ -444,6 +447,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           children: [
                             _PkVideoLayout(
                               live: live,
+                              opponentLive: state.battleOpponentLive,
                               isActive: widget.isActive && connected,
                               battleRoom: isThisRoom
                                   ? di.sl<LiveKitService>().battleRoom
@@ -521,29 +525,38 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       const SizedBox(height: 6),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _PkContributors(
-                                avatars:
-                                    (live.metadata?['pkContributorsLeft']
-                                            as List?)
-                                        ?.cast<String>() ??
-                                    const <String>[],
-                                isLeft: true,
+                        // Follows the tiles above it: left cluster under the
+                        // left feed in every locale.
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _PkContributors(
+                                  avatars: isThisRoom
+                                      ? state.topViewerAvatars
+                                      : (live.metadata?['pkContributorsLeft']
+                                                    as List?)
+                                                ?.map((item) => item.toString())
+                                                .toList() ??
+                                            const <String>[],
+                                  isLeft: true,
+                                ),
                               ),
-                            ),
-                            Expanded(
-                              child: _PkContributors(
-                                avatars:
-                                    (live.metadata?['pkContributorsRight']
-                                            as List?)
-                                        ?.cast<String>() ??
-                                    const <String>[],
-                                isLeft: false,
+                              Expanded(
+                                child: _PkContributors(
+                                  avatars: isThisRoom
+                                      ? state.opponentTopGifterAvatars
+                                      : (live.metadata?['pkContributorsRight']
+                                                    as List?)
+                                                ?.map((item) => item.toString())
+                                                .toList() ??
+                                            const <String>[],
+                                  isLeft: false,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       if (widget.isActive && isThisRoom)
@@ -1184,71 +1197,85 @@ class _SideAction extends StatelessWidget {
 
 class _PkVideoLayout extends StatelessWidget {
   final LiveEntity live;
+  final LiveEntity? opponentLive;
   final bool isActive;
   final Room? battleRoom;
 
   const _PkVideoLayout({
     required this.live,
+    required this.opponentLive,
     required this.isActive,
     required this.battleRoom,
   });
 
   @override
   Widget build(BuildContext context) {
-    final guestName = live.metadata?['guestName'] as String? ?? 'Guest';
-    final guestAvatar = live.metadata?['guestAvatar'] as String?;
-    // Only the host's own tier is known here; the opponent's side stays bare
-    // rather than showing a placeholder league.
-    final hostTier = (live.metadata?['hostLeagueTier'] as String?)?.trim();
+    final guestName =
+        opponentLive?.hostName ??
+        live.metadata?['guestName'] as String? ??
+        'Guest';
+    final guestAvatar =
+        opponentLive?.hostAvatar ?? live.metadata?['guestAvatar'] as String?;
     const badgeTop = 38.0;
 
+    // This viewer's live is the B2 tile and holds the LEFT half, matching the
+    // host stage and the TikTok reference. Left to itself the Row mirrors in
+    // Arabic and the two feeds swap sides, which is what made the opponent
+    // look like it had failed to arrive.
     return ClipRect(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                LiveVideoPlayer(
-                  live: live,
-                  isActive: isActive,
-                  fit: BoxFit.fitWidth,
-                ),
-                if (hostTier != null && hostTier.isNotEmpty)
-                  Positioned(
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  LiveVideoPlayer(
+                    live: live,
+                    isActive: isActive,
+                    fit: BoxFit.fitWidth,
+                  ),
+                  const Positioned(
                     left: 8,
                     top: badgeTop,
-                    child: _PkCornerBadge(label: hostTier),
+                    child: _PkCornerBadge(label: 'B2'),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Container(width: 1, color: Colors.white.withValues(alpha: 0.28)),
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _PkGuestFeed(
-                  liveId: live.id,
-                  guestName: guestName,
-                  guestAvatar: guestAvatar,
-                  room: battleRoom,
-                  fit: BoxFit.fitWidth,
-                ),
-                Positioned(
-                  right: 8,
-                  bottom: 10,
-                  child: _GuestChip(
-                    name: guestName,
-                    avatar: guestAvatar,
-                    showAdd: true,
+            Container(width: 1, color: Colors.white.withValues(alpha: 0.28)),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _PkGuestFeed(
+                    liveId: opponentLive?.id ?? live.id,
+                    guestName: guestName,
+                    guestAvatar: guestAvatar,
+                    room: battleRoom,
+                    fit: BoxFit.fitWidth,
                   ),
-                ),
-              ],
+                  const Positioned(
+                    right: 8,
+                    top: badgeTop,
+                    child: _PkCornerBadge(label: 'B1'),
+                  ),
+                  Positioned(
+                    right: 8,
+                    bottom: 10,
+                    child: _GuestChip(
+                      name: guestName,
+                      avatar: guestAvatar,
+                      showAdd: true,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1299,29 +1326,15 @@ class _PkGuestFeed extends StatelessWidget {
   }
 
   Widget _fallback() {
-    // Waiting-for-track state. Without a real opponent avatar this stays a
-    // neutral placeholder rather than borrowing a stock portrait.
-    final placeholder = Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF2A2A31), Color(0xFF121216)],
-        ),
-      ),
-      alignment: Alignment.center,
-      child: ClipOval(
-        child: SizedBox(
-          width: 72,
-          height: 72,
+    final url = guestAvatar?.trim();
+    if (url == null || url.isEmpty) {
+      return ColoredBox(
+        color: const Color(0xFF2A1A3A),
+        child: Center(
           child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
         ),
-      ),
-    );
-
-    final url = guestAvatar?.trim();
-    if (url == null || url.isEmpty) return placeholder;
-
+      );
+    }
     return ColoredBox(
       color: Colors.black,
       child: CachedNetworkImage(
@@ -1367,10 +1380,7 @@ class _PkBattleTimer extends StatelessWidget {
           children: [
             if (multiplier > 1) ...[
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 7,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
@@ -1487,10 +1497,14 @@ class _PkContributors extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final list = avatars.take(3).toList();
+    final ranked = avatars
+        .take(3)
+        .indexed
+        .map((item) => (url: item.$2, rank: item.$1 + 1))
+        .toList(growable: false);
+    final list = isLeft ? ranked.reversed.toList(growable: false) : ranked;
     if (list.isEmpty) return const SizedBox(height: 34);
     final ring = isLeft ? const Color(0xFFFF5A8A) : const Color(0xFF25F4EE);
-    final ranks = isLeft ? const [3, 2, 1] : const [1, 2, 3];
 
     return Row(
       mainAxisAlignment: isLeft
@@ -1511,7 +1525,7 @@ class _PkContributors extends StatelessWidget {
                 ),
                 child: ClipOval(
                   child: CachedNetworkImage(
-                    imageUrl: list[i],
+                    imageUrl: list[i].url,
                     fit: BoxFit.cover,
                     errorWidget: (_, _, _) => Container(
                       color: AppColors.surface,
@@ -1537,7 +1551,7 @@ class _PkContributors extends StatelessWidget {
                     border: Border.all(color: Colors.black, width: 1),
                   ),
                   child: Text(
-                    '${ranks[i]}',
+                    '${list[i].rank}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 8,

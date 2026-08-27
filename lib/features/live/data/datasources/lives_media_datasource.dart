@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../../core/services/live_audio_session.dart';
+import '../../../../core/services/media_progress_watchdog.dart';
 import '../../../../core/services/live_video_quality_preference.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_capture_profile.dart';
@@ -11,13 +13,32 @@ import '../../domain/entities/live_capture_profile.dart';
 /// Publishes / subscribes LiveKit A/V using **server-issued** `url` + `token` only.
 ///
 /// Never mints JWTs or stores `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`.
+/// How often the room health watchdogs sample media counters.
+const Duration _kMediaHealthTick = Duration(seconds: 2);
+
 class LivesMediaDataSource {
   Room? _room;
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
+
+  /// Whether this datasource currently holds [LiveAudioSession]. Keeps the
+  /// acquire/release pair balanced no matter which connect path ran.
+  var _holdsAudioSession = false;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
+  Timer? _videoHealthTimer;
+  var _videoHealthCheckInFlight = false;
+  // 3 samples at 2s: about six seconds of a stream that decodes no frames
+  // while signalling still says the room is up. Long enough that ordinary
+  // rebuffering is not mistaken for a stall, short enough that the host is not
+  // broadcasting a frozen picture for a quarter of a minute.
+  final _videoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+  Timer? _battleVideoHealthTimer;
+  var _battleVideoHealthCheckInFlight = false;
+  // The opponent room is secondary and crosses another host's uplink, so it
+  // gets a longer rope before its room is rebuilt.
+  final _battleVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 5);
 
   /// The profile the camera actually opened at — not the one we asked for.
   /// Publish options and camera flips both read this so the declared layers
@@ -120,6 +141,18 @@ class LivesMediaDataSource {
     );
   }
 
+  Future<void> _acquireAudioSession() async {
+    if (_holdsAudioSession) return;
+    _holdsAudioSession = true;
+    await LiveAudioSession.instance.acquire();
+  }
+
+  Future<void> _releaseAudioSession() async {
+    if (!_holdsAudioSession) return;
+    _holdsAudioSession = false;
+    await LiveAudioSession.instance.release();
+  }
+
   Future<void> _preferMediaSpeaker() async {
     try {
       // TikTok-style live rooms are media playback, not private calls. Keep
@@ -169,6 +202,75 @@ class LivesMediaDataSource {
       '(stats=$sawAnyStats frames=$lastFrames packets=$lastPackets)',
     );
     return false;
+  }
+
+  void _startOutboundVideoWatchdog(Room room, LocalVideoTrack track) {
+    _stopOutboundVideoWatchdog();
+    _videoProgress.reset();
+    _videoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
+      if (_videoHealthCheckInFlight ||
+          _room != room ||
+          _videoTrack != track ||
+          !_videoPublished) {
+        return;
+      }
+      _videoHealthCheckInFlight = true;
+      unawaited(
+        _sampleOutboundVideo(room, track).whenComplete(() {
+          _videoHealthCheckInFlight = false;
+        }),
+      );
+    });
+  }
+
+  Future<void> _sampleOutboundVideo(Room room, LocalVideoTrack track) async {
+    try {
+      // A host who turned their camera off stops sending frames on purpose.
+      // Without this the watchdog read that as a stall and forced a full
+      // reconnect, which republished the camera the host had just closed.
+      if (track.muted || room.localParticipant?.isCameraEnabled() == false) {
+        _videoProgress.reset();
+        return;
+      }
+      final stats = await track.getSenderStats();
+      if (_room != room || _videoTrack != track || stats.isEmpty) return;
+      num frames = 0;
+      num packets = 0;
+      var hasFrameCounter = false;
+      var hasPacketCounter = false;
+      for (final layer in stats) {
+        final sentFrames = layer.framesSent;
+        final sentPackets = layer.packetsSent;
+        if (sentFrames != null) {
+          hasFrameCounter = true;
+          frames += sentFrames;
+        }
+        if (sentPackets != null) {
+          hasPacketCounter = true;
+          packets += sentPackets;
+        }
+      }
+      final progress = hasFrameCounter
+          ? frames
+          : (hasPacketCounter ? packets : null);
+      if (!_videoProgress.addSample(progress)) return;
+
+      debugPrint(
+        '🔴 [Host] outbound video stopped advancing while room remained connected',
+      );
+      _stopOutboundVideoWatchdog();
+      onRoomEvent?.call('room', 'disconnected:outbound_video_stalled');
+    } catch (error) {
+      // Stats support is platform-dependent. An unavailable sample is not a
+      // disconnect and must not interrupt a healthy broadcast.
+      debugPrint('[Host] outbound health sample unavailable: $error');
+    }
+  }
+
+  void _stopOutboundVideoWatchdog() {
+    _videoHealthTimer?.cancel();
+    _videoHealthTimer = null;
+    _videoProgress.reset();
   }
 
   /// Host/guest: connect then publish camera + mic (production.md §3.4).
@@ -271,11 +373,15 @@ class LivesMediaDataSource {
       });
 
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
+    // Own the Android audio session for the whole broadcast: the PK battle
+    // room disconnecting would otherwise tear it down for this room too.
+    await _acquireAudioSession();
     _room = room;
     try {
       await room.connect(url, token);
     } catch (_) {
       if (_room == room) _room = null;
+      await _releaseAudioSession();
       try {
         await room.dispose();
       } catch (_) {}
@@ -518,6 +624,7 @@ class LivesMediaDataSource {
     debugPrint(
       '🟢 [Host] connectAndPublish: SUCCESS — room + video + audio all up',
     );
+    _startOutboundVideoWatchdog(room, _videoTrack!);
   }
 
   /// Viewer: connect and subscribe only (no publish).
@@ -538,7 +645,13 @@ class LivesMediaDataSource {
         ),
       ),
     );
-    await room.connect(url, token);
+    await _acquireAudioSession();
+    try {
+      await room.connect(url, token);
+    } catch (_) {
+      await _releaseAudioSession();
+      rethrow;
+    }
     _room = room;
     await _preferMediaSpeaker();
     // Subscribe-only: mark connected without local publish.
@@ -584,6 +697,7 @@ class LivesMediaDataSource {
         onRoomEvent?.call('battle', 'reconnected');
         unawaited(_ensureBattleSubscriptions(room));
         unawaited(_preferMediaSpeaker());
+        _startBattleVideoWatchdog(room: room, url: url, token: token);
       })
       ..on<TrackSubscriptionExceptionEvent>((event) {
         unawaited(_retryBattleSubscription(room, event));
@@ -598,6 +712,7 @@ class LivesMediaDataSource {
     _battleRoom = room;
     await _ensureBattleSubscriptions(room);
     await _preferMediaSpeaker();
+    _startBattleVideoWatchdog(room: room, url: url, token: token);
   }
 
   Future<void> _retryBattleSubscription(
@@ -630,6 +745,78 @@ class LivesMediaDataSource {
         }
       }
     }
+  }
+
+  RemoteVideoTrack? _firstBattleVideoTrack(Room room) {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (publication.subscribed && !publication.muted && track != null) {
+          return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  void _startBattleVideoWatchdog({
+    required Room room,
+    required String url,
+    required String token,
+  }) {
+    _stopBattleVideoWatchdog();
+    _battleVideoProgress.reset();
+    _battleVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
+      if (_battleVideoHealthCheckInFlight || _battleRoom != room) return;
+      _battleVideoHealthCheckInFlight = true;
+      unawaited(
+        _sampleBattleVideo(room: room, url: url, token: token).whenComplete(() {
+          _battleVideoHealthCheckInFlight = false;
+        }),
+      );
+    });
+  }
+
+  Future<void> _sampleBattleVideo({
+    required Room room,
+    required String url,
+    required String token,
+  }) async {
+    try {
+      final track = _firstBattleVideoTrack(room);
+      if (_battleRoom != room) return;
+      if (track == null) {
+        await _ensureBattleSubscriptions(room);
+        if (!_battleVideoProgress.addMissingTrackSample()) return;
+      } else {
+        final stats = await track.getReceiverStats();
+        final progress =
+            stats?.framesDecoded ??
+            stats?.framesReceived ??
+            stats?.packetsReceived ??
+            stats?.bytesReceived;
+        if (_battleRoom != room || !_battleVideoProgress.addSample(progress)) {
+          return;
+        }
+      }
+
+      debugPrint(
+        '🔴 [Host] opponent video stalled while battle room stayed up',
+      );
+      _stopBattleVideoWatchdog();
+      await room.disconnect();
+      if (_battleRoom == room) {
+        unawaited(_recoverBattleRoom(room: room, url: url, token: token));
+      }
+    } catch (error) {
+      debugPrint('[Host] opponent video health sample unavailable: $error');
+    }
+  }
+
+  void _stopBattleVideoWatchdog() {
+    _battleVideoHealthTimer?.cancel();
+    _battleVideoHealthTimer = null;
+    _battleVideoProgress.reset();
   }
 
   Future<void> _recoverBattleRoom({
@@ -665,6 +852,7 @@ class LivesMediaDataSource {
           }
           await _ensureBattleSubscriptions(room);
           await _preferMediaSpeaker();
+          _startBattleVideoWatchdog(room: room, url: url, token: token);
           onRoomEvent?.call('battle', 'reconnected');
           return;
         } catch (error) {
@@ -677,6 +865,7 @@ class LivesMediaDataSource {
   }
 
   Future<void> disconnectBattle() async {
+    _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;
     if (room == null) return;
@@ -752,6 +941,7 @@ class LivesMediaDataSource {
         );
         _videoTrack = track;
         _videoPublished = true;
+        _startOutboundVideoWatchdog(room, track);
         return track;
       } catch (e, st) {
         debugPrint('LiveKit camera publish at $at failed: $e\n$st');
@@ -762,15 +952,17 @@ class LivesMediaDataSource {
       }
     }
 
-    final flipped = await publishAt(position) ??
+    final flipped =
+        await publishAt(position) ??
         await Future<LocalVideoTrack?>.delayed(
           const Duration(milliseconds: 350),
           () => publishAt(position),
         );
     if (flipped != null) return flipped;
 
-    final fallbackPosition =
-        useFront ? CameraPosition.back : CameraPosition.front;
+    final fallbackPosition = useFront
+        ? CameraPosition.back
+        : CameraPosition.front;
     final recovered = await publishAt(fallbackPosition);
     if (recovered != null) {
       throw StateError(
@@ -786,7 +978,13 @@ class LivesMediaDataSource {
       '_videoTrack=${_videoTrack != null ? "SET" : "NULL"}, '
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
+    _stopOutboundVideoWatchdog();
     await disconnectBattle();
+    // Back to LiveKit's automatic management *before* the primary room goes
+    // down, so that room's own teardown is what finally frees the session.
+    // Note the ordering against disconnectBattle() above: the battle room is
+    // closed while we still own the session, which is the whole point.
+    await _releaseAudioSession();
     final room = _room;
     // Detach ownership first: RoomDisconnectedEvent emitted by this deliberate
     // teardown must not start the host recovery loop.
