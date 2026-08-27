@@ -42,6 +42,7 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     this.fallbackFilterName,
     this.fallbackFilterIntensity = 1,
     this.fallbackFilterStack = const [],
+    this.fallbackEffects = const [],
   });
 
   final PreviewFrame? frame;
@@ -59,6 +60,10 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   final String? fallbackFilterName;
   final double fallbackFilterIntensity;
   final List<({String name, double intensity})> fallbackFilterStack;
+
+  /// Session effects when timeline sample has not caught up yet.
+  final List<({String type, double progress, Map<String, dynamic> params})>
+      fallbackEffects;
 
   /// Single media surface (images / one video without multi-pane layout).
   final Widget? mediaOverride;
@@ -124,11 +129,20 @@ class VideoTemplateComposedPreview extends StatelessWidget {
       intensity: filterIntensity,
     );
 
-    final effect = TemplateEffectVisual.resolve(
-      (f?.effects ?? const <ResolvedEffect>[]).map(
-        (e) => (type: e.effectType, progress: e.progress, params: e.parameters),
-      ),
-    );
+    final frameEffectInputs = (f?.effects ?? const <ResolvedEffect>[])
+        .map(
+          (e) => (
+            type: e.effectType,
+            progress: e.progress,
+            params: e.parameters,
+          ),
+        )
+        .toList(growable: false);
+    final effectInputs = frameEffectInputs.isNotEmpty
+        ? frameEffectInputs
+        : fallbackEffects;
+
+    final effect = TemplateEffectVisual.resolve(effectInputs);
 
     final duotoneMatrix = effect.duotone > 0.01
         ? TemplateFilterMatrices.forName('duotone', intensity: effect.duotone)
@@ -138,7 +152,7 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     final cw = canvasWidth <= 0 ? 1080 : canvasWidth;
     final ch = canvasHeight <= 0 ? 1920 : canvasHeight;
     final hasLayout = effect.collage != TemplateCollageKind.none;
-    final lookKey = _lookKey(filterName, f?.effects);
+    final lookKey = _lookKey(filterName, effectInputs);
 
     Widget colorGrade(Widget child) {
       var w = child;
@@ -281,7 +295,7 @@ class VideoTemplateComposedPreview extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     if (showTexts) ..._buildTexts(f, cw, ch, previewScale),
-                    ..._buildStickers(f, cw, ch),
+                    ..._buildStickers(f, cw, ch, previewScale),
                     ..._buildOverlays(f),
                   ],
                 ),
@@ -466,7 +480,7 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     }
     // Never mount one VideoPlayerController in more than one pane.
     final vc = videoController;
-    if (vc != null && paneKey == 'main') {
+    if (vc != null && paneKey == 'main' && isVideoMedia) {
       if (vc.value.isInitialized) {
         return FittedBox(
           fit: BoxFit.cover,
@@ -626,8 +640,14 @@ class VideoTemplateComposedPreview extends StatelessWidget {
         .toList(growable: false);
   }
 
-  List<Widget> _buildStickers(PreviewFrame? f, int cw, int ch) {
+  List<Widget> _buildStickers(
+    PreviewFrame? f,
+    int cw,
+    int ch,
+    double previewScale,
+  ) {
     if (f == null) return const [];
+    final basePx = (96 * previewScale).clamp(32.0, 160.0);
     return f.stickers
         .map((item) {
           final align = templateCanvasAlignment(
@@ -638,26 +658,27 @@ class VideoTemplateComposedPreview extends StatelessWidget {
           );
           final url = item.assetUrl;
           final label = item.parameters['label']?.toString();
+          final itemScale = item.scale <= 0 ? 1 : item.scale;
+          final size = (basePx * itemScale).clamp(24.0, cw * previewScale * 0.6);
           return Align(
             alignment: align,
             child: Opacity(
               opacity: item.opacity.clamp(0.0, 1.0),
               child: Transform.rotate(
                 angle: item.rotation * mathPi / 180,
-                child: Transform.scale(
-                  scale: item.scale <= 0 ? 1 : item.scale,
-                  child: SizedBox(
-                    width: 96,
-                    height: 96,
-                    child: url != null && url.isNotEmpty
-                        ? SafeNetworkImage(imageUrl: url, fit: BoxFit.contain)
-                        : Center(
-                            child: Text(
-                              label ?? '✨',
-                              style: const TextStyle(fontSize: 56),
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: url != null && url.isNotEmpty
+                      ? SafeNetworkImage(imageUrl: url, fit: BoxFit.contain)
+                      : Center(
+                          child: Text(
+                            label ?? '✨',
+                            style: TextStyle(
+                              fontSize: (size * 0.55).clamp(20.0, 72.0),
                             ),
                           ),
-                  ),
+                        ),
                 ),
               ),
             ),
@@ -700,10 +721,13 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   }
 }
 
-String _lookKey(String? filterName, List<ResolvedEffect>? effects) {
+String _lookKey(
+  String? filterName,
+  List<({String type, double progress, Map<String, dynamic> params})> effects,
+) {
   final fl = filterName ?? 'none';
-  final fx = (effects ?? const <ResolvedEffect>[])
-      .map((e) => '${e.effectType}:${e.progress.toStringAsFixed(2)}')
+  final fx = effects
+      .map((e) => '${e.type}:${e.progress.toStringAsFixed(2)}')
       .join(',');
   return '$fl|$fx';
 }
@@ -928,11 +952,13 @@ class _LyricSandwichLayout extends StatelessWidget {
       builder: (context, c) {
         final w = c.maxWidth;
         final h = c.maxHeight;
-        final midH = (h * bandHeightRatio.clamp(0.08, 0.35)).roundToDouble();
-        final bandH = (h * imageCropRatio.clamp(0.2, 0.7)).roundToDouble();
-        final cropFactor = (bandH / h).clamp(0.05, 1.0);
+        final cropRatio = imageCropRatio.clamp(0.2, 0.7);
+        final midRatio = bandHeightRatio.clamp(0.08, 0.35);
+        final cropFlex = (cropRatio * 1000).round().clamp(1, 1000);
+        final midFlex = (midRatio * 1000).round().clamp(1, 1000);
 
-        Widget photoBand(Widget source) {
+        Widget photoBand(Widget source, double bandH) {
+          final cropFactor = h > 0 ? (bandH / h).clamp(0.05, 1.0) : 1.0;
           return SizedBox(
             width: w,
             height: bandH,
@@ -946,18 +972,35 @@ class _LyricSandwichLayout extends StatelessWidget {
           );
         }
 
-        return ColoredBox(
-          color: Colors.black,
-          child: Column(
-            children: [
-              photoBand(top),
-              SizedBox(
-                width: w,
-                height: midH,
-                child: ColoredBox(color: bandColor),
-              ),
-              photoBand(bottom),
-            ],
+        return SizedBox(
+          width: w,
+          height: h,
+          child: ColoredBox(
+            color: Colors.black,
+            child: Column(
+              children: [
+                Expanded(
+                  flex: cropFlex,
+                  child: LayoutBuilder(
+                    builder: (context, bandConstraints) {
+                      return photoBand(top, bandConstraints.maxHeight);
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: midFlex,
+                  child: ColoredBox(color: bandColor),
+                ),
+                Expanded(
+                  flex: cropFlex,
+                  child: LayoutBuilder(
+                    builder: (context, bandConstraints) {
+                      return photoBand(bottom, bandConstraints.maxHeight);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

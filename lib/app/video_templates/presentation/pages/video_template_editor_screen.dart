@@ -13,6 +13,7 @@ import 'package:bimobondapp/app/video_templates/composition/template_composition
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:bimobondapp/app/video_templates/domain/repositories/video_templates_repository.dart';
 import 'package:bimobondapp/app/video_templates/domain/usecases/video_templates_usecases.dart';
+import 'package:bimobondapp/app/video_templates/engine/layers/layer_engines.dart';
 import 'package:bimobondapp/app/video_templates/engine/slot/slot_engine.dart';
 import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_injector.dart'
     as vt_di;
@@ -138,6 +139,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     if (widget.initialFills != null) {
       _session.fills = Map<String, SlotFillEntry>.from(widget.initialFills!);
     }
+    _session.seedDefaultsFromRecipe();
     _bootstrap();
     unawaited(_loadPresets());
     unawaited(_loadFonts());
@@ -155,9 +157,17 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       return;
     }
     setState(() => _preview = preview);
-    if (_session.effectiveSound != null && _session.userAudioTiming == null) {
+    preview.reloadTimeline();
+    if (_session.userAudios.isEmpty &&
+        _session.effectiveSound != null &&
+        _session.userAudioTiming == null) {
       final total = max(preview.duration, 0.01);
       _session.patchUserAudioTimingLegacy(startTime: 0, endTime: total);
+      preview.reloadTimeline();
+    }
+    // TikTok-style: image slots advance playhead + music on open (like studio).
+    if (preview.duration > 0) {
+      preview.play();
     }
   }
 
@@ -185,6 +195,20 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       return mapped;
     }
     if (VideoTemplateProjectIds.isServerId(recipeSlotId)) return recipeSlotId;
+    return null;
+  }
+
+  String? _slotIdForRecipeFilterOverlay(String overlayId) {
+    for (final slot in _session.slots) {
+      if (overlayId.startsWith('recipe_flt_${slot.id}_')) return slot.id;
+    }
+    return null;
+  }
+
+  String? _slotIdForRecipeEffectOverlay(String overlayId) {
+    for (final slot in _session.slots) {
+      if (overlayId.startsWith('recipe_fx_${slot.id}_')) return slot.id;
+    }
     return null;
   }
 
@@ -253,18 +277,27 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     super.dispose();
   }
 
-  Future<void> _pickAudio() async {
+  Future<void> _pickAudio({String? replaceTrackId}) async {
+    final wasPlaying = _preview?.isPlaying ?? false;
     _preview?.pause();
     await SoundAudioPreview.stop();
     if (!mounted) return;
+
+    final existingTrack = replaceTrackId == null
+        ? null
+        : _session.userAudios.where((a) => a.id == replaceTrackId).firstOrNull ??
+            _session.resolvedAudioTracks
+                .where((a) => a.id == replaceTrackId)
+                .firstOrNull;
 
     SoundPickResult? picked;
     try {
       picked = await SoundPickerSheet.show(
         context,
-        initialSelection: _session.effectiveSound,
+        initialSelection:
+            existingTrack?.sound ?? _session.effectiveSound,
         initialOffset: Duration(
-          milliseconds:
+          milliseconds: existingTrack?.segmentStartMs ??
               _session.userSoundSegmentStartMs ??
               widget.recipe.soundSegmentStartMs ??
               0,
@@ -279,6 +312,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
 
     if (picked == null) {
       setState(() => _activePanel = null);
+      if (wasPlaying) _preview?.play();
       return;
     }
 
@@ -286,6 +320,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       _session.clearUserAudios();
       await _refreshPreview();
       setState(() => _activePanel = null);
+      if (wasPlaying) _preview?.play();
       return;
     }
 
@@ -296,18 +331,18 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
 
     final total = max(_preview?.duration ?? widget.recipe.duration ?? 5, 0.01);
-    final playhead = (_preview?.playhead ?? 0).clamp(0.0, total);
     final clip = picked.clipRangeMs;
     _session.addUserAudio(
       UserEditorAudioTrack(
-        id: 'audio_${DateTime.now().microsecondsSinceEpoch}',
+        id: existingTrack?.id ??
+            'audio_${DateTime.now().microsecondsSinceEpoch}',
         sound: sound,
         soundSegmentId: picked.soundSegmentId,
         segmentStartMs: clip?.startMs ?? picked.offset.inMilliseconds,
         segmentEndMs:
             clip?.endMs ?? (picked.offset + picked.window).inMilliseconds,
-        startTime: playhead,
-        endTime: total,
+        startTime: existingTrack?.startTime ?? 0,
+        endTime: existingTrack?.endTime ?? total,
       ),
     );
 
@@ -317,14 +352,14 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
 
     await _refreshPreview();
-    if (_preview?.isPlaying == true) {
-      unawaited(_preview!.seek(_preview!.playhead));
-    }
+    _preview?.play();
     setState(() => _activePanel = null);
   }
 
   VideoTemplateRecipeEntity _recipeWithEditorSound() {
     final base = widget.recipe;
+    final handoffTexts = _handoffRecipeTexts(base);
+    final handoffStickers = _handoffRecipeStickers(base);
     if (_session.userSoundCleared) {
       return VideoTemplateRecipeEntity(
         id: base.id,
@@ -356,8 +391,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         transitions: base.transitions,
         tracks: base.tracks,
         clips: base.clips,
-        texts: base.texts,
-        stickers: base.stickers,
+        texts: handoffTexts,
+        stickers: handoffStickers,
         overlays: base.overlays,
         assets: base.assets,
         keyframes: base.keyframes,
@@ -365,7 +400,48 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       );
     }
     final sound = _session.userSound;
-    if (sound == null) return base;
+    if (sound == null) {
+      if (handoffTexts == base.texts && handoffStickers == base.stickers) {
+        return base;
+      }
+      return VideoTemplateRecipeEntity(
+        id: base.id,
+        name: base.name,
+        templateKind: base.templateKind,
+        primarySlotType: base.primarySlotType,
+        allowedOutputs: base.allowedOutputs,
+        slotCount: base.slotCount,
+        coverUrl: base.coverUrl,
+        previewVideoUrl: base.previewVideoUrl,
+        duration: base.duration,
+        width: base.width,
+        height: base.height,
+        fps: base.fps,
+        version: base.version,
+        versionInfo: base.versionInfo,
+        useCount: base.useCount,
+        categoryId: base.categoryId,
+        category: base.category,
+        musicId: base.musicId,
+        music: base.music,
+        soundId: base.soundId,
+        sound: base.sound,
+        soundSegmentId: base.soundSegmentId,
+        soundSegmentStartMs: base.soundSegmentStartMs,
+        soundSegmentEndMs: base.soundSegmentEndMs,
+        slots: base.slots,
+        beatMap: base.beatMap,
+        transitions: base.transitions,
+        tracks: base.tracks,
+        clips: base.clips,
+        texts: handoffTexts,
+        stickers: handoffStickers,
+        overlays: base.overlays,
+        assets: base.assets,
+        keyframes: base.keyframes,
+        renderHints: base.renderHints,
+      );
+    }
     return VideoTemplateRecipeEntity(
       id: base.id,
       name: base.name,
@@ -396,13 +472,57 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       transitions: base.transitions,
       tracks: base.tracks,
       clips: base.clips,
-      texts: base.texts,
-      stickers: base.stickers,
+      texts: handoffTexts,
+      stickers: handoffStickers,
       overlays: base.overlays,
       assets: base.assets,
       keyframes: base.keyframes,
       renderHints: base.renderHints,
     );
+  }
+
+  List<TemplateTextEntity> _handoffRecipeTexts(VideoTemplateRecipeEntity base) {
+    if (!_session.userTextsLayerOwned) return base.texts;
+    return _session.userTexts
+        .where((t) => t.text.trim().isNotEmpty)
+        .map(
+          (t) => TemplateTextEntity(
+            id: t.id,
+            text: t.text.trim(),
+            fontSize: t.fontSize,
+            color: t.color,
+            startTime: t.startTime,
+            endTime: t.endTime,
+            positionX: t.positionX,
+            positionY: t.positionY,
+            fontAssetId: t.fontAssetId,
+            fontAssetUrl: t.fontAssetUrl,
+            animationIn: t.animationIn,
+            animationOut: t.animationOut,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  List<TemplateStickerEntity> _handoffRecipeStickers(
+    VideoTemplateRecipeEntity base,
+  ) {
+    if (!_session.userStickersLayerOwned) return base.stickers;
+    return _session.userStickers
+        .map(
+          (s) => TemplateStickerEntity(
+            id: s.id,
+            assetId: s.presetId,
+            assetUrl: s.assetUrl,
+            positionX: s.positionX,
+            positionY: s.positionY,
+            scale: s.scale,
+            opacity: s.opacity,
+            startTime: s.startTime,
+            endTime: s.endTime ?? s.startTime + 1,
+          ),
+        )
+        .toList(growable: false);
   }
 
   VideoTemplateSlotEntity get _selectedSlot {
@@ -431,6 +551,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     return null;
   }
 
+  String _previewSlotId(CompositionPreviewController preview) =>
+      preview.activeSlotId ?? _selectedSlot.id;
+
   List<({String name, double intensity})> _activeFilterStackAtPlayhead(
     CompositionPreviewController preview,
     String slotId,
@@ -449,6 +572,39 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         continue;
       }
       out.add((name: filter.filterName, intensity: filter.intensity));
+    }
+    return out;
+  }
+
+  List<({String type, double progress, Map<String, dynamic> params})>
+  _activeEffectsAtPlayhead(
+    CompositionPreviewController preview,
+    String slotId,
+  ) {
+    final local = preview.playhead - _slotStartOnTimeline(slotId);
+    final slotDur = _slotDuration(slotId);
+    final out =
+        <({String type, double progress, Map<String, dynamic> params})>[];
+    for (final effect in _session.effectsForSlot(slotId)) {
+      if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
+      if (!SlotLocalTiming.containsLocalTime(
+        slotDuration: slotDur,
+        localTime: local,
+        startTime: effect.startTime,
+        endTime: effect.endTime,
+      )) {
+        continue;
+      }
+      final window = SlotLocalTiming.normalize(
+        slotDuration: slotDur,
+        startTime: effect.startTime,
+        endTime: effect.endTime,
+      );
+      out.add((
+        type: effect.effectType,
+        progress: EffectEngine.progress(local, window.start, window.end),
+        params: effect.parameters,
+      ));
     }
     return out;
   }
@@ -486,8 +642,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     required num canvasH,
     bool showTexts = true,
   }) {
-    final slotId = preview.activeSlotId ?? _selectedSlot.id;
+    final slotId = _previewSlotId(preview);
     final filterStack = _activeFilterStackAtPlayhead(preview, slotId);
+    final effectStack = _activeEffectsAtPlayhead(preview, slotId);
     final filterActive = filterStack.isNotEmpty;
     final primaryFilter = filterActive ? filterStack.first : null;
     return VideoTemplateComposedPreview(
@@ -499,19 +656,23 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       decodedImage: preview.decodedImage,
       isVideoMedia: preview.activeSlotIsVideo || preview.hasVideoSurface,
       videoLookStill: preview.videoLookStill,
-      useVideoLookStill: _shouldUseVideoLookStill(preview),
+      useVideoLookStill: _shouldUseVideoLookStill(preview, slotId: slotId),
       fallbackFilterName: primaryFilter?.name,
       fallbackFilterIntensity: primaryFilter?.intensity ?? 1,
       fallbackFilterStack: filterStack,
+      fallbackEffects: effectStack,
       showTexts: showTexts,
     );
   }
 
-  bool _shouldUseVideoLookStill(CompositionPreviewController preview) {
+  bool _shouldUseVideoLookStill(
+    CompositionPreviewController preview, {
+    String? slotId,
+  }) {
     if (!preview.activeSlotIsVideo && !preview.hasVideoSurface) return false;
-    final slotId = preview.activeSlotId ?? _selectedSlot.id;
-    return _isFilterActiveAtPlayhead(preview, slotId) ||
-        _isEffectActiveAtPlayhead(preview, slotId);
+    final id = slotId ?? _previewSlotId(preview);
+    return _isFilterActiveAtPlayhead(preview, id) ||
+        _isEffectActiveAtPlayhead(preview, id);
   }
 
   Future<void> _refreshPreview({bool reattachMedia = false}) async {
@@ -625,17 +786,12 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         _showSnack('Max $kMaxFiltersPerSlot filters per clip');
         return;
       }
-      final slotDur = _slotDuration(slot.id);
-      final local = ((_preview?.playhead ?? 0) - _slotStartOnTimeline(slot.id))
-          .clamp(0.0, slotDur);
       final track = UserEditorFilterTrack(
         id: 'flt_${DateTime.now().microsecondsSinceEpoch}',
         slotId: slot.id,
         presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
         filterName: preset.previewFilterKey,
         label: preset.name,
-        startTime: local,
-        endTime: slotDur,
       );
       _session.addUserFilter(track);
       _selectedOverlayId = track.id;
@@ -674,17 +830,12 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         _showSnack('Max $kMaxEffectsPerSlot effects per clip');
         return;
       }
-      final slotDur = _slotDuration(slot.id);
-      final local = ((_preview?.playhead ?? 0) - _slotStartOnTimeline(slot.id))
-          .clamp(0.0, slotDur);
       final track = UserEditorEffectTrack(
         id: 'fx_${DateTime.now().microsecondsSinceEpoch}',
         slotId: slot.id,
         presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
         effectType: preset.previewEffectKey,
         label: preset.name,
-        startTime: local,
-        endTime: slotDur,
       );
       _session.addUserEffect(track);
       _selectedOverlayId = track.id;
@@ -714,25 +865,17 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     final preview = _preview;
     if (preview == null) return;
     final slotStart = _slotStartOnTimeline(slotId);
-    final slotDur = _slotDuration(slotId);
+    final slotDur = max(_slotDuration(slotId), 0.05);
     final total = max(preview.duration, 0.01);
-    final target = seekForEffect
-        ? (slotStart + slotDur * 0.45).clamp(0.0, total)
-        : _playheadInsideSlot(slotId, preview.playhead)
-        ? preview.playhead
-        : (slotStart + 0.01).clamp(0.0, total);
+    // Seek into the edited clip so slot-local FX/filters are visible immediately.
+    final target = (slotStart + slotDur * (seekForEffect ? 0.45 : 0.3))
+        .clamp(0.0, total);
     unawaited(
       preview.applyLookPreview(slotId: slotId, targetTime: target).then((_) {
         if (mounted) setState(() {});
       }),
     );
     setState(() {});
-  }
-
-  bool _playheadInsideSlot(String slotId, double playhead) {
-    final slotStart = _slotStartOnTimeline(slotId);
-    final slotEnd = slotStart + _slotDuration(slotId);
-    return playhead >= slotStart && playhead < slotEnd;
   }
 
   Future<void> _syncSlotFilters(String slotId) async {
@@ -743,18 +886,26 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     final items = <Map<String, dynamic>>[];
     for (final filter in _session.filtersForSlot(slotId)) {
       final presetId = VideoTemplateProjectIds.normalizeServerId(filter.presetId);
-      if (presetId == null) continue;
       final window = SlotLocalTiming.normalize(
         slotDuration: slotDur,
         startTime: filter.startTime,
         endTime: filter.endTime,
       );
-      items.add({
-        'presetId': presetId,
-        'intensity': filter.intensity.clamp(0.0, 1.0),
-        'startTime': window.start,
-        'endTime': window.end,
-      });
+      if (presetId != null) {
+        items.add({
+          'presetId': presetId,
+          'intensity': filter.intensity.clamp(0.0, 1.0),
+          'startTime': window.start,
+          'endTime': window.end,
+        });
+      } else if (filter.filterName.isNotEmpty && filter.filterName != 'none') {
+        items.add({
+          'filterName': filter.filterName,
+          'intensity': filter.intensity.clamp(0.0, 1.0),
+          'startTime': window.start,
+          'endTime': window.end,
+        });
+      }
     }
     await _repository.putSlotFilterItems(
       projectId: projectId,
@@ -771,17 +922,25 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     final items = <Map<String, dynamic>>[];
     for (final effect in _session.effectsForSlot(slotId)) {
       final presetId = VideoTemplateProjectIds.normalizeServerId(effect.presetId);
-      if (presetId == null) continue;
       final window = SlotLocalTiming.normalize(
         slotDuration: slotDur,
         startTime: effect.startTime,
         endTime: effect.endTime,
       );
-      items.add({
-        'presetId': presetId,
-        'startTime': window.start,
-        'endTime': window.end,
-      });
+      if (presetId != null) {
+        items.add({
+          'presetId': presetId,
+          'startTime': window.start,
+          'endTime': window.end,
+        });
+      } else if (effect.effectType.isNotEmpty && effect.effectType != 'none') {
+        items.add({
+          'effectType': effect.effectType,
+          'startTime': window.start,
+          'endTime': window.end,
+          if (effect.parameters.isNotEmpty) 'parameters': effect.parameters,
+        });
+      }
     }
     await _repository.putSlotEffectItems(
       projectId: projectId,
@@ -821,11 +980,69 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
   }
 
-  Future<void> _addTextOverlay() async {
+  TemplateEditorTextDraft? _textDraftFrom(UserEditorTextOverlay overlay) {
+    TemplateFontItem? font;
+    if (overlay.fontAssetId != null) {
+      font = _fonts.where((f) => f.id == overlay.fontAssetId).firstOrNull;
+      if (font == null &&
+          overlay.fontAssetUrl != null &&
+          overlay.fontAssetUrl!.isNotEmpty) {
+        font = TemplateFontItem(
+          id: overlay.fontAssetId!,
+          label: overlay.fontLabel ?? 'Font',
+          url: overlay.fontAssetUrl!,
+        );
+      }
+    }
+    return TemplateEditorTextDraft(
+      text: overlay.text,
+      font: font,
+      fontSize: overlay.fontSize,
+      color: overlay.color,
+      positionX: overlay.positionX,
+      positionY: overlay.positionY,
+    );
+  }
+
+  TemplatePresetItem? _stickerPresetFor(UserEditorStickerOverlay overlay) {
+    if (overlay.presetId != null) {
+      final match =
+          _stickerPresets.where((p) => p.id == overlay.presetId).firstOrNull;
+      if (match != null) return match;
+    }
+    if (overlay.presetId != null ||
+        (overlay.assetUrl?.trim().isNotEmpty ?? false)) {
+      return TemplatePresetItem(
+        id: overlay.presetId ?? overlay.id,
+        name: overlay.label ?? 'Sticker',
+        kind: TemplatePresetKind.sticker,
+        assetUrl: overlay.assetUrl,
+      );
+    }
+    return null;
+  }
+
+  TemplateEditorStickerDraft? _stickerDraftFrom(
+    UserEditorStickerOverlay overlay,
+  ) {
+    final preset = _stickerPresetFor(overlay);
+    if (preset == null) return null;
+    return TemplateEditorStickerDraft(
+      preset: preset,
+      positionX: overlay.positionX,
+      positionY: overlay.positionY,
+      scale: overlay.scale,
+    );
+  }
+
+  Future<void> _addTextOverlay({String? replaceId}) async {
     final recipe = widget.recipe;
     final preview = _preview;
     final canvasW = recipe.width > 0 ? recipe.width : 1080;
     final canvasH = recipe.height > 0 ? recipe.height : 1920;
+    final existing = replaceId == null
+        ? null
+        : _session.userTexts.where((t) => t.id == replaceId).firstOrNull;
     final Widget? media = preview == null
         ? null
         : ListenableBuilder(
@@ -847,6 +1064,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       canvasWidth: canvasW,
       canvasHeight: canvasH,
       media: media,
+      initial: existing == null ? null : _textDraftFrom(existing),
+      title: existing == null ? 'Add text' : 'Replace text',
     );
     if (draft == null || draft.text.isEmpty) return;
 
@@ -856,45 +1075,68 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
 
     final duration = _preview?.duration ?? widget.recipe.duration ?? 5;
-    final overlay = UserEditorTextOverlay(
-      id: 'text_${DateTime.now().millisecondsSinceEpoch}',
-      text: draft.text,
-      fontSize: draft.fontSize,
-      color: draft.color,
-      positionX: draft.positionX,
-      positionY: draft.positionY,
-      endTime: duration,
-      fontAssetId: font?.id,
-      fontAssetUrl: font?.url,
-      fontLabel: font?.label,
-    );
-    final next = [..._session.userTexts, overlay];
-    _session.setUserTexts(next);
-    if (mounted) setState(() {});
-    await _refreshPreview();
-
-    final projectId = _serverProjectId;
-    if (projectId != null) {
-      unawaited(
-        _repository.createProjectText(
-          projectId: projectId,
+    if (existing != null && replaceId != null) {
+      _session.replaceUserText(
+        replaceId,
+        existing.copyWith(
           text: draft.text,
           fontSize: draft.fontSize,
           color: draft.color,
           positionX: draft.positionX,
           positionY: draft.positionY,
-          endTime: duration,
           fontAssetId: font?.id,
+          fontAssetUrl: font?.url,
+          fontLabel: font?.label,
+          clearFont: font == null,
         ),
       );
+      _selectedOverlayId = replaceId;
+      _selectedOverlayKind = TemplateEditorOverlayKind.text;
+    } else {
+      final overlay = UserEditorTextOverlay(
+        id: 'text_${DateTime.now().millisecondsSinceEpoch}',
+        text: draft.text,
+        fontSize: draft.fontSize,
+        color: draft.color,
+        positionX: draft.positionX,
+        positionY: draft.positionY,
+        endTime: duration,
+        fontAssetId: font?.id,
+        fontAssetUrl: font?.url,
+        fontLabel: font?.label,
+      );
+      _session.setUserTexts([..._session.userTexts, overlay]);
+      _selectedOverlayId = overlay.id;
+      _selectedOverlayKind = TemplateEditorOverlayKind.text;
+
+      final projectId = _serverProjectId;
+      if (projectId != null) {
+        unawaited(
+          _repository.createProjectText(
+            projectId: projectId,
+            text: draft.text,
+            fontSize: draft.fontSize,
+            color: draft.color,
+            positionX: draft.positionX,
+            positionY: draft.positionY,
+            endTime: duration,
+            fontAssetId: font?.id,
+          ),
+        );
+      }
     }
+    if (mounted) setState(() {});
+    await _refreshPreview();
   }
 
-  Future<void> _addStickerOverlay() async {
+  Future<void> _addStickerOverlay({String? replaceId}) async {
     final recipe = widget.recipe;
     final preview = _preview;
     final canvasW = recipe.width > 0 ? recipe.width : 1080;
     final canvasH = recipe.height > 0 ? recipe.height : 1920;
+    final existing = replaceId == null
+        ? null
+        : _session.userStickers.where((s) => s.id == replaceId).firstOrNull;
     final Widget? media = preview == null
         ? null
         : ListenableBuilder(
@@ -914,39 +1156,58 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       canvasWidth: canvasW,
       canvasHeight: canvasH,
       media: media,
+      initial: existing == null ? null : _stickerDraftFrom(existing),
+      title: existing == null ? 'Stickers' : 'Replace sticker',
     );
     if (draft == null) return;
 
     final duration = _preview?.duration ?? widget.recipe.duration ?? 5;
-    final overlay = UserEditorStickerOverlay(
-      id: 'stk_${DateTime.now().millisecondsSinceEpoch}',
-      presetId: draft.preset.id,
-      assetUrl: draft.preset.assetUrl,
-      label: draft.preset.name,
-      positionX: draft.positionX,
-      positionY: draft.positionY,
-      scale: draft.scale,
-      endTime: duration,
-    );
-    final next = [..._session.userStickers, overlay];
-    _session.setUserStickers(next);
-    if (mounted) setState(() {});
-    await _refreshPreview();
-
-    final projectId = _serverProjectId;
-    if (projectId != null) {
-      unawaited(
-        _repository.createProjectSticker(
-          projectId: projectId,
+    if (existing != null && replaceId != null) {
+      _session.replaceUserSticker(
+        replaceId,
+        existing.copyWith(
           presetId: draft.preset.id,
           assetUrl: draft.preset.assetUrl,
+          label: draft.preset.name,
           positionX: draft.positionX,
           positionY: draft.positionY,
           scale: draft.scale,
-          endTime: duration,
         ),
       );
+      _selectedOverlayId = replaceId;
+      _selectedOverlayKind = TemplateEditorOverlayKind.sticker;
+    } else {
+      final overlay = UserEditorStickerOverlay(
+        id: 'stk_${DateTime.now().millisecondsSinceEpoch}',
+        presetId: draft.preset.id,
+        assetUrl: draft.preset.assetUrl,
+        label: draft.preset.name,
+        positionX: draft.positionX,
+        positionY: draft.positionY,
+        scale: draft.scale,
+        endTime: duration,
+      );
+      _session.setUserStickers([..._session.userStickers, overlay]);
+      _selectedOverlayId = overlay.id;
+      _selectedOverlayKind = TemplateEditorOverlayKind.sticker;
+
+      final projectId = _serverProjectId;
+      if (projectId != null) {
+        unawaited(
+          _repository.createProjectSticker(
+            projectId: projectId,
+            presetId: draft.preset.id,
+            assetUrl: draft.preset.assetUrl,
+            positionX: draft.positionX,
+            positionY: draft.positionY,
+            scale: draft.scale,
+            endTime: duration,
+          ),
+        );
+      }
     }
+    if (mounted) setState(() {});
+    await _refreshPreview();
   }
 
   Future<void> _initRenderedPreview({File? file, String? url}) async {
@@ -999,6 +1260,18 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     );
   }
 
+  Future<void> _syncAllSlotLayersForRender() async {
+    if (_serverProjectId == null) return;
+    for (final slot in _session.slots) {
+      if (_session.slotUsesUserFilters(slot.id)) {
+        await _syncSlotFilters(slot.id);
+      }
+      if (_session.slotUsesUserEffects(slot.id)) {
+        await _syncSlotEffects(slot.id);
+      }
+    }
+  }
+
   Future<void> _exportAndFinish() async {
     if (_busy) return;
     if (_showRenderedPreview) {
@@ -1034,8 +1307,6 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       String? exportUrl;
       Failure? serverFailure;
 
-      final templateId = _catalogTemplateIdForRender;
-
       final hasMedia = _session.slots.any((slot) {
         final fill = _session.fills[slot.id];
         return fill != null &&
@@ -1044,10 +1315,11 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       });
 
       if (hasMedia) {
+        // Gallery-style render — POST /render body only (no catalog merge).
         final apply = await vt_di.sl<OneShotRenderVideoTemplateUseCase>()(
           session: _session,
           selection: selection,
-          catalogTemplateId: templateId,
+          catalogTemplateId: null,
           exportQuality: 'standard',
           resolution: recipe.width > 0 && recipe.height > 0
               ? '${recipe.width}x${recipe.height}'
@@ -1113,22 +1385,25 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         return;
       }
 
-      await _initRenderedPreview(
-        file: hasFile ? outFile : null,
-        url: hasUrl ? exportUrl : null,
-      );
       if (!mounted) return;
-
       setState(() {
         _busy = false;
         _exportProgress = 1;
-        _exportLabel = 'Preview ready';
-        _showRenderedPreview = true;
-        _renderedPreviewFile = hasFile ? outFile : null;
-        _renderedExportUrl = hasUrl ? exportUrl : null;
-        _pendingFinishSelection = selection;
-        _activePanel = null;
+        _exportLabel = 'Done';
       });
+
+      // Skip in-editor server preview — studio shows local render before post.
+      Navigator.of(context).pop(
+        VideoTemplateEditorFinishResult(
+          selection: selection.copyWith(
+            projectId: _serverProjectId,
+            templateId: '',
+          ),
+          renderedFile: hasFile ? outFile : null,
+          serverExportUrl: hasUrl ? exportUrl : null,
+          proceedToNext: true,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1182,7 +1457,10 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       );
       final slotStart = cursor;
 
-      for (final filter in _session.filtersForSlot(slot.id)) {
+      final useUserFilters = _session.slotUsesUserFilters(slot.id);
+      final filtersToRender = _session.previewFiltersForSlot(slot.id);
+
+      for (final filter in filtersToRender) {
         if (filter.filterName.isEmpty || filter.filterName == 'none') continue;
         final window = SlotLocalTiming.normalize(
           slotDuration: dur,
@@ -1200,11 +1478,15 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             color: TemplateEditorTheme.filterTrack,
             icon: LucideIcons.blend,
             selected: _selectedOverlayId == filter.id,
+            editable: useUserFilters,
           ),
         );
       }
 
-      for (final effect in _session.effectsForSlot(slot.id)) {
+      final useUserEffects = _session.slotUsesUserEffects(slot.id);
+      final effectsToRender = _session.previewEffectsForSlot(slot.id);
+
+      for (final effect in effectsToRender) {
         if (effect.effectType.isEmpty || effect.effectType == 'none') continue;
         final window = SlotLocalTiming.normalize(
           slotDuration: dur,
@@ -1222,6 +1504,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             color: TemplateEditorTheme.effectTrack,
             icon: LucideIcons.sparkles,
             selected: _selectedOverlayId == effect.id,
+            editable: useUserEffects,
           ),
         );
       }
@@ -1242,6 +1525,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           label: t.text,
           color: TemplateEditorTheme.textTrack,
           icon: LucideIcons.type,
+          selected: _selectedOverlayId == t.id,
         ),
       );
     }
@@ -1258,6 +1542,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           label: s.presetId ?? 'Sticker',
           color: TemplateEditorTheme.stickerTrack,
           icon: LucideIcons.sticker,
+          selected: _selectedOverlayId == s.id,
         ),
       );
     }
@@ -1266,7 +1551,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     if (audioTracks.isNotEmpty) {
       final track = audioTracks.first;
       final start = track.startTime.clamp(0.0, total);
-      final end = (track.endTime ?? total).clamp(start + 0.2, total);
+      final end = safeEditorClamp(track.endTime ?? total, start + 0.2, total);
       segments.insert(
         0,
         TemplateEditorOverlaySegment(
@@ -1338,12 +1623,26 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             unawaited(_syncSlotFilters(copy.slotId));
           },
           onDelete: () {
-            final track = _session.userFilters
-                .where((f) => f.id == id)
-                .firstOrNull;
-            _session.removeUserFilter(id);
+            if (id.startsWith('recipe_flt_')) {
+              final slotId = _slotIdForRecipeFilterOverlay(id);
+              if (slotId != null) {
+                _session.clearUserFiltersForSlot(slotId);
+                unawaited(_syncSlotFilters(slotId));
+                _commitLookPreview(slotId, seekForEffect: false);
+              }
+            } else {
+              final track = _session.userFilters
+                  .where((f) => f.id == id)
+                  .firstOrNull;
+              _session.removeUserFilter(id);
+              if (track != null) {
+                unawaited(_syncSlotFilters(track.slotId));
+                _commitLookPreview(track.slotId, seekForEffect: false);
+              } else {
+                unawaited(_refreshPreview());
+              }
+            }
             _clearOverlaySelection();
-            if (track != null) unawaited(_syncSlotFilters(track.slotId));
             setState(() {});
           },
           onLayers: () => _showFxLayersSheet(isFilter: true),
@@ -1378,12 +1677,26 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             unawaited(_syncSlotEffects(copy.slotId));
           },
           onDelete: () {
-            final track = _session.userEffects
-                .where((e) => e.id == id)
-                .firstOrNull;
-            _session.removeUserEffect(id);
+            if (id.startsWith('recipe_fx_')) {
+              final slotId = _slotIdForRecipeEffectOverlay(id);
+              if (slotId != null) {
+                _session.clearUserEffectsForSlot(slotId);
+                unawaited(_syncSlotEffects(slotId));
+                _commitLookPreview(slotId, seekForEffect: false);
+              }
+            } else {
+              final track = _session.userEffects
+                  .where((e) => e.id == id)
+                  .firstOrNull;
+              _session.removeUserEffect(id);
+              if (track != null) {
+                unawaited(_syncSlotEffects(track.slotId));
+                _commitLookPreview(track.slotId, seekForEffect: false);
+              } else {
+                unawaited(_refreshPreview());
+              }
+            }
             _clearOverlaySelection();
-            if (track != null) unawaited(_syncSlotEffects(track.slotId));
             setState(() {});
           },
           onLayers: () => _showFxLayersSheet(isFilter: false),
@@ -1399,21 +1712,47 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
       case TemplateEditorOverlayKind.audio:
         return TemplateEditorLayerToolbar(
-          replaceLabel: 'Replace',
+          replaceLabel: 'Replace music',
           onDismiss: () => setState(_clearOverlaySelection),
-          onReplace: () => unawaited(_pickAudio()),
+          onReplace: () => unawaited(_pickAudio(replaceTrackId: id)),
           onCopy: () {},
           onDelete: () {
             _session.clearUserAudios();
             _clearOverlaySelection();
+            unawaited(SoundAudioPreview.stop());
             unawaited(_refreshPreview());
             setState(() {});
           },
           copyEnabled: false,
         );
       case TemplateEditorOverlayKind.text:
+        return TemplateEditorLayerToolbar(
+          replaceLabel: 'Replace text',
+          onDismiss: () => setState(_clearOverlaySelection),
+          onReplace: () => unawaited(_addTextOverlay(replaceId: id)),
+          onCopy: () {},
+          onDelete: () {
+            _session.removeUserText(id);
+            _clearOverlaySelection();
+            unawaited(_refreshPreview());
+            setState(() {});
+          },
+          copyEnabled: false,
+        );
       case TemplateEditorOverlayKind.sticker:
-        return null;
+        return TemplateEditorLayerToolbar(
+          replaceLabel: 'Replace sticker',
+          onDismiss: () => setState(_clearOverlaySelection),
+          onReplace: () => unawaited(_addStickerOverlay(replaceId: id)),
+          onCopy: () {},
+          onDelete: () {
+            _session.removeUserSticker(id);
+            _clearOverlaySelection();
+            unawaited(_refreshPreview());
+            setState(() {});
+          },
+          copyEnabled: false,
+        );
     }
   }
 
@@ -1548,8 +1887,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     double end,
   ) {
     final total = max(_preview?.duration ?? 0, 0.01);
-    start = start.clamp(0.0, total);
-    end = end.clamp(start + 0.2, total);
+    start = safeEditorClamp(start, 0.0, total);
+    end = safeEditorClamp(end, start + 0.2, total);
 
     switch (kind) {
       case TemplateEditorOverlayKind.filter:
@@ -1561,8 +1900,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         final slotDur = _slotDuration(track.slotId);
         final window = SlotLocalTiming.normalize(
           slotDuration: slotDur,
-          startTime: (start - slotStart).clamp(0.0, slotDur),
-          endTime: (end - slotStart).clamp(0.05, slotDur),
+          startTime: safeEditorClamp(start - slotStart, 0.0, slotDur),
+          endTime: safeEditorClamp(end - slotStart, 0.05, slotDur),
         );
         _session.patchUserFilterTiming(
           id,
@@ -1579,8 +1918,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         final slotDur = _slotDuration(track.slotId);
         final window = SlotLocalTiming.normalize(
           slotDuration: slotDur,
-          startTime: (start - slotStart).clamp(0.0, slotDur),
-          endTime: (end - slotStart).clamp(0.05, slotDur),
+          startTime: safeEditorClamp(start - slotStart, 0.0, slotDur),
+          endTime: safeEditorClamp(end - slotStart, 0.05, slotDur),
         );
         _session.patchUserEffectTiming(
           id,
@@ -1689,62 +2028,76 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: AspectRatio(
-        aspectRatio: canvasW / canvasH,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: _showRenderedPreview
-              ? _buildRenderedPreview()
-              : preview == null
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              : ListenableBuilder(
-                  listenable: preview,
-                  builder: (context, _) {
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _buildComposedPreview(
-                          preview: preview,
-                          canvasW: canvasW,
-                          canvasH: canvasH,
-                        ),
-                        TemplateUserTextGestureLayer(
-                          texts: _session.userTexts,
-                          canvasWidth: canvasW,
-                          canvasHeight: canvasH,
-                          onInteractionStart: () => preview.pause(),
-                          onChanged: (updated) {
-                            _session.patchUserTextLayout(
-                              updated.id,
-                              positionX: updated.positionX,
-                              positionY: updated.positionY,
-                              fontSize: updated.fontSize,
-                            );
-                            preview.reloadTimeline();
-                          },
-                        ),
-                        TemplateUserStickerGestureLayer(
-                          stickers: _session.userStickers,
-                          canvasWidth: canvasW,
-                          canvasHeight: canvasH,
-                          onInteractionStart: () => preview.pause(),
-                          onChanged: (updated) {
-                            _session.patchUserStickerLayout(
-                              updated.id,
-                              positionX: updated.positionX,
-                              positionY: updated.positionY,
-                              scale: updated.scale,
-                            );
-                            preview.reloadTimeline();
-                          },
-                        ),
-                      ],
-                    );
-                  },
-                ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final aspect = canvasW / canvasH;
+          var w = constraints.maxWidth;
+          var h = w / aspect;
+          if (constraints.maxHeight.isFinite && h > constraints.maxHeight) {
+            h = constraints.maxHeight;
+            w = h * aspect;
+          }
+          return Center(
+            child: SizedBox(
+              width: w,
+              height: h,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _showRenderedPreview
+                    ? _buildRenderedPreview()
+                    : preview == null
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    : ListenableBuilder(
+                        listenable: preview,
+                        builder: (context, _) {
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _buildComposedPreview(
+                                preview: preview,
+                                canvasW: canvasW,
+                                canvasH: canvasH,
+                              ),
+                              TemplateUserTextGestureLayer(
+                                texts: _session.userTexts,
+                                canvasWidth: canvasW,
+                                canvasHeight: canvasH,
+                                onInteractionStart: () => preview.pause(),
+                                onChanged: (updated) {
+                                  _session.patchUserTextLayout(
+                                    updated.id,
+                                    positionX: updated.positionX,
+                                    positionY: updated.positionY,
+                                    fontSize: updated.fontSize,
+                                  );
+                                  preview.reloadTimeline();
+                                },
+                              ),
+                              TemplateUserStickerGestureLayer(
+                                stickers: _session.userStickers,
+                                canvasWidth: canvasW,
+                                canvasHeight: canvasH,
+                                onInteractionStart: () => preview.pause(),
+                                onChanged: (updated) {
+                                  _session.patchUserStickerLayout(
+                                    updated.id,
+                                    positionX: updated.positionX,
+                                    positionY: updated.positionY,
+                                    scale: updated.scale,
+                                  );
+                                  preview.reloadTimeline();
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1818,110 +2171,143 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       backgroundColor: TemplateEditorTheme.background,
       body: SafeArea(
         child: Column(
-        children: [
+          children: [
             _buildTopBar(),
-          if (_busy)
-            LinearProgressIndicator(
-              value: _exportProgress <= 0 ? null : _exportProgress,
-              backgroundColor: Colors.white12,
-              color: Colors.white,
-            ),
-          if (_error != null)
-            Padding(
+            if (_busy)
+              LinearProgressIndicator(
+                value: _exportProgress <= 0 ? null : _exportProgress,
+                backgroundColor: Colors.white12,
+                color: Colors.white,
+              ),
+            if (_error != null)
+              Padding(
                 padding: const EdgeInsets.all(8),
-              child: Text(
-                _error!,
-                style: const TextStyle(color: Colors.redAccent),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.redAccent),
                   textAlign: TextAlign.center,
                 ),
               ),
-            Expanded(child: _buildPreview()),
-            if (!_showRenderedPreview && preview != null)
-              ListenableBuilder(
-                    listenable: preview,
-                    builder: (context, _) {
-                  final total = max(preview.duration, 0.01);
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxPreviewH = constraints.maxHeight * 0.58;
                   return Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TemplateEditorPlaybackBar(
-                        isPlaying: preview.isPlaying,
-                        currentTime: preview.playhead,
-                        totalTime: total,
-                        canUndo: _session.canUndo,
-                        canRedo: _session.canRedo,
-                        onPlayPause: () {
-                          if (preview.isPlaying) {
-                            preview.pause();
-                          } else {
-                            preview.play();
-                          }
-                        },
-                        onUndo: () async {
-                          _session.undo();
-                          await _refreshPreview();
-                        },
-                        onRedo: () async {
-                          _session.redo();
-                          await _refreshPreview();
-                        },
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: maxPreviewH.clamp(180.0, 520.0),
+                        ),
+                        child: Center(child: _buildPreview()),
                       ),
-                      TemplateEditorTimeline(
-                        slots: _session.slots,
-                        fills: _session.fills,
-                        playhead: preview.playhead,
-                        totalDuration: total,
-                        selectedSlotIndex: _selectedSlotIndex,
-                        overlaySegments: _buildOverlaySegments(total),
-                        onSlotTap: _busy ? null : _pickMediaForSlot,
-                        onAddMedia: _busy
-                            ? null
-                            : () => _pickMediaForSlot(_selectedSlotIndex),
-                        onSeek: _onSeek,
-                        onOverlayRangeChanged: _busy
-                            ? null
-                            : _onOverlayRangeChanged,
-                        onOverlayTap: _busy ? null : _onOverlayTap,
-                        selectedOverlayId: _selectedOverlayId,
-                      ),
+                      if (!_showRenderedPreview && preview != null)
+                        Expanded(
+                          child: ListenableBuilder(
+                            listenable: preview,
+                            builder: (context, _) {
+                              final total = max(preview.duration, 0.01);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TemplateEditorPlaybackBar(
+                                    isPlaying: preview.isPlaying,
+                                    currentTime: preview.playhead,
+                                    totalTime: total,
+                                    canUndo: _session.canUndo,
+                                    canRedo: _session.canRedo,
+                                    onPlayPause: () {
+                                      if (preview.isPlaying) {
+                                        preview.pause();
+                                      } else {
+                                        preview.play();
+                                      }
+                                    },
+                                    onUndo: () async {
+                                      _session.undo();
+                                      await _refreshPreview();
+                                    },
+                                    onRedo: () async {
+                                      _session.redo();
+                                      await _refreshPreview();
+                                    },
+                                  ),
+                                  Expanded(
+                                    child: TemplateEditorTimeline(
+                                      slots: _session.slots,
+                                      fills: _session.fills,
+                                      playhead: preview.playhead,
+                                      totalDuration: total,
+                                      selectedSlotIndex: _selectedSlotIndex,
+                                      overlaySegments:
+                                          _buildOverlaySegments(total),
+                                      onSlotTap: _busy
+                                          ? null
+                                          : _pickMediaForSlot,
+                                      onAddMedia: _busy
+                                          ? null
+                                          : () => _pickMediaForSlot(
+                                                _selectedSlotIndex,
+                                              ),
+                                      onSeek: _onSeek,
+                                      onOverlayRangeChanged: _busy
+                                          ? null
+                                          : _onOverlayRangeChanged,
+                                      onOverlayTap:
+                                          _busy ? null : _onOverlayTap,
+                                      selectedOverlayId: _selectedOverlayId,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        )
+                      else if (!_showRenderedPreview)
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: TemplateEditorTimeline(
+                              slots: _session.slots,
+                              fills: _session.fills,
+                              playhead: 0,
+                              totalDuration: max(
+                                widget.recipe.duration ?? 5,
+                                0.01,
+                              ),
+                              selectedSlotIndex: _selectedSlotIndex,
+                              overlaySegments: _buildOverlaySegments(
+                                max(widget.recipe.duration ?? 5, 0.01),
+                              ),
+                              onSlotTap: _busy ? null : _pickMediaForSlot,
+                              onAddMedia: _busy
+                                  ? null
+                                  : () => _pickMediaForSlot(_selectedSlotIndex),
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
-              )
-            else if (!_showRenderedPreview)
-              TemplateEditorTimeline(
-                slots: _session.slots,
-                fills: _session.fills,
-                playhead: 0,
-                totalDuration: max(widget.recipe.duration ?? 5, 0.01),
-                selectedSlotIndex: _selectedSlotIndex,
-                overlaySegments: _buildOverlaySegments(
-                  max(widget.recipe.duration ?? 5, 0.01),
-                ),
-                onSlotTap: _busy ? null : _pickMediaForSlot,
-                onAddMedia: _busy
-                    ? null
-                    : () => _pickMediaForSlot(_selectedSlotIndex),
               ),
+            ),
             if (!_showRenderedPreview)
               _buildLayerToolbar() ??
                   TemplateEditorToolbar(
-                editable: _editable,
-                activePanel: _activePanel,
-                onPanelSelected: (panel) {
-                  if (_busy) return;
-                  _clearOverlaySelection();
-                  if (panel == TemplateEditorPanel.edit) {
-                    unawaited(_pickMediaForSlot(_selectedSlotIndex));
-                    return;
-                  }
-                  if (panel == TemplateEditorPanel.audio) {
-                    unawaited(_pickAudio());
-                    return;
-                  }
-                  _togglePanel(panel);
-                },
-              ),
+                    editable: _editable,
+                    activePanel: _activePanel,
+                    onPanelSelected: (panel) {
+                      if (_busy) return;
+                      _clearOverlaySelection();
+                      if (panel == TemplateEditorPanel.edit) {
+                        unawaited(_pickMediaForSlot(_selectedSlotIndex));
+                        return;
+                      }
+                      if (panel == TemplateEditorPanel.audio) {
+                        unawaited(_pickAudio());
+                        return;
+                      }
+                      _togglePanel(panel);
+                    },
+                  ),
             if (_showRenderedPreview && _renderedPlayer != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
@@ -1955,10 +2341,10 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                           ),
                         ),
                       ],
-                );
-              },
-            ),
-          ),
+                    );
+                  },
+                ),
+              ),
             if (activeSheet != null && !_showRenderedPreview) activeSheet,
           ],
         ),

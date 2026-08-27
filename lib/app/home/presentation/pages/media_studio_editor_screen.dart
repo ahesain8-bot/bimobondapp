@@ -2142,10 +2142,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
     }
 
-    // Apply → backend render finished: preview the server MP4 in studio.
+    // Apply → backend render finished: local preview in studio (before post).
     if (result.proceedToNext) {
       final file = result.renderedFile;
       final url = result.serverExportUrl?.trim();
+      // Gallery-style edited export — do not tag post/render with catalog id.
+      _catalogTemplateApplied = false;
+      _videoTemplateId = null;
+      // Keep export URL for post handoff only — preview uses the local MP4.
       if (url != null && url.isNotEmpty) {
         _templateServerExportUrl = url;
       }
@@ -2157,14 +2161,24 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       _templateLivePreview = null;
       await SoundAudioPreview.stop();
 
-      if (file != null && await file.exists()) {
-        _templatePreviewFile = file;
+      File? previewFile = file;
+      if ((previewFile == null || !(await previewFile.exists())) &&
+          url != null &&
+          url.isNotEmpty) {
+        try {
+          previewFile = await AppMediaCacheManager.downloadVideoFile(url);
+        } catch (_) {}
+      }
+
+      if (previewFile != null && await previewFile.exists()) {
+        _templatePreviewFile = previewFile;
         _templatePreviewHandedOff = false;
         if (!mounted) return;
         setState(() {
+          _showTemplateSelector = false;
           _states = [
             MediaItemEditState(
-              item: GalleryMediaItem(file: file, type: 'VIDEO'),
+              item: GalleryMediaItem(file: previewFile!, type: 'VIDEO'),
             ),
           ];
           _currentIndex = 0;
@@ -2177,30 +2191,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           _templateExportProgress = 1;
           _templateExportLabel = 'Preview ready';
         });
-      } else if (url != null && url.isNotEmpty) {
-        try {
-          final downloaded = await AppMediaCacheManager.downloadVideoFile(url);
-          if (downloaded != null && await downloaded.exists()) {
-            _templatePreviewFile = downloaded;
-            if (!mounted) return;
-            setState(() {
-              _states = [
-                MediaItemEditState(
-                  item: GalleryMediaItem(file: downloaded, type: 'VIDEO'),
-                ),
-              ];
-              _currentIndex = 0;
-              _previewEpoch++;
-              _studioMediaReady = false;
-              _smoothPreviewFile = null;
-              _applyStateToUi(_states[0]);
-              _isProcessing = false;
-              _templateApplying = false;
-              _templateExportProgress = 1;
-              _templateExportLabel = 'Preview ready';
-            });
-          }
-        } catch (_) {}
       }
       return;
     }
@@ -2581,6 +2571,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         applyGen: applyGen,
       ),
     );
+
+    if (mounted && applyGen == _templateApplyGen) {
+      setState(() => _templateApplying = false);
+    }
   }
 
   /// Open local draft + import slot media after live preview is already shown.
@@ -2868,6 +2862,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   List<MediaStudioSideTool> _sideTools(AppLocalizations l10n) {
     final filtersActive = _showFilters || _hasActiveColorFilter;
+    final previewOnly = _isRenderedTemplatePreview;
     return [
       // 1. Settings
       MediaStudioSideTool(
@@ -2882,32 +2877,34 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         customIcon: _sideRailSvg(AppAssets.cameraShareIcon),
         onTap: _isProcessing ? () {} : _shareCurrent,
       ),
-      // 3. TikTok timeline editor (after capture)
-      MediaStudioSideTool(
-        icon: LucideIcons.scissors,
-        label: l10n.mediaEditorEdit,
-        active: _currentState.isVideo || _videoTemplateId != null,
-        onTap: _isProcessing
-            ? () {}
-            : () => unawaited(_openTemplateTimelineEditor()),
-      ),
-      // 4. Templates (same for photos and videos)
-      MediaStudioSideTool(
-        icon: LucideIcons.layoutTemplate,
-        label: l10n.mediaStudioTemplates,
-        active: _videoTemplateId != null,
-        onTap: _isProcessing || _templateApplying
-            ? () {}
-            : () {
-                if (_states.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.templateNeedMediaFirst)),
-                  );
-                } else {
-                  unawaited(_pickPhotoTemplate());
-                }
-              },
-      ),
+      if (!previewOnly) ...[
+        // 3. TikTok timeline editor (after capture)
+        MediaStudioSideTool(
+          icon: LucideIcons.scissors,
+          label: l10n.mediaEditorEdit,
+          active: _currentState.isVideo || _videoTemplateId != null,
+          onTap: _isProcessing
+              ? () {}
+              : () => unawaited(_openTemplateTimelineEditor()),
+        ),
+        // 4. Templates (same for photos and videos)
+        MediaStudioSideTool(
+          icon: LucideIcons.layoutTemplate,
+          label: l10n.mediaStudioTemplates,
+          active: _videoTemplateId != null,
+          onTap: _isProcessing || _templateApplying
+              ? () {}
+              : () {
+                  if (_states.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.templateNeedMediaFirst)),
+                    );
+                  } else {
+                    unawaited(_pickPhotoTemplate());
+                  }
+                },
+        ),
+      ],
       // 5. Aa
       MediaStudioSideTool(
         icon: LucideIcons.type,
@@ -3514,8 +3511,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                   enabled: !_isProcessing && !_templateApplying,
                                   onYourStory: _onYourStory,
                                   onNext: _onNext,
-                                  onAutoCut: () =>
-                                      unawaited(_pickPhotoTemplate()),
+                                  onAutoCut: _isRenderedTemplatePreview
+                                      ? null
+                                      : () => unawaited(_pickPhotoTemplate()),
                                 ),
                               ),
                             ),
@@ -3574,6 +3572,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                           await _clearSelectedTemplate();
                         },
                         onSelected: _onTemplateSelectedFromPanel,
+                        onEdit: !_isRenderedTemplatePreview &&
+                                _videoTemplateId != null &&
+                                _videoTemplateId!.isNotEmpty &&
+                                !_templateApplying
+                            ? () {
+                                setState(() => _showTemplateSelector = false);
+                                unawaited(_openTemplateTimelineEditor());
+                              }
+                            : null,
                         onYourStory: () {
                           setState(() => _showTemplateSelector = false);
                           unawaited(_onYourStory());

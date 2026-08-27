@@ -50,6 +50,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
     this.canvasWidth = 1080,
     this.canvasHeight = 1920,
     this.initial,
+    this.title = 'Add text',
   });
 
   final List<TemplateFontItem> fonts;
@@ -59,6 +60,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
   final int canvasWidth;
   final int canvasHeight;
   final TemplateEditorTextDraft? initial;
+  final String title;
 
   static Future<TemplateEditorTextDraft?> show(
     BuildContext context, {
@@ -68,6 +70,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
     int canvasWidth = 1080,
     int canvasHeight = 1920,
     TemplateEditorTextDraft? initial,
+    String title = 'Add text',
   }) {
     return Navigator.of(context).push<TemplateEditorTextDraft>(
       PageRouteBuilder(
@@ -81,6 +84,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
           canvasWidth: canvasWidth,
           canvasHeight: canvasHeight,
           initial: initial,
+          title: title,
         ),
       ),
     );
@@ -523,11 +527,11 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(LucideIcons.x, color: Colors.white70),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Add text',
+                        widget.title,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

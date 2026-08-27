@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_one_shot_render_builder.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -610,6 +611,7 @@ class VideoTemplatesRemoteDataSourceImpl
     Map<String, dynamic> body,
   ) async {
     try {
+      TemplateOneShotRenderBuilder.stripCatalogTemplateKeys(body);
       final response = await apiClient.dio.post(
         ApiConstants.videoTemplateRender,
         data: body,

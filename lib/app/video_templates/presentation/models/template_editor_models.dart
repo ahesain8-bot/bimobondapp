@@ -63,6 +63,9 @@ class TemplatePresetItem extends Equatable {
   static String normalizeFilterPreviewKey(String? raw) {
     var key = _slugKey(raw);
     if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('filter_')) {
+      key = key.substring('filter_'.length);
+    }
     key = switch (key) {
       'black_white' || 'blackandwhite' || 'grayscale' || 'mono' => 'bw',
       'black_and_white' => 'bw',
@@ -92,6 +95,9 @@ class TemplatePresetItem extends Equatable {
   static String normalizeEffectPreviewKey(String? raw) {
     var key = _slugKey(raw);
     if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('effect_')) {
+      key = key.substring('effect_'.length);
+    }
     key = switch (key) {
       'zoomin' || 'zoom_in_effect' => 'zoom_in',
       'zoomout' || 'zoom_out_effect' => 'zoom_out',
@@ -119,8 +125,10 @@ class TemplatePresetItem extends Equatable {
     final id = json['id']?.toString() ?? '';
     final name = (json['name'] ?? json['label'] ?? json['title'])?.toString() ??
         'Preset';
+    final engineType = json['engineType']?.toString();
     final rawFilter = (json['filterName'] ??
             json['filterType'] ??
+            engineType ??
             json['slug'] ??
             json['key'] ??
             json['code'] ??
@@ -128,6 +136,7 @@ class TemplatePresetItem extends Equatable {
         ?.toString();
     final rawEffect = (json['effectType'] ??
             json['effectName'] ??
+            engineType ??
             json['slug'] ??
             json['key'] ??
             json['code'] ??
@@ -358,6 +367,12 @@ class UserEditorEffectTrack extends Equatable {
       ];
 }
 
+/// Avoids [ArgumentError] when [min] > [max] (short clips / timeline edges).
+double safeEditorClamp(double value, double min, double max) {
+  if (min > max) return max;
+  return value.clamp(min, max);
+}
+
 /// Clip-local effect/filter window (seconds from slot start).
 ///
 /// See server timing guide: minimum 0.05s, `endTime` clamped to slot duration.
@@ -374,7 +389,7 @@ class SlotLocalTiming {
   }) {
     final dur = slotDuration > 0 ? slotDuration : 0.05;
     final start = startTime.clamp(0.0, dur);
-    final end = (endTime ?? dur).clamp(start + 0.05, dur);
+    final end = safeEditorClamp(endTime ?? dur, start + 0.05, dur);
     return SlotLocalTiming(start: start, end: end);
   }
 
@@ -392,6 +407,39 @@ class SlotLocalTiming {
     );
     return localTime >= window.start && localTime < window.end;
   }
+}
+
+/// Normalize template / API coordinates to center-origin canvas pixels (1080×1920).
+///
+/// Handles normalized (-1…1), top-left absolute, and center-origin offsets.
+({double x, double y}) normalizeEditorCanvasPosition({
+  required double positionX,
+  required double positionY,
+  int canvasWidth = 1080,
+  int canvasHeight = 1920,
+}) {
+  final cw = canvasWidth > 0 ? canvasWidth : 1080;
+  final ch = canvasHeight > 0 ? canvasHeight : 1920;
+  final halfW = cw / 2.0;
+  final halfH = ch / 2.0;
+
+  var x = positionX;
+  var y = positionY;
+
+  // Normalized alignment-style (-1…1).
+  if (x.abs() <= 1.05 && y.abs() <= 1.05) {
+    return (x: x * halfW, y: y * halfH);
+  }
+
+  // Top-left absolute pixels → center origin.
+  if (x >= 0 && x <= cw && y >= 0 && y <= ch) {
+    return (x: x - halfW, y: y - halfH);
+  }
+
+  return (
+    x: x.clamp(-halfW + 8, halfW - 8),
+    y: y.clamp(-halfH + 8, halfH - 8),
+  );
 }
 
 /// Caption added in the editor (maps to POST …/texts).
