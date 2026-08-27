@@ -1114,63 +1114,28 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       return;
     }
 
+    // Accepting only clears the request. Picking the opponent is the UI's job
+    // now: a PK is live-vs-live on the server, and the guest who tapped
+    // "أطلب بدء جولة منافسة" is standing on *this* stage, so they have no live
+    // of their own to battle. This used to call auto-match, which silently
+    // paired the host with an unrelated stranger — or answered
+    // `404 No opponents available` and surfaced as a dead-end "تعذر بدء
+    // المنافسة" whenever nobody else was broadcasting.
+    // `LiveRoomCompetitionRequestPrompt` opens the opponent picker right after
+    // dispatching this.
     emit(
-      current.copyWith(isCompetitionActionBusy: true, clearActionMessage: true),
+      current.copyWith(
+        pendingCompetitionRequest: null,
+        isCompetitionActionBusy: false,
+        clearActionMessage: true,
+      ),
     );
     try {
-      // Battle creation is owner-only. Auto-match is the documented one-tap
-      // endpoint and returns the ACTIVE snapshot that drives both screens.
-      final battle = await _sessionRepository.matchBattle(current.session.id);
-      if (isClosed) return;
-      final ready = _readyOrNull;
-      if (ready == null || ready.session.id != current.session.id) return;
-      if (!battle.isActive) {
-        emit(
-          ready.copyWith(
-            isCompetitionActionBusy: false,
-            actionMessage: 'لم يبدأ الخادم جولة المنافسة، حاول مرة أخرى',
-          ),
-        );
-        return;
-      }
-      try {
-        await _sessionRepository.deleteComment(
-          liveId: current.session.id,
-          commentId: request.commentId,
-        );
-      } catch (_) {}
-      if (isClosed) return;
-      final latest = _readyOrNull;
-      if (latest == null) return;
-      emit(
-        latest.copyWith(
-          pendingCompetitionRequest: null,
-          isCompetitionActionBusy: false,
-          actionMessage: 'بدأت جولة المنافسة',
-        ),
+      await _sessionRepository.deleteComment(
+        liveId: current.session.id,
+        commentId: request.commentId,
       );
-      add(LiveRoomBattleChanged(battle));
-    } on ApiException catch (e) {
-      final ready = _readyOrNull;
-      if (ready != null) {
-        emit(
-          ready.copyWith(
-            isCompetitionActionBusy: false,
-            actionMessage: 'تعذر بدء المنافسة: ${e.message}',
-          ),
-        );
-      }
-    } catch (e) {
-      final ready = _readyOrNull;
-      if (ready != null) {
-        emit(
-          ready.copyWith(
-            isCompetitionActionBusy: false,
-            actionMessage: 'تعذر بدء المنافسة: $e',
-          ),
-        );
-      }
-    }
+    } catch (_) {}
   }
 
   /// This user accepting or declining an invite onto someone else's stage.
@@ -2059,6 +2024,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       case LiveRoomMenuDestination.comments:
         emit(current.copyWith(isChatComposerVisible: true));
       case LiveRoomMenuDestination.settings:
+      case LiveRoomMenuDestination.startBattle:
         // Sheet opened from presentation layer.
         return;
       case LiveRoomMenuDestination.liveGifts:

@@ -409,6 +409,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     return false;
   }
 
+  /// LARGE gifts are staged fullscreen; see [build].
+  bool get _isFullscreenStage => !_isSmall && !_isMedium;
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
@@ -418,11 +421,13 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    // A LARGE video gift is authored full-bleed portrait (the occasion MP4s are
-    // 496x864 with the composition running edge to edge), so it gets the whole
-    // screen the way TikTok plays its fullscreen gifts. Cover-cropping one into
-    // a square at the bottom threw away roughly 40% of every frame.
-    final isFullscreenVideo = isLarge && _kind == _GiftMediaKind.video;
+    // Every LARGE gift takes the whole screen, the way TikTok plays its
+    // fullscreen gifts. The occasion videos are authored full-bleed portrait
+    // (496x864, composition running edge to edge) so they simply cover it; a
+    // LARGE Lottie or a video that failed to decode and fell back to its
+    // thumbnail now fills the same stage instead of shrinking to a square
+    // parked at the bottom of the screen.
+    final isFullscreen = isLarge;
 
     final double stageWidth;
     final double stageHeight;
@@ -430,12 +435,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       stageWidth = stageHeight = (screenSize.width * 0.28).clamp(80.0, 120.0);
     } else if (isMedium) {
       stageWidth = stageHeight = (screenSize.width * 0.72).clamp(240.0, 340.0);
-    } else if (isFullscreenVideo) {
+    } else {
       stageWidth = screenSize.width;
       stageHeight = screenSize.height;
-    } else {
-      // Lottie stages stay 1:1 — those compositions are authored square.
-      stageWidth = stageHeight = screenSize.width.clamp(0.0, screenSize.height);
     }
 
     final media = SizedBox(
@@ -443,7 +445,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       height: stageHeight,
       child: _buildMedia(),
     );
-    final stage = _kind == _GiftMediaKind.video
+    final stage = _kind == _GiftMediaKind.video || isFullscreen
         ? RepaintBoundary(child: media)
         : _withEdgeFade(media);
 
@@ -507,15 +509,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       bottomPosition = null;
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
-    } else if (isFullscreenVideo) {
+    } else {
+      // isFullscreen — the stage already is the screen.
       topPosition = 0;
       bottomPosition = null;
       leftPosition = 0;
-      rightPosition = null;
-    } else {
-      topPosition = null;
-      bottomPosition = 0;
-      leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }
 
@@ -577,7 +575,10 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
           return Lottie(
             composition: composition,
             controller: controller,
-            fit: BoxFit.cover,
+            // Gift Lotties are authored square. On the fullscreen LARGE stage
+            // `cover` would crop away most of a portrait screen's width, so
+            // the composition is contained and centred there instead.
+            fit: _isFullscreenStage ? BoxFit.contain : BoxFit.cover,
             alignment: Alignment.center,
             addRepaintBoundary: true,
           );

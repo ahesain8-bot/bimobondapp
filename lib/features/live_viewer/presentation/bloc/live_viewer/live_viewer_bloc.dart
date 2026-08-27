@@ -1242,7 +1242,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       );
     } else if (event is LiveModerationEvent) {
-      _applyModeration(event, emit);
+      await _applyModeration(event, emit);
     } else if (event is UserJoinedEvent) {
       if (_isMe(event.userId)) {
         if (event.viewerCount != null) {
@@ -1357,10 +1357,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     }
   }
 
-  void _applyModeration(
+  Future<void> _applyModeration(
     LiveModerationEvent event,
     Emitter<LiveViewerState> emit,
-  ) {
+  ) async {
     final isMe = _isMe(event.userId);
     final targetId = event.userId;
     switch (event.moderationType) {
@@ -1399,7 +1399,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         return;
       case 'viewer_banned':
         if (isMe) {
-          unawaited(_kickBanned(event.reason, emit));
+          // Must be awaited: `emit` is handed to it, and an emit that lands
+          // after this handler returns trips bloc's `!_isCompleted` assertion
+          // and aborts the rest of the socket event pipeline.
+          await _kickBanned(event.reason, emit);
           return;
         }
         if (targetId == null || targetId.isEmpty) return;

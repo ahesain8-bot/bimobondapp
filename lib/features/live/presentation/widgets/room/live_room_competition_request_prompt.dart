@@ -6,6 +6,7 @@ import '../../../../../core/models/live_competition_request.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import 'live_room_battle_opponents_sheet.dart';
 
 /// Persistent host decision for a guest's competition request.
 ///
@@ -39,12 +40,18 @@ class LiveRoomCompetitionRequestPrompt extends StatelessWidget {
               accepted: false,
             ),
           ),
-          onAccepted: () => bloc.add(
-            LiveRoomCompetitionRequestAnswered(
-              commentId: request.commentId,
-              accepted: true,
-            ),
-          ),
+          // Accepting retires the request, then opens the opponent picker: a
+          // PK is live-vs-live, so the host still has to choose which
+          // broadcast to go up against (or tap quick-match inside the sheet).
+          onAccepted: () {
+            bloc.add(
+              LiveRoomCompetitionRequestAnswered(
+                commentId: request.commentId,
+                accepted: true,
+              ),
+            );
+            LiveRoomBattleOpponentsSheet.show(context);
+          },
         );
       },
     );
