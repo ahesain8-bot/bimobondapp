@@ -90,7 +90,21 @@ void main() {
       await tester.pump();
 
       expect(find.byType(GiftAnimationOverlay), findsOneWidget);
-      await tester.pump(const Duration(seconds: 2));
+
+      // The image hold timer used to end it here: a LARGE gift whose media is
+      // a still — no `animationUrl`, so the thumbnail — was taken off screen
+      // about 1.6s in, for the viewer and the broadcaster alike.
+      await tester.pump(const Duration(seconds: 6));
+      expect(
+        find.byType(GiftAnimationOverlay),
+        findsOneWidget,
+        reason: 'a large gift waits for a tap, not for a timer',
+      );
+
+      // Unmounting the layer is the owner teardown that releases the entry.
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pump();
+      await tester.pump();
     },
   );
 
@@ -252,13 +266,13 @@ void main() {
   );
 
   testWidgets(
-    'the gift overlay never takes a tap away from the live room',
+    'a tap ends a large gift and nothing else does',
     (tester) async {
-      // The overlay lives in the root overlay, above the room and any sheet.
-      // A full-screen opaque GestureDetector there swallowed every tap for the
-      // whole animation and ended the gift on the first one, so a 15s occasion
-      // gift died about a second in as soon as the viewer touched anything.
-      var tapsReachingTheRoom = 0;
+      // A LARGE gift is presentation the viewer dismisses. It has to outlast
+      // every automatic trigger — its own media ending, the image/failure hold
+      // timers, the stall watchdog — and come down on a tap and nothing else.
+      // The tap is consumed by that dismissal, which is why this no longer
+      // asserts the tap also reaches the room underneath.
       late BuildContext ctx;
 
       await tester.pumpWidget(
@@ -266,11 +280,7 @@ void main() {
           home: Builder(
             builder: (context) {
               ctx = context;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => tapsReachingTheRoom++,
-                child: const SizedBox.expand(),
-              );
+              return const SizedBox.expand();
             },
           ),
         ),
@@ -290,19 +300,23 @@ void main() {
       await tester.pump();
       expect(find.byType(GiftAnimationOverlay), findsOneWidget);
 
-      await tester.tapAt(const Offset(200, 300));
-      await tester.pump();
-
-      expect(tapsReachingTheRoom, 1, reason: 'the tap must pass through');
+      // Well past every hold the overlay used to arm.
+      await tester.pump(const Duration(seconds: 12));
       expect(
         find.byType(GiftAnimationOverlay),
         findsOneWidget,
-        reason: 'and it must not end the gift',
+        reason: 'no timer or completion callback may end a large gift',
       );
 
-      GiftAnimationOverlay.dismiss(owner: owner);
+      await tester.tapAt(const Offset(200, 300));
       await tester.pump();
       await tester.pump();
+
+      expect(
+        find.byType(GiftAnimationOverlay),
+        findsNothing,
+        reason: 'a tap is the one thing that dismisses it',
+      );
     },
   );
 
