@@ -1930,17 +1930,31 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                   opponentSupporters ?? state.opponentTopGifterAvatars,
             ),
           );
-        } catch (e) {
-          if (
-            !isClosed &&
-            !_tearingDown &&
-            _activeLiveId == liveId &&
-            generation == _battleOperationGeneration
-          ) {
-            emit(
-              state.copyWith(moderationBanner: 'تعذر توصيل فيديو الخصم: $e'),
-            );
+        } catch (_) {
+          // The opponent's video is one part of their side of the stage. Their
+          // name, avatar and supporter ring are already fetched and must still
+          // land: bailing here left the right-hand side of a battle blank even
+          // though everything except the video had arrived.
+          final opponentSupporters = await supportersFuture;
+          if (isClosed ||
+              _tearingDown ||
+              _activeLiveId != liveId ||
+              generation != _battleOperationGeneration) {
+            return;
           }
+          // Short and human. This used to interpolate the raw exception, which
+          // put a wrapped SocketException — host, URI, query string and all —
+          // across the middle of the live.
+          emit(
+            state.copyWith(
+              battle: battle,
+              battleOpponentLive: join.live,
+              opponentTopGifterAvatars:
+                  opponentSupporters ?? state.opponentTopGifterAvatars,
+              moderationBanner: 'تعذر عرض فيديو الخصم',
+            ),
+          );
+          _scheduleBannerClear();
         }
       },
     );
