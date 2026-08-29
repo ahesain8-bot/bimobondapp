@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/services/live_audio_session.dart';
+import '../../../../core/services/live_beauty_preference.dart';
 import '../../../../core/services/media_progress_watchdog.dart';
 import '../../../../core/services/live_video_quality_preference.dart';
 import '../../../../core/models/live_media_hints.dart';
@@ -171,23 +172,19 @@ class LivesMediaDataSource {
   }) {
     final generation = _battleConnectionGeneration;
     unawaited(
-      _serializeBattleOperation(
-        () async {
-          await _recoverBattleRoom(
-            room: room,
-            url: url,
-            token: token,
-            generation: generation,
-          );
-          if (
-            generation == _battleConnectionGeneration &&
+      _serializeBattleOperation(() async {
+        await _recoverBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          generation: generation,
+        );
+        if (generation == _battleConnectionGeneration &&
             _battleRoom == room &&
-            room.connectionState == ConnectionState.disconnected
-          ) {
-            onRoomEvent?.call('battle', 'failed');
-          }
-        },
-      ),
+            room.connectionState == ConnectionState.disconnected) {
+          onRoomEvent?.call('battle', 'failed');
+        }
+      }),
     );
   }
 
@@ -596,6 +593,14 @@ class LivesMediaDataSource {
 
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
 
+      // Beauty runs on the published track, not on the preview widget, so it
+      // has to be re-installed on whichever track survived the ladder above.
+      unawaited(
+        LiveBeautyPreference.instance.attachTo(
+          _videoTrack?.mediaStreamTrack.id,
+        ),
+      );
+
       // ============================================================
       // [DEBUG-QOS HOST 2/4] Actual PUBLISHED simulcast layers.
       // Prove what the SFU sees — if HIGH layer is missing here,
@@ -765,10 +770,7 @@ class LivesMediaDataSource {
     );
     room.events
       ..on<RoomDisconnectedEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         debugPrint('🔴 [Host] opponent battle room disconnected');
@@ -776,19 +778,13 @@ class LivesMediaDataSource {
         _queueBattleRecovery(room: room, url: url, token: token);
       })
       ..on<ReconnectingEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         onRoomEvent?.call('battle', 'reconnecting');
       })
       ..on<RoomReconnectedEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         onRoomEvent?.call('battle', 'reconnected');
@@ -801,16 +797,13 @@ class LivesMediaDataSource {
         unawaited(_retryBattleSubscription(room, event, generation));
       })
       ..on<TrackSubscribedEvent>((event) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         if (event.track is RemoteAudioTrack) {
           unawaited(_preferMediaSpeaker());
         }
-    });
+      });
     await room.connect(url, token);
     if (generation != _battleConnectionGeneration) {
       try {
@@ -844,10 +837,7 @@ class LivesMediaDataSource {
     int generation,
   ) async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (
-      _battleRoom != room ||
-      generation != _battleConnectionGeneration
-    ) {
+    if (_battleRoom != room || generation != _battleConnectionGeneration) {
       return;
     }
     final participant = event.participant;
@@ -914,10 +904,7 @@ class LivesMediaDataSource {
     final generation = _battleConnectionGeneration;
     try {
       final track = _firstBattleVideoTrack(room);
-      if (
-        _battleRoom != room ||
-        generation != _battleConnectionGeneration
-      ) {
+      if (_battleRoom != room || generation != _battleConnectionGeneration) {
         return;
       }
       if (track == null) {
@@ -930,11 +917,9 @@ class LivesMediaDataSource {
             stats?.framesReceived ??
             stats?.packetsReceived ??
             stats?.bytesReceived;
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration ||
-          !_battleVideoProgress.addSample(progress)
-        ) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration ||
+            !_battleVideoProgress.addSample(progress)) {
           return;
         }
       }
@@ -943,23 +928,15 @@ class LivesMediaDataSource {
         '🔴 [Host] opponent video stalled while battle room stayed up',
       );
       _stopBattleVideoWatchdog();
-      await _serializeBattleOperation(
-        () async {
-          if (
-            _battleRoom != room ||
-            generation != _battleConnectionGeneration
-          ) {
-            return;
-          }
-          await room.disconnect();
-          if (
-            _battleRoom == room &&
-            generation == _battleConnectionGeneration
-          ) {
-            _queueBattleRecovery(room: room, url: url, token: token);
-          }
-        },
-      );
+      await _serializeBattleOperation(() async {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
+          return;
+        }
+        await room.disconnect();
+        if (_battleRoom == room && generation == _battleConnectionGeneration) {
+          _queueBattleRecovery(room: room, url: url, token: token);
+        }
+      });
     } catch (error) {
       debugPrint('[Host] opponent video health sample unavailable: $error');
     }
@@ -977,11 +954,9 @@ class LivesMediaDataSource {
     required String token,
     required int generation,
   }) async {
-    if (
-      _battleRoom != room ||
-      _battleRecoveryRoom == room ||
-      generation != _battleConnectionGeneration
-    ) {
+    if (_battleRoom != room ||
+        _battleRecoveryRoom == room ||
+        generation != _battleConnectionGeneration) {
       return;
     }
     _battleRecoveryRoom = room;
@@ -993,10 +968,7 @@ class LivesMediaDataSource {
     try {
       for (var attempt = 0; attempt < retryDelays.length; attempt++) {
         await Future<void>.delayed(retryDelays[attempt]);
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         if (room.connectionState == ConnectionState.connected) {
@@ -1010,10 +982,8 @@ class LivesMediaDataSource {
             '${attempt + 1}/${retryDelays.length}',
           );
           await room.connect(url, token);
-          if (
-            _battleRoom != room ||
-            generation != _battleConnectionGeneration
-          ) {
+          if (_battleRoom != room ||
+              generation != _battleConnectionGeneration) {
             await room.disconnect();
             return;
           }
@@ -1114,6 +1084,11 @@ class LivesMediaDataSource {
         _videoTrack = track;
         _videoPublished = true;
         _startOutboundVideoWatchdog(room, track);
+        // The flip published a new track on a new capture session; the shader
+        // installed on the old one went away with it.
+        unawaited(
+          LiveBeautyPreference.instance.attachTo(track.mediaStreamTrack.id),
+        );
         return track;
       } catch (e, st) {
         debugPrint('LiveKit camera publish at $at failed: $e\n$st');
@@ -1151,6 +1126,10 @@ class LivesMediaDataSource {
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     _stopOutboundVideoWatchdog();
+    // Before the track is disposed: native drops its GL objects with the
+    // capture session's EGL context, and a stale registration would otherwise
+    // outlive the broadcast.
+    await LiveBeautyPreference.instance.detach();
     if (!keepBattleRoom) {
       await disconnectBattle();
     }

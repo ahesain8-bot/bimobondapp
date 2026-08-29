@@ -17,6 +17,7 @@ import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import com.dubai.bimobondapp.camera_engine.NativeCameraPlugin
+import com.dubai.bimobondapp.live_beauty.LiveBeautyPlugin
 import com.dubai.bimobondapp.camera_engine.TemplateExportPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -58,6 +59,8 @@ class MainActivity : FlutterActivity() {
         NativeCameraPlugin.register(flutterEngine, this)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
+        // Beauty shader on the LiveKit camera track, so viewers see it too.
+        LiveBeautyPlugin.register(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KEYGUARD_CHANNEL)
             .setMethodCallHandler { call, result ->

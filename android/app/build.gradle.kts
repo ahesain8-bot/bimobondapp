@@ -84,6 +84,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("com.google.guava:guava:33.3.1-android")
 
+    // WebRTC — the live beauty shader runs on the frames LiveKit publishes,
+    // so it needs org.webrtc's GL helpers and frame types. flutter_webrtc
+    // declares this same artifact as `implementation`, which keeps it off our
+    // compile classpath; compileOnly at the identical version lets us build
+    // against it while the plugin still supplies the one copy at runtime.
+    compileOnly("io.github.webrtc-sdk:android:144.7559.09")
+
     // Lottie — confetti overlay animation on the AR camera preview.
     implementation("com.airbnb.android:lottie:6.6.2")
 
