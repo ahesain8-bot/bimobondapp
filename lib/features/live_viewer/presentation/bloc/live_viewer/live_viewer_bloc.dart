@@ -80,9 +80,13 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerGuestsRefreshed>(_onGuestsRefreshed);
     on<LiveViewerGuestApprovalChecked>(_onGuestApprovalChecked);
     on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
+    on<LiveViewerBattleRoomStateChanged>(_onBattleRoomStateChanged);
 
     _liveKitSub = liveKitService.stateStream.listen((mediaState) {
       if (!isClosed) add(LiveViewerLiveKitStateChanged(mediaState));
+    });
+    _battleSub = liveKitService.battleStateStream.listen((mediaState) {
+      if (!isClosed) add(LiveViewerBattleRoomStateChanged(mediaState));
     });
   }
   final JoinLiveUseCase joinLiveUseCase;
@@ -106,6 +110,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   StreamSubscription<SocketEvent>? _socketSub;
   StreamSubscription<GiftComboPayload>? _giftComboSub;
   StreamSubscription<LiveKitConnectionState>? _liveKitSub;
+  StreamSubscription<LiveKitConnectionState>? _battleSub;
   String? _activeLiveId;
   bool _busy = false;
   LiveEntity? _pendingActivate;
@@ -118,12 +123,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   DateTime? _battleSupportersRefreshedAt;
   String? _battleOpponentLiveId;
 
-  /// Guards the opponent connect against BLoC's concurrent event processing.
-  bool _battleConnectInFlight = false;
-
-  /// Set when media failed during activation, so recovery can be kicked once
-  /// `_busy` clears — the state handler ignores drops raised mid-activation.
-  bool _mediaRetryPending = false;
+  /// Keeps one media connect per battle/opponent pair while allowing a newer
+  /// battle to invalidate an older in-flight operation.
+  final _battleConnectKeys = <String>{};
+  int _battleOperationGeneration = 0;
+  var _battleRoomRecoveryInFlight = false;
   bool _tearingDown = false;
   bool _recoveringMedia = false;
   int _mediaRecoveryAttempt = 0;
@@ -240,15 +244,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             // Diagnostics only; token parsing must never block joining.
           }
 
-          // Media only. A failure here used to `return`, which skipped the
-          // socket subscription, the comment history, the supporter
-          // leaderboard and the battle fetch — so a viewer who joined while
-          // LiveKit was briefly unreachable got a room with no chat, no gifts,
-          // no PK and no supporters. Worse, the service's `failed` state
-          // arrives while `_busy` is still set, and the handler for it drops
-          // anything landing mid-activation, so nothing retried either: the
-          // room stayed dead until the viewer swiped away and back.
-          var mediaUp = true;
           try {
             await liveKitService.connect(
               url: result.liveKitUrl,
@@ -259,7 +254,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             );
           } catch (_) {
             if (_activeLiveId != live.id) return;
-            mediaUp = false;
+            emit(
+              state.copyWith(
+                session: state.session!.copyWith(
+                  connectionState: LiveConnectionState.error,
+                  errorMessage: 'Failed to connect to stream',
+                ),
+              ),
+            );
+            return;
           }
           if (_activeLiveId != live.id) return;
 
@@ -271,18 +274,13 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                   metadata: live.metadata,
                   isFollowing: live.isFollowing,
                 ),
-                // `reconnecting`, not `error`: the room is usable — chat,
-                // gifts and the battle are all coming up — and the viewer sees
-                // no alarming banner while the media retries underneath.
-                connectionState: mediaUp
-                    ? LiveConnectionState.connected
-                    : LiveConnectionState.reconnecting,
-                isLiveKitConnected: mediaUp,
+                connectionState: LiveConnectionState.connected,
+                isLiveKitConnected: true,
                 socketToken: result.socketToken,
                 liveKitToken: result.liveKitToken,
                 coinBalance: 1250,
               ),
-              showJoinSuccess: mediaUp,
+              showJoinSuccess: true,
               topViewerAvatars: joinedAvatars.isNotEmpty
                   ? joinedAvatars
                   : state.topViewerAvatars,
@@ -365,9 +363,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             );
           } catch (_) {}
           await _refreshBattle(live.id, emit);
-          // Recovery is kicked from the `finally` below: the handler ignores a
-          // drop raised while activation is still in flight.
-          if (!mediaUp) _mediaRetryPending = true;
         },
       );
     } finally {
@@ -382,11 +377,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       _pendingActivate = null;
       if (pending != null && pending.id != _activeLiveId) {
         add(LiveViewerActivated(pending));
-      } else if (_mediaRetryPending) {
-        _mediaRetryPending = false;
-        add(
-          const LiveViewerLiveKitStateChanged(LiveKitConnectionState.failed),
-        );
       }
     }
   }
@@ -1390,12 +1380,17 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       );
     } else if (event is LiveEndedEvent) {
+      await _disconnectBattleOpponent();
       emit(
         state.copyWith(
           session: session.copyWith(
             connectionState: LiveConnectionState.liveEnded,
             errorMessage: event.reason,
           ),
+          clearBattle: true,
+          clearBattleOpponent: true,
+          battleRoom: null,
+          opponentTopGifterAvatars: const [],
         ),
       );
     } else if (event is NetworkLostEvent) {
@@ -1742,6 +1737,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           state.copyWith(
             clearBattle: true,
             clearBattleOpponent: true,
+            battleRoom: null,
             opponentTopGifterAvatars: const [],
             pkScoreLeft: 0,
             pkScoreRight: 0,
@@ -1766,48 +1762,107 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final liveId = _activeLiveId;
     if (liveId == null || isClosed) return;
     battle = battle.withTimingFrom(state.battle);
+    final opponentId = battle.isActive ? battle.opponentLiveId(liveId) : '';
+    final previousOpponentId = state.battle?.isActive == true
+        ? state.battle!.opponentLiveId(liveId)
+        : '';
+    final battleIdentityChanged =
+        !battle.isActive ||
+        state.battle?.id != battle.id ||
+        previousOpponentId != opponentId;
+    if (battleIdentityChanged) _battleRoomRecoveryInFlight = false;
+    final currentBattleRoom = state.battleRoom;
+    final roomNeedsReplacement =
+        battleIdentityChanged ||
+        currentBattleRoom == null ||
+        currentBattleRoom.connectionState == ConnectionState.disconnected;
+    final battleKey = battle.isActive ? '${battle.id}:$opponentId' : '';
+    final connectionAlreadyInFlight = _battleConnectKeys.contains(battleKey);
+    final startsMediaOperation =
+        !battle.isActive || (roomNeedsReplacement && !connectionAlreadyInFlight);
+    final operationGeneration = startsMediaOperation
+        ? ++_battleOperationGeneration
+        : _battleOperationGeneration;
+
     emit(
       state.copyWith(
         battle: battle,
+        battleRoom: roomNeedsReplacement ? null : currentBattleRoom,
         pkScoreLeft: battle.scoreFor(liveId),
         pkScoreRight: battle.opponentScoreFor(liveId),
       ),
     );
     if (!battle.isActive) {
-      await _disconnectBattleOpponent();
+      await _disconnectBattleOpponent(invalidate: false);
+      if (
+        isClosed ||
+        _tearingDown ||
+        operationGeneration != _battleOperationGeneration
+      ) {
+        return;
+      }
       emit(
         state.copyWith(
           clearBattleOpponent: true,
+          battleRoom: null,
           opponentTopGifterAvatars: const [],
         ),
       );
       return;
     }
-    final opponentId = battle.opponentLiveId(liveId);
     if (opponentId.isEmpty || opponentId == liveId) return;
-    final battleRoom = liveKitService.battleRoom;
-    if (_battleOpponentLiveId == opponentId &&
-        battleRoom != null &&
-        battleRoom.connectionState != ConnectionState.disconnected) {
-      return;
-    }
-    // `liveBattle` score events arrive on every gift, and BLoC processes
-    // events concurrently. `_battleOpponentLiveId` is only set once
-    // `connectBattle` returns, so two handlers both cleared the check above
-    // and the second one's disconnect tore down the room the first was still
-    // opening — the opponent tile blanked mid-battle. Dropping the duplicate
-    // is safe: the next score event re-asserts the opponent a moment later.
-    if (_battleConnectInFlight) return;
-    _battleConnectInFlight = true;
+    if (connectionAlreadyInFlight) return;
+    if (_battleRoomRecoveryInFlight) return;
+    if (!roomNeedsReplacement) return;
+    _battleConnectKeys.add(battleKey);
     try {
       await _connectBattleOpponent(
         battle: battle,
         liveId: liveId,
         opponentId: opponentId,
+        generation: operationGeneration,
         emit: emit,
       );
     } finally {
-      _battleConnectInFlight = false;
+      _battleConnectKeys.remove(battleKey);
+    }
+  }
+
+  Future<void> _onBattleRoomStateChanged(
+    LiveViewerBattleRoomStateChanged event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (
+      isClosed ||
+      _tearingDown ||
+      _activeLiveId == null ||
+      state.battle?.isActive != true
+    ) {
+      return;
+    }
+    switch (event.state) {
+      case LiveKitConnectionState.disconnected:
+      case LiveKitConnectionState.failed:
+        if (
+          event.state == LiveKitConnectionState.disconnected &&
+          _battleConnectKeys.isEmpty
+        ) {
+          _battleRoomRecoveryInFlight = true;
+        } else {
+          _battleRoomRecoveryInFlight = false;
+        }
+        if (state.battleRoom != null) {
+          emit(state.copyWith(battleRoom: null));
+        }
+        return;
+      case LiveKitConnectionState.connected:
+        _battleRoomRecoveryInFlight = false;
+        final room = liveKitService.battleRoom;
+        if (room != null) emit(state.copyWith(battleRoom: room));
+        return;
+      case LiveKitConnectionState.connecting:
+      case LiveKitConnectionState.reconnecting:
+        return;
     }
   }
 
@@ -1815,22 +1870,27 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required LiveBattle battle,
     required String liveId,
     required String opponentId,
+    required int generation,
     required Emitter<LiveViewerState> emit,
   }) async {
-    await _disconnectBattleOpponent();
+    await _disconnectBattleOpponent(invalidate: false);
     final result = await joinLiveUseCase(opponentId);
-    if (_activeLiveId != liveId || isClosed) return;
+    if (_activeLiveId != liveId ||
+        isClosed ||
+        generation != _battleOperationGeneration) {
+      return;
+    }
     await result.fold(
-      (failure) async {
-        emit(
-          state.copyWith(moderationBanner: 'تعذر فتح فيديو الخصم'),
-        );
-        _scheduleBannerClear();
-      },
+      (failure) async => emit(
+        state.copyWith(
+          moderationBanner:
+              'بدأت المعركة لكن تعذر فتح فيديو الخصم: ${failure.message}',
+        ),
+      ),
       (join) async {
+        if (generation != _battleOperationGeneration || isClosed) return;
         final supportersFuture = _loadTopGifterAvatars(opponentId);
         emit(state.copyWith(battleOpponentLive: join.live));
-        var videoUp = true;
         try {
           await liveKitService.connectBattle(
             url: join.liveKitUrl,
@@ -1838,39 +1898,76 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             roomName: opponentId,
             mediaHints: join.mediaHints,
           );
-          if (_activeLiveId != liveId || isClosed) return;
+          _battleRoomRecoveryInFlight = false;
+          if (_activeLiveId != liveId ||
+              isClosed ||
+              generation != _battleOperationGeneration) {
+            return;
+          }
           _battleOpponentLiveId = opponentId;
+          final room = liveKitService.battleRoom;
+          emit(
+            state.copyWith(
+              battle: battle,
+              battleOpponentLive: join.live,
+              battleRoom: room,
+            ),
+          );
+          final opponentSupporters = await supportersFuture;
+          if (_activeLiveId != liveId ||
+              isClosed ||
+              generation != _battleOperationGeneration) {
+            return;
+          }
+          // A new state instance makes the PK renderer read battleRoom now;
+          // track changes after that are driven by the Room notifier itself.
+          emit(
+            state.copyWith(
+              battle: battle,
+              battleOpponentLive: join.live,
+              battleRoom: room,
+              opponentTopGifterAvatars:
+                  opponentSupporters ?? state.opponentTopGifterAvatars,
+            ),
+          );
         } catch (_) {
           // The opponent's video is one part of their side of the stage. Their
           // name, avatar and supporter ring are already fetched and must still
           // land: bailing here left the right-hand side of a battle blank even
           // though everything except the video had arrived.
-          videoUp = false;
+          final opponentSupporters = await supportersFuture;
+          if (isClosed ||
+              _tearingDown ||
+              _activeLiveId != liveId ||
+              generation != _battleOperationGeneration) {
+            return;
+          }
+          // Short and human. This used to interpolate the raw exception, which
+          // put a wrapped SocketException — host, URI, query string and all —
+          // across the middle of the live.
+          emit(
+            state.copyWith(
+              battle: battle,
+              battleOpponentLive: join.live,
+              opponentTopGifterAvatars:
+                  opponentSupporters ?? state.opponentTopGifterAvatars,
+              moderationBanner: 'تعذر عرض فيديو الخصم',
+            ),
+          );
+          _scheduleBannerClear();
         }
-        final opponentSupporters = await supportersFuture;
-        if (_activeLiveId != liveId || isClosed) return;
-        // A new state instance makes the PK renderer read battleRoom now;
-        // track changes after that are driven by the Room notifier itself.
-        emit(
-          state.copyWith(
-            battle: battle,
-            battleOpponentLive: join.live,
-            opponentTopGifterAvatars:
-                opponentSupporters ?? state.opponentTopGifterAvatars,
-            // Short and human. This used to interpolate the raw exception,
-            // which put a wrapped SocketException — host, URI, query string
-            // and all — across the middle of the live.
-            moderationBanner: videoUp ? null : 'تعذر عرض فيديو الخصم',
-          ),
-        );
-        if (!videoUp) _scheduleBannerClear();
       },
     );
   }
 
-  Future<void> _disconnectBattleOpponent() async {
+  Future<void> _disconnectBattleOpponent({bool invalidate = true}) async {
+    if (invalidate) _battleOperationGeneration++;
+    _battleRoomRecoveryInFlight = false;
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
+    if (!isClosed && state.battleRoom != null) {
+      emit(state.copyWith(battleRoom: null));
+    }
     try {
       await liveKitService.disconnectBattle();
     } catch (_) {}
@@ -1951,8 +2048,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   @override
   Future<void> close() async {
     _tearingDown = true;
+    _battleOperationGeneration++;
+    _battleConnectKeys.clear();
     await _liveKitSub?.cancel();
     _liveKitSub = null;
+    await _battleSub?.cancel();
+    _battleSub = null;
     _socketSub?.cancel();
     _socketSub = null;
     _giftComboSub?.cancel();

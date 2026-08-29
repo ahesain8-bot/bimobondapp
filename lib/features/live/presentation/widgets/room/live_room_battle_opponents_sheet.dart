@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/models/live_battle.dart';
+import '../../../domain/entities/live_battle_errors.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
@@ -107,6 +108,11 @@ class _BattleOpponentsBodyState extends State<_BattleOpponentsBody>
     required String success,
   }) async {
     if (_busy) return;
+    final ready = context.read<LiveRoomBloc>().state;
+    if (ready is LiveRoomReady && ready.isBattleActive) {
+      snack('هناك جولة منافسة نشطة بالفعل');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final battle = await action();
@@ -116,18 +122,20 @@ class _BattleOpponentsBodyState extends State<_BattleOpponentsBody>
       snack(success);
     } catch (e) {
       if (!mounted) return;
+      if (isAlreadyInBattleError(e)) {
+        try {
+          final existing = await repository.loadBattle(widget.liveId);
+          if (mounted && existing != null && existing.isActive) {
+            context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(existing));
+            Navigator.of(context).maybePop();
+            snack('المنافسة الجارية ما زالت مفتوحة');
+            return;
+          }
+        } catch (_) {}
+      }
       setState(() => _busy = false);
-      snack(_friendlyError(e));
+      snack(noOpponentsMessage(e));
     }
-  }
-
-  /// The server's own words are English and unhelpful to an Arabic host.
-  String _friendlyError(Object error) {
-    final raw = errorMessage(error);
-    if (raw.toLowerCase().contains('no opponents')) {
-      return 'لا يوجد بث مباشر آخر متاح للمنافسة الآن';
-    }
-    return raw;
   }
 
   @override
@@ -150,17 +158,19 @@ class _BattleOpponentsBodyState extends State<_BattleOpponentsBody>
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
-                FilledButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : () => _startBattle(
-                          () => repository.matchBattle(widget.liveId),
-                          success: 'بدأت جولة المنافسة',
-                        ),
-                  icon: const Icon(Icons.bolt),
-                  label: const Text('مطابقة سريعة'),
-                ),
-                const SizedBox(height: AppSpacing.md),
+                if (_opponents.isNotEmpty) ...[
+                  FilledButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => _startBattle(
+                            () => repository.matchBattle(widget.liveId),
+                            success: 'بدأت جولة المنافسة',
+                          ),
+                    icon: const Icon(Icons.bolt),
+                    label: const Text('مطابقة سريعة'),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 if (_opponents.isEmpty)
                   _EmptyOpponents(busy: _busy, onRefresh: _load)
                 else

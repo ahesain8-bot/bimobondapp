@@ -7,7 +7,7 @@ import 'animated_counter.dart';
 import 'fallback_media.dart';
 import 'tiktok_live_tokens.dart';
 
-/// TikTok LIVE top chrome — matched to attached LIVE screenshots (LTR).
+/// TikTok LIVE top chrome — matched to the supplied LIVE screenshots.
 class TikTokLiveTopBar extends StatelessWidget {
   final LiveEntity live;
   final List<String> topViewerAvatars;
@@ -45,8 +45,21 @@ class TikTokLiveTopBar extends StatelessWidget {
             Row(
               textDirection: TextDirection.ltr,
               children: [
-                Flexible(
-                  child: _HostPill(live: live, onFollow: onFollow),
+                GestureDetector(
+                  onTap: onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: TikTokLiveTokens.closeIcon,
+                    height: TikTokLiveTokens.closeIcon,
+                    child: const Center(
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 24,
+                        shadows: TikTokLiveTokens.glyphShadow,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 6),
                 _ViewerCountPill(
@@ -54,26 +67,15 @@ class TikTokLiveTopBar extends StatelessWidget {
                   viewerCount: live.viewerCount,
                   onTap: onViewersTap,
                 ),
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: onClose,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    width: TikTokLiveTokens.closeIcon,
-                    height: TikTokLiveTokens.closeIcon,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.42),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                const SizedBox(width: 8),
+                // Expanded, not Spacer + Flexible: a Spacer claims an equal
+                // share of the free width, which leaves the pill less than its
+                // avatar and follow button need and collapses the host name to
+                // a single glyph.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _HostPill(live: live, onFollow: onFollow),
                   ),
                 ),
               ],
@@ -102,25 +104,13 @@ class _HostPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hostName = live.hostName.trim();
     return Container(
       height: TikTokLiveTokens.hostPillH,
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.black.withValues(alpha: 0.72),
-            Colors.black.withValues(alpha: 0.42),
-          ],
-        ),
+        color: TikTokLiveTokens.frost(0.34),
         borderRadius: BorderRadius.circular(TikTokLiveTokens.hostPillR),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -145,88 +135,73 @@ class _HostPill extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: TikTokLiveTokens.hostAvatarGap),
+          // No fixed cap here: the name takes the width the row actually has
+          // and only ellipsizes once it runs out.
           Flexible(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  live.hostName,
+                  hostName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    height: 1.05,
-                  ),
+                  style: TikTokLiveTokens.hostName,
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      live.likeCount.formatNumber,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        height: 1.1,
+                const SizedBox(height: 1),
+                // Screenshots put a white heart right after the like count.
+                // Inlined as one run so a long host name or a large text
+                // scale clips it instead of overflowing the capsule.
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: live.likeCount.formatNumber),
+                      const WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: EdgeInsetsDirectional.only(start: 3),
+                          child: Icon(
+                            Icons.favorite_rounded,
+                            size: 9.5,
+                            color: Color(0xB3FFFFFF),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 2),
-                    // Screenshots: white heart next to like count
-                    Icon(
-                      Icons.favorite_rounded,
-                      size: 10,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ],
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                  style: TikTokLiveTokens.likeCount,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: onFollow,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
               height: TikTokLiveTokens.followH,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: live.isFollowing ? 10 : 9,
+              ),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: live.isFollowing
-                    ? Colors.white.withValues(alpha: 0.18)
-                    : const Color(0xFFFE2C55),
+                    ? Colors.white.withValues(alpha: 0.16)
+                    : TikTokLiveTokens.followRed,
                 borderRadius: BorderRadius.circular(TikTokLiveTokens.followR),
-                border: live.isFollowing
-                    ? Border.all(color: Colors.white.withValues(alpha: 0.24))
-                    : null,
               ),
               child: live.isFollowing
-                  ? const Text(
-                      'Following',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        height: 1,
-                      ),
-                    )
+                  ? const Text('Following', style: TikTokLiveTokens.follow)
                   : const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.add, color: Colors.white, size: 13),
-                        SizedBox(width: 1),
-                        Text(
-                          'Follow',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            height: 1,
-                          ),
-                        ),
+                        Icon(Icons.add_rounded, color: Colors.white, size: 14),
+                        SizedBox(width: 2),
+                        Text('Follow', style: TikTokLiveTokens.follow),
                       ],
                     ),
             ),
@@ -249,109 +224,65 @@ class _ViewerCountPill extends StatelessWidget {
     this.onTap,
   });
 
-  static const _badges = ['+100', '+10', '9'];
+  /// Centre-to-centre spacing of the overlapping avatar stack.
+  static const double _pitch =
+      TikTokLiveTokens.viewerAvatar - TikTokLiveTokens.viewerOverlap;
 
   @override
   Widget build(BuildContext context) {
+    const avatar = TikTokLiveTokens.viewerAvatar;
     final shown = avatars.take(3).toList();
-    final stackW = shown.isEmpty ? 0.0 : 22.0 + (shown.length - 1) * 14.0;
+    final stackW = shown.isEmpty ? 0.0 : avatar + (shown.length - 1) * _pitch;
 
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         height: 30,
-        padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+        padding: EdgeInsets.symmetric(horizontal: shown.isEmpty ? 10 : 7),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.48),
+          color: TikTokLiveTokens.frost(0.34),
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         ),
         child: Row(
+          textDirection: TextDirection.ltr,
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedCounter(
               value: viewerCount,
               compact: viewerCount > 999,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
+              style: TikTokLiveTokens.viewerCount,
             ),
             if (shown.isNotEmpty) ...[
-              const SizedBox(width: 5),
+              const SizedBox(width: 6),
               SizedBox(
-                width: stackW + 8,
-                height: 24,
+                width: stackW,
+                height: avatar,
                 child: Stack(
-                  clipBehavior: Clip.none,
                   children: List.generate(shown.length, (i) {
-                    final badge = i < _badges.length ? _badges[i] : null;
                     return Positioned(
-                      left: i * 14.0,
-                      child: SizedBox(
-                        width: 22,
-                        height: 24,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.black.withValues(alpha: 0.55),
-                                  width: 1,
-                                ),
-                              ),
-                              child: ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: shown[i],
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => Container(
-                                    color: const Color(0xFF333333),
-                                    child: const Icon(
-                                      Icons.person,
-                                      size: 11,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                      left: i * _pitch,
+                      child: Container(
+                        width: avatar,
+                        height: avatar,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF2A2A2E),
+                          border: Border.all(
+                            color: const Color(0xFF161823),
+                            width: TikTokLiveTokens.viewerBorder,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: shown[i],
+                            fit: BoxFit.cover,
+                            errorWidget: (_, _, _) => const Icon(
+                              Icons.person,
+                              size: 12,
+                              color: Colors.white54,
                             ),
-                            if (badge != null && i < 2)
-                              Positioned(
-                                right: -4,
-                                bottom: -1,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 2.5,
-                                    vertical: 0.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: i == 0
-                                        ? const Color(0xFFFFB020)
-                                        : const Color(0xFF3D7EFF),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: Colors.black,
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    badge,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 7,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                          ),
                         ),
                       ),
                     );
@@ -373,108 +304,76 @@ class _BadgeRow extends StatelessWidget {
 
   const _BadgeRow({required this.live, this.onHourlyRankTap, this.onLeagueTap});
 
+  /// Every pill here is backed by real room metadata. Anything the backend has
+  /// not sent stays off the chrome rather than falling back to a stand-in
+  /// number, so the row never claims a rank or a goal the room does not have.
   @override
   Widget build(BuildContext context) {
-    final rank = live.metadata?['hourlyRank'] as int? ?? 12;
-    final location = live.metadata?['location'] as String? ?? 'LIVE';
-    final goalProgress = live.metadata?['goalProgress'] as String?;
-    final isPopular = live.metadata?['isPopular'] == true;
-    final popularReason = live.metadata?['popularReason'] as String?;
-    final leagueTier = live.metadata?['hostLeagueTier'] as String?;
-    final hostHearts = live.metadata?['hostHeartCount'] as int? ?? 0;
-    final host = (
-      isPopular: isPopular,
-      popularReason: popularReason,
-      leagueTier: leagueTier,
-      hostHearts: hostHearts,
-    );
+    final meta = live.metadata;
+    final rawRank = meta?['hourlyRank'];
+    final rank = rawRank is num
+        ? rawRank.toInt()
+        : int.tryParse(rawRank?.toString() ?? '');
+    final location = meta?['location']?.toString().trim();
+    final rawGoalProgress = meta?['goalProgress']?.toString().trim();
+    final goalCurrent = meta?['giftGoalCurrent'];
+    final goalTarget = meta?['giftGoalTarget'];
+    final goalProgress = rawGoalProgress != null && rawGoalProgress.isNotEmpty
+        ? rawGoalProgress
+        : (meta?['showGiftGoal'] == true &&
+                  goalCurrent != null &&
+                  goalTarget != null
+              ? '$goalCurrent/$goalTarget'
+              : null);
+    final leagueTier = meta?['hostLeagueTier']?.toString().trim();
+    final isPopular = meta?['isPopular'] == true;
+    final popularReason = meta?['popularReason']?.toString();
+    final locationLabel =
+        location == null || location.isEmpty || location.toLowerCase() == 'live'
+        ? null
+        : location;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
+    final leading = <Widget>[
+      if (leagueTier != null && leagueTier.isNotEmpty)
+        GestureDetector(
+          onTap: onLeagueTap,
+          child: _LeagueTierBadge(tier: leagueTier),
+        ),
+      if (rank != null)
+        GestureDetector(
+          onTap: onHourlyRankTap,
+          child: _HourlyRankPill(rank: rank),
+        ),
+      if (goalProgress != null && goalProgress.isNotEmpty)
+        _GiftGoalPill(progress: goalProgress),
+      if (locationLabel != null) _RankPill(label: locationLabel),
+    ];
+
+    return SizedBox(
+      height: TikTokLiveTokens.badgeH,
       child: Row(
+        textDirection: TextDirection.ltr,
         children: [
-          if (host.isPopular) ...[
-            _PopularityBadge(reason: host.popularReason),
-            const SizedBox(width: 4),
-          ],
-          GestureDetector(
-            onTap: onHourlyRankTap,
-            child: _Pill(
+          // Leading pills scroll on narrow phones; the league standing keeps
+          // the opposite edge the way the reference chrome splits them.
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                textDirection: TextDirection.ltr,
                 children: [
-                  const Text('🔥', style: TextStyle(fontSize: 10)),
-                  const SizedBox(width: 3),
-                  Text(
-                    'Hourly ranking',
-                    style: TextStyle(
-                      color: Colors.amber.shade100,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                    ),
-                  ),
+                  for (var i = 0; i < leading.length; i++) ...[
+                    if (i > 0) const SizedBox(width: TikTokLiveTokens.badgeGap),
+                    leading[i],
+                  ],
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 4),
-          _Pill(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  goalProgress ?? '1/0',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  'Gallery',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: onLeagueTap,
-            child: _Pill(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.emoji_events,
-                    color: Color(0xFFFFC107),
-                    size: 11,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    'No.$rank · $location',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (host.leagueTier != null) ...[
-            const SizedBox(width: 4),
-            _LeagueTierBadge(tier: host.leagueTier!),
+          if (isPopular) ...[
+            const SizedBox(width: TikTokLiveTokens.badgeGap),
+            _PopularityBadge(reason: popularReason),
           ],
         ],
       ),
@@ -482,10 +381,98 @@ class _BadgeRow extends StatelessWidget {
   }
 }
 
-/// Popularity badge — rendered if the backend flagged this host as trending.
-/// Uses `popularReason` to pick glyph + tint:
-///  - `admin_boost`  → rocket / royal purple (staff promoted).
-///  - `hourly_rank`  (or null) → fire / gradient (organic trending).
+/// Hourly ranking pill — a compact frosted badge with a real rank.
+class _HourlyRankPill extends StatelessWidget {
+  final int rank;
+
+  const _HourlyRankPill({required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Pill(
+      child: Row(
+        textDirection: TextDirection.ltr,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.local_fire_department_rounded,
+            size: 12,
+            color: TikTokLiveTokens.joinGold,
+          ),
+          const SizedBox(width: 3),
+          Text('No.$rank', style: TikTokLiveTokens.badge),
+        ],
+      ),
+    );
+  }
+}
+
+class _GiftGoalPill extends StatelessWidget {
+  final String progress;
+
+  const _GiftGoalPill({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Pill(
+      child: Row(
+        textDirection: TextDirection.ltr,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.card_giftcard_rounded,
+            size: 11,
+            color: TikTokLiveTokens.joinGold,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            progress,
+            style: TikTokLiveTokens.badge.copyWith(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankPill extends StatelessWidget {
+  final String label;
+
+  const _RankPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Pill(
+      child: Row(
+        textDirection: TextDirection.ltr,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.emoji_events_rounded,
+            color: Color(0xFFFFC107),
+            size: 11,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TikTokLiveTokens.badge.copyWith(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Popularity badge — rendered only when the backend flags this host as
+/// trending. The surface stays frosted so it matches the other top chips.
 class _PopularityBadge extends StatelessWidget {
   final String? reason;
 
@@ -494,37 +481,20 @@ class _PopularityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBoost = reason == 'admin_boost';
-    final icon = isBoost ? '🚀' : '⭐';
-    const label = 'Popular';
-    final gradient = isBoost
-        ? const LinearGradient(colors: [Color(0xFF7B61FF), Color(0xFFFF6BD6)])
-        : const LinearGradient(colors: [Color(0xFFFF5A3F), Color(0xFFFFC371)]);
+    final iconColor = isBoost
+        ? const Color(0xFFB7A5FF)
+        : TikTokLiveTokens.hostTagOrange;
 
-    return Container(
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.18),
-          width: 0.6,
-        ),
-      ),
+    return _Pill(
       child: Row(
+        textDirection: TextDirection.ltr,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 10)),
+          Icon(Icons.local_fire_department_rounded, size: 13, color: iconColor),
           const SizedBox(width: 3),
           Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              height: 1,
-            ),
+            'Popular',
+            style: TikTokLiveTokens.badge.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -555,23 +525,22 @@ class _LeagueTierBadge extends StatelessWidget {
       color = const Color(0xFF9AA0A6);
     }
 
-    return Container(
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.55), width: 0.8),
-      ),
-      child: Text(
-        t.isEmpty ? 'Tier' : 'League · $t',
-        style: TextStyle(
-          color: color,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w800,
-          height: 1,
-        ),
+    return _Pill(
+      child: Row(
+        textDirection: TextDirection.ltr,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.diamond_rounded, size: 10, color: color),
+          const SizedBox(width: 4),
+          Text(
+            t.isEmpty ? 'Tier' : 'League · $t',
+            style: TikTokLiveTokens.badge.copyWith(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -585,27 +554,22 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 7),
+      height: TikTokLiveTokens.badgeH,
+      padding: const EdgeInsets.symmetric(
+        horizontal: TikTokLiveTokens.badgePadH - 1,
+      ),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.44),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        color: TikTokLiveTokens.badgeBg(0.42),
+        borderRadius: BorderRadius.circular(TikTokLiveTokens.badgeR),
       ),
       child: child,
     );
   }
 }
 
-/// PK battle score bar — TikTok layout.
-///
-/// Reference (TikTok LIVE battle): one full-width split bar, each side's score
-/// sitting at its own outer edge in white, and the seam marker riding the split
-/// rather than parked at an edge. The centre of the bar is left empty on
-/// purpose: TikTok puts the round countdown there, and the previous
-/// "Win to get 2x points" capsule was occupying that slot and colliding with
-/// the timer the room already renders just below.
+/// PK battle score bar — full-bleed split with the reference's diagonal seam
+/// and each side's score pinned to its own outer edge.
 class PkBattleBar extends StatelessWidget {
   final int scoreLeft;
   final int scoreRight;
@@ -620,24 +584,13 @@ class PkBattleBar extends StatelessWidget {
     this.seamMarker = '😘',
   });
 
-  static const double _barHeight = 22;
-
-  /// Neither side's colour is ever fully squeezed out, so the bar still reads
-  /// as a contest when one room is running away with it (TikTok keeps a sliver).
-  static const double _minShare = 0.06;
-
-  static String _fmt(int n) {
-    if (n < 1000) return '$n';
-    return n.toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]},',
-    );
-  }
+  static const double _height = 18;
 
   @override
   Widget build(BuildContext context) {
     final total = (scoreLeft + scoreRight).clamp(1, 1 << 30);
-    final target = (scoreLeft / total).clamp(_minShare, 1 - _minShare);
+    // Each side keeps a sliver even in a blowout so both scores stay readable.
+    final ratio = (scoreLeft / total).clamp(0.08, 0.92);
 
     // `seamX` is measured from the left edge, so the two sides must be laid
     // out from the left edge too. Under Arabic the Row mirrored while the
@@ -645,10 +598,10 @@ class PkBattleBar extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: SizedBox(
-        height: _barHeight,
+        height: _height,
         // A score arriving as a socket event should slide the seam, not snap it.
         child: TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: target, end: target),
+          tween: Tween<double>(end: ratio),
           duration: const Duration(milliseconds: 420),
           curve: Curves.easeOutCubic,
           builder: (context, ratio, _) {
@@ -721,20 +674,40 @@ class PkBattleBar extends StatelessWidget {
       ),
     );
   }
+
+  static String _fmt(int value) {
+    if (value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}K';
+    }
+    return '$value';
+  }
+
+  static const TextStyle _scoreStyle = TextStyle(
+    color: Colors.white,
+    fontWeight: FontWeight.w800,
+    fontSize: 12,
+    height: 1,
+    shadows: [
+      Shadow(color: Color(0x73000000), blurRadius: 2, offset: Offset(0, 0.5)),
+    ],
+  );
 }
 
 class _Side extends StatelessWidget {
+  final int score;
+  final Alignment alignment;
+  final EdgeInsets padding;
+  final Gradient gradient;
+
   const _Side({
     required this.score,
     required this.alignment,
     required this.padding,
     required this.gradient,
   });
-
-  final int score;
-  final Alignment alignment;
-  final EdgeInsets padding;
-  final Gradient gradient;
 
   @override
   Widget build(BuildContext context) {
@@ -746,21 +719,7 @@ class _Side extends StatelessWidget {
         PkBattleBar._fmt(score),
         maxLines: 1,
         overflow: TextOverflow.clip,
-        // Both sides are white on TikTok. The cyan side used to be black87,
-        // which read as a disabled score next to the pink one.
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 14,
-          height: 1,
-          shadows: [
-            Shadow(
-              color: Color(0x66000000),
-              blurRadius: 2,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
+        style: PkBattleBar._scoreStyle,
       ),
     );
   }
@@ -814,78 +773,111 @@ class TikTokLiveBottomBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child:
-                    commentField ??
-                    GestureDetector(
-                      onTap: onTypeTap,
-                      child: Container(
-                        height: 38,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        alignment: Alignment.centerLeft,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.48),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
+                child: commentField == null
+                    ? GestureDetector(
+                        onTap: onTypeTap,
+                        child: Container(
+                          height: TikTokLiveTokens.inputH,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: TikTokLiveTokens.frost(0.36),
+                            borderRadius: BorderRadius.circular(
+                              TikTokLiveTokens.inputR,
+                            ),
+                          ),
+                          child: Row(
+                            textDirection: TextDirection.ltr,
+                            children: [
+                              GestureDetector(
+                                onTap: onEmojiTap ?? onTypeTap,
+                                behavior: HitTestBehavior.opaque,
+                                child: const SizedBox(
+                                  width: 24,
+                                  height: TikTokLiveTokens.inputH,
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.emoji_emotions_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                      shadows: TikTokLiveTokens.glyphShadow,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Type...',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign:
+                                      Directionality.of(context) ==
+                                          TextDirection.rtl
+                                      ? TextAlign.right
+                                      : TextAlign.left,
+                                  textDirection: Directionality.of(context),
+                                  style: TikTokLiveTokens.inputHint,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Text(
-                          'Type...',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.62),
-                            fontSize: 14,
-                          ),
-                        ),
+                      )
+                    : Align(
+                        alignment: Alignment.bottomCenter,
+                        child: commentField,
                       ),
-                    ),
               ),
-              const SizedBox(width: 6),
-              _BottomAction(
-                onTap: onEmojiTap ?? onTypeTap,
-                child: const Icon(
-                  Icons.emoji_emotions_rounded,
-                  color: Colors.white,
-                  size: 23,
-                ),
-              ),
-              if (onMultiGuestTap != null) ...[
-                const SizedBox(width: 5),
-                _BottomAction(
-                  onTap: onMultiGuestTap!,
-                  child: const _GuestActionGlyph(),
-                ),
-              ],
-              if (onRoseTap != null) ...[
-                const SizedBox(width: 5),
-                _BottomAction(
-                  onTap: onRoseTap!,
-                  child: const Text('🌹', style: TextStyle(fontSize: 23)),
-                ),
-              ],
-              const SizedBox(width: 5),
-              _BottomAction(
-                onTap: onGiftTap,
-                child: const Icon(
-                  Icons.card_giftcard_rounded,
-                  color: Color(0xFFFF5B87),
-                  size: 23,
-                ),
-              ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               _BottomAction(
                 onTap: onShareTap,
                 badge: shareCount != null && shareCount! > 0
                     ? (shareCount! > 999 ? '999+' : '$shareCount')
                     : null,
+                scrim: true,
                 child: Transform.flip(
                   flipX: true,
                   child: const Icon(
                     Icons.reply_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: TikTokLiveTokens.bottomGlyph,
+                    shadows: TikTokLiveTokens.glyphShadow,
                   ),
                 ),
               ),
+              const SizedBox(width: TikTokLiveTokens.bottomIconGap),
+              _BottomAction(
+                onTap: onGiftTap,
+                scrim: true,
+                child: const Icon(
+                  Icons.card_giftcard_rounded,
+                  color: TikTokLiveTokens.giftPink,
+                  size: TikTokLiveTokens.giftIcon,
+                  shadows: TikTokLiveTokens.glyphShadow,
+                ),
+              ),
+              if (onRoseTap != null) ...[
+                const SizedBox(width: TikTokLiveTokens.bottomIconGap),
+                _BottomAction(
+                  onTap: onRoseTap!,
+                  scrim: true,
+                  child: const Text(
+                    '🌹',
+                    style: TextStyle(
+                      fontSize: 24,
+                      shadows: TikTokLiveTokens.glyphShadow,
+                    ),
+                  ),
+                ),
+              ],
+              if (onMultiGuestTap != null) ...[
+                const SizedBox(width: TikTokLiveTokens.bottomIconGap),
+                _BottomAction(
+                  onTap: onMultiGuestTap!,
+                  scrim: true,
+                  child: const _GuestActionGlyph(),
+                ),
+              ],
             ],
           ),
         ),
@@ -895,11 +887,19 @@ class TikTokLiveBottomBar extends StatelessWidget {
 }
 
 class _BottomAction extends StatelessWidget {
-  const _BottomAction({required this.onTap, required this.child, this.badge});
+  const _BottomAction({
+    required this.onTap,
+    required this.child,
+    this.badge,
+    this.scrim = false,
+  });
 
   final VoidCallback onTap;
   final Widget child;
   final String? badge;
+
+  /// TikTok gives the action controls a quiet circular scrim over live video.
+  final bool scrim;
 
   @override
   Widget build(BuildContext context) {
@@ -907,38 +907,34 @@ class _BottomAction extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: 38,
-        height: 40,
+        width: TikTokLiveTokens.bottomHit,
+        height: TikTokLiveTokens.inputH,
         child: Stack(
+          alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            Positioned(
-              left: 1,
-              top: 1,
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
+            if (scrim)
+              Container(
+                width: TikTokLiveTokens.bottomScrimDisc,
+                height: TikTokLiveTokens.bottomScrimDisc,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.48),
+                  color: TikTokLiveTokens.frost(0.36),
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
-                  ),
                 ),
-                child: child,
               ),
-            ),
+            child,
             if (badge != null)
               Positioned(
-                right: -2,
-                bottom: -1,
+                right: 0,
+                bottom: 0,
                 child: Text(
                   badge!,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 8,
+                    fontSize: 9,
                     fontWeight: FontWeight.w700,
+                    height: 1,
+                    shadows: TikTokLiveTokens.glyphShadow,
                   ),
                 ),
               ),
@@ -955,19 +951,29 @@ class _GuestActionGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      width: 27,
+      width: 28,
       height: 24,
       child: Stack(
         children: [
           Positioned(
-            left: 1,
+            left: 0,
             bottom: 1,
-            child: Icon(Icons.person, color: Color(0xFF25F4EE), size: 20),
+            child: Icon(
+              Icons.person,
+              color: TikTokLiveTokens.liveCyan,
+              size: 21,
+              shadows: TikTokLiveTokens.glyphShadow,
+            ),
           ),
           Positioned(
             right: 0,
             bottom: 1,
-            child: Icon(Icons.person, color: Color(0xFFFF2D55), size: 20),
+            child: Icon(
+              Icons.person,
+              color: TikTokLiveTokens.giftPink,
+              size: 21,
+              shadows: TikTokLiveTokens.glyphShadow,
+            ),
           ),
         ],
       ),

@@ -91,6 +91,7 @@ class LiveRoomReady extends LiveRoomState {
     this.pendingCompetitionRequest,
     this.isCompetitionActionBusy = false,
     this.battle,
+    this.battleMediaRoom,
     this.topGifterAvatars = const [],
     this.opponentTopGifterAvatars = const [],
   });
@@ -158,6 +159,14 @@ class LiveRoomReady extends LiveRoomState {
   /// Current server-authoritative PK battle, if this live is paired.
   final LiveBattle? battle;
 
+  /// The subscribe-only LiveKit room for the opponent's battle stream.
+  ///
+  /// This is deliberately part of BLoC state. The media repository owns the
+  /// imperative Room, but the stage must be told when that Room becomes
+  /// available instead of relying on an unchanged [battle] value to trigger a
+  /// rebuild.
+  final Room? battleMediaRoom;
+
   /// Ordered supporter avatars for this live — the top-gifter ring TikTok
   /// draws under the host's own PK tile. From
   /// `GET /lives/:id/leaderboard/gifters` and `liveTopGiftersUpdated`.
@@ -208,6 +217,7 @@ class LiveRoomReady extends LiveRoomState {
     Object? pendingCompetitionRequest = _unset,
     bool? isCompetitionActionBusy,
     Object? battle = _unset,
+    Object? battleMediaRoom = _unset,
     List<String>? topGifterAvatars,
     List<String>? opponentTopGifterAvatars,
   }) {
@@ -260,6 +270,9 @@ class LiveRoomReady extends LiveRoomState {
       isCompetitionActionBusy:
           isCompetitionActionBusy ?? this.isCompetitionActionBusy,
       battle: identical(battle, _unset) ? this.battle : battle as LiveBattle?,
+      battleMediaRoom: identical(battleMediaRoom, _unset)
+          ? this.battleMediaRoom
+          : battleMediaRoom as Room?,
       topGifterAvatars: topGifterAvatars ?? this.topGifterAvatars,
       opponentTopGifterAvatars:
           opponentTopGifterAvatars ?? this.opponentTopGifterAvatars,

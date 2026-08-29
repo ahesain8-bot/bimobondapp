@@ -6,6 +6,7 @@ import 'package:bimobondapp/app/video_templates/domain/entities/video_template_e
 import 'package:bimobondapp/app/video_templates/domain/repositories/video_templates_repository.dart';
 import 'package:bimobondapp/app/video_templates/engine/template_engine.dart';
 import 'package:bimobondapp/app/video_templates/composition/composition_session.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_one_shot_render_builder.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/video_template_client_renderer.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/video_template_slot_filler.dart';
@@ -981,21 +982,57 @@ class OneShotRenderVideoTemplateUseCase {
     }
     report(0.18, label: 'Uploaded');
 
+    final filterPresetsResult = await repository.listPresets(kind: 'FILTER');
+    final effectPresetsResult = await repository.listPresets(kind: 'EFFECT');
+    final filterPresets = filterPresetsResult.fold(
+      (_) => const <TemplatePresetItem>[],
+      (list) => list,
+    );
+    final effectPresets = effectPresetsResult.fold(
+      (_) => const <TemplatePresetItem>[],
+      (list) => list,
+    );
+
     final body = TemplateOneShotRenderBuilder.build(
       session: session,
       slotIdToUploadedUrl: slotIdToUrl,
-      catalogTemplateId: catalogTemplateId,
+      catalogTemplateId: null,
       title: projectTitle ?? selection.name,
       exportQuality: exportQuality,
       resolution: resolution,
       fps: fps,
+      filterPresets: filterPresets,
+      effectPresets: effectPresets,
+      includeCatalogTemplateId: false,
+      explicitEditedExport: true,
     );
+
+    body.remove('templateId');
+    TemplateOneShotRenderBuilder.stripCatalogTemplateKeys(body);
 
     debugPrint(
       'OneShotRender POST /render keys=${body.keys.toList()} '
       'hasTemplateId=${body.containsKey('templateId')} '
+      'hasVideoTemplateId=${body.containsKey('videoTemplateId')} '
+      'texts=${(body['texts'] as List?)?.length ?? 'omit'} '
+      'stickers=${(body['stickers'] as List?)?.length ?? 'omit'} '
+      'textsOwned=${session.userTextsLayerOwned} '
+      'audios=${(body['audios'] as List?)?.length ?? 'omit'} '
+      'durationSeconds=${body['durationSeconds']} '
       'slots=${body['slots']}',
     );
+    final slotList = body['slots'];
+    if (slotList is List && slotList.isNotEmpty) {
+      final first = slotList.first;
+      if (first is Map) {
+        debugPrint(
+          'OneShotRender slot0 filters=${first['filters']} '
+          'filterName=${first['filterName']} '
+          'effects=${first['effects']} '
+          'effectType=${first['effectType']}',
+        );
+      }
+    }
 
     if (body['media'] == null && body['templateId'] == null) {
       return Left(ServerFailure('no_media_for_template'));

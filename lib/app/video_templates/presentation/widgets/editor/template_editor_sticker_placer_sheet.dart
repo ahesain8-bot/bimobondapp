@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_theme.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -27,12 +28,16 @@ class TemplateEditorStickerPlacerSheet extends StatefulWidget {
     this.media,
     this.canvasWidth = 1080,
     this.canvasHeight = 1920,
+    this.initial,
+    this.title = 'Stickers',
   });
 
   final List<TemplatePresetItem> presets;
   final Widget? media;
   final int canvasWidth;
   final int canvasHeight;
+  final TemplateEditorStickerDraft? initial;
+  final String title;
 
   static Future<TemplateEditorStickerDraft?> show(
     BuildContext context, {
@@ -40,6 +45,8 @@ class TemplateEditorStickerPlacerSheet extends StatefulWidget {
     Widget? media,
     int canvasWidth = 1080,
     int canvasHeight = 1920,
+    TemplateEditorStickerDraft? initial,
+    String title = 'Stickers',
   }) {
     return Navigator.of(context).push<TemplateEditorStickerDraft>(
       PageRouteBuilder(
@@ -51,6 +58,8 @@ class TemplateEditorStickerPlacerSheet extends StatefulWidget {
           media: media,
           canvasWidth: canvasWidth,
           canvasHeight: canvasHeight,
+          initial: initial,
+          title: title,
         ),
       ),
     );
@@ -77,18 +86,30 @@ class _TemplateEditorStickerPlacerSheetState
   @override
   void initState() {
     super.initState();
-    _positionX = 0;
-    _positionY = 0;
-    _scale = 1;
+    final initial = widget.initial;
+    if (initial != null) {
+      _selected = initial.preset;
+      _positionX = initial.positionX;
+      _positionY = initial.positionY;
+      _scale = initial.scale;
+      _baseScale = initial.scale;
+    } else {
+      _positionX = 0;
+      _positionY = 0;
+      _scale = 1;
+      _baseScale = 1;
+    }
   }
 
   void _pickPreset(TemplatePresetItem preset) {
     setState(() {
       _selected = preset;
-      _positionX = 0;
-      _positionY = 0;
-      _scale = 1;
-      _baseScale = 1;
+      if (widget.initial == null) {
+        _positionX = 0;
+        _positionY = 0;
+        _scale = 1;
+        _baseScale = 1;
+      }
     });
   }
 
@@ -133,10 +154,11 @@ class _TemplateEditorStickerPlacerSheetState
   }
 
   Widget _stickerVisual(double previewWidth) {
+    final l10n = AppLocalizations.of(context)!;
     final preset = _selected;
     if (preset == null) {
       return Text(
-        'Pick a sticker below',
+        l10n.templateEditorPickStickerBelow,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.55),
           fontSize: 14,
@@ -213,8 +235,10 @@ class _TemplateEditorStickerPlacerSheetState
                     child: IgnorePointer(
                       child: Text(
                         _selected == null
-                            ? 'Tap a sticker below'
-                            : 'Drag to move · Pinch or ± to resize',
+                            ? AppLocalizations.of(context)!
+                                .templateEditorTapStickerBelow
+                            : AppLocalizations.of(context)!
+                                .templateEditorDragResizeSticker,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
@@ -251,11 +275,11 @@ class _TemplateEditorStickerPlacerSheetState
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(LucideIcons.x, color: Colors.white),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Stickers',
+                      widget.title,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
@@ -265,7 +289,7 @@ class _TemplateEditorStickerPlacerSheetState
                   TextButton(
                     onPressed: _selected == null ? null : _submit,
                     child: Text(
-                      'Apply',
+                      AppLocalizations.of(context)!.templateEditorApply,
                       style: TextStyle(
                         color: _selected == null
                             ? Colors.white38

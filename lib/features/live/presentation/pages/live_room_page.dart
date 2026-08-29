@@ -133,7 +133,10 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final bloc = _bloc;
     if (bloc == null) return;
-    if (state == AppLifecycleState.inactive) {
+    // `inactive` fires for sheets, the PK picker, and system overlays. Ending
+    // or dropping the camera there is what left both hosts' LiveKit rooms
+    // empty for 10s+ and made the server finish the live (and the PK) at 0–0.
+    if (state == AppLifecycleState.paused) {
       bloc.add(const LiveRoomAppPaused());
     } else if (state == AppLifecycleState.resumed) {
       LiveScreenWakelock.enable();
@@ -249,6 +252,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
               ],
               child: Scaffold(
                 backgroundColor: Colors.black,
+                // Keep the camera canvas fixed; the bottom chrome follows the
+                // keyboard through the view inset instead of resizing video.
+                resizeToAvoidBottomInset: false,
                 body: _LiveRoomBody(
                   startIndicatorDeadline: _startIndicatorDeadline,
                 ),
@@ -269,12 +275,19 @@ class _LiveRoomBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LiveRoomBloc, LiveRoomState>(
-      buildWhen: (previous, current) =>
-          current is LiveRoomLoading ||
-          current is LiveRoomOpening ||
-          current is LiveRoomFailure ||
-          current is LiveRoomReady ||
-          current is LiveRoomEnded,
+      buildWhen: (previous, current) {
+        if (previous.runtimeType != current.runtimeType) return true;
+        if (current is LiveRoomReady && previous is LiveRoomReady) {
+          // Chat messages, send progress, likes, and other overlay-only
+          // updates have their own builders below. Rebuilding this full
+          // canvas for them makes the column remeasure while typing/sending.
+          return previous.isMediaConnected != current.isMediaConnected;
+        }
+        return current is LiveRoomLoading ||
+            current is LiveRoomOpening ||
+            current is LiveRoomFailure ||
+            current is LiveRoomEnded;
+      },
       builder: (context, state) {
         if (state is LiveRoomLoading || state is LiveRoomInitial) {
           return const Center(
@@ -425,44 +438,49 @@ class _LiveRoomBody extends StatelessWidget {
                 ),
               ),
             ),
-            const SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  SizedBox(height: AppSpacing.xxs),
-                  LiveRoomHeader(),
-                  SizedBox(height: AppSpacing.xs),
-                  LiveRoomInfoRow(),
-                  // Everything between the header and the bars lives in one
-                  // flexible slot pinned to its bottom. Previously the feed was
-                  // a rigid child after a Spacer, so the moment the keyboard or
-                  // the effects panel claimed the space the column overflowed
-                  // and the feed was the part that got clipped.
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        SizedBox(height: AppSpacing.xs),
-                        Flexible(
-                          child: Padding(
-                            padding: EdgeInsetsDirectional.only(
-                              start: AppSpacing.xl,
-                              end: AppSpacing.roomHorizontal,
-                              bottom: AppSpacing.xs,
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    SizedBox(height: AppSpacing.xxs),
+                    LiveRoomHeader(),
+                    SizedBox(height: AppSpacing.xs),
+                    LiveRoomInfoRow(),
+                    // Everything between the header and the bars lives in one
+                    // flexible slot pinned to its bottom. Previously the feed was
+                    // a rigid child after a Spacer, so the moment the keyboard or
+                    // the effects panel claimed the space the column overflowed
+                    // and the feed was the part that got clipped.
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(height: AppSpacing.xs),
+                          Flexible(
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.only(
+                                start: AppSpacing.xl,
+                                end: AppSpacing.roomHorizontal,
+                                bottom: AppSpacing.xs,
+                              ),
+                              child: LiveRoomChatFeed(),
                             ),
-                            child: LiveRoomChatFeed(),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  LiveRoomCompetitionRequestPrompt(),
-                  LiveRoomGuestRequestPrompt(),
-                  LiveRoomGuestInvitePrompt(),
-                  LiveRoomChatComposer(),
-                  LiveRoomBottomBar(),
-                  LiveRoomEffectsPanel(),
-                ],
+                    LiveRoomCompetitionRequestPrompt(),
+                    LiveRoomGuestRequestPrompt(),
+                    LiveRoomGuestInvitePrompt(),
+                    LiveRoomChatComposer(),
+                    LiveRoomBottomBar(),
+                    LiveRoomEffectsPanel(),
+                  ],
+                ),
               ),
             ),
             Positioned.fill(

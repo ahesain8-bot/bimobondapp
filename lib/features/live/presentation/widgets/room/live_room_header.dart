@@ -13,7 +13,8 @@ import 'live_room_ranking_sheet.dart';
 import 'live_room_pill.dart';
 import 'live_room_profile_pill.dart';
 
-/// Top overlay matching the reference: profile+likes on start, power+viewers on end.
+/// Top overlay matching the reference: identity on the right, exit/viewers on
+/// the left.
 class LiveRoomHeader extends StatelessWidget {
   const LiveRoomHeader({super.key});
 
@@ -37,10 +38,13 @@ class LiveRoomHeader extends StatelessWidget {
             textDirection: TextDirection.ltr,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Start (right): profile then likes → visual [likes][profile]
-              LiveRoomProfilePill(
-                host: session.host,
-                followerCount: session.host.hostHeartCount,
+              // Keep the exit control and viewer cluster on the left, with
+              // the broadcaster identity anchored to the opposite edge like
+              // the viewer chrome.
+              _PowerButton(
+                onTap: () => context.read<LiveRoomBloc>().add(
+                  const LiveRoomEndRequested(),
+                ),
               ),
               const SizedBox(width: 6),
               GestureDetector(
@@ -88,10 +92,17 @@ class LiveRoomHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              _PowerButton(
+              const Spacer(),
+              GestureDetector(
                 onTap: () => context.read<LiveRoomBloc>().add(
-                  const LiveRoomEndRequested(),
+                  const LiveRoomLikeTapped(),
                 ),
+                child: LiveRoomLikesPill(likeCount: session.likeCount),
+              ),
+              const SizedBox(width: 6),
+              LiveRoomProfilePill(
+                host: session.host,
+                followerCount: session.host.hostHeartCount,
               ),
             ],
           ),
@@ -163,16 +174,23 @@ class _PowerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: const SizedBox(
         width: 34,
         height: 34,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.46),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        child: Center(
+          child: Icon(
+            Icons.close_rounded,
+            color: Colors.white,
+            size: 24,
+            shadows: [
+              Shadow(
+                color: Color(0x8C000000),
+                blurRadius: 5,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
         ),
-        alignment: Alignment.center,
-        child: SvgPicture.asset(AppAssets.roomPower, width: 18, height: 18),
       ),
     );
   }

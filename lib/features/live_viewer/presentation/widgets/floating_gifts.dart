@@ -111,14 +111,15 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
   void _presentCombo(GiftComboPayload payload) {
     final gift = payload.gift ?? const <String, dynamic>{};
     final sender = payload.sender ?? const <String, dynamic>{};
-    final giftName = _readString(payload.giftName) ??
-        _readString(gift['name']) ??
-        'Gift';
-    final senderName = _readString(payload.senderName) ??
+    final giftName =
+        _readString(payload.giftName) ?? _readString(gift['name']) ?? 'Gift';
+    final senderName =
+        _readString(payload.senderName) ??
         _readString(sender['fullName']) ??
         _readString(sender['username']) ??
         'User';
-    final senderAvatar = _readString(payload.senderAvatarUrl) ??
+    final senderAvatar =
+        _readString(payload.senderAvatarUrl) ??
         _readString(sender['avatarUrl']) ??
         _readString(sender['avatar']);
     // `imageUrl` is a static asset, so it belongs in the thumbnail slot only.
@@ -291,7 +292,9 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.65),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: _audioAccent().withValues(alpha: 0.7)),
+                border: Border.all(
+                  color: _audioAccent().withValues(alpha: 0.7),
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(

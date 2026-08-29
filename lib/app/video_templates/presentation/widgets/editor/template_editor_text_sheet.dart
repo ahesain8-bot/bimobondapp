@@ -4,6 +4,7 @@ import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_font_cache.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_theme.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -50,6 +51,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
     this.canvasWidth = 1080,
     this.canvasHeight = 1920,
     this.initial,
+    this.title = 'Add text',
   });
 
   final List<TemplateFontItem> fonts;
@@ -59,6 +61,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
   final int canvasWidth;
   final int canvasHeight;
   final TemplateEditorTextDraft? initial;
+  final String title;
 
   static Future<TemplateEditorTextDraft?> show(
     BuildContext context, {
@@ -68,6 +71,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
     int canvasWidth = 1080,
     int canvasHeight = 1920,
     TemplateEditorTextDraft? initial,
+    String title = 'Add text',
   }) {
     return Navigator.of(context).push<TemplateEditorTextDraft>(
       PageRouteBuilder(
@@ -81,6 +85,7 @@ class TemplateEditorTextSheet extends StatefulWidget {
           canvasWidth: canvasWidth,
           canvasHeight: canvasHeight,
           initial: initial,
+          title: title,
         ),
       ),
     );
@@ -308,8 +313,9 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
         // Center-origin → top-left of text center in preview px.
         final cx = w / 2 + _positionX * (w / _cw);
         final cy = h / 2 + _positionY * (h / _ch);
+        final l10n = AppLocalizations.of(context)!;
         final display = _controller.text.trim().isEmpty
-            ? 'Type below…'
+            ? l10n.templateEditorTypeBelow
             : _controller.text.trim();
         final style = _liveStyle(w).copyWith(
           color: _controller.text.trim().isEmpty
@@ -370,8 +376,8 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
                     child: IgnorePointer(
                       child: Text(
                         _placing
-                            ? 'Drag to move · Pinch to resize'
-                            : 'Tap media to place · Drag to move',
+                            ? l10n.templateEditorDragPinchResize
+                            : l10n.templateEditorTapMediaToPlace,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
@@ -484,7 +490,7 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
                 _FontChip(
-                  label: 'Default',
+                  label: AppLocalizations.of(context)!.templateEditorDefault,
                   selected: _selected == null,
                   onTap: () => _selectFont(null),
                 ),
@@ -523,11 +529,11 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(LucideIcons.x, color: Colors.white70),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Add text',
+                        widget.title,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -551,9 +557,9 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      child: const Text(
-                        'Apply',
-                        style: TextStyle(fontWeight: FontWeight.w800),
+                      child: Text(
+                        AppLocalizations.of(context)!.templateEditorApply,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
                   ],
@@ -588,7 +594,8 @@ class _TemplateEditorTextSheetState extends State<TemplateEditorTextSheet> {
                     ),
                     cursorColor: TemplateEditorTheme.accent,
                     decoration: InputDecoration(
-                      hintText: 'Type your caption…',
+                      hintText: AppLocalizations.of(context)!
+                          .templateEditorTypeCaption,
                       hintStyle: TextStyle(
                         color: _color.withValues(alpha: 0.4),
                       ),

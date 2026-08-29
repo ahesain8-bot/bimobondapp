@@ -2048,5 +2048,96 @@
   "marketplaceVerifiedProduct": "منتج موثّق",
   "marketplaceSecurePayment": "دفع آمن",
   "marketplaceBuyerProtection": "حماية المشتري",
-  "marketplaceDeliveryTracking": "تتبع التوصيل"
+  "marketplaceDeliveryTracking": "تتبع التوصيل",
+  "templateEditorSound": "الصوت",
+  "templateEditorText": "نص",
+  "templateEditorEffects": "مؤثرات",
+  "templateEditorFilters": "فلاتر",
+  "templateEditorTransitions": "انتقالات",
+  "templateEditorStickers": "ملصقات",
+  "templateEditorCopy": "نسخ",
+  "templateEditorDelete": "حذف",
+  "templateEditorLayers": "طبقات",
+  "templateEditorNone": "بدون",
+  "templateEditorTrending": "الرائج",
+  "templateEditorApply": "تطبيق",
+  "templateEditorDefault": "افتراضي",
+  "templateEditorPhoto": "صورة",
+  "templateEditorVideo": "فيديو",
+  "templateEditorFont": "خط",
+  "templateEditorAddText": "إضافة نص",
+  "templateEditorReplaceText": "استبدال النص",
+  "templateEditorReplaceSticker": "استبدال الملصق",
+  "templateEditorReplaceFilter": "استبدال الفلتر",
+  "templateEditorReplaceEffect": "استبدال المؤثر",
+  "templateEditorReplaceTransition": "استبدال الانتقال",
+  "templateEditorReplaceMusic": "استبدال الموسيقى",
+  "templateEditorAddFilterClip": "إضافة فلتر · مقطع {clip}",
+  "@templateEditorAddFilterClip": {
+    "placeholders": {
+      "clip": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorAddEffectClip": "إضافة مؤثر · مقطع {clip}",
+  "@templateEditorAddEffectClip": {
+    "placeholders": {
+      "clip": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorAddTransition": "إضافة انتقال",
+  "templateEditorFilterLayers": "طبقات الفلاتر",
+  "templateEditorEffectLayers": "طبقات المؤثرات",
+  "templateEditorServerPreview": "معاينة السيرفر",
+  "templateEditorContinueWithRender": "اضغط ← للمتابعة بهذا التصيير",
+  "templateEditorTypeBelow": "اكتب بالأسفل…",
+  "templateEditorTypeCaption": "اكتب التعليق…",
+  "templateEditorDragPinchResize": "اسحب للتحريك · اضغط للتصغير/التكبير",
+  "templateEditorTapMediaToPlace": "اضغط على الوسائط للوضع · اسحب للتحريك",
+  "templateEditorPickStickerBelow": "اختر ملصقاً من الأسفل",
+  "templateEditorTapStickerBelow": "اضغط على ملصق بالأسفل",
+  "templateEditorDragResizeSticker": "اسحب للتحريك · اضغط أو ± للتحجيم",
+  "templateEditorMaxFiltersPerClip": "حد أقصى {count} فلاتر لكل مقطع",
+  "@templateEditorMaxFiltersPerClip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorMaxEffectsPerClip": "حد أقصى {count} مؤثرات لكل مقطع",
+  "@templateEditorMaxEffectsPerClip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorTransitionsNeedClips": "الانتقالات تحتاج مقطعين على الأقل",
+  "templateEditorAddMediaAllSlots": "أضف وسائط لجميع الخانات قبل التصيير.",
+  "templateEditorCouldNotRender": "تعذر التصيير على السيرفر",
+  "templateEditorExportFailed": "فشل التصدير",
+  "templateEditorPresetNone": "بدون",
+  "templateEditorPresetCinematic": "سينمائي",
+  "templateEditorPresetWarm": "دافئ",
+  "templateEditorPresetCool": "بارد",
+  "templateEditorPresetVintage": "كلاسيكي",
+  "templateEditorPresetVivid": "حيوي",
+  "templateEditorPresetFade": "تلاشي",
+  "templateEditorPresetBw": "أبيض وأسود",
+  "templateEditorPresetZoomIn": "تكبير",
+  "templateEditorPresetZoomOut": "تصغير",
+  "templateEditorPresetShake": "اهتزاز",
+  "templateEditorPresetPulse": "نبض",
+  "templateEditorPresetCrossfade": "تلاشي متقاطع",
+  "templateEditorPresetFlash": "وميض",
+  "templateEditorPresetSlideLeft": "انزلاق لليسار",
+  "templateEditorPresetSlideRight": "انزلاق لليمين",
+  "templateEditorPresetZoom": "زوم",
+  "templateEditorPresetBlur": "ضبابية",
+  "templateEditorPresetGlitch": "خلل",
+  "templateEditorPresetFilmBurn": "حرق فيلم"
 }

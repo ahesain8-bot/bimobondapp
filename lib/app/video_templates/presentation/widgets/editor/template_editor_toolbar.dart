@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_theme.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -18,46 +19,54 @@ class TemplateEditorToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final items = <_ToolItem>[
       _ToolItem(
         panel: TemplateEditorPanel.edit,
         icon: LucideIcons.scissors,
-        label: 'Edit',
+        label: l10n.edit,
         enabled: true,
       ),
       if (editable.music)
         _ToolItem(
           panel: TemplateEditorPanel.audio,
           icon: LucideIcons.music,
-          label: 'Audio',
+          label: l10n.templateEditorSound,
           enabled: true,
         ),
       if (editable.text)
         _ToolItem(
           panel: TemplateEditorPanel.text,
           icon: LucideIcons.type,
-          label: 'Text',
+          label: l10n.templateEditorText,
           enabled: true,
         ),
       if (editable.effects)
         _ToolItem(
           panel: TemplateEditorPanel.effects,
           icon: LucideIcons.sparkles,
-          label: 'Effects',
+          label: l10n.templateEditorEffects,
           enabled: true,
         ),
       if (editable.filters)
         _ToolItem(
           panel: TemplateEditorPanel.filters,
           icon: LucideIcons.aperture,
-          label: 'Filters',
+          label: l10n.templateEditorFilters,
+          enabled: true,
+        ),
+      if (editable.transitions)
+        _ToolItem(
+          panel: TemplateEditorPanel.transitions,
+          icon: LucideIcons.betweenHorizontalStart,
+          label: l10n.templateEditorTransitions,
           enabled: true,
         ),
       if (editable.stickers)
         _ToolItem(
           panel: TemplateEditorPanel.stickers,
           icon: LucideIcons.sticker,
-          label: 'Stickers',
+          label: l10n.templateEditorStickers,
           enabled: true,
         ),
     ];
@@ -65,7 +74,7 @@ class TemplateEditorToolbar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -149,6 +158,7 @@ class _ToolButton extends StatelessWidget {
                 item.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: item.enabled
                       ? TemplateEditorTheme.textPrimary

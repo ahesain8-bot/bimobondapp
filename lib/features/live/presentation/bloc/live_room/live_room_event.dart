@@ -312,6 +312,11 @@ class LiveRoomBattleChanged extends LiveRoomEvent {
   final LiveBattle? battle;
 }
 
+/// Re-reads `GET /lives/:id/battle` while the HUD socket is down.
+class LiveRoomBattlePollRequested extends LiveRoomEvent {
+  const LiveRoomBattlePollRequested();
+}
+
 /// Re-reads the supporter leaderboards this room draws — this live's, and the
 /// opponent's while a battle is active.
 class LiveRoomSupportersRefreshRequested extends LiveRoomEvent {

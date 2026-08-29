@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/models/live_battle.dart';
+import '../../../domain/entities/live_battle_errors.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
@@ -116,6 +117,10 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
     required String success,
   }) async {
     if (_busy) return;
+    if (_battle?.isActive == true) {
+      snack('هناك جولة منافسة نشطة بالفعل');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final battle = await action();
@@ -124,7 +129,16 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
       context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(battle));
       snack(success);
     } catch (e) {
-      if (mounted) snack(errorMessage(e));
+      if (isAlreadyInBattleError(e)) {
+        final existing = await _loadBattleSafely();
+        if (mounted && existing != null && existing.isActive) {
+          setState(() => _battle = existing);
+          context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(existing));
+          snack('المنافسة الجارية ما زالت مفتوحة');
+          return;
+        }
+      }
+      if (mounted) snack(noOpponentsMessage(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -347,16 +361,25 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
           style: TextStyle(color: Colors.white54, fontSize: 12),
         ),
         const SizedBox(height: 10),
-        FilledButton.icon(
-          onPressed: _busy
-              ? null
-              : () => _runBattle(
-                  () => repository.matchBattle(widget.liveId),
-                  success: 'بدأت المعركة',
-                ),
-          icon: const Icon(Icons.bolt),
-          label: const Text('مطابقة تلقائية وبدء المعركة'),
-        ),
+        if (_opponents.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'لا يوجد بث مباشر آخر متاح للمنافسة الآن',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          )
+        else
+          FilledButton.icon(
+            onPressed: _busy
+                ? null
+                : () => _runBattle(
+                    () => repository.matchBattle(widget.liveId),
+                    success: 'بدأت المعركة',
+                  ),
+            icon: const Icon(Icons.bolt),
+            label: const Text('مطابقة تلقائية وبدء المعركة'),
+          ),
         if (_opponents.isNotEmpty) ...[
           const SizedBox(height: 10),
           ..._opponents

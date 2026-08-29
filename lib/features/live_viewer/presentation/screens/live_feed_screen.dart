@@ -192,6 +192,10 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
         ],
         child: Scaffold(
           backgroundColor: isDark ? Colors.black : Colors.white,
+          // The live canvas remains full-screen while the composer handles
+          // its own keyboard inset. Resizing this scaffold moves the video,
+          // chrome, comments, and every bottom-anchored overlay together.
+          resizeToAvoidBottomInset: false,
           body: BlocBuilder<LiveFeedBloc, LiveFeedState>(
             // The silent refresh runs every 8 seconds and comes back with new
             // viewer counts almost every time. Without this the whole PageView

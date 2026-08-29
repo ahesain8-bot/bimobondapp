@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_one_shot_render_builder.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
@@ -129,6 +130,18 @@ abstract class VideoTemplatesRemoteDataSource {
     String? presetId,
     double? startTime,
     double? endTime,
+  });
+
+  Future<void> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<void> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
   });
 
   Future<void> createProjectText({
@@ -598,6 +611,7 @@ class VideoTemplatesRemoteDataSourceImpl
     Map<String, dynamic> body,
   ) async {
     try {
+      TemplateOneShotRenderBuilder.stripCatalogTemplateKeys(body);
       final response = await apiClient.dio.post(
         ApiConstants.videoTemplateRender,
         data: body,
@@ -889,6 +903,38 @@ class VideoTemplatesRemoteDataSourceImpl
           if (startTime != null) 'effectStartTime': startTime,
           if (endTime != null) 'effectEndTime': endTime,
         },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotFilters(projectId, slotId),
+        data: {'items': items},
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotEffects(projectId, slotId),
+        data: {'items': items},
       );
     } on DioException catch (e) {
       throw DioHandler.handle(e);

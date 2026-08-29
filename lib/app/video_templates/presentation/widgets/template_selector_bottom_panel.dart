@@ -22,6 +22,7 @@ class TemplateSelectorBottomPanel extends StatefulWidget {
     required this.onClose,
     required this.onClear,
     required this.onSelected,
+    this.onEdit,
     required this.onYourStory,
     required this.onNext,
     this.avatarUrl,
@@ -35,6 +36,7 @@ class TemplateSelectorBottomPanel extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback onClear;
   final Future<void> Function(VideoTemplateSelection selection) onSelected;
+  final VoidCallback? onEdit;
   final VoidCallback onYourStory;
   final VoidCallback onNext;
   final String? avatarUrl;
@@ -364,6 +366,11 @@ class _TemplateSelectorBottomPanelState
                             busy: busy,
                             durationLabel: _formatDuration(card.duration),
                             onTap: () => _select(card),
+                            onEdit: selected &&
+                                    !busy &&
+                                    widget.onEdit != null
+                                ? widget.onEdit
+                                : null,
                           );
                         },
                       ),
@@ -459,6 +466,7 @@ class _PanelThumb extends StatelessWidget {
     required this.busy,
     required this.durationLabel,
     required this.onTap,
+    this.onEdit,
   });
 
   final VideoTemplateCardEntity card;
@@ -466,6 +474,7 @@ class _PanelThumb extends StatelessWidget {
   final bool busy;
   final String durationLabel;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -534,6 +543,28 @@ class _PanelThumb extends StatelessWidget {
                                   Icons.check,
                                   size: 12,
                                   color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (onEdit != null)
+                          Positioned(
+                            top: 4,
+                            left: 4,
+                            child: Material(
+                              color: Colors.black54,
+                              shape: const CircleBorder(),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: onEdit,
+                                customBorder: const CircleBorder(),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    LucideIcons.pencil,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),

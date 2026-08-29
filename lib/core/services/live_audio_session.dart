@@ -44,14 +44,31 @@ class LiveAudioSession {
   /// Whether manual mode is currently ours to hand back.
   bool _owned = false;
 
+  /// Serializes native audio-session transitions. AudioManager is process-wide,
+  /// so overlapping acquire/release calls must not observe half-applied state.
+  Future<void> _operation = Future<void>.value();
+
   static bool get _appliesToPlatform => !kIsWeb && Platform.isAndroid;
 
   @visibleForTesting
   int get holderCount => _holders;
 
+  /// Whether this coordinator currently owns manual LiveKit audio management.
+  bool get isHeld => _owned;
+
+  Future<T> _serialize<T>(Future<T> Function() operation) {
+    final previous = _operation;
+    final result = previous.then((_) => operation());
+    // Keep the queue usable after a failed operation while preserving the
+    // failure for the caller that initiated it.
+    _operation = result.then<void>((_) {}, onError: (_, __) {});
+    return result;
+  }
+
   /// Takes ownership of the audio session. Call **before** connecting the first
-  /// [Room] of a live. Safe to nest — the session is configured once.
-  Future<void> acquire() async {
+  /// [Room] of a live. Safe to nest — the session is configured once. Throws if
+  /// the session cannot be configured and owned.
+  Future<void> acquire() => _serialize(() async {
     if (!_appliesToPlatform) return;
     _holders++;
     if (_owned) return;
@@ -62,18 +79,39 @@ class LiveAudioSession {
       await AudioManager.instance.setAudioSessionOptions(
         const AudioSessionOptions.communication(),
       );
+      if (AudioManager.instance.managementMode !=
+          AudioSessionManagementMode.manual) {
+        throw StateError(
+          'LiveKit audio session did not enter manual management mode',
+        );
+      }
       // Live rooms are media playback, not private calls: keep a headset or
       // Bluetooth device first, otherwise route to the loudspeaker.
       await AudioManager.instance.setSpeakerOutputPreferred(true, force: false);
       _owned = true;
       debugPrint('🔊 [LiveAudioSession] acquired (manual mode, holders=$_holders)');
     } catch (error, stack) {
-      _holders = _holders > 0 ? _holders - 1 : 0;
-      // Falling back to LiveKit's automatic management is worse than owning
-      // the session, but it is not worse than failing to connect at all.
+      _holders--;
+      // `setAudioSessionOptions` enters manual mode before applying native
+      // configuration. If a later step fails, restore a known mode before the
+      // caller is allowed to create/connect a Room.
+      try {
+        if (AudioManager.instance.managementMode ==
+            AudioSessionManagementMode.manual) {
+          await AudioManager.instance.setAudioSessionManagementMode(
+            AudioSessionManagementMode.automatic,
+          );
+        }
+      } catch (cleanupError, cleanupStack) {
+        debugPrint(
+          '🔴 [LiveAudioSession] failed to restore automatic management '
+          'after acquire failure: $cleanupError\n$cleanupStack',
+        );
+      }
       debugPrint('🔴 [LiveAudioSession] acquire failed: $error\n$stack');
+      rethrow;
     }
-  }
+  });
 
   /// Hands the session back to LiveKit's automatic management.
   ///
@@ -82,18 +120,36 @@ class LiveAudioSession {
   /// and the room teardown that follows is then the call that releases it. A
   /// battle room closing while the primary room is still connected must never
   /// reach here — that is exactly the case this class exists to survive.
-  Future<void> release() async {
-    if (!_appliesToPlatform) return;
-    if (_holders > 0) _holders--;
-    if (_holders > 0 || !_owned) return;
-    _owned = false;
+  Future<void> release() => _serialize(() async {
+    if (!_appliesToPlatform || _holders == 0) return;
+    if (_holders > 1) {
+      _holders--;
+      return;
+    }
+    if (!_owned) {
+      _holders = 0;
+      return;
+    }
+
     try {
       await AudioManager.instance.setAudioSessionManagementMode(
         AudioSessionManagementMode.automatic,
       );
+      if (AudioManager.instance.managementMode !=
+          AudioSessionManagementMode.automatic) {
+        throw StateError(
+          'LiveKit audio session did not return to automatic management mode',
+        );
+      }
+      _holders = 0;
+      _owned = false;
       debugPrint('🔊 [LiveAudioSession] released back to automatic management');
     } catch (error, stack) {
+      // Keep the ownership state intact so a caller can retry. In particular,
+      // do not let a primary room be disposed while the coordinator still
+      // believes another room owns a manual session.
       debugPrint('🔴 [LiveAudioSession] release failed: $error\n$stack');
+      rethrow;
     }
-  }
+  });
 }

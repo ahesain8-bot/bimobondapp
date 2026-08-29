@@ -12,8 +12,9 @@ abstract final class TemplateEditorTheme {
   static const audioTrack = Color(0xFF5B9BD5);
   static const textTrack = Color(0xFFE91E8C);
   static const stickerTrack = Color(0xFFB39DDB);
-  static const filterTrack = Color(0xFFFF8A65);
-  static const effectTrack = Color(0xFFFFB74D);
+  static const filterTrack = Color(0xFFF06292);
+  static const effectTrack = Color(0xFFCE93D8);
+  static const transitionTrack = Color(0xFF80CBC4);
   static const slotSelectedBorder = Colors.white;
 
   static String formatTime(double seconds) {

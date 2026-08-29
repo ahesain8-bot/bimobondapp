@@ -48,6 +48,8 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/template_se
 import 'package:bimobondapp/app/video_templates/presentation/widgets/video_template_composed_preview.dart';
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/pages/video_template_editor_screen.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_export_l10n.dart';
+import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_export_overlay.dart';
 import 'package:bimobondapp/app/video_templates/preview/media_texture_cache.dart';
 import 'package:bimobondapp/app/video_templates/preview/template_preview_renderer.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
@@ -193,6 +195,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
   MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
   bool _magicOn = false;
+  bool _preserveNeutralAdjustments = false;
 
   static const Map<MediaPhotoEditorTool, double> _magicBeautyDefaults = {
     MediaPhotoEditorTool.smooth: 0.50,
@@ -632,6 +635,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
       final session = engine.open(recipe, projectId: _templateProjectId);
       session.fills = fills;
+      session.seedDefaultsFromRecipe();
       final preview = CompositionPreviewController(
         engine: engine,
         session: session,
@@ -1490,45 +1494,78 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     return false;
   }
 
-  /// Upload slots + queue FFmpeg worker (server-preferred / client fallback).
+  /// Upload media + one-shot server render (same path as template Edit → Finish).
   Future<bool> _exportTemplateOnServer({
     String exportQuality = 'standard',
   }) async {
-    final catalogTemplateId =
-        _usesCatalogTemplate
-            ? VideoTemplateProjectIds.normalizeServerId(_videoTemplateId)
-            : null;
-
     final sources = _templateSourceFiles.isNotEmpty
         ? _templateSourceFiles
         : _states.map((s) => s.sourceFile).toList(growable: false);
     if (sources.isEmpty) return false;
 
-    final recipe = _templateRecipe ?? await _ensureTemplateRecipe();
+    var recipe = _templateRecipe ?? await _ensureTemplateRecipe();
     if (recipe == null) return false;
 
-    final applyResult = await vt_di.sl<ApplyVideoTemplateUseCase>()(
-      selection: VideoTemplateSelection(
-        templateId: catalogTemplateId ?? '',
-        name: _videoTemplateName ?? recipe.name,
-        projectId: VideoTemplateProjectIds.normalizeServerId(
-          _templateProjectId,
-        ),
-        recipe: recipe,
+    if (_selectedSound != null) {
+      recipe = _recipeWithStudioSound(recipe, _selectedSound!);
+    }
+    _templateRecipe = recipe;
+
+    final videoHints = _videoHintsForFiles(sources);
+    final engine = vt_di.sl<TemplateCompositionEngine>();
+    final session = engine.open(
+      recipe,
+      projectId: VideoTemplateProjectIds.normalizeServerId(_templateProjectId),
+    );
+    final slotEngine = SlotEngine(recipe: recipe);
+    var fills = slotEngine.fillsFromFiles(sources, isVideoHints: videoHints);
+    fills = await _applyVideoTrimsToFills(
+      fills: fills,
+      slots: slotEngine.slots,
+    );
+    fills = slotEngine.applyBeatSyncTrims(fills);
+    session.fills = fills;
+    // Same as Edit: seed recipe filters / effects / transitions / text / stickers.
+    session.seedDefaultsFromRecipe();
+
+    final sound = _selectedSound ?? recipe.effectivePreviewSound;
+    if (sound != null) {
+      session.setUserSound(
+        sound,
         soundSegmentId: _pickedSoundSegmentId ?? recipe.soundSegmentId,
-        sound: _selectedSound ?? recipe.sound,
-      ),
-      localFiles: sources,
-      catalogTemplateId: catalogTemplateId,
-      preferServerExport: true,
-      allowClientFallback: true,
-      renderClientVideo: false,
+        segmentStartMs: recipe.soundSegmentStartMs ?? 0,
+        segmentEndMs: recipe.soundSegmentEndMs,
+      );
+    }
+
+    final selection = VideoTemplateSelection(
+      templateId: '',
+      name: _videoTemplateName ?? recipe.name,
+      projectId: VideoTemplateProjectIds.normalizeServerId(_templateProjectId),
+      recipe: recipe,
+      soundSegmentId: _pickedSoundSegmentId ?? recipe.soundSegmentId,
+      sound: sound,
+    );
+
+    debugPrint(
+      'Select template export → OneShotRender (same as Edit) '
+      'slots=${session.slots.length} media=${sources.length}',
+    );
+
+    final applyResult = await vt_di.sl<OneShotRenderVideoTemplateUseCase>()(
+      session: session,
+      selection: selection,
+      catalogTemplateId: null,
       exportQuality: exportQuality == 'draft' ? 'draft' : 'standard',
+      resolution: recipe.width > 0 && recipe.height > 0
+          ? '${recipe.width}x${recipe.height}'
+          : '1080x1920',
+      fps: recipe.fps > 0 ? recipe.fps.toDouble() : 30,
       onProgress: _reportTemplateExportProgress,
     );
 
     final applied = applyResult.fold<VideoTemplateApplyResult?>((f) {
-      debugPrint('Server template export failed: ${f.message}');
+      debugPrint('OneShot template export failed: ${f.message}');
       return null;
     }, (r) => r);
     if (applied == null) return false;
@@ -1540,9 +1577,12 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     if (exportUrl != null && exportUrl.isNotEmpty) {
       _templateServerExportUrl = exportUrl;
       _templateClientExportQuality = null;
+      var local = applied.renderedVideo;
       try {
-        _reportTemplateExportProgress(0.96, label: 'Downloading');
-        final local = await AppMediaCacheManager.downloadVideoFile(exportUrl);
+        if (local == null || !(await local.exists())) {
+          _reportTemplateExportProgress(0.96, label: 'Downloading');
+          local = await AppMediaCacheManager.downloadVideoFile(exportUrl);
+        }
         if (local != null && await local.exists()) {
           _templatePreviewFile = local;
         }
@@ -1550,13 +1590,20 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       } catch (e, st) {
         debugPrint('Download server export preview: $e\n$st');
       }
-      // Success only when we have a server URL (local download optional).
+      return true;
+    }
+
+    final rendered = applied.renderedVideo;
+    if (rendered != null && await rendered.exists()) {
+      _templatePreviewFile = rendered;
+      _templateClientExportQuality = null;
+      _reportTemplateExportProgress(1, label: 'Done');
       return true;
     }
 
     final failed = applied.export;
     debugPrint(
-      'Server export incomplete (no client fallback): '
+      'OneShot export incomplete: '
       '${failed?.stageLabel ?? failed?.status} '
       '${failed?.errorMessage ?? ''}',
     );
@@ -1678,7 +1725,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _arFilterId = 'whitening';
         _arColorCategoryId = 'beauty';
         _magicOn = true;
-        _adjustments.addAll(_magicBeautyDefaults);
+        if (!_preserveNeutralAdjustments) {
+          _adjustments.addAll(_magicBeautyDefaults);
+        }
         _showFilters = false;
       }
       _saveUiToCurrentState();
@@ -1721,7 +1770,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     setState(() {
       _magicOn = !_magicOn;
       if (_magicOn) {
-        _adjustments.addAll(_magicBeautyDefaults);
+        if (!_preserveNeutralAdjustments) {
+          _adjustments.addAll(_magicBeautyDefaults);
+        }
         _photoEditorTool = MediaPhotoEditorTool.smooth;
       } else {
         _photoEditorTool = MediaPhotoEditorTool.magic;
@@ -1851,11 +1902,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   void _resetPhotoEditor() {
     _smoothDebounce?.cancel();
+    _smoothGen++;
     setState(() {
       _magicOn = false;
       for (final key in _adjustments.keys) {
         _adjustments[key] = 0.0;
       }
+      _arFilterIntensity = 0.0;
+      _preserveNeutralAdjustments = true;
       _photoEditorTool = MediaPhotoEditorTool.magic;
       // Clear Makeup Film grade if one is applied.
       if (ArFilterCatalog.isColorFilter(_arFilterId)) {
@@ -2142,10 +2196,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       }
     }
 
-    // Apply → backend render finished: preview the server MP4 in studio.
+    // Apply → backend render finished: local preview in studio (before post).
     if (result.proceedToNext) {
       final file = result.renderedFile;
       final url = result.serverExportUrl?.trim();
+      // Gallery-style edited export — do not tag post/render with catalog id.
+      _catalogTemplateApplied = false;
+      _videoTemplateId = null;
+      // Keep export URL for post handoff only — preview uses the local MP4.
       if (url != null && url.isNotEmpty) {
         _templateServerExportUrl = url;
       }
@@ -2157,14 +2215,24 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
       _templateLivePreview = null;
       await SoundAudioPreview.stop();
 
-      if (file != null && await file.exists()) {
-        _templatePreviewFile = file;
+      File? previewFile = file;
+      if ((previewFile == null || !(await previewFile.exists())) &&
+          url != null &&
+          url.isNotEmpty) {
+        try {
+          previewFile = await AppMediaCacheManager.downloadVideoFile(url);
+        } catch (_) {}
+      }
+
+      if (previewFile != null && await previewFile.exists()) {
+        _templatePreviewFile = previewFile;
         _templatePreviewHandedOff = false;
         if (!mounted) return;
         setState(() {
+          _showTemplateSelector = false;
           _states = [
             MediaItemEditState(
-              item: GalleryMediaItem(file: file, type: 'VIDEO'),
+              item: GalleryMediaItem(file: previewFile!, type: 'VIDEO'),
             ),
           ];
           _currentIndex = 0;
@@ -2177,30 +2245,6 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
           _templateExportProgress = 1;
           _templateExportLabel = 'Preview ready';
         });
-      } else if (url != null && url.isNotEmpty) {
-        try {
-          final downloaded = await AppMediaCacheManager.downloadVideoFile(url);
-          if (downloaded != null && await downloaded.exists()) {
-            _templatePreviewFile = downloaded;
-            if (!mounted) return;
-            setState(() {
-              _states = [
-                MediaItemEditState(
-                  item: GalleryMediaItem(file: downloaded, type: 'VIDEO'),
-                ),
-              ];
-              _currentIndex = 0;
-              _previewEpoch++;
-              _studioMediaReady = false;
-              _smoothPreviewFile = null;
-              _applyStateToUi(_states[0]);
-              _isProcessing = false;
-              _templateApplying = false;
-              _templateExportProgress = 1;
-              _templateExportLabel = 'Preview ready';
-            });
-          }
-        } catch (_) {}
       }
       return;
     }
@@ -2581,6 +2625,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         applyGen: applyGen,
       ),
     );
+
+    if (mounted && applyGen == _templateApplyGen) {
+      setState(() => _templateApplying = false);
+    }
   }
 
   /// Open local draft + import slot media after live preview is already shown.
@@ -2868,6 +2916,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   List<MediaStudioSideTool> _sideTools(AppLocalizations l10n) {
     final filtersActive = _showFilters || _hasActiveColorFilter;
+    final previewOnly = _isRenderedTemplatePreview;
     return [
       // 1. Settings
       MediaStudioSideTool(
@@ -2882,32 +2931,34 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         customIcon: _sideRailSvg(AppAssets.cameraShareIcon),
         onTap: _isProcessing ? () {} : _shareCurrent,
       ),
-      // 3. TikTok timeline editor (after capture)
-      MediaStudioSideTool(
-        icon: LucideIcons.scissors,
-        label: l10n.mediaEditorEdit,
-        active: _currentState.isVideo || _videoTemplateId != null,
-        onTap: _isProcessing
-            ? () {}
-            : () => unawaited(_openTemplateTimelineEditor()),
-      ),
-      // 4. Templates (same for photos and videos)
-      MediaStudioSideTool(
-        icon: LucideIcons.layoutTemplate,
-        label: l10n.mediaStudioTemplates,
-        active: _videoTemplateId != null,
-        onTap: _isProcessing || _templateApplying
-            ? () {}
-            : () {
-                if (_states.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.templateNeedMediaFirst)),
-                  );
-                } else {
-                  unawaited(_pickPhotoTemplate());
-                }
-              },
-      ),
+      if (!previewOnly) ...[
+        // 3. TikTok timeline editor (after capture)
+        MediaStudioSideTool(
+          icon: LucideIcons.scissors,
+          label: l10n.mediaEditorEdit,
+          active: _currentState.isVideo || _videoTemplateId != null,
+          onTap: _isProcessing
+              ? () {}
+              : () => unawaited(_openTemplateTimelineEditor()),
+        ),
+        // 4. Templates (same for photos and videos)
+        MediaStudioSideTool(
+          icon: LucideIcons.layoutTemplate,
+          label: l10n.mediaStudioTemplates,
+          active: _videoTemplateId != null,
+          onTap: _isProcessing || _templateApplying
+              ? () {}
+              : () {
+                  if (_states.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.templateNeedMediaFirst)),
+                    );
+                  } else {
+                    unawaited(_pickPhotoTemplate());
+                  }
+                },
+        ),
+      ],
       // 5. Aa
       MediaStudioSideTool(
         icon: LucideIcons.type,
@@ -3514,8 +3565,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                                   enabled: !_isProcessing && !_templateApplying,
                                   onYourStory: _onYourStory,
                                   onNext: _onNext,
-                                  onAutoCut: () =>
-                                      unawaited(_pickPhotoTemplate()),
+                                  onAutoCut: _isRenderedTemplatePreview
+                                      ? null
+                                      : () => unawaited(_pickPhotoTemplate()),
                                 ),
                               ),
                             ),
@@ -3574,6 +3626,15 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                           await _clearSelectedTemplate();
                         },
                         onSelected: _onTemplateSelectedFromPanel,
+                        onEdit: !_isRenderedTemplatePreview &&
+                                _videoTemplateId != null &&
+                                _videoTemplateId!.isNotEmpty &&
+                                !_templateApplying
+                            ? () {
+                                setState(() => _showTemplateSelector = false);
+                                unawaited(_openTemplateTimelineEditor());
+                              }
+                            : null,
                         onYourStory: () {
                           setState(() => _showTemplateSelector = false);
                           unawaited(_onYourStory());
@@ -3600,12 +3661,17 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
                 sendLabel: l10n.mediaEditorSendToFriends,
               ),
             if (_isProcessing)
-              CameraAppLoading(
-                message: l10n.promoteProcessing,
-                progress: _videoTemplateId != null
-                    ? (_templateExportProgress ?? 0)
-                    : null,
-              ),
+              (_videoTemplateId != null || _templateExportProgress != null)
+                  ? TemplateEditorExportOverlay(
+                      progress: _templateExportProgress ?? 0,
+                      label: localizeTemplateExportLabel(
+                        l10n,
+                        _templateExportLabel ?? l10n.templateExportRendering,
+                      ),
+                    )
+                  : CameraAppLoading(
+                      message: l10n.promoteProcessing,
+                    ),
           ],
         ),
       ),

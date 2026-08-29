@@ -9016,6 +9016,384 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delivery Tracking'**
   String get marketplaceDeliveryTracking;
+
+  /// No description provided for @templateEditorSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get templateEditorSound;
+
+  /// No description provided for @templateEditorText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get templateEditorText;
+
+  /// No description provided for @templateEditorEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'Effects'**
+  String get templateEditorEffects;
+
+  /// No description provided for @templateEditorFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get templateEditorFilters;
+
+  /// No description provided for @templateEditorTransitions.
+  ///
+  /// In en, this message translates to:
+  /// **'Transitions'**
+  String get templateEditorTransitions;
+
+  /// No description provided for @templateEditorStickers.
+  ///
+  /// In en, this message translates to:
+  /// **'Stickers'**
+  String get templateEditorStickers;
+
+  /// No description provided for @templateEditorCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get templateEditorCopy;
+
+  /// No description provided for @templateEditorDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get templateEditorDelete;
+
+  /// No description provided for @templateEditorLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get templateEditorLayers;
+
+  /// No description provided for @templateEditorNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get templateEditorNone;
+
+  /// No description provided for @templateEditorTrending.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending'**
+  String get templateEditorTrending;
+
+  /// No description provided for @templateEditorApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get templateEditorApply;
+
+  /// No description provided for @templateEditorDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get templateEditorDefault;
+
+  /// No description provided for @templateEditorPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get templateEditorPhoto;
+
+  /// No description provided for @templateEditorVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get templateEditorVideo;
+
+  /// No description provided for @templateEditorFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Font'**
+  String get templateEditorFont;
+
+  /// No description provided for @templateEditorAddText.
+  ///
+  /// In en, this message translates to:
+  /// **'Add text'**
+  String get templateEditorAddText;
+
+  /// No description provided for @templateEditorReplaceText.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace text'**
+  String get templateEditorReplaceText;
+
+  /// No description provided for @templateEditorReplaceSticker.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace sticker'**
+  String get templateEditorReplaceSticker;
+
+  /// No description provided for @templateEditorReplaceFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace filter'**
+  String get templateEditorReplaceFilter;
+
+  /// No description provided for @templateEditorReplaceEffect.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace effect'**
+  String get templateEditorReplaceEffect;
+
+  /// No description provided for @templateEditorReplaceTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace transition'**
+  String get templateEditorReplaceTransition;
+
+  /// No description provided for @templateEditorReplaceMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace music'**
+  String get templateEditorReplaceMusic;
+
+  /// No description provided for @templateEditorAddFilterClip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter · clip {clip}'**
+  String templateEditorAddFilterClip(int clip);
+
+  /// No description provided for @templateEditorAddEffectClip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add effect · clip {clip}'**
+  String templateEditorAddEffectClip(int clip);
+
+  /// No description provided for @templateEditorAddTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Add transition'**
+  String get templateEditorAddTransition;
+
+  /// No description provided for @templateEditorFilterLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter layers'**
+  String get templateEditorFilterLayers;
+
+  /// No description provided for @templateEditorEffectLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Effect layers'**
+  String get templateEditorEffectLayers;
+
+  /// No description provided for @templateEditorServerPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Server preview'**
+  String get templateEditorServerPreview;
+
+  /// No description provided for @templateEditorContinueWithRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap → to continue with this render'**
+  String get templateEditorContinueWithRender;
+
+  /// No description provided for @templateEditorTypeBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Type below…'**
+  String get templateEditorTypeBelow;
+
+  /// No description provided for @templateEditorTypeCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your caption…'**
+  String get templateEditorTypeCaption;
+
+  /// No description provided for @templateEditorDragPinchResize.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move · Pinch to resize'**
+  String get templateEditorDragPinchResize;
+
+  /// No description provided for @templateEditorTapMediaToPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap media to place · Drag to move'**
+  String get templateEditorTapMediaToPlace;
+
+  /// No description provided for @templateEditorPickStickerBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a sticker below'**
+  String get templateEditorPickStickerBelow;
+
+  /// No description provided for @templateEditorTapStickerBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a sticker below'**
+  String get templateEditorTapStickerBelow;
+
+  /// No description provided for @templateEditorDragResizeSticker.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move · Pinch or ± to resize'**
+  String get templateEditorDragResizeSticker;
+
+  /// No description provided for @templateEditorMaxFiltersPerClip.
+  ///
+  /// In en, this message translates to:
+  /// **'Max {count} filters per clip'**
+  String templateEditorMaxFiltersPerClip(int count);
+
+  /// No description provided for @templateEditorMaxEffectsPerClip.
+  ///
+  /// In en, this message translates to:
+  /// **'Max {count} effects per clip'**
+  String templateEditorMaxEffectsPerClip(int count);
+
+  /// No description provided for @templateEditorTransitionsNeedClips.
+  ///
+  /// In en, this message translates to:
+  /// **'Transitions need at least 2 clips'**
+  String get templateEditorTransitionsNeedClips;
+
+  /// No description provided for @templateEditorAddMediaAllSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'Add media to all slots before rendering.'**
+  String get templateEditorAddMediaAllSlots;
+
+  /// No description provided for @templateEditorCouldNotRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not render on server'**
+  String get templateEditorCouldNotRender;
+
+  /// No description provided for @templateEditorExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get templateEditorExportFailed;
+
+  /// No description provided for @templateEditorPresetNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get templateEditorPresetNone;
+
+  /// No description provided for @templateEditorPresetCinematic.
+  ///
+  /// In en, this message translates to:
+  /// **'Cinematic'**
+  String get templateEditorPresetCinematic;
+
+  /// No description provided for @templateEditorPresetWarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm'**
+  String get templateEditorPresetWarm;
+
+  /// No description provided for @templateEditorPresetCool.
+  ///
+  /// In en, this message translates to:
+  /// **'Cool'**
+  String get templateEditorPresetCool;
+
+  /// No description provided for @templateEditorPresetVintage.
+  ///
+  /// In en, this message translates to:
+  /// **'Vintage'**
+  String get templateEditorPresetVintage;
+
+  /// No description provided for @templateEditorPresetVivid.
+  ///
+  /// In en, this message translates to:
+  /// **'Vivid'**
+  String get templateEditorPresetVivid;
+
+  /// No description provided for @templateEditorPresetFade.
+  ///
+  /// In en, this message translates to:
+  /// **'Fade'**
+  String get templateEditorPresetFade;
+
+  /// No description provided for @templateEditorPresetBw.
+  ///
+  /// In en, this message translates to:
+  /// **'B&W'**
+  String get templateEditorPresetBw;
+
+  /// No description provided for @templateEditorPresetZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get templateEditorPresetZoomIn;
+
+  /// No description provided for @templateEditorPresetZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get templateEditorPresetZoomOut;
+
+  /// No description provided for @templateEditorPresetShake.
+  ///
+  /// In en, this message translates to:
+  /// **'Shake'**
+  String get templateEditorPresetShake;
+
+  /// No description provided for @templateEditorPresetPulse.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse'**
+  String get templateEditorPresetPulse;
+
+  /// No description provided for @templateEditorPresetCrossfade.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade'**
+  String get templateEditorPresetCrossfade;
+
+  /// No description provided for @templateEditorPresetFlash.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash'**
+  String get templateEditorPresetFlash;
+
+  /// No description provided for @templateEditorPresetSlideLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Slide left'**
+  String get templateEditorPresetSlideLeft;
+
+  /// No description provided for @templateEditorPresetSlideRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Slide right'**
+  String get templateEditorPresetSlideRight;
+
+  /// No description provided for @templateEditorPresetZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom'**
+  String get templateEditorPresetZoom;
+
+  /// No description provided for @templateEditorPresetBlur.
+  ///
+  /// In en, this message translates to:
+  /// **'Blur'**
+  String get templateEditorPresetBlur;
+
+  /// No description provided for @templateEditorPresetGlitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Glitch'**
+  String get templateEditorPresetGlitch;
+
+  /// No description provided for @templateEditorPresetFilmBurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Film burn'**
+  String get templateEditorPresetFilmBurn;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

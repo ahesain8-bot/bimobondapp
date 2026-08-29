@@ -12,6 +12,7 @@ enum TemplateEditorPanel {
   effects,
   filters,
   stickers,
+  transitions,
 }
 
 /// Which preset catalog to load in the picker sheet.
@@ -19,6 +20,7 @@ enum TemplatePresetKind {
   filter,
   effect,
   sticker,
+  transition,
 }
 
 /// Catalog preset tile (filter / effect / sticker).
@@ -30,6 +32,7 @@ class TemplatePresetItem extends Equatable {
     this.thumbnailUrl,
     this.filterName,
     this.effectType,
+    this.transitionType,
     this.assetUrl,
     this.category,
   });
@@ -44,6 +47,9 @@ class TemplatePresetItem extends Equatable {
 
   /// Local preview key for effects.
   final String? effectType;
+
+  /// Local preview / render key for transitions.
+  final String? transitionType;
   final String? assetUrl;
   final String? category;
 
@@ -59,10 +65,17 @@ class TemplatePresetItem extends Equatable {
         effectType ?? name,
       );
 
+  String get previewTransitionKey => normalizeTransitionPreviewKey(
+        transitionType ?? name,
+      );
+
   /// Maps API / display names to local preview matrix keys.
   static String normalizeFilterPreviewKey(String? raw) {
     var key = _slugKey(raw);
     if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('filter_')) {
+      key = key.substring('filter_'.length);
+    }
     key = switch (key) {
       'black_white' || 'blackandwhite' || 'grayscale' || 'mono' => 'bw',
       'black_and_white' => 'bw',
@@ -92,12 +105,39 @@ class TemplatePresetItem extends Equatable {
   static String normalizeEffectPreviewKey(String? raw) {
     var key = _slugKey(raw);
     if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('effect_')) {
+      key = key.substring('effect_'.length);
+    }
     key = switch (key) {
       'zoomin' || 'zoom_in_effect' => 'zoom_in',
       'zoomout' || 'zoom_out_effect' => 'zoom_out',
       'kenburns' || 'ken_burns' || 'ken_burn' => 'ken_burns',
       'slowzoom' || 'slow_zoom' => 'zoom_in',
       'punch' || 'zoom_punch' => 'zoom_punch',
+      _ => key,
+    };
+    return key;
+  }
+
+  /// Maps API / display names to local transition keys.
+  static String normalizeTransitionPreviewKey(String? raw) {
+    var key = _slugKey(raw);
+    if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('transition_')) {
+      key = key.substring('transition_'.length);
+    }
+    key = switch (key) {
+      'cross_fade' || 'xfade' => 'crossfade',
+      'slideleft' => 'slide_left',
+      'slideright' => 'slide_right',
+      'zoomin' => 'zoom_in',
+      'zoomout' => 'zoom_out',
+      'pushleft' => 'push_left',
+      'pushright' => 'push_right',
+      'pushup' => 'push_up',
+      'pushdown' => 'push_down',
+      'filmburn' || 'burn' => 'film_burn',
+      'matchcut' || 'match_cut' => 'match_cut_flash',
       _ => key,
     };
     return key;
@@ -119,8 +159,10 @@ class TemplatePresetItem extends Equatable {
     final id = json['id']?.toString() ?? '';
     final name = (json['name'] ?? json['label'] ?? json['title'])?.toString() ??
         'Preset';
+    final engineType = json['engineType']?.toString();
     final rawFilter = (json['filterName'] ??
             json['filterType'] ??
+            engineType ??
             json['slug'] ??
             json['key'] ??
             json['code'] ??
@@ -128,6 +170,15 @@ class TemplatePresetItem extends Equatable {
         ?.toString();
     final rawEffect = (json['effectType'] ??
             json['effectName'] ??
+            engineType ??
+            json['slug'] ??
+            json['key'] ??
+            json['code'] ??
+            json['presetKey'])
+        ?.toString();
+    final rawTransition = (json['transitionType'] ??
+            json['transitionName'] ??
+            engineType ??
             json['slug'] ??
             json['key'] ??
             json['code'] ??
@@ -145,14 +196,28 @@ class TemplatePresetItem extends Equatable {
       effectType: kind == TemplatePresetKind.effect
           ? normalizeEffectPreviewKey(rawEffect ?? name)
           : (rawEffect != null ? normalizeEffectPreviewKey(rawEffect) : null),
+      transitionType: kind == TemplatePresetKind.transition
+          ? normalizeTransitionPreviewKey(rawTransition ?? name)
+          : (rawTransition != null
+              ? normalizeTransitionPreviewKey(rawTransition)
+              : null),
       assetUrl: (json['assetUrl'] ?? json['url'])?.toString(),
       category: json['category']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props =>
-      [id, name, kind, thumbnailUrl, filterName, effectType, assetUrl, category];
+  List<Object?> get props => [
+        id,
+        name,
+        kind,
+        thumbnailUrl,
+        filterName,
+        effectType,
+        transitionType,
+        assetUrl,
+        category,
+      ];
 }
 
 /// User-applied slot filter — replaces admin slot filters in merged preview.
@@ -237,6 +302,193 @@ class UserSlotEffectOverride extends Equatable {
       [presetId, effectType, parameters, startTime, endTime];
 }
 
+/// One transition after a slot (junction into the next clip).
+class UserEditorTransitionTrack extends Equatable {
+  const UserEditorTransitionTrack({
+    required this.id,
+    required this.slotId,
+    this.presetId,
+    required this.transitionType,
+    this.label,
+    this.durationSeconds = 0.35,
+    this.parameters = const {},
+  });
+
+  final String id;
+
+  /// Outgoing slot — transition plays at the end of this clip.
+  final String slotId;
+  final String? presetId;
+  final String transitionType;
+  final String? label;
+  final double durationSeconds;
+  final Map<String, dynamic> parameters;
+
+  String get displayName {
+    final l = label?.trim();
+    if (l != null && l.isNotEmpty) return l;
+    return transitionType;
+  }
+
+  UserEditorTransitionTrack copyWith({
+    String? id,
+    String? slotId,
+    String? presetId,
+    String? transitionType,
+    String? label,
+    double? durationSeconds,
+    Map<String, dynamic>? parameters,
+  }) {
+    return UserEditorTransitionTrack(
+      id: id ?? this.id,
+      slotId: slotId ?? this.slotId,
+      presetId: presetId ?? this.presetId,
+      transitionType: transitionType ?? this.transitionType,
+      label: label ?? this.label,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      parameters: parameters ?? this.parameters,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        slotId,
+        presetId,
+        transitionType,
+        label,
+        durationSeconds,
+        parameters,
+      ];
+}
+
+const kMaxFiltersPerSlot = 8;
+const kMaxEffectsPerSlot = 8;
+
+/// One filter layer on a slot (stack up to [kMaxFiltersPerSlot]).
+class UserEditorFilterTrack extends Equatable {
+  const UserEditorFilterTrack({
+    required this.id,
+    required this.slotId,
+    this.presetId,
+    required this.filterName,
+    this.label,
+    this.intensity = 1,
+    this.startTime = 0,
+    this.endTime,
+  });
+
+  final String id;
+  final String slotId;
+  final String? presetId;
+  final String filterName;
+  final String? label;
+  final double intensity;
+  final double startTime;
+  final double? endTime;
+
+  String get displayName {
+    final l = label?.trim();
+    if (l != null && l.isNotEmpty) return l;
+    return filterName;
+  }
+
+  UserEditorFilterTrack copyWith({
+    String? id,
+    String? slotId,
+    String? presetId,
+    String? filterName,
+    String? label,
+    double? intensity,
+    double? startTime,
+    double? endTime,
+  }) {
+    return UserEditorFilterTrack(
+      id: id ?? this.id,
+      slotId: slotId ?? this.slotId,
+      presetId: presetId ?? this.presetId,
+      filterName: filterName ?? this.filterName,
+      label: label ?? this.label,
+      intensity: intensity ?? this.intensity,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, slotId, presetId, filterName, label, intensity, startTime, endTime];
+}
+
+/// One effect layer on a slot (stack up to [kMaxEffectsPerSlot]).
+class UserEditorEffectTrack extends Equatable {
+  const UserEditorEffectTrack({
+    required this.id,
+    required this.slotId,
+    this.presetId,
+    required this.effectType,
+    this.label,
+    this.parameters = const {},
+    this.startTime = 0,
+    this.endTime,
+  });
+
+  final String id;
+  final String slotId;
+  final String? presetId;
+  final String effectType;
+  final String? label;
+  final Map<String, dynamic> parameters;
+  final double startTime;
+  final double? endTime;
+
+  String get displayName {
+    final l = label?.trim();
+    if (l != null && l.isNotEmpty) return l;
+    return effectType;
+  }
+
+  UserEditorEffectTrack copyWith({
+    String? id,
+    String? slotId,
+    String? presetId,
+    String? effectType,
+    String? label,
+    Map<String, dynamic>? parameters,
+    double? startTime,
+    double? endTime,
+  }) {
+    return UserEditorEffectTrack(
+      id: id ?? this.id,
+      slotId: slotId ?? this.slotId,
+      presetId: presetId ?? this.presetId,
+      effectType: effectType ?? this.effectType,
+      label: label ?? this.label,
+      parameters: parameters ?? this.parameters,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        slotId,
+        presetId,
+        effectType,
+        label,
+        parameters,
+        startTime,
+        endTime,
+      ];
+}
+
+/// Avoids [ArgumentError] when [min] > [max] (short clips / timeline edges).
+double safeEditorClamp(double value, double min, double max) {
+  if (min > max) return max;
+  return value.clamp(min, max);
+}
+
 /// Clip-local effect/filter window (seconds from slot start).
 ///
 /// See server timing guide: minimum 0.05s, `endTime` clamped to slot duration.
@@ -253,7 +505,7 @@ class SlotLocalTiming {
   }) {
     final dur = slotDuration > 0 ? slotDuration : 0.05;
     final start = startTime.clamp(0.0, dur);
-    final end = (endTime ?? dur).clamp(start + 0.05, dur);
+    final end = safeEditorClamp(endTime ?? dur, start + 0.05, dur);
     return SlotLocalTiming(start: start, end: end);
   }
 
@@ -271,6 +523,39 @@ class SlotLocalTiming {
     );
     return localTime >= window.start && localTime < window.end;
   }
+}
+
+/// Normalize template / API coordinates to center-origin canvas pixels (1080×1920).
+///
+/// Handles normalized (-1…1), top-left absolute, and center-origin offsets.
+({double x, double y}) normalizeEditorCanvasPosition({
+  required double positionX,
+  required double positionY,
+  int canvasWidth = 1080,
+  int canvasHeight = 1920,
+}) {
+  final cw = canvasWidth > 0 ? canvasWidth : 1080;
+  final ch = canvasHeight > 0 ? canvasHeight : 1920;
+  final halfW = cw / 2.0;
+  final halfH = ch / 2.0;
+
+  var x = positionX;
+  var y = positionY;
+
+  // Normalized alignment-style (-1…1).
+  if (x.abs() <= 1.05 && y.abs() <= 1.05) {
+    return (x: x * halfW, y: y * halfH);
+  }
+
+  // Top-left absolute pixels → center origin.
+  if (x >= 0 && x <= cw && y >= 0 && y <= ch) {
+    return (x: x - halfW, y: y - halfH);
+  }
+
+  return (
+    x: x.clamp(-halfW + 8, halfW - 8),
+    y: y.clamp(-halfH + 8, halfH - 8),
+  );
 }
 
 /// Caption added in the editor (maps to POST …/texts).
@@ -677,5 +962,68 @@ const kFallbackEffectPresets = <TemplatePresetItem>[
     name: 'Pulse',
     kind: TemplatePresetKind.effect,
     effectType: 'pulse',
+  ),
+];
+
+const kFallbackTransitionPresets = <TemplatePresetItem>[
+  TemplatePresetItem(
+    id: 'none',
+    name: 'None',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'none',
+  ),
+  TemplatePresetItem(
+    id: 'fade',
+    name: 'Fade',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'fade',
+  ),
+  TemplatePresetItem(
+    id: 'crossfade',
+    name: 'Crossfade',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'crossfade',
+  ),
+  TemplatePresetItem(
+    id: 'flash',
+    name: 'Flash',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'flash',
+  ),
+  TemplatePresetItem(
+    id: 'slide_left',
+    name: 'Slide left',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'slide_left',
+  ),
+  TemplatePresetItem(
+    id: 'slide_right',
+    name: 'Slide right',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'slide_right',
+  ),
+  TemplatePresetItem(
+    id: 'zoom',
+    name: 'Zoom',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'zoom',
+  ),
+  TemplatePresetItem(
+    id: 'blur',
+    name: 'Blur',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'blur',
+  ),
+  TemplatePresetItem(
+    id: 'glitch',
+    name: 'Glitch',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'glitch',
+  ),
+  TemplatePresetItem(
+    id: 'film_burn',
+    name: 'Film burn',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'film_burn',
   ),
 ];
