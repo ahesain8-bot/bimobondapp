@@ -43,6 +43,9 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     this.fallbackFilterIntensity = 1,
     this.fallbackFilterStack = const [],
     this.fallbackEffects = const [],
+    this.preferSessionFilters = false,
+    this.preferSessionEffects = false,
+    this.suppressFrameTransitions = false,
   });
 
   final PreviewFrame? frame;
@@ -64,6 +67,16 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   /// Session effects when timeline sample has not caught up yet.
   final List<({String type, double progress, Map<String, dynamic> params})>
       fallbackEffects;
+
+  /// When true, ignore recipe/frame filters and use only [fallbackFilterStack]
+  /// (empty stack = no filter — e.g. after user delete).
+  final bool preferSessionFilters;
+
+  /// When true, ignore recipe/frame effects and use only [fallbackEffects].
+  final bool preferSessionEffects;
+
+  /// When true, do not apply sampled frame transitions (user cleared look).
+  final bool suppressFrameTransitions;
 
   /// Single media surface (images / one video without multi-pane layout).
   final Widget? mediaOverride;
@@ -102,7 +115,10 @@ class VideoTemplateComposedPreview extends StatelessWidget {
         .toList(growable: false);
 
     List<({String name, double intensity})> activeStack;
-    if (fallbackFilterStack.isNotEmpty) {
+    if (preferSessionFilters) {
+      // User owns this slot's filters — empty means intentionally cleared.
+      activeStack = fallbackFilterStack;
+    } else if (fallbackFilterStack.isNotEmpty) {
       final names = fallbackFilterStack.map((e) => e.name).toSet();
       activeStack = [
         ...fallbackFilterStack,
@@ -138,9 +154,9 @@ class VideoTemplateComposedPreview extends StatelessWidget {
           ),
         )
         .toList(growable: false);
-    final effectInputs = frameEffectInputs.isNotEmpty
-        ? frameEffectInputs
-        : fallbackEffects;
+    final effectInputs = preferSessionEffects
+        ? fallbackEffects
+        : (frameEffectInputs.isNotEmpty ? frameEffectInputs : fallbackEffects);
 
     final effect = TemplateEffectVisual.resolve(effectInputs);
 
@@ -148,7 +164,10 @@ class VideoTemplateComposedPreview extends StatelessWidget {
         ? TemplateFilterMatrices.forName('duotone', intensity: effect.duotone)
         : null;
 
-    final transition = _transitionVisual(f);
+    final transition = _transitionVisual(
+      f,
+      suppress: suppressFrameTransitions,
+    );
     final cw = canvasWidth <= 0 ? 1080 : canvasWidth;
     final ch = canvasHeight <= 0 ? 1920 : canvasHeight;
     final hasLayout = effect.collage != TemplateCollageKind.none;
@@ -535,8 +554,11 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     return null;
   }
 
-  _TransitionVisual _transitionVisual(PreviewFrame? f) {
-    if (f == null) return const _TransitionVisual();
+  _TransitionVisual _transitionVisual(
+    PreviewFrame? f, {
+    bool suppress = false,
+  }) {
+    if (suppress || f == null) return const _TransitionVisual();
     var flash = 0.0;
     var burn = 0.0;
     var dx = 0.0;

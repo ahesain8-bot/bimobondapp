@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_theme.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -27,10 +28,11 @@ class TemplateEditorLayerToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 12),
         child: Row(
           children: [
             _ActionButton(
@@ -51,18 +53,18 @@ class TemplateEditorLayerToolbar extends StatelessWidget {
                   ),
                   _ActionButton(
                     icon: LucideIcons.copy,
-                    label: 'Copy',
+                    label: l10n.templateEditorCopy,
                     onTap: copyEnabled ? onCopy : null,
                   ),
                   _ActionButton(
                     icon: LucideIcons.trash2,
-                    label: 'Delete',
+                    label: l10n.templateEditorDelete,
                     onTap: onDelete,
                   ),
                   if (onLayers != null)
                     _ActionButton(
                       icon: LucideIcons.layers,
-                      label: 'Layers',
+                      label: l10n.templateEditorLayers,
                       onTap: layersEnabled ? onLayers : null,
                     ),
                 ],
@@ -125,6 +127,7 @@ class _ActionButton extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: enabled
                         ? TemplateEditorTheme.textPrimary

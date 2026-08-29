@@ -18,7 +18,10 @@ import 'package:bimobondapp/app/video_templates/engine/slot/slot_engine.dart';
 import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_injector.dart'
     as vt_di;
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_editor_l10n.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_export_l10n.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_font_cache.dart';
+import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_export_overlay.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_layer_toolbar.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_playback_bar.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_preset_sheet.dart';
@@ -32,6 +35,7 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/temp
 import 'package:bimobondapp/app/video_templates/presentation/widgets/video_template_composed_preview.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
@@ -75,6 +79,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
   String? _error;
   double _exportProgress = 0;
   String _exportLabel = 'Rendering…';
+
+  AppLocalizations get _l10n => AppLocalizations.of(context)!;
   int _selectedSlotIndex = 0;
   TemplateEditorPanel? _activePanel;
   TemplateEditorOverlayKind? _selectedOverlayKind;
@@ -643,6 +649,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     bool showTexts = true,
   }) {
     final slotId = _previewSlotId(preview);
+    final preferSessionFilters = _session.slotUsesUserFilters(slotId);
+    final preferSessionEffects = _session.slotUsesUserEffects(slotId);
     final filterStack = _activeFilterStackAtPlayhead(preview, slotId);
     final effectStack = _activeEffectsAtPlayhead(preview, slotId);
     final filterActive = filterStack.isNotEmpty;
@@ -661,8 +669,28 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       fallbackFilterIntensity: primaryFilter?.intensity ?? 1,
       fallbackFilterStack: filterStack,
       fallbackEffects: effectStack,
+      preferSessionFilters: preferSessionFilters,
+      preferSessionEffects: preferSessionEffects,
+      suppressFrameTransitions: _shouldSuppressFrameTransitions(preview),
       showTexts: showTexts,
+      emptyLabel: _l10n.templateAddMediaToPreview,
     );
+  }
+
+  /// True when the timeline sample still has a transition the user cleared.
+  bool _shouldSuppressFrameTransitions(CompositionPreviewController preview) {
+    final frame = preview.frame;
+    if (frame == null || frame.transitions.isEmpty) return false;
+    final t = preview.playhead;
+    for (final tr in _session.previewTransitions()) {
+      final junction =
+          _slotStartOnTimeline(tr.slotId) + _slotDuration(tr.slotId);
+      final half = (tr.durationSeconds.clamp(0.05, 2.0)) / 2;
+      if (t >= junction - half - 0.02 && t <= junction + half + 0.02) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool _shouldUseVideoLookStill(
@@ -721,17 +749,17 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             children: [
               ListTile(
                 leading: const Icon(LucideIcons.image, color: Colors.white),
-                title: const Text(
-                  'Photo',
-                  style: TextStyle(color: Colors.white),
+                title: Text(
+                  AppLocalizations.of(ctx)!.templateEditorPhoto,
+                  style: const TextStyle(color: Colors.white),
                 ),
                 onTap: () => Navigator.pop(ctx, 'image'),
               ),
               ListTile(
                 leading: const Icon(LucideIcons.video, color: Colors.white),
-                title: const Text(
-                  'Video',
-                  style: TextStyle(color: Colors.white),
+                title: Text(
+                  AppLocalizations.of(ctx)!.templateEditorVideo,
+                  style: const TextStyle(color: Colors.white),
                 ),
                 onTap: () => Navigator.pop(ctx, 'video'),
               ),
@@ -783,7 +811,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       _replaceOverlayId = null;
     } else {
       if (_session.filtersForSlot(slot.id).length >= kMaxFiltersPerSlot) {
-        _showSnack('Max $kMaxFiltersPerSlot filters per clip');
+        _showSnack(
+          _l10n.templateEditorMaxFiltersPerClip(kMaxFiltersPerSlot),
+        );
         return;
       }
       final track = UserEditorFilterTrack(
@@ -827,7 +857,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       _replaceOverlayId = null;
     } else {
       if (_session.effectsForSlot(slot.id).length >= kMaxEffectsPerSlot) {
-        _showSnack('Max $kMaxEffectsPerSlot effects per clip');
+        _showSnack(
+          _l10n.templateEditorMaxEffectsPerClip(kMaxEffectsPerSlot),
+        );
         return;
       }
       final track = UserEditorEffectTrack(
@@ -843,6 +875,55 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     }
     _commitLookPreview(slot.id, seekForEffect: !preset.isClear);
     unawaited(_syncSlotEffects(slot.id));
+    setState(() => _activePanel = null);
+  }
+
+  Future<void> _applyTransition(TemplatePresetItem preset) async {
+    final slots = _session.slots;
+    if (slots.length < 2) {
+      _showSnack(_l10n.templateEditorTransitionsNeedClips);
+      return;
+    }
+    // Prefer selected outgoing slot; last clip has no outgoing transition.
+    var slot = _selectedSlot;
+    final idx = slots.indexWhere((s) => s.id == slot.id);
+    if (idx < 0 || idx >= slots.length - 1) {
+      slot = slots[slots.length - 2];
+      setState(() => _selectedSlotIndex = slots.length - 2);
+    }
+    final replaceId = _replaceOverlayId;
+    if (preset.isClear) {
+      _session.clearUserTransitionForSlot(slot.id);
+      _clearOverlaySelection();
+    } else if (replaceId != null) {
+      _session.setUserTransition(
+        UserEditorTransitionTrack(
+          id: replaceId,
+          slotId: slot.id,
+          presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
+          transitionType: preset.previewTransitionKey,
+          label: preset.name,
+        ),
+      );
+      _selectedOverlayId = replaceId;
+      _selectedOverlayKind = TemplateEditorOverlayKind.transition;
+      _replaceOverlayId = null;
+    } else {
+      final track = UserEditorTransitionTrack(
+        id: 'tr_${DateTime.now().microsecondsSinceEpoch}',
+        slotId: slot.id,
+        presetId: VideoTemplateProjectIds.normalizeServerId(preset.id),
+        transitionType: preset.previewTransitionKey,
+        label: preset.name,
+      );
+      _session.setUserTransition(track);
+      _selectedOverlayId = track.id;
+      _selectedOverlayKind = TemplateEditorOverlayKind.transition;
+    }
+    // Seek near the junction so the transition is visible in preview.
+    final junction = _slotStartOnTimeline(slot.id) + _slotDuration(slot.id);
+    unawaited(_preview?.seek((junction - 0.05).clamp(0.0, junction)));
+    unawaited(_refreshPreview());
     setState(() => _activePanel = null);
   }
 
@@ -870,6 +951,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     // Seek into the edited clip so slot-local FX/filters are visible immediately.
     final target = (slotStart + slotDur * (seekForEffect ? 0.45 : 0.3))
         .clamp(0.0, total);
+    // Rebuild timeline first so cleared looks are not resampled from stale FX.
+    preview.reloadTimeline();
     unawaited(
       preview.applyLookPreview(slotId: slotId, targetTime: target).then((_) {
         if (mounted) setState(() {});
@@ -976,6 +1059,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       case TemplateEditorOverlayKind.text:
       case TemplateEditorOverlayKind.sticker:
       case TemplateEditorOverlayKind.audio:
+      case TemplateEditorOverlayKind.transition:
         return;
     }
   }
@@ -989,7 +1073,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           overlay.fontAssetUrl!.isNotEmpty) {
         font = TemplateFontItem(
           id: overlay.fontAssetId!,
-          label: overlay.fontLabel ?? 'Font',
+          label: overlay.fontLabel ?? _l10n.templateEditorFont,
           url: overlay.fontAssetUrl!,
         );
       }
@@ -1014,7 +1098,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         (overlay.assetUrl?.trim().isNotEmpty ?? false)) {
       return TemplatePresetItem(
         id: overlay.presetId ?? overlay.id,
-        name: overlay.label ?? 'Sticker',
+        name: overlay.label ?? _l10n.templateEditorStickers,
         kind: TemplatePresetKind.sticker,
         assetUrl: overlay.assetUrl,
       );
@@ -1065,7 +1149,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       canvasHeight: canvasH,
       media: media,
       initial: existing == null ? null : _textDraftFrom(existing),
-      title: existing == null ? 'Add text' : 'Replace text',
+      title: existing == null
+          ? _l10n.templateEditorAddText
+          : _l10n.templateEditorReplaceText,
     );
     if (draft == null || draft.text.isEmpty) return;
 
@@ -1157,7 +1243,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       canvasHeight: canvasH,
       media: media,
       initial: existing == null ? null : _stickerDraftFrom(existing),
-      title: existing == null ? 'Stickers' : 'Replace sticker',
+      title: existing == null
+          ? _l10n.templateEditorStickers
+          : _l10n.templateEditorReplaceSticker,
     );
     if (draft == null) return;
 
@@ -1367,7 +1455,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         }
       } else {
         serverFailure = ServerFailure(
-          'Add media to all slots before rendering.',
+          _l10n.templateEditorAddMediaAllSlots,
         );
       }
 
@@ -1379,7 +1467,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       if (!hasFile && !hasUrl) {
         setState(() {
           _busy = false;
-          _error = serverFailure?.message ?? 'Could not render on server';
+          _error = serverFailure?.message ?? _l10n.templateEditorCouldNotRender;
           _exportLabel = 'Export failed';
         });
         return;
@@ -1408,7 +1496,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Export failed';
+        _error = _l10n.templateEditorExportFailed;
         _exportLabel = 'Export failed';
       });
     }
@@ -1474,7 +1562,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             kind: TemplateEditorOverlayKind.filter,
             start: slotStart + window.start,
             end: slotStart + window.end,
-            label: filter.displayName,
+            label: localizeTemplateOverlayLabel(_l10n, filter.displayName),
             color: TemplateEditorTheme.filterTrack,
             icon: LucideIcons.blend,
             selected: _selectedOverlayId == filter.id,
@@ -1500,7 +1588,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             kind: TemplateEditorOverlayKind.effect,
             start: slotStart + window.start,
             end: slotStart + window.end,
-            label: effect.displayName,
+            label: localizeTemplateOverlayLabel(_l10n, effect.displayName),
             color: TemplateEditorTheme.effectTrack,
             icon: LucideIcons.sparkles,
             selected: _selectedOverlayId == effect.id,
@@ -1510,6 +1598,36 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       }
 
       cursor = slotStart + dur;
+    }
+
+    for (final tr in _session.previewTransitions()) {
+      final slotIndex = _session.slots.indexWhere((s) => s.id == tr.slotId);
+      if (slotIndex < 0 || slotIndex >= _session.slots.length - 1) continue;
+      var cursor = 0.0;
+      for (var i = 0; i <= slotIndex; i++) {
+        cursor += UserProjectSlotMapper.resolveSlotDuration(
+          _session.slots[i],
+          _session.fills[_session.slots[i].id],
+        );
+      }
+      final junction = cursor;
+      final half = (tr.durationSeconds.clamp(0.05, 2.0)) / 2;
+      final start = (junction - half).clamp(0.0, total);
+      final end = (junction + half).clamp(0.0, total);
+      segments.add(
+        TemplateEditorOverlaySegment(
+          id: tr.id,
+          slotId: tr.slotId,
+          kind: TemplateEditorOverlayKind.transition,
+          start: start,
+          end: end > start ? end : min(start + 0.1, total),
+          label: localizeTemplateOverlayLabel(_l10n, tr.displayName),
+          color: TemplateEditorTheme.transitionTrack,
+          icon: LucideIcons.betweenHorizontalStart,
+          selected: _selectedOverlayId == tr.id,
+          editable: _session.slotUsesUserTransitions(tr.slotId),
+        ),
+      );
     }
 
     for (final t in _session.userTexts) {
@@ -1539,7 +1657,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           kind: TemplateEditorOverlayKind.sticker,
           start: start,
           end: end > start ? end : min(start + 5, total),
-          label: s.presetId ?? 'Sticker',
+          label: s.presetId ?? _l10n.templateEditorStickers,
           color: TemplateEditorTheme.stickerTrack,
           icon: LucideIcons.sticker,
           selected: _selectedOverlayId == s.id,
@@ -1604,7 +1722,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     switch (kind) {
       case TemplateEditorOverlayKind.filter:
         return TemplateEditorLayerToolbar(
-          replaceLabel: 'Replace filter',
+          replaceLabel: _l10n.templateEditorReplaceFilter,
           onDismiss: () => setState(_clearOverlaySelection),
           onReplace: () {
             _replaceOverlayId = id;
@@ -1613,7 +1731,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           onCopy: () {
             final copy = _session.duplicateUserFilter(id);
             if (copy == null) {
-              _showSnack('Max $kMaxFiltersPerSlot filters per clip');
+              _showSnack(
+          _l10n.templateEditorMaxFiltersPerClip(kMaxFiltersPerSlot),
+        );
               return;
             }
             setState(() {
@@ -1658,7 +1778,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
       case TemplateEditorOverlayKind.effect:
         return TemplateEditorLayerToolbar(
-          replaceLabel: 'Replace effect',
+          replaceLabel: _l10n.templateEditorReplaceEffect,
           onDismiss: () => setState(_clearOverlaySelection),
           onReplace: () {
             _replaceOverlayId = id;
@@ -1667,7 +1787,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           onCopy: () {
             final copy = _session.duplicateUserEffect(id);
             if (copy == null) {
-              _showSnack('Max $kMaxEffectsPerSlot effects per clip');
+              _showSnack(
+          _l10n.templateEditorMaxEffectsPerClip(kMaxEffectsPerSlot),
+        );
               return;
             }
             setState(() {
@@ -1710,9 +1832,50 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
               ).length <
               kMaxEffectsPerSlot,
         );
+      case TemplateEditorOverlayKind.transition:
+        return TemplateEditorLayerToolbar(
+          replaceLabel: _l10n.templateEditorReplaceTransition,
+          onDismiss: () => setState(_clearOverlaySelection),
+          onReplace: () {
+            _replaceOverlayId = id;
+            setState(() => _activePanel = TemplateEditorPanel.transitions);
+          },
+          onCopy: () {},
+          onDelete: () {
+            String? slotId;
+            if (id.startsWith('recipe_tr_')) {
+              slotId = id.replaceFirst('recipe_tr_', '');
+              _session.clearUserTransitionForSlot(slotId);
+            } else if (id.startsWith('tr_seed_')) {
+              slotId = id.replaceFirst('tr_seed_', '');
+              _session.clearUserTransitionForSlot(slotId);
+            } else {
+              slotId = _session.userTransitions
+                  .where((t) => t.id == id)
+                  .map((t) => t.slotId)
+                  .firstOrNull;
+              _session.removeUserTransition(id);
+            }
+            _clearOverlaySelection();
+            if (slotId != null && slotId.isNotEmpty) {
+              final junction =
+                  _slotStartOnTimeline(slotId) + _slotDuration(slotId);
+              unawaited(
+                _preview?.applyLookPreview(
+                  slotId: slotId,
+                  targetTime: (junction - 0.05).clamp(0.0, junction),
+                ),
+              );
+            } else {
+              unawaited(_refreshPreview());
+            }
+            setState(() {});
+          },
+          copyEnabled: false,
+        );
       case TemplateEditorOverlayKind.audio:
         return TemplateEditorLayerToolbar(
-          replaceLabel: 'Replace music',
+          replaceLabel: _l10n.templateEditorReplaceMusic,
           onDismiss: () => setState(_clearOverlaySelection),
           onReplace: () => unawaited(_pickAudio(replaceTrackId: id)),
           onCopy: () {},
@@ -1727,7 +1890,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
       case TemplateEditorOverlayKind.text:
         return TemplateEditorLayerToolbar(
-          replaceLabel: 'Replace text',
+          replaceLabel: _l10n.templateEditorReplaceText,
           onDismiss: () => setState(_clearOverlaySelection),
           onReplace: () => unawaited(_addTextOverlay(replaceId: id)),
           onCopy: () {},
@@ -1741,7 +1904,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         );
       case TemplateEditorOverlayKind.sticker:
         return TemplateEditorLayerToolbar(
-          replaceLabel: 'Replace sticker',
+          replaceLabel: _l10n.templateEditorReplaceSticker,
           onDismiss: () => setState(_clearOverlaySelection),
           onReplace: () => unawaited(_addStickerOverlay(replaceId: id)),
           onCopy: () {},
@@ -1772,11 +1935,11 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Padding(
-                  padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Filter layers',
-                    style: TextStyle(
+                    _l10n.templateEditorFilterLayers,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -1786,7 +1949,10 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                 for (final layer in layers)
                   ListTile(
                     title: Text(
-                      layer.displayName,
+                      localizeTemplateOverlayLabel(
+                        _l10n,
+                        layer.displayName,
+                      ),
                       style: const TextStyle(color: Colors.white),
                     ),
                     trailing: _selectedOverlayId == layer.id
@@ -1821,11 +1987,11 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Text(
-                  'Effect layers',
-                  style: TextStyle(
+                  _l10n.templateEditorEffectLayers,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
@@ -1835,7 +2001,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
               for (final layer in effectLayers)
                 ListTile(
                   title: Text(
-                    layer.displayName,
+                    localizeTemplateOverlayLabel(_l10n, layer.displayName),
                     style: const TextStyle(color: Colors.white),
                   ),
                   trailing: _selectedOverlayId == layer.id
@@ -1933,6 +2099,16 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         _session.patchUserStickerTiming(id, startTime: start, endTime: end);
       case TemplateEditorOverlayKind.audio:
         _session.patchUserAudioTiming(id: id, startTime: start, endTime: end);
+      case TemplateEditorOverlayKind.transition:
+        final track = _session.userTransitions
+                .where((t) => t.id == id)
+                .firstOrNull ??
+            _session.previewTransitions().where((t) => t.id == id).firstOrNull;
+        if (track == null) return;
+        final duration = (end - start).clamp(0.05, 2.0);
+        _session.setUserTransition(
+          track.copyWith(durationSeconds: duration),
+        );
     }
     _preview?.reloadTimeline();
     if (kind == TemplateEditorOverlayKind.filter ||
@@ -1966,12 +2142,14 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
 
   Widget _buildTopBar() {
     final previewMode = _showRenderedPreview;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final l10n = _l10n;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 0),
       child: Row(
         children: [
           _CircleNavButton(
-            icon: LucideIcons.chevronLeft,
+            icon: isRtl ? LucideIcons.chevronRight : LucideIcons.chevronLeft,
             color: TemplateEditorTheme.accent,
             onPressed: _busy
                 ? null
@@ -1980,21 +2158,15 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                 : _popWithoutNext,
           ),
           const Spacer(),
-          if (_busy)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                _exportLabel,
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-            )
-          else if (previewMode)
-            const Text(
-              'Server preview',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+          if (previewMode && !_busy)
+            Text(
+              l10n.templateEditorServerPreview,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
           _CircleNavButton(
-            icon: previewMode ? LucideIcons.arrowRight : LucideIcons.check,
+            icon: previewMode
+                ? (isRtl ? LucideIcons.arrowLeft : LucideIcons.arrowRight)
+                : LucideIcons.check,
             color: TemplateEditorTheme.accent,
             onPressed: _busy ? null : _exportAndFinish,
           ),
@@ -2107,8 +2279,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       case TemplateEditorPanel.filters:
         return TemplateEditorPresetSheet(
           title: _replaceOverlayId != null
-              ? 'Replace filter'
-              : 'Add filter · clip ${_selectedSlotIndex + 1}',
+              ? _l10n.templateEditorReplaceFilter
+              : _l10n.templateEditorAddFilterClip(_selectedSlotIndex + 1),
           presets: _filterPresets,
           selectedId: _selectedFilterId,
           onSelected: _applyFilter,
@@ -2121,12 +2293,28 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
       case TemplateEditorPanel.effects:
         return TemplateEditorPresetSheet(
           title: _replaceOverlayId != null
-              ? 'Replace effect'
-              : 'Add effect · clip ${_selectedSlotIndex + 1}',
+              ? _l10n.templateEditorReplaceEffect
+              : _l10n.templateEditorAddEffectClip(_selectedSlotIndex + 1),
           presets: _effectPresets,
           selectedId: _selectedEffectId,
           onSelected: _applyEffect,
           onClear: () => _applyEffect(kFallbackEffectPresets.first),
+          onClose: () => setState(() {
+            _activePanel = null;
+            _replaceOverlayId = null;
+          }),
+        );
+      case TemplateEditorPanel.transitions:
+        return TemplateEditorPresetSheet(
+          title: _replaceOverlayId != null
+              ? _l10n.templateEditorReplaceTransition
+              : _l10n.templateEditorAddTransition,
+          presets: kFallbackTransitionPresets,
+          selectedId: _session
+              .transitionForSlot(_selectedSlot.id)
+              ?.transitionType,
+          onSelected: _applyTransition,
+          onClear: () => _applyTransition(kFallbackTransitionPresets.first),
           onClose: () => setState(() {
             _activePanel = null;
             _replaceOverlayId = null;
@@ -2166,188 +2354,197 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
   Widget build(BuildContext context) {
     final preview = _preview;
     final activeSheet = _buildActiveSheet();
+    final l10n = _l10n;
 
     return Scaffold(
       backgroundColor: TemplateEditorTheme.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            if (_busy)
-              LinearProgressIndicator(
-                value: _exportProgress <= 0 ? null : _exportProgress,
-                backgroundColor: Colors.white12,
-                color: Colors.white,
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.redAccent),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final maxPreviewH = constraints.maxHeight * 0.58;
-                  return Column(
-                    children: [
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight: maxPreviewH.clamp(180.0, 520.0),
-                        ),
-                        child: Center(child: _buildPreview()),
-                      ),
-                      if (!_showRenderedPreview && preview != null)
-                        Expanded(
-                          child: ListenableBuilder(
-                            listenable: preview,
-                            builder: (context, _) {
-                              final total = max(preview.duration, 0.01);
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  TemplateEditorPlaybackBar(
-                                    isPlaying: preview.isPlaying,
-                                    currentTime: preview.playhead,
-                                    totalTime: total,
-                                    canUndo: _session.canUndo,
-                                    canRedo: _session.canRedo,
-                                    onPlayPause: () {
-                                      if (preview.isPlaying) {
-                                        preview.pause();
-                                      } else {
-                                        preview.play();
-                                      }
-                                    },
-                                    onUndo: () async {
-                                      _session.undo();
-                                      await _refreshPreview();
-                                    },
-                                    onRedo: () async {
-                                      _session.redo();
-                                      await _refreshPreview();
-                                    },
-                                  ),
-                                  Expanded(
-                                    child: TemplateEditorTimeline(
-                                      slots: _session.slots,
-                                      fills: _session.fills,
-                                      playhead: preview.playhead,
-                                      totalDuration: total,
-                                      selectedSlotIndex: _selectedSlotIndex,
-                                      overlaySegments:
-                                          _buildOverlaySegments(total),
-                                      onSlotTap: _busy
-                                          ? null
-                                          : _pickMediaForSlot,
-                                      onAddMedia: _busy
-                                          ? null
-                                          : () => _pickMediaForSlot(
-                                                _selectedSlotIndex,
-                                              ),
-                                      onSeek: _onSeek,
-                                      onOverlayRangeChanged: _busy
-                                          ? null
-                                          : _onOverlayRangeChanged,
-                                      onOverlayTap:
-                                          _busy ? null : _onOverlayTap,
-                                      selectedOverlayId: _selectedOverlayId,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        )
-                      else if (!_showRenderedPreview)
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: TemplateEditorTimeline(
-                              slots: _session.slots,
-                              fills: _session.fills,
-                              playhead: 0,
-                              totalDuration: max(
-                                widget.recipe.duration ?? 5,
-                                0.01,
-                              ),
-                              selectedSlotIndex: _selectedSlotIndex,
-                              overlaySegments: _buildOverlaySegments(
-                                max(widget.recipe.duration ?? 5, 0.01),
-                              ),
-                              onSlotTap: _busy ? null : _pickMediaForSlot,
-                              onAddMedia: _busy
-                                  ? null
-                                  : () => _pickMediaForSlot(_selectedSlotIndex),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _buildTopBar(),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.redAccent),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final maxPreviewH = constraints.maxHeight * 0.58;
+                      return Column(
+                        children: [
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: maxPreviewH.clamp(180.0, 520.0),
                             ),
+                            child: Center(child: _buildPreview()),
                           ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            if (!_showRenderedPreview)
-              _buildLayerToolbar() ??
-                  TemplateEditorToolbar(
-                    editable: _editable,
-                    activePanel: _activePanel,
-                    onPanelSelected: (panel) {
-                      if (_busy) return;
-                      _clearOverlaySelection();
-                      if (panel == TemplateEditorPanel.edit) {
-                        unawaited(_pickMediaForSlot(_selectedSlotIndex));
-                        return;
-                      }
-                      if (panel == TemplateEditorPanel.audio) {
-                        unawaited(_pickAudio());
-                        return;
-                      }
-                      _togglePanel(panel);
+                          if (!_showRenderedPreview && preview != null)
+                            Expanded(
+                              child: ListenableBuilder(
+                                listenable: preview,
+                                builder: (context, _) {
+                                  final total = max(preview.duration, 0.01);
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      TemplateEditorPlaybackBar(
+                                        isPlaying: preview.isPlaying,
+                                        currentTime: preview.playhead,
+                                        totalTime: total,
+                                        canUndo: _session.canUndo,
+                                        canRedo: _session.canRedo,
+                                        onPlayPause: () {
+                                          if (preview.isPlaying) {
+                                            preview.pause();
+                                          } else {
+                                            preview.play();
+                                          }
+                                        },
+                                        onUndo: () async {
+                                          _session.undo();
+                                          await _refreshPreview();
+                                        },
+                                        onRedo: () async {
+                                          _session.redo();
+                                          await _refreshPreview();
+                                        },
+                                      ),
+                                      Expanded(
+                                        child: TemplateEditorTimeline(
+                                          slots: _session.slots,
+                                          fills: _session.fills,
+                                          playhead: preview.playhead,
+                                          totalDuration: total,
+                                          selectedSlotIndex: _selectedSlotIndex,
+                                          overlaySegments:
+                                              _buildOverlaySegments(total),
+                                          onSlotTap: _busy
+                                              ? null
+                                              : _pickMediaForSlot,
+                                          onAddMedia: _busy
+                                              ? null
+                                              : () => _pickMediaForSlot(
+                                                    _selectedSlotIndex,
+                                                  ),
+                                          onSeek: _onSeek,
+                                          onOverlayRangeChanged: _busy
+                                              ? null
+                                              : _onOverlayRangeChanged,
+                                          onOverlayTap:
+                                              _busy ? null : _onOverlayTap,
+                                          selectedOverlayId: _selectedOverlayId,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            )
+                          else if (!_showRenderedPreview)
+                            Flexible(
+                              child: SingleChildScrollView(
+                                child: TemplateEditorTimeline(
+                                  slots: _session.slots,
+                                  fills: _session.fills,
+                                  playhead: 0,
+                                  totalDuration: max(
+                                    widget.recipe.duration ?? 5,
+                                    0.01,
+                                  ),
+                                  selectedSlotIndex: _selectedSlotIndex,
+                                  overlaySegments: _buildOverlaySegments(
+                                    max(widget.recipe.duration ?? 5, 0.01),
+                                  ),
+                                  onSlotTap:
+                                      _busy ? null : _pickMediaForSlot,
+                                  onAddMedia: _busy
+                                      ? null
+                                      : () => _pickMediaForSlot(
+                                            _selectedSlotIndex,
+                                          ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
                     },
                   ),
-            if (_showRenderedPreview && _renderedPlayer != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-                child: ValueListenableBuilder<VideoPlayerValue>(
-                  valueListenable: _renderedPlayer!,
-                  builder: (context, value, _) {
-                    return Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            value.isPlaying
-                                ? LucideIcons.pause
-                                : LucideIcons.play,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            if (value.isPlaying) {
-                              _renderedPlayer!.pause();
-                            } else {
-                              _renderedPlayer!.play();
-                            }
-                          },
-                        ),
-                        Expanded(
-                          child: Text(
-                            'Tap → to continue with this render',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
                 ),
-              ),
-            if (activeSheet != null && !_showRenderedPreview) activeSheet,
-          ],
-        ),
+                if (!_showRenderedPreview)
+                  _buildLayerToolbar() ??
+                      TemplateEditorToolbar(
+                        editable: _editable,
+                        activePanel: _activePanel,
+                        onPanelSelected: (panel) {
+                          if (_busy) return;
+                          _clearOverlaySelection();
+                          if (panel == TemplateEditorPanel.edit) {
+                            unawaited(_pickMediaForSlot(_selectedSlotIndex));
+                            return;
+                          }
+                          if (panel == TemplateEditorPanel.audio) {
+                            unawaited(_pickAudio());
+                            return;
+                          }
+                          _togglePanel(panel);
+                        },
+                      ),
+                if (_showRenderedPreview && _renderedPlayer != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+                    child: ValueListenableBuilder<VideoPlayerValue>(
+                      valueListenable: _renderedPlayer!,
+                      builder: (context, value, _) {
+                        return Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                value.isPlaying
+                                    ? LucideIcons.pause
+                                    : LucideIcons.play,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                if (value.isPlaying) {
+                                  _renderedPlayer!.pause();
+                                } else {
+                                  _renderedPlayer!.play();
+                                }
+                              },
+                            ),
+                            Expanded(
+                              child: Text(
+                                _l10n.templateEditorContinueWithRender,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                if (activeSheet != null && !_showRenderedPreview) activeSheet,
+              ],
+            ),
+          ),
+          if (_busy)
+            TemplateEditorExportOverlay(
+              progress: _exportProgress,
+              label: localizeTemplateExportLabel(l10n, _exportLabel),
+            ),
+        ],
       ),
     );
   }
