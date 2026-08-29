@@ -90,6 +90,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomShareChannelRequested>(_onShareChannelRequested);
     on<LiveRoomGuestsChanged>(_onGuestsChanged);
     on<LiveRoomBattleChanged>(_onBattleChanged);
+    on<LiveRoomBattlePollRequested>(_onBattlePollRequested);
     on<LiveRoomCommentsResyncRequested>(_onCommentsResync);
     on<LiveRoomGuestInviteAnswered>(_onGuestInviteAnswered);
     on<LiveRoomGuestRequestAnswered>(_onGuestRequestAnswered);
@@ -143,6 +144,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   var _mediaRecoveryInFlight = false;
   var _appPaused = false;
   var _closing = false;
+
+  /// Invalidates an older battle connect when a new battle or battle end
+  /// arrives while its join request is still in flight.
+  var _battleOperationGeneration = 0;
+
+  /// `liveBattle` score updates are frequent. Keep one media connect per
+  /// battle/opponent pair while still allowing a different battle to replace
+  /// an older connection that has not finished yet.
+  final _battleConnectKeys = <String>{};
+  var _battleRoomRecoveryInFlight = false;
+  Timer? _battlePollTimer;
 
   LiveRoomReady? get _readyOrNull =>
       state is LiveRoomReady ? state as LiveRoomReady : null;
@@ -797,6 +809,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     _appPaused = true;
     final current = _readyOrNull;
     if (current == null) return;
+    // Keep publishing through a PK. Dropping the camera here empties
+    // `live_{id}` and the server ends both streams after ~10s.
+    if (current.isBattleActive) return;
     final controller = current.controller;
     if (controller == null || !current.isCameraInitialized) return;
 
@@ -1072,47 +1087,145 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     final battle = event.battle?.withTimingFrom(current.battle);
+    final opponentId = battle?.isActive == true
+        ? battle!.opponentLiveId(current.session.id)
+        : '';
+    final previousOpponentId = current.battle?.isActive == true
+        ? current.battle!.opponentLiveId(current.session.id)
+        : '';
+    final battleIdentityChanged =
+        battle?.isActive != true ||
+        current.battle?.id != battle?.id ||
+        previousOpponentId != opponentId;
+    if (battleIdentityChanged) _battleRoomRecoveryInFlight = false;
+    final currentBattleRoom = current.battleMediaRoom;
+    final roomNeedsReplacement =
+        battleIdentityChanged ||
+        currentBattleRoom == null ||
+        currentBattleRoom.connectionState == ConnectionState.disconnected;
+    final battleKey = battle?.isActive == true
+        ? '${battle!.id}:$opponentId'
+        : '';
+    final connectionAlreadyInFlight = _battleConnectKeys.contains(battleKey);
+    final startsMediaOperation =
+        battle?.isActive != true ||
+        (roomNeedsReplacement && !connectionAlreadyInFlight);
+    final operationGeneration = startsMediaOperation
+        ? ++_battleOperationGeneration
+        : _battleOperationGeneration;
     emit(
       current.copyWith(
         battle: battle,
+        battleMediaRoom: roomNeedsReplacement ? null : currentBattleRoom,
         pendingCompetitionRequest: battle?.isActive == true
             ? null
             : current.pendingCompetitionRequest,
         isCompetitionActionBusy: false,
       ),
     );
+    _syncBattlePoll(_readyOrNull ?? current);
     if (battle?.isActive != true) {
+      _battleRoomRecoveryInFlight = false;
       await _sessionRepository.disconnectBattleOpponentMedia();
+      if (
+        isClosed ||
+        _closing ||
+        operationGeneration != _battleOperationGeneration
+      ) {
+        return;
+      }
       final ended = _readyOrNull;
       if (ended != null && ended.opponentTopGifterAvatars.isNotEmpty) {
         emit(ended.copyWith(opponentTopGifterAvatars: const []));
       }
       return;
     }
-    final opponentId = battle!.opponentLiveId(current.session.id);
     if (opponentId.isEmpty || opponentId == current.session.id) return;
+    if (connectionAlreadyInFlight) return;
+    if (_battleRoomRecoveryInFlight) return;
+    if (!roomNeedsReplacement) return;
     // Both rings are re-read now that the opponent is known.
     _scheduleSupportersRefresh();
+    _battleConnectKeys.add(battleKey);
     try {
       await _sessionRepository.connectBattleOpponentMedia(opponentId);
-      if (isClosed) return;
+      _battleRoomRecoveryInFlight = false;
+      if (
+        isClosed ||
+        _closing ||
+        operationGeneration != _battleOperationGeneration
+      ) {
+        return;
+      }
       final ready = _readyOrNull;
-      if (ready != null && ready.battle?.id == battle.id) {
-        // The state identity change tells the stage to pick up battleMediaRoom;
-        // subsequent track publications repaint through Room notifications.
-        emit(ready.copyWith(battle: battle));
+      final battleState = ready?.battle;
+      if (ready != null &&
+          battle != null &&
+          battleState?.isActive == true &&
+          battleState?.id == battle.id &&
+          battleState!.opponentLiveId(ready.session.id) == opponentId) {
+        final room = _sessionRepository.battleMediaRoom;
+        // Explicit runtime-to-state handoff: the stage must not depend on an
+        // unchanged Equatable LiveBattle to discover the connected Room.
+        emit(ready.copyWith(battleMediaRoom: room is Room ? room : null));
       }
     } catch (e) {
-      if (isClosed) return;
+      if (
+        isClosed ||
+        _closing ||
+        operationGeneration != _battleOperationGeneration
+      ) {
+        return;
+      }
       final ready = _readyOrNull;
-      if (ready != null) {
+      final battleState = ready?.battle;
+      if (ready != null && battle != null && battleState?.id == battle.id) {
         emit(
           ready.copyWith(
             actionMessage: 'بدأت المعركة لكن تعذر فتح فيديو الخصم: $e',
           ),
         );
       }
+    } finally {
+      _battleConnectKeys.remove(battleKey);
     }
+  }
+
+  Future<void> _onBattlePollRequested(
+    LiveRoomBattlePollRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null || !current.isBattleActive) {
+      _stopBattlePoll();
+      return;
+    }
+    final liveId = current.session.id;
+    try {
+      final battle = await _sessionRepository.loadBattle(liveId);
+      if (isClosed || _readyOrNull?.session.id != liveId || battle == null) {
+        return;
+      }
+      add(LiveRoomBattleChanged(battle));
+    } catch (e) {
+      debugPrint('Battle poll failed for $liveId: $e');
+    }
+  }
+
+  void _syncBattlePoll(LiveRoomReady current) {
+    final shouldPoll = current.isBattleActive && !current.isRealtimeConnected;
+    if (!shouldPoll) {
+      _stopBattlePoll();
+      return;
+    }
+    _battlePollTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!isClosed) add(const LiveRoomBattlePollRequested());
+    });
+  }
+
+  void _stopBattlePoll() {
+    _battlePollTimer?.cancel();
+    _battlePollTimer = null;
   }
 
   /// Pulls the comment history again, keeping whatever the socket delivered
@@ -1535,13 +1648,18 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
               clearActionMessage: current.actionMessage != null,
             ),
           );
+          _syncBattlePoll(_readyOrNull ?? current);
           // The socket may have missed comments while it was down.
           add(const LiveRoomCommentsResyncRequested());
+          if ((_readyOrNull ?? current).isBattleActive) {
+            add(const LiveRoomBattlePollRequested());
+          }
           return;
         }
         // Recover silently. A dropped HUD socket must not cover the live with
         // a red banner/SnackBar; Socket.IO keeps retrying in the background.
         emit(current.copyWith(isRealtimeConnected: false));
+        _syncBattlePoll(_readyOrNull ?? current);
       case LiveHudCommentEvent(:final message):
         final competitionRequest = _competitionRequestFrom(current, message);
         if (competitionRequest != null) {
@@ -1651,7 +1769,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                 : current.floatingHeartBurst + 1,
           ),
         );
-      case LiveHudEndedEvent():
+      case LiveHudEndedEvent(:final liveId):
+        if (liveId.isNotEmpty && liveId != current.session.id) return;
         add(const LiveRoomRemoteEnded());
       case LiveHudGiftComboEvent(:final payload, :final totalEarnedCoins):
         final giftCombo = GiftComboPayload.fromMap(payload);
@@ -1788,6 +1907,27 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         _closing) {
       return;
     }
+    if (event.event.tag == 'battle') {
+      if (!current.isBattleActive) return;
+      switch (event.event.state) {
+        case LiveMediaConnectionState.disconnected:
+          _battleRoomRecoveryInFlight = true;
+          emit(current.copyWith(battleMediaRoom: null));
+          return;
+        case LiveMediaConnectionState.reconnected:
+          _battleRoomRecoveryInFlight = false;
+          final room = _sessionRepository.battleMediaRoom;
+          if (room is Room) {
+            emit(current.copyWith(battleMediaRoom: room));
+          }
+          return;
+        case LiveMediaConnectionState.failed:
+          _battleRoomRecoveryInFlight = false;
+          return;
+        case LiveMediaConnectionState.reconnecting:
+          return;
+      }
+    }
     switch (event.event.state) {
       case LiveMediaConnectionState.reconnecting:
         debugPrint('[Host] media reconnecting after ${_broadcastUptime()}');
@@ -1810,11 +1950,22 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           '[Host] media DISCONNECTED after ${_broadcastUptime()} — '
           'reason: ${event.event.reason ?? "livekit terminal disconnect"}',
         );
+        final stallDuringPk =
+            current.isBattleActive &&
+            (event.event.reason ?? '').contains('outbound_video_stalled');
+        if (stallDuringPk) {
+          debugPrint(
+            '[Host] ignoring outbound stall during PK — stay in live_${current.session.id}',
+          );
+          return;
+        }
         _mediaConnectedAt = null;
         emit(current.copyWith(isMediaConnected: false, localVideoTrack: null));
         if (!_appPaused) {
           await _recoverHostMedia(current.session.id, emit);
         }
+        return;
+      case LiveMediaConnectionState.failed:
         return;
     }
   }
@@ -2213,6 +2364,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   @override
   Future<void> close() async {
     _closing = true;
+    _battleOperationGeneration++;
+    _battleConnectKeys.clear();
+    _stopBattlePoll();
     _supportersRefreshTimer?.cancel();
     _supportersRefreshTimer = null;
     final giftLiveId = _giftJoinedLiveId;
@@ -2232,22 +2386,18 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       await _disposeCamera(controller);
     }
 
-    // Host must POST /end — do not only disconnect LiveKit/Socket (mobile-api §1).
-    if (!_sessionTeardownDone &&
-        current != null &&
-        current.session.id.isNotEmpty &&
-        current.session.isLive) {
-      try {
-        await _endLiveSession(current.session.id);
-        _sessionTeardownDone = true;
-      } catch (_) {
-        await _sessionRepository.disconnectRealtime();
-        await _sessionRepository.disconnectMedia();
-      }
-    } else {
-      await _sessionRepository.disconnectRealtime();
-      await _sessionRepository.disconnectMedia();
+    _stopBattlePoll();
+    // PK is overlay + scores on the same live. Disposing this bloc (a sheet,
+    // a rebuild, leaving the route without tapping End) must not POST
+    // `/lives/:id/end` — that finishes the battle at 0–0. Only the End
+    // broadcast tap goes through [_onEndRequested].
+    if (!_sessionTeardownDone) {
+      debugPrint(
+        '[Host] bloc closed without End broadcast — leaving live LIVE',
+      );
     }
+    await _sessionRepository.disconnectRealtime();
+    await _sessionRepository.disconnectMedia();
     return super.close();
   }
 }

@@ -35,6 +35,7 @@ class LiveRoomStage extends StatelessWidget {
               (previous is! LiveRoomReady ||
                   previous.guests != current.guests ||
                   previous.battle != current.battle ||
+                  previous.battleMediaRoom != current.battleMediaRoom ||
                   previous.topGifterAvatars != current.topGifterAvatars ||
                   previous.opponentTopGifterAvatars !=
                       current.opponentTopGifterAvatars)),
@@ -48,6 +49,7 @@ class LiveRoomStage extends StatelessWidget {
             battle: state.battle!,
             currentLiveId: state.session.id,
             topInset: topInset,
+            battleMediaRoom: state.battleMediaRoom,
             supporters: state.topGifterAvatars,
             opponentSupporters: state.opponentTopGifterAvatars,
           );
@@ -142,6 +144,7 @@ class _BattleStage extends StatelessWidget {
     required this.battle,
     required this.currentLiveId,
     required this.topInset,
+    required this.battleMediaRoom,
     required this.supporters,
     required this.opponentSupporters,
   });
@@ -149,6 +152,7 @@ class _BattleStage extends StatelessWidget {
   final LiveBattle battle;
   final String currentLiveId;
   final double topInset;
+  final Room? battleMediaRoom;
 
   /// Top-gifter avatars for this host's side and the opponent's, newest
   /// snapshot first. Empty until the leaderboard answers.
@@ -161,7 +165,7 @@ class _BattleStage extends StatelessWidget {
     final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
     final height = math.min(size.width / kStageAspect, maxHeight);
     final width = math.min(size.width, height * kStageAspect);
-    final room = context.read<LiveSessionRepository>().battleMediaRoom;
+    final room = battleMediaRoom;
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(

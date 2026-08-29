@@ -19,6 +19,8 @@ const Duration _kMediaHealthTick = Duration(seconds: 2);
 
 class RealLiveKitService implements LiveKitService {
   final _stateController = StreamController<LiveKitConnectionState>.broadcast();
+  final _battleStateController =
+      StreamController<LiveKitConnectionState>.broadcast();
 
   LiveKitConnectionState _state = LiveKitConnectionState.disconnected;
   String? _roomName;
@@ -29,6 +31,8 @@ class RealLiveKitService implements LiveKitService {
   Room? _room;
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
+  Future<void> _battleOperationQueue = Future<void>.value();
+  var _battleConnectionGeneration = 0;
   Timer? _primaryVideoHealthTimer;
   Timer? _battleVideoHealthTimer;
   bool _primaryHealthCheckInFlight = false;
@@ -91,6 +95,10 @@ class RealLiveKitService implements LiveKitService {
   Stream<LiveKitConnectionState> get stateStream => _stateController.stream;
 
   @override
+  Stream<LiveKitConnectionState> get battleStateStream =>
+      _battleStateController.stream;
+
+  @override
   String? get roomName => _roomName;
 
   @override
@@ -109,14 +117,58 @@ class RealLiveKitService implements LiveKitService {
 
   Future<void> _acquireAudioSession() async {
     if (_holdsAudioSession) return;
-    _holdsAudioSession = true;
     await LiveAudioSession.instance.acquire();
+    _holdsAudioSession = true;
   }
 
   Future<void> _releaseAudioSession() async {
     if (!_holdsAudioSession) return;
-    _holdsAudioSession = false;
     await LiveAudioSession.instance.release();
+    _holdsAudioSession = false;
+  }
+
+  Future<T> _serializeBattleOperation<T>(Future<T> Function() operation) {
+    final previous = _battleOperationQueue;
+    final result = previous.then((_) => operation());
+    // Keep a failed reconnect from blocking a later battle-end/disconnect,
+    // while preserving the original error for its caller.
+    _battleOperationQueue = result.then<void>((_) {}, onError: (_, __) {});
+    return result;
+  }
+
+  void _queueBattleRecovery({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) {
+    final generation = _battleConnectionGeneration;
+    unawaited(
+      _serializeBattleOperation(
+        () async {
+          await _recoverBattleRoom(
+            room: room,
+            url: url,
+            token: token,
+            roomName: roomName,
+            generation: generation,
+          );
+          if (
+            generation == _battleConnectionGeneration &&
+            _battleRoom == room &&
+            room.connectionState == ConnectionState.connected
+          ) {
+            _setBattleState(LiveKitConnectionState.connected);
+          } else if (
+            generation == _battleConnectionGeneration &&
+            _battleRoom == room &&
+            room.connectionState == ConnectionState.disconnected
+          ) {
+            _setBattleState(LiveKitConnectionState.failed);
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _preferMediaSpeaker() async {
@@ -149,10 +201,17 @@ class RealLiveKitService implements LiveKitService {
 
   Future<void> _retryRemoteSubscription(
     Room room,
-    TrackSubscriptionExceptionEvent event,
-  ) async {
+    TrackSubscriptionExceptionEvent event, {
+    int? battleGeneration,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
     if (_room != room && _battleRoom != room) return;
+    if (
+      battleGeneration != null &&
+      battleGeneration != _battleConnectionGeneration
+    ) {
+      return;
+    }
     final participant = event.participant;
     if (participant == null) return;
     final publication = participant.trackPublications[event.sid];
@@ -284,25 +343,38 @@ class RealLiveKitService implements LiveKitService {
     required String token,
     required String roomName,
   }) async {
+    final generation = _battleConnectionGeneration;
     try {
       final track = _firstRemoteVideoTrack(room);
-      if (_battleRoom != room) return;
+      if (
+        _battleRoom != room ||
+        generation != _battleConnectionGeneration
+      ) {
+        return;
+      }
       if (track == null) {
         await _ensureRemoteTracksSubscribed(room);
         if (!_battleVideoProgress.addMissingTrackSample()) return;
       } else {
         final progress = await _receiverVideoProgress(track);
-        if (_battleRoom != room || !_battleVideoProgress.addSample(progress)) {
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration ||
+          !_battleVideoProgress.addSample(progress)
+        ) {
           return;
         }
       }
       debugPrint('🔴 Battle opponent video stalled: $roomName');
       _stopBattleVideoWatchdog();
-      await _restartStalledBattleRoom(
-        room: room,
-        url: url,
-        token: token,
-        roomName: roomName,
+      await _serializeBattleOperation(
+        () => _restartStalledBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
+          generation: generation,
+        ),
       );
     } catch (error) {
       debugPrint('Battle inbound health sample unavailable: $error');
@@ -314,17 +386,37 @@ class RealLiveKitService implements LiveKitService {
     required String url,
     required String token,
     required String roomName,
+    required int generation,
   }) async {
-    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    if (
+      _battleRoom != room ||
+      _battleRecoveryRoom == room ||
+      generation != _battleConnectionGeneration
+    ) {
+      return;
+    }
     _battleRecoveryRoom = room;
     var failed = false;
     try {
       await room.disconnect();
       await Future<void>.delayed(const Duration(milliseconds: 250));
-      if (_battleRoom != room) return;
+      if (
+        _battleRoom != room ||
+        generation != _battleConnectionGeneration
+      ) {
+        return;
+      }
       await _runWithLiveKitErrorGuard(() => room.connect(url, token));
+      if (
+        _battleRoom != room ||
+        generation != _battleConnectionGeneration
+      ) {
+        await room.disconnect();
+        return;
+      }
       await _ensureRemoteTracksSubscribed(room);
       await _preferMediaSpeaker();
+      _setBattleState(LiveKitConnectionState.connected);
       _startBattleVideoWatchdog(
         room: room,
         url: url,
@@ -337,14 +429,16 @@ class RealLiveKitService implements LiveKitService {
     } finally {
       if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
     }
-    if (failed && _battleRoom == room) {
-      unawaited(
-        _recoverBattleRoom(
-          room: room,
-          url: url,
-          token: token,
-          roomName: roomName,
-        ),
+    if (
+      failed &&
+      _battleRoom == room &&
+      generation == _battleConnectionGeneration
+    ) {
+      _queueBattleRecovery(
+        room: room,
+        url: url,
+        token: token,
+        roomName: roomName,
       );
     }
   }
@@ -365,8 +459,15 @@ class RealLiveKitService implements LiveKitService {
     required String url,
     required String token,
     required String roomName,
+    required int generation,
   }) async {
-    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    if (
+      _battleRoom != room ||
+      _battleRecoveryRoom == room ||
+      generation != _battleConnectionGeneration
+    ) {
+      return;
+    }
     _battleRecoveryRoom = room;
     const retryDelays = <Duration>[
       Duration(milliseconds: 250),
@@ -376,9 +477,15 @@ class RealLiveKitService implements LiveKitService {
     try {
       for (var attempt = 0; attempt < retryDelays.length; attempt++) {
         await Future<void>.delayed(retryDelays[attempt]);
-        if (_battleRoom != room) return;
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration
+        ) {
+          return;
+        }
         if (room.connectionState == ConnectionState.connected) {
           await _ensureRemoteTracksSubscribed(room);
+          _setBattleState(LiveKitConnectionState.connected);
           return;
         }
         if (room.connectionState != ConnectionState.disconnected) return;
@@ -388,7 +495,10 @@ class RealLiveKitService implements LiveKitService {
             '${attempt + 1}/${retryDelays.length}: $roomName',
           );
           await _runWithLiveKitErrorGuard(() => room.connect(url, token));
-          if (_battleRoom != room) {
+          if (
+            _battleRoom != room ||
+            generation != _battleConnectionGeneration
+          ) {
             await room.disconnect();
             return;
           }
@@ -411,8 +521,28 @@ class RealLiveKitService implements LiveKitService {
     required String token,
     required String roomName,
     LiveMediaHints? mediaHints,
+  }) {
+    final generation = ++_battleConnectionGeneration;
+    _battleStateController.add(LiveKitConnectionState.connecting);
+    return _serializeBattleOperation(
+      () => _connectBattle(
+        url: url,
+        token: token,
+        roomName: roomName,
+        mediaHints: mediaHints,
+        generation: generation,
+      ),
+    );
+  }
+
+  Future<void> _connectBattle({
+    required String url,
+    required String token,
+    required String roomName,
+    LiveMediaHints? mediaHints,
+    required int generation,
   }) async {
-    await disconnectBattle();
+    await _disconnectBattle();
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
@@ -421,21 +551,39 @@ class RealLiveKitService implements LiveKitService {
       final guardedRoom = Room(roomOptions: _roomOptions(hints));
       guardedRoom.events
         ..on<RoomDisconnectedEvent>((_) {
-          if (_battleRoom != guardedRoom) return;
+          if (
+            _battleRoom != guardedRoom ||
+            generation != _battleConnectionGeneration
+          ) {
+            return;
+          }
+          _setBattleState(LiveKitConnectionState.disconnected);
           debugPrint('🔴 Battle LiveKit terminal disconnect: $roomName');
-          unawaited(
-            _recoverBattleRoom(
-              room: guardedRoom,
-              url: url,
-              token: token,
-              roomName: roomName,
-            ),
+          _queueBattleRecovery(
+            room: guardedRoom,
+            url: url,
+            token: token,
+            roomName: roomName,
           );
         })
         ..on<ReconnectingEvent>((_) {
+          if (
+            _battleRoom != guardedRoom ||
+            generation != _battleConnectionGeneration
+          ) {
+            return;
+          }
+          _setBattleState(LiveKitConnectionState.reconnecting);
           debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
         })
         ..on<RoomReconnectedEvent>((_) {
+          if (
+            _battleRoom != guardedRoom ||
+            generation != _battleConnectionGeneration
+          ) {
+            return;
+          }
+          _setBattleState(LiveKitConnectionState.connected);
           debugPrint('🔗 Battle LiveKit reconnected: $roomName');
           unawaited(_preferMediaSpeaker());
           unawaited(_ensureRemoteTracksSubscribed(guardedRoom));
@@ -449,19 +597,55 @@ class RealLiveKitService implements LiveKitService {
           }
         })
         ..on<TrackSubscribedEvent>((event) {
+          if (
+            _battleRoom != guardedRoom ||
+            generation != _battleConnectionGeneration
+          ) {
+            return;
+          }
           if (event.track is RemoteAudioTrack) {
             unawaited(_preferMediaSpeaker());
           }
         })
         ..on<TrackSubscriptionExceptionEvent>((event) {
-          unawaited(_retryRemoteSubscription(guardedRoom, event));
+          if (
+            _battleRoom != guardedRoom ||
+            generation != _battleConnectionGeneration
+          ) {
+            return;
+          }
+          unawaited(
+            _retryRemoteSubscription(
+              guardedRoom,
+              event,
+              battleGeneration: generation,
+            ),
+          );
         });
       await guardedRoom.connect(url, token);
       await _preferMediaSpeaker();
       return guardedRoom;
     });
+    if (generation != _battleConnectionGeneration) {
+      try {
+        await _runWithLiveKitErrorGuard(() async {
+          await room.disconnect();
+          await room.dispose();
+        });
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Stale battle LiveKit room cleanup failed: $error\n$stackTrace',
+        );
+      }
+      return;
+    }
     _battleRoom = room;
     await _ensureRemoteTracksSubscribed(room);
+    if (generation != _battleConnectionGeneration) {
+      await _disconnectBattle();
+      return;
+    }
+    _setBattleState(LiveKitConnectionState.connected);
     _startBattleVideoWatchdog(
       room: room,
       url: url,
@@ -471,7 +655,13 @@ class RealLiveKitService implements LiveKitService {
   }
 
   @override
-  Future<void> disconnectBattle() async {
+  Future<void> disconnectBattle() {
+    _battleConnectionGeneration++;
+    _battleStateController.add(LiveKitConnectionState.disconnected);
+    return _serializeBattleOperation(_disconnectBattle);
+  }
+
+  Future<void> _disconnectBattle() async {
     _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;
@@ -487,6 +677,10 @@ class RealLiveKitService implements LiveKitService {
   void _setState(LiveKitConnectionState next) {
     _state = next;
     _stateController.add(next);
+  }
+
+  void _setBattleState(LiveKitConnectionState next) {
+    _battleStateController.add(next);
   }
 
   @override
@@ -881,5 +1075,6 @@ class RealLiveKitService implements LiveKitService {
     _stopPrimaryVideoWatchdog();
     _stopBattleVideoWatchdog();
     _stateController.close();
+    _battleStateController.close();
   }
 }

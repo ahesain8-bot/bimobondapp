@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/core/models/live_media_hints.dart';
 import 'package:bimobondapp/features/live/data/datasources/lives_media_datasource.dart';
 import 'package:bimobondapp/features/live/data/datasources/lives_remote_datasource.dart';
@@ -13,6 +14,10 @@ class _RecordingMedia extends LivesMediaDataSource {
   final List<String> calls = [];
   Completer<void>? holdConnect;
   bool _battleRoomUp = false;
+  Room? _battleRoom;
+
+  @override
+  Room? get battleRoom => _battleRoom;
 
   @override
   bool get isBattleRoomUsable => _battleRoomUp;
@@ -27,12 +32,16 @@ class _RecordingMedia extends LivesMediaDataSource {
     final hold = holdConnect;
     if (hold != null) await hold.future;
     _battleRoomUp = true;
+    _battleRoom = Room();
   }
 
   @override
   Future<void> disconnectBattle() async {
     calls.add('disconnect');
     _battleRoomUp = false;
+    final room = _battleRoom;
+    _battleRoom = null;
+    await room?.dispose();
   }
 }
 
@@ -94,7 +103,9 @@ void main() {
 
   test('a different opponent still replaces the room, in order', () async {
     await repository.connectBattleOpponentMedia('opponent-1');
+    final firstRoom = repository.battleMediaRoom;
     await repository.connectBattleOpponentMedia('opponent-2');
+    final secondRoom = repository.battleMediaRoom;
 
     expect(media.calls, [
       'disconnect',
@@ -103,6 +114,31 @@ void main() {
       'connect',
     ]);
     expect(remote.joins, 2);
+    expect(secondRoom, isA<Room>());
+    expect(identical(firstRoom, secondRoom), isFalse);
+  });
+
+  test('the repository exposes the actual battle Room after connect', () async {
+    expect(repository.battleMediaRoom, isNull);
+
+    await repository.connectBattleOpponentMedia('opponent-1');
+
+    expect(repository.battleMediaRoom, isA<Room>());
+    await repository.disconnectBattleOpponentMedia();
+    expect(repository.battleMediaRoom, isNull);
+  });
+
+  test('battle end queued during connect cannot leave a stale Room', () async {
+    media.holdConnect = Completer<void>();
+    final connecting = repository.connectBattleOpponentMedia('opponent-1');
+    await Future<void>.delayed(Duration.zero);
+    final ending = repository.disconnectBattleOpponentMedia();
+
+    media.holdConnect!.complete();
+    await Future.wait([connecting, ending]);
+
+    expect(repository.battleMediaRoom, isNull);
+    expect(media.calls, ['disconnect', 'connect', 'disconnect']);
   });
 
   test('a failed connect does not block the next one', () async {

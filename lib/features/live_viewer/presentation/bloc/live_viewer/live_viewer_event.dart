@@ -233,3 +233,14 @@ class LiveViewerLiveKitStateChanged extends LiveViewerEvent {
   @override
   List<Object?> get props => [state];
 }
+
+/// Internal bridge from the separate battle LiveKit room into presentation
+/// state. The primary room lifecycle must not be used for this room.
+class LiveViewerBattleRoomStateChanged extends LiveViewerEvent {
+  const LiveViewerBattleRoomStateChanged(this.state);
+
+  final LiveKitConnectionState state;
+
+  @override
+  List<Object?> get props => [state];
+}

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/gift_entity.dart';
@@ -6,6 +7,8 @@ import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
 import '../../../domain/repositories/guest_repository.dart';
 import '../../../../../core/models/live_battle.dart';
+
+const Object _unset = Object();
 
 class LiveViewerState extends Equatable {
   final LiveSessionEntity? session;
@@ -54,6 +57,13 @@ class LiveViewerState extends Equatable {
   /// guessed names/avatars when battle socket payloads contain IDs only.
   final LiveEntity? battleOpponentLive;
 
+  /// The subscribe-only LiveKit room for the opponent's battle stream.
+  ///
+  /// The media service owns the imperative Room. Keeping the reference in
+  /// state makes the runtime-to-widget handoff explicit and independent of
+  /// whether the Equatable battle snapshot changed.
+  final Room? battleRoom;
+
   const LiveViewerState({
     this.session,
     this.comments = const [],
@@ -80,6 +90,7 @@ class LiveViewerState extends Equatable {
     this.isGuestActionBusy = false,
     this.battle,
     this.battleOpponentLive,
+    this.battleRoom,
   });
 
   /// Guests actually publishing right now — what the stage renders.
@@ -128,6 +139,7 @@ class LiveViewerState extends Equatable {
     bool clearBattle = false,
     LiveEntity? battleOpponentLive,
     bool clearBattleOpponent = false,
+    Object? battleRoom = _unset,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -168,6 +180,9 @@ class LiveViewerState extends Equatable {
       battleOpponentLive: clearBattleOpponent
           ? null
           : (battleOpponentLive ?? this.battleOpponentLive),
+      battleRoom: identical(battleRoom, _unset)
+          ? this.battleRoom
+          : battleRoom as Room?,
     );
   }
 
@@ -198,6 +213,7 @@ class LiveViewerState extends Equatable {
     isGuestActionBusy,
     battle,
     battleOpponentLive,
+    battleRoom,
   ];
 }
 

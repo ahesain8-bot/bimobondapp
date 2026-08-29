@@ -16,6 +16,8 @@ enum LiveKitConnectionState {
 abstract class LiveKitService {
   LiveKitConnectionState get state;
   Stream<LiveKitConnectionState> get stateStream;
+  Stream<LiveKitConnectionState> get battleStateStream =>
+      const Stream<LiveKitConnectionState>.empty();
   String? get roomName;
   String? get streamUrl;
   LiveMediaHints? get mediaHints => null;
@@ -79,6 +81,8 @@ abstract class LiveKitService {
 /// Simulates LiveKit join / leave / reconnect with realistic delays.
 class FakeLiveKitService implements LiveKitService {
   final _stateController = StreamController<LiveKitConnectionState>.broadcast();
+  final _battleStateController =
+      StreamController<LiveKitConnectionState>.broadcast();
 
   LiveKitConnectionState _state = LiveKitConnectionState.disconnected;
   String? _roomName;
@@ -102,10 +106,21 @@ class FakeLiveKitService implements LiveKitService {
     required String token,
     required String roomName,
     LiveMediaHints? mediaHints,
-  }) async {}
+  }) async {
+    _setBattleState(LiveKitConnectionState.connecting);
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (token.isEmpty) {
+      _setBattleState(LiveKitConnectionState.failed);
+      throw Exception('Invalid LiveKit battle token');
+    }
+    _setBattleState(LiveKitConnectionState.connected);
+  }
 
   @override
-  Future<void> disconnectBattle() async {}
+  Future<void> disconnectBattle() async {
+    _setBattleState(LiveKitConnectionState.disconnected);
+    await Future.delayed(const Duration(milliseconds: 150));
+  }
 
   var _publishing = false;
 
@@ -148,6 +163,9 @@ class FakeLiveKitService implements LiveKitService {
   Stream<LiveKitConnectionState> get stateStream => _stateController.stream;
 
   @override
+  Stream<LiveKitConnectionState> get battleStateStream => _battleStateController.stream;
+
+  @override
   String? get roomName => _roomName;
 
   @override
@@ -156,6 +174,10 @@ class FakeLiveKitService implements LiveKitService {
   void _setState(LiveKitConnectionState next) {
     _state = next;
     _stateController.add(next);
+  }
+
+  void _setBattleState(LiveKitConnectionState next) {
+    _battleStateController.add(next);
   }
 
   @override
@@ -208,5 +230,6 @@ class FakeLiveKitService implements LiveKitService {
 
   void dispose() {
     _stateController.close();
+    _battleStateController.close();
   }
 }

@@ -173,13 +173,23 @@ class LiveHudConnectionEvent extends LiveHudEvent {
 
 /// LiveKit media health is intentionally separate from [LiveHudConnectionEvent].
 /// The video can fail while comments remain connected (and vice versa).
-enum LiveMediaConnectionState { reconnecting, reconnected, disconnected }
+enum LiveMediaConnectionState {
+  reconnecting,
+  reconnected,
+  disconnected,
+  failed,
+}
 
 class LiveMediaConnectionEvent {
-  const LiveMediaConnectionEvent({required this.state, this.reason});
+  const LiveMediaConnectionEvent({
+    required this.state,
+    this.reason,
+    this.tag = 'room',
+  });
 
   final LiveMediaConnectionState state;
   final String? reason;
+  final String tag;
 }
 
 /// LiveKit publish credentials handed to a guest who joined the stage

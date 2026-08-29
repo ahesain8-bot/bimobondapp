@@ -133,7 +133,10 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final bloc = _bloc;
     if (bloc == null) return;
-    if (state == AppLifecycleState.inactive) {
+    // `inactive` fires for sheets, the PK picker, and system overlays. Ending
+    // or dropping the camera there is what left both hosts' LiveKit rooms
+    // empty for 10s+ and made the server finish the live (and the PK) at 0–0.
+    if (state == AppLifecycleState.paused) {
       bloc.add(const LiveRoomAppPaused());
     } else if (state == AppLifecycleState.resumed) {
       LiveScreenWakelock.enable();
