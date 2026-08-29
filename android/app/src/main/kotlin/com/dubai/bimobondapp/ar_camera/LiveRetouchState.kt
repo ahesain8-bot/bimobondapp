@@ -414,8 +414,8 @@ object LiveRetouchState {
                 mapped[1],
                 // Stay inside the inner lip contour on both axes so no part of
                 // the upper or lower lip can ever fall in the region.
-                FaceCoordinateMapper.toWarpRadiusX(innerW * 0.46f, imageWidth),
-                FaceCoordinateMapper.toWarpLengthY(openingPx * 0.46f, imageHeight),
+                FaceCoordinateMapper.toWarpRadiusX(innerW * 0.49f, imageWidth),
+                FaceCoordinateMapper.toWarpLengthY(openingPx * 0.49f, imageHeight),
             )
         } else {
             toothRegion = floatArrayOf(0f, 0f, 0f, 0f)

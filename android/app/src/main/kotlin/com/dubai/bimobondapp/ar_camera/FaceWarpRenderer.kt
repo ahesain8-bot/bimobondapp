@@ -16,6 +16,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.pow
 import android.opengl.EGLConfig as AndroidEglConfig
 import android.opengl.EGLSurface as AndroidEglSurface
 
@@ -131,6 +132,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var smoothedBackPersonWeight = 0f
     /** One-shot log confirming live OES path is running grain clean. */
     private var oesDenoiseLogged = false
+    /** State-transition-only diagnostics for the live face-aware render path. */
+    private var lastFacePipelineDiagnosticState = Int.MIN_VALUE
 
     private var oesUSmoothStrength = 0
     private var oesUWhiten = 0
@@ -796,6 +799,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             oesUMouthRadius,
             oesURetouchTooth,
             oesUToothRegion,
+            diagnoseLivePath = true,
         )
         // After retouch binds — drives −47→bright remap on skin.
         if (oesUBackPersonWeight >= 0) {
@@ -2213,8 +2217,44 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         locMouthRadius: Int,
         locTooth: Int,
         locToothRegion: Int,
+        diagnoseLivePath: Boolean = false,
     ) {
         val adj = LiveRetouchState.adjustments
+        if (diagnoseLivePath) {
+            val noseValid = kotlin.math.abs(adj.nose) >= 0.01f &&
+                LiveRetouchState.noseRadius > 0.001f
+            val shapeValid = kotlin.math.abs(adj.shape) >= 0.01f &&
+                LiveRetouchState.jawRadius > 0.001f
+            val eyesSelected = kotlin.math.abs(adj.eyes) >= 0.01f
+            val eyeUniformsBound = locEyes >= 0 && locEyeL >= 0 && locEyeR >= 0 &&
+                locEyeRadius >= 0
+            val eyeBranchExecutes = eyesSelected && LiveRetouchState.eyeRadius > 0.001f &&
+                eyeUniformsBound
+            val mouthValid = kotlin.math.abs(adj.mouth) >= 0.01f &&
+                LiveRetouchState.mouthRadius > 0.001f
+            val toothValid = kotlin.math.abs(adj.tooth) >= 0.01f &&
+                LiveRetouchState.toothVisibility > 0f
+            val faceEffectActive = kotlin.math.abs(adj.nose) >= 0.01f ||
+                kotlin.math.abs(adj.shape) >= 0.01f || eyesSelected ||
+                kotlin.math.abs(adj.mouth) >= 0.01f || kotlin.math.abs(adj.tooth) >= 0.01f
+            val rendererFaceValid = noseValid || shapeValid || eyeBranchExecutes ||
+                mouthValid || toothValid
+            val diagnosticState =
+                (if (faceEffectActive) 1 else 0) or
+                    (if (rendererFaceValid) 2 else 0) or
+                    (if (eyesSelected) 4 else 0) or
+                    (if (eyeBranchExecutes) 8 else 0)
+            if (diagnosticState != lastFacePipelineDiagnosticState) {
+                lastFacePipelineDiagnosticState = diagnosticState
+                Log.i(
+                    FACE_PIPELINE_TAG,
+                    "Stages 10-11 renderer: path=OES faceEffectActive=$faceEffectActive " +
+                        "faceValid=$rendererFaceValid eyesSlider=${adj.eyes} " +
+                        "eyeStrength=${eyeWarpStrength(adj.eyes)} eyeRadius=${LiveRetouchState.eyeRadius} " +
+                        "eyeUniformsBound=$eyeUniformsBound eyeBranchExecutes=$eyeBranchExecutes",
+                )
+            }
+        }
         // Live color baseline is back-camera only. On front with Magic Off,
         // suppress that exact baseline so selfies stay natural; Magic On and
         // non-baseline grades (filters / manual sliders) still apply.
@@ -2304,7 +2344,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glUniform2fv(locJawR, 1, LiveRetouchState.jawWingR, 0)
         }
         if (locJawRadius >= 0) GLES20.glUniform1f(locJawRadius, LiveRetouchState.jawRadius)
-        if (locEyes >= 0) GLES20.glUniform1f(locEyes, adj.eyes)
+        if (locEyes >= 0) GLES20.glUniform1f(locEyes, eyeWarpStrength(adj.eyes))
         if (locEyeL >= 0) {
             GLES20.glUniform2fv(locEyeL, 1, LiveRetouchState.eyeL, 0)
         }
@@ -2327,6 +2367,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (locToothRegion >= 0) {
             GLES20.glUniform4fv(locToothRegion, 1, LiveRetouchState.toothRegion, 0)
         }
+    }
+
+    private fun eyeWarpStrength(slider: Float): Float {
+        val value = slider.coerceIn(-1f, 1f)
+        return 0.36f * kotlin.math.sign(value) * kotlin.math.abs(value).pow(1.35f)
     }
 
     companion object {
@@ -2373,6 +2418,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         private const val ENCODER_RENDER_MAX_PIXELS = 1_200_000L
 
         private const val TAG = "FaceWarpRenderer"
+        private const val FACE_PIPELINE_TAG = "ArFacePipeline"
 
         /** Consecutive camera-texture update failures before giving up on GL. */
         private const val MAX_OES_UPDATE_FAILURES = 30
@@ -2634,9 +2680,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // Eyes: + open & slightly larger eyeball, − closed & smaller.
             vec2 applyRetouchEyesWarp(vec2 uv) {
                 if (abs(uRetouchEyes) < 0.01 || uEyeRadius <= 0.001) return uv;
-                float amount = 0.16 * uRetouchEyes;
-                uv = retouchEyeScale(uv, uEyeL, uEyeRadius, amount);
-                uv = retouchEyeScale(uv, uEyeR, uEyeRadius, amount);
+                uv = retouchEyeScale(uv, uEyeL, uEyeRadius, uRetouchEyes);
+                uv = retouchEyeScale(uv, uEyeR, uEyeRadius, uRetouchEyes);
                 return uv;
             }
 
@@ -2673,7 +2718,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 float ay = d.y / uToothRegion.w;
                 float r2 = ax * ax + ay * ay;
                 if (r2 >= 1.0) return col;
-                float region = 1.0 - smoothstep(0.45, 1.0, r2);
+                float region = 1.0 - smoothstep(0.72, 1.0, r2);
 
                 float hi = max(col.r, max(col.g, col.b));
                 float lo = min(col.r, min(col.g, col.b));
@@ -2686,11 +2731,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 // green close to red and enough blue even on warm teeth.
                 // The old 0.10 luma floor accepted the whole mouth cavity and
                 // neutralised it into the visible grey oval.
-                float tooth = smoothstep(0.32, 0.56, luma) *
-                    (1.0 - smoothstep(0.28, 0.48, saturation)) *
-                    smoothstep(0.72, 0.88, greenToRed) *
-                    smoothstep(0.48, 0.70, blueToGreen) *
-                    (1.0 - smoothstep(0.055, 0.15, redExcess)) *
+                float tooth = smoothstep(0.22, 0.46, luma) *
+                    (1.0 - smoothstep(0.38, 0.62, saturation)) *
+                    smoothstep(0.62, 0.82, greenToRed) *
+                    smoothstep(0.40, 0.62, blueToGreen) *
+                    (1.0 - smoothstep(0.09, 0.22, redExcess)) *
                     region;
                 if (tooth < 0.001) return col;
 

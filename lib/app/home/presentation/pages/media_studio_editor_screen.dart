@@ -195,6 +195,7 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
   MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
   bool _magicOn = false;
+  bool _preserveNeutralAdjustments = false;
 
   static const Map<MediaPhotoEditorTool, double> _magicBeautyDefaults = {
     MediaPhotoEditorTool.smooth: 0.50,
@@ -1724,7 +1725,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         _arFilterId = 'whitening';
         _arColorCategoryId = 'beauty';
         _magicOn = true;
-        _adjustments.addAll(_magicBeautyDefaults);
+        if (!_preserveNeutralAdjustments) {
+          _adjustments.addAll(_magicBeautyDefaults);
+        }
         _showFilters = false;
       }
       _saveUiToCurrentState();
@@ -1767,7 +1770,9 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
     setState(() {
       _magicOn = !_magicOn;
       if (_magicOn) {
-        _adjustments.addAll(_magicBeautyDefaults);
+        if (!_preserveNeutralAdjustments) {
+          _adjustments.addAll(_magicBeautyDefaults);
+        }
         _photoEditorTool = MediaPhotoEditorTool.smooth;
       } else {
         _photoEditorTool = MediaPhotoEditorTool.magic;
@@ -1897,11 +1902,14 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
 
   void _resetPhotoEditor() {
     _smoothDebounce?.cancel();
+    _smoothGen++;
     setState(() {
       _magicOn = false;
       for (final key in _adjustments.keys) {
         _adjustments[key] = 0.0;
       }
+      _arFilterIntensity = 0.0;
+      _preserveNeutralAdjustments = true;
       _photoEditorTool = MediaPhotoEditorTool.magic;
       // Clear Makeup Film grade if one is applied.
       if (ArFilterCatalog.isColorFilter(_arFilterId)) {
