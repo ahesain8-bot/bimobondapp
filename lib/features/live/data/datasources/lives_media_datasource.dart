@@ -20,6 +20,7 @@ class LivesMediaDataSource {
   Room? _room;
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
+  Future<void> _battleOperationQueue = Future<void>.value();
 
   /// Whether this datasource currently holds [LiveAudioSession]. Keeps the
   /// acquire/release pair balanced no matter which connect path ran.
@@ -143,14 +144,35 @@ class LivesMediaDataSource {
 
   Future<void> _acquireAudioSession() async {
     if (_holdsAudioSession) return;
-    _holdsAudioSession = true;
     await LiveAudioSession.instance.acquire();
+    _holdsAudioSession = true;
   }
 
   Future<void> _releaseAudioSession() async {
     if (!_holdsAudioSession) return;
-    _holdsAudioSession = false;
     await LiveAudioSession.instance.release();
+    _holdsAudioSession = false;
+  }
+
+  Future<T> _serializeBattleOperation<T>(Future<T> Function() operation) {
+    final previous = _battleOperationQueue;
+    final result = previous.then((_) => operation());
+    // A failed reconnect must not prevent a later battle-end/disconnect from
+    // running, while the original caller still receives its error.
+    _battleOperationQueue = result.then<void>((_) {}, onError: (_, __) {});
+    return result;
+  }
+
+  void _queueBattleRecovery({
+    required Room room,
+    required String url,
+    required String token,
+  }) {
+    unawaited(
+      _serializeBattleOperation(
+        () => _recoverBattleRoom(room: room, url: url, token: token),
+      ),
+    );
   }
 
   Future<void> _preferMediaSpeaker() async {
@@ -375,7 +397,19 @@ class LivesMediaDataSource {
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
     // Own the Android audio session for the whole broadcast: the PK battle
     // room disconnecting would otherwise tear it down for this room too.
-    await _acquireAudioSession();
+    try {
+      await _acquireAudioSession();
+    } catch (_) {
+      try {
+        await room.dispose();
+      } catch (disposeError, disposeStack) {
+        debugPrint(
+          '🔴 [Host] failed to dispose room after audio-session failure: '
+          '$disposeError\n$disposeStack',
+        );
+      }
+      rethrow;
+    }
     _room = room;
     try {
       await room.connect(url, token);
@@ -645,7 +679,19 @@ class LivesMediaDataSource {
         ),
       ),
     );
-    await _acquireAudioSession();
+    try {
+      await _acquireAudioSession();
+    } catch (_) {
+      try {
+        await room.dispose();
+      } catch (disposeError, disposeStack) {
+        debugPrint(
+          '🔴 [Host] failed to dispose subscribe room after audio-session '
+          'failure: $disposeError\n$disposeStack',
+        );
+      }
+      rethrow;
+    }
     try {
       await room.connect(url, token);
     } catch (_) {
@@ -667,8 +713,20 @@ class LivesMediaDataSource {
     required String url,
     required String token,
     LiveMediaHints? mediaHints,
+  }) => _serializeBattleOperation(
+    () => _connectBattleAndSubscribe(
+      url: url,
+      token: token,
+      mediaHints: mediaHints,
+    ),
+  );
+
+  Future<void> _connectBattleAndSubscribe({
+    required String url,
+    required String token,
+    LiveMediaHints? mediaHints,
   }) async {
-    await disconnectBattle();
+    await _disconnectBattle();
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
@@ -686,7 +744,7 @@ class LivesMediaDataSource {
         if (_battleRoom != room) return;
         debugPrint('🔴 [Host] opponent battle room disconnected');
         onRoomEvent?.call('battle', 'disconnected');
-        unawaited(_recoverBattleRoom(room: room, url: url, token: token));
+        _queueBattleRecovery(room: room, url: url, token: token);
       })
       ..on<ReconnectingEvent>((_) {
         if (_battleRoom != room) return;
@@ -804,10 +862,15 @@ class LivesMediaDataSource {
         '🔴 [Host] opponent video stalled while battle room stayed up',
       );
       _stopBattleVideoWatchdog();
-      await room.disconnect();
-      if (_battleRoom == room) {
-        unawaited(_recoverBattleRoom(room: room, url: url, token: token));
-      }
+      await _serializeBattleOperation(
+        () async {
+          if (_battleRoom != room) return;
+          await room.disconnect();
+          if (_battleRoom == room) {
+            _queueBattleRecovery(room: room, url: url, token: token);
+          }
+        },
+      );
     } catch (error) {
       debugPrint('[Host] opponent video health sample unavailable: $error');
     }
@@ -864,7 +927,10 @@ class LivesMediaDataSource {
     }
   }
 
-  Future<void> disconnectBattle() async {
+  Future<void> disconnectBattle() =>
+      _serializeBattleOperation(_disconnectBattle);
+
+  Future<void> _disconnectBattle() async {
     _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;

@@ -120,6 +120,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   /// Guards the opponent connect against BLoC's concurrent event processing.
   bool _battleConnectInFlight = false;
+  int _battleOperationGeneration = 0;
   bool _tearingDown = false;
   bool _recoveringMedia = false;
   int _mediaRecoveryAttempt = 0;
@@ -1799,9 +1800,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required String opponentId,
     required Emitter<LiveViewerState> emit,
   }) async {
-    await _disconnectBattleOpponent();
+    final generation = ++_battleOperationGeneration;
+    await _disconnectBattleOpponent(invalidate: false);
     final result = await joinLiveUseCase(opponentId);
-    if (_activeLiveId != liveId || isClosed) return;
+    if (_activeLiveId != liveId ||
+        isClosed ||
+        generation != _battleOperationGeneration) {
+      return;
+    }
     await result.fold(
       (failure) async => emit(
         state.copyWith(
@@ -1810,6 +1816,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       ),
       (join) async {
+        if (generation != _battleOperationGeneration || isClosed) return;
         final supportersFuture = _loadTopGifterAvatars(opponentId);
         emit(state.copyWith(battleOpponentLive: join.live));
         try {
@@ -1819,10 +1826,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             roomName: opponentId,
             mediaHints: join.mediaHints,
           );
-          if (_activeLiveId != liveId || isClosed) return;
+          if (_activeLiveId != liveId ||
+              isClosed ||
+              generation != _battleOperationGeneration) {
+            return;
+          }
           _battleOpponentLiveId = opponentId;
           final opponentSupporters = await supportersFuture;
-          if (_activeLiveId != liveId || isClosed) return;
+          if (_activeLiveId != liveId ||
+              isClosed ||
+              generation != _battleOperationGeneration) {
+            return;
+          }
           // A new state instance makes the PK renderer read battleRoom now;
           // track changes after that are driven by the Room notifier itself.
           emit(
@@ -1844,7 +1859,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
   }
 
-  Future<void> _disconnectBattleOpponent() async {
+  Future<void> _disconnectBattleOpponent({bool invalidate = true}) async {
+    if (invalidate) _battleOperationGeneration++;
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
     try {

@@ -5,9 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/services/live_audio_session.dart';
+
 class LiveKitCallService {
   Room? _room;
   EventsListener<RoomEvent>? _listener;
+  bool _holdsAudioSession = false;
 
   bool _isMuted = false;
   bool _isCameraOff = false;
@@ -22,6 +25,18 @@ class LiveKitCallService {
   bool get isCameraOff => _isCameraOff;
   bool get isSpeakerPhoneOn => _isSpeakerPhoneOn;
   bool get isConnected => _room?.connectionState == ConnectionState.connected;
+
+  Future<void> _acquireAudioSession() async {
+    if (_holdsAudioSession) return;
+    await LiveAudioSession.instance.acquire();
+    _holdsAudioSession = true;
+  }
+
+  Future<void> _releaseAudioSession() async {
+    if (!_holdsAudioSession) return;
+    await LiveAudioSession.instance.release();
+    _holdsAudioSession = false;
+  }
 
   Stream<List<Participant>> get onParticipantsChanged =>
       _participantsController.stream;
@@ -81,6 +96,7 @@ class LiveKitCallService {
     await _configureAudioSession();
 
     try {
+      await _acquireAudioSession();
       final roomOptions = const RoomOptions(
         defaultAudioPublishOptions: AudioPublishOptions(
           name: 'microphone',
@@ -133,6 +149,14 @@ class LiveKitCallService {
       _updateState();
     } catch (e) {
       debugPrint('LiveKitCallService connection error: $e');
+      try {
+        await _releaseAudioSession();
+      } catch (releaseError, releaseStack) {
+        debugPrint(
+          'LiveKitCallService audio session release error: '
+          '$releaseError\n$releaseStack',
+        );
+      }
       rethrow;
     }
   }
@@ -239,6 +263,7 @@ class LiveKitCallService {
     try {
       _listener?.dispose();
       _listener = null;
+      await _releaseAudioSession();
       if (_room != null) {
         await _room!.disconnect();
         await _room!.dispose();

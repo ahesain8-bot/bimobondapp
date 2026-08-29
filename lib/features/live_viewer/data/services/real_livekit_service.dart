@@ -29,6 +29,7 @@ class RealLiveKitService implements LiveKitService {
   Room? _room;
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
+  Future<void> _battleOperationQueue = Future<void>.value();
   Timer? _primaryVideoHealthTimer;
   Timer? _battleVideoHealthTimer;
   bool _primaryHealthCheckInFlight = false;
@@ -109,14 +110,41 @@ class RealLiveKitService implements LiveKitService {
 
   Future<void> _acquireAudioSession() async {
     if (_holdsAudioSession) return;
-    _holdsAudioSession = true;
     await LiveAudioSession.instance.acquire();
+    _holdsAudioSession = true;
   }
 
   Future<void> _releaseAudioSession() async {
     if (!_holdsAudioSession) return;
-    _holdsAudioSession = false;
     await LiveAudioSession.instance.release();
+    _holdsAudioSession = false;
+  }
+
+  Future<T> _serializeBattleOperation<T>(Future<T> Function() operation) {
+    final previous = _battleOperationQueue;
+    final result = previous.then((_) => operation());
+    // Keep a failed reconnect from blocking a later battle-end/disconnect,
+    // while preserving the original error for its caller.
+    _battleOperationQueue = result.then<void>((_) {}, onError: (_, __) {});
+    return result;
+  }
+
+  void _queueBattleRecovery({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) {
+    unawaited(
+      _serializeBattleOperation(
+        () => _recoverBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
+        ),
+      ),
+    );
   }
 
   Future<void> _preferMediaSpeaker() async {
@@ -298,11 +326,13 @@ class RealLiveKitService implements LiveKitService {
       }
       debugPrint('🔴 Battle opponent video stalled: $roomName');
       _stopBattleVideoWatchdog();
-      await _restartStalledBattleRoom(
-        room: room,
-        url: url,
-        token: token,
-        roomName: roomName,
+      await _serializeBattleOperation(
+        () => _restartStalledBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
+        ),
       );
     } catch (error) {
       debugPrint('Battle inbound health sample unavailable: $error');
@@ -338,13 +368,11 @@ class RealLiveKitService implements LiveKitService {
       if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
     }
     if (failed && _battleRoom == room) {
-      unawaited(
-        _recoverBattleRoom(
-          room: room,
-          url: url,
-          token: token,
-          roomName: roomName,
-        ),
+      _queueBattleRecovery(
+        room: room,
+        url: url,
+        token: token,
+        roomName: roomName,
       );
     }
   }
@@ -411,8 +439,22 @@ class RealLiveKitService implements LiveKitService {
     required String token,
     required String roomName,
     LiveMediaHints? mediaHints,
+  }) => _serializeBattleOperation(
+    () => _connectBattle(
+      url: url,
+      token: token,
+      roomName: roomName,
+      mediaHints: mediaHints,
+    ),
+  );
+
+  Future<void> _connectBattle({
+    required String url,
+    required String token,
+    required String roomName,
+    LiveMediaHints? mediaHints,
   }) async {
-    await disconnectBattle();
+    await _disconnectBattle();
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
@@ -423,13 +465,11 @@ class RealLiveKitService implements LiveKitService {
         ..on<RoomDisconnectedEvent>((_) {
           if (_battleRoom != guardedRoom) return;
           debugPrint('🔴 Battle LiveKit terminal disconnect: $roomName');
-          unawaited(
-            _recoverBattleRoom(
-              room: guardedRoom,
-              url: url,
-              token: token,
-              roomName: roomName,
-            ),
+          _queueBattleRecovery(
+            room: guardedRoom,
+            url: url,
+            token: token,
+            roomName: roomName,
           );
         })
         ..on<ReconnectingEvent>((_) {
@@ -471,7 +511,10 @@ class RealLiveKitService implements LiveKitService {
   }
 
   @override
-  Future<void> disconnectBattle() async {
+  Future<void> disconnectBattle() =>
+      _serializeBattleOperation(_disconnectBattle);
+
+  Future<void> _disconnectBattle() async {
     _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;

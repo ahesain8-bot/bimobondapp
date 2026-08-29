@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:bimobondapp/app/calls/domain/session/call_session_state.dart';
+import 'package:bimobondapp/core/services/live_audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -60,7 +61,11 @@ class AudioRouteManager {
     try {
       await _routeChangeSub?.cancel();
       _routeChangeSub = null;
-      await _audioSession?.setActive(false);
+      // `audio_session` is process-wide too. A call ending while a live room
+      // is still active must not abandon the platform session owned by LiveKit.
+      if (!LiveAudioSession.instance.isHeld) {
+        await _audioSession?.setActive(false);
+      }
     } catch (e) {
       debugPrint('AudioRouteManager release error: $e');
     }
