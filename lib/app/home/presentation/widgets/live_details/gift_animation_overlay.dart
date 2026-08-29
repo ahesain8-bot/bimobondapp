@@ -39,6 +39,10 @@ class GiftAnimationOverlay extends StatefulWidget {
   static String? _activeUrl;
   static bool _activeIsLarge = false;
 
+  /// Recently finished media URLs — blocks late socket duplicates from replaying.
+  static final Map<String, DateTime> _recentlyPlayedUrls = {};
+  static const Duration _recentDedupeWindow = Duration(seconds: 12);
+
   /// LARGE is the default size: only an explicit SMALL/MEDIUM opts out.
   ///
   /// Needed before a [State] exists, because a LARGE gift stays on screen
@@ -93,13 +97,18 @@ class GiftAnimationOverlay extends StatefulWidget {
     // ExoPlayer texture over the live feed. A duplicate is now a no-op.
     final duplicateKey =
         dedupeKey != null && dedupeKey.isNotEmpty && dedupeKey == _activeKey;
-    // A LARGE gift now waits for the viewer's tap, so it stays on screen far
-    // longer than those events take to arrive — and their keys disagree when
-    // one payload carries the profile name and another falls back to 'User',
-    // which let a duplicate through to tear the animation down and restart it.
-    // The media URL is the one identity all three events agree on.
+    // A LARGE gift can stay on screen longer than follow-up socket events;
+    // keys may disagree (profile name vs 'User') while the media URL matches.
     final duplicateLargeMedia = _activeIsLarge && resolved == _activeUrl;
     if (_activeEntry != null && (duplicateKey || duplicateLargeMedia)) {
+      return Future.value();
+    }
+
+    // Drop late duplicates of a gift that just finished (lives + auction).
+    _pruneRecentlyPlayed();
+    final lastPlayed = _recentlyPlayedUrls[resolved];
+    if (lastPlayed != null &&
+        DateTime.now().difference(lastPlayed) < _recentDedupeWindow) {
       return Future.value();
     }
 
@@ -154,6 +163,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     _activeKey = dedupeKey;
     _activeUrl = resolved;
     _activeIsLarge = _isLargeSize(size);
+    _recentlyPlayedUrls[resolved] = DateTime.now();
     overlay.insert(entry);
 
     // Second safety net behind the owner's own dismiss: tie the entry to the
@@ -191,6 +201,11 @@ class GiftAnimationOverlay extends StatefulWidget {
     try {
       active.remove();
     } catch (_) {}
+  }
+
+  static void _pruneRecentlyPlayed() {
+    final cutoff = DateTime.now().subtract(_recentDedupeWindow);
+    _recentlyPlayedUrls.removeWhere((_, at) => at.isBefore(cutoff));
   }
 
   @override
@@ -244,16 +259,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         unawaited(_initVideo());
         break;
       case _GiftMediaKind.image:
-        // A LARGE gift is ended by the viewer's tap, never by a clock. This
-        // hold is what took a LARGE gift off screen after ~1.6s whenever its
-        // media resolved to a still (no `animationUrl`, so the thumbnail).
-        if (!_isLarge) {
-          // Animated WebP often needs a bit longer on screen.
-          final hold = _isWebp
-              ? const Duration(milliseconds: 2800)
-              : const Duration(milliseconds: 1600);
-          _scheduleFinish(hold);
-        }
+        // Still / animated image: short hold, then dismiss (no loop).
+        final hold = _isWebp
+            ? const Duration(milliseconds: 2800)
+            : const Duration(milliseconds: 1600);
+        _scheduleFinish(hold);
         break;
     }
   }
@@ -285,7 +295,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
 
     if (composition == null) {
       setState(() => _lottieFailed = true);
-      if (!_isLarge) _scheduleFinish(const Duration(milliseconds: 1600));
+      _scheduleFinish(const Duration(milliseconds: 1600));
       return;
     }
 
@@ -296,13 +306,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     _lottieController = controller;
     setState(() => _composition = composition);
 
-    if (_isLarge) {
-      // Loops instead of ending: reaching the last frame is not a reason to
-      // take a LARGE gift down, and a frozen final frame reads as a bug.
-      unawaited(controller.repeat());
-      return;
-    }
-
+    // Play once — do not loop (lives + auction).
     await controller.forward();
     if (!mounted) return;
     await Future<void>.delayed(const Duration(milliseconds: 120));
@@ -323,18 +327,11 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
         _videoController = null;
         return;
       }
-      // A LARGE gift loops until it is tapped, so it neither ends on its own
-      // nor freezes on the last frame.
-      await controller.setLooping(_isLarge);
+      // Play once — no looping for LARGE/MEDIUM (lives + auction).
+      await controller.setLooping(false);
       await controller.setVolume(1);
       setState(() {});
       await controller.play();
-
-      if (_isLarge) {
-        // Deliberately no completion listener and no stall watchdog: both end
-        // the overlay, and for a LARGE gift only the viewer's tap may.
-        return;
-      }
 
       void onTick() {
         final value = controller!.value;
@@ -354,9 +351,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       _videoController = null;
       if (!mounted) return;
       setState(() => _videoFailed = true);
-      // A failed LARGE gift still shows its fallback until tapped, rather than
-      // flashing it for 1.6s and vanishing.
-      if (!_isLarge) _scheduleFinish(const Duration(milliseconds: 1600));
+      _scheduleFinish(const Duration(milliseconds: 1600));
     }
   }
 
@@ -543,10 +538,7 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       );
     }
 
-    // Position calculation:
-    // - SMALL: very small, left-aligned above comments and highest price card (bottom: 230px, left/right: 16px)
-    // - MEDIUM: center of screen
-    // - LARGE: lower-edge anchored through the bottom controls
+    // LARGE: flush to bottom of the screen (bottom: 0).
     final double? topPosition;
     final double? bottomPosition;
     final double? leftPosition;
@@ -566,11 +558,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     } else {
-      // Match the known-good main-branch composition: the shared stage ends
-      // at the viewport edge, and the root overlay places it above the route's
-      // bottom controls rather than reserving space above them.
+      // Flush to the bottom edge (lives + auction share this overlay).
       topPosition = null;
-      bottomPosition = (screenSize.height * 0.14).clamp(92.0, 150.0);
+      bottomPosition = 0;
       leftPosition = (screenSize.width - stageWidth) / 2;
       rightPosition = null;
     }

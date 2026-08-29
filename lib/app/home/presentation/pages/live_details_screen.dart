@@ -1051,7 +1051,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     // Ignore socket+local doubles even when URLs differ slightly.
     if (_lastGiftPlayedKey == dedupeKey &&
         lastAt != null &&
-        now.difference(lastAt) < const Duration(seconds: 3)) {
+        now.difference(lastAt) < const Duration(seconds: 12)) {
       return;
     }
     if (lastAt != null &&

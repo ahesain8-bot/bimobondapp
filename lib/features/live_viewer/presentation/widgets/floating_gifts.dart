@@ -185,6 +185,13 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
 
     final shouldPlay = _playedAnimations.add(comboKey);
     _restartComboTimer(comboKey);
+    // Keep medium/large dedupe longer than the combo chip timer so late
+    // gift_combo / lastGift / comment duplicates do not replay the animation.
+    if (shouldPlay) {
+      Timer(const Duration(seconds: 25), () {
+        _playedAnimations.remove(comboKey);
+      });
+    }
     if (shouldPlay && mounted) {
       unawaited(
         GiftAnimationOverlay.show(
@@ -195,9 +202,7 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
           giftName: giftName,
           size: size,
           owner: this,
-          // The viewer stack already tracks `_playedAnimations`, but the
-          // overlay is a process-wide singleton shared with the auction stack:
-          // key it so neither can restart the other's running animation.
+          // Shared with auction stack — key so neither restarts the other.
           dedupeKey: comboKey,
         ),
       );
@@ -209,7 +214,8 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     _comboTimers[key] = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
       setState(() => _activeCombos.remove(key));
-      _playedAnimations.remove(key);
+      // Do not clear `_playedAnimations` here — that caused large gifts to
+      // replay when a duplicate socket event arrived after ~5s.
       _comboTimers.remove(key);
     });
   }

@@ -157,12 +157,12 @@ class CompositionSession {
   /// Snapshot for undo (fills only — MediaSources rebuilt on restore).
   CompositionSession _cloneFills() {
     return CompositionSession(
-        recipe: recipe,
-        slotEngine: slotEngine,
-        fills: Map<String, SlotFillEntry>.from(
-          fills.map((k, v) => MapEntry(k, v)),
-        ),
-        projectId: projectId,
+      recipe: recipe,
+      slotEngine: slotEngine,
+      fills: Map<String, SlotFillEntry>.from(
+        fills.map((k, v) => MapEntry(k, v)),
+      ),
+      projectId: projectId,
       )
       ..userFilters = List<UserEditorFilterTrack>.from(userFilters)
       ..userEffects = List<UserEditorEffectTrack>.from(userEffects)
