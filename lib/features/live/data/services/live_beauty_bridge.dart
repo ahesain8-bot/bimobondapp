@@ -12,15 +12,20 @@ import '../../domain/entities/live_beauty_preset.dart';
 /// processor on the WebRTC track LiveKit encodes, which is the one place a
 /// change is visible on both sides of the broadcast.
 ///
-/// Android only: the processor hooks `flutter_webrtc`'s Android
-/// `LocalVideoTrack.ExternalVideoFrameProcessing`, which has no iOS
-/// counterpart. Every method is a no-op elsewhere so callers need no guard.
+/// Both mobile platforms hook the same extension point under different names —
+/// `LocalVideoTrack.ExternalVideoFrameProcessing` on Android,
+/// `ExternalVideoProcessingDelegate` on iOS. The two shaders are not identical:
+/// Android gates smoothing by a YCbCr skin probability and can lift the eyes,
+/// while iOS applies an edge-preserving Core Image chain to the whole frame and
+/// ignores [LiveBeautyPreset.eyes], which needs landmarks it does not run.
+/// Every method is a no-op on other platforms so callers need no guard.
 class LiveBeautyBridge {
   const LiveBeautyBridge._();
 
   static const _channel = MethodChannel('com.dubai.bimobondapp/live_beauty');
 
-  static bool get isSupported => !kIsWeb && Platform.isAndroid;
+  static bool get isSupported =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   static String? _attachedTrackId;
 

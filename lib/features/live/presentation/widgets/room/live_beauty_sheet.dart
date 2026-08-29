@@ -99,7 +99,7 @@ class _LiveBeautySheetState extends State<LiveBeautySheet> {
                         LiveBeautyBridge.isSupported
                             ? 'التجميل يُطبَّق على البث نفسه، فيظهر للمشاهدين '
                                   'كما تراه أنت.'
-                            : 'التجميل أثناء البث متاح حاليًا على أندرويد فقط.',
+                            : 'التجميل أثناء البث غير متاح على هذا الجهاز.',
                         style: AppTextStyles.optionsMenuSubtitle,
                       ),
                     ),
