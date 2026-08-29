@@ -337,6 +337,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             prev.isOnStage != curr.isOnStage ||
             prev.battle != curr.battle ||
             prev.battleOpponentLive != curr.battleOpponentLive ||
+            prev.battleRoom != curr.battleRoom ||
             prev.topViewerAvatars != curr.topViewerAvatars ||
             prev.opponentTopGifterAvatars != curr.opponentTopGifterAvatars ||
             prevInfo != currInfo;
@@ -450,7 +451,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               opponentLive: state.battleOpponentLive,
                               isActive: widget.isActive && connected,
                               battleRoom: isThisRoom
-                                  ? di.sl<LiveKitService>().battleRoom
+                                  ? state.battleRoom
                                   : null,
                             ),
                             if (isThisRoom)

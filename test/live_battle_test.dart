@@ -1,6 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:livekit_client/livekit_client.dart';
 
 import 'package:bimobondapp/core/models/live_battle.dart';
+import 'package:bimobondapp/features/live/domain/entities/live_host.dart';
+import 'package:bimobondapp/features/live/domain/entities/live_session.dart';
+import 'package:bimobondapp/features/live/presentation/bloc/live_room/live_room_state.dart';
 import 'package:bimobondapp/features/live_viewer/data/mappers/socket_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/socket_event.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
@@ -97,4 +101,65 @@ void main() {
     expect(opponent.hostName, 'صاحب البث');
     expect(opponent.viewers, 102);
   });
+
+  test(
+    'battle Room availability is a state transition independent of battle equality',
+    () {
+      final battle = LiveBattle.fromJson({
+        'id': 'battle-1',
+        'live1Id': 'live-a',
+        'live2Id': 'live-b',
+        'status': 'ACTIVE',
+      });
+      final beforeRoom = LiveViewerState(battle: battle);
+      final room = Room();
+      addTearDown(room.dispose);
+
+      final afterRoom = beforeRoom.copyWith(battleRoom: room);
+
+      expect(identical(afterRoom.battle, battle), isTrue);
+      expect(beforeRoom.battleRoom, isNull);
+      expect(identical(afterRoom.battleRoom, room), isTrue);
+      expect(afterRoom, isNot(equals(beforeRoom)));
+
+      final cleared = afterRoom.copyWith(battleRoom: null);
+      expect(cleared.battleRoom, isNull);
+      final replacement = Room();
+      addTearDown(replacement.dispose);
+      final replaced = cleared.copyWith(battleRoom: replacement);
+      expect(identical(replaced.battleRoom, replacement), isTrue);
+    },
+  );
+
+  test(
+    'host battle Room availability is propagated without changing battle',
+    () {
+      final battle = LiveBattle.fromJson({
+        'id': 'battle-1',
+        'live1Id': 'live-a',
+        'live2Id': 'live-b',
+        'status': 'ACTIVE',
+      });
+      const session = LiveSession(
+        id: 'live-a',
+        host: LiveHost(id: 'host-a', displayName: 'Host', avatarUrl: ''),
+        viewerCount: 1,
+        likeCount: 0,
+        galleryCurrent: 0,
+        galleryTotal: 0,
+        guestInviteCount: 0,
+        hourlyRankingLabel: '',
+        messages: [],
+      );
+      final beforeRoom = LiveRoomReady(session: session, battle: battle);
+      final room = Room();
+      addTearDown(room.dispose);
+
+      final afterRoom = beforeRoom.copyWith(battleMediaRoom: room);
+
+      expect(identical(afterRoom.battle, battle), isTrue);
+      expect(identical(afterRoom.battleMediaRoom, room), isTrue);
+      expect(afterRoom.copyWith(battleMediaRoom: null).battleMediaRoom, isNull);
+    },
+  );
 }

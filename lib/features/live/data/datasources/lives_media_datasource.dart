@@ -21,6 +21,7 @@ class LivesMediaDataSource {
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
   Future<void> _battleOperationQueue = Future<void>.value();
+  var _battleConnectionGeneration = 0;
 
   /// Whether this datasource currently holds [LiveAudioSession]. Keeps the
   /// acquire/release pair balanced no matter which connect path ran.
@@ -168,9 +169,24 @@ class LivesMediaDataSource {
     required String url,
     required String token,
   }) {
+    final generation = _battleConnectionGeneration;
     unawaited(
       _serializeBattleOperation(
-        () => _recoverBattleRoom(room: room, url: url, token: token),
+        () async {
+          await _recoverBattleRoom(
+            room: room,
+            url: url,
+            token: token,
+            generation: generation,
+          );
+          if (
+            generation == _battleConnectionGeneration &&
+            _battleRoom == room &&
+            room.connectionState == ConnectionState.disconnected
+          ) {
+            onRoomEvent?.call('battle', 'failed');
+          }
+        },
       ),
     );
   }
@@ -713,18 +729,23 @@ class LivesMediaDataSource {
     required String url,
     required String token,
     LiveMediaHints? mediaHints,
-  }) => _serializeBattleOperation(
-    () => _connectBattleAndSubscribe(
-      url: url,
-      token: token,
-      mediaHints: mediaHints,
-    ),
-  );
+  }) {
+    final generation = ++_battleConnectionGeneration;
+    return _serializeBattleOperation(
+      () => _connectBattleAndSubscribe(
+        url: url,
+        token: token,
+        mediaHints: mediaHints,
+        generation: generation,
+      ),
+    );
+  }
 
   Future<void> _connectBattleAndSubscribe({
     required String url,
     required String token,
     LiveMediaHints? mediaHints,
+    required int generation,
   }) async {
     await _disconnectBattle();
     if (url.isEmpty || token.isEmpty) {
@@ -741,44 +762,91 @@ class LivesMediaDataSource {
     );
     room.events
       ..on<RoomDisconnectedEvent>((_) {
-        if (_battleRoom != room) return;
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration
+        ) {
+          return;
+        }
         debugPrint('🔴 [Host] opponent battle room disconnected');
         onRoomEvent?.call('battle', 'disconnected');
         _queueBattleRecovery(room: room, url: url, token: token);
       })
       ..on<ReconnectingEvent>((_) {
-        if (_battleRoom != room) return;
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration
+        ) {
+          return;
+        }
         onRoomEvent?.call('battle', 'reconnecting');
       })
       ..on<RoomReconnectedEvent>((_) {
-        if (_battleRoom != room) return;
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration
+        ) {
+          return;
+        }
         onRoomEvent?.call('battle', 'reconnected');
         unawaited(_ensureBattleSubscriptions(room));
         unawaited(_preferMediaSpeaker());
         _startBattleVideoWatchdog(room: room, url: url, token: token);
       })
       ..on<TrackSubscriptionExceptionEvent>((event) {
-        unawaited(_retryBattleSubscription(room, event));
+        if (generation != _battleConnectionGeneration) return;
+        unawaited(_retryBattleSubscription(room, event, generation));
       })
       ..on<TrackSubscribedEvent>((event) {
-        if (_battleRoom != room) return;
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration
+        ) {
+          return;
+        }
         if (event.track is RemoteAudioTrack) {
           unawaited(_preferMediaSpeaker());
         }
-      });
+    });
     await room.connect(url, token);
+    if (generation != _battleConnectionGeneration) {
+      try {
+        await room.disconnect();
+        await room.dispose();
+      } catch (error, stackTrace) {
+        debugPrint(
+          '[Host] stale opponent battle room cleanup failed: '
+          '$error\n$stackTrace',
+        );
+      }
+      return;
+    }
     _battleRoom = room;
     await _ensureBattleSubscriptions(room);
+    if (generation != _battleConnectionGeneration) {
+      await _disconnectBattle();
+      return;
+    }
     await _preferMediaSpeaker();
+    if (generation != _battleConnectionGeneration) {
+      await _disconnectBattle();
+      return;
+    }
     _startBattleVideoWatchdog(room: room, url: url, token: token);
   }
 
   Future<void> _retryBattleSubscription(
     Room room,
     TrackSubscriptionExceptionEvent event,
+    int generation,
   ) async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (_battleRoom != room) return;
+    if (
+      _battleRoom != room ||
+      generation != _battleConnectionGeneration
+    ) {
+      return;
+    }
     final participant = event.participant;
     if (participant == null) return;
     final publication = participant.trackPublications[event.sid];
@@ -840,9 +908,15 @@ class LivesMediaDataSource {
     required String url,
     required String token,
   }) async {
+    final generation = _battleConnectionGeneration;
     try {
       final track = _firstBattleVideoTrack(room);
-      if (_battleRoom != room) return;
+      if (
+        _battleRoom != room ||
+        generation != _battleConnectionGeneration
+      ) {
+        return;
+      }
       if (track == null) {
         await _ensureBattleSubscriptions(room);
         if (!_battleVideoProgress.addMissingTrackSample()) return;
@@ -853,7 +927,11 @@ class LivesMediaDataSource {
             stats?.framesReceived ??
             stats?.packetsReceived ??
             stats?.bytesReceived;
-        if (_battleRoom != room || !_battleVideoProgress.addSample(progress)) {
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration ||
+          !_battleVideoProgress.addSample(progress)
+        ) {
           return;
         }
       }
@@ -864,9 +942,17 @@ class LivesMediaDataSource {
       _stopBattleVideoWatchdog();
       await _serializeBattleOperation(
         () async {
-          if (_battleRoom != room) return;
+          if (
+            _battleRoom != room ||
+            generation != _battleConnectionGeneration
+          ) {
+            return;
+          }
           await room.disconnect();
-          if (_battleRoom == room) {
+          if (
+            _battleRoom == room &&
+            generation == _battleConnectionGeneration
+          ) {
             _queueBattleRecovery(room: room, url: url, token: token);
           }
         },
@@ -886,8 +972,15 @@ class LivesMediaDataSource {
     required Room room,
     required String url,
     required String token,
+    required int generation,
   }) async {
-    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    if (
+      _battleRoom != room ||
+      _battleRecoveryRoom == room ||
+      generation != _battleConnectionGeneration
+    ) {
+      return;
+    }
     _battleRecoveryRoom = room;
     const retryDelays = <Duration>[
       Duration(milliseconds: 250),
@@ -897,7 +990,12 @@ class LivesMediaDataSource {
     try {
       for (var attempt = 0; attempt < retryDelays.length; attempt++) {
         await Future<void>.delayed(retryDelays[attempt]);
-        if (_battleRoom != room) return;
+        if (
+          _battleRoom != room ||
+          generation != _battleConnectionGeneration
+        ) {
+          return;
+        }
         if (room.connectionState == ConnectionState.connected) {
           await _ensureBattleSubscriptions(room);
           return;
@@ -909,7 +1007,10 @@ class LivesMediaDataSource {
             '${attempt + 1}/${retryDelays.length}',
           );
           await room.connect(url, token);
-          if (_battleRoom != room) {
+          if (
+            _battleRoom != room ||
+            generation != _battleConnectionGeneration
+          ) {
             await room.disconnect();
             return;
           }
@@ -927,8 +1028,10 @@ class LivesMediaDataSource {
     }
   }
 
-  Future<void> disconnectBattle() =>
-      _serializeBattleOperation(_disconnectBattle);
+  Future<void> disconnectBattle() {
+    _battleConnectionGeneration++;
+    return _serializeBattleOperation(_disconnectBattle);
+  }
 
   Future<void> _disconnectBattle() async {
     _stopBattleVideoWatchdog();

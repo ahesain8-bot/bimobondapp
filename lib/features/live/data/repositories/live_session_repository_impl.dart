@@ -29,17 +29,18 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
        _socket = socket,
        _media = media {
     _media.onRoomEvent = (tag, message) {
-      if (tag != 'room') return;
       if (message == 'reconnecting') {
         _mediaEvents.add(
-          const LiveMediaConnectionEvent(
+          LiveMediaConnectionEvent(
             state: LiveMediaConnectionState.reconnecting,
+            tag: tag,
           ),
         );
       } else if (message == 'reconnected') {
         _mediaEvents.add(
-          const LiveMediaConnectionEvent(
+          LiveMediaConnectionEvent(
             state: LiveMediaConnectionState.reconnected,
+            tag: tag,
           ),
         );
       } else if (message.startsWith('disconnected')) {
@@ -47,6 +48,14 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
           LiveMediaConnectionEvent(
             state: LiveMediaConnectionState.disconnected,
             reason: message.split(':').skip(1).join(':'),
+            tag: tag,
+          ),
+        );
+      } else if (message == 'failed') {
+        _mediaEvents.add(
+          LiveMediaConnectionEvent(
+            state: LiveMediaConnectionState.failed,
+            tag: tag,
           ),
         );
       }
@@ -58,6 +67,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   final LivesMediaDataSource _media;
   final _mediaEvents = StreamController<LiveMediaConnectionEvent>.broadcast();
   String? _battleOpponentLiveId;
+  String? _battleRequestedOpponentLiveId;
+  var _battleMediaGeneration = 0;
   Future<void>? _battleMediaQueue;
 
   /// Runs battle-room media work one operation at a time.
@@ -553,33 +564,56 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> connectBattleOpponentMedia(String opponentLiveId) =>
-      _serializeBattleMedia(() => _connectBattleOpponentMedia(opponentLiveId));
+  Future<void> connectBattleOpponentMedia(String opponentLiveId) {
+    final sameRequest = _battleRequestedOpponentLiveId == opponentLiveId;
+    _battleRequestedOpponentLiveId = opponentLiveId;
+    final generation = sameRequest
+        ? _battleMediaGeneration
+        : ++_battleMediaGeneration;
+    return _serializeBattleMedia(
+      () => _connectBattleOpponentMedia(opponentLiveId, generation),
+    );
+  }
 
-  Future<void> _connectBattleOpponentMedia(String opponentLiveId) async {
+  Future<void> _connectBattleOpponentMedia(
+    String opponentLiveId,
+    int generation,
+  ) async {
+    if (generation != _battleMediaGeneration) return;
     if (_battleOpponentLiveId == opponentLiveId && _media.isBattleRoomUsable) {
       return;
     }
     // The private form: the public one would await the queue this call is
     // already the head of.
     await _disconnectBattleOpponentMedia();
+    if (generation != _battleMediaGeneration) return;
     final json = await _remote.join(opponentLiveId);
+    if (generation != _battleMediaGeneration) return;
     final data = json['data'];
     final source = data is Map ? Map<String, dynamic>.from(data) : json;
     final token = source['token']?.toString() ?? '';
     final url =
         source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '';
+    if (generation != _battleMediaGeneration) return;
     await _media.connectBattleAndSubscribe(
       url: url,
       token: token,
       mediaHints: LiveMediaHints.fromPayload(source, fallbackRole: 'viewer'),
     );
+    if (generation != _battleMediaGeneration) {
+      // A newer connect/disconnect is already queued behind this serialized
+      // operation and owns the next room teardown.
+      return;
+    }
     _battleOpponentLiveId = opponentLiveId;
   }
 
   @override
-  Future<void> disconnectBattleOpponentMedia() =>
-      _serializeBattleMedia(_disconnectBattleOpponentMedia);
+  Future<void> disconnectBattleOpponentMedia() {
+    _battleRequestedOpponentLiveId = null;
+    _battleMediaGeneration++;
+    return _serializeBattleMedia(_disconnectBattleOpponentMedia);
+  }
 
   Future<void> _disconnectBattleOpponentMedia() async {
     final liveId = _battleOpponentLiveId;
