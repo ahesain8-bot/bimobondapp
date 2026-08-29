@@ -122,6 +122,8 @@ abstract final class TemplateOneShotRenderBuilder {
 
       final effectsOwned = session.slotUsesUserEffects(slot.id);
 
+      final transitionsOwned = session.slotUsesUserTransitions(slot.id);
+
       final slotFilters = galleryMode
 
           ? session.previewFiltersForSlot(slot.id)
@@ -142,6 +144,22 @@ abstract final class TemplateOneShotRenderBuilder {
 
               : const <UserEditorEffectTrack>[];
 
+      final slotTransition = galleryMode
+
+          ? session
+
+              .previewTransitions()
+
+              .where((t) => t.slotId == slot.id)
+
+              .firstOrNull
+
+          : transitionsOwned
+
+              ? session.transitionForSlot(slot.id)
+
+              : null;
+
       final slotPatch = _buildSlotPatch(
 
         slotIndex: slot.slotIndex >= 0 ? slot.slotIndex : i,
@@ -154,13 +172,19 @@ abstract final class TemplateOneShotRenderBuilder {
 
         effects: slotEffects,
 
+        transition: slotTransition,
+
         filtersOwned: filtersOwned,
 
         effectsOwned: effectsOwned,
 
+        transitionsOwned: transitionsOwned,
+
         includeFilters: galleryMode || filtersOwned,
 
         includeEffects: galleryMode || effectsOwned,
+
+        includeTransitions: galleryMode || transitionsOwned,
 
         filterPresets: filterPresets,
 
@@ -187,6 +211,78 @@ abstract final class TemplateOneShotRenderBuilder {
     if (slots.isNotEmpty) {
 
       body['slots'] = slots;
+
+    }
+
+
+
+    final exportTransitions = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < session.slots.length - 1; i++) {
+
+      final slot = session.slots[i];
+
+      final owned = session.slotUsesUserTransitions(slot.id);
+
+      if (!galleryMode && !owned) continue;
+
+      final track = galleryMode
+
+          ? session
+
+              .previewTransitions()
+
+              .where((t) => t.slotId == slot.id)
+
+              .firstOrNull
+
+          : session.transitionForSlot(slot.id);
+
+      final slotIndex = slot.slotIndex >= 0 ? slot.slotIndex : i;
+
+      if (track == null ||
+
+          track.transitionType.isEmpty ||
+
+          track.transitionType == 'none' ||
+
+          track.transitionType == 'cut') {
+
+        if (owned) {
+
+          exportTransitions.add({
+
+            'afterSlotIndex': slotIndex,
+
+            'transitionType': 'cut',
+
+            'durationSeconds': 0,
+
+          });
+
+        }
+
+        continue;
+
+      }
+
+      exportTransitions.add({
+
+        'afterSlotIndex': slotIndex,
+
+        'transitionType': track.transitionType,
+
+        'durationSeconds': track.durationSeconds.clamp(0.05, 2.0),
+
+        if (track.parameters.isNotEmpty) 'parameters': track.parameters,
+
+      });
+
+    }
+
+    if (galleryMode || exportTransitions.isNotEmpty) {
+
+      body['transitions'] = exportTransitions;
 
     }
 
@@ -494,13 +590,19 @@ abstract final class TemplateOneShotRenderBuilder {
 
     List<UserEditorEffectTrack> effects = const [],
 
+    UserEditorTransitionTrack? transition,
+
     bool filtersOwned = false,
 
     bool effectsOwned = false,
 
+    bool transitionsOwned = false,
+
     bool includeFilters = false,
 
     bool includeEffects = false,
+
+    bool includeTransitions = false,
 
     List<TemplatePresetItem> filterPresets = const [],
 
@@ -727,6 +829,36 @@ abstract final class TemplateOneShotRenderBuilder {
         map['effectStartTime'] = first['startTime'];
 
         map['effectEndTime'] = first['endTime'];
+
+      }
+
+      hasOverride = true;
+
+    }
+
+
+
+    if (includeTransitions) {
+
+      if (transition != null &&
+
+          transition.transitionType.isNotEmpty &&
+
+          transition.transitionType != 'none' &&
+
+          transition.transitionType != 'cut') {
+
+        map['transitionType'] = transition.transitionType;
+
+        map['transitionDurationSeconds'] =
+
+            transition.durationSeconds.clamp(0.05, 2.0);
+
+      } else if (transitionsOwned) {
+
+        map['transitionType'] = 'cut';
+
+        map['transitionDurationSeconds'] = 0;
 
       }
 

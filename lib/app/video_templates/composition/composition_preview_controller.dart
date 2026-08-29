@@ -221,11 +221,11 @@ class CompositionPreviewController extends ChangeNotifier {
     _preview = engine.preview(session);
     _preview!.seek(_sampleTime);
     _lastLookSig = null;
+    // Always drop the previous graded still so deleted FX/filters disappear.
+    _clearVideoLookStill();
     await _syncSurface(force: true);
     if (activeSlotIsVideo && _lookActiveAtPlayhead(slotId)) {
       await refreshVideoLookStill();
-    } else {
-      _clearVideoLookStill();
     }
     _safeNotify();
   }

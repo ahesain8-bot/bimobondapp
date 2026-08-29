@@ -59,7 +59,7 @@ String localizeTemplateExportLabel(AppLocalizations l10n, String? raw) {
       return l10n.templateExportDone;
     case 'failed':
     case 'export failed':
-      return l10n.templateExportRendering;
+      return l10n.templateEditorExportFailed;
     case 'rendering on device…':
     case 'rendering on device...':
       return l10n.templateExportRendering;

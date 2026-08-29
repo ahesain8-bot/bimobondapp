@@ -29,6 +29,7 @@ class CompositionSession {
   /// User filter/effect layers — replace admin slot FX in merged preview (guide §5).
   List<UserEditorFilterTrack> userFilters = [];
   List<UserEditorEffectTrack> userEffects = [];
+  List<UserEditorTransitionTrack> userTransitions = [];
   List<UserEditorTextOverlay> userTexts = [];
   List<UserEditorStickerOverlay> userStickers = [];
   List<UserEditorAudioTrack> userAudios = [];
@@ -36,6 +37,7 @@ class CompositionSession {
   /// Slots/layers the user has touched — empty user lists must not fall back to recipe.
   Set<String> userOwnedFilterSlots = {};
   Set<String> userOwnedEffectSlots = {};
+  Set<String> userOwnedTransitionSlots = {};
   bool userTextsLayerOwned = false;
   bool userStickersLayerOwned = false;
   bool userAudioLayerOwned = false;
@@ -45,6 +47,9 @@ class CompositionSession {
 
   bool slotUsesUserEffects(String slotId) =>
       userOwnedEffectSlots.contains(slotId);
+
+  bool slotUsesUserTransitions(String slotId) =>
+      userOwnedTransitionSlots.contains(slotId);
 
   /// Legacy single-track fields — kept in sync with [userAudios.first] for older paths.
   UserEditorAudioTiming? userAudioTiming;
@@ -126,6 +131,7 @@ class CompositionSession {
       fills: fills,
       userFilters: userFilters,
       userEffects: userEffects,
+      userTransitions: userTransitions,
       userTexts: userTexts,
       userStickers: userStickers,
       userAudios: userAudios,
@@ -136,6 +142,7 @@ class CompositionSession {
       userSoundSegmentEndMs: userSoundSegmentEndMs,
       userOwnedFilterSlots: userOwnedFilterSlots,
       userOwnedEffectSlots: userOwnedEffectSlots,
+      userOwnedTransitionSlots: userOwnedTransitionSlots,
       userTextsLayerOwned: userTextsLayerOwned,
       userStickersLayerOwned: userStickersLayerOwned,
     );
@@ -159,6 +166,7 @@ class CompositionSession {
       )
       ..userFilters = List<UserEditorFilterTrack>.from(userFilters)
       ..userEffects = List<UserEditorEffectTrack>.from(userEffects)
+      ..userTransitions = List<UserEditorTransitionTrack>.from(userTransitions)
       ..userTexts = List<UserEditorTextOverlay>.from(userTexts)
       ..userStickers = List<UserEditorStickerOverlay>.from(userStickers)
       ..userAudios = List<UserEditorAudioTrack>.from(userAudios)
@@ -170,6 +178,7 @@ class CompositionSession {
       ..userSoundSegmentEndMs = userSoundSegmentEndMs
       ..userOwnedFilterSlots = Set<String>.from(userOwnedFilterSlots)
       ..userOwnedEffectSlots = Set<String>.from(userOwnedEffectSlots)
+      ..userOwnedTransitionSlots = Set<String>.from(userOwnedTransitionSlots)
       ..userTextsLayerOwned = userTextsLayerOwned
       ..userStickersLayerOwned = userStickersLayerOwned
       ..userAudioLayerOwned = userAudioLayerOwned;
@@ -435,6 +444,90 @@ class CompositionSession {
     return copy;
   }
 
+  UserEditorTransitionTrack? transitionForSlot(String slotId) {
+    final matches = userTransitions.where((t) => t.slotId == slotId);
+    return matches.isEmpty ? null : matches.first;
+  }
+
+  void setUserTransition(UserEditorTransitionTrack track) {
+    _pushUndo();
+    userOwnedTransitionSlots.add(track.slotId);
+    userTransitions = [
+      ...userTransitions.where((t) => t.slotId != track.slotId),
+      track,
+    ];
+    _invalidateTimeline();
+  }
+
+  void removeUserTransition(String id) {
+    final i = userTransitions.indexWhere((t) => t.id == id);
+    if (i < 0) return;
+    _pushUndo();
+    userOwnedTransitionSlots.add(userTransitions[i].slotId);
+    userTransitions = List<UserEditorTransitionTrack>.from(userTransitions)
+      ..removeAt(i);
+    _invalidateTimeline();
+  }
+
+  void clearUserTransitionForSlot(String slotId) {
+    _pushUndo();
+    userOwnedTransitionSlots.add(slotId);
+    userTransitions = userTransitions.where((t) => t.slotId != slotId).toList();
+    _invalidateTimeline();
+  }
+
+  /// Transitions visible in the editor (user-owned or recipe fallback).
+  List<UserEditorTransitionTrack> previewTransitions() {
+    final out = <UserEditorTransitionTrack>[];
+    final slots = this.slots;
+    for (var i = 0; i < slots.length - 1; i++) {
+      final slot = slots[i];
+      if (slotUsesUserTransitions(slot.id)) {
+        final user = transitionForSlot(slot.id);
+        if (user != null &&
+            user.transitionType.isNotEmpty &&
+            user.transitionType != 'none' &&
+            user.transitionType != 'cut') {
+          out.add(user);
+        }
+        continue;
+      }
+      final recipeTr = _recipeTransitionAfter(i, slot);
+      if (recipeTr == null) continue;
+      out.add(
+        UserEditorTransitionTrack(
+          id: 'recipe_tr_${slot.id}',
+          slotId: slot.id,
+          transitionType: TemplatePresetItem.normalizeTransitionPreviewKey(
+            recipeTr.type,
+          ),
+          label: recipeTr.type,
+          durationSeconds: recipeTr.durationSeconds.clamp(0.05, 2.0),
+          parameters: Map<String, dynamic>.from(recipeTr.parameters ?? const {}),
+        ),
+      );
+    }
+    return out;
+  }
+
+  VideoTemplateTransitionEntity? _recipeTransitionAfter(
+    int slotIndex,
+    VideoTemplateSlotEntity slot,
+  ) {
+    for (final t in recipe.transitions) {
+      if (t.afterSlotIndex == slotIndex) return t;
+    }
+    final type = slot.transitionType ?? slot.defaultTransition;
+    if (type == null || type.isEmpty || type.toLowerCase() == 'cut') {
+      return null;
+    }
+    return VideoTemplateTransitionEntity(
+      afterSlotIndex: slotIndex,
+      type: type,
+      durationSeconds: slot.transitionDurationSeconds ?? 0.3,
+    );
+  }
+
   void patchUserFilterTiming(
     String id, {
     required double startTime,
@@ -590,6 +683,7 @@ class CompositionSession {
   bool get _userLayersEmpty =>
       userFilters.isEmpty &&
       userEffects.isEmpty &&
+      userTransitions.isEmpty &&
       userTexts.isEmpty &&
       userStickers.isEmpty &&
       userAudios.isEmpty;
@@ -614,6 +708,7 @@ class CompositionSession {
 
     userOwnedFilterSlots = {};
     userOwnedEffectSlots = {};
+    userOwnedTransitionSlots = {};
     userTextsLayerOwned = false;
     userStickersLayerOwned = false;
     userAudioLayerOwned = false;
@@ -734,6 +829,30 @@ class CompositionSession {
     userEffects = effects;
     userTexts = texts;
     userStickers = stickers;
+
+    final transitions = <UserEditorTransitionTrack>[];
+    for (var i = 0; i < slots.length - 1; i++) {
+      final slot = slots[i];
+      final recipeTr = _recipeTransitionAfter(i, slot);
+      if (recipeTr == null) continue;
+      final type = TemplatePresetItem.normalizeTransitionPreviewKey(
+        recipeTr.type,
+      );
+      if (type.isEmpty || type == 'none' || type == 'cut') continue;
+      transitions.add(
+        UserEditorTransitionTrack(
+          id: 'tr_seed_${slot.id}',
+          slotId: slot.id,
+          transitionType: type,
+          label: recipeTr.type,
+          durationSeconds: recipeTr.durationSeconds.clamp(0.05, 2.0),
+          parameters: Map<String, dynamic>.from(recipeTr.parameters ?? const {}),
+        ),
+      );
+      userOwnedTransitionSlots.add(slot.id);
+    }
+    userTransitions = transitions;
+
     if (recipe.texts.any((t) => t.text.trim().isNotEmpty)) {
       userTextsLayerOwned = true;
     }
@@ -791,6 +910,7 @@ class CompositionSession {
     fills = snap.fills;
     userFilters = List<UserEditorFilterTrack>.from(snap.userFilters);
     userEffects = List<UserEditorEffectTrack>.from(snap.userEffects);
+    userTransitions = List<UserEditorTransitionTrack>.from(snap.userTransitions);
     userTexts = List<UserEditorTextOverlay>.from(snap.userTexts);
     userStickers = List<UserEditorStickerOverlay>.from(snap.userStickers);
     userAudios = List<UserEditorAudioTrack>.from(snap.userAudios);
@@ -802,6 +922,7 @@ class CompositionSession {
     userSoundSegmentEndMs = snap.userSoundSegmentEndMs;
     userOwnedFilterSlots = Set<String>.from(snap.userOwnedFilterSlots);
     userOwnedEffectSlots = Set<String>.from(snap.userOwnedEffectSlots);
+    userOwnedTransitionSlots = Set<String>.from(snap.userOwnedTransitionSlots);
     userTextsLayerOwned = snap.userTextsLayerOwned;
     userStickersLayerOwned = snap.userStickersLayerOwned;
     userAudioLayerOwned = snap.userAudioLayerOwned;

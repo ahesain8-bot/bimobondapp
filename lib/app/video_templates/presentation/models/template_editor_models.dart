@@ -12,6 +12,7 @@ enum TemplateEditorPanel {
   effects,
   filters,
   stickers,
+  transitions,
 }
 
 /// Which preset catalog to load in the picker sheet.
@@ -19,6 +20,7 @@ enum TemplatePresetKind {
   filter,
   effect,
   sticker,
+  transition,
 }
 
 /// Catalog preset tile (filter / effect / sticker).
@@ -30,6 +32,7 @@ class TemplatePresetItem extends Equatable {
     this.thumbnailUrl,
     this.filterName,
     this.effectType,
+    this.transitionType,
     this.assetUrl,
     this.category,
   });
@@ -44,6 +47,9 @@ class TemplatePresetItem extends Equatable {
 
   /// Local preview key for effects.
   final String? effectType;
+
+  /// Local preview / render key for transitions.
+  final String? transitionType;
   final String? assetUrl;
   final String? category;
 
@@ -57,6 +63,10 @@ class TemplatePresetItem extends Equatable {
   /// Key for [TemplateEffectVisual] / local preview (not the display name).
   String get previewEffectKey => normalizeEffectPreviewKey(
         effectType ?? name,
+      );
+
+  String get previewTransitionKey => normalizeTransitionPreviewKey(
+        transitionType ?? name,
       );
 
   /// Maps API / display names to local preview matrix keys.
@@ -109,6 +119,30 @@ class TemplatePresetItem extends Equatable {
     return key;
   }
 
+  /// Maps API / display names to local transition keys.
+  static String normalizeTransitionPreviewKey(String? raw) {
+    var key = _slugKey(raw);
+    if (key.isEmpty || key == 'none') return 'none';
+    if (key.startsWith('transition_')) {
+      key = key.substring('transition_'.length);
+    }
+    key = switch (key) {
+      'cross_fade' || 'xfade' => 'crossfade',
+      'slideleft' => 'slide_left',
+      'slideright' => 'slide_right',
+      'zoomin' => 'zoom_in',
+      'zoomout' => 'zoom_out',
+      'pushleft' => 'push_left',
+      'pushright' => 'push_right',
+      'pushup' => 'push_up',
+      'pushdown' => 'push_down',
+      'filmburn' || 'burn' => 'film_burn',
+      'matchcut' || 'match_cut' => 'match_cut_flash',
+      _ => key,
+    };
+    return key;
+  }
+
   static String _slugKey(String? raw) {
     final s = raw?.trim().toLowerCase() ?? '';
     if (s.isEmpty) return '';
@@ -142,6 +176,14 @@ class TemplatePresetItem extends Equatable {
             json['code'] ??
             json['presetKey'])
         ?.toString();
+    final rawTransition = (json['transitionType'] ??
+            json['transitionName'] ??
+            engineType ??
+            json['slug'] ??
+            json['key'] ??
+            json['code'] ??
+            json['presetKey'])
+        ?.toString();
     return TemplatePresetItem(
       id: id,
       name: name,
@@ -154,14 +196,28 @@ class TemplatePresetItem extends Equatable {
       effectType: kind == TemplatePresetKind.effect
           ? normalizeEffectPreviewKey(rawEffect ?? name)
           : (rawEffect != null ? normalizeEffectPreviewKey(rawEffect) : null),
+      transitionType: kind == TemplatePresetKind.transition
+          ? normalizeTransitionPreviewKey(rawTransition ?? name)
+          : (rawTransition != null
+              ? normalizeTransitionPreviewKey(rawTransition)
+              : null),
       assetUrl: (json['assetUrl'] ?? json['url'])?.toString(),
       category: json['category']?.toString(),
     );
   }
 
   @override
-  List<Object?> get props =>
-      [id, name, kind, thumbnailUrl, filterName, effectType, assetUrl, category];
+  List<Object?> get props => [
+        id,
+        name,
+        kind,
+        thumbnailUrl,
+        filterName,
+        effectType,
+        transitionType,
+        assetUrl,
+        category,
+      ];
 }
 
 /// User-applied slot filter — replaces admin slot filters in merged preview.
@@ -244,6 +300,66 @@ class UserSlotEffectOverride extends Equatable {
   @override
   List<Object?> get props =>
       [presetId, effectType, parameters, startTime, endTime];
+}
+
+/// One transition after a slot (junction into the next clip).
+class UserEditorTransitionTrack extends Equatable {
+  const UserEditorTransitionTrack({
+    required this.id,
+    required this.slotId,
+    this.presetId,
+    required this.transitionType,
+    this.label,
+    this.durationSeconds = 0.35,
+    this.parameters = const {},
+  });
+
+  final String id;
+
+  /// Outgoing slot — transition plays at the end of this clip.
+  final String slotId;
+  final String? presetId;
+  final String transitionType;
+  final String? label;
+  final double durationSeconds;
+  final Map<String, dynamic> parameters;
+
+  String get displayName {
+    final l = label?.trim();
+    if (l != null && l.isNotEmpty) return l;
+    return transitionType;
+  }
+
+  UserEditorTransitionTrack copyWith({
+    String? id,
+    String? slotId,
+    String? presetId,
+    String? transitionType,
+    String? label,
+    double? durationSeconds,
+    Map<String, dynamic>? parameters,
+  }) {
+    return UserEditorTransitionTrack(
+      id: id ?? this.id,
+      slotId: slotId ?? this.slotId,
+      presetId: presetId ?? this.presetId,
+      transitionType: transitionType ?? this.transitionType,
+      label: label ?? this.label,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      parameters: parameters ?? this.parameters,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        slotId,
+        presetId,
+        transitionType,
+        label,
+        durationSeconds,
+        parameters,
+      ];
 }
 
 const kMaxFiltersPerSlot = 8;
@@ -846,5 +962,68 @@ const kFallbackEffectPresets = <TemplatePresetItem>[
     name: 'Pulse',
     kind: TemplatePresetKind.effect,
     effectType: 'pulse',
+  ),
+];
+
+const kFallbackTransitionPresets = <TemplatePresetItem>[
+  TemplatePresetItem(
+    id: 'none',
+    name: 'None',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'none',
+  ),
+  TemplatePresetItem(
+    id: 'fade',
+    name: 'Fade',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'fade',
+  ),
+  TemplatePresetItem(
+    id: 'crossfade',
+    name: 'Crossfade',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'crossfade',
+  ),
+  TemplatePresetItem(
+    id: 'flash',
+    name: 'Flash',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'flash',
+  ),
+  TemplatePresetItem(
+    id: 'slide_left',
+    name: 'Slide left',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'slide_left',
+  ),
+  TemplatePresetItem(
+    id: 'slide_right',
+    name: 'Slide right',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'slide_right',
+  ),
+  TemplatePresetItem(
+    id: 'zoom',
+    name: 'Zoom',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'zoom',
+  ),
+  TemplatePresetItem(
+    id: 'blur',
+    name: 'Blur',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'blur',
+  ),
+  TemplatePresetItem(
+    id: 'glitch',
+    name: 'Glitch',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'glitch',
+  ),
+  TemplatePresetItem(
+    id: 'film_burn',
+    name: 'Film burn',
+    kind: TemplatePresetKind.transition,
+    transitionType: 'film_burn',
   ),
 ];

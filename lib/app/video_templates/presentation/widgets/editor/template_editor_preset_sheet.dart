@@ -129,7 +129,7 @@ class TemplateEditorPresetSheet extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 itemCount: presets.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
                 itemBuilder: (context, i) {
                   final preset = presets[i];
                   final selected = _presetSelected(preset, selectedId);
@@ -156,6 +156,8 @@ bool _presetSelected(TemplatePresetItem preset, String? selectedId) {
       return preset.previewFilterKey == selectedId;
     case TemplatePresetKind.effect:
       return preset.previewEffectKey == selectedId;
+    case TemplatePresetKind.transition:
+      return preset.previewTransitionKey == selectedId;
     case TemplatePresetKind.sticker:
       return false;
   }
@@ -202,7 +204,9 @@ class _PresetTile extends StatelessWidget {
                               ? LucideIcons.aperture
                               : preset.kind == TemplatePresetKind.effect
                                   ? LucideIcons.sparkles
-                                  : LucideIcons.sticker,
+                                  : preset.kind == TemplatePresetKind.transition
+                                      ? LucideIcons.betweenHorizontalStart
+                                      : LucideIcons.sticker,
                           color: Colors.white54,
                           size: 24,
                         ),

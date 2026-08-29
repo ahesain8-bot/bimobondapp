@@ -8,7 +8,7 @@ import 'package:bimobondapp/core/utils/video_thumbnail_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-enum TemplateEditorOverlayKind { filter, effect, text, sticker, audio }
+enum TemplateEditorOverlayKind { filter, effect, transition, text, sticker, audio }
 
 /// Timed bar on a secondary editor track (filter / effect / text / sticker).
 class TemplateEditorOverlaySegment {
@@ -109,6 +109,8 @@ class _EditorTimelineLayout {
   double get minBarWidth => _d(8).clamp(6, 12);
   double get handleWidth => _d(14).clamp(11, 18);
   double get handlePillHeight => _v(14).clamp(10, 16);
+  /// Touch target for start/end trim (extends past the bar edge).
+  double get handleHitWidth => _d(28).clamp(24, 36);
   double get barRadius => _d(8).clamp(6, 10);
   double get iconSizeSm => _d(12).clamp(10, 14);
   double get iconSizeMd => _d(16).clamp(14, 18);
@@ -130,16 +132,12 @@ class _EditorTimelineLayout {
         maxWidth - horizontalPadding * 2 - leftGutter,
       );
 
-  /// 5s spans the full track area; longer clips scale out and scroll.
+  /// 5s spans the full track area; shorter clips end earlier; longer scroll.
   double get pxPerSecond => trackAreaWidth / fullWidthReferenceSeconds;
 
+  /// Content width for [duration] — end of period sits at this x (not stretched).
   double resolveTimelineWidth(double duration) {
-    final safeDuration = math.max(duration, 0.01);
-    final scaled = safeDuration * pxPerSecond;
-    if (safeDuration <= fullWidthReferenceSeconds) {
-      return trackAreaWidth;
-    }
-    return scaled;
+    return math.max(duration, 0.01) * pxPerSecond;
   }
 
   /// Width of the horizontally scrollable track content.
@@ -341,6 +339,7 @@ class _TemplateEditorTimelineState extends State<TemplateEditorTimeline> {
     TemplateEditorOverlayKind.audio,
     TemplateEditorOverlayKind.filter,
     TemplateEditorOverlayKind.effect,
+    TemplateEditorOverlayKind.transition,
     TemplateEditorOverlayKind.text,
     TemplateEditorOverlayKind.sticker,
   ];
@@ -470,7 +469,7 @@ class _TemplateEditorTimelineState extends State<TemplateEditorTimeline> {
             SizedBox(height: layout.sectionGap),
             Expanded(
               child: Stack(
-                clipBehavior: Clip.hardEdge,
+                clipBehavior: Clip.none,
                 children: [
                   Positioned(
                     left: 0,
@@ -629,21 +628,33 @@ class _TemplateEditorTimelineState extends State<TemplateEditorTimeline> {
           ),
         );
 
+        // Keep timeline scrubbing LTR in Arabic UI (time still flows left→right).
+        Widget wrapLtr(Widget child) => Directionality(
+              textDirection: TextDirection.ltr,
+              child: child,
+            );
+
         if (needsVerticalScroll) {
-          return SizedBox(
-            height: maxHeight,
-            child: SingleChildScrollView(
-              physics: const ClampingScrollPhysics(),
-              child: timeline,
+          return wrapLtr(
+            SizedBox(
+              height: maxHeight,
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: timeline,
+              ),
             ),
           );
         }
 
-        return SizedBox(
-          height: maxHeight.isFinite ? math.min(totalHeight, maxHeight) : totalHeight,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: timeline,
+        return wrapLtr(
+          SizedBox(
+            height: maxHeight.isFinite
+                ? math.min(totalHeight, maxHeight)
+                : totalHeight,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: timeline,
+            ),
           ),
         );
       },
@@ -727,6 +738,7 @@ class _TemplateEditorTimelineState extends State<TemplateEditorTimeline> {
       TemplateEditorOverlayKind.audio => LucideIcons.volume2,
       TemplateEditorOverlayKind.filter => LucideIcons.blend,
       TemplateEditorOverlayKind.effect => LucideIcons.sparkles,
+      TemplateEditorOverlayKind.transition => LucideIcons.betweenHorizontalStart,
       TemplateEditorOverlayKind.text => LucideIcons.type,
       TemplateEditorOverlayKind.sticker => LucideIcons.sticker,
     };
@@ -877,69 +889,74 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
     final width = geometry.width;
     final compact = width < layout.compactBarWidth;
     final showHandles =
-        widget.editable && !compact && widget.onRangeChanged != null;
+        widget.editable && widget.onRangeChanged != null;
+    final hit = showHandles ? layout.handleHitWidth : 0.0;
 
     return Positioned(
-      left: left,
+      // Expand bounds so start/end handles remain hittable outside the bar.
+      left: left - hit / 2,
       top: widget.barTop,
-      width: width,
+      width: width + hit,
       height: widget.barHeight,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: widget.color.withValues(alpha: widget.selected ? 0.62 : 0.48),
-            borderRadius: BorderRadius.circular(layout.barRadius),
-            border: Border.all(
-              color: widget.selected
-                  ? Colors.white
-                  : widget.color.withValues(alpha: 0.85),
-              width: widget.selected ? 2 : 1,
-            ),
-          ),
-          clipBehavior: Clip.hardEdge,
-          child: compact
-              ? Center(
-                  child: Icon(
-                    widget.icon ?? LucideIcons.minus,
-                    color: Colors.white,
-                    size: layout.iconSizeSm,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: hit / 2,
+            top: 0,
+            width: width,
+            height: widget.barHeight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onTap,
+              onHorizontalDragStart: showHandles
+                  ? (_) => _beginDrag(_Handle.move)
+                  : null,
+              onHorizontalDragUpdate: showHandles
+                  ? (d) {
+                      final dt =
+                          d.delta.dx / widget.timelineWidth * safeTotal;
+                      _updateDrag(dt);
+                    }
+                  : null,
+              onHorizontalDragEnd: showHandles ? (_) => _endDrag() : null,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: widget.color
+                      .withValues(alpha: widget.selected ? 0.62 : 0.48),
+                  borderRadius: BorderRadius.circular(layout.barRadius),
+                  border: Border.all(
+                    color: widget.selected
+                        ? Colors.white
+                        : widget.color.withValues(alpha: 0.85),
+                    width: widget.selected ? 2 : 1,
                   ),
-                )
-              : Row(
-                  children: [
-                    if (showHandles)
-                      _DragHandle(
-                        width: layout.handleWidth,
-                        pillHeight: layout.handlePillHeight,
-                        onDragStart: () => _beginDrag(_Handle.start),
-                        onDragUpdate: (dx) {
-                          final dt = dx / widget.timelineWidth * safeTotal;
-                          _updateDrag(dt);
-                        },
-                        onDragEnd: _endDrag,
-                      ),
-                    if (widget.icon != null) ...[
-                      Icon(
-                        widget.icon,
-                        color: Colors.white,
-                        size: layout.iconSizeSm,
-                      ),
-                      SizedBox(width: layout.gapSm),
-                    ],
-                    Expanded(
-                      child: showHandles
-                          ? GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onHorizontalDragStart: (_) =>
-                                  _beginDrag(_Handle.move),
-                              onHorizontalDragUpdate: (d) {
-                                final dt = d.delta.dx /
-                                    widget.timelineWidth *
-                                    safeTotal;
-                                _updateDrag(dt);
-                              },
-                              onHorizontalDragEnd: (_) => _endDrag(),
+                ),
+                child: compact
+                    ? Center(
+                        child: Icon(
+                          widget.icon ?? LucideIcons.minus,
+                          color: Colors.white,
+                          size: layout.iconSizeSm,
+                        ),
+                      )
+                    : Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: showHandles
+                              ? layout.handleWidth * 0.35
+                              : layout.gapSm,
+                        ),
+                        child: Row(
+                          children: [
+                            if (widget.icon != null) ...[
+                              Icon(
+                                widget.icon,
+                                color: Colors.white,
+                                size: layout.iconSizeSm,
+                              ),
+                              SizedBox(width: layout.gapSm),
+                            ],
+                            Expanded(
                               child: Text(
                                 widget.label,
                                 maxLines: 1,
@@ -950,32 +967,50 @@ class _TimedTrackBarState extends State<_TimedTrackBar> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            )
-                          : Text(
-                              widget.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: layout.sp(10),
-                                fontWeight: FontWeight.w600,
-                              ),
                             ),
-                    ),
-                    if (showHandles)
-                      _DragHandle(
-                        width: layout.handleWidth,
-                        pillHeight: layout.handlePillHeight,
-                        onDragStart: () => _beginDrag(_Handle.end),
-                        onDragUpdate: (dx) {
-                          final dt = dx / widget.timelineWidth * safeTotal;
-                          _updateDrag(dt);
-                        },
-                        onDragEnd: _endDrag,
+                          ],
+                        ),
                       ),
-                  ],
-                ),
-        ),
+              ),
+            ),
+          ),
+          if (showHandles) ...[
+            Positioned(
+              left: 0,
+              top: 0,
+              width: hit,
+              height: widget.barHeight,
+              child: _DragHandle(
+                width: hit,
+                pillHeight: layout.handlePillHeight,
+                pillWidth: 4,
+                onDragStart: () => _beginDrag(_Handle.start),
+                onDragUpdate: (dx) {
+                  final dt = dx / widget.timelineWidth * safeTotal;
+                  _updateDrag(dt);
+                },
+                onDragEnd: _endDrag,
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 0,
+              width: hit,
+              height: widget.barHeight,
+              child: _DragHandle(
+                width: hit,
+                pillHeight: layout.handlePillHeight,
+                pillWidth: 4,
+                onDragStart: () => _beginDrag(_Handle.end),
+                onDragUpdate: (dx) {
+                  final dt = dx / widget.timelineWidth * safeTotal;
+                  _updateDrag(dt);
+                },
+                onDragEnd: _endDrag,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -988,10 +1023,12 @@ class _DragHandle extends StatelessWidget {
     required this.onDragStart,
     required this.onDragUpdate,
     required this.onDragEnd,
+    this.pillWidth = 3,
   });
 
   final double width;
   final double pillHeight;
+  final double pillWidth;
   final VoidCallback onDragStart;
   final ValueChanged<double> onDragUpdate;
   final VoidCallback onDragEnd;
@@ -1003,15 +1040,24 @@ class _DragHandle extends StatelessWidget {
       onHorizontalDragStart: (_) => onDragStart(),
       onHorizontalDragUpdate: (d) => onDragUpdate(d.delta.dx),
       onHorizontalDragEnd: (_) => onDragEnd(),
+      onHorizontalDragCancel: onDragEnd,
       child: SizedBox(
         width: width,
+        height: double.infinity,
         child: Center(
           child: Container(
-            width: 3,
+            width: pillWidth,
             height: pillHeight,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: Colors.white.withValues(alpha: 0.95),
               borderRadius: BorderRadius.circular(2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
           ),
         ),

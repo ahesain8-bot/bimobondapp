@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_theme.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -153,10 +154,11 @@ class _TemplateEditorStickerPlacerSheetState
   }
 
   Widget _stickerVisual(double previewWidth) {
+    final l10n = AppLocalizations.of(context)!;
     final preset = _selected;
     if (preset == null) {
       return Text(
-        'Pick a sticker below',
+        l10n.templateEditorPickStickerBelow,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.55),
           fontSize: 14,
@@ -233,8 +235,10 @@ class _TemplateEditorStickerPlacerSheetState
                     child: IgnorePointer(
                       child: Text(
                         _selected == null
-                            ? 'Tap a sticker below'
-                            : 'Drag to move · Pinch or ± to resize',
+                            ? AppLocalizations.of(context)!
+                                .templateEditorTapStickerBelow
+                            : AppLocalizations.of(context)!
+                                .templateEditorDragResizeSticker,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
@@ -285,7 +289,7 @@ class _TemplateEditorStickerPlacerSheetState
                   TextButton(
                     onPressed: _selected == null ? null : _submit,
                     child: Text(
-                      'Apply',
+                      AppLocalizations.of(context)!.templateEditorApply,
                       style: TextStyle(
                         color: _selected == null
                             ? Colors.white38

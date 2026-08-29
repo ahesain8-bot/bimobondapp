@@ -29,7 +29,10 @@ class TemplateEditorPlaybackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
       child: Row(
         children: [
           _IconBtn(
@@ -57,14 +60,18 @@ class TemplateEditorPlaybackBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          Text(
-            '${TemplateEditorTheme.formatTime(currentTime)} / '
-            '${TemplateEditorTheme.formatTime(totalTime)}',
-            style: const TextStyle(
-              color: TemplateEditorTheme.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              fontFeatures: [FontFeature.tabularFigures()],
+          // Timecode always LTR so mm:ss reads naturally in Arabic UI.
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Text(
+              '${TemplateEditorTheme.formatTime(currentTime)} / '
+              '${TemplateEditorTheme.formatTime(totalTime)}',
+              style: const TextStyle(
+                color: TemplateEditorTheme.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
@@ -90,10 +97,11 @@ class _IconBtn extends StatelessWidget {
       onPressed: enabled ? onPressed : null,
       icon: Icon(
         icon,
-        color: enabled ? TemplateEditorTheme.textPrimary : TemplateEditorTheme.textMuted,
-        size: 20,
+        color: enabled
+            ? TemplateEditorTheme.textPrimary
+            : TemplateEditorTheme.textMuted,
+        size: 22,
       ),
-      visualDensity: VisualDensity.compact,
     );
   }
 }

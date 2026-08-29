@@ -4700,4 +4700,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get marketplaceDeliveryTracking => 'Delivery Tracking';
+
+  @override
+  String get templateEditorSound => 'Sound';
+
+  @override
+  String get templateEditorText => 'Text';
+
+  @override
+  String get templateEditorEffects => 'Effects';
+
+  @override
+  String get templateEditorFilters => 'Filters';
+
+  @override
+  String get templateEditorTransitions => 'Transitions';
+
+  @override
+  String get templateEditorStickers => 'Stickers';
+
+  @override
+  String get templateEditorCopy => 'Copy';
+
+  @override
+  String get templateEditorDelete => 'Delete';
+
+  @override
+  String get templateEditorLayers => 'Layers';
+
+  @override
+  String get templateEditorNone => 'None';
+
+  @override
+  String get templateEditorTrending => 'Trending';
+
+  @override
+  String get templateEditorApply => 'Apply';
+
+  @override
+  String get templateEditorDefault => 'Default';
+
+  @override
+  String get templateEditorPhoto => 'Photo';
+
+  @override
+  String get templateEditorVideo => 'Video';
+
+  @override
+  String get templateEditorFont => 'Font';
+
+  @override
+  String get templateEditorAddText => 'Add text';
+
+  @override
+  String get templateEditorReplaceText => 'Replace text';
+
+  @override
+  String get templateEditorReplaceSticker => 'Replace sticker';
+
+  @override
+  String get templateEditorReplaceFilter => 'Replace filter';
+
+  @override
+  String get templateEditorReplaceEffect => 'Replace effect';
+
+  @override
+  String get templateEditorReplaceTransition => 'Replace transition';
+
+  @override
+  String get templateEditorReplaceMusic => 'Replace music';
+
+  @override
+  String templateEditorAddFilterClip(int clip) {
+    return 'Add filter · clip $clip';
+  }
+
+  @override
+  String templateEditorAddEffectClip(int clip) {
+    return 'Add effect · clip $clip';
+  }
+
+  @override
+  String get templateEditorAddTransition => 'Add transition';
+
+  @override
+  String get templateEditorFilterLayers => 'Filter layers';
+
+  @override
+  String get templateEditorEffectLayers => 'Effect layers';
+
+  @override
+  String get templateEditorServerPreview => 'Server preview';
+
+  @override
+  String get templateEditorContinueWithRender => 'Tap → to continue with this render';
+
+  @override
+  String get templateEditorTypeBelow => 'Type below…';
+
+  @override
+  String get templateEditorTypeCaption => 'Type your caption…';
+
+  @override
+  String get templateEditorDragPinchResize => 'Drag to move · Pinch to resize';
+
+  @override
+  String get templateEditorTapMediaToPlace => 'Tap media to place · Drag to move';
+
+  @override
+  String get templateEditorPickStickerBelow => 'Pick a sticker below';
+
+  @override
+  String get templateEditorTapStickerBelow => 'Tap a sticker below';
+
+  @override
+  String get templateEditorDragResizeSticker => 'Drag to move · Pinch or ± to resize';
+
+  @override
+  String templateEditorMaxFiltersPerClip(int count) {
+    return 'Max $count filters per clip';
+  }
+
+  @override
+  String templateEditorMaxEffectsPerClip(int count) {
+    return 'Max $count effects per clip';
+  }
+
+  @override
+  String get templateEditorTransitionsNeedClips => 'Transitions need at least 2 clips';
+
+  @override
+  String get templateEditorAddMediaAllSlots => 'Add media to all slots before rendering.';
+
+  @override
+  String get templateEditorCouldNotRender => 'Could not render on server';
+
+  @override
+  String get templateEditorExportFailed => 'Export failed';
+
+  @override
+  String get templateEditorPresetNone => 'None';
+
+  @override
+  String get templateEditorPresetCinematic => 'Cinematic';
+
+  @override
+  String get templateEditorPresetWarm => 'Warm';
+
+  @override
+  String get templateEditorPresetCool => 'Cool';
+
+  @override
+  String get templateEditorPresetVintage => 'Vintage';
+
+  @override
+  String get templateEditorPresetVivid => 'Vivid';
+
+  @override
+  String get templateEditorPresetFade => 'Fade';
+
+  @override
+  String get templateEditorPresetBw => 'B&W';
+
+  @override
+  String get templateEditorPresetZoomIn => 'Zoom in';
+
+  @override
+  String get templateEditorPresetZoomOut => 'Zoom out';
+
+  @override
+  String get templateEditorPresetShake => 'Shake';
+
+  @override
+  String get templateEditorPresetPulse => 'Pulse';
+
+  @override
+  String get templateEditorPresetCrossfade => 'Crossfade';
+
+  @override
+  String get templateEditorPresetFlash => 'Flash';
+
+  @override
+  String get templateEditorPresetSlideLeft => 'Slide left';
+
+  @override
+  String get templateEditorPresetSlideRight => 'Slide right';
+
+  @override
+  String get templateEditorPresetZoom => 'Zoom';
+
+  @override
+  String get templateEditorPresetBlur => 'Blur';
+
+  @override
+  String get templateEditorPresetGlitch => 'Glitch';
+
+  @override
+  String get templateEditorPresetFilmBurn => 'Film burn';
 }

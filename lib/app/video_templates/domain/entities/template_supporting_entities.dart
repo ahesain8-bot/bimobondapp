@@ -347,6 +347,7 @@ class TemplateEditableFlags extends Equatable {
     this.stickers = true,
     this.effects = true,
     this.filters = true,
+    this.transitions = true,
     this.reorder = false,
   });
 
@@ -355,6 +356,7 @@ class TemplateEditableFlags extends Equatable {
   final bool stickers;
   final bool effects;
   final bool filters;
+  final bool transitions;
   final bool reorder;
 
   factory TemplateEditableFlags.fromJson(Map<String, dynamic>? json) {
@@ -371,11 +373,12 @@ class TemplateEditableFlags extends Equatable {
       stickers: flag('stickers'),
       effects: flag('effects'),
       filters: flag('filters'),
+      transitions: flag('transitions'),
       reorder: flag('reorder', fallback: false),
     );
   }
 
   @override
   List<Object?> get props =>
-      [music, text, stickers, effects, filters, reorder];
+      [music, text, stickers, effects, filters, transitions, reorder];
 }

@@ -197,6 +197,7 @@ class TimelineEngine {
     required Map<String, SlotFillEntry> fills,
     List<UserEditorFilterTrack> userFilters = const [],
     List<UserEditorEffectTrack> userEffects = const [],
+    List<UserEditorTransitionTrack> userTransitions = const [],
     List<UserEditorTextOverlay> userTexts = const [],
     List<UserEditorStickerOverlay> userStickers = const [],
     List<UserEditorAudioTrack> userAudios = const [],
@@ -207,6 +208,7 @@ class TimelineEngine {
     int? userSoundSegmentEndMs,
     Set<String> userOwnedFilterSlots = const {},
     Set<String> userOwnedEffectSlots = const {},
+    Set<String> userOwnedTransitionSlots = const {},
     bool userTextsLayerOwned = false,
     bool userStickersLayerOwned = false,
   }) {
@@ -343,20 +345,48 @@ class TimelineEngine {
       }
 
       // Transition after this slot.
-      final tr = _transitionAfter(recipe, i, slot);
-      if (tr != null && i < slots.length - 1) {
-        final td = tr.durationSeconds.clamp(0.05, 2.0);
-        items.add(
-          TimelineItem(
-            id: 'tr_${slot.id}',
-            kind: TimelineLayerKind.transition,
-            startTime: math.max(0, end - td / 2),
-            endTime: end + td / 2,
-            layerOrder: 2000 + i,
-            transitionType: tr.type,
-            parameters: tr.parameters ?? const {},
-          ),
-        );
+      final useUserTransition = userOwnedTransitionSlots.contains(slot.id) ||
+          userTransitions.any((t) => t.slotId == slot.id);
+      if (useUserTransition) {
+        final userTr = userTransitions
+            .where((t) => t.slotId == slot.id)
+            .firstOrNull;
+        if (userTr != null &&
+            i < slots.length - 1 &&
+            userTr.transitionType.isNotEmpty &&
+            userTr.transitionType != 'none' &&
+            userTr.transitionType != 'cut') {
+          final td = userTr.durationSeconds.clamp(0.05, 2.0);
+          items.add(
+            TimelineItem(
+              id: 'user_tr_${userTr.id}',
+              kind: TimelineLayerKind.transition,
+              startTime: math.max(0, end - td / 2),
+              endTime: end + td / 2,
+              layerOrder: 2000 + i,
+              slotId: slot.id,
+              transitionType: userTr.transitionType,
+              parameters: userTr.parameters,
+            ),
+          );
+        }
+      } else {
+        final tr = _transitionAfter(recipe, i, slot);
+        if (tr != null && i < slots.length - 1) {
+          final td = tr.durationSeconds.clamp(0.05, 2.0);
+          items.add(
+            TimelineItem(
+              id: 'tr_${slot.id}',
+              kind: TimelineLayerKind.transition,
+              startTime: math.max(0, end - td / 2),
+              endTime: end + td / 2,
+              layerOrder: 2000 + i,
+              slotId: slot.id,
+              transitionType: tr.type,
+              parameters: tr.parameters ?? const {},
+            ),
+          );
+        }
       }
 
       cursor = end;
@@ -395,38 +425,51 @@ class TimelineEngine {
         ),
       );
       // Promote clip filters/effects so preview + bake share the same look.
-      for (var e = 0; e < clip.effects.length; e++) {
-        final fx = clip.effects[e];
-        final fxStart = start + fx.startTime;
-        final fxEnd = fx.endTime != null ? start + fx.endTime! : end;
-        items.add(
-          TimelineItem(
-            id: 'clip_fx_${clip.id}_$e',
-            kind: TimelineLayerKind.videoClip,
-            startTime: fxStart.clamp(start, end),
-            endTime: fxEnd.clamp(start, end),
-            layerOrder: 1100 + e,
-            clipId: clip.id,
-            effectType: fx.effectType,
-            parameters: fx.parameters,
-          ),
-        );
+      // When the user owns that slot's look (incl. cleared), do not re-apply
+      // recipe clip FX — otherwise deleted filters/effects stay in preview.
+      final clipSlotId = clip.slotId;
+      final skipClipEffects = clipSlotId != null
+          ? userOwnedEffectSlots.contains(clipSlotId)
+          : userOwnedEffectSlots.isNotEmpty;
+      final skipClipFilters = clipSlotId != null
+          ? userOwnedFilterSlots.contains(clipSlotId)
+          : userOwnedFilterSlots.isNotEmpty;
+      if (!skipClipEffects) {
+        for (var e = 0; e < clip.effects.length; e++) {
+          final fx = clip.effects[e];
+          final fxStart = start + fx.startTime;
+          final fxEnd = fx.endTime != null ? start + fx.endTime! : end;
+          items.add(
+            TimelineItem(
+              id: 'clip_fx_${clip.id}_$e',
+              kind: TimelineLayerKind.videoClip,
+              startTime: fxStart.clamp(start, end),
+              endTime: fxEnd.clamp(start, end),
+              layerOrder: 1100 + e,
+              clipId: clip.id,
+              effectType: fx.effectType,
+              parameters: fx.parameters,
+            ),
+          );
+        }
       }
-      for (var f = 0; f < clip.filters.length; f++) {
-        final filter = clip.filters[f];
-        items.add(
-          TimelineItem(
-            id: 'clip_filter_${clip.id}_$f',
-            kind: TimelineLayerKind.videoClip,
-            startTime: start,
-            endTime: end,
-            layerOrder: 950 + f,
-            clipId: clip.id,
-            filterName: filter.filterName,
-            filterIntensity: filter.intensity,
-            lutAssetId: filter.lutAssetId,
-          ),
-        );
+      if (!skipClipFilters) {
+        for (var f = 0; f < clip.filters.length; f++) {
+          final filter = clip.filters[f];
+          items.add(
+            TimelineItem(
+              id: 'clip_filter_${clip.id}_$f',
+              kind: TimelineLayerKind.videoClip,
+              startTime: start,
+              endTime: end,
+              layerOrder: 950 + f,
+              clipId: clip.id,
+              filterName: filter.filterName,
+              filterIntensity: filter.intensity,
+              lutAssetId: filter.lutAssetId,
+            ),
+          );
+        }
       }
       if (end > total) total = end;
     }
