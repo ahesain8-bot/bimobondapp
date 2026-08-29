@@ -98,6 +98,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   /// Retouch (Magic) On by default when the camera opens.
   bool _photoEditorMagicOn = true;
+  bool _preserveNeutralAdjustments = false;
 
   /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
   static const double _kMagicAutoSmooth = 0.50;
@@ -552,6 +553,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _restoreLiveColorDefaults() {
+    if (_preserveNeutralAdjustments) return;
     _photoAdjustments.addAll(
       _isFrontCamera ? _kFrontLiveColorDefaults : _kLiveColorDefaults,
     );
@@ -600,7 +602,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final next = !_photoEditorMagicOn;
     _photoEditorMagicOn = next;
     if (next) {
-      _photoAdjustments.addAll(_kMagicBeautyDefaults);
+      if (!_preserveNeutralAdjustments) {
+        _photoAdjustments.addAll(_kMagicBeautyDefaults);
+      }
       _photoEditorTool = MediaPhotoEditorTool.smooth;
     } else {
       _photoEditorTool = MediaPhotoEditorTool.magic;
@@ -610,7 +614,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     setState(() {});
     if (_useNativeArFilters) {
       if (next) {
-        ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+        ArCameraBridge.setMagicEnabled(
+          true,
+          strength:
+              _photoAdjustments[MediaPhotoEditorTool.smooth] ??
+              _kMagicAutoSmooth,
+        );
         _syncRetouchToNative();
       } else {
         ArCameraBridge.setMagicEnabled(false);
@@ -667,11 +676,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   }
 
   void _resetPhotoEditor() {
+    _smoothAdjustDebounce?.cancel();
+    _retouchAdjustDebounce?.cancel();
+    _arFilterIntensityDebounce?.cancel();
     setState(() {
       for (final key in _photoAdjustments.keys) {
         _photoAdjustments[key] = 0.0;
       }
-      _restoreLiveColorDefaults();
+      _arFilterIntensity = 0.0;
+      _preserveNeutralAdjustments = true;
       _photoEditorTool = MediaPhotoEditorTool.magic;
       _photoEditorMagicOn = false;
       if (_useNativeArFilters) {
@@ -684,8 +697,19 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     });
     if (_useNativeArFilters) {
       ArCameraBridge.setMagicEnabled(false);
-      ArCameraBridge.clearRetouchAdjustments();
-      _applyArFilter('none');
+      _applyArFilter('none', intensity: 0.0);
+      // clearRetouchAdjustments restores a camera baseline; Reset requires
+      // every adjustable renderer value to be exactly neutral instead.
+      ArCameraBridge.setRetouchAdjustments();
+      ArCameraBridge.setBeautyFilter(
+        smooth: 0,
+        whiten: 0,
+        brighten: 0,
+        blush: 0,
+        lipTint: '#000000',
+        lipStrength: 0,
+        intensity: 0,
+      );
     } else {
       unawaited(_applyBeauty(false));
     }

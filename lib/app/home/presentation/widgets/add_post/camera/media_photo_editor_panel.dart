@@ -42,6 +42,9 @@ const Set<MediaPhotoEditorTool> _bipolarTools = {
 /// One-way 0…1 tools (Smooth).
 const Set<MediaPhotoEditorTool> _intensityTools = {MediaPhotoEditorTool.smooth};
 
+/// UI-only feature flag; the teeth filter implementation remains available.
+const bool _showTeethWhiteningTool = false;
+
 enum MediaPhotoEditorTab { face, makeup }
 
 /// Film color-grade category shown under Makeup.
@@ -242,6 +245,8 @@ class _FloatingBipolarSlider extends StatelessWidget {
   final ValueChanged<double> onChanged;
   final ValueChanged<double> onChangeEnd;
 
+  static double _snapToZero(double value) => value.abs() <= 0.03 ? 0.0 : value;
+
   @override
   Widget build(BuildContext context) {
     final label = '${(value * 100).round()}';
@@ -267,23 +272,39 @@ class _FloatingBipolarSlider extends StatelessWidget {
               ),
             ),
           ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 2.5,
-              activeTrackColor: const Color(0xFFE11D48),
-              inactiveTrackColor: Colors.white.withValues(alpha: 0.45),
-              thumbColor: Colors.white,
-              overlayColor: const Color(0x33E11D48),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-            ),
-            child: Slider(
-              value: value.clamp(-1.0, 1.0),
-              min: -1.0,
-              max: 1.0,
-              onChanged: onChanged,
-              onChangeEnd: onChangeEnd,
-            ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IgnorePointer(
+                child: Container(
+                  width: 2,
+                  height: 10,
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
+              ),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2.5,
+                  activeTrackColor: const Color(0xFFE11D48),
+                  inactiveTrackColor: Colors.white.withValues(alpha: 0.45),
+                  thumbColor: Colors.white,
+                  overlayColor: const Color(0x33E11D48),
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 8,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 14,
+                  ),
+                ),
+                child: Slider(
+                  value: value.clamp(-1.0, 1.0),
+                  min: -1.0,
+                  max: 1.0,
+                  onChanged: (next) => onChanged(_snapToZero(next)),
+                  onChangeEnd: (next) => onChangeEnd(_snapToZero(next)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -498,11 +519,12 @@ class _FaceToolsRow extends StatelessWidget {
         LucideIcons.eye,
         l10n.mediaPhotoEditorEyes,
       ),
-      _AdjustToolSpec(
-        MediaPhotoEditorTool.tooth,
-        LucideIcons.sparkle,
-        l10n.mediaPhotoEditorTooth,
-      ),
+      if (_showTeethWhiteningTool)
+        _AdjustToolSpec(
+          MediaPhotoEditorTool.tooth,
+          LucideIcons.sparkle,
+          l10n.mediaPhotoEditorTooth,
+        ),
       _AdjustToolSpec(
         MediaPhotoEditorTool.mouth,
         LucideIcons.laugh,
