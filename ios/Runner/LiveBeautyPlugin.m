@@ -3,6 +3,7 @@
 #import <CoreImage/CoreImage.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Metal/Metal.h>
+#import <os/lock.h>
 #import <WebRTC/WebRTC.h>
 
 #import <flutter_webrtc/FlutterWebRTCPlugin.h>
