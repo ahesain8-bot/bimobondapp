@@ -18,6 +18,7 @@ import '../datasources/lives_socket_datasource.dart';
 import '../mappers/live_host_extras_mapper.dart';
 import '../mappers/live_session_mapper.dart';
 import '../../domain/entities/live_viewer.dart';
+import '../../domain/entities/live_battle_errors.dart';
 
 /// Remote live-session repository backed by Nest `/lives` + Socket.IO + LiveKit.
 class LiveSessionRepositoryImpl implements LiveSessionRepository {
@@ -153,15 +154,25 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
 
   @override
   Future<LiveSession> reconnectHostSession(String liveId) async {
-    final response = await _remote.start(liveId);
-    final liveMap = (response['live'] as Map<String, dynamic>?) ?? response;
-    return LiveSessionMapper.fromLiveJson(
-      liveMap,
-      liveKitToken: response['token']?.toString(),
-      liveKitUrl: response['url']?.toString(),
-      liveKitRole: response['role']?.toString() ?? 'host',
-      mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: 'host'),
-    );
+    try {
+      final response = await _remote.start(liveId);
+      final liveMap = (response['live'] as Map<String, dynamic>?) ?? response;
+      return LiveSessionMapper.fromLiveJson(
+        liveMap,
+        liveKitToken: response['token']?.toString(),
+        liveKitUrl: response['url']?.toString(),
+        liveKitRole: response['role']?.toString() ?? 'host',
+        mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: 'host'),
+      );
+    } on ApiException catch (e) {
+      if (isEndedLiveStartError(e)) {
+        throw StateError(
+          'Live $liveId is no longer LIVE. Create a new live instead of '
+          'POST /lives/$liveId/start.',
+        );
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -516,13 +527,19 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required String opponentLiveId,
     int durationSeconds = 300,
   }) async {
-    return _battleFrom(
-      await _remote.startBattle(
-        liveId: liveId,
-        opponentLiveId: opponentLiveId,
-        durationSeconds: durationSeconds,
-      ),
-    );
+    try {
+      return _battleFrom(
+        await _remote.startBattle(
+          liveId: liveId,
+          opponentLiveId: opponentLiveId,
+          durationSeconds: durationSeconds,
+        ),
+      );
+    } on ApiException catch (e) {
+      final existing = await _existingActiveBattle(liveId, e);
+      if (existing != null) return existing;
+      rethrow;
+    }
   }
 
   @override
@@ -530,12 +547,28 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     String liveId, {
     int durationSeconds = 300,
   }) async {
-    return _battleFrom(
-      await _remote.matchBattle(
-        liveId: liveId,
-        durationSeconds: durationSeconds,
-      ),
-    );
+    try {
+      return _battleFrom(
+        await _remote.matchBattle(
+          liveId: liveId,
+          durationSeconds: durationSeconds,
+        ),
+      );
+    } on ApiException catch (e) {
+      final existing = await _existingActiveBattle(liveId, e);
+      if (existing != null) return existing;
+      rethrow;
+    }
+  }
+
+  Future<LiveBattle?> _existingActiveBattle(
+    String liveId,
+    ApiException error,
+  ) async {
+    if (!isAlreadyInBattleError(error)) return null;
+    final existing = await loadBattle(liveId);
+    if (existing != null && existing.isActive) return existing;
+    return null;
   }
 
   @override

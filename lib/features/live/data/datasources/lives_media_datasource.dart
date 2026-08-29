@@ -320,7 +320,10 @@ class LivesMediaDataSource {
     Future<void> Function()? beforeVideoCapture,
     LiveMediaHints? mediaHints,
   }) async {
-    await disconnect();
+    // Keep an in-progress PK subscribe up. PK is overlay + scores on the
+    // same `live_{id}` publish; tearing the opponent room down here is what
+    // made hosts leave their own room for 10s+ while recovering a token.
+    await disconnect(keepBattleRoom: true);
 
     final hints = mediaHints ?? LiveMediaHints.defaultsForRole('host');
     if (!hints.canPublish) {
@@ -1141,14 +1144,16 @@ class LivesMediaDataSource {
     throw StateError('LiveKit camera flip failed and could not be recovered');
   }
 
-  Future<void> disconnect() async {
+  Future<void> disconnect({bool keepBattleRoom = false}) async {
     debugPrint(
       '🔍 [Host] disconnect() called — _room=${_room != null ? "SET" : "NULL"}, '
       '_videoTrack=${_videoTrack != null ? "SET" : "NULL"}, '
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     _stopOutboundVideoWatchdog();
-    await disconnectBattle();
+    if (!keepBattleRoom) {
+      await disconnectBattle();
+    }
     // Back to LiveKit's automatic management *before* the primary room goes
     // down, so that room's own teardown is what finally frees the session.
     // Note the ordering against disconnectBattle() above: the battle room is
