@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'comment_entity.dart';
 import 'gift_entity.dart';
+import 'hourly_ranking_entity.dart';
 import '../../../../core/models/live_battle.dart';
 
 /// Socket event types matching the backend contract.
@@ -18,6 +19,8 @@ enum SocketEventType {
   liveGuestInvite,
   liveGuestUpdate,
   liveBattle,
+  liveHourlyRank,
+  liveTopGifters,
   reconnecting,
   reconnected,
   networkLost,
@@ -244,6 +247,38 @@ class LiveBattleEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, updateType, battle];
+}
+
+/// `liveHourlyRankUpdated` — this stream moved inside the current UTC hour
+/// (mobile-api.md §19). Carries the same shape as
+/// `GET /lives/:id/leaderboard/hourly`.
+class LiveHourlyRankEvent extends SocketEvent {
+  final LiveHourlyRank rank;
+
+  const LiveHourlyRankEvent({
+    required super.liveId,
+    required this.rank,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveHourlyRank);
+
+  @override
+  List<Object?> get props => [...super.props, rank];
+}
+
+/// `liveTopGiftersUpdated` — the real top supporters for this stream session.
+/// The header only needs the first three avatars; the full leaderboard remains
+/// available from `GET /lives/:id/leaderboard/gifters` for the ranking sheet.
+class LiveTopGiftersUpdatedEvent extends SocketEvent {
+  final List<String> avatarUrls;
+
+  const LiveTopGiftersUpdatedEvent({
+    required super.liveId,
+    required this.avatarUrls,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveTopGifters);
+
+  @override
+  List<Object?> get props => [...super.props, avatarUrls];
 }
 
 class NetworkLostEvent extends SocketEvent {

@@ -319,6 +319,19 @@ class LivesSocketDataSource {
     _on(socket, 'liveBattle', (data) => battleEvent(data, 'score'));
     _on(socket, 'liveBattlePhase', (data) => battleEvent(data, 'phase'));
 
+    _on(socket, 'liveTopGiftersUpdated', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      final liveId = map['liveId']?.toString() ?? _liveId;
+      if (liveId == null || liveId.isEmpty) return;
+      _controller.add(
+        LiveHudTopGiftersEvent(
+          liveId: liveId,
+          avatarUrls: avatarUrlsFrom(map['data'] ?? map['gifters']),
+        ),
+      );
+    });
+
     _on(socket, 'liveHourlyRankUpdated', (data) {
       final map = _asMap(data);
       final rank = _asInt(map?['hourlyRank'] ?? map?['rank']);
@@ -526,6 +539,23 @@ class LivesSocketDataSource {
   /// Nested objects are converted too: the payload arrives as `Map<dynamic,
   /// dynamic>` on some transports, and a shallow copy left `map['user']`
   /// un-castable further down the mapper.
+  /// Ordered avatar URLs out of a leaderboard payload. Entries wrap the user
+  /// in `user`, but some emitters flatten it, so both shapes are read.
+  static List<String> avatarUrlsFrom(dynamic raw) {
+    if (raw is! List) return const [];
+    final urls = <String>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final map = entry.cast<String, dynamic>();
+      final nested = map['user'];
+      final user = nested is Map ? nested.cast<String, dynamic>() : map;
+      final url = (user['avatarUrl'] ?? user['avatar'])?.toString().trim();
+      if (url == null || url.isEmpty) continue;
+      urls.add(url);
+    }
+    return urls;
+  }
+
   Map<String, dynamic>? _asMap(dynamic data) {
     if (data is! Map) return null;
     return data.map((key, value) => MapEntry(key.toString(), _deep(value)));

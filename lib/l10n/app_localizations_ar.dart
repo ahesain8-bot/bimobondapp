@@ -4700,4 +4700,201 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get marketplaceDeliveryTracking => 'تتبع التوصيل';
+
+  @override
+  String get templateEditorSound => 'الصوت';
+
+  @override
+  String get templateEditorText => 'نص';
+
+  @override
+  String get templateEditorEffects => 'مؤثرات';
+
+  @override
+  String get templateEditorFilters => 'فلاتر';
+
+  @override
+  String get templateEditorTransitions => 'انتقالات';
+
+  @override
+  String get templateEditorStickers => 'ملصقات';
+
+  @override
+  String get templateEditorCopy => 'نسخ';
+
+  @override
+  String get templateEditorDelete => 'حذف';
+
+  @override
+  String get templateEditorLayers => 'طبقات';
+
+  @override
+  String get templateEditorNone => 'بدون';
+
+  @override
+  String get templateEditorTrending => 'الرائج';
+
+  @override
+  String get templateEditorApply => 'تطبيق';
+
+  @override
+  String get templateEditorDefault => 'افتراضي';
+
+  @override
+  String get templateEditorPhoto => 'صورة';
+
+  @override
+  String get templateEditorVideo => 'فيديو';
+
+  @override
+  String get templateEditorFont => 'خط';
+
+  @override
+  String get templateEditorAddText => 'إضافة نص';
+
+  @override
+  String get templateEditorReplaceText => 'استبدال النص';
+
+  @override
+  String get templateEditorReplaceSticker => 'استبدال الملصق';
+
+  @override
+  String get templateEditorReplaceFilter => 'استبدال الفلتر';
+
+  @override
+  String get templateEditorReplaceEffect => 'استبدال المؤثر';
+
+  @override
+  String get templateEditorReplaceTransition => 'استبدال الانتقال';
+
+  @override
+  String get templateEditorReplaceMusic => 'استبدال الموسيقى';
+
+  @override
+  String templateEditorAddFilterClip(int clip) {
+    return 'إضافة فلتر · مقطع $clip';
+  }
+
+  @override
+  String templateEditorAddEffectClip(int clip) {
+    return 'إضافة مؤثر · مقطع $clip';
+  }
+
+  @override
+  String get templateEditorAddTransition => 'إضافة انتقال';
+
+  @override
+  String get templateEditorFilterLayers => 'طبقات الفلاتر';
+
+  @override
+  String get templateEditorEffectLayers => 'طبقات المؤثرات';
+
+  @override
+  String get templateEditorServerPreview => 'معاينة السيرفر';
+
+  @override
+  String get templateEditorContinueWithRender => 'اضغط ← للمتابعة بهذا التصيير';
+
+  @override
+  String get templateEditorTypeBelow => 'اكتب بالأسفل…';
+
+  @override
+  String get templateEditorTypeCaption => 'اكتب التعليق…';
+
+  @override
+  String get templateEditorDragPinchResize => 'اسحب للتحريك · اضغط للتصغير/التكبير';
+
+  @override
+  String get templateEditorTapMediaToPlace => 'اضغط على الوسائط للوضع · اسحب للتحريك';
+
+  @override
+  String get templateEditorPickStickerBelow => 'اختر ملصقاً من الأسفل';
+
+  @override
+  String get templateEditorTapStickerBelow => 'اضغط على ملصق بالأسفل';
+
+  @override
+  String get templateEditorDragResizeSticker => 'اسحب للتحريك · اضغط أو ± للتحجيم';
+
+  @override
+  String templateEditorMaxFiltersPerClip(int count) {
+    return 'حد أقصى $count فلاتر لكل مقطع';
+  }
+
+  @override
+  String templateEditorMaxEffectsPerClip(int count) {
+    return 'حد أقصى $count مؤثرات لكل مقطع';
+  }
+
+  @override
+  String get templateEditorTransitionsNeedClips => 'الانتقالات تحتاج مقطعين على الأقل';
+
+  @override
+  String get templateEditorAddMediaAllSlots => 'أضف وسائط لجميع الخانات قبل التصيير.';
+
+  @override
+  String get templateEditorCouldNotRender => 'تعذر التصيير على السيرفر';
+
+  @override
+  String get templateEditorExportFailed => 'فشل التصدير';
+
+  @override
+  String get templateEditorPresetNone => 'بدون';
+
+  @override
+  String get templateEditorPresetCinematic => 'سينمائي';
+
+  @override
+  String get templateEditorPresetWarm => 'دافئ';
+
+  @override
+  String get templateEditorPresetCool => 'بارد';
+
+  @override
+  String get templateEditorPresetVintage => 'كلاسيكي';
+
+  @override
+  String get templateEditorPresetVivid => 'حيوي';
+
+  @override
+  String get templateEditorPresetFade => 'تلاشي';
+
+  @override
+  String get templateEditorPresetBw => 'أبيض وأسود';
+
+  @override
+  String get templateEditorPresetZoomIn => 'تكبير';
+
+  @override
+  String get templateEditorPresetZoomOut => 'تصغير';
+
+  @override
+  String get templateEditorPresetShake => 'اهتزاز';
+
+  @override
+  String get templateEditorPresetPulse => 'نبض';
+
+  @override
+  String get templateEditorPresetCrossfade => 'تلاشي متقاطع';
+
+  @override
+  String get templateEditorPresetFlash => 'وميض';
+
+  @override
+  String get templateEditorPresetSlideLeft => 'انزلاق لليسار';
+
+  @override
+  String get templateEditorPresetSlideRight => 'انزلاق لليمين';
+
+  @override
+  String get templateEditorPresetZoom => 'زوم';
+
+  @override
+  String get templateEditorPresetBlur => 'ضبابية';
+
+  @override
+  String get templateEditorPresetGlitch => 'خلل';
+
+  @override
+  String get templateEditorPresetFilmBurn => 'حرق فيلم';
 }

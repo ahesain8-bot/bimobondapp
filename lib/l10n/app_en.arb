@@ -2078,5 +2078,96 @@
   "marketplaceVerifiedProduct": "Verified Product",
   "marketplaceSecurePayment": "Secure Payment",
   "marketplaceBuyerProtection": "Buyer Protection",
-  "marketplaceDeliveryTracking": "Delivery Tracking"
+  "marketplaceDeliveryTracking": "Delivery Tracking",
+  "templateEditorSound": "Sound",
+  "templateEditorText": "Text",
+  "templateEditorEffects": "Effects",
+  "templateEditorFilters": "Filters",
+  "templateEditorTransitions": "Transitions",
+  "templateEditorStickers": "Stickers",
+  "templateEditorCopy": "Copy",
+  "templateEditorDelete": "Delete",
+  "templateEditorLayers": "Layers",
+  "templateEditorNone": "None",
+  "templateEditorTrending": "Trending",
+  "templateEditorApply": "Apply",
+  "templateEditorDefault": "Default",
+  "templateEditorPhoto": "Photo",
+  "templateEditorVideo": "Video",
+  "templateEditorFont": "Font",
+  "templateEditorAddText": "Add text",
+  "templateEditorReplaceText": "Replace text",
+  "templateEditorReplaceSticker": "Replace sticker",
+  "templateEditorReplaceFilter": "Replace filter",
+  "templateEditorReplaceEffect": "Replace effect",
+  "templateEditorReplaceTransition": "Replace transition",
+  "templateEditorReplaceMusic": "Replace music",
+  "templateEditorAddFilterClip": "Add filter · clip {clip}",
+  "@templateEditorAddFilterClip": {
+    "placeholders": {
+      "clip": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorAddEffectClip": "Add effect · clip {clip}",
+  "@templateEditorAddEffectClip": {
+    "placeholders": {
+      "clip": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorAddTransition": "Add transition",
+  "templateEditorFilterLayers": "Filter layers",
+  "templateEditorEffectLayers": "Effect layers",
+  "templateEditorServerPreview": "Server preview",
+  "templateEditorContinueWithRender": "Tap → to continue with this render",
+  "templateEditorTypeBelow": "Type below…",
+  "templateEditorTypeCaption": "Type your caption…",
+  "templateEditorDragPinchResize": "Drag to move · Pinch to resize",
+  "templateEditorTapMediaToPlace": "Tap media to place · Drag to move",
+  "templateEditorPickStickerBelow": "Pick a sticker below",
+  "templateEditorTapStickerBelow": "Tap a sticker below",
+  "templateEditorDragResizeSticker": "Drag to move · Pinch or ± to resize",
+  "templateEditorMaxFiltersPerClip": "Max {count} filters per clip",
+  "@templateEditorMaxFiltersPerClip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorMaxEffectsPerClip": "Max {count} effects per clip",
+  "@templateEditorMaxEffectsPerClip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "templateEditorTransitionsNeedClips": "Transitions need at least 2 clips",
+  "templateEditorAddMediaAllSlots": "Add media to all slots before rendering.",
+  "templateEditorCouldNotRender": "Could not render on server",
+  "templateEditorExportFailed": "Export failed",
+  "templateEditorPresetNone": "None",
+  "templateEditorPresetCinematic": "Cinematic",
+  "templateEditorPresetWarm": "Warm",
+  "templateEditorPresetCool": "Cool",
+  "templateEditorPresetVintage": "Vintage",
+  "templateEditorPresetVivid": "Vivid",
+  "templateEditorPresetFade": "Fade",
+  "templateEditorPresetBw": "B&W",
+  "templateEditorPresetZoomIn": "Zoom in",
+  "templateEditorPresetZoomOut": "Zoom out",
+  "templateEditorPresetShake": "Shake",
+  "templateEditorPresetPulse": "Pulse",
+  "templateEditorPresetCrossfade": "Crossfade",
+  "templateEditorPresetFlash": "Flash",
+  "templateEditorPresetSlideLeft": "Slide left",
+  "templateEditorPresetSlideRight": "Slide right",
+  "templateEditorPresetZoom": "Zoom",
+  "templateEditorPresetBlur": "Blur",
+  "templateEditorPresetGlitch": "Glitch",
+  "templateEditorPresetFilmBurn": "Film burn"
 }

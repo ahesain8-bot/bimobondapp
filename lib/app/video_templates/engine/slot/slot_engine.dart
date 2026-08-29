@@ -412,7 +412,7 @@ class UserProjectSlotMapper {
       return math.max(0.05, raw / speed);
     }
     // IMAGE fills (and IMAGE slots without trim) use the image hold duration
-    // (default 2s) so preview timeline and export share one clock.
+    // (default 5s) so preview timeline and export share one clock.
     final isImageHold = fill == null ||
         fill.isLocalImage ||
         (!fill.isLocalVideo && (slot.isImage || slot.isImageOnly));

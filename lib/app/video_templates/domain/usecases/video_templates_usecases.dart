@@ -5,6 +5,10 @@ import 'package:bimobondapp/app/video_templates/data/datasources/video_template_
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
 import 'package:bimobondapp/app/video_templates/domain/repositories/video_templates_repository.dart';
 import 'package:bimobondapp/app/video_templates/engine/template_engine.dart';
+import 'package:bimobondapp/app/video_templates/composition/composition_session.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_one_shot_render_builder.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/video_template_client_renderer.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/video_template_slot_filler.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -194,6 +198,19 @@ class CreateVideoTemplateProjectUseCase {
   }
 }
 
+class CreateProjectFromMediaUseCase {
+  CreateProjectFromMediaUseCase(this.repository);
+
+  final VideoTemplatesRepository repository;
+
+  Future<Either<Failure, VideoTemplateProjectEntity>> call({
+    required List<ProjectFromMediaInput> media,
+    String? title,
+  }) {
+    return repository.createProjectFromMedia(media: media, title: title);
+  }
+}
+
 class CompleteVideoTemplateProjectUseCase {
   CompleteVideoTemplateProjectUseCase(this.repository);
 
@@ -331,11 +348,13 @@ class VideoTemplateApplyResult {
   }
 }
 
-/// Orchestrates the mobile-api apply path (rendering guide):
-/// 1) recipe  2) project  3) upload + PATCH slots  4) **server export** (recommended)
-/// 5) client render only as offline / feature-fallback
+/// Orchestrates the mobile rendering guide path:
+/// 1) recipe  2) project  3) upload + PATCH slots
+/// 4) **server export** (`POST …/export` → SSE/poll)
+/// 5) client render only when [allowClientFallback] / offline
 ///
-/// Call [CompleteVideoTemplateProjectUseCase] **after** a successful `POST /posts`.
+/// Call [CompleteVideoTemplateProjectUseCase] **after** a successful `POST /posts`
+/// (or after Apply when posting immediately).
 class ApplyVideoTemplateUseCase {
   ApplyVideoTemplateUseCase({
     required this.repository,
@@ -351,17 +370,20 @@ class ApplyVideoTemplateUseCase {
     required VideoTemplateSelection selection,
     List<File> localFiles = const [],
     List<String> uploadedUrls = const [],
-    /// Ignored — all exports are forced to server.
-    bool? preferServerExport,
-    /// If server export fails, try local compose (off by default — server-only).
-    bool allowClientFallback = false,
+    /// Prefer server FFmpeg worker (default). Set false to force client encode.
+    bool preferServerExport = true,
+    /// If server export fails, try local compose.
+    bool allowClientFallback = true,
     /// Force client compose even when server succeeds (rare; preview tools).
     bool renderClientVideo = false,
     /// Only create project + upload/PATCH slots (no encode). For client handoff.
     bool skipExport = false,
-    /// Forced to `draft` for all server exports.
+    /// Final post → `standard`; fast preview/retry → `draft` (guide §5).
     String? exportQuality,
-    int? fps,
+    String? resolution,
+    double? fps,
+    /// Catalog shelf UUID — omit for gallery / free edit (uses media[] only).
+    String? catalogTemplateId,
     String? projectTitle,
     int exportMaxTicks = 240,
     /// Overall apply progress in `0..1` (upload → export → done).
@@ -377,7 +399,7 @@ class ApplyVideoTemplateUseCase {
           .where((u) => u.isNotEmpty),
     );
 
-    report(0.02, label: 'Preparing');
+    report(0.02, label: 'Preparing export…');
 
     // 1) Recipe (with overlays) — golden rule: always /recipe
     VideoTemplateRecipeEntity recipe;
@@ -386,8 +408,17 @@ class ApplyVideoTemplateUseCase {
         (existing.slots.isNotEmpty || existing.slotCount > 0)) {
       recipe = existing;
     } else {
+      final catalogId =
+          VideoTemplateProjectIds.normalizeServerId(catalogTemplateId);
+      if (catalogId == null) {
+        return Left(
+          ServerFailure(
+            'recipe_failed — no catalog template and no local recipe',
+          ),
+        );
+      }
       final recipeResult = await repository.getRecipe(
-        selection.templateId,
+        catalogId,
         includeOverlays: true,
       );
       final recipeOr = recipeResult.fold<VideoTemplateRecipeEntity?>(
@@ -405,43 +436,23 @@ class ApplyVideoTemplateUseCase {
 
     final slotCount = recipe.applySlotCount;
     final hints = recipe.renderHints;
-    // Forced policy: always server + draft (ignore preferredPath / caller).
-    const quality = 'draft';
+    final quality = _normalizeQuality(
+      exportQuality ??
+          (preferServerExport ? 'standard' : hints.recommendedFinalQuality),
+    );
+    final useServer = preferServerExport && !renderClientVideo;
     debugPrint(
-      'ApplyVideoTemplate path=server quality=draft '
-      '(forced; preferredPath=${hints.preferredPath} '
-      'complexity=${hints.complexity} '
-      'callerPreferServer=$preferServerExport '
-      'callerQuality=$exportQuality)',
+      'ApplyVideoTemplate path=${useServer ? 'server' : 'client'} '
+      'quality=$quality resolution=$resolution fps=$fps '
+      '(preferredPath=${hints.preferredPath} complexity=${hints.complexity})',
     );
 
-    // 2) Create project, or reuse only while still EDITING.
-    // Completed projects reject PATCH ("Project is already completed").
-    if (VideoTemplateProjectIds.isLocalClientId(selection.projectId)) {
-      debugPrint(
-        'ApplyVideoTemplate: ignoring client draft id '
-        '${selection.projectId} — creating server project',
-      );
-    }
-    final projectIdResult = await _ensureEditableProjectId(
-      templateId: selection.templateId,
-      title: projectTitle ?? selection.name,
-      existingProjectId: selection.serverProjectId,
-    );
-    final projectId = projectIdResult.fold<String?>((_) => null, (id) => id);
-    if (projectId == null) {
-      return projectIdResult.fold(
-        (f) => Left(f),
-        (_) => Left(ServerFailure('project_create_failed')),
-      );
-    }
-
-    // 3) Upload user media in parallel → `/uploads/...` for server render
+    // 2) Upload user media first when needed (required before Flow B project).
     if (urls.isEmpty) {
       if (localFiles.isEmpty) {
         return Left(ServerFailure('no_media_for_template'));
       }
-      report(0.05, label: 'Uploading');
+      report(0.05, label: 'Uploading…');
       final uploadResults = await Future.wait(
         localFiles.map((file) => uploadMedia(file)),
       );
@@ -462,9 +473,42 @@ class ApplyVideoTemplateUseCase {
       urls = VideoTemplateSlotFiller.padByRepeat(urls, slotCount);
     }
 
-    // 4) Fill UserProjectSlots in parallel (IMAGE vs VIDEO PATCH rules)
-    report(0.2, label: 'Preparing slots');
+    // 3) Create server project (Flow A catalog template or Flow B from-media).
+    if (VideoTemplateProjectIds.isLocalClientId(selection.projectId)) {
+      debugPrint(
+        'ApplyVideoTemplate: ignoring client draft id '
+        '${selection.projectId} — creating server project',
+      );
+    }
+    final projectEntityResult = await _ensureEditableProject(
+      selection: selection,
+      title: projectTitle ?? selection.name,
+      existingProjectId: selection.serverProjectId,
+      urls: urls,
+      localFiles: localFiles,
+      catalogTemplateId: catalogTemplateId,
+    );
+    final projectEntity = projectEntityResult.fold<VideoTemplateProjectEntity?>(
+      (_) => null,
+      (p) => p,
+    );
+    if (projectEntity == null) {
+      return projectEntityResult.fold(
+        (f) => Left(f),
+        (_) => Left(ServerFailure('project_create_failed')),
+      );
+    }
+    final projectId = VideoTemplateProjectIds.normalizeServerId(
+      projectEntity.id,
+    );
+    if (projectId == null) {
+      return Left(ServerFailure('project_create_failed'));
+    }
     var activeProjectId = projectId;
+    final serverSlots = projectEntity.slots;
+
+    // 4) Fill UserProjectSlots (Flow A) or refresh trims (Flow B may pre-fill).
+    report(0.2, label: 'Preparing slots…');
     final slots = recipe.slots;
     if (slots.isNotEmpty) {
       final patchResult = await _patchProjectSlots(
@@ -472,6 +516,7 @@ class ApplyVideoTemplateUseCase {
         recipe: recipe,
         urls: urls,
         localFiles: localFiles,
+        serverSlots: serverSlots,
       );
       final patchFailure = patchResult.fold<Failure?>((f) => f, (_) => null);
       if (patchFailure != null) {
@@ -480,12 +525,19 @@ class ApplyVideoTemplateUseCase {
             'ApplyVideoTemplate: slot PATCH hit completed project '
             '$activeProjectId — recreating',
           );
-          final recreated = await _ensureEditableProjectId(
-            templateId: selection.templateId,
+          final recreated = await _ensureEditableProject(
+            selection: selection,
             title: projectTitle ?? selection.name,
             existingProjectId: null,
+            urls: urls,
+            localFiles: localFiles,
+            catalogTemplateId: catalogTemplateId,
           );
-          final newId = recreated.fold<String?>((_) => null, (id) => id);
+          final newProject = recreated.fold<VideoTemplateProjectEntity?>(
+            (_) => null,
+            (p) => p,
+          );
+          final newId = VideoTemplateProjectIds.normalizeServerId(newProject?.id);
           if (newId == null) {
             return recreated.fold(
               (f) => Left(f),
@@ -498,6 +550,7 @@ class ApplyVideoTemplateUseCase {
             recipe: recipe,
             urls: urls,
             localFiles: localFiles,
+            serverSlots: newProject?.slots ?? const [],
           );
           if (retry.isLeft()) {
             return retry.fold(
@@ -511,47 +564,78 @@ class ApplyVideoTemplateUseCase {
       }
     }
 
-    // 5–6) Server export only — never encode IMAGE/VIDEO templates on device.
+    // 5–6) Server export (guide §4–7) → optional client fallback (§9)
     VideoTemplateExportEntity? export;
-    const File? renderedVideo = null;
+    File? renderedVideo;
 
     if (!skipExport) {
-      if (renderClientVideo || allowClientFallback) {
-        debugPrint(
-          'ApplyVideoTemplate: ignoring client render flags '
-          '(renderClientVideo=$renderClientVideo '
-          'allowClientFallback=$allowClientFallback) — server-only policy',
+      var serverOk = false;
+      if (useServer) {
+        report(0.22, label: 'Preparing export…');
+        export = await _queueAndWaitExport(
+          projectId: activeProjectId,
+          quality: quality,
+          resolution: resolution,
+          fps: fps,
+          maxTicks: exportMaxTicks,
+          onProgress: (entity) {
+            final pct = entity.progress.clamp(0, 100) / 100.0;
+            report(
+              0.22 + pct * 0.7,
+              label: entity.stageLabel ?? 'Rendering clips…',
+            );
+          },
         );
-      }
-      report(0.22, label: 'Rendering');
-      export = await _queueAndWaitExport(
-        projectId: activeProjectId,
-        quality: 'draft',
-        maxTicks: exportMaxTicks,
-        onProgress: (entity) {
-          // Server progress is 0..100 → map into overall 22%..92%.
-          final pct = entity.progress.clamp(0, 100) / 100.0;
-          report(
-            0.22 + pct * 0.7,
-            label: entity.stageLabel ?? 'Rendering',
+        if (export != null && export.isFailed) {
+          debugPrint(
+            'Server template export FAILED: '
+            '${export.stageLabel ?? export.errorMessage ?? export.status}',
           );
-        },
-      );
-      if (export != null && export.isFailed) {
-        debugPrint(
-          'Server template export FAILED: '
-          '${export.stageLabel ?? export.errorMessage ?? export.status}',
-        );
+        }
+        serverOk = export != null &&
+            export.isComplete &&
+            (export.exportUrl?.trim().isNotEmpty ?? false);
+        if (serverOk) {
+          report(0.95, label: export.stageLabel ?? 'Export complete');
+        }
       }
-      final serverOk = export != null &&
-          export.isComplete &&
-          (export.exportUrl?.trim().isNotEmpty ?? false);
-      if (serverOk) {
-        report(0.95, label: export?.stageLabel ?? 'Almost done');
+
+      final needClient = renderClientVideo ||
+          (!serverOk && (allowClientFallback || !useServer));
+      if (needClient) {
+        report(0.35, label: 'Rendering on device…');
+        final fills = <String, SlotFillEntry>{};
+        for (var i = 0; i < recipe.slots.length; i++) {
+          final slot = recipe.slots[i];
+          if (slot.id.isEmpty) continue;
+          final file = localFiles.isNotEmpty
+              ? localFiles[i % localFiles.length]
+              : null;
+          if (file == null) continue;
+          fills[slot.id] = SlotFillEntry(
+            slotId: slot.id,
+            slotIndex: slot.slotIndex,
+            localFile: file,
+            userAssetUrl: urls.isNotEmpty ? urls[i % urls.length] : null,
+          );
+        }
+        final clientQuality = quality == 'draft'
+            ? TemplateClientExportQuality.draft
+            : TemplateClientExportQuality.standard;
+        renderedVideo = await engine.export(
+          recipe: recipe,
+          fills: fills,
+          quality: clientQuality,
+          onProgress: (p) =>
+              report(0.35 + p * 0.6, label: 'Rendering clips…'),
+        );
+        if (renderedVideo != null) {
+          report(0.97, label: 'Finalizing…');
+        }
       }
     }
 
-    report(1, label: 'Done');
+    report(1, label: 'Export complete');
     return Right(
       VideoTemplateApplyResult(
         selection: selection.copyWith(
@@ -559,6 +643,7 @@ class ApplyVideoTemplateUseCase {
           projectId: activeProjectId,
           slotCount: slotCount,
           templateKind: recipe.templateKind,
+          templateId: catalogTemplateId ?? '',
           sound: recipe.sound ?? selection.sound,
           soundSegmentId: recipe.soundSegmentId ?? selection.soundSegmentId,
         ),
@@ -571,18 +656,27 @@ class ApplyVideoTemplateUseCase {
     );
   }
 
-  Future<Either<Failure, String>> _ensureEditableProjectId({
-    required String templateId,
+  static String _normalizeQuality(String? raw) {
+    final q = (raw ?? 'standard').trim().toLowerCase();
+    return q == 'draft' ? 'draft' : 'standard';
+  }
+
+  Future<Either<Failure, VideoTemplateProjectEntity>> _ensureEditableProject({
+    required VideoTemplateSelection selection,
     required String? title,
+    required List<String> urls,
+    required List<File> localFiles,
     String? existingProjectId,
+    String? catalogTemplateId,
   }) async {
     final existing =
         VideoTemplateProjectIds.normalizeServerId(existingProjectId);
     if (existing != null) {
       final got = await repository.getProject(existing);
-      final project = got.fold<VideoTemplateProjectEntity?>((_) => null, (p) => p);
+      final project =
+          got.fold<VideoTemplateProjectEntity?>((_) => null, (p) => p);
       if (project != null && project.isEditing) {
-        return Right(existing);
+        return Right(project);
       }
       debugPrint(
         'ApplyVideoTemplate: project $existing '
@@ -590,22 +684,61 @@ class ApplyVideoTemplateUseCase {
       );
     }
 
-    final created = await repository.createProject(
-      templateId: templateId,
-      title: title,
+    final catalogId = VideoTemplateProjectIds.normalizeServerId(
+      catalogTemplateId,
     );
-    final project = created.fold<VideoTemplateProjectEntity?>(
-      (_) => null,
-      (p) => p,
-    );
-    final createdId = VideoTemplateProjectIds.normalizeServerId(project?.id);
-    if (createdId == null) {
-      return created.fold(
-        (f) => Left(f),
-        (_) => Left(ServerFailure('project_create_failed')),
+    if (catalogId != null) {
+      debugPrint('ApplyVideoTemplate: Flow A catalog template $catalogId');
+      return repository.createProject(templateId: catalogId, title: title);
+    }
+
+    // Flow B — gallery / free edit (never send local_edit as templateId).
+    if (urls.isEmpty) {
+      return Left(
+        ServerFailure('upload media before POST /projects/from-media'),
       );
     }
-    return Right(createdId);
+    final media = <ProjectFromMediaInput>[];
+    for (var i = 0; i < urls.length; i++) {
+      final url = urls[i];
+      final local = localFiles.isNotEmpty
+          ? localFiles[i % localFiles.length]
+          : null;
+      final isVideo = local != null
+          ? VideoThumbnailUtils.isVideoFile(local)
+          : _looksLikeVideoAsset(url);
+      media.add(
+        ProjectFromMediaInput(
+          url: url,
+          type: isVideo ? 'VIDEO' : 'IMAGE',
+        ),
+      );
+    }
+    debugPrint(
+      'ApplyVideoTemplate: Flow B from-media (${media.length} clip(s))',
+    );
+    return repository.createProjectFromMedia(media: media, title: title);
+  }
+
+  static String _resolvePatchSlotId({
+    required int slotIndex,
+    required VideoTemplateSlotEntity recipeSlot,
+    required List<VideoTemplateProjectSlotEntity> serverSlots,
+  }) {
+    for (final s in serverSlots) {
+      if (s.slotIndex == slotIndex) {
+        final id = s.patchSlotId;
+        if (VideoTemplateProjectIds.isServerId(id)) return id;
+      }
+    }
+    if (slotIndex < serverSlots.length) {
+      final id = serverSlots[slotIndex].patchSlotId;
+      if (VideoTemplateProjectIds.isServerId(id)) return id;
+    }
+    if (VideoTemplateProjectIds.isServerId(recipeSlot.id)) {
+      return recipeSlot.id;
+    }
+    return recipeSlot.id;
   }
 
   Future<Either<Failure, void>> _patchProjectSlots({
@@ -613,13 +746,26 @@ class ApplyVideoTemplateUseCase {
     required VideoTemplateRecipeEntity recipe,
     required List<String> urls,
     List<File> localFiles = const [],
+    List<VideoTemplateProjectSlotEntity> serverSlots = const [],
   }) async {
     final slots = recipe.slots;
     final beats = recipe.beatTimestamps;
     final patchFutures = <Future<Either<Failure, dynamic>>>[];
     for (var i = 0; i < slots.length; i++) {
       final slot = slots[i];
-      if (slot.id.isEmpty) continue;
+      final patchSlotId = _resolvePatchSlotId(
+        slotIndex: i,
+        recipeSlot: slot,
+        serverSlots: serverSlots,
+      );
+      if (patchSlotId.isEmpty ||
+          !VideoTemplateProjectIds.isServerId(patchSlotId)) {
+        debugPrint(
+          '_patchProjectSlots: skip slot $i — no server slotId '
+          '(recipeSlot=${slot.id})',
+        );
+        continue;
+      }
       final url = urls[i % urls.length];
       final local = localFiles.isNotEmpty
           ? localFiles[i % localFiles.length]
@@ -660,7 +806,7 @@ class ApplyVideoTemplateUseCase {
       patchFutures.add(
         repository.patchProjectSlot(
           projectId: projectId,
-          slotId: slot.id,
+          slotId: patchSlotId,
           userAssetUrl: url,
           trimStart: trimStart,
           trimEnd: trimEnd,
@@ -702,12 +848,16 @@ class ApplyVideoTemplateUseCase {
   Future<VideoTemplateExportEntity?> _queueAndWaitExport({
     required String projectId,
     required String quality,
+    String? resolution,
+    double? fps,
     required int maxTicks,
     void Function(VideoTemplateExportEntity entity)? onProgress,
   }) async {
     final queued = await repository.queueExport(
       projectId: projectId,
       quality: quality,
+      resolution: resolution,
+      fps: fps,
     );
     final started = queued.fold<VideoTemplateExportEntity?>(
       (f) {
@@ -743,9 +893,9 @@ class ApplyVideoTemplateUseCase {
     }
 
     for (var i = 0; i < maxTicks; i++) {
-      // 500ms while PROCESSING, 2s while QUEUED (mobile-api checklist).
+      // Guide §4: poll every 1–2s (faster while PROCESSING).
       final delay = last.isProcessing
-          ? const Duration(milliseconds: 500)
+          ? const Duration(seconds: 1)
           : const Duration(seconds: 2);
       await Future<void>.delayed(delay);
       final snap = await repository.getExport(
@@ -761,6 +911,240 @@ class ApplyVideoTemplateUseCase {
           'Template export ${entity.progress.round()}% — ${entity.stageLabel}',
         );
       }
+      if (entity.isComplete || entity.isFailed) return entity;
+    }
+    return last;
+  }
+}
+
+/// One-shot server render per mobile guide: upload → `POST /render` → poll.
+class OneShotRenderVideoTemplateUseCase {
+  OneShotRenderVideoTemplateUseCase({
+    required this.repository,
+    required this.uploadMedia,
+  });
+
+  final VideoTemplatesRepository repository;
+  final UploadMediaUseCase uploadMedia;
+
+  Future<Either<Failure, VideoTemplateApplyResult>> call({
+    required CompositionSession session,
+    required VideoTemplateSelection selection,
+    String? catalogTemplateId,
+    String? exportQuality,
+    String? resolution,
+    double? fps,
+    String? projectTitle,
+    int exportMaxTicks = 240,
+    void Function(double progress, {String? label})? onProgress,
+  }) async {
+    void report(double p, {String? label}) {
+      onProgress?.call(p.clamp(0.0, 1.0), label: label);
+    }
+
+    final recipe = session.recipe;
+    final slots = session.slots;
+    if (slots.isEmpty) {
+      return Left(ServerFailure('no_media_for_template'));
+    }
+
+    report(0.05, label: 'Uploading…');
+    final slotIdToUrl = <String, String>{};
+    final uploadedUrls = <String>[];
+
+    for (final slot in slots) {
+      final fill = session.fills[slot.id];
+      if (fill == null) continue;
+
+      String? url = fill.userAssetUrl != null
+          ? MediaUtils.toServerUploadPath(fill.userAssetUrl!)
+          : null;
+
+      if (fill.localFile != null && fill.localFile!.path.isNotEmpty) {
+        final upload = await uploadMedia(fill.localFile!);
+        final uploaded = upload.fold<String?>((_) => null, (u) => u);
+        if (uploaded == null || uploaded.isEmpty) {
+          return upload.fold(
+            (f) => Left(f),
+            (_) => Left(ServerFailure('upload_failed')),
+          );
+        }
+        url = MediaUtils.toServerUploadPath(uploaded);
+      }
+
+      if (url == null || url.isEmpty) continue;
+      slotIdToUrl[slot.id] = url;
+      uploadedUrls.add(url);
+    }
+
+    if (uploadedUrls.isEmpty) {
+      return Left(ServerFailure('no_media_for_template'));
+    }
+    report(0.18, label: 'Uploaded');
+
+    final filterPresetsResult = await repository.listPresets(kind: 'FILTER');
+    final effectPresetsResult = await repository.listPresets(kind: 'EFFECT');
+    final filterPresets = filterPresetsResult.fold(
+      (_) => const <TemplatePresetItem>[],
+      (list) => list,
+    );
+    final effectPresets = effectPresetsResult.fold(
+      (_) => const <TemplatePresetItem>[],
+      (list) => list,
+    );
+
+    final body = TemplateOneShotRenderBuilder.build(
+      session: session,
+      slotIdToUploadedUrl: slotIdToUrl,
+      catalogTemplateId: null,
+      title: projectTitle ?? selection.name,
+      exportQuality: exportQuality,
+      resolution: resolution,
+      fps: fps,
+      filterPresets: filterPresets,
+      effectPresets: effectPresets,
+      includeCatalogTemplateId: false,
+      explicitEditedExport: true,
+    );
+
+    body.remove('templateId');
+    TemplateOneShotRenderBuilder.stripCatalogTemplateKeys(body);
+
+    debugPrint(
+      'OneShotRender POST /render keys=${body.keys.toList()} '
+      'hasTemplateId=${body.containsKey('templateId')} '
+      'hasVideoTemplateId=${body.containsKey('videoTemplateId')} '
+      'texts=${(body['texts'] as List?)?.length ?? 'omit'} '
+      'stickers=${(body['stickers'] as List?)?.length ?? 'omit'} '
+      'textsOwned=${session.userTextsLayerOwned} '
+      'audios=${(body['audios'] as List?)?.length ?? 'omit'} '
+      'durationSeconds=${body['durationSeconds']} '
+      'slots=${body['slots']}',
+    );
+    final slotList = body['slots'];
+    if (slotList is List && slotList.isNotEmpty) {
+      final first = slotList.first;
+      if (first is Map) {
+        debugPrint(
+          'OneShotRender slot0 filters=${first['filters']} '
+          'filterName=${first['filterName']} '
+          'effects=${first['effects']} '
+          'effectType=${first['effectType']}',
+        );
+      }
+    }
+
+    if (body['media'] == null && body['templateId'] == null) {
+      return Left(ServerFailure('no_media_for_template'));
+    }
+
+    report(0.22, label: 'Preparing export…');
+    final jobResult = await repository.renderOneShot(body);
+    final job = jobResult.fold<VideoTemplateRenderJobEntity?>(
+      (_) => null,
+      (j) => j,
+    );
+    if (job == null) {
+      return jobResult.fold(
+        (f) => Left(f),
+        (_) => Left(ServerFailure('render_failed')),
+      );
+    }
+
+    final projectId = VideoTemplateProjectIds.normalizeServerId(job.projectId);
+    final exportId = job.exportId.trim();
+    if (projectId == null || exportId.isEmpty) {
+      return Left(ServerFailure('render_failed'));
+    }
+
+    var export = job.toExportEntity();
+    if (export.isComplete || export.isFailed) {
+      if (export.isFailed) {
+        return Left(ServerFailure(export.stageLabel ?? 'Export failed'));
+      }
+    } else {
+      export = await _waitForExport(
+            projectId: projectId,
+            exportId: exportId,
+            initial: export,
+            maxTicks: exportMaxTicks,
+            onProgress: (entity) {
+              final pct = entity.progress.clamp(0, 100) / 100.0;
+              report(
+                0.22 + pct * 0.7,
+                label: entity.stageLabel ?? 'Rendering clips…',
+              );
+            },
+          ) ??
+          export;
+    }
+
+    if (export.isFailed) {
+      return Left(
+        ServerFailure(export.stageLabel ?? export.errorMessage ?? 'Export failed'),
+      );
+    }
+    if (!export.isComplete ||
+        (export.exportUrl?.trim().isEmpty ?? true)) {
+      return Left(ServerFailure('export_timeout'));
+    }
+
+    report(0.95, label: export.stageLabel ?? 'Export complete');
+
+    final updatedSelection = selection.copyWith(
+      projectId: projectId,
+      recipe: recipe,
+      templateId: catalogTemplateId ?? '',
+    );
+
+    return Right(
+      VideoTemplateApplyResult(
+        selection: updatedSelection,
+        projectId: projectId,
+        uploadedUrls: uploadedUrls,
+        recipe: recipe,
+        export: export,
+      ),
+    );
+  }
+
+  Future<VideoTemplateExportEntity?> _waitForExport({
+    required String projectId,
+    required String exportId,
+    required VideoTemplateExportEntity initial,
+    required int maxTicks,
+    void Function(VideoTemplateExportEntity entity)? onProgress,
+  }) async {
+    var last = initial;
+    onProgress?.call(last);
+    if (last.isComplete || last.isFailed) return last;
+
+    final streamed = await repository.listenExportStream(
+      projectId: projectId,
+      exportId: exportId,
+      onUpdate: (entity) {
+        last = entity;
+        onProgress?.call(entity);
+      },
+    );
+    if (streamed != null) {
+      onProgress?.call(streamed);
+      return streamed;
+    }
+
+    for (var i = 0; i < maxTicks; i++) {
+      final delay = last.isProcessing
+          ? const Duration(seconds: 1)
+          : const Duration(seconds: 2);
+      await Future<void>.delayed(delay);
+      final snap = await repository.getExport(
+        projectId: projectId,
+        exportId: exportId,
+      );
+      final entity = snap.fold<VideoTemplateExportEntity?>((_) => null, (e) => e);
+      if (entity == null) continue;
+      last = entity;
+      onProgress?.call(entity);
       if (entity.isComplete || entity.isFailed) return entity;
     }
     return last;

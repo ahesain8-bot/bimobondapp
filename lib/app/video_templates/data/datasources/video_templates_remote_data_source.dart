@@ -1,10 +1,13 @@
 import 'dart:convert';
 
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_one_shot_render_builder.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/network/api_client.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -59,6 +62,11 @@ abstract class VideoTemplatesRemoteDataSource {
     String? title,
   });
 
+  Future<VideoTemplateProjectEntity> createProjectFromMedia({
+    required List<ProjectFromMediaInput> media,
+    String? title,
+  });
+
   Future<VideoTemplateProjectEntity> getProject(String projectId);
 
   Future<VideoTemplateProjectSlotEntity> patchProjectSlot({
@@ -75,9 +83,15 @@ abstract class VideoTemplatesRemoteDataSource {
 
   Future<void> completeProject(String projectId);
 
+  Future<VideoTemplateRenderJobEntity> renderOneShot(
+    Map<String, dynamic> body,
+  );
+
   Future<VideoTemplateExportEntity> queueExport({
     required String projectId,
     String quality = 'standard',
+    String? resolution,
+    double? fps,
   });
 
   Future<VideoTemplateExportEntity> getExport({
@@ -85,12 +99,73 @@ abstract class VideoTemplatesRemoteDataSource {
     required String exportId,
   });
 
-  /// SSE progress stream. Returns final snapshot or null if stream unavailable.
   Future<VideoTemplateExportEntity?> listenExportStream({
     required String projectId,
     required String exportId,
     void Function(VideoTemplateExportEntity snap)? onUpdate,
     Duration timeout = const Duration(minutes: 8),
+  });
+
+  Future<List<TemplatePresetItem>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  });
+
+  Future<List<TemplateFontItem>> listFonts();
+
+  Future<void> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+    double? startTime,
+    double? endTime,
+  });
+
+  Future<void> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double? startTime,
+    double? endTime,
+  });
+
+  Future<void> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<void> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<void> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionX = 0,
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+    String? fontAssetId,
+  });
+
+  Future<void> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
   });
 }
 
@@ -432,6 +507,38 @@ class VideoTemplatesRemoteDataSourceImpl
   }
 
   @override
+  Future<VideoTemplateProjectEntity> createProjectFromMedia({
+    required List<ProjectFromMediaInput> media,
+    String? title,
+  }) async {
+    try {
+      final response = await apiClient.dio.post(
+        ApiConstants.videoTemplateProjectsFromMedia,
+        data: {
+          'media': media
+              .map(
+                (m) => {
+                  'url': MediaUtils.toServerUploadPath(m.url),
+                  'type': m.type.toUpperCase(),
+                },
+              )
+              .toList(growable: false),
+          if (title != null && title.isNotEmpty) 'title': title,
+        },
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return VideoTemplateProjectEntity.fromJson(_unwrap(response.data));
+      }
+      throw ServerException(
+        message: _extractErrorMessage(response.data) ??
+            'Failed to create project from media',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
   Future<VideoTemplateProjectEntity> getProject(String projectId) async {
     try {
       final response = await apiClient.dio.get(
@@ -500,19 +607,46 @@ class VideoTemplatesRemoteDataSourceImpl
   }
 
   @override
+  Future<VideoTemplateRenderJobEntity> renderOneShot(
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      TemplateOneShotRenderBuilder.stripCatalogTemplateKeys(body);
+      final response = await apiClient.dio.post(
+        ApiConstants.videoTemplateRender,
+        data: body,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return VideoTemplateRenderJobEntity.fromJson(_unwrap(response.data));
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to queue render',
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
   Future<VideoTemplateExportEntity> queueExport({
     required String projectId,
     String quality = 'standard',
+    String? resolution,
+    double? fps,
   }) async {
     try {
-      final normalized = quality.trim().toLowerCase() == 'draft'
-          ? 'draft'
-          : 'standard';
+      final q = quality.trim().toLowerCase();
+      final normalized = q == 'draft' ? 'draft' : 'standard';
+      final res = resolution?.trim();
+      final data = <String, dynamic>{
+        'quality': normalized,
+        if (res != null && res.isNotEmpty) 'resolution': res,
+        if (fps != null && fps >= 1 && fps <= 60) 'fps': fps.round(),
+      };
       final response = await apiClient.dio.post(
         ApiConstants.videoTemplateProjectExport(projectId),
-        data: {
-          'quality': normalized,
-        },
+        data: data,
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final map = _unwrap(response.data);
@@ -637,6 +771,236 @@ class VideoTemplatesRemoteDataSourceImpl
       return VideoTemplateExportEntity.fromJson(body);
     } catch (_) {
       return null;
+    }
+  }
+
+  TemplatePresetKind _presetKindFrom(String kind) {
+    switch (kind.toUpperCase()) {
+      case 'EFFECT':
+        return TemplatePresetKind.effect;
+      case 'STICKER':
+        return TemplatePresetKind.sticker;
+      default:
+        return TemplatePresetKind.filter;
+    }
+  }
+
+  List<TemplatePresetItem> _parsePresetList(dynamic body, String kind) {
+    List<dynamic>? raw;
+    if (body is List) {
+      raw = body;
+    } else if (body is Map) {
+      final map = Map<String, dynamic>.from(body);
+      final data = map['data'] ?? map['items'] ?? map['presets'];
+      if (data is List) raw = data;
+    }
+    if (raw == null) return const [];
+    final presetKind = _presetKindFrom(kind);
+    return raw
+        .whereType<Map>()
+        .map(
+          (e) => TemplatePresetItem.fromJson(
+            Map<String, dynamic>.from(e),
+            kind: presetKind,
+          ),
+        )
+        .where((e) => e.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<TemplatePresetItem>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  }) async {
+    try {
+      final path = projectId != null
+          ? ApiConstants.videoTemplateProjectPresets(projectId)
+          : ApiConstants.videoTemplatePresets;
+      final response = await apiClient.dio.get(
+        path,
+        queryParameters: {
+          'kind': kind,
+          if (category != null && category.isNotEmpty) 'category': category,
+          'limit': limit,
+        },
+      );
+      if (response.statusCode == 200) {
+        return _parsePresetList(response.data, kind);
+      }
+      return const [];
+    } on DioException catch (e) {
+      debugPrint('listPresets: ${e.message}');
+      return const [];
+    }
+  }
+
+  @override
+  Future<List<TemplateFontItem>> listFonts() async {
+    try {
+      final response = await apiClient.dio.get(ApiConstants.videoTemplateFonts);
+      if (response.statusCode != 200) return const [];
+      final raw = response.data;
+      List? list;
+      if (raw is List) {
+        list = raw;
+      } else if (raw is Map) {
+        final map = Map<String, dynamic>.from(raw);
+        final data = map['data'] ?? map['items'] ?? map['fonts'];
+        if (data is List) list = data;
+      }
+      if (list == null) return const [];
+      return list
+          .whereType<Map>()
+          .map((e) => TemplateFontItem.fromJson(Map<String, dynamic>.from(e)))
+          .where((f) => f.id.isNotEmpty && f.url.isNotEmpty)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      debugPrint('listFonts: ${e.message}');
+      return const [];
+    }
+  }
+
+  @override
+  Future<void> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+    double? startTime,
+    double? endTime,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotFilters(projectId, slotId),
+        data: {
+          if (presetId == null) 'presetId': null else 'presetId': presetId,
+          'intensity': intensity,
+          if (startTime != null) 'filterStartTime': startTime,
+          if (endTime != null) 'filterEndTime': endTime,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double? startTime,
+    double? endTime,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotEffects(projectId, slotId),
+        data: {
+          if (presetId == null) 'presetId': null else 'presetId': presetId,
+          if (startTime != null) 'effectStartTime': startTime,
+          if (endTime != null) 'effectEndTime': endTime,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotFilters(projectId, slotId),
+        data: {'items': items},
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    try {
+      await apiClient.dio.put(
+        ApiConstants.videoTemplateProjectSlotEffects(projectId, slotId),
+        data: {'items': items},
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionX = 0,
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+    String? fontAssetId,
+  }) async {
+    try {
+      await apiClient.dio.post(
+        ApiConstants.videoTemplateProjectTexts(projectId),
+        data: {
+          'text': text,
+          'fontSize': fontSize.clamp(12, 120),
+          'color': color,
+          'positionX': positionX,
+          'positionY': positionY,
+          'startTime': startTime,
+          'endTime': endTime,
+          if (fontAssetId != null && fontAssetId.isNotEmpty)
+            'fontAssetId': fontAssetId,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
+  }) async {
+    try {
+      await apiClient.dio.post(
+        ApiConstants.videoTemplateProjectStickers(projectId),
+        data: {
+          if (presetId != null) 'presetId': presetId,
+          if (assetUrl != null) 'assetUrl': assetUrl,
+          'positionX': positionX,
+          'positionY': positionY,
+          'scale': scale,
+          'opacity': opacity,
+          'startTime': startTime,
+          if (endTime != null) 'endTime': endTime,
+        },
+      );
+    } on DioException catch (e) {
+      throw DioHandler.handle(e);
     }
   }
 }

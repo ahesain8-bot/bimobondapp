@@ -213,6 +213,7 @@ class LiveRoomPauseLiveTapped extends LiveRoomEvent {
 enum LiveRoomMenuDestination {
   liveGifts,
   liveHighlights,
+  startBattle,
   settings,
   comments,
   aboutMe,
@@ -288,6 +289,17 @@ class LiveRoomGuestRequestAnswered extends LiveRoomEvent {
   final bool accepted;
 }
 
+/// Host answers an accepted guest's request to start a PK round.
+class LiveRoomCompetitionRequestAnswered extends LiveRoomEvent {
+  const LiveRoomCompetitionRequestAnswered({
+    required this.commentId,
+    required this.accepted,
+  });
+
+  final String commentId;
+  final bool accepted;
+}
+
 /// Guest list changed — refresh pending invite badge.
 class LiveRoomGuestsChanged extends LiveRoomEvent {
   const LiveRoomGuestsChanged();
@@ -298,6 +310,12 @@ class LiveRoomBattleChanged extends LiveRoomEvent {
   const LiveRoomBattleChanged(this.battle);
 
   final LiveBattle? battle;
+}
+
+/// Re-reads the supporter leaderboards this room draws — this live's, and the
+/// opponent's while a battle is active.
+class LiveRoomSupportersRefreshRequested extends LiveRoomEvent {
+  const LiveRoomSupportersRefreshRequested();
 }
 
 /// Gallery list changed — refresh gallery counts chip.

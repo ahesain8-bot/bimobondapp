@@ -16,7 +16,15 @@ class LiveViewerState extends Equatable {
   final int floatingHeartBurst;
   final int coinDelta;
   final bool showJoinSuccess;
+  /// Supporter avatars for THIS live, highest rank first.
+  ///
+  /// Named for the header slot it fills, not its contents: it used to hold
+  /// whoever joined most recently, and now carries the real top gifters from
+  /// `GET /lives/:id/leaderboard/gifters` and `liveTopGiftersUpdated`.
   final List<String> topViewerAvatars;
+
+  /// The same, for the opponent's side of an active battle.
+  final List<String> opponentTopGifterAvatars;
   final int pkScoreLeft;
   final int pkScoreRight;
   final CommentEntity? pinnedComment;
@@ -42,6 +50,10 @@ class LiveViewerState extends Equatable {
   /// Current battle snapshot from REST/Socket.IO.
   final LiveBattle? battle;
 
+  /// Real opponent returned by `POST /lives/:opponentId/join`. This avoids
+  /// guessed names/avatars when battle socket payloads contain IDs only.
+  final LiveEntity? battleOpponentLive;
+
   const LiveViewerState({
     this.session,
     this.comments = const [],
@@ -52,6 +64,7 @@ class LiveViewerState extends Equatable {
     this.coinDelta = 0,
     this.showJoinSuccess = false,
     this.topViewerAvatars = const [],
+    this.opponentTopGifterAvatars = const [],
     this.pkScoreLeft = 0,
     this.pkScoreRight = 0,
     this.pinnedComment,
@@ -66,6 +79,7 @@ class LiveViewerState extends Equatable {
     this.isOnStage = false,
     this.isGuestActionBusy = false,
     this.battle,
+    this.battleOpponentLive,
   });
 
   /// Guests actually publishing right now — what the stage renders.
@@ -93,6 +107,7 @@ class LiveViewerState extends Equatable {
     int? coinDelta,
     bool? showJoinSuccess,
     List<String>? topViewerAvatars,
+    List<String>? opponentTopGifterAvatars,
     int? pkScoreLeft,
     int? pkScoreRight,
     CommentEntity? pinnedComment,
@@ -111,6 +126,8 @@ class LiveViewerState extends Equatable {
     bool? isGuestActionBusy,
     LiveBattle? battle,
     bool clearBattle = false,
+    LiveEntity? battleOpponentLive,
+    bool clearBattleOpponent = false,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -126,6 +143,8 @@ class LiveViewerState extends Equatable {
       coinDelta: coinDelta ?? this.coinDelta,
       showJoinSuccess: showJoinSuccess ?? this.showJoinSuccess,
       topViewerAvatars: topViewerAvatars ?? this.topViewerAvatars,
+      opponentTopGifterAvatars:
+          opponentTopGifterAvatars ?? this.opponentTopGifterAvatars,
       pkScoreLeft: pkScoreLeft ?? this.pkScoreLeft,
       pkScoreRight: pkScoreRight ?? this.pkScoreRight,
       pinnedComment: clearPinnedComment
@@ -146,6 +165,9 @@ class LiveViewerState extends Equatable {
       isOnStage: isOnStage ?? this.isOnStage,
       isGuestActionBusy: isGuestActionBusy ?? this.isGuestActionBusy,
       battle: clearBattle ? null : (battle ?? this.battle),
+      battleOpponentLive: clearBattleOpponent
+          ? null
+          : (battleOpponentLive ?? this.battleOpponentLive),
     );
   }
 
@@ -160,6 +182,7 @@ class LiveViewerState extends Equatable {
     coinDelta,
     showJoinSuccess,
     topViewerAvatars,
+    opponentTopGifterAvatars,
     pkScoreLeft,
     pkScoreRight,
     pinnedComment,
@@ -174,6 +197,7 @@ class LiveViewerState extends Equatable {
     isOnStage,
     isGuestActionBusy,
     battle,
+    battleOpponentLive,
   ];
 }
 

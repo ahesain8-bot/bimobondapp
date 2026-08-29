@@ -2,6 +2,7 @@ import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../../../core/models/live_battle.dart';
+import 'hourly_ranking_mapper.dart';
 
 /// Converts Socket.IO payloads (lives/mobile-api.md §16) into typed
 /// [SocketEvent]s consumed by the live room UI.
@@ -278,6 +279,41 @@ class SocketMapper {
           'User',
       avatarUrl: user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
       viewerCount: _viewerCount(map),
+      timestamp: DateTime.now(),
+    );
+  }
+
+  /// `liveHourlyRankUpdated` (mobile-api.md §19). Also accepts the
+  /// `livePopularStatus` shape, which sends `reason` / `hourlyRank` instead.
+  static LiveHourlyRankEvent? hourlyRankEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final liveId = map['liveId']?.toString() ?? fallbackLiveId ?? '';
+    if (liveId.isEmpty) return null;
+    return LiveHourlyRankEvent(
+      liveId: liveId,
+      rank: HourlyRankingMapper.liveRankFromPayload(
+        map,
+        fallbackLiveId: liveId,
+      ),
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveTopGiftersUpdatedEvent? topGiftersEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final liveId = map['liveId']?.toString() ?? fallbackLiveId ?? '';
+    if (liveId.isEmpty) return null;
+    return LiveTopGiftersUpdatedEvent(
+      liveId: liveId,
+      avatarUrls: avatarUrlsFrom(map['data'] ?? map['gifters']),
       timestamp: DateTime.now(),
     );
   }

@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:livekit_client/livekit_client.dart' show ConnectionState;
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
 import '../../../../../core/models/live_battle.dart';
+import '../../../../../core/models/live_competition_request.dart';
 import '../../../data/services/fake_livekit_service.dart';
 import '../../../data/services/fake_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
@@ -60,6 +62,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerHeartBurstConsumed>(_onHeartBurstConsumed);
     on<LiveViewerGiftAnimationCleared>(_onGiftAnimationCleared);
     on<LiveViewerModerationBannerConsumed>(_onModerationBannerConsumed);
+    on<LiveViewerJoinSuccessConsumed>(_onJoinSuccessConsumed);
+    on<LiveViewerBattleSupportersRefreshRequested>(
+      _onBattleSupportersRefreshRequested,
+    );
     on<LiveViewerSocketEventReceived>(_onSocketEventReceived);
     on<LiveViewerCommentDeletedRequested>(_onCommentDeletedRequested);
     on<LiveViewerViewerChatMuteRequested>(_onViewerChatMuteRequested);
@@ -103,11 +109,17 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   String? _activeLiveId;
   bool _busy = false;
   LiveEntity? _pendingActivate;
+  bool _deactivateRequested = false;
   String? _currentUserId;
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
   Timer? _guestApprovalTimer;
+  Timer? _battleSupportersRefreshTimer;
+  DateTime? _battleSupportersRefreshedAt;
   String? _battleOpponentLiveId;
+
+  /// Guards the opponent connect against BLoC's concurrent event processing.
+  bool _battleConnectInFlight = false;
   bool _tearingDown = false;
   bool _recoveringMedia = false;
   int _mediaRecoveryAttempt = 0;
@@ -122,6 +134,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   ) async {
     if (_busy) {
       _pendingActivate = event.live;
+      // The newest visible page wins over an older close/deactivate request.
+      _deactivateRequested = false;
       return;
     }
     if (_activeLiveId == event.live.id &&
@@ -147,10 +161,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           ),
           topViewerAvatars: initialAvatars.isNotEmpty
               ? initialAvatars
-              : List.generate(
-                  3,
-                  (i) => 'https://i.pravatar.cc/150?u=${live.id}_v$i',
-                ),
+              : const [],
           pkScoreLeft: isPk
               ? ((live.metadata?['scoreLeft'] as num?)?.toInt() ?? 0)
               : 0,
@@ -272,7 +283,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             const Duration(milliseconds: 1200),
             () {
               if (_activeLiveId == live.id && !isClosed) {
-                emit(state.copyWith(showJoinSuccess: false));
+                add(const LiveViewerJoinSuccessConsumed());
               }
             },
           );
@@ -297,6 +308,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           );
           final meFuture = _loadCurrentUserId();
           final guestsFuture = guestRepository.listGuests(live.id);
+          final topGiftersFuture = _loadTopGifterAvatars(live.id);
 
           try {
             final results = await Future.wait<dynamic>([
@@ -304,6 +316,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               commentsFuture,
               meFuture,
               guestsFuture,
+              topGiftersFuture,
             ]);
             if (_activeLiveId != live.id) return;
 
@@ -311,6 +324,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             final commentsResult = results[1];
             _currentUserId = results[2] as String? ?? _currentUserId;
             final guestsResult = results[3];
+            final topGifters = results[4] as List<String>?;
             final comments = commentsResult
                 .fold(
                   (_) => <CommentEntity>[],
@@ -336,6 +350,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                   (_) => state.guests,
                   (items) => items,
                 ),
+                topViewerAvatars: topGifters ?? state.topViewerAvatars,
               ),
             );
           } catch (_) {}
@@ -343,6 +358,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         },
       );
     } finally {
+      final shouldDeactivate = _deactivateRequested;
+      _deactivateRequested = false;
+      if (shouldDeactivate) {
+        _pendingActivate = null;
+        await _teardown(silent: false, emit: emit);
+      }
       _busy = false;
       final pending = _pendingActivate;
       _pendingActivate = null;
@@ -356,7 +377,23 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerDeactivated event,
     Emitter<LiveViewerState> emit,
   ) async {
-    await _teardown(silent: false, emit: emit);
+    // Activated/Deactivated have separate BLoC event types and can otherwise
+    // run concurrently. A late teardown from the previous PageView page would
+    // then disconnect the brand-new room opened by the visible page.
+    if (_busy) {
+      _pendingActivate = null;
+      _deactivateRequested = true;
+      return;
+    }
+    _busy = true;
+    try {
+      await _teardown(silent: false, emit: emit);
+    } finally {
+      _busy = false;
+      final pending = _pendingActivate;
+      _pendingActivate = null;
+      if (pending != null) add(LiveViewerActivated(pending));
+    }
   }
 
   Future<void> _onRetryRequested(
@@ -414,7 +451,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         if (!state.comments.any((c) => c.id == comment.id)) {
           emit(
             emitState.copyWith(
-              comments: [...emitState.comments, comment],
+              comments: _capComments([...emitState.comments, comment]),
               currentUserId: _currentUserId,
             ),
           );
@@ -528,6 +565,39 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (state.moderationBanner != null) {
       emit(state.copyWith(clearModerationBanner: true));
     }
+  }
+
+  Future<void> _onJoinSuccessConsumed(
+    LiveViewerJoinSuccessConsumed event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (state.showJoinSuccess) {
+      emit(state.copyWith(showJoinSuccess: false));
+    }
+  }
+
+  Future<void> _onBattleSupportersRefreshRequested(
+    LiveViewerBattleSupportersRefreshRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = _activeLiveId;
+    final battle = state.battle;
+    if (liveId == null || battle?.isActive != true) return;
+    final opponentId = battle!.opponentLiveId(liveId);
+    if (opponentId.isEmpty || opponentId == liveId) return;
+    _battleSupportersRefreshedAt = DateTime.now();
+
+    final results = await Future.wait<List<String>?>([
+      _loadTopGifterAvatars(liveId),
+      _loadTopGifterAvatars(opponentId),
+    ]);
+    if (isClosed || _activeLiveId != liveId) return;
+    emit(
+      state.copyWith(
+        topViewerAvatars: results[0] ?? state.topViewerAvatars,
+        opponentTopGifterAvatars: results[1] ?? state.opponentTopGifterAvatars,
+      ),
+    );
   }
 
   // ── New moderation / chat event handlers ──────────────
@@ -858,7 +928,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     emit(state.copyWith(isGuestActionBusy: true));
     final result = await commentRepository.sendComment(
       liveId: liveId,
-      content: '⚔️ أطلب بدء جولة منافسة',
+      content: liveCompetitionRequestContent,
     );
     if (isClosed || _activeLiveId != liveId) return;
     await result.fold(
@@ -1191,6 +1261,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
     if (event is LiveBattleEvent) {
       await _applyBattle(event.battle, emit);
+      _scheduleBattleSupportersRefresh();
+      return;
+    }
+
+    if (event is LiveTopGiftersUpdatedEvent) {
+      emit(state.copyWith(topViewerAvatars: event.avatarUrls));
       return;
     }
 
@@ -1203,7 +1279,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       final next = [...state.comments, event.comment];
       emit(
         state.copyWith(
-          comments: next.length > 80 ? next.sublist(next.length - 80) : next,
+          comments: _capComments(next),
           pinnedComment: event.comment.isPinned
               ? event.comment
               : state.pinnedComment,
@@ -1240,7 +1316,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       );
     } else if (event is LiveModerationEvent) {
-      _applyModeration(event, emit);
+      await _applyModeration(event, emit);
     } else if (event is UserJoinedEvent) {
       if (_isMe(event.userId)) {
         if (event.viewerCount != null) {
@@ -1267,11 +1343,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       final next = [...state.comments, joinNotice];
       emit(
         state.copyWith(
-          comments: next.length > 80 ? next.sublist(next.length - 80) : next,
-          topViewerAvatars: _pushAvatar(
-            state.topViewerAvatars,
-            event.avatarUrl,
-          ),
+          comments: _capComments(next),
           session: event.viewerCount != null
               ? session.copyWith(
                   live: session.live.copyWith(viewerCount: event.viewerCount!),
@@ -1297,9 +1369,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           session: session.copyWith(
             live: session.live.copyWith(viewerCount: event.viewerCount),
           ),
-          topViewerAvatars: event.topViewerAvatars.isNotEmpty
-              ? event.topViewerAvatars
-              : state.topViewerAvatars,
         ),
       );
     } else if (event is LiveEndedEvent) {
@@ -1355,10 +1424,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     }
   }
 
-  void _applyModeration(
+  Future<void> _applyModeration(
     LiveModerationEvent event,
     Emitter<LiveViewerState> emit,
-  ) {
+  ) async {
     final isMe = _isMe(event.userId);
     final targetId = event.userId;
     switch (event.moderationType) {
@@ -1397,7 +1466,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         return;
       case 'viewer_banned':
         if (isMe) {
-          unawaited(_kickBanned(event.reason, emit));
+          // Must be awaited: `emit` is handed to it, and an emit that lands
+          // after this handler returns trips bloc's `!_isCompleted` assertion
+          // and aborts the rest of the socket event pipeline.
+          await _kickBanned(event.reason, emit);
           return;
         }
         if (targetId == null || targetId.isEmpty) return;
@@ -1564,12 +1636,61 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         .toList();
   }
 
-  List<String> _pushAvatar(List<String> current, String? avatarUrl) {
-    if (avatarUrl == null || avatarUrl.isEmpty) return current;
-    return [
-      avatarUrl,
-      ...current.where((url) => url != avatarUrl),
-    ].take(3).toList();
+  /// How deep the viewer keeps its comment backlog. One constant so every
+  /// append trims identically — the room used to trim socket comments and join
+  /// notices but let the viewer's own sends grow for the whole watch session.
+  static const int _commentBacklogLimit = 80;
+
+  static List<CommentEntity> _capComments(List<CommentEntity> comments) {
+    if (comments.length <= _commentBacklogLimit) return comments;
+    return comments.sublist(comments.length - _commentBacklogLimit);
+  }
+
+  Future<List<String>?> _loadTopGifterAvatars(String liveId) async {
+    try {
+      final result = await giftRepository.getTopGifters(liveId, limit: 3);
+      return result.fold<List<String>?>(
+        (_) => null,
+        (entries) => entries
+            .map((entry) => entry.avatarUrl?.trim())
+            .whereType<String>()
+            .where((url) => url.isNotEmpty)
+            .take(3)
+            .toList(growable: false),
+      );
+    } catch (_) {
+      // Supporter enrichment must never block the video room.
+      return null;
+    }
+  }
+
+  /// Debounced, but with a ceiling.
+  ///
+  /// Battle score events land on every gift, and a plain trailing debounce
+  /// never fires while they keep coming — each one pushed the timer out again,
+  /// so the ring froze during exactly the burst it exists to show.
+  static const Duration _supportersRefreshMaxWait = Duration(seconds: 4);
+
+  void _scheduleBattleSupportersRefresh() {
+    final last = _battleSupportersRefreshedAt;
+    if (last != null &&
+        DateTime.now().difference(last) >= _supportersRefreshMaxWait) {
+      _battleSupportersRefreshTimer?.cancel();
+      _battleSupportersRefreshTimer = null;
+      if (!isClosed && state.battle?.isActive == true) {
+        add(const LiveViewerBattleSupportersRefreshRequested());
+      }
+      return;
+    }
+    _battleSupportersRefreshTimer?.cancel();
+    _battleSupportersRefreshTimer = Timer(
+      const Duration(milliseconds: 600),
+      () {
+        if (!isClosed && state.battle?.isActive == true) {
+          add(const LiveViewerBattleSupportersRefreshRequested());
+        }
+      },
+    );
   }
 
   Future<String?> _loadCurrentUserId() async {
@@ -1585,6 +1706,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     } catch (_) {}
     return fb.FirebaseAuth.instance.currentUser?.uid;
   }
+
   Future<void> _refreshBattle(
     String liveId,
     Emitter<LiveViewerState> emit,
@@ -1599,7 +1721,13 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         if (state.battle?.isActive == true) return;
         await _disconnectBattleOpponent();
         emit(
-          state.copyWith(clearBattle: true, pkScoreLeft: 0, pkScoreRight: 0),
+          state.copyWith(
+            clearBattle: true,
+            clearBattleOpponent: true,
+            opponentTopGifterAvatars: const [],
+            pkScoreLeft: 0,
+            pkScoreRight: 0,
+          ),
         );
         return;
       }
@@ -1612,6 +1740,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       // fail because this optional enrichment endpoint is unavailable.
     }
   }
+
   Future<void> _applyBattle(
     LiveBattle battle,
     Emitter<LiveViewerState> emit,
@@ -1628,14 +1757,48 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     if (!battle.isActive) {
       await _disconnectBattleOpponent();
+      emit(
+        state.copyWith(
+          clearBattleOpponent: true,
+          opponentTopGifterAvatars: const [],
+        ),
+      );
       return;
     }
     final opponentId = battle.opponentLiveId(liveId);
     if (opponentId.isEmpty || opponentId == liveId) return;
+    final battleRoom = liveKitService.battleRoom;
     if (_battleOpponentLiveId == opponentId &&
-        liveKitService.battleRoom != null) {
+        battleRoom != null &&
+        battleRoom.connectionState != ConnectionState.disconnected) {
       return;
     }
+    // `liveBattle` score events arrive on every gift, and BLoC processes
+    // events concurrently. `_battleOpponentLiveId` is only set once
+    // `connectBattle` returns, so two handlers both cleared the check above
+    // and the second one's disconnect tore down the room the first was still
+    // opening — the opponent tile blanked mid-battle. Dropping the duplicate
+    // is safe: the next score event re-asserts the opponent a moment later.
+    if (_battleConnectInFlight) return;
+    _battleConnectInFlight = true;
+    try {
+      await _connectBattleOpponent(
+        battle: battle,
+        liveId: liveId,
+        opponentId: opponentId,
+        emit: emit,
+      );
+    } finally {
+      _battleConnectInFlight = false;
+    }
+  }
+
+  Future<void> _connectBattleOpponent({
+    required LiveBattle battle,
+    required String liveId,
+    required String opponentId,
+    required Emitter<LiveViewerState> emit,
+  }) async {
     await _disconnectBattleOpponent();
     final result = await joinLiveUseCase(opponentId);
     if (_activeLiveId != liveId || isClosed) return;
@@ -1647,6 +1810,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       ),
       (join) async {
+        final supportersFuture = _loadTopGifterAvatars(opponentId);
+        emit(state.copyWith(battleOpponentLive: join.live));
         try {
           await liveKitService.connectBattle(
             url: join.liveKitUrl,
@@ -1656,9 +1821,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           );
           if (_activeLiveId != liveId || isClosed) return;
           _battleOpponentLiveId = opponentId;
+          final opponentSupporters = await supportersFuture;
+          if (_activeLiveId != liveId || isClosed) return;
           // A new state instance makes the PK renderer read battleRoom now;
           // track changes after that are driven by the Room notifier itself.
-          emit(state.copyWith(battle: battle));
+          emit(
+            state.copyWith(
+              battle: battle,
+              battleOpponentLive: join.live,
+              opponentTopGifterAvatars:
+                  opponentSupporters ?? state.opponentTopGifterAvatars,
+            ),
+          );
         } catch (e) {
           if (!isClosed) {
             emit(
@@ -1669,6 +1843,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       },
     );
   }
+
   Future<void> _disconnectBattleOpponent() async {
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
@@ -1681,6 +1856,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       } catch (_) {}
     }
   }
+
   CommentEntity? _pinnedFromLiveMetadata(LiveEntity live) {
     final raw = live.metadata?['pinnedComment'];
     if (raw is! Map) return null;
@@ -1709,6 +1885,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       isPinned: true,
     );
   }
+
   Future<void> _teardown({
     required bool silent,
     required Emitter<LiveViewerState> emit,
@@ -1720,6 +1897,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
+    _battleSupportersRefreshTimer?.cancel();
+    _battleSupportersRefreshTimer = null;
     _guestApprovalTimer?.cancel();
     _guestApprovalTimer = null;
     await _disconnectBattleOpponent();
@@ -1744,6 +1923,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       emit(const LiveViewerState());
     }
   }
+
   @override
   Future<void> close() async {
     _tearingDown = true;
@@ -1755,6 +1935,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _giftComboSub = null;
     _bannerClearTimer?.cancel();
     _joinSuccessClearTimer?.cancel();
+    _battleSupportersRefreshTimer?.cancel();
+    _battleSupportersRefreshTimer = null;
     _guestApprovalTimer?.cancel();
     _guestApprovalTimer = null;
     await _disconnectBattleOpponent();

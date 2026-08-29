@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:bimobondapp/app/video_templates/engine/layers/layer_engines.dart';
 import 'package:bimobondapp/app/video_templates/engine/render/render_engine.dart';
+import 'package:bimobondapp/app/video_templates/presentation/utils/template_font_cache.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_preview_look.dart';
 import 'package:bimobondapp/app/video_templates/preview/media_texture_cache.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
@@ -16,10 +17,8 @@ import 'package:video_player/video_player.dart';
 ///
 /// **Critical:** [VideoPlayer] / [MediaStudioPreview] cannot be mounted twice.
 /// Layout effects that need multiple copies must call this builder per pane.
-typedef TemplateMediaPaneBuilder = Widget Function({
-  required String paneKey,
-  bool muted,
-});
+typedef TemplateMediaPaneBuilder =
+    Widget Function({required String paneKey, bool muted});
 
 /// TikTok-style local compositor for template preview (server parity).
 ///
@@ -37,12 +36,47 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     this.canvasWidth = 1080,
     this.canvasHeight = 1920,
     this.emptyLabel = 'Add media to preview',
+    this.showTexts = true,
+    this.videoLookStill,
+    this.useVideoLookStill = false,
+    this.fallbackFilterName,
+    this.fallbackFilterIntensity = 1,
+    this.fallbackFilterStack = const [],
+    this.fallbackEffects = const [],
+    this.preferSessionFilters = false,
+    this.preferSessionEffects = false,
+    this.suppressFrameTransitions = false,
   });
 
   final PreviewFrame? frame;
   final VideoPlayerController? videoController;
   final File? imageFile;
   final ui.Image? decodedImage;
+
+  /// JPEG frame extracted from video for filter/effect preview on mobile.
+  final File? videoLookStill;
+
+  /// When true, prefer [videoLookStill] over live [VideoPlayer] for the main pane.
+  final bool useVideoLookStill;
+
+  /// Session filter when timeline sample has not caught up yet.
+  final String? fallbackFilterName;
+  final double fallbackFilterIntensity;
+  final List<({String name, double intensity})> fallbackFilterStack;
+
+  /// Session effects when timeline sample has not caught up yet.
+  final List<({String type, double progress, Map<String, dynamic> params})>
+      fallbackEffects;
+
+  /// When true, ignore recipe/frame filters and use only [fallbackFilterStack]
+  /// (empty stack = no filter — e.g. after user delete).
+  final bool preferSessionFilters;
+
+  /// When true, ignore recipe/frame effects and use only [fallbackEffects].
+  final bool preferSessionEffects;
+
+  /// When true, do not apply sampled frame transitions (user cleared look).
+  final bool suppressFrameTransitions;
 
   /// Single media surface (images / one video without multi-pane layout).
   final Widget? mediaOverride;
@@ -56,6 +90,9 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   final int canvasWidth;
   final int canvasHeight;
   final String emptyLabel;
+
+  /// When false, caption overlays are omitted (e.g. live text placer).
+  final bool showTexts;
 
   @override
   Widget build(BuildContext context) {
@@ -73,38 +110,93 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     }
 
     final f = frame;
-    final filter = f?.filters.isNotEmpty == true ? f!.filters.first : null;
+    final frameFilters = (f?.filters ?? const <ResolvedFilter>[])
+        .map((rf) => (name: rf.filterName, intensity: rf.intensity))
+        .toList(growable: false);
+
+    List<({String name, double intensity})> activeStack;
+    if (preferSessionFilters) {
+      // User owns this slot's filters — empty means intentionally cleared.
+      activeStack = fallbackFilterStack;
+    } else if (fallbackFilterStack.isNotEmpty) {
+      final names = fallbackFilterStack.map((e) => e.name).toSet();
+      activeStack = [
+        ...fallbackFilterStack,
+        for (final ff in frameFilters)
+          if (!names.contains(ff.name)) ff,
+      ];
+    } else if (frameFilters.isNotEmpty) {
+      activeStack = frameFilters;
+    } else if (fallbackFilterName != null &&
+        fallbackFilterName!.isNotEmpty &&
+        fallbackFilterName != 'none') {
+      activeStack = [
+        (name: fallbackFilterName!, intensity: fallbackFilterIntensity),
+      ];
+    } else {
+      activeStack = const [];
+    }
+
+    final primaryFilter = activeStack.isNotEmpty ? activeStack.first : null;
+    final filterName = primaryFilter?.name;
+    final filterIntensity = primaryFilter?.intensity ?? fallbackFilterIntensity;
     final matrix = TemplateFilterMatrices.forName(
-      filter?.filterName,
-      intensity: filter?.intensity ?? 1,
+      filterName,
+      intensity: filterIntensity,
     );
 
-    final effect = TemplateEffectVisual.resolve(
-      (f?.effects ?? const <ResolvedEffect>[]).map(
-        (e) => (
-          type: e.effectType,
-          progress: e.progress,
-          params: e.parameters,
-        ),
-      ),
-    );
+    final frameEffectInputs = (f?.effects ?? const <ResolvedEffect>[])
+        .map(
+          (e) => (
+            type: e.effectType,
+            progress: e.progress,
+            params: e.parameters,
+          ),
+        )
+        .toList(growable: false);
+    final effectInputs = preferSessionEffects
+        ? fallbackEffects
+        : (frameEffectInputs.isNotEmpty ? frameEffectInputs : fallbackEffects);
+
+    final effect = TemplateEffectVisual.resolve(effectInputs);
 
     final duotoneMatrix = effect.duotone > 0.01
         ? TemplateFilterMatrices.forName('duotone', intensity: effect.duotone)
         : null;
 
-    final transition = _transitionVisual(f);
+    final transition = _transitionVisual(
+      f,
+      suppress: suppressFrameTransitions,
+    );
     final cw = canvasWidth <= 0 ? 1080 : canvasWidth;
     final ch = canvasHeight <= 0 ? 1920 : canvasHeight;
     final hasLayout = effect.collage != TemplateCollageKind.none;
+    final lookKey = _lookKey(filterName, effectInputs);
 
     Widget colorGrade(Widget child) {
-      var w = ColorFiltered(
-        colorFilter: ColorFilter.matrix(matrix),
-        child: child,
-      );
+      var w = child;
+      for (var i = 0; i < activeStack.length; i++) {
+        final layer = activeStack[i];
+        final layerMatrix = TemplateFilterMatrices.forName(
+          layer.name,
+          intensity: layer.intensity,
+        );
+        w = ColorFiltered(
+          key: ValueKey('grade-$lookKey-$i-${layer.name}'),
+          colorFilter: ColorFilter.matrix(layerMatrix),
+          child: w,
+        );
+      }
+      if (activeStack.isEmpty) {
+        w = ColorFiltered(
+          key: ValueKey('grade-$lookKey'),
+          colorFilter: ColorFilter.matrix(matrix),
+          child: w,
+        );
+      }
       if (duotoneMatrix != null) {
         w = ColorFiltered(
+          key: ValueKey('duotone-$lookKey'),
           colorFilter: ColorFilter.matrix(duotoneMatrix),
           child: w,
         );
@@ -185,76 +277,103 @@ class VideoTemplateComposedPreview extends StatelessWidget {
       ),
     );
 
-    final composed = ClipRect(
-      child: Stack(
+    if (isVideoMedia && useVideoLookStill && videoLookStill == null) {
+      layered = Stack(
         fit: StackFit.expand,
         children: [
-          ColoredBox(color: Colors.black, child: layered),
-          RepaintBoundary(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ..._buildTexts(f, cw, ch),
-                ..._buildStickers(f, cw, ch),
-                ..._buildOverlays(f),
-              ],
+          layered,
+          const ColoredBox(
+            color: Color(0x33000000),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white54,
+                ),
+              ),
             ),
           ),
-          if (effect.lightLeak > 0.01)
-            IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0.75, -0.65),
-                    radius: 1.1,
-                    colors: [
-                      Color.fromRGBO(255, 170, 60, 0.55 * effect.lightLeak),
-                      Color.fromRGBO(255, 90, 40, 0.22 * effect.lightLeak),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.35, 1.0],
+        ],
+      );
+    }
+
+    final composed = LayoutBuilder(
+      builder: (context, constraints) {
+        final previewScale = constraints.maxWidth > 0
+            ? (constraints.maxWidth / cw).clamp(0.05, 4.0)
+            : 1.0;
+        return ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(color: Colors.black, child: layered),
+              RepaintBoundary(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (showTexts) ..._buildTexts(f, cw, ch, previewScale),
+                    ..._buildStickers(f, cw, ch, previewScale),
+                    ..._buildOverlays(f),
+                  ],
+                ),
+              ),
+              if (effect.lightLeak > 0.01)
+                IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(0.75, -0.65),
+                        radius: 1.1,
+                        colors: [
+                          Color.fromRGBO(255, 170, 60, 0.55 * effect.lightLeak),
+                          Color.fromRGBO(255, 90, 40, 0.22 * effect.lightLeak),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.35, 1.0],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          if (effect.vhs > 0.01)
-            IgnorePointer(
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.08 * effect.vhs),
-                child: const CustomPaint(painter: _VhsGrainPainter()),
-              ),
-            ),
-          if (effect.flashWhite > 0.01 ||
-              transition.flash > 0.01 ||
-              effect.filmBurn > 0.01 ||
-              transition.burn > 0.01)
-            IgnorePointer(
-              child: ColoredBox(
-                color: Color.lerp(
-                  Colors.white,
-                  const Color(0xFFFF6A2A),
-                  (effect.filmBurn + transition.burn).clamp(0.0, 1.0),
-                )!
-                    .withValues(
-                  alpha: (effect.flashWhite +
-                          transition.flash +
-                          effect.filmBurn * 0.7 +
-                          transition.burn * 0.7)
-                      .clamp(0.0, 0.9),
+              if (effect.vhs > 0.01)
+                IgnorePointer(
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.08 * effect.vhs),
+                    child: const CustomPaint(painter: _VhsGrainPainter()),
+                  ),
                 ),
-              ),
-            ),
-        ],
-      ),
+              if (effect.flashWhite > 0.01 ||
+                  transition.flash > 0.01 ||
+                  effect.filmBurn > 0.01 ||
+                  transition.burn > 0.01)
+                IgnorePointer(
+                  child: ColoredBox(
+                    color:
+                        Color.lerp(
+                          Colors.white,
+                          const Color(0xFFFF6A2A),
+                          (effect.filmBurn + transition.burn).clamp(0.0, 1.0),
+                        )!.withValues(
+                          alpha:
+                              (effect.flashWhite +
+                                      transition.flash +
+                                      effect.filmBurn * 0.7 +
+                                      transition.burn * 0.7)
+                                  .clamp(0.0, 0.9),
+                        ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
 
     return ColoredBox(
       color: Colors.black,
       child: Center(
-        child: AspectRatio(
-          aspectRatio: cw / ch,
-          child: composed,
-        ),
+        child: AspectRatio(aspectRatio: cw / ch, child: composed),
       ),
     );
   }
@@ -267,8 +386,10 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   }) {
     switch (effect.collage) {
       case TemplateCollageKind.pip:
-        final wr = (effect.pipWidthRatio ?? effect.pipInsetScale ?? 0.36)
-            .clamp(0.2, 0.95);
+        final wr = (effect.pipWidthRatio ?? effect.pipInsetScale ?? 0.36).clamp(
+          0.2,
+          0.95,
+        );
         return _PipLayout(
           widthRatio: wr,
           bgBlur: effect.pipBgBlur > 0 ? effect.pipBgBlur : 12,
@@ -278,8 +399,10 @@ class VideoTemplateComposedPreview extends StatelessWidget {
           child: pane(key: 'pip-fg', muted: false),
         );
       case TemplateCollageKind.circlePip:
-        final wr = (effect.pipWidthRatio ?? effect.pipInsetScale ?? 0.42)
-            .clamp(0.2, 0.95);
+        final wr = (effect.pipWidthRatio ?? effect.pipInsetScale ?? 0.42).clamp(
+          0.2,
+          0.95,
+        );
         return _PipLayout(
           widthRatio: wr,
           bgBlur: effect.pipBgBlur > 0 ? effect.pipBgBlur : 14,
@@ -356,18 +479,48 @@ class VideoTemplateComposedPreview extends StatelessWidget {
   }
 
   Widget? _buildMediaSurface({required String paneKey, required bool muted}) {
+    if (useVideoLookStill && paneKey == 'main' && isVideoMedia) {
+      if (videoLookStill != null) {
+        return Image.file(
+          videoLookStill!,
+          key: ValueKey('tpl-vlook-$paneKey-${videoLookStill!.path}'),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          cacheWidth: MediaTextureCache.defaultPreviewMaxWidth,
+          filterQuality: FilterQuality.low,
+        );
+      }
+      // Never show live VideoPlayer under ColorFiltered — it ignores GPU textures
+      // on mobile and looks like the filter did not apply.
+      return const ColoredBox(color: Colors.black);
+    }
     if (mediaPaneBuilder != null && isVideoMedia) {
       return mediaPaneBuilder!(paneKey: paneKey, muted: muted);
     }
     // Never mount one VideoPlayerController in more than one pane.
     final vc = videoController;
-    if (vc != null && vc.value.isInitialized && paneKey == 'main') {
-      return FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: vc.value.size.width,
-          height: vc.value.size.height,
-          child: VideoPlayer(vc),
+    if (vc != null && paneKey == 'main' && isVideoMedia) {
+      if (vc.value.isInitialized) {
+        return FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: vc.value.size.width,
+            height: vc.value.size.height,
+            child: VideoPlayer(vc),
+          ),
+        );
+      }
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white54,
+            ),
+          ),
         ),
       );
     }
@@ -401,8 +554,11 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     return null;
   }
 
-  _TransitionVisual _transitionVisual(PreviewFrame? f) {
-    if (f == null) return const _TransitionVisual();
+  _TransitionVisual _transitionVisual(
+    PreviewFrame? f, {
+    bool suppress = false,
+  }) {
+    if (suppress || f == null) return const _TransitionVisual();
     var flash = 0.0;
     var burn = 0.0;
     var dx = 0.0;
@@ -453,100 +609,118 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildTexts(PreviewFrame? f, int cw, int ch) {
+  List<Widget> _buildTexts(
+    PreviewFrame? f,
+    int cw,
+    int ch,
+    double previewScale,
+  ) {
     if (f == null) return const [];
     const textEngine = TextEngine();
-    return f.texts.map((item) {
-      final color = textEngine.parseColor(item.color) ?? Colors.white;
-      final align = templateCanvasAlignment(
-        item.positionX,
-        item.positionY,
-        canvasWidth: cw,
-        canvasHeight: ch,
-      );
-      final appear = _animationOpacity(
-        item.animationIn,
-        f.time,
-        item.startTime,
-        item.endTime,
-      );
-      return Align(
-        alignment: align,
-        child: Opacity(
-          opacity: (item.opacity * appear).clamp(0.0, 1.0),
-          child: Transform.scale(
-            scale: item.scale <= 0 ? 1 : item.scale,
-            child: Transform.rotate(
-              angle: item.rotation * mathPi / 180,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  item.text ?? '',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: (item.fontSize ?? 42).toDouble(),
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                    shadows: const [
-                      Shadow(
-                        color: Colors.black87,
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
+    return f.texts
+        .map((item) {
+          final color = textEngine.parseColor(item.color) ?? Colors.white;
+          final align = templateCanvasAlignment(
+            item.positionX,
+            item.positionY,
+            canvasWidth: cw,
+            canvasHeight: ch,
+          );
+          final appear = _animationOpacity(
+            item.animationIn,
+            f.time,
+            item.startTime,
+            item.endTime,
+          );
+          final fontId = item.parameters['fontAssetId']?.toString();
+          final fontUrl = item.assetUrl;
+          final canvasFont = (item.fontSize ?? 42).toDouble();
+          final displayFont = (canvasFont * previewScale).clamp(8.0, 160.0);
+          return Align(
+            alignment: align,
+            child: Opacity(
+              opacity: (item.opacity * appear).clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: item.scale <= 0 ? 1 : item.scale,
+                child: Transform.rotate(
+                  angle: item.rotation * mathPi / 180,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _TemplateCaptionText(
+                      text: item.text ?? '',
+                      fontSize: displayFont,
+                      color: color,
+                      fontAssetId: fontId,
+                      fontAssetUrl: fontUrl,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-      );
-    }).toList(growable: false);
+          );
+        })
+        .toList(growable: false);
   }
 
-  List<Widget> _buildStickers(PreviewFrame? f, int cw, int ch) {
+  List<Widget> _buildStickers(
+    PreviewFrame? f,
+    int cw,
+    int ch,
+    double previewScale,
+  ) {
     if (f == null) return const [];
-    return f.stickers.map((item) {
-      final align = templateCanvasAlignment(
-        item.positionX,
-        item.positionY,
-        canvasWidth: cw,
-        canvasHeight: ch,
-      );
-      final url = item.assetUrl;
-      return Align(
-        alignment: align,
-        child: Opacity(
-          opacity: item.opacity.clamp(0.0, 1.0),
-          child: Transform.rotate(
-            angle: item.rotation * mathPi / 180,
-            child: Transform.scale(
-              scale: item.scale <= 0 ? 1 : item.scale,
-              child: SizedBox(
-                width: 96,
-                height: 96,
-                child: url != null && url.isNotEmpty
-                    ? SafeNetworkImage(imageUrl: url, fit: BoxFit.contain)
-                    : const Icon(Icons.emoji_emotions, color: Colors.white70),
+    final basePx = (96 * previewScale).clamp(32.0, 160.0);
+    return f.stickers
+        .map((item) {
+          final align = templateCanvasAlignment(
+            item.positionX,
+            item.positionY,
+            canvasWidth: cw,
+            canvasHeight: ch,
+          );
+          final url = item.assetUrl;
+          final label = item.parameters['label']?.toString();
+          final itemScale = item.scale <= 0 ? 1 : item.scale;
+          final size = (basePx * itemScale).clamp(24.0, cw * previewScale * 0.6);
+          return Align(
+            alignment: align,
+            child: Opacity(
+              opacity: item.opacity.clamp(0.0, 1.0),
+              child: Transform.rotate(
+                angle: item.rotation * mathPi / 180,
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: url != null && url.isNotEmpty
+                      ? SafeNetworkImage(imageUrl: url, fit: BoxFit.contain)
+                      : Center(
+                          child: Text(
+                            label ?? '✨',
+                            style: TextStyle(
+                              fontSize: (size * 0.55).clamp(20.0, 72.0),
+                            ),
+                          ),
+                        ),
+                ),
               ),
             ),
-          ),
-        ),
-      );
-    }).toList(growable: false);
+          );
+        })
+        .toList(growable: false);
   }
 
   List<Widget> _buildOverlays(PreviewFrame? f) {
     if (f == null) return const [];
-    return f.overlays.map((item) {
-      final url = item.assetUrl;
-      if (url == null || url.isEmpty) return const SizedBox.shrink();
-      return Opacity(
-        opacity: item.opacity.clamp(0.0, 1.0),
-        child: SafeNetworkImage(imageUrl: url, fit: BoxFit.cover),
-      );
-    }).toList(growable: false);
+    return f.overlays
+        .map((item) {
+          final url = item.assetUrl;
+          if (url == null || url.isEmpty) return const SizedBox.shrink();
+          return Opacity(
+            opacity: item.opacity.clamp(0.0, 1.0),
+            child: SafeNetworkImage(imageUrl: url, fit: BoxFit.cover),
+          );
+        })
+        .toList(growable: false);
   }
 
   double _animationOpacity(
@@ -567,6 +741,17 @@ class VideoTemplateComposedPreview extends StatelessWidget {
     }
     return 1;
   }
+}
+
+String _lookKey(
+  String? filterName,
+  List<({String type, double progress, Map<String, dynamic> params})> effects,
+) {
+  final fl = filterName ?? 'none';
+  final fx = effects
+      .map((e) => '${e.type}:${e.progress.toStringAsFixed(2)}')
+      .join(',');
+  return '$fl|$fx';
 }
 
 const double mathPi = 3.1415926535897932;
@@ -613,10 +798,7 @@ class _PipLayout extends StatelessWidget {
 
     final inset = circular
         ? ClipOval(child: child)
-        : ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: child,
-          );
+        : ClipRRect(borderRadius: BorderRadius.circular(12), child: child);
 
     return Stack(
       fit: StackFit.expand,
@@ -677,12 +859,7 @@ class _MirrorStackLayout extends StatelessWidget {
 
         return ColoredBox(
           color: Colors.black,
-          child: Column(
-            children: [
-              band(top),
-              band(bottom),
-            ],
-          ),
+          child: Column(children: [band(top), band(bottom)]),
         );
       },
     );
@@ -797,11 +974,13 @@ class _LyricSandwichLayout extends StatelessWidget {
       builder: (context, c) {
         final w = c.maxWidth;
         final h = c.maxHeight;
-        final midH = (h * bandHeightRatio.clamp(0.08, 0.35)).roundToDouble();
-        final bandH = (h * imageCropRatio.clamp(0.2, 0.7)).roundToDouble();
-        final cropFactor = (bandH / h).clamp(0.05, 1.0);
+        final cropRatio = imageCropRatio.clamp(0.2, 0.7);
+        final midRatio = bandHeightRatio.clamp(0.08, 0.35);
+        final cropFlex = (cropRatio * 1000).round().clamp(1, 1000);
+        final midFlex = (midRatio * 1000).round().clamp(1, 1000);
 
-        Widget photoBand(Widget source) {
+        Widget photoBand(Widget source, double bandH) {
+          final cropFactor = h > 0 ? (bandH / h).clamp(0.05, 1.0) : 1.0;
           return SizedBox(
             width: w,
             height: bandH,
@@ -815,18 +994,35 @@ class _LyricSandwichLayout extends StatelessWidget {
           );
         }
 
-        return ColoredBox(
-          color: Colors.black,
-          child: Column(
-            children: [
-              photoBand(top),
-              SizedBox(
-                width: w,
-                height: midH,
-                child: ColoredBox(color: bandColor),
-              ),
-              photoBand(bottom),
-            ],
+        return SizedBox(
+          width: w,
+          height: h,
+          child: ColoredBox(
+            color: Colors.black,
+            child: Column(
+              children: [
+                Expanded(
+                  flex: cropFlex,
+                  child: LayoutBuilder(
+                    builder: (context, bandConstraints) {
+                      return photoBand(top, bandConstraints.maxHeight);
+                    },
+                  ),
+                ),
+                Expanded(
+                  flex: midFlex,
+                  child: ColoredBox(color: bandColor),
+                ),
+                Expanded(
+                  flex: cropFlex,
+                  child: LayoutBuilder(
+                    builder: (context, bandConstraints) {
+                      return photoBand(bottom, bandConstraints.maxHeight);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -893,10 +1089,7 @@ class _VhsGrainPainter extends CustomPainter {
     final rng = math.Random(7);
     for (var i = 0; i < 48; i++) {
       final y = rng.nextDouble() * size.height;
-      canvas.drawRect(
-        Rect.fromLTWH(0, y, size.width, 1.2),
-        paint,
-      );
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1.2), paint);
     }
   }
 
@@ -1337,7 +1530,8 @@ class _ShapedCutoutLayoutState extends State<_ShapedCutoutLayout> {
     if (raw.isEmpty) return;
     final url = MediaUtils.resolveAbsoluteUrl(raw);
     final lower = url.toLowerCase();
-    final isVideo = lower.contains('.mp4') ||
+    final isVideo =
+        lower.contains('.mp4') ||
         lower.contains('.mov') ||
         lower.contains('.webm') ||
         lower.contains('.m3u8') ||
@@ -1360,8 +1554,9 @@ class _ShapedCutoutLayoutState extends State<_ShapedCutoutLayout> {
   @override
   Widget build(BuildContext context) {
     final bgUrl = widget.backgroundUrl?.trim();
-    final resolved =
-        (bgUrl == null || bgUrl.isEmpty) ? null : MediaUtils.resolveAbsoluteUrl(bgUrl);
+    final resolved = (bgUrl == null || bgUrl.isEmpty)
+        ? null
+        : MediaUtils.resolveAbsoluteUrl(bgUrl);
 
     Widget background;
     final vc = _bgVideo;
@@ -1413,8 +1608,7 @@ class _ShapedCutoutLayoutState extends State<_ShapedCutoutLayout> {
     if (shape == 'rect') {
       return ClipRect(child: child);
     }
-    if (shape == 'custom' &&
-        (widget.maskUrl?.trim().isNotEmpty ?? false)) {
+    if (shape == 'custom' && (widget.maskUrl?.trim().isNotEmpty ?? false)) {
       final mask = MediaUtils.resolveAbsoluteUrl(widget.maskUrl!);
       return ShaderMask(
         blendMode: BlendMode.dstIn,
@@ -1425,7 +1619,9 @@ class _ShapedCutoutLayoutState extends State<_ShapedCutoutLayout> {
           ).createShader(bounds);
         },
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(widget.cornerRadius.clamp(0, 120)),
+          borderRadius: BorderRadius.circular(
+            widget.cornerRadius.clamp(0, 120),
+          ),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -1444,6 +1640,83 @@ class _ShapedCutoutLayoutState extends State<_ShapedCutoutLayout> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(widget.cornerRadius.clamp(0, 120)),
       child: child,
+    );
+  }
+}
+
+/// Caption that loads a catalog TTF/OTF and applies it to [text].
+class _TemplateCaptionText extends StatefulWidget {
+  const _TemplateCaptionText({
+    required this.text,
+    required this.fontSize,
+    required this.color,
+    this.fontAssetId,
+    this.fontAssetUrl,
+  });
+
+  final String text;
+  final double fontSize;
+  final Color color;
+  final String? fontAssetId;
+  final String? fontAssetUrl;
+
+  @override
+  State<_TemplateCaptionText> createState() => _TemplateCaptionTextState();
+}
+
+class _TemplateCaptionTextState extends State<_TemplateCaptionText> {
+  String? _family;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureFont();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TemplateCaptionText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.fontAssetId != widget.fontAssetId ||
+        oldWidget.fontAssetUrl != widget.fontAssetUrl) {
+      _ensureFont();
+    }
+  }
+
+  Future<void> _ensureFont() async {
+    final id = widget.fontAssetId;
+    final url = widget.fontAssetUrl;
+    if (id == null || id.isEmpty || url == null || url.isEmpty) {
+      if (_family != null && mounted) setState(() => _family = null);
+      return;
+    }
+    if (TemplateFontCache.isLoaded(id)) {
+      final family = TemplateFontCache.familyFor(id);
+      if (_family != family && mounted) setState(() => _family = family);
+      return;
+    }
+    final ok = await TemplateFontCache.load(fontAssetId: id, url: url);
+    if (!mounted) return;
+    setState(() {
+      _family = ok ? TemplateFontCache.familyFor(id) : null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      widget.text,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: widget.color,
+        fontSize: widget.fontSize,
+        fontFamily: _family,
+        // Single-face TTFs: wrong weight makes Flutter drop the custom family.
+        fontWeight: _family == null ? FontWeight.w800 : FontWeight.normal,
+        height: 1.1,
+        shadows: const [
+          Shadow(color: Colors.black87, blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
     );
   }
 }

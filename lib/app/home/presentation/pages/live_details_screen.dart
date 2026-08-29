@@ -322,7 +322,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
 
       // 4. Prefer socket sendGift (qty 1); HTTP fallback if socket offline.
       await _ensureAuctionRoomsJoined();
-      final liveId = _liveRoomId;
+      final liveId = _giftLiveId;
       final socket = _auctionSocket;
       GiftSocketSendResult? socketResult;
       if (socket != null &&
@@ -651,13 +651,20 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     await _ensureAuctionRoomsJoined();
   }
 
-  /// Live room id for socket gifts — auction.liveId when known, else post id.
+  /// Socket room id — auction.liveId when known, else post id.
   String? get _liveRoomId {
     final fromAuction = _resolvedLiveId?.trim();
     if (fromAuction != null && fromAuction.isNotEmpty) return fromAuction;
     final postId = widget.post?.id.trim();
     if (postId != null && postId.isNotEmpty) return postId;
     return null;
+  }
+
+  /// Live id for gift sends — never the post id: `/gifts/send` rejects a
+  /// `liveId` that is not a live in `LIVE` status. Null for post auctions.
+  String? get _giftLiveId {
+    final liveId = _resolvedLiveId?.trim();
+    return liveId != null && liveId.isNotEmpty ? liveId : null;
   }
 
   Future<void> _ensureAuctionRoomsJoined() async {
@@ -886,9 +893,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       senderId: payload.senderId,
       giftName: giftName,
       animationUrl:
-          (giftMap?['animationUrl'] ??
-                  giftMap?['animation_url'] ??
-                  giftMap?['imageUrl'])
+          (giftMap?['animationUrl'] ?? giftMap?['animation_url'])
               ?.toString(),
       thumbnailUrl:
           (giftMap?['thumbnailUrl'] ??
@@ -1005,6 +1010,11 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     final url = animationUrl?.trim();
     if (url == null || url.isEmpty || !mounted) return;
 
+    final gName = giftName ?? 'Gift';
+    final gId = (giftId != null && giftId.isNotEmpty) ? giftId : gName;
+    final sName = senderName ?? 'User';
+    final sId = (senderId != null && senderId.isNotEmpty) ? senderId : sName;
+
     final isSmall =
         size == GiftCatalogSize.small ||
         size?.toString().toUpperCase() == 'SMALL';
@@ -1030,7 +1040,12 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
     // animation and will render the event through its own HUD pipeline.
     if (!mounted || !isRealtimeGiftRouteCurrent(context)) return;
 
-    final dedupeKey = '${giftName ?? ''}|${senderName ?? ''}';
+    // Key on identity, not on what is displayed. The same send arrives from
+    // the gift comment, `auctionGiftCombo` and `auctionUpdated.lastGift`, and
+    // those payloads disagree about the sender's display name — one carries the
+    // profile name, another falls back to 'User'. A name-based key therefore
+    // read the duplicates as different gifts and replayed them.
+    final dedupeKey = '$gId|$sId';
     final now = DateTime.now();
     final lastAt = _lastGiftPlayedAt;
     // Ignore socket+local doubles even when URLs differ slightly.
@@ -1056,6 +1071,9 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
         giftName: giftName,
         size: size,
         owner: this,
+        // Second line of defence: a late duplicate that clears the 3s window
+        // above must still not restart an animation that is on screen.
+        dedupeKey: dedupeKey,
       ),
     );
   }
@@ -1172,7 +1190,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
           (gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'])
               ?.toString();
       final animationUrl =
-          (gift['animationUrl'] ?? gift['animation_url'] ?? thumb)?.toString();
+          (gift['animationUrl'] ?? gift['animation_url'])?.toString();
       final audioUrl = (gift['audioUrl'] ?? gift['audio_url'])?.toString();
       final giftId =
           (gift['giftId'] ?? gift['id'] ?? parsedLastGift?.id)?.toString() ??
@@ -1925,7 +1943,7 @@ class _LiveDetailsScreenState extends State<LiveDetailsScreen>
       // Prefer nested user.id — feed sometimes omits top-level userId.
       receiverId: _hostUserId ?? post?.userId,
       auctionId: auctionId,
-      liveId: _liveRoomId,
+      liveId: _giftLiveId,
       canSendToHost: _canSendGiftToHost,
       onSmallGiftOptimistic: _showOptimisticSmallGiftCombo,
       onGiftSent: _refreshAfterGift,

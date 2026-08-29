@@ -21,6 +21,10 @@ class LiveRoomProfilePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hostName = host.displayName.trim();
+    final nameMaxWidth = (MediaQuery.sizeOf(context).width * 0.28)
+        .clamp(86.0, 132.0)
+        .toDouble();
     return LiveRoomPill(
       height: 42,
       padding: const EdgeInsetsDirectional.only(start: 4, end: 10),
@@ -34,9 +38,9 @@ class LiveRoomProfilePill extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 86),
+                constraints: BoxConstraints(maxWidth: nameMaxWidth),
                 child: Text(
-                  host.displayName,
+                  hostName,
                   style: AppTextStyles.roomHostName.copyWith(
                     fontSize: 12.5,
                     height: 1.1,

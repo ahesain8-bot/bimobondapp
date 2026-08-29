@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../../core/services/live_audio_session.dart';
+import '../../../../core/services/media_progress_watchdog.dart';
 import '../../../../core/services/live_video_quality_preference.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_capture_profile.dart';
@@ -11,12 +13,32 @@ import '../../domain/entities/live_capture_profile.dart';
 /// Publishes / subscribes LiveKit A/V using **server-issued** `url` + `token` only.
 ///
 /// Never mints JWTs or stores `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`.
+/// How often the room health watchdogs sample media counters.
+const Duration _kMediaHealthTick = Duration(seconds: 2);
+
 class LivesMediaDataSource {
   Room? _room;
   Room? _battleRoom;
+  Room? _battleRecoveryRoom;
+
+  /// Whether this datasource currently holds [LiveAudioSession]. Keeps the
+  /// acquire/release pair balanced no matter which connect path ran.
+  var _holdsAudioSession = false;
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
+  Timer? _videoHealthTimer;
+  var _videoHealthCheckInFlight = false;
+  // 3 samples at 2s: about six seconds of a stream that decodes no frames
+  // while signalling still says the room is up. Long enough that ordinary
+  // rebuffering is not mistaken for a stall, short enough that the host is not
+  // broadcasting a frozen picture for a quarter of a minute.
+  final _videoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+  Timer? _battleVideoHealthTimer;
+  var _battleVideoHealthCheckInFlight = false;
+  // The opponent room is secondary and crosses another host's uplink, so it
+  // gets a longer rope before its room is rebuilt.
+  final _battleVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 5);
 
   /// The profile the camera actually opened at — not the one we asked for.
   /// Publish options and camera flips both read this so the declared layers
@@ -36,6 +58,10 @@ class LivesMediaDataSource {
 
   /// Subscribe-only room for the other host during a PK battle.
   Room? get battleRoom => _battleRoom;
+
+  bool get isBattleRoomUsable =>
+      _battleRoom != null &&
+      _battleRoom!.connectionState != ConnectionState.disconnected;
 
   /// Local camera track for [VideoTrackRenderer] preview (host/guest).
   LocalVideoTrack? get localVideoTrack => _videoTrack;
@@ -115,6 +141,18 @@ class LivesMediaDataSource {
     );
   }
 
+  Future<void> _acquireAudioSession() async {
+    if (_holdsAudioSession) return;
+    _holdsAudioSession = true;
+    await LiveAudioSession.instance.acquire();
+  }
+
+  Future<void> _releaseAudioSession() async {
+    if (!_holdsAudioSession) return;
+    _holdsAudioSession = false;
+    await LiveAudioSession.instance.release();
+  }
+
   Future<void> _preferMediaSpeaker() async {
     try {
       // TikTok-style live rooms are media playback, not private calls. Keep
@@ -123,6 +161,116 @@ class LivesMediaDataSource {
     } catch (error) {
       debugPrint('Live audio route selection failed: $error');
     }
+  }
+
+  /// Waits briefly for proof that the camera is producing outbound frames.
+  ///
+  /// A successful `publishVideoTrack` only proves signalling succeeded. On
+  /// some Android Camera2 devices the capture session fails asynchronously,
+  /// so the publication exists but its counters remain at zero forever.
+  Future<bool> _waitForOutboundVideo(LocalVideoTrack track) async {
+    final deadline = DateTime.now().add(const Duration(milliseconds: 2200));
+    var sawFrameCounter = false;
+    var sawAnyStats = false;
+    num lastFrames = 0;
+    num lastPackets = 0;
+
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 275));
+      try {
+        final stats = await track.getSenderStats();
+        if (stats.isEmpty) continue;
+        sawAnyStats = true;
+        lastFrames = 0;
+        lastPackets = 0;
+        for (final layer in stats) {
+          if (layer.framesSent != null) sawFrameCounter = true;
+          lastFrames += layer.framesSent ?? 0;
+          lastPackets += layer.packetsSent ?? 0;
+        }
+        if (lastFrames > 0) return true;
+        // Some platforms do not expose framesSent. Packets are the best
+        // available proof there and must not turn into a false failure.
+        if (!sawFrameCounter && lastPackets > 0) return true;
+      } catch (error) {
+        debugPrint('[Host] outbound video stats unavailable: $error');
+      }
+    }
+
+    debugPrint(
+      '🔴 [Host] no outbound camera frames '
+      '(stats=$sawAnyStats frames=$lastFrames packets=$lastPackets)',
+    );
+    return false;
+  }
+
+  void _startOutboundVideoWatchdog(Room room, LocalVideoTrack track) {
+    _stopOutboundVideoWatchdog();
+    _videoProgress.reset();
+    _videoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
+      if (_videoHealthCheckInFlight ||
+          _room != room ||
+          _videoTrack != track ||
+          !_videoPublished) {
+        return;
+      }
+      _videoHealthCheckInFlight = true;
+      unawaited(
+        _sampleOutboundVideo(room, track).whenComplete(() {
+          _videoHealthCheckInFlight = false;
+        }),
+      );
+    });
+  }
+
+  Future<void> _sampleOutboundVideo(Room room, LocalVideoTrack track) async {
+    try {
+      // A host who turned their camera off stops sending frames on purpose.
+      // Without this the watchdog read that as a stall and forced a full
+      // reconnect, which republished the camera the host had just closed.
+      if (track.muted || room.localParticipant?.isCameraEnabled() == false) {
+        _videoProgress.reset();
+        return;
+      }
+      final stats = await track.getSenderStats();
+      if (_room != room || _videoTrack != track || stats.isEmpty) return;
+      num frames = 0;
+      num packets = 0;
+      var hasFrameCounter = false;
+      var hasPacketCounter = false;
+      for (final layer in stats) {
+        final sentFrames = layer.framesSent;
+        final sentPackets = layer.packetsSent;
+        if (sentFrames != null) {
+          hasFrameCounter = true;
+          frames += sentFrames;
+        }
+        if (sentPackets != null) {
+          hasPacketCounter = true;
+          packets += sentPackets;
+        }
+      }
+      final progress = hasFrameCounter
+          ? frames
+          : (hasPacketCounter ? packets : null);
+      if (!_videoProgress.addSample(progress)) return;
+
+      debugPrint(
+        '🔴 [Host] outbound video stopped advancing while room remained connected',
+      );
+      _stopOutboundVideoWatchdog();
+      onRoomEvent?.call('room', 'disconnected:outbound_video_stalled');
+    } catch (error) {
+      // Stats support is platform-dependent. An unavailable sample is not a
+      // disconnect and must not interrupt a healthy broadcast.
+      debugPrint('[Host] outbound health sample unavailable: $error');
+    }
+  }
+
+  void _stopOutboundVideoWatchdog() {
+    _videoHealthTimer?.cancel();
+    _videoHealthTimer = null;
+    _videoProgress.reset();
   }
 
   /// Host/guest: connect then publish camera + mic (production.md §3.4).
@@ -225,11 +373,15 @@ class LivesMediaDataSource {
       });
 
     debugPrint('🔍 [Host] connectAndPublish: connecting to room...');
+    // Own the Android audio session for the whole broadcast: the PK battle
+    // room disconnecting would otherwise tear it down for this room too.
+    await _acquireAudioSession();
     _room = room;
     try {
       await room.connect(url, token);
     } catch (_) {
       if (_room == room) _room = null;
+      await _releaseAudioSession();
       try {
         await room.dispose();
       } catch (_) {}
@@ -305,98 +457,90 @@ class LivesMediaDataSource {
         ...fallbacks.skip(1),
       ];
       final attemptCount = maxAttempts.clamp(1, ladder.length);
-      for (var attempt = 0; attempt < attemptCount; attempt++) {
-        // Try each profile once, highest to lowest. Repeating every failed
-        // profile twice added 7.5 seconds of sleeps on a busy lens and looked
-        // exactly like a frozen live; a lower supported mode is the useful
-        // recovery action.
-        final profile = ladder[attempt];
-        try {
-          debugPrint(
-            '🔍 [Host] connectAndPublish: '
-            'createCameraTrack attempt ${attempt + 1}/$attemptCount '
-            'at ${profile.label}...',
-          );
-          _videoTrack = await LocalVideoTrack.createCameraTrack(
-            _captureOptionsFor(profile, cameraPosition),
-          );
-          _activeProfile = profile;
-          _videoPublished = false;
-          lastError = null;
-          debugPrint(
-            '🔍 [Host] connectAndPublish: '
-            'camera track created on attempt ${attempt + 1} '
-            'at ${profile.label}',
-          );
-
-          // ============================================================
-          // [DEBUG-QOS HOST 1/4] Actual CAPTURE runtime diagnostics.
-          // Do NOT trust the params we passed: inspect the values the
-          // camera hardware + LiveKit engine actually accepted.
-          // Reads correct 2.11.0 getters only (LocalVideoTrack.currentOptions
-          // → VideoCaptureOptions.params → VideoParameters.dimensions/encoding).
-          // ============================================================
-          try {
-            final t = _videoTrack!;
-            final opts = t
-                .currentOptions; // VideoCaptureOptions (2.11.0 correct name, not .options)
-            final params =
-                opts.params; // VideoParameters (dimensions + encoding)
-            final dims = params.dimensions;
-            final enc = params.encoding;
-            final capW = dims.width;
-            final capH = dims.height;
-            final capFps = enc?.maxFramerate ?? opts.maxFrameRate ?? 30;
-            final capBr = enc?.maxBitrate ?? 2500000;
-            debugPrint(
-              '[DEBUG-QOS] HOST-CAPTURE:'
-              '  position=${cameraPosition.name}'
-              '  dimensions(WxH)=${capW}x$capH'
-              '  requestedFps=$capFps'
-              '  requestedBitrate=${(capBr / 1000).toStringAsFixed(0)}kbps'
-              '  track.sid=${t.sid}'
-              '  captureMaxFrameRate_opt=${opts.maxFrameRate}'
-              '  (W>H => landscape; H>W => portrait).',
-            );
-          } catch (e) {
-            debugPrint('[DEBUG-QOS] HOST-CAPTURE (read failed): $e');
-          }
-
-          break;
-        } catch (e, st) {
-          lastError = e;
-          debugPrint(
-            '🔴 [Host] LiveKit camera open attempt ${attempt + 1} '
-            'failed: $e\n$st',
-          );
-          // No backoff after the final try: the caller is about to act on
-          // the failure, and sleeping first only delays that.
-          if (attempt < attemptCount - 1) {
-            await Future<void>.delayed(
-              Duration(milliseconds: 250 * (attempt + 1)),
-            );
-          }
-        }
-      }
-      if (_videoTrack == null) {
-        throw StateError('LiveKit camera open failed: $lastError');
-      }
-      // Pass EXPLICIT VideoPublishOptions — L284 of SDK 2.11.0 local_participant:
-      //   publishOptions ??= track.lastPublishOptions ?? room.roomOptions.defaults.
-      // By passing explicitly we guarantee the layers are declared at publish
-      // time regardless of any future room-default override path. The ladder
-      // is derived from the profile the camera actually opened at, so we never
-      // advertise a layer the sensor refused, and it always bottoms out at
-      // 854×480 (M2 requirement: never publish below 480p).
       final local = room.localParticipant;
       if (local == null) {
         throw StateError('LiveKit local participant unavailable');
       }
-      await local.publishVideoTrack(
-        _videoTrack!,
-        publishOptions: _publishOptionsFor(_activeProfile),
-      );
-      _videoPublished = true;
+
+      for (var attempt = 0; attempt < attemptCount; attempt++) {
+        final profile = ladder[attempt];
+        LocalVideoTrack? candidate;
+        String? publicationSid;
+        try {
+          debugPrint(
+            '🔍 [Host] connectAndPublish: '
+            'camera/publish attempt ${attempt + 1}/$attemptCount '
+            'at ${profile.label}...',
+          );
+          candidate = await LocalVideoTrack.createCameraTrack(
+            _captureOptionsFor(profile, cameraPosition),
+          );
+
+          final opts = candidate.currentOptions;
+          final params = opts.params;
+          final dims = params.dimensions;
+          final enc = params.encoding;
+          debugPrint(
+            '[DEBUG-QOS] HOST-CAPTURE:'
+            '  position=${cameraPosition.name}'
+            '  dimensions(WxH)=${dims.width}x${dims.height}'
+            '  requestedFps=${enc?.maxFramerate ?? opts.maxFrameRate ?? 30}'
+            '  requestedBitrate='
+            '${((enc?.maxBitrate ?? 2500000) / 1000).toStringAsFixed(0)}kbps'
+            '  track.sid=${candidate.sid}',
+          );
+
+          final publication = await local.publishVideoTrack(
+            candidate,
+            publishOptions: _publishOptionsFor(profile),
+          );
+          publicationSid = publication.sid;
+
+          // Camera2 can report success and fail its capture-session setup a
+          // few milliseconds later. Do not replace the visible camera with a
+          // LiveKit texture until RTC proves that real frames are leaving the
+          // handset. This specifically prevents "published but black" lives.
+          final hasFrames = await _waitForOutboundVideo(candidate);
+          if (!hasFrames) {
+            throw StateError(
+              'camera opened at ${profile.label} but produced no video frames',
+            );
+          }
+
+          _videoTrack = candidate;
+          _activeProfile = profile;
+          _videoPublished = true;
+          lastError = null;
+          debugPrint(
+            '🔍 [Host] connectAndPublish: video frames verified '
+            'at ${profile.label} ✅',
+          );
+          break;
+        } catch (e, st) {
+          lastError = e;
+          _videoTrack = null;
+          _videoPublished = false;
+          debugPrint(
+            '🔴 [Host] LiveKit video attempt ${attempt + 1} '
+            'failed: $e\n$st',
+          );
+          if (publicationSid != null) {
+            try {
+              await local.removePublishedTrack(publicationSid);
+            } catch (_) {}
+          }
+          try {
+            await candidate?.dispose();
+          } catch (_) {}
+          if (attempt < attemptCount - 1) {
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+          }
+        }
+      }
+      if (_videoTrack == null || !_videoPublished) {
+        throw StateError('LiveKit camera publish failed: $lastError');
+      }
+
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
 
       // ============================================================
@@ -480,6 +624,7 @@ class LivesMediaDataSource {
     debugPrint(
       '🟢 [Host] connectAndPublish: SUCCESS — room + video + audio all up',
     );
+    _startOutboundVideoWatchdog(room, _videoTrack!);
   }
 
   /// Viewer: connect and subscribe only (no publish).
@@ -500,7 +645,13 @@ class LivesMediaDataSource {
         ),
       ),
     );
-    await room.connect(url, token);
+    await _acquireAudioSession();
+    try {
+      await room.connect(url, token);
+    } catch (_) {
+      await _releaseAudioSession();
+      rethrow;
+    }
     _room = room;
     await _preferMediaSpeaker();
     // Subscribe-only: mark connected without local publish.
@@ -530,12 +681,191 @@ class LivesMediaDataSource {
         ),
       ),
     );
+    room.events
+      ..on<RoomDisconnectedEvent>((_) {
+        if (_battleRoom != room) return;
+        debugPrint('🔴 [Host] opponent battle room disconnected');
+        onRoomEvent?.call('battle', 'disconnected');
+        unawaited(_recoverBattleRoom(room: room, url: url, token: token));
+      })
+      ..on<ReconnectingEvent>((_) {
+        if (_battleRoom != room) return;
+        onRoomEvent?.call('battle', 'reconnecting');
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        if (_battleRoom != room) return;
+        onRoomEvent?.call('battle', 'reconnected');
+        unawaited(_ensureBattleSubscriptions(room));
+        unawaited(_preferMediaSpeaker());
+        _startBattleVideoWatchdog(room: room, url: url, token: token);
+      })
+      ..on<TrackSubscriptionExceptionEvent>((event) {
+        unawaited(_retryBattleSubscription(room, event));
+      })
+      ..on<TrackSubscribedEvent>((event) {
+        if (_battleRoom != room) return;
+        if (event.track is RemoteAudioTrack) {
+          unawaited(_preferMediaSpeaker());
+        }
+      });
     await room.connect(url, token);
     _battleRoom = room;
+    await _ensureBattleSubscriptions(room);
     await _preferMediaSpeaker();
+    _startBattleVideoWatchdog(room: room, url: url, token: token);
+  }
+
+  Future<void> _retryBattleSubscription(
+    Room room,
+    TrackSubscriptionExceptionEvent event,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (_battleRoom != room) return;
+    final participant = event.participant;
+    if (participant == null) return;
+    final publication = participant.trackPublications[event.sid];
+    if (publication is! RemoteTrackPublication || publication.subscribed) {
+      return;
+    }
+    try {
+      await publication.subscribe();
+    } catch (error) {
+      debugPrint('[Host] opponent track resubscribe failed: $error');
+    }
+  }
+
+  Future<void> _ensureBattleSubscriptions(Room room) async {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.trackPublications.values) {
+        if (publication.subscribed) continue;
+        try {
+          await publication.subscribe();
+        } catch (error) {
+          debugPrint('[Host] opponent track restore failed: $error');
+        }
+      }
+    }
+  }
+
+  RemoteVideoTrack? _firstBattleVideoTrack(Room room) {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (publication.subscribed && !publication.muted && track != null) {
+          return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  void _startBattleVideoWatchdog({
+    required Room room,
+    required String url,
+    required String token,
+  }) {
+    _stopBattleVideoWatchdog();
+    _battleVideoProgress.reset();
+    _battleVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
+      if (_battleVideoHealthCheckInFlight || _battleRoom != room) return;
+      _battleVideoHealthCheckInFlight = true;
+      unawaited(
+        _sampleBattleVideo(room: room, url: url, token: token).whenComplete(() {
+          _battleVideoHealthCheckInFlight = false;
+        }),
+      );
+    });
+  }
+
+  Future<void> _sampleBattleVideo({
+    required Room room,
+    required String url,
+    required String token,
+  }) async {
+    try {
+      final track = _firstBattleVideoTrack(room);
+      if (_battleRoom != room) return;
+      if (track == null) {
+        await _ensureBattleSubscriptions(room);
+        if (!_battleVideoProgress.addMissingTrackSample()) return;
+      } else {
+        final stats = await track.getReceiverStats();
+        final progress =
+            stats?.framesDecoded ??
+            stats?.framesReceived ??
+            stats?.packetsReceived ??
+            stats?.bytesReceived;
+        if (_battleRoom != room || !_battleVideoProgress.addSample(progress)) {
+          return;
+        }
+      }
+
+      debugPrint(
+        '🔴 [Host] opponent video stalled while battle room stayed up',
+      );
+      _stopBattleVideoWatchdog();
+      await room.disconnect();
+      if (_battleRoom == room) {
+        unawaited(_recoverBattleRoom(room: room, url: url, token: token));
+      }
+    } catch (error) {
+      debugPrint('[Host] opponent video health sample unavailable: $error');
+    }
+  }
+
+  void _stopBattleVideoWatchdog() {
+    _battleVideoHealthTimer?.cancel();
+    _battleVideoHealthTimer = null;
+    _battleVideoProgress.reset();
+  }
+
+  Future<void> _recoverBattleRoom({
+    required Room room,
+    required String url,
+    required String token,
+  }) async {
+    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    _battleRecoveryRoom = room;
+    const retryDelays = <Duration>[
+      Duration(milliseconds: 250),
+      Duration(milliseconds: 900),
+      Duration(milliseconds: 1800),
+    ];
+    try {
+      for (var attempt = 0; attempt < retryDelays.length; attempt++) {
+        await Future<void>.delayed(retryDelays[attempt]);
+        if (_battleRoom != room) return;
+        if (room.connectionState == ConnectionState.connected) {
+          await _ensureBattleSubscriptions(room);
+          return;
+        }
+        if (room.connectionState != ConnectionState.disconnected) return;
+        try {
+          debugPrint(
+            '🔄 [Host] opponent terminal reconnect '
+            '${attempt + 1}/${retryDelays.length}',
+          );
+          await room.connect(url, token);
+          if (_battleRoom != room) {
+            await room.disconnect();
+            return;
+          }
+          await _ensureBattleSubscriptions(room);
+          await _preferMediaSpeaker();
+          _startBattleVideoWatchdog(room: room, url: url, token: token);
+          onRoomEvent?.call('battle', 'reconnected');
+          return;
+        } catch (error) {
+          debugPrint('[Host] opponent reconnect attempt failed: $error');
+        }
+      }
+    } finally {
+      if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
+    }
   }
 
   Future<void> disconnectBattle() async {
+    _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;
     if (room == null) return;
@@ -588,19 +918,58 @@ class LivesMediaDataSource {
     _videoTrack = null;
     _videoPublished = false;
 
-    final next = await LocalVideoTrack.createCameraTrack(options);
     final local = room.localParticipant;
     if (local == null) {
-      await next.dispose();
       throw StateError('LiveKit local participant unavailable');
     }
-    await local.publishVideoTrack(
-      next,
-      publishOptions: _publishOptionsFor(_activeProfile),
-    );
-    _videoTrack = next;
-    _videoPublished = true;
-    return next;
+
+    // The old track is already unpublished and stopped by this point, so a
+    // failure here leaves the host broadcasting a black frame — which reads as
+    // the live having dropped. Android in particular refuses to open the
+    // camera for a moment after the previous capturer is released, so retry
+    // the flip and then fall back to the side we came from: staying on the
+    // original camera is always better than going dark mid-broadcast.
+    Future<LocalVideoTrack?> publishAt(CameraPosition at) async {
+      LocalVideoTrack? track;
+      try {
+        track = await LocalVideoTrack.createCameraTrack(
+          _captureOptionsFor(_activeProfile, at),
+        );
+        await local.publishVideoTrack(
+          track,
+          publishOptions: _publishOptionsFor(_activeProfile),
+        );
+        _videoTrack = track;
+        _videoPublished = true;
+        _startOutboundVideoWatchdog(room, track);
+        return track;
+      } catch (e, st) {
+        debugPrint('LiveKit camera publish at $at failed: $e\n$st');
+        try {
+          await track?.dispose();
+        } catch (_) {}
+        return null;
+      }
+    }
+
+    final flipped =
+        await publishAt(position) ??
+        await Future<LocalVideoTrack?>.delayed(
+          const Duration(milliseconds: 350),
+          () => publishAt(position),
+        );
+    if (flipped != null) return flipped;
+
+    final fallbackPosition = useFront
+        ? CameraPosition.back
+        : CameraPosition.front;
+    final recovered = await publishAt(fallbackPosition);
+    if (recovered != null) {
+      throw StateError(
+        'Camera flip failed; kept broadcasting on the previous camera',
+      );
+    }
+    throw StateError('LiveKit camera flip failed and could not be recovered');
   }
 
   Future<void> disconnect() async {
@@ -609,7 +978,13 @@ class LivesMediaDataSource {
       '_videoTrack=${_videoTrack != null ? "SET" : "NULL"}, '
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
+    _stopOutboundVideoWatchdog();
     await disconnectBattle();
+    // Back to LiveKit's automatic management *before* the primary room goes
+    // down, so that room's own teardown is what finally frees the session.
+    // Note the ordering against disconnectBattle() above: the battle room is
+    // closed while we still own the session, which is the whole point.
+    await _releaseAudioSession();
     final room = _room;
     // Detach ownership first: RoomDisconnectedEvent emitted by this deliberate
     // teardown must not start the host recovery loop.

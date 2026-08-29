@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:bimobondapp/app/video_templates/data/datasources/video_template_asset_loader.dart';
 import 'package:bimobondapp/app/video_templates/domain/entities/video_template_entity.dart';
+import 'package:bimobondapp/app/video_templates/presentation/models/template_editor_models.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
@@ -101,6 +102,12 @@ abstract class VideoTemplatesRepository {
     String? title,
   });
 
+  /// Gallery / free edit — no catalog `templateId` (Flow B).
+  Future<Either<Failure, VideoTemplateProjectEntity>> createProjectFromMedia({
+    required List<ProjectFromMediaInput> media,
+    String? title,
+  });
+
   Future<Either<Failure, VideoTemplateProjectEntity>> getProject(
     String projectId,
   );
@@ -119,9 +126,15 @@ abstract class VideoTemplatesRepository {
 
   Future<Either<Failure, void>> completeProject(String projectId);
 
+  Future<Either<Failure, VideoTemplateRenderJobEntity>> renderOneShot(
+    Map<String, dynamic> body,
+  );
+
   Future<Either<Failure, VideoTemplateExportEntity>> queueExport({
     required String projectId,
     String quality = 'standard',
+    String? resolution,
+    double? fps,
   });
 
   /// SSE export progress. Null = stream unavailable (caller should poll).
@@ -135,6 +148,68 @@ abstract class VideoTemplatesRepository {
   Future<Either<Failure, VideoTemplateExportEntity>> getExport({
     required String projectId,
     required String exportId,
+  });
+
+  Future<Either<Failure, List<TemplatePresetItem>>> listPresets({
+    required String kind,
+    String? projectId,
+    String? category,
+    int limit = 50,
+  });
+
+  Future<Either<Failure, List<TemplateFontItem>>> listFonts();
+
+  Future<Either<Failure, void>> putSlotFilter({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double intensity = 1,
+    double? startTime,
+    double? endTime,
+  });
+
+  Future<Either<Failure, void>> putSlotEffect({
+    required String projectId,
+    required String slotId,
+    String? presetId,
+    double? startTime,
+    double? endTime,
+  });
+
+  Future<Either<Failure, void>> putSlotFilterItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<Either<Failure, void>> putSlotEffectItems({
+    required String projectId,
+    required String slotId,
+    required List<Map<String, dynamic>> items,
+  });
+
+  Future<Either<Failure, void>> createProjectText({
+    required String projectId,
+    required String text,
+    double fontSize = 48,
+    String color = '#FFFFFF',
+    double positionX = 0,
+    double positionY = 120,
+    double startTime = 0,
+    required double endTime,
+    String? fontAssetId,
+  });
+
+  Future<Either<Failure, void>> createProjectSticker({
+    required String projectId,
+    String? presetId,
+    String? assetUrl,
+    double positionX = 0,
+    double positionY = -200,
+    double scale = 1,
+    double opacity = 1,
+    double startTime = 0,
+    double? endTime,
   });
 }
 

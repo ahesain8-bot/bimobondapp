@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/models/live_battle.dart';
+import '../../../../../core/models/live_competition_request.dart';
 
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_guest.dart';
@@ -87,7 +88,11 @@ class LiveRoomReady extends LiveRoomState {
     this.isRealtimeConnected = false,
     this.guests = const [],
     this.pendingGuestInvite,
+    this.pendingCompetitionRequest,
+    this.isCompetitionActionBusy = false,
     this.battle,
+    this.topGifterAvatars = const [],
+    this.opponentTopGifterAvatars = const [],
   });
 
   final LiveSession session;
@@ -142,8 +147,24 @@ class LiveRoomReady extends LiveRoomState {
   /// An invite addressed to this user that has not been answered yet.
   final LivePendingGuestInvite? pendingGuestInvite;
 
+  /// An active guest asked the host to start a PK round. This is rendered as
+  /// an actionable card, never as an ordinary chat line.
+  final LiveCompetitionRequest? pendingCompetitionRequest;
+
+  /// Prevents accepting/rejecting the same request more than once while the
+  /// server starts the battle.
+  final bool isCompetitionActionBusy;
+
   /// Current server-authoritative PK battle, if this live is paired.
   final LiveBattle? battle;
+
+  /// Ordered supporter avatars for this live — the top-gifter ring TikTok
+  /// draws under the host's own PK tile. From
+  /// `GET /lives/:id/leaderboard/gifters` and `liveTopGiftersUpdated`.
+  final List<String> topGifterAvatars;
+
+  /// The same, for the opponent's side of an active battle.
+  final List<String> opponentTopGifterAvatars;
 
   bool get isBattleActive => battle?.isActive == true;
 
@@ -184,7 +205,11 @@ class LiveRoomReady extends LiveRoomState {
     bool? isRealtimeConnected,
     List<LiveGuest>? guests,
     Object? pendingGuestInvite = _unset,
+    Object? pendingCompetitionRequest = _unset,
+    bool? isCompetitionActionBusy,
     Object? battle = _unset,
+    List<String>? topGifterAvatars,
+    List<String>? opponentTopGifterAvatars,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -229,7 +254,15 @@ class LiveRoomReady extends LiveRoomState {
       pendingGuestInvite: identical(pendingGuestInvite, _unset)
           ? this.pendingGuestInvite
           : pendingGuestInvite as LivePendingGuestInvite?,
+      pendingCompetitionRequest: identical(pendingCompetitionRequest, _unset)
+          ? this.pendingCompetitionRequest
+          : pendingCompetitionRequest as LiveCompetitionRequest?,
+      isCompetitionActionBusy:
+          isCompetitionActionBusy ?? this.isCompetitionActionBusy,
       battle: identical(battle, _unset) ? this.battle : battle as LiveBattle?,
+      topGifterAvatars: topGifterAvatars ?? this.topGifterAvatars,
+      opponentTopGifterAvatars:
+          opponentTopGifterAvatars ?? this.opponentTopGifterAvatars,
     );
   }
 }

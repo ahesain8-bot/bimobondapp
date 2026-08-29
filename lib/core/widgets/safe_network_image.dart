@@ -34,9 +34,11 @@ class SafeNetworkImage extends StatefulWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.borderRadius,
     this.errorIcon = Icons.broken_image_outlined,
     this.blankOnError = false,
+    this.transparentPlaceholder = false,
     this.showLoadingIndicator = true,
     this.loadingSize,
     this.onLoadFailed,
@@ -48,9 +50,11 @@ class SafeNetworkImage extends StatefulWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
+  final Alignment alignment;
   final BorderRadius? borderRadius;
   final IconData errorIcon;
   final bool blankOnError;
+  final bool transparentPlaceholder;
   final bool showLoadingIndicator;
   final double? loadingSize;
   final VoidCallback? onLoadFailed;
@@ -215,6 +219,9 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
 
   /// Instagram-style fixed circular spinner centered on a muted fill.
   Widget _loadingPlaceholder(ThemeData theme) {
+    if (widget.transparentPlaceholder) {
+      return _wrapSized(const SizedBox.expand());
+    }
     if (!widget.showLoadingIndicator && widget.blankOnError) {
       return _wrapSized(_blackBox());
     }
@@ -251,6 +258,9 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
   }
 
   Widget _placeholder(ThemeData theme) {
+    if (widget.transparentPlaceholder) {
+      return _wrapSized(const SizedBox.expand());
+    }
     if (widget.blankOnError) {
       return _wrapSized(_blackBox());
     }
@@ -276,9 +286,11 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
+        alignment: widget.alignment,
         borderRadius: widget.borderRadius,
         errorIcon: widget.errorIcon,
         blankOnError: widget.blankOnError,
+        transparentPlaceholder: widget.transparentPlaceholder,
         showLoadingIndicator: widget.showLoadingIndicator,
         loadingSize: widget.loadingSize,
         onLoadFailed: widget.onLoadFailed,
@@ -306,6 +318,7 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
       image = SizedBox.expand(
         child: FittedBox(
           fit: widget.fit,
+          alignment: widget.alignment,
           clipBehavior: Clip.hardEdge,
           child: image,
         ),
@@ -326,9 +339,11 @@ class _SafeNetworkSvgImage extends StatefulWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.borderRadius,
     this.errorIcon = Icons.broken_image_outlined,
     this.blankOnError = false,
+    this.transparentPlaceholder = false,
     this.showLoadingIndicator = true,
     this.loadingSize,
     this.onLoadFailed,
@@ -339,9 +354,11 @@ class _SafeNetworkSvgImage extends StatefulWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
+  final Alignment alignment;
   final BorderRadius? borderRadius;
   final IconData errorIcon;
   final bool blankOnError;
+  final bool transparentPlaceholder;
   final bool showLoadingIndicator;
   final double? loadingSize;
   final VoidCallback? onLoadFailed;
@@ -383,6 +400,9 @@ class _SafeNetworkSvgImageState extends State<_SafeNetworkSvgImage> {
   }
 
   Widget _loadingPlaceholder(ThemeData theme) {
+    if (widget.transparentPlaceholder) {
+      return _wrapSized(const SizedBox.expand());
+    }
     if (!widget.showLoadingIndicator && widget.blankOnError) {
       return _wrapSized(const ColoredBox(color: Colors.black));
     }
@@ -430,6 +450,7 @@ class _SafeNetworkSvgImageState extends State<_SafeNetworkSvgImage> {
       svg = SizedBox.expand(
         child: FittedBox(
           fit: widget.fit,
+          alignment: widget.alignment,
           clipBehavior: Clip.hardEdge,
           child: svg,
         ),

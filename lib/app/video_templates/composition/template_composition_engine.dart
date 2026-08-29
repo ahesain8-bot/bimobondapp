@@ -24,17 +24,17 @@ class TemplateCompositionEngine {
     StickerEngine? stickerEngine,
     OverlayEngine? overlayEngine,
     AudioEngine? audioEngine,
-  })  : templateEngine = templateEngine ?? TemplateEngine(),
-        timelineEngine = timelineEngine ?? const TimelineEngine(),
-        renderEngine = renderEngine ?? const RenderEngine(),
-        filterEngine = filterEngine ?? const FilterEngine(),
-        effectEngine = effectEngine ?? const EffectEngine(),
-        transitionEngine = transitionEngine ?? const TransitionEngine(),
-        keyframeEngine = keyframeEngine ?? const KeyframeEngine(),
-        textEngine = textEngine ?? const TextEngine(),
-        stickerEngine = stickerEngine ?? const StickerEngine(),
-        overlayEngine = overlayEngine ?? const OverlayEngine(),
-        audioEngine = audioEngine ?? const AudioEngine();
+  }) : templateEngine = templateEngine ?? TemplateEngine(),
+       timelineEngine = timelineEngine ?? const TimelineEngine(),
+       renderEngine = renderEngine ?? const RenderEngine(),
+       filterEngine = filterEngine ?? const FilterEngine(),
+       effectEngine = effectEngine ?? const EffectEngine(),
+       transitionEngine = transitionEngine ?? const TransitionEngine(),
+       keyframeEngine = keyframeEngine ?? const KeyframeEngine(),
+       textEngine = textEngine ?? const TextEngine(),
+       stickerEngine = stickerEngine ?? const StickerEngine(),
+       overlayEngine = overlayEngine ?? const OverlayEngine(),
+       audioEngine = audioEngine ?? const AudioEngine();
 
   final TemplateEngine templateEngine;
   final TimelineEngine timelineEngine;
@@ -48,7 +48,10 @@ class TemplateCompositionEngine {
   final OverlayEngine overlayEngine;
   final AudioEngine audioEngine;
 
-  CompositionSession open(VideoTemplateRecipeEntity recipe, {String? projectId}) {
+  CompositionSession open(
+    VideoTemplateRecipeEntity recipe, {
+    String? projectId,
+  }) {
     final slots = templateEngine.slotsFor(recipe);
     return CompositionSession(
       recipe: recipe,
@@ -57,12 +60,7 @@ class TemplateCompositionEngine {
     );
   }
 
-  TemplateTimeline buildTimeline(CompositionSession session) {
-    return timelineEngine.build(
-      recipe: session.recipe,
-      fills: session.fills,
-    );
-  }
+  TemplateTimeline buildTimeline(CompositionSession session) => session.timeline;
 
   PreviewEngine preview(CompositionSession session) {
     final timeline = buildTimeline(session);

@@ -111,18 +111,22 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
   void _presentCombo(GiftComboPayload payload) {
     final gift = payload.gift ?? const <String, dynamic>{};
     final sender = payload.sender ?? const <String, dynamic>{};
-    final giftName = _readString(payload.giftName) ??
-        _readString(gift['name']) ??
-        'Gift';
-    final senderName = _readString(payload.senderName) ??
+    final giftName =
+        _readString(payload.giftName) ?? _readString(gift['name']) ?? 'Gift';
+    final senderName =
+        _readString(payload.senderName) ??
         _readString(sender['fullName']) ??
         _readString(sender['username']) ??
         'User';
-    final senderAvatar = _readString(payload.senderAvatarUrl) ??
+    final senderAvatar =
+        _readString(payload.senderAvatarUrl) ??
         _readString(sender['avatarUrl']) ??
         _readString(sender['avatar']);
+    // `imageUrl` is a static asset, so it belongs in the thumbnail slot only.
+    // Accepting it as an animation put a frozen gift image on the fullscreen
+    // stage until the hydrated duplicate event arrived with the real animation.
     final animationUrl = _readString(
-      gift['animationUrl'] ?? gift['animation_url'] ?? gift['imageUrl'],
+      gift['animationUrl'] ?? gift['animation_url'],
     );
     final thumbnailUrl = _readString(
       gift['thumbnailUrl'] ?? gift['thumbnail_url'] ?? gift['imageUrl'],
@@ -151,9 +155,7 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     // A payload the catalog could not hydrate still has a sender, a gift name
     // and a combo count, so announce it as a combo badge. Dropping it here is
     // what left the host with nothing but the chat line.
-    final isSmall = mediaUrl.isEmpty ||
-        normalizedSize == 'SMALL' ||
-        (normalizedSize == null && animationUrl == null);
+    final isSmall = animationUrl == null || normalizedSize == 'SMALL';
     final comboKey = payload.overlayKey.isNotEmpty
         ? payload.overlayKey
         : '${payload.senderId}_${payload.giftId}';
@@ -193,6 +195,10 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
           giftName: giftName,
           size: size,
           owner: this,
+          // The viewer stack already tracks `_playedAnimations`, but the
+          // overlay is a process-wide singleton shared with the auction stack:
+          // key it so neither can restart the other's running animation.
+          dedupeKey: comboKey,
         ),
       );
     }
@@ -286,7 +292,9 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.65),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: _audioAccent().withValues(alpha: 0.7)),
+                border: Border.all(
+                  color: _audioAccent().withValues(alpha: 0.7),
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(

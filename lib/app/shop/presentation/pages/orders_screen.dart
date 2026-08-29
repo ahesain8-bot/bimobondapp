@@ -1255,7 +1255,7 @@ class _OrderTile extends StatelessWidget {
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
-                        ),
+                      ),
                     ),
                   ),
                 ],

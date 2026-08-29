@@ -20,7 +20,8 @@ import 'fake_socket_service.dart' show SocketService;
 /// Client → server: `joinLive { liveId }` / `leaveLive { liveId }`.
 /// Server → client (`live_{id}`): liveComment, liveCommentDeleted,
 /// liveCommentPinned, liveCommentUnpinned, liveModeration, liveGift,
-/// liveLike, liveViewers, liveEnded, userJoined + reconnect lifecycle.
+/// liveLike, liveViewers, liveEnded, userJoined, liveHourlyRankUpdated,
+/// liveTopGiftersUpdated, livePopularStatus + reconnect lifecycle.
 class RealSocketService implements SocketService {
   RealSocketService({Future<String?> Function()? idTokenProvider})
     : _idTokenProvider = idTokenProvider ?? _defaultTokenProvider;
@@ -229,6 +230,23 @@ class RealSocketService implements SocketService {
 
     _on(socket, 'liveBattlePhase', (data) {
       final event = SocketMapper.battleEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    // Hourly ranking moves as gifts land, so the rank shown in the ranking
+    // sheet must not be frozen at whatever it was when the sheet opened.
+    _on(socket, 'liveHourlyRankUpdated', (data) {
+      final event = SocketMapper.hourlyRankEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveTopGiftersUpdated', (data) {
+      final event = SocketMapper.topGiftersEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'livePopularStatus', (data) {
+      final event = SocketMapper.hourlyRankEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 

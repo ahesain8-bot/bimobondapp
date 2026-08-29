@@ -5,6 +5,8 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/models/live_media_hints.dart';
+import '../../../../core/services/live_audio_session.dart';
+import '../../../../core/services/media_progress_watchdog.dart';
 import 'fake_livekit_service.dart' show LiveKitConnectionState, LiveKitService;
 
 /// Real LiveKit implementation of [LiveKitService] using `livekit_client`.
@@ -12,6 +14,9 @@ import 'fake_livekit_service.dart' show LiveKitConnectionState, LiveKitService;
 /// The viewer connects **subscribe-only** — never publishes camera/mic.
 /// `url` + `token` must come from `POST /lives/:id/join` (mobile-api.md §15).
 /// Token TTL ≈ 6h — reconnect means re-joining to refresh the token.
+/// How often the viewer health watchdogs sample inbound media counters.
+const Duration _kMediaHealthTick = Duration(seconds: 2);
+
 class RealLiveKitService implements LiveKitService {
   final _stateController = StreamController<LiveKitConnectionState>.broadcast();
 
@@ -23,6 +28,22 @@ class RealLiveKitService implements LiveKitService {
   LiveMediaHints? _mediaHints;
   Room? _room;
   Room? _battleRoom;
+  Room? _battleRecoveryRoom;
+  Timer? _primaryVideoHealthTimer;
+  Timer? _battleVideoHealthTimer;
+  bool _primaryHealthCheckInFlight = false;
+  bool _battleHealthCheckInFlight = false;
+  int _primaryMissingTrackSamples = 0;
+  // 3 samples at 2s: roughly six seconds of a frozen picture before the room
+  // is rebuilt. At the previous 4 samples of 4s a viewer stared at a stopped
+  // frame for a quarter of a minute before anything happened.
+  final _primaryVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+  final _battleVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 5);
+
+  /// Whether this service currently holds [LiveAudioSession]. The battle room
+  /// coming and going must never touch it — only entering and leaving the live
+  /// does, which is what keeps a PK teardown from silencing the primary room.
+  bool _holdsAudioSession = false;
 
   /// LiveKit 2.11 can leave an internal participant-update callback waiting
   /// for `RoomConnectedEvent` after a room has already been replaced. Ten
@@ -86,6 +107,18 @@ class RealLiveKitService implements LiveKitService {
   @override
   Room? get battleRoom => _battleRoom;
 
+  Future<void> _acquireAudioSession() async {
+    if (_holdsAudioSession) return;
+    _holdsAudioSession = true;
+    await LiveAudioSession.instance.acquire();
+  }
+
+  Future<void> _releaseAudioSession() async {
+    if (!_holdsAudioSession) return;
+    _holdsAudioSession = false;
+    await LiveAudioSession.instance.release();
+  }
+
   Future<void> _preferMediaSpeaker() async {
     try {
       await AudioManager.instance.setSpeakerOutputPreferred(true, force: false);
@@ -133,6 +166,245 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
+  Future<void> _ensureRemoteTracksSubscribed(Room room) async {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.trackPublications.values) {
+        if (publication.subscribed) continue;
+        try {
+          await publication.subscribe();
+        } catch (error) {
+          debugPrint('Battle LiveKit track restore failed: $error');
+        }
+      }
+    }
+  }
+
+  RemoteVideoTrack? _firstRemoteVideoTrack(Room room) {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        final track = publication.track;
+        if (publication.subscribed && !publication.muted && track != null) {
+          return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<num?> _receiverVideoProgress(RemoteVideoTrack track) async {
+    final stats = await track.getReceiverStats();
+    if (stats == null) return null;
+    return stats.framesDecoded ??
+        stats.framesReceived ??
+        stats.packetsReceived ??
+        stats.bytesReceived;
+  }
+
+  void _startPrimaryVideoWatchdog(Room room) {
+    _stopPrimaryVideoWatchdog();
+    _primaryVideoProgress.reset();
+    _primaryMissingTrackSamples = 0;
+    _primaryVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
+      if (_primaryHealthCheckInFlight || _room != room) return;
+      _primaryHealthCheckInFlight = true;
+      unawaited(
+        _samplePrimaryVideo(room).whenComplete(() {
+          _primaryHealthCheckInFlight = false;
+        }),
+      );
+    });
+  }
+
+  Future<void> _samplePrimaryVideo(Room room) async {
+    try {
+      final track = _firstRemoteVideoTrack(room);
+      if (_room != room) return;
+      if (track == null) {
+        await _ensureRemoteTracksSubscribed(room);
+        _primaryMissingTrackSamples++;
+        final stalledAfterMedia = _primaryVideoProgress.addMissingTrackSample();
+        if (!stalledAfterMedia && _primaryMissingTrackSamples < 12) return;
+        _reportPrimaryVideoStall(room, 'remote_video_missing');
+        return;
+      }
+      _primaryMissingTrackSamples = 0;
+      final progress = await _receiverVideoProgress(track);
+      if (_room != room || !_primaryVideoProgress.addSample(progress)) return;
+      _reportPrimaryVideoStall(room, 'inbound_video_stalled');
+    } catch (error) {
+      debugPrint('Viewer inbound health sample unavailable: $error');
+    }
+  }
+
+  void _reportPrimaryVideoStall(Room room, String reason) {
+    if (_room != room) return;
+    debugPrint(
+      '🔴 Viewer video stopped advancing while room remained connected: $reason',
+    );
+    _stopPrimaryVideoWatchdog();
+    // The BLoC responds by obtaining a fresh join token and replacing the
+    // stale Room. Keeping that policy above the SDK avoids reusing dead ICE.
+    _setState(LiveKitConnectionState.disconnected);
+  }
+
+  void _stopPrimaryVideoWatchdog() {
+    _primaryVideoHealthTimer?.cancel();
+    _primaryVideoHealthTimer = null;
+    _primaryVideoProgress.reset();
+    _primaryMissingTrackSamples = 0;
+  }
+
+  void _startBattleVideoWatchdog({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) {
+    _stopBattleVideoWatchdog();
+    _battleVideoProgress.reset();
+    _battleVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
+      if (_battleHealthCheckInFlight || _battleRoom != room) return;
+      _battleHealthCheckInFlight = true;
+      unawaited(
+        _sampleBattleVideo(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
+        ).whenComplete(() {
+          _battleHealthCheckInFlight = false;
+        }),
+      );
+    });
+  }
+
+  Future<void> _sampleBattleVideo({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    try {
+      final track = _firstRemoteVideoTrack(room);
+      if (_battleRoom != room) return;
+      if (track == null) {
+        await _ensureRemoteTracksSubscribed(room);
+        if (!_battleVideoProgress.addMissingTrackSample()) return;
+      } else {
+        final progress = await _receiverVideoProgress(track);
+        if (_battleRoom != room || !_battleVideoProgress.addSample(progress)) {
+          return;
+        }
+      }
+      debugPrint('🔴 Battle opponent video stalled: $roomName');
+      _stopBattleVideoWatchdog();
+      await _restartStalledBattleRoom(
+        room: room,
+        url: url,
+        token: token,
+        roomName: roomName,
+      );
+    } catch (error) {
+      debugPrint('Battle inbound health sample unavailable: $error');
+    }
+  }
+
+  Future<void> _restartStalledBattleRoom({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    _battleRecoveryRoom = room;
+    var failed = false;
+    try {
+      await room.disconnect();
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (_battleRoom != room) return;
+      await _runWithLiveKitErrorGuard(() => room.connect(url, token));
+      await _ensureRemoteTracksSubscribed(room);
+      await _preferMediaSpeaker();
+      _startBattleVideoWatchdog(
+        room: room,
+        url: url,
+        token: token,
+        roomName: roomName,
+      );
+    } catch (error) {
+      failed = true;
+      debugPrint('Battle stalled-room restart failed: $error');
+    } finally {
+      if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
+    }
+    if (failed && _battleRoom == room) {
+      unawaited(
+        _recoverBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
+        ),
+      );
+    }
+  }
+
+  void _stopBattleVideoWatchdog() {
+    _battleVideoHealthTimer?.cancel();
+    _battleVideoHealthTimer = null;
+    _battleVideoProgress.reset();
+  }
+
+  /// A normal LiveKit reconnect preserves the Room and its tracks. On some
+  /// Android networks the SDK exhausts that reconnect and emits a terminal
+  /// disconnect instead; keeping the dead Room made one PK tile stay blank
+  /// until the battle ended. Re-use the still-valid battle JWT for a few
+  /// bounded reconnect attempts and restore every remote subscription.
+  Future<void> _recoverBattleRoom({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) async {
+    if (_battleRoom != room || _battleRecoveryRoom == room) return;
+    _battleRecoveryRoom = room;
+    const retryDelays = <Duration>[
+      Duration(milliseconds: 250),
+      Duration(milliseconds: 900),
+      Duration(milliseconds: 1800),
+    ];
+    try {
+      for (var attempt = 0; attempt < retryDelays.length; attempt++) {
+        await Future<void>.delayed(retryDelays[attempt]);
+        if (_battleRoom != room) return;
+        if (room.connectionState == ConnectionState.connected) {
+          await _ensureRemoteTracksSubscribed(room);
+          return;
+        }
+        if (room.connectionState != ConnectionState.disconnected) return;
+        try {
+          debugPrint(
+            '🔄 Battle LiveKit terminal reconnect '
+            '${attempt + 1}/${retryDelays.length}: $roomName',
+          );
+          await _runWithLiveKitErrorGuard(() => room.connect(url, token));
+          if (_battleRoom != room) {
+            await room.disconnect();
+            return;
+          }
+          await _ensureRemoteTracksSubscribed(room);
+          await _preferMediaSpeaker();
+          debugPrint('🔗 Battle LiveKit media restored: $roomName');
+          return;
+        } catch (error) {
+          debugPrint('Battle LiveKit reconnect attempt failed: $error');
+        }
+      }
+    } finally {
+      if (_battleRecoveryRoom == room) _battleRecoveryRoom = null;
+    }
+  }
+
   @override
   Future<void> connectBattle({
     required String url,
@@ -148,12 +420,33 @@ class RealLiveKitService implements LiveKitService {
       final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
       final guardedRoom = Room(roomOptions: _roomOptions(hints));
       guardedRoom.events
+        ..on<RoomDisconnectedEvent>((_) {
+          if (_battleRoom != guardedRoom) return;
+          debugPrint('🔴 Battle LiveKit terminal disconnect: $roomName');
+          unawaited(
+            _recoverBattleRoom(
+              room: guardedRoom,
+              url: url,
+              token: token,
+              roomName: roomName,
+            ),
+          );
+        })
         ..on<ReconnectingEvent>((_) {
           debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
         })
         ..on<RoomReconnectedEvent>((_) {
           debugPrint('🔗 Battle LiveKit reconnected: $roomName');
           unawaited(_preferMediaSpeaker());
+          unawaited(_ensureRemoteTracksSubscribed(guardedRoom));
+          if (_battleRoom == guardedRoom) {
+            _startBattleVideoWatchdog(
+              room: guardedRoom,
+              url: url,
+              token: token,
+              roomName: roomName,
+            );
+          }
         })
         ..on<TrackSubscribedEvent>((event) {
           if (event.track is RemoteAudioTrack) {
@@ -168,10 +461,18 @@ class RealLiveKitService implements LiveKitService {
       return guardedRoom;
     });
     _battleRoom = room;
+    await _ensureRemoteTracksSubscribed(room);
+    _startBattleVideoWatchdog(
+      room: room,
+      url: url,
+      token: token,
+      roomName: roomName,
+    );
   }
 
   @override
   Future<void> disconnectBattle() async {
+    _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;
     if (room == null) return;
@@ -202,10 +503,14 @@ class RealLiveKitService implements LiveKitService {
     // room and produces "room unavailable after joining the stage". Retire
     // the old primary room silently; only a real user/network disconnect is
     // exposed through [disconnect] or the Room lifecycle callbacks.
+    // Taken before the old room is disposed: a guest upgrade replaces the
+    // primary room mid-live, and that teardown must not drop the session.
+    await _acquireAudioSession();
     await disconnectBattle();
     await _disposePrimaryRoom(notify: false);
 
     if (url.isEmpty || token.isEmpty) {
+      await _releaseAudioSession();
       _setState(LiveKitConnectionState.failed);
       throw StateError('LiveKit url/token missing — re-join the live');
     }
@@ -239,6 +544,7 @@ class RealLiveKitService implements LiveKitService {
             if (_room != room) return;
             debugPrint('🔗 LiveKit reconnected: $roomName');
             _setState(LiveKitConnectionState.connected);
+            _startPrimaryVideoWatchdog(room);
             unawaited(_preferMediaSpeaker());
             if (_publishing) {
               unawaited(_restoreStageTracks(room, hints));
@@ -329,10 +635,15 @@ class RealLiveKitService implements LiveKitService {
       // required and no artificial cap on good links.
       _streamUrl = mockStreamUrl;
       _setState(LiveKitConnectionState.connected);
+      final connectedRoom = _room;
+      if (connectedRoom != null) {
+        _startPrimaryVideoWatchdog(connectedRoom);
+      }
     } catch (e, st) {
       debugPrint('❌ LiveKit connect failed: $e\n$st');
       final failedRoom = _room;
       _room = null;
+      await _releaseAudioSession();
       try {
         await failedRoom?.dispose();
       } catch (_) {}
@@ -498,11 +809,16 @@ class RealLiveKitService implements LiveKitService {
 
   @override
   Future<void> disconnect() async {
+    // The battle room closes while we still own the session; only after that
+    // is management handed back, so the primary room's own teardown below is
+    // what actually frees it.
     await disconnectBattle();
+    await _releaseAudioSession();
     await _disposePrimaryRoom(notify: true);
   }
 
   Future<void> _disposePrimaryRoom({required bool notify}) async {
+    _stopPrimaryVideoWatchdog();
     final room = _room;
     // Clear identity first so a late RoomDisconnectedEvent from the room being
     // replaced cannot mutate the state of its successor.
@@ -562,6 +878,8 @@ class RealLiveKitService implements LiveKitService {
   }
 
   void dispose() {
+    _stopPrimaryVideoWatchdog();
+    _stopBattleVideoWatchdog();
     _stateController.close();
   }
 }

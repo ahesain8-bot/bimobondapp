@@ -40,7 +40,7 @@ abstract final class TikTokLiveTokens {
   static const double badgeH = 20; // matches _Pill height in chrome
   /// Top chrome body under status bar: pad + host row + gap + badges.
   static const double topChromeBodyH =
-      2 + hostPillH + 6 + badgeH; // matches TikTokLiveTopBar
+      topInsetV + hostPillH + 6 + badgeH; // matches TikTokLiveTopBar
   static const double badgeR = 11;
   static const double badgeGap = 5;
   static const double badgePadH = 8;
@@ -59,13 +59,23 @@ abstract final class TikTokLiveTokens {
   static const double guestIcon = 28;
   static const double treasureFloat = 44;
 
+  /// Quiet circular scrim behind each supported action in the reference.
+  static const double bottomGlyph = 27;
+  static const double bottomHit = 36;
+  static const double bottomScrimDisc = 34;
+
+  /// Lifts white glyphs off bright video frames.
+  static const List<Shadow> glyphShadow = [
+    Shadow(color: Color(0x8C000000), blurRadius: 5, offset: Offset(0, 1)),
+  ];
+
   // —— Comments ——
   static const double commentMaxWidthFactor = 0.76;
   static const double commentLeft = 12;
   static const double commentAboveBar = 10;
   static const double commentAvatar = 24;
   static const double commentAvatarGap = 6;
-  static const double commentGap = 5;
+  static const double commentGap = 6;
   static const double commentFade = 36;
   static const double commentFeedH = 216;
 
@@ -152,10 +162,21 @@ abstract final class TikTokLiveTokens {
   );
 
   static const TextStyle commentUser = TextStyle(
-    color: Color(0xE6FFFFFF), // 0.90
-    fontSize: 13,
+    color: Color(0xB8FFFFFF), // 0.72 — reference dims the name, not the body
+    fontSize: 12.5,
     fontWeight: FontWeight.w600,
     height: 1.15,
+    shadows: [
+      Shadow(color: Color(0x59000000), blurRadius: 2, offset: Offset(0, 0.5)),
+    ],
+  );
+
+  /// Role chip in front of a comment name (host / moderator).
+  static const TextStyle commentTag = TextStyle(
+    color: Colors.white,
+    fontSize: 9,
+    fontWeight: FontWeight.w800,
+    height: 1,
   );
 
   static const TextStyle commentBody = TextStyle(

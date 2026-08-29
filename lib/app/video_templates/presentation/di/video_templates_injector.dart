@@ -60,6 +60,7 @@ Future<void> initVideoTemplates() async {
   sl.registerLazySingleton(() => PrepareVideoTemplateEditorUseCase(sl()));
   sl.registerLazySingleton(() => RecordVideoTemplateUseUseCase(sl()));
   sl.registerLazySingleton(() => CreateVideoTemplateProjectUseCase(sl()));
+  sl.registerLazySingleton(() => CreateProjectFromMediaUseCase(sl()));
   sl.registerLazySingleton(() => CompleteVideoTemplateProjectUseCase(sl()));
   sl.registerLazySingleton(
     () => ExportTemplateCompositionUseCase(
@@ -73,6 +74,12 @@ Future<void> initVideoTemplates() async {
       repository: sl(),
       uploadMedia: sl(),
       engine: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => OneShotRenderVideoTemplateUseCase(
+      repository: sl(),
+      uploadMedia: sl(),
     ),
   );
 }

@@ -16,6 +16,12 @@ class CommentsSection extends StatefulWidget {
   /// When true, comments sit at the top of the feed (multi-grid under tiles).
   final bool alignTop;
 
+  /// PK lays the feed over the black band under the split video, where TikTok
+  /// draws no surface at all — only the text shadow every comment already
+  /// carries. Kept as a hook for slots that ever need more separation; it must
+  /// never reintroduce the opaque pill, which is not what the reference does.
+  final bool highContrast;
+
   final String? currentUserId;
   final String? hostId;
   final List<String> moderatorIds;
@@ -35,6 +41,7 @@ class CommentsSection extends StatefulWidget {
     required this.comments,
     this.height = TikTokLiveTokens.commentFeedH,
     this.alignTop = false,
+    this.highContrast = false,
     this.currentUserId,
     this.hostId,
     this.moderatorIds = const [],
@@ -88,84 +95,85 @@ class _CommentsSectionState extends State<CommentsSection> {
         MediaQuery.sizeOf(context).width *
         TikTokLiveTokens.commentMaxWidthFactor;
 
-    // Local override only: Arabic still shapes right-to-left inside each
-    // line, but the feed itself hugs the left edge like the host room does
-    // rather than following the RTL start edge into the middle of the screen.
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Align(
-        alignment: widget.alignTop ? Alignment.topLeft : Alignment.bottomLeft,
-        child: SizedBox(
-          width: maxW,
-          height: widget.height,
-          child: ShaderMask(
-            // Same rule as the host feed: a band measured in pixels, capped
-            // so a short slot cannot have most of it faded away.
-            shaderCallback: (rect) =>
-                liveFeedFadeShader(rect, scrollableHeight: widget.height),
-            blendMode: BlendMode.dstIn,
-            child: ListView.builder(
-              controller: _scrollController,
-              reverse: !widget.alignTop,
-              padding: EdgeInsets.zero,
-              itemCount: visible.length,
-              itemBuilder: (context, index) {
-                final comment = widget.alignTop
-                    ? visible[index]
-                    : visible[visible.length - 1 - index];
-                final isHostOrMod =
-                    (widget.currentUserId != null &&
-                        widget.currentUserId == widget.hostId) ||
-                    widget.moderatorIds.contains(widget.currentUserId);
-                final isSelf = comment.userId == widget.currentUserId;
-                final cIsJoin = comment.metadata?['type'] == 'join';
-                final cIsGift = comment.metadata?['type'] == 'gift';
-                final isMuted = widget.mutedUserIds.contains(comment.userId);
-                final isBanned = widget.bannedUserIds.contains(comment.userId);
-                return TikTokCommentBubble(
-                      comment: comment,
-                      showModerationMenu:
-                          isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
-                      isMuted: isMuted,
-                      isBanned: isBanned,
-                      onDelete: widget.onDeleteComment == null
-                          ? null
-                          : () => widget.onDeleteComment!(
-                              comment.id,
-                              comment.userId,
-                            ),
-                      onMute: widget.onMuteUser == null
-                          ? null
-                          : () => widget.onMuteUser!(
-                              comment.userId,
-                              comment.username,
-                              null,
-                            ),
-                      onUnmute: widget.onUnmuteUser == null
-                          ? null
-                          : () => widget.onUnmuteUser!(
-                              comment.userId,
-                              comment.username,
-                            ),
-                      onBan: widget.onBanUser == null
-                          ? null
-                          : () => widget.onBanUser!(
-                              comment.userId,
-                              comment.username,
-                              null,
-                            ),
-                      onUnban: widget.onUnbanUser == null
-                          ? null
-                          : () => widget.onUnbanUser!(
-                              comment.userId,
-                              comment.username,
-                            ),
-                    )
-                    .animate(key: ValueKey(comment.id))
-                    .fadeIn(duration: 140.ms)
-                    .slideY(begin: 0.12, end: 0, duration: 180.ms);
-              },
-            ),
+    // The feed follows the ambient direction: TikTok LIVE in Arabic runs the
+    // comment column down the right edge with the avatar on the right, which
+    // is what the reference screenshots show. The slot this sits in already
+    // reserves the gutter the side-action rail needs.
+    return Align(
+      alignment: widget.alignTop
+          ? AlignmentDirectional.topStart
+          : AlignmentDirectional.bottomStart,
+      child: SizedBox(
+        width: maxW,
+        height: widget.height,
+        child: ShaderMask(
+          // Same rule as the host feed: a band measured in pixels, capped
+          // so a short slot cannot have most of it faded away.
+          shaderCallback: (rect) =>
+              liveFeedFadeShader(rect, scrollableHeight: widget.height),
+          blendMode: BlendMode.dstIn,
+          child: ListView.builder(
+            controller: _scrollController,
+            reverse: !widget.alignTop,
+            padding: EdgeInsets.zero,
+            itemCount: visible.length,
+            itemBuilder: (context, index) {
+              final comment = widget.alignTop
+                  ? visible[index]
+                  : visible[visible.length - 1 - index];
+              final isHostOrMod =
+                  (widget.currentUserId != null &&
+                      widget.currentUserId == widget.hostId) ||
+                  widget.moderatorIds.contains(widget.currentUserId);
+              final isSelf = comment.userId == widget.currentUserId;
+              final cIsJoin = comment.metadata?['type'] == 'join';
+              final cIsGift = comment.metadata?['type'] == 'gift';
+              final isMuted = widget.mutedUserIds.contains(comment.userId);
+              final isBanned = widget.bannedUserIds.contains(comment.userId);
+              return TikTokCommentBubble(
+                    comment: comment,
+                    highContrast: widget.highContrast,
+                    showModerationMenu:
+                        isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
+                    isMuted: isMuted,
+                    isBanned: isBanned,
+                    onDelete: widget.onDeleteComment == null
+                        ? null
+                        : () => widget.onDeleteComment!(
+                            comment.id,
+                            comment.userId,
+                          ),
+                    onMute: widget.onMuteUser == null
+                        ? null
+                        : () => widget.onMuteUser!(
+                            comment.userId,
+                            comment.username,
+                            null,
+                          ),
+                    onUnmute: widget.onUnmuteUser == null
+                        ? null
+                        : () => widget.onUnmuteUser!(
+                            comment.userId,
+                            comment.username,
+                          ),
+                    onBan: widget.onBanUser == null
+                        ? null
+                        : () => widget.onBanUser!(
+                            comment.userId,
+                            comment.username,
+                            null,
+                          ),
+                    onUnban: widget.onUnbanUser == null
+                        ? null
+                        : () => widget.onUnbanUser!(
+                            comment.userId,
+                            comment.username,
+                          ),
+                  )
+                  .animate(key: ValueKey(comment.id))
+                  .fadeIn(duration: 140.ms)
+                  .slideY(begin: 0.12, end: 0, duration: 180.ms);
+            },
           ),
         ),
       ),
@@ -175,6 +183,14 @@ class _CommentsSectionState extends State<CommentsSection> {
 
 class TikTokCommentBubble extends StatelessWidget {
   final CommentEntity comment;
+  final bool highContrast;
+
+  /// Author is the room's host — tagged the way the reference feed marks them.
+  final bool isFromHost;
+
+  /// Author is one of the room's moderators.
+  final bool isFromModerator;
+
   final bool showModerationMenu;
   final bool isMuted;
   final bool isBanned;
@@ -187,6 +203,9 @@ class TikTokCommentBubble extends StatelessWidget {
   const TikTokCommentBubble({
     super.key,
     required this.comment,
+    this.highContrast = false,
+    this.isFromHost = false,
+    this.isFromModerator = false,
     this.showModerationMenu = false,
     this.isMuted = false,
     this.isBanned = false,
@@ -205,22 +224,25 @@ class TikTokCommentBubble extends StatelessWidget {
     if (_isJoin) {
       return Padding(
         padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
-        child: RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: comment.username,
-                style: TikTokLiveTokens.joinUser,
-              ),
-              TextSpan(
-                text: ' joined',
-                style: TikTokLiveTokens.commentBody.copyWith(
-                  color: const Color(0xD9FFFFFF),
-                  shadows: const [],
+        child: Container(
+          padding: EdgeInsets.zero,
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: comment.username,
+                  style: TikTokLiveTokens.joinUser,
                 ),
-              ),
-              const TextSpan(text: ' 👋', style: TextStyle(fontSize: 12)),
-            ],
+                TextSpan(
+                  text: ' joined',
+                  style: TikTokLiveTokens.commentBody.copyWith(
+                    color: Colors.white,
+                    shadows: const [],
+                  ),
+                ),
+                const TextSpan(text: ' 👋', style: TextStyle(fontSize: 12)),
+              ],
+            ),
           ),
         ),
       );
@@ -248,7 +270,7 @@ class TikTokCommentBubble extends StatelessWidget {
                     child: CachedNetworkImage(
                       imageUrl: comment.userAvatar ?? '',
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => FallbackAvatar(
+                      errorWidget: (_, _, _) => FallbackAvatar(
                         seed: comment.userId,
                         name: comment.username,
                         radius: 10,
@@ -298,8 +320,12 @@ class TikTokCommentBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
-        decoration: const BoxDecoration(color: Colors.transparent),
+        key: ValueKey('comment-bubble-${comment.id}'),
+        // No surface and no border, in PK too: TikTok comments are bare text
+        // over the video, carried by the shadow in `commentBody`. The opaque
+        // pill this used to draw in PK is the single thing that read as "not
+        // TikTok" on the competition screen.
+        padding: const EdgeInsetsDirectional.fromSTEB(5, 4, 9, 4),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,12 +336,12 @@ class TikTokCommentBubble extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: comment.userAvatar ?? '',
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => FallbackAvatar(
+                  errorWidget: (_, _, _) => FallbackAvatar(
                     seed: comment.userId,
                     name: comment.username,
                     radius: 12,
                   ),
-                  placeholder: (_, __) => FallbackAvatar(
+                  placeholder: (_, _) => FallbackAvatar(
                     seed: comment.userId,
                     name: comment.username,
                     radius: 12,
@@ -330,6 +356,19 @@ class TikTokCommentBubble extends StatelessWidget {
                 children: [
                   Row(
                     children: [
+                      if (isFromHost) ...[
+                        const _CommentRoleTag(
+                          label: 'Host',
+                          color: TikTokLiveTokens.hostTagOrange,
+                        ),
+                        const SizedBox(width: 4),
+                      ] else if (isFromModerator) ...[
+                        const _CommentRoleTag(
+                          label: 'Mod',
+                          color: Color(0xFF3D7EFF),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       if (level > 0) ...[
                         GifterLevelBadge(level: level, compact: true),
                         const SizedBox(width: 4),
@@ -355,16 +394,16 @@ class TikTokCommentBubble extends StatelessWidget {
                           comment.username,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TikTokLiveTokens.commentUser.copyWith(
-                            color: isYou
-                                ? TikTokLiveTokens.liveCyan
-                                : const Color(0xE6FFFFFF),
-                          ),
+                          style: isYou
+                              ? TikTokLiveTokens.commentUser.copyWith(
+                                  color: TikTokLiveTokens.liveCyan,
+                                )
+                              : TikTokLiveTokens.commentUser,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text(comment.content, style: TikTokLiveTokens.commentBody),
                 ],
               ),
@@ -384,6 +423,26 @@ class TikTokCommentBubble extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Role chip in front of a comment name (host / moderator).
+class _CommentRoleTag extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _CommentRoleTag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label, style: TikTokLiveTokens.commentTag),
     );
   }
 }

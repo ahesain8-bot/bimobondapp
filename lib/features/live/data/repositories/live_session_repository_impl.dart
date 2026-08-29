@@ -58,6 +58,23 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   final LivesMediaDataSource _media;
   final _mediaEvents = StreamController<LiveMediaConnectionEvent>.broadcast();
   String? _battleOpponentLiveId;
+  Future<void>? _battleMediaQueue;
+
+  /// Runs battle-room media work one operation at a time.
+  ///
+  /// `liveBattle` score events arrive on every gift and each one re-asserts the
+  /// opponent, but BLoC processes events concurrently and
+  /// `_battleOpponentLiveId` is only set once the connect finishes. Two
+  /// handlers therefore both passed the "already connected" check, and the
+  /// second one's `disconnectBattle` tore down the room the first was still
+  /// opening — the opponent tile blanked in the middle of a battle.
+  Future<T> _serializeBattleMedia<T>(Future<T> Function() operation) {
+    final previous = _battleMediaQueue ?? Future<void>.value();
+    final result = previous.then((_) => operation());
+    // The queue only sequences. A failed operation must not poison the next.
+    _battleMediaQueue = result.then<void>((_) {}, onError: (_) {});
+    return result;
+  }
 
   @override
   Stream<LiveHudEvent> get hudEvents => _socket.events;
@@ -536,11 +553,16 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> connectBattleOpponentMedia(String opponentLiveId) async {
-    if (_battleOpponentLiveId == opponentLiveId && _media.battleRoom != null) {
+  Future<void> connectBattleOpponentMedia(String opponentLiveId) =>
+      _serializeBattleMedia(() => _connectBattleOpponentMedia(opponentLiveId));
+
+  Future<void> _connectBattleOpponentMedia(String opponentLiveId) async {
+    if (_battleOpponentLiveId == opponentLiveId && _media.isBattleRoomUsable) {
       return;
     }
-    await disconnectBattleOpponentMedia();
+    // The private form: the public one would await the queue this call is
+    // already the head of.
+    await _disconnectBattleOpponentMedia();
     final json = await _remote.join(opponentLiveId);
     final data = json['data'];
     final source = data is Map ? Map<String, dynamic>.from(data) : json;
@@ -556,7 +578,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> disconnectBattleOpponentMedia() async {
+  Future<void> disconnectBattleOpponentMedia() =>
+      _serializeBattleMedia(_disconnectBattleOpponentMedia);
+
+  Future<void> _disconnectBattleOpponentMedia() async {
     final liveId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
     await _media.disconnectBattle();
