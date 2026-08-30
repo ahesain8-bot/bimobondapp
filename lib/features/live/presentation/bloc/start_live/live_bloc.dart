@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -33,6 +34,9 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
   bool get _preferNativeCamera =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+  bool get _useExistingArCamera =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   Future<NativeCameraController?> _openNativeCamera() async {
     if (!_preferNativeCamera) return null;
     final controller = NativeCameraController();
@@ -60,6 +64,15 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     emit(const LiveCameraInitializing());
+    if (_useExistingArCamera) {
+      try {
+        await ArCameraBridge.warmup();
+      } catch (_) {}
+      if (!isClosed) {
+        emit(const LiveReady(isCameraInitialized: true, isFrontCamera: true));
+      }
+      return;
+    }
     final nativeController = await _openNativeCamera();
     if (isClosed) {
       if (nativeController != null) {
@@ -93,6 +106,13 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     final current = _ready(state);
+    if (_useExistingArCamera && current.isCameraInitialized) {
+      try {
+        final isFront = await ArCameraBridge.flipCamera();
+        if (!isClosed) emit(current.copyWith(isFrontCamera: isFront));
+      } catch (_) {}
+      return;
+    }
     final nativeController = current.nativeController;
     if (nativeController != null && current.isCameraInitialized) {
       try {
@@ -164,6 +184,11 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     final current = _ready(state);
+    if (_useExistingArCamera) {
+      await ArCameraBridge.suspendPreview();
+      if (!isClosed) emit(current.copyWith(isCameraInitialized: false));
+      return;
+    }
     final nativeController = current.nativeController;
     if (nativeController != null && current.isCameraInitialized) {
       try {
@@ -185,6 +210,13 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     final current = _ready(state);
+    if (_useExistingArCamera) {
+      await ArCameraBridge.resumePreview();
+      if (!isClosed) {
+        emit(current.copyWith(isCameraInitialized: true));
+      }
+      return;
+    }
     if ((current.controller != null || current.nativeController != null) &&
         current.isCameraInitialized) {
       return;

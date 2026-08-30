@@ -679,6 +679,15 @@ class PkBattleBar extends StatelessWidget {
     if (value >= 1000000) {
       return '${(value / 1000000).toStringAsFixed(1)}M';
     }
+    // At a decisive PK score, retain the full grouped number rather than
+    // rounding it to an ambiguous `100.0K` value.
+    if (value >= 100000) {
+      final raw = '$value';
+      return raw.replaceAllMapped(
+        RegExp(r'(?<=\d)(?=(\d{3})+(?!\d))'),
+        (_) => ',',
+      );
+    }
     if (value >= 1000) {
       return '${(value / 1000).toStringAsFixed(1)}K';
     }

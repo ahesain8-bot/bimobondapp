@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -30,6 +31,8 @@ class _LiveContainerState extends State<LiveContainer> {
   Future<void> _openLiveRoom(BuildContext context) async {
     final title = widget.titleController.text.trim();
     final liveBloc = context.read<LiveBloc>();
+    final useExistingArCamera =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
     // REUSE the camera that is already running on the start screen: hand the
     // SAME controller to the room (no close/reopen -> no black flicker). This
@@ -45,7 +48,16 @@ class _LiveContainerState extends State<LiveContainer> {
         ? ready.nativeController
         : null;
 
-    if (runningCamera != null || runningNativeCamera != null) {
+    if (useExistingArCamera) {
+      final unmounted = liveBloc.stream.firstWhere(
+        (state) => state is LiveReady && !state.isCameraInitialized,
+      );
+      liveBloc.add(const LiveCameraHandedOff());
+      try {
+        await unmounted.timeout(const Duration(seconds: 1));
+      } catch (_) {}
+      await WidgetsBinding.instance.endOfFrame;
+    } else if (runningCamera != null || runningNativeCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());
     } else {
       liveBloc.add(const LiveAppPaused());
@@ -56,8 +68,8 @@ class _LiveContainerState extends State<LiveContainer> {
       MaterialPageRoute<void>(
         builder: (_) => LiveRoomPage(
           title: title.isEmpty ? null : title,
-          initialCamera: runningCamera,
-          initialNativeCamera: runningNativeCamera,
+          initialCamera: useExistingArCamera ? null : runningCamera,
+          initialNativeCamera: useExistingArCamera ? null : runningNativeCamera,
         ),
       ),
     );

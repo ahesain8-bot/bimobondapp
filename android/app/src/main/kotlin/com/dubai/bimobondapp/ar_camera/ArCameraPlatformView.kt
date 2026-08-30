@@ -88,6 +88,7 @@ class ArCameraPlatformView(
         warpGlView.visibility = View.INVISIBLE
 
         warpGlView.ensureGlInitialized()
+        ArCameraLivePublisher.bindRenderer(warpGlView)
 
         confettiOverlay.visibility = View.GONE
         videoOverlay.visibility = View.GONE
@@ -115,6 +116,7 @@ class ArCameraPlatformView(
     override fun getView(): View = root
 
     override fun dispose() {
+        ArCameraLivePublisher.unbindRenderer(warpGlView)
         try {
             activity.lifecycle.removeObserver(lifecycleObserver)
         } catch (_: Throwable) {

@@ -1,4 +1,6 @@
+import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
 import 'package:bimobondapp/app/camera_engine/native_camera_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -39,7 +41,15 @@ class LiveRoomCameraLayer extends StatelessWidget {
             previous.isMediaConnected != current.isMediaConnected;
       },
       builder: (context, state) {
+        final useExistingArCamera =
+            !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
         if (state is LiveRoomOpening) {
+          if (useExistingArCamera && state.isCameraInitialized) {
+            return const Stack(
+              fit: StackFit.expand,
+              children: [ArCameraPreview()],
+            );
+          }
           if (state.isCameraInitialized && state.nativeController != null) {
             return NativeCameraPreview(controller: state.nativeController!);
           }
@@ -51,6 +61,16 @@ class LiveRoomCameraLayer extends StatelessWidget {
 
         if (state is! LiveRoomReady) {
           return const ColoredBox(color: Colors.black);
+        }
+
+        if (useExistingArCamera && state.isCameraInitialized) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              const ArCameraPreview(),
+              if (state.isLivePaused) const _PausedOverlay(),
+            ],
+          );
         }
 
         Widget? preview;

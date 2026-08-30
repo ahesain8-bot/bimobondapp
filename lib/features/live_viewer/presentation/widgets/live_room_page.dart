@@ -723,6 +723,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 LiveVideoPlayer(
                   live: live,
                   isActive: widget.isActive && connected,
+                  liveKitOnly: true,
                 ),
               IgnorePointer(
                 child: Align(
@@ -1272,8 +1273,9 @@ class _PkVideoLayout extends StatelessWidget {
                   LiveVideoPlayer(
                     live: live,
                     isActive: isActive,
-                    fit: BoxFit.fitWidth,
+                    fit: BoxFit.cover,
                     compact: true,
+                    liveKitOnly: true,
                   ),
                   const Positioned(
                     left: 8,
@@ -1293,7 +1295,7 @@ class _PkVideoLayout extends StatelessWidget {
                     guestName: guestName,
                     guestAvatar: guestAvatar,
                     room: battleRoom,
-                    fit: BoxFit.fitWidth,
+                    fit: BoxFit.cover,
                   ),
                   const Positioned(
                     right: 8,
@@ -1358,7 +1360,11 @@ class _PkGuestFeedState extends State<_PkGuestFeed> {
           final track = publication?.track;
           if (publication != null && track != null) {
             unawaited(_requestCompactLayer(publication));
-            return VideoTrackRenderer(track, fit: VideoViewFit.cover);
+            return VideoTrackRenderer(
+              track,
+              fit: VideoViewFit.cover,
+              placeholderBuilder: (_) => _fallback(context),
+            );
           }
           return _fallback(context);
         },

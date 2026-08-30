@@ -1894,12 +1894,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           join.live,
         );
         try {
-          await liveKitService.connectBattle(
-            url: join.liveKitUrl,
-            token: join.liveKitToken,
-            roomName: opponentId,
-            mediaHints: join.mediaHints,
-          );
+          await Future.wait<void>([
+            liveKitService.connectBattle(
+              url: join.liveKitUrl,
+              token: join.liveKitToken,
+              roomName: opponentId,
+              mediaHints: join.mediaHints,
+            ),
+            mediaFuture,
+          ]);
           _battleRoomRecoveryInFlight = false;
           if (_activeLiveId != liveId ||
               isClosed ||
@@ -1908,15 +1911,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           }
           _battleOpponentLiveId = opponentId;
           final room = liveKitService.battleRoom;
-          emit(
-            state.copyWith(
-              battle: battle,
-              battleOpponentLive: join.live,
-              battleRoom: room,
-            ),
-          );
-          unawaited(mediaFuture);
           final opponentSupporters = await supportersFuture;
+          if (_activeLiveId != liveId ||
+              isClosed ||
+              generation != _battleOperationGeneration) {
+            return;
+          }
+          await LiveViewerMediaPreloader.instance.prefetchUrls(
+            opponentSupporters ?? const <String>[],
+          );
           if (_activeLiveId != liveId ||
               isClosed ||
               generation != _battleOperationGeneration) {

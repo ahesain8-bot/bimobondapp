@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_live_track.dart';
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -30,6 +31,7 @@ class LivesMediaDataSource {
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
+  var _arCameraTrackActive = false;
   Timer? _videoHealthTimer;
   var _videoHealthCheckInFlight = false;
   // 3 samples at 2s: about six seconds of a stream that decodes no frames
@@ -91,11 +93,17 @@ class LivesMediaDataSource {
   /// Every tier at or below the capture profile is declared so the SFU always
   /// has a lower layer to hand a viewer on a weak connection, and the walk
   /// stops at 480p — nothing below that is ever published.
-  List<VideoParameters> _simulcastLayersFor(LiveCaptureProfile profile) {
+  List<VideoParameters> _simulcastLayersFor(
+    LiveCaptureProfile profile, {
+    bool portrait = false,
+  }) {
     return [
       for (final tier in profile.fallbacks)
         VideoParameters(
-          dimensions: VideoDimensions(tier.width, tier.height),
+          dimensions: VideoDimensions(
+            portrait ? tier.height : tier.width,
+            portrait ? tier.width : tier.height,
+          ),
           encoding: VideoEncoding(
             maxBitrate: tier == profile
                 ? profile.maxBitrate
@@ -106,7 +114,10 @@ class LivesMediaDataSource {
     ];
   }
 
-  VideoPublishOptions _publishOptionsFor(LiveCaptureProfile profile) {
+  VideoPublishOptions _publishOptionsFor(
+    LiveCaptureProfile profile, {
+    bool portrait = false,
+  }) {
     return VideoPublishOptions(
       // This is the proven stable Android publishing path used before the
       // regression: one codec negotiation with fixed simulcast layers.
@@ -116,7 +127,7 @@ class LivesMediaDataSource {
         maxBitrate: profile.maxBitrate,
         maxFramerate: profile.maxFps,
       ),
-      videoSimulcastLayers: _simulcastLayersFor(profile),
+      videoSimulcastLayers: _simulcastLayersFor(profile, portrait: portrait),
     );
   }
 
@@ -501,12 +512,17 @@ class LivesMediaDataSource {
 
     try {
       Object? lastError;
+      final useExistingArCamera = await ArCameraLiveTrack.isAvailable();
       final fallbacks = requestedProfile.fallbacks;
       final ladder = <LiveCaptureProfile>[
         requestedProfile,
         ...fallbacks.skip(1),
       ];
-      final attemptCount = maxAttempts.clamp(1, ladder.length);
+      // The native AR renderer is one stable source, not a Camera2 mode that
+      // should be closed and reopened at progressively lower presets.
+      final attemptCount = useExistingArCamera
+          ? 1
+          : maxAttempts.clamp(1, ladder.length);
       final local = room.localParticipant;
       if (local == null) {
         throw StateError('LiveKit local participant unavailable');
@@ -522,24 +538,22 @@ class LivesMediaDataSource {
             'camera/publish attempt ${attempt + 1}/$attemptCount '
             'at ${profile.label}...',
           );
-          candidate = await LocalVideoTrack.createCameraTrack(
-            _captureOptionsFor(profile, cameraPosition),
-          );
-
-          // Install the native beauty/filter processor while flutter_webrtc
-          // still owns this freshly-created local track. Waiting until after
-          // publish can be too late on Android: the SDK may already have moved
-          // the track into its sender and native lookup then misses it. Doing
-          // this here also makes the very first encoded frame match the host's
-          // selected live-camera look.
-          final beautyAttached = await LiveBeautyPreference.instance.attachTo(
-            candidate.mediaStreamTrack.id,
-          );
-          debugPrint(
-            beautyAttached
-                ? '🟢 [Host] live filter attached before publish'
-                : '🟡 [Host] live filter unavailable; publishing source frames',
-          );
+          if (useExistingArCamera) {
+            candidate = await ArCameraLiveTrack.create(
+              width: profile.height,
+              height: profile.width,
+              fps: profile.maxFps,
+              maxBitrate: profile.maxBitrate,
+              cameraPosition: cameraPosition,
+            );
+          } else {
+            candidate = await LocalVideoTrack.createCameraTrack(
+              _captureOptionsFor(profile, cameraPosition),
+            );
+            await LiveBeautyPreference.instance.attachTo(
+              candidate.mediaStreamTrack.id,
+            );
+          }
 
           final opts = candidate.currentOptions;
           final params = opts.params;
@@ -557,7 +571,10 @@ class LivesMediaDataSource {
 
           final publication = await local.publishVideoTrack(
             candidate,
-            publishOptions: _publishOptionsFor(profile),
+            publishOptions: _publishOptionsFor(
+              profile,
+              portrait: useExistingArCamera,
+            ),
           );
           publicationSid = publication.sid;
 
@@ -573,6 +590,7 @@ class LivesMediaDataSource {
           }
 
           _videoTrack = candidate;
+          _arCameraTrackActive = useExistingArCamera;
           _activeProfile = profile;
           _videoPublished = true;
           lastError = null;
@@ -597,6 +615,10 @@ class LivesMediaDataSource {
           try {
             await candidate?.dispose();
           } catch (_) {}
+          if (useExistingArCamera) {
+            await ArCameraLiveTrack.detach();
+            _arCameraTrackActive = false;
+          }
           if (attempt < attemptCount - 1) {
             await Future<void>.delayed(const Duration(milliseconds: 300));
           }
@@ -1036,6 +1058,10 @@ class LivesMediaDataSource {
 
   /// Flip between front/back by restarting the camera capturer when possible.
   Future<LocalVideoTrack?> flipCamera({required bool useFront}) async {
+    // Android live uses the existing Kotlin AR preview as its sole source.
+    // The host flips that preview through ArCameraBridge; opening a LiveKit
+    // CameraX capturer here would compete for the same physical camera.
+    if (_arCameraTrackActive) return _videoTrack;
     final room = _room;
     final old = _videoTrack;
     if (room == null || old == null || !_videoPublished) return _videoTrack;
@@ -1129,10 +1155,11 @@ class LivesMediaDataSource {
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     _stopOutboundVideoWatchdog();
-    // Before the track is disposed: native drops its GL objects with the
-    // capture session's EGL context, and a stale registration would otherwise
-    // outlive the broadcast.
-    await LiveBeautyPreference.instance.detach();
+    if (!_arCameraTrackActive) {
+      // Non-Android fallback only. Android publishes the already-rendered
+      // Kotlin AR frame and does not install this second processor.
+      await LiveBeautyPreference.instance.detach();
+    }
     if (!keepBattleRoom) {
       await disconnectBattle();
     }
@@ -1151,6 +1178,10 @@ class LivesMediaDataSource {
       // VideoSource") which breaks the NEXT live with a dead video source.
       await _videoTrack?.dispose();
       _videoTrack = null;
+      if (_arCameraTrackActive) {
+        await ArCameraLiveTrack.detach();
+        _arCameraTrackActive = false;
+      }
       await _audioTrack?.dispose();
       _audioTrack = null;
       await room?.disconnect();
@@ -1162,6 +1193,10 @@ class LivesMediaDataSource {
       _audioTrack = null;
       _room = null;
       _videoPublished = false;
+      if (_arCameraTrackActive) {
+        await ArCameraLiveTrack.detach();
+        _arCameraTrackActive = false;
+      }
     }
   }
 }

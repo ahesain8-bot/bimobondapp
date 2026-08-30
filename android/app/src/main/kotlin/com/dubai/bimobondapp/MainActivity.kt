@@ -8,6 +8,7 @@ import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraOverlayPrefetcher
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
+import com.dubai.bimobondapp.ar_camera.ArCameraLivePublisher
 import com.dubai.bimobondapp.ar_camera.ScreenOverlaySource
 import com.dubai.bimobondapp.ar_camera.parseOverlayMediaType
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
@@ -17,7 +18,6 @@ import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import com.dubai.bimobondapp.camera_engine.NativeCameraPlugin
-import com.dubai.bimobondapp.live_beauty.LiveBeautyPlugin
 import com.dubai.bimobondapp.camera_engine.TemplateExportPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -57,10 +57,11 @@ class MainActivity : FlutterActivity() {
 
         // Phase 1: CameraX → Flutter TextureRegistry (no effects / recording).
         NativeCameraPlugin.register(flutterEngine, this)
+        // Publish the already-rendered ar_camera frame; this bridge never opens
+        // another camera or changes the existing CameraX configuration.
+        ArCameraLivePublisher.register(flutterEngine)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
-        // Beauty shader on the LiveKit camera track, so viewers see it too.
-        LiveBeautyPlugin.register(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KEYGUARD_CHANNEL)
             .setMethodCallHandler { call, result ->

@@ -1,4 +1,6 @@
+import 'package:bimobondapp/app/ar_camera/ar_camera_preview.dart';
 import 'package:bimobondapp/app/camera_engine/native_camera_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -24,6 +26,11 @@ class CameraPreviewLayer extends StatelessWidget {
           previous.isCameraInitialized != current.isCameraInitialized,
       builder: (context, state) {
         final ready = state is LiveReady ? state : null;
+        if (!kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android &&
+            ready?.isCameraInitialized == true) {
+          return const ArCameraPreview();
+        }
         final nativeController = ready?.nativeController;
         if (ready != null &&
             ready.isCameraInitialized &&

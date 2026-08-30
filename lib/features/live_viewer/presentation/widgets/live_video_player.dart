@@ -19,6 +19,7 @@ class LiveVideoPlayer extends StatefulWidget {
 
   final BoxFit fit;
   final bool compact;
+  final bool liveKitOnly;
 
   const LiveVideoPlayer({
     super.key,
@@ -26,6 +27,7 @@ class LiveVideoPlayer extends StatefulWidget {
     this.isActive = true,
     this.fit = BoxFit.cover,
     this.compact = false,
+    this.liveKitOnly = false,
   });
 
   @override
@@ -52,7 +54,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     _liveKitSub = liveKit.stateStream.listen(_onLiveKitState);
     final room = liveKit.room;
     if (room != null) _attachRoom(room);
-    if (widget.isActive) _init();
+    if (widget.isActive && !widget.liveKitOnly) _init();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -195,7 +197,8 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     if (state == LiveKitConnectionState.connected) {
       final room = liveKit.room;
       if (room != null && room != _room) _attachRoom(room);
-      if (widget.isActive &&
+      if (!widget.liveKitOnly &&
+          widget.isActive &&
           _controller == null &&
           !_initializing &&
           !_hasError) {
@@ -252,11 +255,11 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.live.id != widget.live.id) {
       _disposeController();
-      if (widget.isActive) _init();
+      if (widget.isActive && !widget.liveKitOnly) _init();
     } else if (oldWidget.isActive != widget.isActive ||
         oldWidget.compact != widget.compact) {
       unawaited(_applyQualityFloor(widget.isActive));
-      if (widget.isActive) {
+      if (widget.isActive && !widget.liveKitOnly) {
         if (_controller == null) {
           _init();
         } else {
@@ -276,6 +279,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   }
 
   Future<void> _init() async {
+    if (widget.liveKitOnly) return;
     final gen = ++_gen;
     if (!mounted) return;
 
@@ -371,11 +375,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
           fit: widget.fit == BoxFit.cover
               ? VideoViewFit.cover
               : VideoViewFit.contain,
-          placeholderBuilder: (_) => AnimatedVideoPlaceholder(
-            seed: widget.live.id,
-            category: widget.live.category,
-            hostInitial: widget.live.hostName,
-          ),
+          placeholderBuilder: (_) => _buildPlaceholderMedia(),
         ),
       );
     }
@@ -396,6 +396,10 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       );
     }
 
+    return _buildPlaceholderMedia();
+  }
+
+  Widget _buildPlaceholderMedia() {
     final thumbnailUrl = widget.live.thumbnailUrl;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       return ColoredBox(

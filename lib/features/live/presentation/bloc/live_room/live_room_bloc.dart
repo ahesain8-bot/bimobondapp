@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 
 import 'package:camera/camera.dart';
@@ -147,6 +148,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   var _appPaused = false;
   var _closing = false;
 
+  bool get _useExistingArCamera =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   /// Invalidates an older battle connect when a new battle or battle end
   /// arrives while its join request is still in flight.
   var _battleOperationGeneration = 0;
@@ -181,8 +185,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Critical path: open local camera immediately — never wait for Nest/LiveKit.
     // If the start screen handed us its RUNNING camera, reuse it (same lens,
     // no reopen, no black flicker); otherwise open a fresh one.
-    final nativeController = event.initialNativeCamera;
-    final cameraFuture = nativeController != null
+    final nativeController = _useExistingArCamera
+        ? null
+        : event.initialNativeCamera;
+    final cameraFuture = _useExistingArCamera
+        ? Future<CameraController?>.value(null)
+        : nativeController != null
         ? Future<CameraController?>.value(null)
         : event.initialCamera != null
         ? Future<CameraController?>.value(event.initialCamera)
@@ -198,7 +206,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       return;
     }
 
-    if (controller != null || nativeController != null) {
+    if (_useExistingArCamera ||
+        controller != null ||
+        nativeController != null) {
       emit(
         LiveRoomOpening(
           controller: controller,
@@ -358,14 +368,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         return;
       }
 
-      final cameraFuture = _initializeCamera(useFront: true);
+      final cameraFuture = _useExistingArCamera
+          ? Future<CameraController?>.value(null)
+          : _initializeCamera(useFront: true);
       final sessionFuture = _sessionRepository.reconnectHostSession(active.id);
       final controller = await cameraFuture;
       if (isClosed) {
         if (controller != null) await _disposeCamera(controller);
         return;
       }
-      if (controller != null) {
+      if (_useExistingArCamera || controller != null) {
         emit(
           LiveRoomOpening(
             controller: controller,
@@ -436,7 +448,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         session: session,
         controller: controller,
         nativeController: nativeController,
-        isCameraInitialized: controller != null || nativeController != null,
+        isCameraInitialized:
+            _useExistingArCamera ||
+            controller != null ||
+            nativeController != null,
         isFrontCamera: nativeController?.state.isFront ?? true,
         isMediaConnected: false,
       ),
@@ -627,6 +642,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Keep the local preview alive while room signalling and audio connect.
     // Release it exactly once immediately before WebRTC opens the camera, so
     // CameraX and LiveKit never contend for the same lens.
+    // Android keeps the Kotlin AR camera mounted for the whole broadcast.
+    // LiveKit receives that renderer's output and never opens a second lens.
     var localReleased = false;
     Future<void> releaseLocalCamera() async {
       if ((local == null && localNative == null) || localReleased || isClosed) {
@@ -654,14 +671,14 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         url: url,
         token: token,
         useFrontCamera: useFront,
-        beforeVideoCapture: releaseLocalCamera,
+        beforeVideoCapture: _useExistingArCamera ? null : releaseLocalCamera,
         mediaHints: current.session.mediaHints,
       );
       debugPrint('🔍 [BLoC] connectMedia SUCCESS ✅');
     } catch (e) {
       debugPrint('🔴 [BLoC] connectMedia failed: $e');
       CameraController? fallback = localReleased ? null : local;
-      if (localReleased) {
+      if (localReleased && !_useExistingArCamera) {
         fallback = await _initializeCamera(useFront: useFront);
       }
       if (isClosed) {
@@ -678,6 +695,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           controller: fallback,
           nativeController: localReleased ? null : ready.nativeController,
           isCameraInitialized:
+              _useExistingArCamera ||
               fallback != null ||
               (!localReleased && ready.nativeController != null),
           isMediaConnected: false,
@@ -708,9 +726,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (mediaUp) _mediaConnectedAt ??= DateTime.now();
     emit(
       ready.copyWith(
-        controller: swapToLiveKit ? null : ready.controller,
-        nativeController: swapToLiveKit ? null : ready.nativeController,
-        isCameraInitialized: swapToLiveKit ? false : ready.isCameraInitialized,
+        controller: _useExistingArCamera || swapToLiveKit
+            ? null
+            : ready.controller,
+        nativeController: _useExistingArCamera || swapToLiveKit
+            ? null
+            : ready.nativeController,
+        isCameraInitialized: _useExistingArCamera
+            ? true
+            : swapToLiveKit
+            ? false
+            : ready.isCameraInitialized,
         isMediaConnected: mediaUp,
         localVideoTrack: liveTrack,
         isFrontCamera: useFront,
@@ -861,6 +887,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Keep publishing through a PK. Dropping the camera here empties
     // `live_{id}` and the server ends both streams after ~10s.
     if (current.isBattleActive) return;
+    if (_useExistingArCamera) {
+      await ArCameraBridge.suspendPreview();
+      if (!isClosed) emit(current.copyWith(isCameraInitialized: false));
+      return;
+    }
     final nativeController = current.nativeController;
     if (nativeController != null && current.isCameraInitialized) {
       try {
@@ -887,6 +918,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     _appPaused = false;
     final current = _readyOrNull;
     if (current == null) return;
+    if (_useExistingArCamera) {
+      await ArCameraBridge.resumePreview();
+      if (!isClosed) emit(current.copyWith(isCameraInitialized: true));
+      if (!current.isMediaConnected &&
+          current.session.isLive &&
+          !current.isEnding) {
+        await _recoverHostMedia(current.session.id, emit);
+      }
+      return;
+    }
     if (current.isMediaConnected) return;
     if (current.session.isLive && !current.isEnding) {
       await _recoverHostMedia(current.session.id, emit);
@@ -2100,7 +2141,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                 mediaHints: refreshed.mediaHints,
               ),
               controller: null,
-              isCameraInitialized: false,
+              isCameraInitialized: _useExistingArCamera,
               isMediaConnected: true,
               localVideoTrack: track,
               clearActionMessage: true,
@@ -2194,6 +2235,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final nextIsFront = !current.isFrontCamera;
 
     try {
+      if (_useExistingArCamera && current.isCameraInitialized) {
+        try {
+          final isFront = await ArCameraBridge.flipCamera();
+          if (!isClosed) emit(current.copyWith(isFrontCamera: isFront));
+        } catch (e) {
+          if (!isClosed) {
+            emit(current.copyWith(actionMessage: 'تعذر تبديل الكاميرا: $e'));
+          }
+        }
+        return;
+      }
       if (current.isMediaConnected) {
         try {
           await _sessionRepository.flipMediaCamera(useFront: nextIsFront);
