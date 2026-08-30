@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -32,11 +33,13 @@ class LiveContainer extends StatelessWidget {
         ? liveBloc.state as LiveReady
         : null;
     final CameraController? runningCamera =
+        (ready != null && ready.isCameraInitialized) ? ready.controller : null;
+    final NativeCameraController? runningNativeCamera =
         (ready != null && ready.isCameraInitialized)
-            ? ready.controller
-            : null;
+        ? ready.nativeController
+        : null;
 
-    if (runningCamera != null) {
+    if (runningCamera != null || runningNativeCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());
     } else {
       liveBloc.add(const LiveAppPaused());
@@ -48,6 +51,7 @@ class LiveContainer extends StatelessWidget {
         builder: (_) => LiveRoomPage(
           title: title.isEmpty ? null : title,
           initialCamera: runningCamera,
+          initialNativeCamera: runningNativeCamera,
         ),
       ),
     );

@@ -9,6 +9,7 @@ import '../../../../../core/network/live_api_client.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/models/live_competition_request.dart';
 import '../../../data/services/fake_livekit_service.dart';
+import '../../../data/services/live_viewer_media_preloader.dart';
 import '../../../data/services/fake_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/live_entity.dart';
@@ -157,6 +158,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       await _teardown(silent: true, emit: emit);
       _activeLiveId = event.live.id;
       final live = event.live;
+      unawaited(LiveViewerMediaPreloader.instance.prefetchLive(live));
 
       final isPk = live.metadata?['isPk'] == true;
       final initialAvatars = _avatarsFromLive(live);
@@ -1662,7 +1664,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   Future<List<String>?> _loadTopGifterAvatars(String liveId) async {
     try {
       final result = await giftRepository.getTopGifters(liveId, limit: 3);
-      return result.fold<List<String>?>(
+      final avatars = result.fold<List<String>?>(
         (_) => null,
         (entries) => entries
             .map((entry) => entry.avatarUrl?.trim())
@@ -1671,6 +1673,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             .take(3)
             .toList(growable: false),
       );
+      if (avatars != null) {
+        unawaited(LiveViewerMediaPreloader.instance.prefetchUrls(avatars));
+      }
+      return avatars;
     } catch (_) {
       // Supporter enrichment must never block the video room.
       return null;
@@ -1779,7 +1785,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final battleKey = battle.isActive ? '${battle.id}:$opponentId' : '';
     final connectionAlreadyInFlight = _battleConnectKeys.contains(battleKey);
     final startsMediaOperation =
-        !battle.isActive || (roomNeedsReplacement && !connectionAlreadyInFlight);
+        !battle.isActive ||
+        (roomNeedsReplacement && !connectionAlreadyInFlight);
     final operationGeneration = startsMediaOperation
         ? ++_battleOperationGeneration
         : _battleOperationGeneration;
@@ -1787,6 +1794,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     emit(
       state.copyWith(
         battle: battle,
+        clearBattleOpponent: battleIdentityChanged,
         battleRoom: roomNeedsReplacement ? null : currentBattleRoom,
         pkScoreLeft: battle.scoreFor(liveId),
         pkScoreRight: battle.opponentScoreFor(liveId),
@@ -1794,11 +1802,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     if (!battle.isActive) {
       await _disconnectBattleOpponent(invalidate: false);
-      if (
-        isClosed ||
-        _tearingDown ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _tearingDown ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       emit(
@@ -1832,21 +1838,17 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerBattleRoomStateChanged event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (
-      isClosed ||
-      _tearingDown ||
-      _activeLiveId == null ||
-      state.battle?.isActive != true
-    ) {
+    if (isClosed ||
+        _tearingDown ||
+        _activeLiveId == null ||
+        state.battle?.isActive != true) {
       return;
     }
     switch (event.state) {
       case LiveKitConnectionState.disconnected:
       case LiveKitConnectionState.failed:
-        if (
-          event.state == LiveKitConnectionState.disconnected &&
-          _battleConnectKeys.isEmpty
-        ) {
+        if (event.state == LiveKitConnectionState.disconnected &&
+            _battleConnectKeys.isEmpty) {
           _battleRoomRecoveryInFlight = true;
         } else {
           _battleRoomRecoveryInFlight = false;
@@ -1882,15 +1884,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     }
     await result.fold(
       (failure) async {
-        emit(
-          state.copyWith(moderationBanner: 'تعذر فتح فيديو الخصم'),
-        );
+        emit(state.copyWith(moderationBanner: 'تعذر فتح فيديو الخصم'));
         _scheduleBannerClear();
       },
       (join) async {
         if (generation != _battleOperationGeneration || isClosed) return;
         final supportersFuture = _loadTopGifterAvatars(opponentId);
-        emit(state.copyWith(battleOpponentLive: join.live));
+        final mediaFuture = LiveViewerMediaPreloader.instance.prefetchLive(
+          join.live,
+        );
         try {
           await liveKitService.connectBattle(
             url: join.liveKitUrl,
@@ -1913,6 +1915,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               battleRoom: room,
             ),
           );
+          unawaited(mediaFuture);
           final opponentSupporters = await supportersFuture;
           if (_activeLiveId != liveId ||
               isClosed ||
@@ -1935,6 +1938,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           // name, avatar and supporter ring are already fetched and must still
           // land: bailing here left the right-hand side of a battle blank even
           // though everything except the video had arrived.
+          await mediaFuture;
           final opponentSupporters = await supportersFuture;
           if (isClosed ||
               _tearingDown ||
@@ -1965,9 +1969,6 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _battleRoomRecoveryInFlight = false;
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
-    if (!isClosed && state.battleRoom != null) {
-      emit(state.copyWith(battleRoom: null));
-    }
     try {
       await liveKitService.disconnectBattle();
     } catch (_) {}

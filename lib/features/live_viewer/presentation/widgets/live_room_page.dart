@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -6,7 +7,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
+import '../../../../core/utils/app_media_cache_manager.dart';
 import '../../../../core/utils/build_safe_notifier.dart';
+import '../../../../core/widgets/safe_network_image.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
@@ -55,11 +58,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
   final List<FloatingHeart> _tapHearts = [];
+  final Set<String> _preloadedImageUrls = <String>{};
 
   @override
   void initState() {
     super.initState();
     _scheduleActivate();
+    _scheduleImagePreload(<String?>[
+      widget.live.hostAvatar,
+      widget.live.thumbnailUrl,
+    ]);
   }
 
   @override
@@ -92,6 +100,24 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.isActive) return;
       context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
+    });
+  }
+
+  void _scheduleImagePreload(Iterable<String?> urls) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      for (final raw in urls) {
+        final url = raw?.trim() ?? '';
+        if (url.isEmpty || !_preloadedImageUrls.add(url)) continue;
+        unawaited(
+          precacheSafeNetworkImage(
+            context,
+            url,
+            width: screenWidth,
+          ).catchError((_) {}),
+        );
+      }
     });
   }
 
@@ -289,7 +315,19 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<LiveViewerBloc, LiveViewerState>(
+    return BlocConsumer<LiveViewerBloc, LiveViewerState>(
+      listenWhen: (previous, current) =>
+          previous.battleOpponentLive != current.battleOpponentLive ||
+          previous.topViewerAvatars != current.topViewerAvatars ||
+          previous.opponentTopGifterAvatars != current.opponentTopGifterAvatars,
+      listener: (context, state) {
+        _scheduleImagePreload(<String?>[
+          state.battleOpponentLive?.hostAvatar,
+          state.battleOpponentLive?.thumbnailUrl,
+          ...state.topViewerAvatars,
+          ...state.opponentTopGifterAvatars,
+        ]);
+      },
       buildWhen: (prev, curr) {
         final prevLive = prev.live;
         final currLive = curr.live;
@@ -450,9 +488,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               live: live,
                               opponentLive: state.battleOpponentLive,
                               isActive: widget.isActive && connected,
-                              battleRoom: isThisRoom
-                                  ? state.battleRoom
-                                  : null,
+                              battleRoom: isThisRoom ? state.battleRoom : null,
                             ),
                             if (isThisRoom)
                               Positioned(
@@ -1237,6 +1273,7 @@ class _PkVideoLayout extends StatelessWidget {
                     live: live,
                     isActive: isActive,
                     fit: BoxFit.fitWidth,
+                    compact: true,
                   ),
                   const Positioned(
                     left: 8,
@@ -1282,7 +1319,7 @@ class _PkVideoLayout extends StatelessWidget {
   }
 }
 
-class _PkGuestFeed extends StatelessWidget {
+class _PkGuestFeed extends StatefulWidget {
   final String liveId;
   final String guestName;
   final String? guestAvatar;
@@ -1298,57 +1335,107 @@ class _PkGuestFeed extends StatelessWidget {
   });
 
   @override
+  State<_PkGuestFeed> createState() => _PkGuestFeedState();
+}
+
+class _PkGuestFeedState extends State<_PkGuestFeed> {
+  String? _requestedTrackSid;
+
+  @override
+  void didUpdateWidget(covariant _PkGuestFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.room != widget.room) _requestedTrackSid = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currentRoom = room;
+    final currentRoom = widget.room;
     if (currentRoom != null) {
       return BuildSafeListenableBuilder(
         listenable: currentRoom,
         builder: (_, _) {
-          final track = _remoteVideoTrack(currentRoom);
-          return track == null
-              ? _fallback()
-              : VideoTrackRenderer(track, fit: VideoViewFit.cover);
+          final publication = _remoteVideoPublication(currentRoom);
+          final track = publication?.track;
+          if (publication != null && track != null) {
+            unawaited(_requestCompactLayer(publication));
+            return VideoTrackRenderer(track, fit: VideoViewFit.cover);
+          }
+          return _fallback(context);
         },
       );
     }
-    return _fallback();
+    return _fallback(context);
   }
 
-  VideoTrack? _remoteVideoTrack(Room room) {
+  RemoteTrackPublication<RemoteVideoTrack>? _remoteVideoPublication(Room room) {
     for (final participant in room.remoteParticipants.values) {
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
         if (publication.subscribed && !publication.muted && track != null) {
-          return track;
+          return publication;
         }
       }
     }
     return null;
   }
 
-  Widget _fallback() {
-    final url = guestAvatar?.trim();
+  Future<void> _requestCompactLayer(
+    RemoteTrackPublication<RemoteVideoTrack> publication,
+  ) async {
+    final sid = publication.sid;
+    if (_requestedTrackSid == sid) return;
+    _requestedTrackSid = sid;
+    try {
+      await publication.setVideoDimensions(const VideoDimensions(640, 960));
+      await publication.setVideoQuality(VideoQuality.MEDIUM);
+    } catch (_) {
+      if (_requestedTrackSid == sid) _requestedTrackSid = null;
+    }
+  }
+
+  Widget _fallback(BuildContext context) {
+    final url = widget.guestAvatar?.trim();
     if (url == null || url.isEmpty) {
       return ColoredBox(
         color: const Color(0xFF2A1A3A),
         child: Center(
-          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
+          child: FallbackAvatar(
+            seed: widget.liveId,
+            name: widget.guestName,
+            radius: 36,
+          ),
         ),
       );
     }
+    final memCacheWidth =
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
+            .ceil()
+            .clamp(1, 4096)
+            .toInt();
     return ColoredBox(
       color: Colors.black,
       child: CachedNetworkImage(
         imageUrl: url,
-        fit: fit,
+        cacheManager: AppMediaCacheManager.instance,
+        memCacheWidth: memCacheWidth,
+        fit: widget.fit,
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.center,
         placeholder: (_, _) => Center(
-          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
+          child: FallbackAvatar(
+            seed: widget.liveId,
+            name: widget.guestName,
+            radius: 36,
+          ),
         ),
         errorWidget: (_, _, _) => Center(
-          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
+          child: FallbackAvatar(
+            seed: widget.liveId,
+            name: widget.guestName,
+            radius: 36,
+          ),
         ),
       ),
     );
@@ -1531,6 +1618,8 @@ class _PkContributors extends StatelessWidget {
                 child: ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: list[i].url,
+                    cacheManager: AppMediaCacheManager.instance,
+                    memCacheWidth: 128,
                     fit: BoxFit.cover,
                     errorWidget: (_, _, _) => Container(
                       color: AppColors.surface,
@@ -1599,6 +1688,8 @@ class _GuestChip extends StatelessWidget {
                 height: 18,
                 child: CachedNetworkImage(
                   imageUrl: avatar!,
+                  cacheManager: AppMediaCacheManager.instance,
+                  memCacheWidth: 72,
                   fit: BoxFit.cover,
                   errorWidget: (_, _, _) =>
                       FallbackAvatar(seed: name, name: name, radius: 9),

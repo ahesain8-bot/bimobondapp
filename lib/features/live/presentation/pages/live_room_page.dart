@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
@@ -49,7 +50,12 @@ import '../../../live_viewer/presentation/widgets/floating_gifts.dart';
 
 /// Host live-room screen: full-screen camera with TikTok-style Arabic overlays.
 class LiveRoomPage extends StatefulWidget {
-  const LiveRoomPage({super.key, this.title, this.initialCamera});
+  const LiveRoomPage({
+    super.key,
+    this.title,
+    this.initialCamera,
+    this.initialNativeCamera,
+  });
 
   /// Optional title entered on the start screen.
   final String? title;
@@ -57,6 +63,9 @@ class LiveRoomPage extends StatefulWidget {
   /// The camera that was ALREADY running on the start screen.
   /// Handed over so the room reuses the same lens (no reopen, no flicker).
   final CameraController? initialCamera;
+
+  /// CameraX/GPU camera already running on Android's start-live screen.
+  final NativeCameraController? initialNativeCamera;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -125,6 +134,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           LiveRoomStarted(
             title: widget.title,
             initialCamera: widget.initialCamera,
+            initialNativeCamera: widget.initialNativeCamera,
           ),
         );
   }
@@ -223,6 +233,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     if (current is! LiveRoomReady) return true;
                     if (previous is! LiveRoomReady) return true;
                     return previous.controller != current.controller ||
+                        previous.nativeController != current.nativeController ||
                         previous.selectedEffectId != current.selectedEffectId ||
                         previous.isCameraInitialized !=
                             current.isCameraInitialized ||

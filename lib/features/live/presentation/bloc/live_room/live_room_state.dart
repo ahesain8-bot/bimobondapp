@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/models/live_battle.dart';
@@ -29,11 +30,13 @@ class LiveRoomLoading extends LiveRoomState {
 class LiveRoomOpening extends LiveRoomState {
   const LiveRoomOpening({
     this.controller,
+    this.nativeController,
     this.isCameraInitialized = false,
     this.isFrontCamera = true,
   });
 
   final CameraController? controller;
+  final NativeCameraController? nativeController;
   final bool isCameraInitialized;
   final bool isFrontCamera;
 }
@@ -63,6 +66,7 @@ class LiveRoomReady extends LiveRoomState {
   const LiveRoomReady({
     required this.session,
     this.controller,
+    this.nativeController,
     this.localVideoTrack,
     this.isCameraInitialized = false,
     this.isFrontCamera = true,
@@ -100,6 +104,9 @@ class LiveRoomReady extends LiveRoomState {
 
   /// Optional Flutter [CameraController] (effects / fallback preview only).
   final CameraController? controller;
+
+  /// CameraX/GPU preview used until LiveKit opens its native WebRTC capturer.
+  final NativeCameraController? nativeController;
 
   /// LiveKit local camera track for [VideoTrackRenderer] host preview.
   final VideoTrack? localVideoTrack;
@@ -188,6 +195,7 @@ class LiveRoomReady extends LiveRoomState {
   LiveRoomReady copyWith({
     LiveSession? session,
     Object? controller = _unset,
+    Object? nativeController = _unset,
     Object? localVideoTrack = _unset,
     bool? isCameraInitialized,
     bool? isFrontCamera,
@@ -226,6 +234,9 @@ class LiveRoomReady extends LiveRoomState {
       controller: identical(controller, _unset)
           ? this.controller
           : controller as CameraController?,
+      nativeController: identical(nativeController, _unset)
+          ? this.nativeController
+          : nativeController as NativeCameraController?,
       localVideoTrack: identical(localVideoTrack, _unset)
           ? this.localVideoTrack
           : localVideoTrack as VideoTrack?,

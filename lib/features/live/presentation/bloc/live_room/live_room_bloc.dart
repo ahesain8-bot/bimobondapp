@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -159,6 +161,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   LiveRoomReady? get _readyOrNull =>
       state is LiveRoomReady ? state as LiveRoomReady : null;
 
+  Future<void> _releaseNativeCamera(NativeCameraController controller) async {
+    await controller.releaseNative();
+    controller.dispose();
+  }
+
   Future<void> _onStarted(
     LiveRoomStarted event,
     Emitter<LiveRoomState> emit,
@@ -174,7 +181,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Critical path: open local camera immediately — never wait for Nest/LiveKit.
     // If the start screen handed us its RUNNING camera, reuse it (same lens,
     // no reopen, no black flicker); otherwise open a fresh one.
-    final cameraFuture = event.initialCamera != null
+    final nativeController = event.initialNativeCamera;
+    final cameraFuture = nativeController != null
+        ? Future<CameraController?>.value(null)
+        : event.initialCamera != null
         ? Future<CameraController?>.value(event.initialCamera)
         : _initializeCamera(useFront: true);
     final sessionFuture = _startLiveSession(title: title);
@@ -182,15 +192,19 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final controller = await cameraFuture;
     if (isClosed) {
       if (controller != null) await _disposeCamera(controller);
+      if (nativeController != null) {
+        await _releaseNativeCamera(nativeController);
+      }
       return;
     }
 
-    if (controller != null) {
+    if (controller != null || nativeController != null) {
       emit(
         LiveRoomOpening(
           controller: controller,
+          nativeController: nativeController,
           isCameraInitialized: true,
-          isFrontCamera: true,
+          isFrontCamera: nativeController?.state.isFront ?? true,
         ),
       );
     }
@@ -202,11 +216,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     } catch (e) {
       if (isClosed) {
         if (controller != null) await _disposeCamera(controller);
+        if (nativeController != null) {
+          await _releaseNativeCamera(nativeController);
+        }
         return;
       }
       final conflict = e is ApiException && _isActiveLiveConflict(e);
       if (conflict) {
         if (controller != null) await _disposeCamera(controller);
+        if (nativeController != null) {
+          await _releaseNativeCamera(nativeController);
+        }
         emit(
           LiveRoomFailure(
             message:
@@ -239,6 +259,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
     if (isClosed) {
       if (controller != null) await _disposeCamera(controller);
+      if (nativeController != null) {
+        await _releaseNativeCamera(nativeController);
+      }
       return;
     }
 
@@ -246,6 +269,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       emit: emit,
       session: session,
       controller: controller,
+      nativeController: nativeController,
       startedOnServer: startedOnServer,
     );
   }
@@ -387,6 +411,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required Emitter<LiveRoomState> emit,
     required LiveSession session,
     required CameraController? controller,
+    NativeCameraController? nativeController,
     bool startedOnServer = true,
   }) async {
     await _hudSub?.cancel();
@@ -410,8 +435,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       LiveRoomReady(
         session: session,
         controller: controller,
-        isCameraInitialized: controller != null,
-        isFrontCamera: true,
+        nativeController: nativeController,
+        isCameraInitialized: controller != null || nativeController != null,
+        isFrontCamera: nativeController?.state.isFront ?? true,
         isMediaConnected: false,
       ),
     );
@@ -419,11 +445,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (startedOnServer && session.id.isNotEmpty) {
       _giftJoinedLiveId = session.id;
       unawaited(
-        _giftSocketService
-            .ensureJoined(liveId: session.id)
-            .catchError((error) {
-              debugPrint('Canonical gift socket join failed: $error');
-            }),
+        _giftSocketService.ensureJoined(liveId: session.id).catchError((error) {
+          debugPrint('Canonical gift socket join failed: $error');
+        }),
       );
     }
 
@@ -592,9 +616,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     final useFront = current.isFrontCamera;
     final local = current.controller;
+    final localNative = current.nativeController;
     debugPrint(
       '🔍 [BLoC] _publishLiveKitAfterPreview: '
-      'useFront=$useFront, localController=${local != null ? "SET" : "NULL"}',
+      'useFront=$useFront, localController=${local != null ? "SET" : "NULL"}, '
+      'nativeController=${localNative != null ? "SET" : "NULL"}',
     );
 
     // ── Two-phase camera handoff (no black screen) ─────────────────────────
@@ -603,19 +629,23 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // CameraX and LiveKit never contend for the same lens.
     var localReleased = false;
     Future<void> releaseLocalCamera() async {
-      if (local == null || localReleased || isClosed) return;
+      if ((local == null && localNative == null) || localReleased || isClosed) {
+        return;
+      }
       final beforeRelease = _readyOrNull;
       if (beforeRelease == null) return;
       emit(
         beforeRelease.copyWith(
           controller: null,
+          nativeController: null,
           isCameraInitialized: false,
           clearActionMessage: true,
         ),
       );
-      await _disposeCamera(local);
+      if (local != null) await _disposeCamera(local);
+      if (localNative != null) await _releaseNativeCamera(localNative);
       localReleased = true;
-      debugPrint('🔍 [BLoC] Flutter camera handed off to LiveKit ✅');
+      debugPrint('🔍 [BLoC] Local camera handed off to LiveKit ✅');
     }
 
     try {
@@ -646,7 +676,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       emit(
         ready.copyWith(
           controller: fallback,
-          isCameraInitialized: fallback != null,
+          nativeController: localReleased ? null : ready.nativeController,
+          isCameraInitialized:
+              fallback != null ||
+              (!localReleased && ready.nativeController != null),
           isMediaConnected: false,
           localVideoTrack: null,
           actionMessage: 'تعذر نشر الفيديو عبر LiveKit: $e',
@@ -676,6 +709,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(
       ready.copyWith(
         controller: swapToLiveKit ? null : ready.controller,
+        nativeController: swapToLiveKit ? null : ready.nativeController,
         isCameraInitialized: swapToLiveKit ? false : ready.isCameraInitialized,
         isMediaConnected: mediaUp,
         localVideoTrack: liveTrack,
@@ -731,14 +765,19 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       current.copyWith(
         isEnding: true,
         controller: null,
+        nativeController: null,
         isCameraInitialized: false,
         clearActionMessage: true,
       ),
     );
 
     final controller = current.controller;
+    final nativeController = current.nativeController;
     if (controller != null) {
       await _disposeCamera(controller);
+    }
+    if (nativeController != null) {
+      await _releaseNativeCamera(nativeController);
     }
 
     String? endFailure;
@@ -783,11 +822,21 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     final controller = current.controller;
+    final nativeController = current.nativeController;
     // Drop the controller from the widget tree first (no rebuild can race
     // the slow Xiaomi teardown and render a disposed controller).
-    if (controller != null) {
-      emit(current.copyWith(controller: null, isCameraInitialized: false));
-      await _disposeCamera(controller);
+    if (controller != null || nativeController != null) {
+      emit(
+        current.copyWith(
+          controller: null,
+          nativeController: null,
+          isCameraInitialized: false,
+        ),
+      );
+      if (controller != null) await _disposeCamera(controller);
+      if (nativeController != null) {
+        await _releaseNativeCamera(nativeController);
+      }
     }
     await _sessionRepository.disconnectRealtime();
     await _sessionRepository.disconnectMedia();
@@ -812,6 +861,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Keep publishing through a PK. Dropping the camera here empties
     // `live_{id}` and the server ends both streams after ~10s.
     if (current.isBattleActive) return;
+    final nativeController = current.nativeController;
+    if (nativeController != null && current.isCameraInitialized) {
+      try {
+        await nativeController.stop();
+      } catch (_) {}
+      if (isClosed) return;
+      emit(current.copyWith(isCameraInitialized: false));
+      return;
+    }
     final controller = current.controller;
     if (controller == null || !current.isCameraInitialized) return;
 
@@ -834,13 +892,34 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       await _recoverHostMedia(current.session.id, emit);
       if (_readyOrNull?.isMediaConnected == true) return;
     }
-    if (current.controller != null && current.isCameraInitialized) return;
+    if ((current.controller != null || current.nativeController != null) &&
+        current.isCameraInitialized) {
+      return;
+    }
+
+    final nativeController = current.nativeController;
+    if (nativeController != null) {
+      try {
+        final next = await nativeController.start();
+        if (isClosed) return;
+        emit(
+          current.copyWith(
+            isCameraInitialized: next.ok,
+            isFrontCamera: next.isFront,
+          ),
+        );
+        return;
+      } catch (_) {
+        await _releaseNativeCamera(nativeController);
+      }
+    }
 
     final controller = await _initializeCamera(useFront: current.isFrontCamera);
     if (isClosed) return;
     emit(
       current.copyWith(
         controller: controller,
+        nativeController: null,
         isCameraInitialized: controller != null,
       ),
     );
@@ -1127,11 +1206,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (battle?.isActive != true) {
       _battleRoomRecoveryInFlight = false;
       await _sessionRepository.disconnectBattleOpponentMedia();
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ended = _readyOrNull;
@@ -1150,11 +1227,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     try {
       await _sessionRepository.connectBattleOpponentMedia(opponentId);
       _battleRoomRecoveryInFlight = false;
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ready = _readyOrNull;
@@ -1170,11 +1245,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         emit(ready.copyWith(battleMediaRoom: room is Room ? room : null));
       }
     } catch (e) {
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ready = _readyOrNull;
@@ -2141,6 +2214,25 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         return;
       }
 
+      final nativeController = current.nativeController;
+      if (nativeController != null && current.isCameraInitialized) {
+        try {
+          final next = await nativeController.switchCamera();
+          if (isClosed) return;
+          emit(
+            current.copyWith(
+              isFrontCamera: next.isFront,
+              isCameraInitialized: next.ok,
+            ),
+          );
+        } catch (e) {
+          if (!isClosed) {
+            emit(current.copyWith(actionMessage: 'تعذر تبديل الكاميرا: $e'));
+          }
+        }
+        return;
+      }
+
       final oldController = current.controller;
       if (oldController == null || !current.isCameraInitialized) return;
 
@@ -2382,8 +2474,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     _giftComboSub = null;
     final current = _readyOrNull;
     final controller = current?.controller;
+    final nativeController = current?.nativeController;
     if (controller != null) {
       await _disposeCamera(controller);
+    }
+    if (nativeController != null) {
+      await _releaseNativeCamera(nativeController);
     }
 
     _stopBattlePoll();
