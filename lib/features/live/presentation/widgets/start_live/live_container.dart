@@ -11,7 +11,6 @@ import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
 import '../../bloc/start_live/live_state.dart';
 import '../../pages/live_room_page.dart';
-import '../live_countdown_overlay.dart';
 
 /// Live setup card: title input + image picker + LIVE start button.
 class LiveContainer extends StatelessWidget {
@@ -20,10 +19,6 @@ class LiveContainer extends StatelessWidget {
   final TextEditingController titleController;
 
   Future<void> _openLiveRoom(BuildContext context) async {
-    // Pre-live countdown (3 → 2 → 1) shown over the camera preview.
-    await LiveCountdownOverlay.run(context);
-    if (!context.mounted) return;
-
     final title = titleController.text.trim();
     final liveBloc = context.read<LiveBloc>();
 

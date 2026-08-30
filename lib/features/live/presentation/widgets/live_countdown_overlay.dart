@@ -3,9 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 /// Full-screen pre-live countdown shown over the camera preview.
-///
-/// Displays 1 → 2 → 3 (one second each), then pops itself so the caller can
-/// start the live session.
 class LiveCountdownOverlay {
   const LiveCountdownOverlay._();
 
@@ -20,23 +17,30 @@ class LiveCountdownOverlay {
         barrierDismissible: false,
         transitionDuration: const Duration(milliseconds: 250),
         reverseTransitionDuration: const Duration(milliseconds: 200),
-        pageBuilder: (_, __, ___) => const _LiveCountdownOverlayBody(),
-        transitionsBuilder: (_, animation, __, child) =>
+        pageBuilder: (_, _, _) =>
+            LiveCountdownLayer(onFinished: () => navigator.pop()),
+        transitionsBuilder: (_, animation, _, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
     );
   }
 }
 
-class _LiveCountdownOverlayBody extends StatefulWidget {
-  const _LiveCountdownOverlayBody();
+/// Embedded countdown layer for the live room.
+///
+/// The room starts its server/LiveKit connection as soon as this widget is
+/// mounted. This layer only hides that work behind 1 → 2 → 3, instead of
+/// delaying the connection until the countdown has finished.
+class LiveCountdownLayer extends StatefulWidget {
+  const LiveCountdownLayer({super.key, required this.onFinished});
+
+  final VoidCallback onFinished;
 
   @override
-  State<_LiveCountdownOverlayBody> createState() =>
-      _LiveCountdownOverlayBodyState();
+  State<LiveCountdownLayer> createState() => _LiveCountdownLayerState();
 }
 
-class _LiveCountdownOverlayBodyState extends State<_LiveCountdownOverlayBody> {
+class _LiveCountdownLayerState extends State<LiveCountdownLayer> {
   Timer? _timer;
   int _value = 1;
 
@@ -64,7 +68,7 @@ class _LiveCountdownOverlayBodyState extends State<_LiveCountdownOverlayBody> {
 
   void _finish() {
     if (!mounted) return;
-    Navigator.of(context).pop();
+    widget.onFinished();
   }
 
   @override

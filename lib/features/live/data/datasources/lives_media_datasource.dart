@@ -161,7 +161,7 @@ class LivesMediaDataSource {
     final result = previous.then((_) => operation());
     // A failed reconnect must not prevent a later battle-end/disconnect from
     // running, while the original caller still receives its error.
-    _battleOperationQueue = result.then<void>((_) {}, onError: (_, __) {});
+    _battleOperationQueue = result.then<void>((_) {}, onError: (_, _) {});
     return result;
   }
 
@@ -526,6 +526,21 @@ class LivesMediaDataSource {
             _captureOptionsFor(profile, cameraPosition),
           );
 
+          // Install the native beauty/filter processor while flutter_webrtc
+          // still owns this freshly-created local track. Waiting until after
+          // publish can be too late on Android: the SDK may already have moved
+          // the track into its sender and native lookup then misses it. Doing
+          // this here also makes the very first encoded frame match the host's
+          // selected live-camera look.
+          final beautyAttached = await LiveBeautyPreference.instance.attachTo(
+            candidate.mediaStreamTrack.id,
+          );
+          debugPrint(
+            beautyAttached
+                ? '🟢 [Host] live filter attached before publish'
+                : '🟡 [Host] live filter unavailable; publishing source frames',
+          );
+
           final opts = candidate.currentOptions;
           final params = opts.params;
           final dims = params.dimensions;
@@ -592,14 +607,6 @@ class LivesMediaDataSource {
       }
 
       debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
-
-      // Beauty runs on the published track, not on the preview widget, so it
-      // has to be re-installed on whichever track survived the ladder above.
-      unawaited(
-        LiveBeautyPreference.instance.attachTo(
-          _videoTrack?.mediaStreamTrack.id,
-        ),
-      );
 
       // ============================================================
       // [DEBUG-QOS HOST 2/4] Actual PUBLISHED simulcast layers.
@@ -1077,6 +1084,7 @@ class LivesMediaDataSource {
         track = await LocalVideoTrack.createCameraTrack(
           _captureOptionsFor(_activeProfile, at),
         );
+        await LiveBeautyPreference.instance.attachTo(track.mediaStreamTrack.id);
         await local.publishVideoTrack(
           track,
           publishOptions: _publishOptionsFor(_activeProfile),
@@ -1084,11 +1092,6 @@ class LivesMediaDataSource {
         _videoTrack = track;
         _videoPublished = true;
         _startOutboundVideoWatchdog(room, track);
-        // The flip published a new track on a new capture session; the shader
-        // installed on the old one went away with it.
-        unawaited(
-          LiveBeautyPreference.instance.attachTo(track.mediaStreamTrack.id),
-        );
         return track;
       } catch (e, st) {
         debugPrint('LiveKit camera publish at $at failed: $e\n$st');

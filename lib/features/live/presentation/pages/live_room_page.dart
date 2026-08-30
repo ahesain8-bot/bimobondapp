@@ -42,6 +42,7 @@ import '../widgets/room/live_room_stage.dart';
 import '../widgets/room/live_room_effects_panel.dart';
 import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
+import '../widgets/live_countdown_overlay.dart';
 import '../widgets/room/live_starting_indicator.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
@@ -79,6 +80,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   late final LiveFaceTracker _faceTracker;
   late final DateTime _startIndicatorDeadline;
   var _depsReady = false;
+  var _showStartCountdown = true;
 
   @override
   void initState() {
@@ -266,8 +268,20 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 // Keep the camera canvas fixed; the bottom chrome follows the
                 // keyboard through the view inset instead of resizing video.
                 resizeToAvoidBottomInset: false,
-                body: _LiveRoomBody(
-                  startIndicatorDeadline: _startIndicatorDeadline,
+                body: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _LiveRoomBody(
+                      startIndicatorDeadline: _startIndicatorDeadline,
+                    ),
+                    if (_showStartCountdown)
+                      LiveCountdownLayer(
+                        onFinished: () {
+                          if (!mounted) return;
+                          setState(() => _showStartCountdown = false);
+                        },
+                      ),
+                  ],
                 ),
               ),
             ),

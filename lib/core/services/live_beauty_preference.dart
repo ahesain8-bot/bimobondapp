@@ -50,9 +50,10 @@ class LiveBeautyPreference extends ChangeNotifier {
 
   /// Installs the shader on a freshly published track and applies the current
   /// look. Called after every publish, including camera flips.
-  Future<void> attachTo(String? trackId) async {
+  Future<bool> attachTo(String? trackId) async {
     final attached = await LiveBeautyBridge.attach(trackId);
     if (attached) await _push();
+    return attached;
   }
 
   Future<void> detach() => LiveBeautyBridge.detach();

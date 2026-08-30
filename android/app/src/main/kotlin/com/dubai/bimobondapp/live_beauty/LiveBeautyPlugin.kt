@@ -20,10 +20,19 @@ object LiveBeautyPlugin {
 
     private var channel: MethodChannel? = null
 
+    /**
+     * The flutter_webrtc instance registered on the same UI engine as this
+     * channel. `sharedSingleton` can later be overwritten by a Firebase/headless
+     * FlutterEngine, whose local-track registry does not contain the live room.
+     */
+    private var flutterWebRtcPlugin: FlutterWebRTCPlugin? = null
+
     /** Track the processor is currently installed on, so flips can hand over. */
     private var attachedTrackId: String? = null
 
     fun register(flutterEngine: FlutterEngine) {
+        flutterWebRtcPlugin = flutterEngine.plugins
+            .get(FlutterWebRTCPlugin::class.java) as? FlutterWebRTCPlugin
         val methodChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL,
@@ -86,7 +95,7 @@ object LiveBeautyPlugin {
     }
 
     private fun localVideoTrack(trackId: String): LocalVideoTrack? {
-        val plugin = FlutterWebRTCPlugin.sharedSingleton ?: return null
+        val plugin = flutterWebRtcPlugin ?: FlutterWebRTCPlugin.sharedSingleton ?: return null
         return plugin.getLocalTrack(trackId) as? LocalVideoTrack
     }
 

@@ -9,7 +9,6 @@ import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
-import '../../../../../features/live/presentation/widgets/live_countdown_overlay.dart';
 import '../../../../../features/live/presentation/pages/live_room_page.dart';
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
@@ -26,11 +25,9 @@ class LiveContainer extends StatefulWidget {
 }
 
 class _LiveContainerState extends State<LiveContainer> {
-  /// Shows countdown (3 → 2 → 1), then navigates to the live room.
+  /// Opens the room immediately. Its countdown runs over the connection work,
+  /// so the host does not wait another network round-trip after 1 → 2 → 3.
   Future<void> _openLiveRoom(BuildContext context) async {
-    await LiveCountdownOverlay.run(context);
-    if (!context.mounted) return;
-
     final title = widget.titleController.text.trim();
     final liveBloc = context.read<LiveBloc>();
 
