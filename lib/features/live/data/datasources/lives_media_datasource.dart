@@ -21,6 +21,16 @@ import '../../domain/entities/live_capture_profile.dart';
 /// How often the room health watchdogs sample media counters.
 const Duration _kMediaHealthTick = Duration(seconds: 2);
 
+/// Quiet window after the app returns to the foreground.
+///
+/// Coming back is not instant: `_onAppPaused` suspended the preview, so on
+/// resume CameraX has to rebind and the GL pipeline has to present again
+/// before `framesSent` moves. Sampling straight away sees a counter that has
+/// not advanced *yet* and calls it a stall — measured on an HONOR LGN-LX2, the
+/// broadcast survived 24s backgrounded and was then killed 6s after resuming,
+/// which is exactly this tick times the three-sample limit.
+const Duration _kResumeGrace = Duration(seconds: 12);
+
 /// True while the app is not in the foreground.
 ///
 /// Android suspends the camera for a backgrounded app, so `framesSent` stops
@@ -57,6 +67,35 @@ class LivesMediaDataSource {
   // rebuffering is not mistaken for a stall, short enough that the host is not
   // broadcasting a frozen picture for a quarter of a minute.
   final _videoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+
+  /// True while the last watchdog sample saw the app out of the foreground.
+  var _sawBackgrounded = false;
+
+  /// When the app most recently came back; see [_kResumeGrace].
+  DateTime? _foregroundSince;
+
+  /// Whether the watchdogs should skip this sample entirely.
+  ///
+  /// Covers both the backgrounded case and the settling window right after
+  /// coming back, and keeps the progress counter reset through both so the
+  /// first real sample starts from a clean slate.
+  bool get _watchdogShouldHold {
+    if (_appBackgrounded) {
+      _sawBackgrounded = true;
+      return true;
+    }
+    if (_sawBackgrounded) {
+      _sawBackgrounded = false;
+      _foregroundSince = DateTime.now();
+      return true;
+    }
+    final since = _foregroundSince;
+    if (since != null) {
+      if (DateTime.now().difference(since) < _kResumeGrace) return true;
+      _foregroundSince = null;
+    }
+    return false;
+  }
   Timer? _battleVideoHealthTimer;
   var _battleVideoHealthCheckInFlight = false;
   // The opponent room is secondary and crosses another host's uplink, so it
@@ -299,10 +338,10 @@ class LivesMediaDataSource {
         _videoProgress.reset();
         return;
       }
-      // Backgrounded: the camera is stopped by the platform, not stalled.
-      // Reset so the host does not come back to a broadcast this watchdog
-      // ended while they were reading a notification.
-      if (_appBackgrounded) {
+      // Backgrounded, or still settling after coming back: the camera is
+      // stopped or restarting, not stalled. Reset so the host does not come
+      // back to a broadcast this watchdog ended for them.
+      if (_watchdogShouldHold) {
         _videoProgress.reset();
         return;
       }
@@ -973,7 +1012,7 @@ class LivesMediaDataSource {
     _battleVideoProgress.reset();
     _battleVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
       if (_battleVideoHealthCheckInFlight || _battleRoom != room) return;
-      if (_appBackgrounded) {
+      if (_watchdogShouldHold) {
         _battleVideoProgress.reset();
         return;
       }
