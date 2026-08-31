@@ -70,6 +70,7 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import androidx.camera.core.Camera
 import android.util.Log
 
@@ -376,6 +377,15 @@ object ArCameraController {
     @Volatile
     private var switchingCamera = false
 
+    /**
+     * CameraX only permits one unbind/bind transaction at a time.  Surface
+     * callbacks, route handoff and filter changes can all ask for one in the
+     * same frame; serialise them and run one final bind using the latest state.
+     */
+    private val cameraBindInFlight = AtomicBoolean(false)
+    private val cameraBindQueued = AtomicBoolean(false)
+    private val cameraBindGeneration = AtomicInteger(0)
+
     /** Consecutive failed [ProcessCameraProvider] resolutions; see [onCameraProviderUnavailable]. */
     private var cameraInitAttempts = 0
 
@@ -571,23 +581,12 @@ object ArCameraController {
         ArCameraWatchdog.isPaused = { isRecordingActive() || previewSuspended }
 
         if (!hasCameraPermission(activity)) {
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(
-                    Manifest.permission.CAMERA,
-                    Manifest.permission.RECORD_AUDIO,
-                ),
-                100,
-            )
+            // Permission is intentionally requested by Flutter before this
+            // platform view is made ready.  Requesting it here as well races
+            // permission_handler, and on some devices each completion causes
+            // a separate CameraX bind/unbind cycle.
+            Log.i("ArCameraLifecycle", "Controller.start waiting for Flutter camera permission")
             return
-        }
-
-        if (!hasMicPermission(activity)) {
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(Manifest.permission.RECORD_AUDIO),
-                101,
-            )
         }
 
         if (previewView.width > 0 && previewView.height > 0) {
@@ -602,6 +601,7 @@ object ArCameraController {
     }
 
     fun onPermissionGranted() {
+        if (!started || previewSuspended) return
         val lifecycleOwner = ArCameraBridge.lifecycleOwner ?: return
         val previewView = ArCameraBridge.previewView ?: return
         val faceOverlay = ArCameraBridge.faceOverlay ?: return
@@ -891,6 +891,9 @@ object ArCameraController {
         analysisUseCaseBound = false
         videoUseCaseBound = false
         rebindPosted = false
+        cameraBindGeneration.incrementAndGet()
+        cameraBindQueued.set(false)
+        cameraBindInFlight.set(false)
         convertingFrame.set(false)
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
@@ -3017,7 +3020,10 @@ object ArCameraController {
     private fun buildLivePreview(
         displayRotation: Int,
         cameraProvider: ProcessCameraProvider,
+        activity: Activity,
     ): Preview {
+        val (targetW, targetH) = LiveCaptureCapability.previewTargetPortrait(activity)
+
         val resolutionSelector = ResolutionSelector.Builder()
             .setAspectRatioStrategy(
                 AspectRatioStrategy(
@@ -3041,10 +3047,9 @@ object ArCameraController {
                     // it to 16:9, and setTargetRotation handles final rotation.
                     // Tier-aware: 1080p where the SoC can carry it, 720p where
                     // it cannot. Every frame crosses the face-warp shader, so
-                    // this is the largest single lever on live smoothness.
-                    LiveCaptureCapability.previewTargetPortrait().let { (w, h) ->
-                        Size(h, w)
-                    },
+                    // this is the largest single lever on live smoothness, and
+                    // is passed in sensor/landscape order per the note above.
+                    Size(targetH, targetW),
                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                 ),
             )
@@ -3542,6 +3547,9 @@ object ArCameraController {
         camera = null
         boundToOes = false
         rebindPosted = false
+        cameraBindGeneration.incrementAndGet()
+        cameraBindQueued.set(false)
+        cameraBindInFlight.set(false)
         switchingCamera = false
         ArCameraWatchdog.stop()
         Log.i("ArCameraLifecycle", "Controller.onHostPause camera fully unbound")
@@ -3899,6 +3907,9 @@ object ArCameraController {
         faceOverlay: FaceOverlayView,
     ) {
         switchingCamera = false
+        // A scheduled retry uses the latest requested configuration; keeping a
+        // second queued bind here would immediately race that retry.
+        cameraBindQueued.set(false)
         // A retry for this same failure is already queued; let it do the work.
         if (cameraInitRetryPending) return
         cameraInitAttempts++
@@ -3935,17 +3946,62 @@ object ArCameraController {
         previewView: PreviewView,
         faceOverlay: FaceOverlayView,
     ) {
+        if (!started || previewSuspended) {
+            switchingCamera = false
+            return
+        }
+        if (ArCameraBridge.previewView !== previewView ||
+            ArCameraBridge.faceOverlay !== faceOverlay
+        ) {
+            Log.i("ArCameraLifecycle", "bindCamera ignored stale PlatformView")
+            return
+        }
+        if (!cameraBindInFlight.compareAndSet(false, true)) {
+            cameraBindQueued.set(true)
+            Log.i(
+                "ArCameraOES",
+                "bindCamera coalesced; a bind is already in flight " +
+                    "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            return
+        }
+        bindCameraNow(
+            lifecycleOwner,
+            previewView,
+            faceOverlay,
+            cameraBindGeneration.get(),
+        )
+    }
+
+    private fun bindCameraNow(
+        lifecycleOwner: LifecycleOwner,
+        previewView: PreviewView,
+        faceOverlay: FaceOverlayView,
+        bindGeneration: Int,
+    ) {
         val activity = ArCameraBridge.hostActivity ?: run {
             switchingCamera = false
+            finishCameraBind(bindGeneration)
             return
         }
         val executor = analysisExecutor ?: run {
             switchingCamera = false
+            finishCameraBind(bindGeneration)
             return
         }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
         cameraProviderFuture.addListener({
-            val bindStart = android.os.SystemClock.elapsedRealtime()
+            try {
+                if (bindGeneration != cameraBindGeneration.get() ||
+                    !started ||
+                    previewSuspended ||
+                    ArCameraBridge.previewView !== previewView ||
+                    ArCameraBridge.faceOverlay !== faceOverlay
+                ) {
+                    Log.i("ArCameraLifecycle", "bindCamera cancelled stale transaction")
+                    return@addListener
+                }
+                val bindStart = android.os.SystemClock.elapsedRealtime()
             // CameraX resolves this future with a failure when the device
             // reports no usable camera — a transient HAL hiccup, another app
             // holding the lens, or an emulator booted with a lens set to
@@ -3969,7 +4025,11 @@ object ArCameraController {
                     Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
                 }
 
-                val preview = buildLivePreview(displayRotation, cameraProvider)
+                val preview = buildLivePreview(
+                    displayRotation,
+                    cameraProvider,
+                    activity,
+                )
 
                 val glView = ArCameraBridge.warpGlView
                 // Simple mode never binds the camera into the GL/OES pipeline — that
@@ -4428,7 +4488,28 @@ object ArCameraController {
                 videoUseCaseBound = false
                 ArCameraWatchdog.reportGlFailure()
             }
+            } finally {
+                finishCameraBind(bindGeneration)
+            }
         }, ContextCompat.getMainExecutor(activity))
+    }
+
+    /** Runs one coalesced bind after the in-flight CameraX transaction ends. */
+    private fun finishCameraBind(bindGeneration: Int) {
+        if (bindGeneration != cameraBindGeneration.get()) return
+        cameraBindInFlight.set(false)
+        if (!started || previewSuspended || cameraInitRetryPending) {
+            if (cameraInitRetryPending) cameraBindQueued.set(false)
+            return
+        }
+        if (!cameraBindQueued.compareAndSet(true, false)) return
+        mainHandler.post {
+            if (!started || previewSuspended) return@post
+            val lifecycleOwner = ArCameraBridge.lifecycleOwner ?: return@post
+            val previewView = ArCameraBridge.previewView ?: return@post
+            val faceOverlay = ArCameraBridge.faceOverlay ?: return@post
+            bindCamera(lifecycleOwner, previewView, faceOverlay)
+        }
     }
 
     private fun flushPendingPhotoCapture() {

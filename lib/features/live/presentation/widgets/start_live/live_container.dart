@@ -38,14 +38,8 @@ class LiveContainer extends StatelessWidget {
         : null;
 
     if (useExistingArCamera) {
-      final unmounted = liveBloc.stream.firstWhere(
-        (state) => state is LiveReady && !state.isCameraInitialized,
-      );
-      liveBloc.add(const LiveCameraHandedOff());
-      try {
-        await unmounted.timeout(const Duration(seconds: 1));
-      } catch (_) {}
-      await WidgetsBinding.instance.endOfFrame;
+      // Let the destination PlatformView claim the existing CameraX session
+      // before this route is removed. This avoids an expensive stop/open gap.
     } else if (runningCamera != null || runningNativeCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());
     } else {

@@ -28,6 +28,7 @@ class LiveBeautyBridge {
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   static String? _attachedTrackId;
+  static var _channelUnavailable = false;
 
   /// WebRTC id of the track the processor is installed on, if any.
   static String? get attachedTrackId => _attachedTrackId;
@@ -38,13 +39,22 @@ class LiveBeautyBridge {
   /// Safe to call repeatedly: a flip publishes a new track, and native hands
   /// the processor over rather than stacking two of them.
   static Future<bool> attach(String? trackId) async {
-    if (!isSupported || trackId == null || trackId.isEmpty) return false;
+    if (!isSupported ||
+        _channelUnavailable ||
+        trackId == null ||
+        trackId.isEmpty) {
+      return false;
+    }
     try {
       final ok =
           await _channel.invokeMethod<bool>('attach', {'trackId': trackId}) ??
           false;
       _attachedTrackId = ok ? trackId : null;
       return ok;
+    } on MissingPluginException {
+      _channelUnavailable = true;
+      _attachedTrackId = null;
+      return false;
     } catch (e) {
       debugPrint('LiveBeautyBridge.attach failed: $e');
       _attachedTrackId = null;
@@ -53,10 +63,12 @@ class LiveBeautyBridge {
   }
 
   static Future<void> detach() async {
-    if (!isSupported) return;
+    if (!isSupported || _channelUnavailable) return;
     _attachedTrackId = null;
     try {
       await _channel.invokeMethod<void>('detach');
+    } on MissingPluginException {
+      _channelUnavailable = true;
     } catch (e) {
       debugPrint('LiveBeautyBridge.detach failed: $e');
     }
@@ -67,7 +79,7 @@ class LiveBeautyBridge {
     LiveBeautyPreset preset, {
     double intensity = 1.0,
   }) async {
-    if (!isSupported) return;
+    if (!isSupported || _channelUnavailable) return;
     try {
       await _channel.invokeMethod<void>('setBeauty', {
         'smooth': preset.smooth,
@@ -78,15 +90,19 @@ class LiveBeautyBridge {
         'intensity': intensity.clamp(0.0, 1.0),
         'enabled': preset.isActive,
       });
+    } on MissingPluginException {
+      _channelUnavailable = true;
     } catch (e) {
       debugPrint('LiveBeautyBridge.apply failed: $e');
     }
   }
 
   static Future<void> clear() async {
-    if (!isSupported) return;
+    if (!isSupported || _channelUnavailable) return;
     try {
       await _channel.invokeMethod<void>('clearBeauty');
+    } on MissingPluginException {
+      _channelUnavailable = true;
     } catch (e) {
       debugPrint('LiveBeautyBridge.clear failed: $e');
     }

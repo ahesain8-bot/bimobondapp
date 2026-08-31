@@ -315,9 +315,7 @@ class _EffectSearchHeader extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 minimumSize: const Size(45, 35),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: const Text('إلغاء', style: TextStyle(fontSize: 15)),

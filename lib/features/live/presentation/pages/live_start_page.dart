@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../../app/ar_camera/ar_camera_bridge.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../live/data/repositories/camera_repository_impl.dart';
 import '../../../live/domain/repositories/camera_repository.dart';
@@ -52,9 +53,14 @@ class _LiveStartPageState extends State<LiveStartPage>
       initializeCamera: InitializeCamera(_cameraRepository),
       disposeCamera: DisposeCamera(_cameraRepository),
     );
-    _preRequestPermissions();
-    _liveBloc.add(const LiveInitializeRequested());
+    _initializeAfterPermissions();
     LiveScreenWakelock.enable();
+  }
+
+  Future<void> _initializeAfterPermissions() async {
+    await _preRequestPermissions();
+    if (!mounted) return;
+    _liveBloc.add(const LiveInitializeRequested());
   }
 
   /// Request CAMERA + MICROPHONE together up-front so starting the live later
@@ -62,7 +68,13 @@ class _LiveStartPageState extends State<LiveStartPage>
   /// for CAMERA; LiveKit asks for RECORD_AUDIO when it creates the mic track).
   Future<void> _preRequestPermissions() async {
     try {
-      await [Permission.camera, Permission.microphone].request();
+      final permissions = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+      if (permissions[Permission.camera]?.isGranted ?? false) {
+        await ArCameraBridge.notifyPermissionsGranted();
+      }
     } catch (_) {
       // Camera init below surfaces any hard failure; ignore request errors.
     }
@@ -74,6 +86,7 @@ class _LiveStartPageState extends State<LiveStartPage>
       _liveBloc.add(const LiveAppPaused());
     } else if (state == AppLifecycleState.resumed) {
       LiveScreenWakelock.enable();
+      _preRequestPermissions();
       _liveBloc.add(const LiveAppResumed());
     }
   }
@@ -166,60 +179,60 @@ class _LiveStartPageState extends State<LiveStartPage>
           body: Stack(
             fit: StackFit.expand,
             children: [
-            const CameraPreviewLayer(),
-            const VignetteLayer(),
-            StatusBarArea(onClose: _closeToMainPage),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ToolsRow(
-                    onBeautifyTap: _toggleBeautifyPanel,
-                    onEffectsTap: _toggleEffectsPanel,
-                    onSettingsTap: _toggleSettingsPanel,
-                    onServiceTap: _openServicePlusPage,
-                    onFansTap: _openFansCommunityPage,
-                    onShareTap: _openStartLiveSharePage,
-                    onInteractionTap: _openStartLiveInteractionSheet,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  LiveContainer(titleController: _titleController),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  const OptionsRow(),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  SizedBox(height: MediaQuery.of(context).padding.bottom),
-                ],
-              ),
-            ),
-            if (_isBeautifyPanelVisible || _isEffectsPanelVisible)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _dismissPanels,
-                  child: const SizedBox.expand(),
+              const CameraPreviewLayer(),
+              const VignetteLayer(),
+              StatusBarArea(onClose: _closeToMainPage),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ToolsRow(
+                      onBeautifyTap: _toggleBeautifyPanel,
+                      onEffectsTap: _toggleEffectsPanel,
+                      onSettingsTap: _toggleSettingsPanel,
+                      onServiceTap: _openServicePlusPage,
+                      onFansTap: _openFansCommunityPage,
+                      onShareTap: _openStartLiveSharePage,
+                      onInteractionTap: _openStartLiveInteractionSheet,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    LiveContainer(titleController: _titleController),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    const OptionsRow(),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    SizedBox(height: MediaQuery.of(context).padding.bottom),
+                  ],
                 ),
               ),
-            if (_isBeautifyPanelVisible)
-              const Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: BeautifyPanel(),
-              ),
-            if (_isEffectsPanelVisible)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: EffectsPanel(onClose: _dismissPanels),
-              ),
-            if (_isSettingsPanelVisible)
-              Positioned.fill(
-                child: SettingsPanel(onDismiss: _dismissPanels),
-              ),
+              if (_isBeautifyPanelVisible || _isEffectsPanelVisible)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _dismissPanels,
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              if (_isBeautifyPanelVisible)
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: BeautifyPanel(),
+                ),
+              if (_isEffectsPanelVisible)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: EffectsPanel(onClose: _dismissPanels),
+                ),
+              if (_isSettingsPanelVisible)
+                Positioned.fill(
+                  child: SettingsPanel(onDismiss: _dismissPanels),
+                ),
             ],
           ),
         ),

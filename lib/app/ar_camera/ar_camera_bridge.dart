@@ -33,6 +33,18 @@ class ArCameraBridge {
     await _channel.invokeMethod<void>('warmup');
   }
 
+  /// Lets the native platform view bind only after Flutter's single
+  /// permission flow has completed.  Keeping the prompt in Flutter prevents
+  /// CameraX and permission_handler from racing each other with duplicate
+  /// CAMERA/RECORD_AUDIO dialogs and duplicate camera binds.
+  static Future<void> notifyPermissionsGranted() async {
+    try {
+      await _channel.invokeMethod<void>('permissionsGranted');
+    } catch (_) {
+      // The preview can be disposed while a system permission sheet is open.
+    }
+  }
+
   static Future<void> prepareShaderPipeline() async {
     await _channel.invokeMethod<void>('prepareShaderPipeline');
   }
@@ -47,12 +59,13 @@ class ArCameraBridge {
     final overlay = ArFilterCatalog.overlayById(filter);
 
     // Mobile Rendering Decision Tree: Does video object/videoId exist & is360 == true?
-    final is360Video = filter == 'static_360_test' || (overlay != null && overlay.is360);
+    final is360Video =
+        filter == 'static_360_test' || (overlay != null && overlay.is360);
     final String? video360Url = is360Video
         ? (overlay?.video?.url ??
-            (filter == 'static_360_test'
-                ? 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-                : null))
+              (filter == 'static_360_test'
+                  ? 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                  : null))
         : null;
 
     _channel.invokeMethod<void>('setFilter', {
@@ -64,7 +77,8 @@ class ArCameraBridge {
       'overlayMediaType': overlay?.isVideo == true ? 'video' : 'lottie',
       'is360': is360Video,
       'video360Url': video360Url,
-      'projection': overlay?.video?.projection.name.toUpperCase() ?? 'EQUIRECTANGULAR',
+      'projection':
+          overlay?.video?.projection.name.toUpperCase() ?? 'EQUIRECTANGULAR',
       'stereoMode': overlay?.video?.stereoMode.name.toUpperCase() ?? 'MONO',
     });
   }

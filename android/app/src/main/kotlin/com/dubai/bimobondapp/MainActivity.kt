@@ -20,6 +20,7 @@ import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import com.dubai.bimobondapp.camera_engine.NativeCameraPlugin
 import com.dubai.bimobondapp.camera_engine.TemplateExportPlugin
+import com.dubai.bimobondapp.live_beauty.LiveBeautyPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -61,6 +62,10 @@ class MainActivity : FlutterActivity() {
         // Publish the already-rendered ar_camera frame; this bridge never opens
         // another camera or changes the existing CameraX configuration.
         ArCameraLivePublisher.register(flutterEngine)
+        // Native frame processing for the published LiveKit track. Without
+        // registering this channel, every beauty-sheet close throws a
+        // MissingPluginException and the selected beauty preset is ignored.
+        LiveBeautyPlugin.register(flutterEngine)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
 
@@ -108,6 +113,14 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "warmup" -> {
                         warmArCameraPipeline()
+                        result.success(null)
+                    }
+                    // Flutter owns the one permission prompt used by both the
+                    // studio and live screens.  Bind only after it completes;
+                    // otherwise CameraX's request races permission_handler
+                    // and the same surface can be rebound twice.
+                    "permissionsGranted" -> {
+                        ArCameraController.onPermissionGranted()
                         result.success(null)
                     }
                     // Whether this handset may start a broadcast at 1080p.

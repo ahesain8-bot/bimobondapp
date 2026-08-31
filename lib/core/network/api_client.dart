@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'network_console.dart';
+
 class ApiClient {
   late final Dio _dio;
   final SharedPreferences sharedPreferences;
@@ -26,27 +28,6 @@ class ApiClient {
         },
       ),
     );
-
-    // Debug only, and never the bodies.
-    //
-    // This used to be added unconditionally with `requestBody`/`responseBody`
-    // on, so every call serialised its full payload and pushed it through
-    // logcat — the feed response alone is ~22KB. A live room polls comments,
-    // gifts and viewers continuously, so this was doing that work over and
-    // over on the UI isolate while the host was broadcasting. Errors still
-    // carry their own diagnostics through [DioHandler].
-    if (kDebugMode) {
-      _dio.interceptors.add(
-        LogInterceptor(
-          request: true,
-          requestHeader: false,
-          requestBody: false,
-          responseHeader: false,
-          responseBody: false,
-          error: true,
-        ),
-      );
-    }
 
     // Queued so concurrent requests wait for a single token refresh.
     _dio.interceptors.add(
@@ -113,6 +94,13 @@ class ApiClient {
         },
       ),
     );
+
+    // Postman-style debug traces with bounded payload previews. It is placed
+    // after auth so the report reflects the outgoing request, while secrets
+    // remain redacted by [NetworkConsoleInterceptor].
+    if (kDebugMode) {
+      _dio.interceptors.add(NetworkConsoleInterceptor());
+    }
   }
 
   bool _shouldRefreshAndRetry(DioException error) {

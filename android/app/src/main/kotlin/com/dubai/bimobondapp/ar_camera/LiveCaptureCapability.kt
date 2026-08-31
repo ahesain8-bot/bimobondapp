@@ -28,7 +28,19 @@ object LiveCaptureCapability {
     private const val TAG = "LiveCaptureCapability"
 
     /** Free system memory required before 1080p is even considered. */
-    private const val REQUIRED_FREE_BYTES = 900L * 1024 * 1024
+    private const val REQUIRED_FREE_BYTES = 1200L * 1024 * 1024
+
+    /**
+     * Publishing 1080p from a 720p panel only upscales the already-rendered
+     * AR frame. It adds GPU pixels and a third simulcast encoder without any
+     * source detail for viewers, so keep that whole class of phones at 720p.
+     */
+    private fun hasFullHdDisplay(context: Context): Boolean {
+        val metrics = context.resources.displayMetrics
+        val shortEdge = minOf(metrics.widthPixels, metrics.heightPixels)
+        val longEdge = maxOf(metrics.widthPixels, metrics.heightPixels)
+        return shortEdge >= 1080 && longEdge >= 1920
+    }
 
     /** Below this the platform tells us outright it cannot afford big buffers. */
     private fun isLowRam(context: Context): Boolean {
@@ -46,7 +58,7 @@ object LiveCaptureCapability {
     }
 
     /**
-     * True when a hardware H.264 encoder lists 1080p30 as a *performance point*.
+     * True when a hardware H.264 encoder lists 1080p60 as a *performance point*.
      *
      * [MediaCodecInfo.VideoCapabilities.getSupportedPerformancePoints] is the
      * only API that reports a sustainable rate rather than a merely accepted
@@ -55,7 +67,7 @@ object LiveCaptureCapability {
      * API is unavailable (below Android 10) we answer no and stay at 720p,
      * because an old platform is not the place to gamble on this.
      */
-    private fun encoderSustains1080p30(): Boolean {
+    private fun encoderHasFullHdHeadroom(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
         return try {
             val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS)
@@ -69,7 +81,10 @@ object LiveCaptureCapability {
                     .getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
                     .videoCapabilities ?: return@any false
                 val points = video.supportedPerformancePoints ?: return@any false
-                points.any { it.covers(MediaCodecInfo.VideoCapabilities.PerformancePoint.FHD_30) }
+                // FHD_30 only proves that an *unfiltered single* encode may
+                // configure. The live pipeline also renders AR and simulcast,
+                // so require FHD_60 headroom before allowing a 1080p layer.
+                points.any { it.covers(MediaCodecInfo.VideoCapabilities.PerformancePoint.FHD_60) }
             }
         } catch (t: Throwable) {
             Log.w(TAG, "encoder capability probe failed; assuming 720p", t)
@@ -100,12 +115,13 @@ object LiveCaptureCapability {
      * Devices that pass the tier check keep 1080p, where the ceiling on
      * recording and photo quality still matters.
      */
-    fun previewTargetPortrait(): Pair<Int, Int> {
-        val sustains = sustainsFullHdCache ?: encoderSustains1080p30().also {
+    fun previewTargetPortrait(context: Context): Pair<Int, Int> {
+        val encoderHasHeadroom = sustainsFullHdCache ?: encoderHasFullHdHeadroom().also {
             sustainsFullHdCache = it
-            Log.i(TAG, "preview tier probe: sustainsFullHd=$it")
+            Log.i(TAG, "preview tier probe: encoderHasFullHdHeadroom=$it")
         }
-        return if (sustains) 1080 to 1920 else 720 to 1280
+        val fullHd = encoderHasHeadroom && hasFullHdDisplay(context)
+        return if (fullHd) 1080 to 1920 else 720 to 1280
     }
 
     /**
@@ -119,16 +135,17 @@ object LiveCaptureCapability {
     fun allowsFullHd(context: Context): Boolean {
         val lowRam = isLowRam(context)
         val free = freeBytes(context)
-        val encoder = sustainsFullHdCache ?: encoderSustains1080p30().also {
+        val encoder = sustainsFullHdCache ?: encoderHasFullHdHeadroom().also {
             sustainsFullHdCache = it
         }
-        val allowed = !lowRam && free >= REQUIRED_FREE_BYTES && encoder
+        val display = hasFullHdDisplay(context)
+        val allowed = !lowRam && free >= REQUIRED_FREE_BYTES && encoder && display
         Log.i(
             TAG,
             "1080p allowed=$allowed (lowRam=$lowRam " +
                 "freeMB=${free / (1024 * 1024)} " +
                 "needMB=${REQUIRED_FREE_BYTES / (1024 * 1024)} " +
-                "encoderFhd30=$encoder)",
+                "encoderFhd60=$encoder displayFhd=$display)",
         )
         return allowed
     }

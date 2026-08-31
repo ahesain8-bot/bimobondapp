@@ -288,8 +288,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
       _syncRetouchToNative();
     }
-    unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
+    unawaited(_prepareNativeCameraPermissions());
     unawaited(_loadCatalog());
+  }
+
+  Future<void> _prepareNativeCameraPermissions() async {
+    await CameraStudioPermissions.ensureCameraAndMicrophone();
+    if (_useNativeArFilters) {
+      await ArCameraBridge.notifyPermissionsGranted();
+    }
   }
 
   Future<void> _loadCatalog() async {

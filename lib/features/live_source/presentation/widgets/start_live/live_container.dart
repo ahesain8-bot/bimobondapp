@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:camera/camera.dart';
 import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:flutter/foundation.dart';
@@ -49,14 +47,11 @@ class _LiveContainerState extends State<LiveContainer> {
         : null;
 
     if (useExistingArCamera) {
-      final unmounted = liveBloc.stream.firstWhere(
-        (state) => state is LiveReady && !state.isCameraInitialized,
-      );
-      liveBloc.add(const LiveCameraHandedOff());
-      try {
-        await unmounted.timeout(const Duration(seconds: 1));
-      } catch (_) {}
-      await WidgetsBinding.instance.endOfFrame;
+      // Keep the old PlatformView alive until the room creates its own view.
+      // ArCameraController.start() detects that handoff and rebinds the one
+      // CameraX session to the new GL surface. Emitting LiveCameraHandedOff
+      // here used to unmount the old view a frame before the room existed,
+      // forcing a cold stop/open cycle on every live start.
     } else if (runningCamera != null || runningNativeCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());
     } else {

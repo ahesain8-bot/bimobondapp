@@ -3,14 +3,13 @@ import 'package:http/http.dart' as http;
 
 import 'api_endpoints.dart';
 import 'api_exceptions.dart';
+import 'network_console.dart';
 
 typedef IdTokenProvider = Future<String?> Function();
 
 class LiveApiClient {
-  LiveApiClient({
-    http.Client? httpClient,
-    this.idTokenProvider,
-  }) : _http = httpClient ?? http.Client();
+  LiveApiClient({http.Client? httpClient, this.idTokenProvider})
+    : _http = httpClient ?? http.Client();
 
   final http.Client _http;
   IdTokenProvider? idTokenProvider;
@@ -40,8 +39,12 @@ class LiveApiClient {
       uri = uri.replace(queryParameters: query);
     }
     final headers = await _headers(auth: auth);
-    final response = await _http.get(uri, headers: headers);
-    return _handleResponse(response);
+    return _send(
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+      request: () => _http.get(uri, headers: headers),
+    );
   }
 
   Future<Map<String, dynamic>> post(
@@ -51,12 +54,14 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.post(
-      uri,
+    final encodedBody = body != null ? jsonEncode(body) : null;
+    return _send(
+      method: 'POST',
+      uri: uri,
       headers: headers,
-      body: body != null ? jsonEncode(body) : null,
+      body: body,
+      request: () => _http.post(uri, headers: headers, body: encodedBody),
     );
-    return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> patch(
@@ -66,12 +71,14 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.patch(
-      uri,
+    final encodedBody = body != null ? jsonEncode(body) : null;
+    return _send(
+      method: 'PATCH',
+      uri: uri,
       headers: headers,
-      body: body != null ? jsonEncode(body) : null,
+      body: body,
+      request: () => _http.patch(uri, headers: headers, body: encodedBody),
     );
-    return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> put(
@@ -81,25 +88,71 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.put(
-      uri,
+    final encodedBody = body != null ? jsonEncode(body) : null;
+    return _send(
+      method: 'PUT',
+      uri: uri,
       headers: headers,
-      body: body != null ? jsonEncode(body) : null,
+      body: body,
+      request: () => _http.put(uri, headers: headers, body: encodedBody),
     );
-    return _handleResponse(response);
   }
 
-  Future<Map<String, dynamic>> delete(
-    String path, {
-    bool auth = true,
-  }) async {
+  Future<Map<String, dynamic>> delete(String path, {bool auth = true}) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.delete(uri, headers: headers);
-    return _handleResponse(response);
+    return _send(
+      method: 'DELETE',
+      uri: uri,
+      headers: headers,
+      request: () => _http.delete(uri, headers: headers),
+    );
   }
 
-  Map<String, dynamic> _handleResponse(http.Response response) {
+  Future<Map<String, dynamic>> _send({
+    required String method,
+    required Uri uri,
+    required Map<String, String> headers,
+    required Future<http.Response> Function() request,
+    Object? body,
+  }) async {
+    final trace = NetworkConsole.start(
+      method: method,
+      uri: uri,
+      headers: Map<String, dynamic>.from(headers),
+      body: body,
+    );
+    var responseLogged = false;
+    try {
+      final response = await request();
+      final decoded = _decodeResponse(response);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        NetworkConsole.complete(
+          trace,
+          statusCode: response.statusCode,
+          headers: Map<String, dynamic>.from(response.headers),
+          body: decoded,
+        );
+      } else {
+        NetworkConsole.failure(
+          trace,
+          error: 'HTTP ${response.statusCode}',
+          statusCode: response.statusCode,
+          headers: Map<String, dynamic>.from(response.headers),
+          body: decoded,
+        );
+      }
+      responseLogged = true;
+      return _handleResponse(response, decoded);
+    } catch (error) {
+      if (!responseLogged) {
+        NetworkConsole.failure(trace, error: error);
+      }
+      rethrow;
+    }
+  }
+
+  dynamic _decodeResponse(http.Response response) {
     dynamic decoded;
     if (response.body.isNotEmpty) {
       try {
@@ -108,7 +161,13 @@ class LiveApiClient {
         decoded = response.body;
       }
     }
+    return decoded;
+  }
 
+  Map<String, dynamic> _handleResponse(
+    http.Response response,
+    dynamic decoded,
+  ) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (decoded is Map<String, dynamic>) return decoded;
       if (decoded is Map) return Map<String, dynamic>.from(decoded);
@@ -117,8 +176,8 @@ class LiveApiClient {
 
     final message = decoded is Map && decoded['message'] != null
         ? (decoded['message'] is List
-            ? (decoded['message'] as List).join(', ')
-          : decoded['message'].toString())
+              ? (decoded['message'] as List).join(', ')
+              : decoded['message'].toString())
         : 'Request failed with status ${response.statusCode}';
 
     switch (response.statusCode) {
@@ -126,13 +185,25 @@ class LiveApiClient {
         throw BadRequestException(message, statusCode: 400, details: decoded);
       case 401:
       case 403:
-        throw UnauthorizedException(message, statusCode: response.statusCode, details: decoded);
+        throw UnauthorizedException(
+          message,
+          statusCode: response.statusCode,
+          details: decoded,
+        );
       case 404:
         throw NotFoundException(message, statusCode: 404, details: decoded);
       case 503:
-        throw ServiceUnavailableException(message, statusCode: 503, details: decoded);
+        throw ServiceUnavailableException(
+          message,
+          statusCode: 503,
+          details: decoded,
+        );
       default:
-        throw ApiException(message, statusCode: response.statusCode, details: decoded);
+        throw ApiException(
+          message,
+          statusCode: response.statusCode,
+          details: decoded,
+        );
     }
   }
 }
