@@ -53,14 +53,24 @@ void main() {
 
   group('LiveVideoQualityPreference', () {
     tearDown(() {
-      LiveVideoQualityPreference.instance.select(LiveCaptureProfile.preferred);
+      LiveVideoQualityPreference.instance.resetForTest();
     });
 
-    test('defaults to 1080p, matching what the host actually captures', () {
+    test('defaults to 720p until a device proves it can sustain more', () {
+      // 1080p is raised at runtime by resolveDeviceDefault(), and only on
+      // hardware that passes the capability probe — never as a bare default.
       expect(
         LiveVideoQualityPreference.instance.profile,
-        LiveCaptureProfile.fullHd,
+        LiveCaptureProfile.hd,
       );
+    });
+
+    test('a host choice is not overruled by a later capability probe', () async {
+      final preference = LiveVideoQualityPreference.instance;
+      preference.select(LiveCaptureProfile.sd);
+      await preference.resolveDeviceDefault();
+
+      expect(preference.profile, LiveCaptureProfile.sd);
     });
 
     test('selecting a tier notifies listeners once', () {
@@ -71,12 +81,12 @@ void main() {
       preference.addListener(listener);
       // Must differ from the default, or the first select is a no-op and
       // there is nothing to notify about.
-      preference.select(LiveCaptureProfile.hd);
-      preference.select(LiveCaptureProfile.hd);
+      preference.select(LiveCaptureProfile.fullHd);
+      preference.select(LiveCaptureProfile.fullHd);
       preference.removeListener(listener);
 
       expect(notifications, 1);
-      expect(preference.profile, LiveCaptureProfile.hd);
+      expect(preference.profile, LiveCaptureProfile.fullHd);
     });
   });
 }

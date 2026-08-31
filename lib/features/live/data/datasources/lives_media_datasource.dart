@@ -340,6 +340,9 @@ class LivesMediaDataSource {
     if (!hints.canPublish) {
       throw StateError('The server did not grant media publishing permission');
     }
+    // Ask the hardware what it can sustain before choosing a tier. Only ever
+    // raises the ceiling above 720p, and only on a device that passes.
+    await LiveVideoQualityPreference.instance.resolveDeviceDefault();
     final requestedProfile = _profileForHints(hints);
 
     // ── RoomOptions tuned for stable host publishing ──────────────────────

@@ -14,6 +14,7 @@ import com.dubai.bimobondapp.ar_camera.parseOverlayMediaType
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
 import com.dubai.bimobondapp.ar_camera.LiveBeautyAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveBeautyState
+import com.dubai.bimobondapp.ar_camera.LiveCaptureCapability
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
@@ -108,6 +109,14 @@ class MainActivity : FlutterActivity() {
                     "warmup" -> {
                         warmArCameraPipeline()
                         result.success(null)
+                    }
+                    // Whether this handset may start a broadcast at 1080p.
+                    // See LiveCaptureCapability for why core count and total
+                    // RAM are not the test.
+                    "allowsFullHdLive" -> {
+                        result.success(
+                            LiveCaptureCapability.allowsFullHd(applicationContext),
+                        )
                     }
                     "applyBeauty" -> {
                         val path = call.argument<String>("path")
